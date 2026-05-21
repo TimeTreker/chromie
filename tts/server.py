@@ -57,7 +57,6 @@ SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
 
 synthesis_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SYNTHESIS)
 
-
 def sanitize_speaker_id(speaker_id: str) -> str:
     speaker_id = (speaker_id or "default").strip()
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", speaker_id):
@@ -163,19 +162,21 @@ def build_model_config():
         backend=Backend.LLAMACPP,
         quantization=get_quantization(),
     )
+
     cfg.n_gpu_layers = TTS_N_GPU_LAYERS
     cfg.max_seq_length = TTS_CONTEXT_SIZE
     cfg.device = "cuda"
     cfg.verbose = True
-
+    
+    # Do not duplicate OuteTTS top-level fields here.
+    # OuteTTS already passes cfg.n_gpu_layers, cfg.max_seq_length, and cfg.verbose
+    # into llama-cpp-python internally.
     cfg.additional_model_config = {
-        "n_gpu_layers": TTS_N_GPU_LAYERS,
-        "n_ctx": TTS_CONTEXT_SIZE,
         "n_batch": TTS_N_BATCH,
         "n_threads": TTS_THREADS,
         "main_gpu": 0,
-        "verbose": True,
     }
+
     logger.info("OuteTTS additional_model_config=%s", cfg.additional_model_config)
     logger.info("OuteTTS cfg.n_gpu_layers=%s", getattr(cfg, "n_gpu_layers", None))
     return cfg

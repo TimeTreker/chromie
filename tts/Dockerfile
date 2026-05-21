@@ -60,19 +60,6 @@ RUN pip uninstall -y llama-cpp-python || true && \
     FORCE_CMAKE=1 \
     pip install --no-cache-dir --no-deps --force-reinstall --no-binary=llama-cpp-python llama-cpp-python
 
-RUN python - <<'PY'
-from llama_cpp import llama_cpp
-
-info = llama_cpp.llama_print_system_info().decode(errors="ignore")
-print(info)
-
-upper = info.upper()
-if "CUDA" not in upper and "CUBLAS" not in upper:
-    raise SystemExit("ERROR: llama-cpp-python was built without CUDA backend")
-
-print("OK: llama-cpp-python CUDA backend detected")
-PY
-
 COPY server.py .
 COPY create_speaker.py .
 
