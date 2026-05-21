@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+node_modules/
+dist/
+build/
+.cache/
+hf_cache/
+ollama_data/
+recordings/
+speakers/*.wav
+speakers/*.raw

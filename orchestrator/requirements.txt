@@ -1,0 +1,7 @@
+aiohttp
+websockets
+numpy
+scipy
+sounddevice
+python-dotenv
+webrtcvad-wheels

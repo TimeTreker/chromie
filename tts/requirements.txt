@@ -1,0 +1,7 @@
+outetts
+websockets
+numpy
+scipy
+soundfile
+huggingface-hub
+python-dotenv

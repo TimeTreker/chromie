@@ -1,0 +1,203 @@
+services:
+  chromie-asr:
+    container_name: chromie-asr
+    build:
+      context: ./asr
+      args:
+        ASR_CUDA_IMAGE: ${ASR_CUDA_IMAGE}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        http_proxy: ${HTTP_PROXY:-}
+        https_proxy: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+        no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+    image: chromie-asr:latest
+    init: true
+    restart: unless-stopped
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "9001:9001"
+    environment:
+      ASR_HOST: "0.0.0.0"
+      ASR_PORT: "9001"
+      ASR_MODEL: ${ASR_MODEL}
+      ASR_DEVICE: ${ASR_DEVICE}
+      ASR_COMPUTE_TYPE: ${ASR_COMPUTE_TYPE}
+      ASR_LANGUAGE: ${ASR_LANGUAGE:-}
+      ASR_BEAM_SIZE: ${ASR_BEAM_SIZE:-1}
+      ASR_VAD_FILTER: ${ASR_VAD_FILTER:-false}
+      ASR_CONDITION_ON_PREVIOUS_TEXT: ${ASR_CONDITION_ON_PREVIOUS_TEXT:-false}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      HF_HOME: /root/.cache/huggingface
+      HUGGINGFACE_HUB_CACHE: /root/.cache/huggingface
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      http_proxy: ${HTTP_PROXY:-}
+      https_proxy: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./hf_cache:/root/.cache/huggingface
+    networks:
+      - chromie-net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          python - <<'PY'
+          import asyncio, json, websockets
+          async def main():
+              async with websockets.connect('ws://127.0.0.1:9001', open_timeout=5) as ws:
+                  await ws.send(json.dumps({'type': 'health'}))
+                  msg = await asyncio.wait_for(ws.recv(), timeout=5)
+                  assert json.loads(msg).get('type') == 'pong'
+          asyncio.run(main())
+          PY
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  chromie-tts:
+    container_name: chromie-tts
+    build:
+      context: ./tts
+      args:
+        TTS_CUDA_IMAGE: ${TTS_CUDA_IMAGE}
+        TTS_CUDA_ARCH: ${TTS_CUDA_ARCH}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        http_proxy: ${HTTP_PROXY:-}
+        https_proxy: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+        no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+    image: chromie-tts:latest
+    init: true
+    restart: unless-stopped
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "5000:5000"
+    environment:
+      TTS_HOST: "0.0.0.0"
+      TTS_PORT: "5000"
+      TTS_MODEL_SIZE: ${TTS_MODEL_SIZE}
+      TTS_QUANTIZATION: ${TTS_QUANTIZATION}
+      TTS_N_GPU_LAYERS: ${TTS_N_GPU_LAYERS}
+      TTS_CONTEXT_SIZE: ${TTS_CONTEXT_SIZE}
+      TTS_MAX_LENGTH: ${TTS_MAX_LENGTH}
+      TTS_N_BATCH: ${TTS_N_BATCH}
+      TTS_THREADS: ${TTS_THREADS}
+      TTS_SAMPLE_RATE: ${TTS_SAMPLE_RATE}
+      TTS_CHUNK_MS: ${TTS_CHUNK_MS}
+      TTS_MAX_CONCURRENT_SYNTHESIS: ${TTS_MAX_CONCURRENT_SYNTHESIS:-1}
+      TTS_TEMPERATURE: ${TTS_TEMPERATURE:-0.4}
+      TTS_REPETITION_PENALTY: ${TTS_REPETITION_PENALTY:-1.1}
+      TTS_MIN_TEXT_CHARS: ${TTS_MIN_TEXT_CHARS:-4}
+      TTS_MAX_TEXT_CHARS: ${TTS_MAX_TEXT_CHARS:-220}
+      TTS_GENERATION_RETRIES: ${TTS_GENERATION_RETRIES:-2}
+      TTS_AUDIO_CODEC_DEVICE: ${TTS_AUDIO_CODEC_DEVICE:-cpu}
+      PYTORCH_CUDA_ALLOC_CONF: ${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      SPEAKER_DIR: /app/speakers
+      HF_HOME: /root/.cache/huggingface
+      HUGGINGFACE_HUB_CACHE: /root/.cache/huggingface
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      http_proxy: ${HTTP_PROXY:-}
+      https_proxy: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./hf_cache:/root/.cache/huggingface
+      - ./hf_cache/outeai:/root/.cache/outeai
+      - ./tts/speakers:/app/speakers
+    networks:
+      - chromie-net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          python - <<'PY'
+          import asyncio, json, websockets
+          async def main():
+              async with websockets.connect('ws://127.0.0.1:5000', open_timeout=5) as ws:
+                  await ws.send(json.dumps({'type': 'health'}))
+                  msg = await asyncio.wait_for(ws.recv(), timeout=5)
+                  assert json.loads(msg).get('type') == 'pong'
+          asyncio.run(main())
+          PY
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  chromie-llm:
+    container_name: chromie-llm
+    image: ollama/ollama:latest
+    init: true
+    restart: unless-stopped
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "11434:11434"
+    environment:
+      OLLAMA_HOST: "0.0.0.0:11434"
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL}
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH}
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      http_proxy: ${HTTP_PROXY:-}
+      https_proxy: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    networks:
+      - chromie-net
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  chromie-net:
+    driver: bridge
