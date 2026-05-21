@@ -1,18 +1,42 @@
 # Chromie Voice Assistant - LLM Context
 
-This file summarizes the whole project so a new LLM/chat session can quickly understand the current architecture, important design decisions, recent fixes, and how to continue development safely.
+This file summarizes the Chromie project so a new LLM/chat session can quickly understand the current architecture, important design decisions, recent fixes, and how to continue development safely.
+
+## Collaboration / source-of-truth workflow
+
+The GitHub repository is the source of truth for all future Chromie changes:
+
+```text
+https://github.com/TimeTreker/chromie.git
+```
+
+Do not base future changes on older uploaded ZIP files once this GitHub repo exists.
+
+For every future modification:
+
+1. Read or pull the latest files from the GitHub repository first.
+2. Analyze the current repo state before proposing changes.
+3. Propose the solution and list all files that need to change.
+4. Only after user confirmation, generate patched files, a patched ZIP, or apply-ready diffs.
+5. The assistant cannot directly push to GitHub from ChatGPT; provide exact git commands for the user to commit and push changes.
+
+When starting a new session, first read this `llm_context.md` file and follow this workflow before editing the project.
 
 ## Hardware preset in this package
 
 - Preset: **RTX4090 laptop**
 - TTS CUDA architecture: `89`
-- TTS GPU layer offload: `TTS_N_GPU_LAYERS=-1` (all possible llama.cpp layers)
-- NVIDIA visibility: `NVIDIA_VISIBLE_DEVICES=all`, `NVIDIA_DRIVER_CAPABILITIES=compute,utility`
+- TTS GPU layer offload: `TTS_N_GPU_LAYERS=-1`
+- NVIDIA visibility: `NVIDIA_VISIBLE_DEVICES=all`
+- NVIDIA driver capabilities: `NVIDIA_DRIVER_CAPABILITIES=compute,utility`
 - TTS threads: `4`
 - TTS batch: `192`
-- Note: Use CUDA 12.8 images for consistency. `TTS_CUDA_ARCH=89` for Ada / RTX4090 Laptop GPU.
 
-This package is the RTX4090 laptop build. It keeps the same application logic as the prior optimized package, with an additional TTS GPU-offload fix for OuteTTS / llama-cpp-python.
+Use CUDA 12.8 images for consistency.
+
+`TTS_CUDA_ARCH=89` is for Ada / RTX4090 Laptop GPU. This package is the RTX4090 laptop build.
+
+It keeps the same application logic as the prior optimized package, with an additional TTS GPU-offload fix for OuteTTS / llama-cpp-python.
 
 ## Goal of the project
 
@@ -31,41 +55,56 @@ The project is optimized for local GPU use and low voice-assistant latency.
 ## Top-level structure
 
 ```text
-.env                         Hardware/service preset values
-docker-compose.yml            Starts ASR, TTS, and Ollama services
-README.md                     Human setup instructions
-llm_context.md                This project summary for future LLM sessions
-
-asr/
-  Dockerfile                  Faster-Whisper CUDA image
-  requirements.txt
-  server.py                   ASR websocket server, listens on port 9001
-
-llm/
-  Not a local folder. Uses ollama/ollama container, port 11434.
-
-tts/
-  Dockerfile                  OuteTTS / llama-cpp CUDA image
-  requirements.txt
-  server.py                   TTS websocket server, listens on port 5000
-  create_speaker.py           Optional helper; production speaker creation is in server.py
-  speakers/                   Stores WAV references and speaker JSON profiles
-
-orchestrator/
-  orchestrator.py             Host-side controller: mic, VAD, ASR, LLM, TTS, playback
-  audio_device_manager.py     Selects input/output devices and detects sample rates
-  vad.py                      WebRTC VAD wrapper
-  list_devices.py             Prints sounddevice input/output device list
-  requirements.txt
-  .env.local.example          Host orchestrator runtime settings
-
-scripts/
-  setup_orchestrator.sh       Create host Python env and install orchestrator deps
-  start_services.sh           Build/start Docker services
-  verify_tts_gpu.sh           Check llama-cpp CUDA backend and TTS health
-  warm_ollama.sh              Preload Ollama model to reduce first-token latency
-  record_voice.sh             Record a reference WAV
-  create_speaker_in_container.sh Create speaker profile through running TTS server
+.
+├── .env
+│   Hardware/service preset values
+├── docker-compose.yml
+│   Starts ASR, TTS, and Ollama services
+├── README.md
+│   Human setup instructions
+├── llm_context.md
+│   This project summary for future LLM sessions
+├── llm.md
+│   Compatibility pointer to llm_context.md
+├── asr/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── server.py
+│       Faster-Whisper websocket server, listens on port 9001
+├── tts/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── server.py
+│   │   OuteTTS websocket server, listens on port 5000
+│   ├── create_speaker.py
+│   │   Optional helper; production speaker creation is in server.py
+│   └── speakers/
+│       Stores WAV references and speaker JSON profiles
+├── orchestrator/
+│   ├── orchestrator.py
+│   │   Host-side controller: mic, VAD, ASR, LLM, TTS, playback
+│   ├── audio_device_manager.py
+│   │   Selects input/output devices and detects sample rates
+│   ├── vad.py
+│   │   WebRTC VAD wrapper
+│   ├── list_devices.py
+│   │   Prints sounddevice input/output device list
+│   ├── requirements.txt
+│   └── .env.local.example
+│       Host orchestrator runtime settings
+└── scripts/
+    ├── setup_orchestrator.sh
+    │   Create host Python env and install orchestrator deps
+    ├── start_services.sh
+    │   Build/start Docker services
+    ├── verify_tts_gpu.sh
+    │   Check llama-cpp CUDA backend and TTS health
+    ├── warm_ollama.sh
+    │   Preload Ollama model to reduce first-token latency
+    ├── record_voice.sh
+    │   Record a reference WAV
+    └── create_speaker_in_container.sh
+        Create speaker profile through running TTS server
 ```
 
 ## Services
@@ -77,7 +116,8 @@ scripts/
 - Protocol: websocket
 - Default model: `dropbox-dash/faster-whisper-large-v3-turbo`
 - Device: CUDA / float16
-- It receives raw 16 kHz mono PCM S16LE audio from the orchestrator and returns JSON results.
+
+The ASR service receives raw 16 kHz mono PCM S16LE audio from the orchestrator and returns JSON results.
 
 ### LLM service
 
@@ -85,8 +125,10 @@ scripts/
 - Image: `ollama/ollama:latest`
 - Port: `11434`
 - Default model: `gemma4:e2b`
-- The orchestrator calls `/api/generate` with streaming enabled.
-- Important fix: payload includes `"think": false` so thinking-capable models do not consume the entire token budget in the `thinking` field and return zero speakable `response` text.
+
+The orchestrator calls `/api/generate` with streaming enabled.
+
+Important fix: the payload includes `"think": false` so thinking-capable models do not consume the entire token budget in the `thinking` field and return zero speakable `response` text.
 
 ### TTS service
 
@@ -95,14 +137,23 @@ scripts/
 - Protocol: websocket
 - Model: OuteTTS 1.0 0.6B GGUF with llama-cpp backend
 - Default quantization: FP16
-- The TTS server streams PCM S16LE audio chunks to the orchestrator.
-- TTS source sample rate defaults to `44100`. This is **not** necessarily the speaker rate. The orchestrator resamples to the detected speaker output rate.
-- RTX4090 laptop GPU path: llama-cpp-python is compiled with `GGML_CUDA=ON`, `CMAKE_CUDA_ARCHITECTURES=89`, runtime CUDA stubs are not kept in `LD_LIBRARY_PATH`, and OuteTTS passes `n_gpu_layers=-1` / `main_gpu=0`.
 
+The TTS server streams PCM S16LE audio chunks to the orchestrator.
+
+TTS source sample rate defaults to `44100`. This is **not** necessarily the speaker rate. The orchestrator resamples to the detected speaker output rate.
+
+RTX4090 laptop GPU path:
+
+- `llama-cpp-python` is compiled with `GGML_CUDA=ON`
+- `CMAKE_CUDA_ARCHITECTURES=89`
+- Runtime CUDA stubs are not kept in `LD_LIBRARY_PATH`
+- OuteTTS passes `n_gpu_layers=-1` / `main_gpu=0`
 
 ## TTS GPU fix added in this package
 
-This package includes the accepted fix for TTS using CPU instead of the RTX4090 Laptop GPU. The likely failure mode was a weak runtime CUDA path: CUDA-enabled `llama-cpp-python` could be built, but OuteTTS was not forced strongly enough to offload all layers, and CUDA stub libraries were left in the runtime library path.
+This package includes the accepted fix for TTS using CPU instead of the RTX4090 Laptop GPU.
+
+The likely failure mode was a weak runtime CUDA path: CUDA-enabled `llama-cpp-python` could be built, but OuteTTS was not forced strongly enough to offload all layers, and CUDA stub libraries were left in the runtime library path.
 
 Final fix:
 
@@ -110,8 +161,12 @@ Final fix:
 - `.env` sets `TTS_N_GPU_LAYERS=-1` so llama.cpp offloads all possible layers.
 - `.env` sets `NVIDIA_VISIBLE_DEVICES=all` and `NVIDIA_DRIVER_CAPABILITIES=compute,utility`.
 - `docker-compose.yml` has `gpus: all` plus explicit NVIDIA device reservations for ASR, TTS, and Ollama.
-- `tts/Dockerfile` uses `/usr/local/cuda/lib64/stubs` only during `llama-cpp-python` compilation; final runtime `LD_LIBRARY_PATH` excludes the stubs directory.
-- `tts/server.py` and `tts/create_speaker.py` set `cfg.device = "cuda"`, `cfg.n_gpu_layers = -1`, and `additional_model_config` includes `n_gpu_layers`, `main_gpu=0`, and verbose llama.cpp logs.
+- `tts/Dockerfile` uses `/usr/local/cuda/lib64/stubs` only during `llama-cpp-python` compilation.
+- Final runtime `LD_LIBRARY_PATH` excludes the CUDA stubs directory.
+- `tts/server.py` and `tts/create_speaker.py` set:
+  - `cfg.device = "cuda"`
+  - `cfg.n_gpu_layers = -1`
+  - `additional_model_config` includes `n_gpu_layers`, `main_gpu=0`, and verbose llama.cpp logs.
 
 Expected runtime proof:
 
@@ -121,18 +176,38 @@ OuteTTS additional_model_config={'n_gpu_layers': -1, ...}
 llama.cpp log lines mentioning CUDA/GGML and layer offload
 ```
 
-If the host/container NVIDIA runtime is configured correctly, `docker exec chromie-tts nvidia-smi` should work and GPU memory should increase while the model is loaded.
+If the host/container NVIDIA runtime is configured correctly, this should work:
+
+```bash
+docker exec chromie-tts nvidia-smi
+```
+
+GPU memory should increase while the model is loaded.
 
 ## Optimization pass added in this package
 
-The project has been lightly optimized without changing the core ASR → LLM → TTS → playback architecture. The important changes are:
+The project has been lightly optimized without changing the core ASR → LLM → TTS → playback architecture.
+
+Important changes:
 
 - Orchestrator TTS chunking now extracts and schedules the first complete sentence from the streaming LLM buffer, reducing time-to-first-audio on multi-sentence replies.
 - Host playback resampling and speaker-reference resampling now use `scipy.signal.resample_poly` instead of FFT `signal.resample`, which is generally better for realtime sample-rate conversion.
 - `ORCH_SAVE_AUDIO=false` disables raw `.raw` input/output writes by default to avoid extra disk I/O and recording growth during normal operation.
-- ASR exposes runtime env knobs: `ASR_BEAM_SIZE`, `ASR_VAD_FILTER`, and `ASR_CONDITION_ON_PREVIOUS_TEXT`. The low-latency defaults remain beam size 1, no internal ASR VAD, and no previous-text conditioning.
+- ASR exposes runtime env knobs:
+  - `ASR_BEAM_SIZE`
+  - `ASR_VAD_FILTER`
+  - `ASR_CONDITION_ON_PREVIOUS_TEXT`
+- Low-latency ASR defaults remain:
+  - beam size 1
+  - no internal ASR VAD
+  - no previous-text conditioning
 - TTS speaker IDs and speaker WAV paths are validated so websocket speaker creation cannot write outside `SPEAKER_DIR`.
-- Docker Compose now uses `init: true`, healthchecks, explicit NVIDIA GPU wiring, no production bind-mount override for `tts/server.py`, and smaller Docker build contexts through service-level `.dockerignore` files.
+- Docker Compose now uses:
+  - `init: true`
+  - healthchecks
+  - explicit NVIDIA GPU wiring
+  - no production bind-mount override for `tts/server.py`
+  - smaller Docker build contexts through service-level `.dockerignore` files
 - `scripts/start_services.sh` creates required directories, rebuilds the three named services, supports `REBUILD_NO_CACHE=1` for clean CUDA rebuilds, and only tails logs when `FOLLOW_LOGS=1`.
 
 ## Important final fixes already included
@@ -146,7 +221,9 @@ llm_done: response_chars=0 scheduled_tts=0
 llm_done_raw: done_reason=length eval_count=96
 ```
 
-Diagnosis: the model generated tokens, but they were in a thinking stream rather than the `response` field. No TTS was scheduled.
+Diagnosis:
+
+The model generated tokens, but they were in a thinking stream rather than the `response` field. No TTS was scheduled.
 
 Fix in `orchestrator.py`:
 
@@ -171,8 +248,8 @@ payload = {
 Problem observed while creating custom voice profiles:
 
 - `torchcodec` missing
-- then FFmpeg shared libraries missing
-- then `libnppicc.so.13` missing
+- FFmpeg shared libraries missing
+- `libnppicc.so.13` missing
 
 Final design:
 
@@ -184,9 +261,9 @@ Final design:
 Expected speaker files:
 
 ```text
-tts/speakers/chromie_voice.wav   Reference voice recording
-tts/speakers/chromie_voice.json  Generated speaker profile
-tts/speakers/default.json        Optional default speaker profile
+tts/speakers/chromie_voice.wav
+tts/speakers/chromie_voice.json
+tts/speakers/default.json
 ```
 
 Use from orchestrator:
@@ -199,8 +276,8 @@ TTS_SPEAKER_ID=chromie_voice
 
 Important distinction:
 
-- `TTS_SAMPLE_RATE` = source PCM rate from TTS, usually `44100`.
-- Output device rate = real speaker rate, detected by `audio_device_manager.py`, often `48000` for PipeWire/PulseAudio/USB devices.
+- `TTS_SAMPLE_RATE` = source PCM rate from TTS, usually `44100`
+- Output device rate = real speaker rate, detected by `audio_device_manager.py`, often `48000` for PipeWire/PulseAudio/USB devices
 
 The orchestrator automatically resamples:
 
@@ -307,6 +384,7 @@ Common:
 
 ```env
 COMPOSE_PROJECT_NAME=chromie
+
 HF_HUB_OFFLINE=0
 TRANSFORMERS_OFFLINE=0
 
@@ -371,6 +449,7 @@ ORCH_MIN_AUDIO_MS=1200
 ORCH_VAD_SILENCE_MS=650
 
 ORCH_PLAYBACK_CHUNK_MS=80
+
 ORCH_TTS_WS_RETRIES=2
 ORCH_TTS_WS_RETRY_DELAY_MS=300
 ORCH_TTS_CONCURRENCY=1
@@ -389,39 +468,44 @@ LOG_LEVEL=INFO
 
 ## Startup workflow
 
-1. Start Docker services:
+### 1. Start Docker services
 
 ```bash
 ./scripts/start_services.sh
 ```
 
-or manually:
+Or manually:
 
 ```bash
 docker compose up -d --build chromie-asr chromie-llm chromie-tts
 ```
 
-2. Verify TTS GPU:
+### 2. Verify TTS GPU
 
 ```bash
 ./scripts/verify_tts_gpu.sh
 ```
 
-Look for CUDA in llama-cpp system info, `n_gpu_layers=-1`, layer-offload messages, and `TTS server ready`.
+Look for:
 
-3. Warm Ollama:
+- CUDA in llama-cpp system info
+- `n_gpu_layers=-1`
+- layer-offload messages
+- `TTS server ready`
+
+### 3. Warm Ollama
 
 ```bash
 ./scripts/warm_ollama.sh
 ```
 
-4. Set up host orchestrator if needed:
+### 4. Set up host orchestrator if needed
 
 ```bash
 ./scripts/setup_orchestrator.sh
 ```
 
-5. Choose real audio devices:
+### 5. Choose real audio devices
 
 ```bash
 cd orchestrator
@@ -429,7 +513,15 @@ source .venv/bin/activate
 python list_devices.py
 ```
 
-6. Edit `orchestrator/.env.local`, then run:
+### 6. Edit host env and run orchestrator
+
+Edit:
+
+```text
+orchestrator/.env.local
+```
+
+Then run:
 
 ```bash
 python orchestrator.py
@@ -437,32 +529,32 @@ python orchestrator.py
 
 ## Custom voice / speaker workflow
 
-1. Record a clean 10-15 second WAV:
+### 1. Record a clean 10-15 second WAV
 
 ```bash
 ./scripts/record_voice.sh
 ```
 
-or manually:
+Or manually:
 
 ```bash
 mkdir -p tts/speakers
 arecord -D default -f S16_LE -r 48000 -c 1 -d 14 tts/speakers/chromie_voice.wav
 ```
 
-2. Start TTS:
+### 2. Start TTS
 
 ```bash
 docker compose up -d chromie-tts
 ```
 
-3. Create speaker through the running TTS server:
+### 3. Create speaker through the running TTS server
 
 ```bash
 ./scripts/create_speaker_in_container.sh /app/speakers/chromie_voice.wav chromie_voice --make-default
 ```
 
-4. Set speaker in orchestrator:
+### 4. Set speaker in orchestrator
 
 ```env
 TTS_SPEAKER_ID=chromie_voice
@@ -478,7 +570,7 @@ TTS GGUF model:
 
 ```bash
 mkdir -p hf_cache
-HF_HOME="$(pwd)/hf_cache" huggingface-cli download   OuteAI/OuteTTS-1.0-0.6B-GGUF   OuteTTS-1.0-0.6B-FP16.gguf
+HF_HOME="$(pwd)/hf_cache" huggingface-cli download OuteAI/OuteTTS-1.0-0.6B-GGUF OuteTTS-1.0-0.6B-FP16.gguf
 ```
 
 Then set:
@@ -549,7 +641,9 @@ Check logs:
 
 ### TTS tries to connect to Hugging Face and fails
 
-The GGUF model is not visible in the mounted cache, or offline mode/cache path is wrong. Verify inside container:
+The GGUF model is not visible in the mounted cache, or offline mode/cache path is wrong.
+
+Verify inside container:
 
 ```bash
 docker exec -it chromie-tts bash -lc 'find -L /root/.cache/huggingface -name "OuteTTS-1.0-0.6B-FP16.gguf" -ls'
@@ -574,7 +668,9 @@ NVIDIA_VISIBLE_DEVICES=all
 NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ```
 
-If `nvidia-smi` fails inside the container, fix the host NVIDIA Container Toolkit / Docker GPU runtime first. If `nvidia-smi` works but llama.cpp is CPU-only, rebuild TTS without cache:
+If `nvidia-smi` fails inside the container, fix the host NVIDIA Container Toolkit / Docker GPU runtime first.
+
+If `nvidia-smi` works but llama.cpp is CPU-only, rebuild TTS without cache:
 
 ```bash
 docker compose down
@@ -584,7 +680,9 @@ docker compose up -d chromie-tts
 
 ### Audio plays too slow or too fast
 
-Likely wrong source/output sample rate. Remember:
+Likely wrong source/output sample rate.
+
+Remember:
 
 - `TTS_SAMPLE_RATE` is the TTS PCM source rate.
 - The speaker output rate is detected from the selected output device.
@@ -592,7 +690,9 @@ Likely wrong source/output sample rate. Remember:
 
 ### Speaker creation errors involving torchcodec, FFmpeg, or libnppicc
 
-The final design should not require that path. Make sure you are using the final `tts/server.py` and optional final `tts/create_speaker.py`, both of which use `soundfile/scipy` for reference audio loading.
+The final design should not require that path.
+
+Make sure you are using the final `tts/server.py` and optional final `tts/create_speaker.py`, both of which use `soundfile/scipy` for reference audio loading.
 
 ## Do not regress these design decisions
 
@@ -607,12 +707,29 @@ The final design should not require that path. Make sure you are using the final
 
 ## Current project status
 
-This is the RTX4090 laptop integrated build. It includes the final orchestrator, TTS server with built-in custom speaker creation, the TTS GPU-offload fix, helper scripts, and this `llm_context.md` summary for future LLM sessions.
+This is the RTX4090 laptop integrated build.
 
+It includes:
+
+- final orchestrator
+- TTS server with built-in custom speaker creation
+- TTS GPU-offload fix
+- helper scripts
+- this `llm_context.md` summary for future LLM sessions
 
 ## GitHub master comparison and merge update
 
-Compared with `https://github.com/TimeTreker/chromie.git`, branch `master`.
+Compared with:
+
+```text
+https://github.com/TimeTreker/chromie.git
+```
+
+Branch:
+
+```text
+master
+```
 
 ### Useful upstream items merged
 
