@@ -9,6 +9,7 @@ import uuid
 from typing import Optional
 
 from dotenv import load_dotenv
+from readiness import ServiceReadinessGate
 
 load_dotenv(".env.local")
 load_dotenv("../.env")
@@ -887,7 +888,16 @@ class VoiceAssistant:
                 await asyncio.sleep(0)
 
     async def run(self):
-        await self.connect_services()
+        gate = ServiceReadinessGate(
+            asr_url=self.asr_url,
+            tts_url=self.tts_url,
+            llm_url=self.llm_url,
+            ollama_model=self.ollama_model,
+            speaker_id=self.speaker_id,
+            get_http_session=self.get_http_session,
+        )
+        self.asr_ws = await gate.wait_until_ready()
+
         self.playback_task = asyncio.create_task(self.playback_worker())
         await self.mic_stream()
 
