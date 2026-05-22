@@ -1,3 +1,7 @@
-./hf_cache
-./ollama_data
+# Ignore local cache/data directories
+/hf_cache/
+/ollama_data/
+/recordings/
 
+# Ignore Python bytecode cache directories everywhere
+__pycache__/

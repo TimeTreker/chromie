@@ -4,7 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-mkdir -p hf_cache ollama_data recordings tts/speakers
+if [ ! -d "${ROOT_DIR}/hf_cache" ]; then
+    mkdir -p hf_cache ollama_data recordings
+fi
 
 echo "[start] Project root: $ROOT_DIR"
 echo "[start] Starting Chromie Docker services..."
