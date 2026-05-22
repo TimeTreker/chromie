@@ -167,7 +167,7 @@ def build_model_config():
     cfg.max_seq_length = TTS_CONTEXT_SIZE
     cfg.device = "cuda"
     cfg.verbose = True
-    
+
     # Do not duplicate OuteTTS top-level fields here.
     # OuteTTS already passes cfg.n_gpu_layers, cfg.max_seq_length, and cfg.verbose
     # into llama-cpp-python internally.

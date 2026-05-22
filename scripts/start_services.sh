@@ -12,6 +12,8 @@ echo "[start] Project root: $ROOT_DIR"
 echo "[start] Starting Chromie Docker services..."
 
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+export TTS_CUDA_ARCH="$(./scripts/detect-cuda-arch.sh)"
+echo "Detected TTS_CUDA_ARCH=${TTS_CUDA_ARCH}"
 
 if [[ "${REBUILD_NO_CACHE:-0}" == "1" ]]; then
   docker compose build --no-cache chromie-asr chromie-tts
