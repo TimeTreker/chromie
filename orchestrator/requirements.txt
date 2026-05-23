@@ -1,7 +1,8 @@
-aiohttp
-websockets
-numpy
-scipy
-sounddevice
-python-dotenv
-webrtcvad-wheels
+aiohttp>=3.9,<4
+websockets>=12,<16
+python-dotenv>=1,<2
+numpy>=1.26
+scipy>=1.11
+sounddevice>=0.4
+webrtcvad>=2.0.10
+pydantic>=2,<3

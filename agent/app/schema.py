@@ -1,0 +1,204 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+from uuid import uuid4
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+RouteName = Literal[
+    "chat",
+    "robot_action",
+    "tool",
+    "memory",
+    "clarify",
+    "interrupt",
+    "ignore",
+]
+
+Priority = Literal["low", "normal", "high", "urgent"]
+DecisionSource = Literal["rules", "llm", "fallback"]
+AgentStatus = Literal["ok", "clarify", "blocked", "ignored", "error"]
+SpeakStyle = Literal["brief", "normal", "empathetic", "confirm", "warning"]
+ActionTarget = Literal[
+    "robot_pose_controller",
+    "motion_controller",
+    "tool_executor",
+    "memory_store",
+    "vision_system",
+    "system",
+]
+
+
+class RouteDecision(BaseModel):
+    """Router output consumed by the agent service.
+
+    This mirrors router/app/schema.py so the agent module can run independently.
+    Later this can move into shared/chromie_contracts.
+    """
+
+    route: RouteName
+    agents: list[str] = Field(default_factory=list)
+    intent: str = "unknown"
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    language: str = "auto"
+    priority: Priority = "normal"
+    interrupt_current: bool = False
+    needs_agent: bool = True
+    should_speak: bool = True
+    speak_first: str | None = None
+    actions: list[dict[str, Any]] = Field(default_factory=list)
+    reason: str | None = None
+    source: DecisionSource = "fallback"
+
+    @field_validator("agents")
+    @classmethod
+    def normalize_agents(cls, value: list[str]) -> list[str]:
+        seen: set[str] = set()
+        normalized: list[str] = []
+        for agent in value or []:
+            agent = str(agent).strip()
+            if not agent or agent in seen:
+                continue
+            seen.add(agent)
+            normalized.append(agent)
+        return normalized
+
+
+class AgentRunRequest(BaseModel):
+    """Request from host orchestrator after routing."""
+
+    sid: str | None = None
+    text: str = Field(default="", description="ASR final text")
+    route_decision: RouteDecision
+    language: str | None = Field(default=None, description="Optional BCP-47 language hint")
+    context: dict[str, Any] = Field(default_factory=dict)
+    history: list[dict[str, Any]] = Field(default_factory=list)
+
+    @field_validator("text")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return (value or "").strip()
+
+    @model_validator(mode="after")
+    def fill_language(self) -> "AgentRunRequest":
+        if not self.language:
+            if self.route_decision.language and self.route_decision.language != "auto":
+                self.language = self.route_decision.language
+            else:
+                self.language = detect_language(self.text)
+        return self
+
+
+class SpeakItem(BaseModel):
+    text: str = Field(min_length=1)
+    style: SpeakStyle = "brief"
+    priority: Priority = "normal"
+    interruptible: bool = True
+    after_action_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("text")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return " ".join((value or "").strip().split())
+
+
+class ActionCommand(BaseModel):
+    id: str = Field(default_factory=lambda: f"act_{uuid4().hex[:8]}")
+    target: ActionTarget
+    type: str = Field(min_length=1)
+    params: dict[str, Any] = Field(default_factory=dict)
+    blocking: bool = False
+    timeout_ms: int | None = Field(default=None, ge=1)
+    requires_confirmation: bool = False
+    reason: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MemoryUpdate(BaseModel):
+    type: str = Field(min_length=1)
+    key: str | None = None
+    value: Any = None
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentResult(BaseModel):
+    status: AgentStatus = "ok"
+    speak_immediate: list[SpeakItem] = Field(default_factory=list)
+    actions: list[ActionCommand] = Field(default_factory=list)
+    speak_after: list[SpeakItem] = Field(default_factory=list)
+    memory_updates: list[MemoryUpdate] = Field(default_factory=list)
+    requires_confirmation: bool = False
+    reason: str | None = None
+    handled_by: list[str] = Field(default_factory=list)
+    trace: list[str] = Field(default_factory=list)
+
+    def add_speak_immediate(
+        self,
+        text: str | None,
+        *,
+        style: SpeakStyle = "brief",
+        priority: Priority = "normal",
+    ) -> None:
+        text = (text or "").strip()
+        if text:
+            self.speak_immediate.append(SpeakItem(text=text, style=style, priority=priority))
+
+    def add_speak_after(
+        self,
+        text: str | None,
+        *,
+        style: SpeakStyle = "brief",
+        priority: Priority = "normal",
+        after_action_id: str | None = None,
+    ) -> None:
+        text = (text or "").strip()
+        if text:
+            self.speak_after.append(
+                SpeakItem(text=text, style=style, priority=priority, after_action_id=after_action_id)
+            )
+
+    def add_action(
+        self,
+        target: ActionTarget,
+        action_type: str,
+        *,
+        params: dict[str, Any] | None = None,
+        blocking: bool = False,
+        timeout_ms: int | None = None,
+        requires_confirmation: bool = False,
+        reason: str | None = None,
+    ) -> ActionCommand:
+        action = ActionCommand(
+            target=target,
+            type=action_type,
+            params=params or {},
+            blocking=blocking,
+            timeout_ms=timeout_ms,
+            requires_confirmation=requires_confirmation,
+            reason=reason,
+        )
+        self.actions.append(action)
+        if requires_confirmation:
+            self.requires_confirmation = True
+        return action
+
+
+class HealthResponse(BaseModel):
+    ok: bool = True
+    service: str = "chromie-agent"
+    model: str | None = None
+    ollama_url: str | None = None
+    use_llm: bool = True
+    available_agents: list[str] = Field(default_factory=list)
+
+
+def detect_language(text: str) -> str:
+    text = text or ""
+    if any("\u4e00" <= ch <= "\u9fff" for ch in text):
+        return "zh-CN"
+    if any("\u0400" <= ch <= "\u04ff" for ch in text):
+        return "ru-RU"
+    return "en-US"

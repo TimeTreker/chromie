@@ -1,0 +1,24 @@
+# Copy this service into docker-compose.yml and attach it to the same network as chromie-llm.
+chromie-agent:
+  build:
+    context: ./agent
+  container_name: chromie-agent
+  restart: unless-stopped
+  init: true
+  environment:
+    AGENT_HOST: 0.0.0.0
+    AGENT_PORT: 8092
+    AGENT_OLLAMA_URL: ${AGENT_OLLAMA_URL:-http://chromie-llm:11434}
+    AGENT_MODEL: ${AGENT_MODEL:-qwen3:4b}
+    AGENT_TIMEOUT_MS: ${AGENT_TIMEOUT_MS:-2500}
+    AGENT_USE_LLM: ${AGENT_USE_LLM:-1}
+    AGENT_MAX_SPEAK_CHARS: ${AGENT_MAX_SPEAK_CHARS:-120}
+    HARDWARE_DAEMON_URL: ${HARDWARE_DAEMON_URL:-http://host.docker.internal:8095}
+  ports:
+    - "${AGENT_PORT:-8092}:8092"
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    - chromie-llm
+  networks:
+    - chromie-net

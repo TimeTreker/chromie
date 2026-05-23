@@ -8,3 +8,4 @@ __pycache__/
 
 # Ignore .env.local
 /orchestrator/.env.local
+/.env
