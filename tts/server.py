@@ -1,10 +1,12 @@
 import asyncio
+import concurrent.futures
 import contextlib
 import json
 import logging
 import math
 import os
 import re
+import threading
 import time
 import types
 from pathlib import Path
@@ -51,11 +53,26 @@ TTS_REPETITION_PENALTY = float(os.getenv("TTS_REPETITION_PENALTY", "1.1"))
 MAX_CONCURRENT_SYNTHESIS = int(os.getenv("TTS_MAX_CONCURRENT_SYNTHESIS", "1"))
 TTS_MIN_TEXT_CHARS = int(os.getenv("TTS_MIN_TEXT_CHARS", "4"))
 TTS_MAX_TEXT_CHARS = int(os.getenv("TTS_MAX_TEXT_CHARS", "220"))
-TTS_GENERATION_RETRIES = max(1, int(os.getenv("TTS_GENERATION_RETRIES", "2")))
+TTS_GENERATION_RETRIES = max(1, int(os.getenv("TTS_GENERATION_RETRIES", "1")))
+TTS_RESET_LLAMA_STATE = os.getenv("TTS_RESET_LLAMA_STATE", "1").lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
 SPEAKER_DIR = Path(os.getenv("SPEAKER_DIR", "/app/speakers"))
 SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
 
 synthesis_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SYNTHESIS)
+
+# One global OuteTTS Interface owns one llama.cpp model/context. Treat it as
+# process-global mutable CUDA state: never call it concurrently.
+tts_interface_lock = threading.RLock()
+tts_generate_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=1,
+    thread_name_prefix="chromie-tts-generate",
+)
+
 
 def sanitize_speaker_id(speaker_id: str) -> str:
     speaker_id = (speaker_id or "default").strip()
@@ -280,8 +297,9 @@ def save_speaker_json(speaker, output_json: Path):
     for candidate in tmp_candidates:
         if candidate.exists():
             candidate.unlink()
+        with tts_interface_lock:
+            interface.save_speaker(speaker, str(tmp_base))
 
-    interface.save_speaker(speaker, str(tmp_base))
 
     created_json = None
     for candidate in tmp_candidates:
@@ -311,19 +329,16 @@ def create_speaker_profile_from_wav(speaker_id: str, wav_path: Path, save_as_def
 
     logger.info("Creating speaker profile speaker_id=%s wav=%s", speaker_id, wav_path)
 
-    with patch_torch_1d_audio_slice():
-        speaker = interface.create_speaker(str(wav_path))
-
-    save_speaker_json(speaker, output_json)
-
-    if save_as_default and speaker_id != "default":
-        default_json = SPEAKER_DIR / "default.json"
-        save_speaker_json(speaker, default_json)
-
-    speakers_cache[speaker_id] = speaker
-    if save_as_default:
-        speakers_cache["default"] = speaker
-
+    with tts_interface_lock:
+        with patch_torch_1d_audio_slice():
+            speaker = interface.create_speaker(str(wav_path))
+        save_speaker_json(speaker, output_json)
+        if save_as_default and speaker_id != "default":
+            default_json = SPEAKER_DIR / "default.json"
+            save_speaker_json(speaker, default_json)
+        speakers_cache[speaker_id] = speaker
+        if save_as_default:
+            speakers_cache["default"] = speaker
     return speaker
 
 
@@ -333,6 +348,40 @@ interface = Interface(config=build_model_config())
 patch_audio_loader(interface)
 logger.info("TTS model loaded")
 
+def reset_llama_generation_state() -> None:
+    """Clear llama-cpp-python prompt/KV reuse state between independent TTS jobs.
+
+    Unrelated websocket requests should not share llama.cpp generation state.
+    Without this reset, llama-cpp-python can report prefix-match reuse across
+    different TTS requests and eventually corrupt sequence/KV state.
+    """
+    if not TTS_RESET_LLAMA_STATE:
+        return
+
+    try:
+        llama = getattr(getattr(interface, "model", None), "model", None)
+        reset = getattr(llama, "reset", None)
+        if callable(reset):
+            reset()
+    except Exception as exc:
+        logger.debug("Could not reset llama generation state: %s", exc)
+
+
+def generate_tts_sync(cfg: GenerationConfig):
+    """Run OuteTTS generation under a process-wide interface lock."""
+    with tts_interface_lock:
+        reset_llama_generation_state()
+        try:
+            return interface.generate(config=cfg)
+        finally:
+            reset_llama_generation_state()
+
+
+async def generate_tts_serialized(cfg: GenerationConfig):
+    """Serialize access to the global OuteTTS/llama.cpp instance."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(tts_generate_executor, generate_tts_sync, cfg)
+
 
 def load_default_speaker():
     speaker_json = SPEAKER_DIR / "default.json"
@@ -340,14 +389,16 @@ def load_default_speaker():
 
     if speaker_json.exists():
         logger.info("Loading default speaker from %s", speaker_json)
-        return interface.load_speaker(str(speaker_json))
+        with tts_interface_lock:
+            return interface.load_speaker(str(speaker_json))
 
     if speaker_wav.exists():
         logger.info("Creating default speaker from %s", speaker_wav)
         return create_speaker_profile_from_wav("default", speaker_wav, save_as_default=False)
 
     logger.warning("No default speaker found, using built-in EN-FEMALE-1-NEUTRAL")
-    return interface.load_default_speaker("EN-FEMALE-1-NEUTRAL")
+    with tts_interface_lock:
+        return interface.load_default_speaker("EN-FEMALE-1-NEUTRAL")
 
 
 def audio_to_pcm16(audio) -> bytes:
@@ -379,7 +430,8 @@ def get_or_load_speaker(speaker_id: str):
 
     if speaker_json.exists():
         logger.info("Loading speaker_id=%s from %s", speaker_id, speaker_json)
-        speaker = interface.load_speaker(str(speaker_json))
+        with tts_interface_lock:
+            speaker = interface.load_speaker(str(speaker_json))
         speakers_cache[speaker_id] = speaker
         return speaker
 
@@ -456,7 +508,7 @@ async def synthesize_text(text: str, speaker, ws, request_id: Optional[str] = No
                 )
 
                 generate_start = time.time()
-                output = await asyncio.to_thread(interface.generate, config=cfg)
+                output = await generate_tts_serialized(cfg)
                 generate_seconds = time.time() - generate_start
 
                 pcm = audio_to_pcm16(output.audio)
@@ -582,6 +634,8 @@ async def ws_handler(ws):
                         "service": "tts",
                         "sample_rate": TTS_SAMPLE_RATE,
                         "gpu_layers": TTS_N_GPU_LAYERS,
+                        "reset_llama_state": TTS_RESET_LLAMA_STATE,
+                        "single_model_worker": True,
                         "speakers": list_speaker_ids(),
                     },
                 )
