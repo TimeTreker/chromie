@@ -16,10 +16,10 @@ export TTS_CUDA_ARCH="$(./scripts/detect-cuda-arch.sh)"
 echo "Detected TTS_CUDA_ARCH=${TTS_CUDA_ARCH}"
 
 if [[ "${REBUILD_NO_CACHE:-0}" == "1" ]]; then
-  docker compose build --no-cache chromie-asr chromie-tts
+  docker compose build --no-cache chromie-asr chromie-tts chromie-router chromie-agent
 fi
 
-docker compose up -d --build chromie-asr chromie-llm chromie-tts
+docker compose up -d --build chromie-asr chromie-llm chromie-tts chromie-router chromie-agent
 
 echo
 echo "[start] Docker service status:"
