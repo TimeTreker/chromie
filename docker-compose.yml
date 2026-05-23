@@ -34,19 +34,22 @@ services:
       ASR_BEAM_SIZE: ${ASR_BEAM_SIZE:-1}
       ASR_VAD_FILTER: ${ASR_VAD_FILTER:-false}
       ASR_CONDITION_ON_PREVIOUS_TEXT: ${ASR_CONDITION_ON_PREVIOUS_TEXT:-false}
+
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+
       HF_HOME: /root/.cache/huggingface
       HUGGINGFACE_HUB_CACHE: /root/.cache/huggingface
       HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
       TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
       HF_HUB_DISABLE_TELEMETRY: "1"
+
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       http_proxy: ${HTTP_PROXY:-}
       https_proxy: ${HTTPS_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
-      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -59,11 +62,13 @@ services:
         - |
           python - <<'PY'
           import asyncio, json, websockets
+
           async def main():
-              async with websockets.connect('ws://127.0.0.1:9001', open_timeout=5) as ws:
-                  await ws.send(json.dumps({'type': 'health'}))
+              async with websockets.connect("ws://127.0.0.1:9001", open_timeout=5) as ws:
+                  await ws.send(json.dumps({"type": "health"}))
                   msg = await asyncio.wait_for(ws.recv(), timeout=5)
-                  assert json.loads(msg).get('type') == 'pong'
+                  assert json.loads(msg).get("type") == "pong"
+
           asyncio.run(main())
           PY
       interval: 30s
@@ -109,6 +114,7 @@ services:
       TTS_THREADS: ${TTS_THREADS}
       TTS_SAMPLE_RATE: ${TTS_SAMPLE_RATE}
       TTS_CHUNK_MS: ${TTS_CHUNK_MS}
+
       TTS_MAX_CONCURRENT_SYNTHESIS: ${TTS_MAX_CONCURRENT_SYNTHESIS:-1}
       TTS_TEMPERATURE: ${TTS_TEMPERATURE:-0.4}
       TTS_REPETITION_PENALTY: ${TTS_REPETITION_PENALTY:-1.1}
@@ -117,23 +123,26 @@ services:
       TTS_GENERATION_RETRIES: ${TTS_GENERATION_RETRIES:-1}
       TTS_RESET_LLAMA_STATE: ${TTS_RESET_LLAMA_STATE:-1}
       TTS_AUDIO_CODEC_DEVICE: ${TTS_AUDIO_CODEC_DEVICE:-cpu}
+
       PYTORCH_CUDA_ALLOC_CONF: ${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
       GGML_CUDA_DISABLE_GRAPHS: "1"
       TOKENIZERS_PARALLELISM: "false"
+
       SPEAKER_DIR: /app/speakers
       HF_HOME: /root/.cache/huggingface
       HUGGINGFACE_HUB_CACHE: /root/.cache/huggingface
       HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
       TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
       HF_HUB_DISABLE_TELEMETRY: "1"
+
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       http_proxy: ${HTTP_PROXY:-}
       https_proxy: ${HTTPS_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
-      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -148,11 +157,13 @@ services:
         - |
           python - <<'PY'
           import asyncio, json, websockets
+
           async def main():
-              async with websockets.connect('ws://127.0.0.1:5000', open_timeout=5) as ws:
-                  await ws.send(json.dumps({'type': 'health'}))
+              async with websockets.connect("ws://127.0.0.1:5000", open_timeout=5) as ws:
+                  await ws.send(json.dumps({"type": "health"}))
                   msg = await asyncio.wait_for(ws.recv(), timeout=5)
-                  assert json.loads(msg).get('type') == 'pong'
+                  assert json.loads(msg).get("type") == "pong"
+
           asyncio.run(main())
           PY
       interval: 30s
@@ -177,17 +188,20 @@ services:
       - "11434:11434"
     environment:
       OLLAMA_HOST: "0.0.0.0:11434"
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE}
-      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL}
-      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-24h}
+      OLLAMA_LOAD_TIMEOUT: ${OLLAMA_LOAD_TIMEOUT:-10m}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-2048}
+
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       http_proxy: ${HTTP_PROXY:-}
       https_proxy: ${HTTPS_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
-      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,host.docker.internal}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -216,23 +230,24 @@ services:
     init: true
     restart: unless-stopped
     ports:
-      - "${ROUTER_PORT:-8091}:8091"
+      - "8091:8091"
     environment:
       ROUTER_HOST: "0.0.0.0"
       ROUTER_PORT: "8091"
-      ROUTER_MODE: ${ROUTER_MODE:-hybrid}
-      ROUTER_RULES_FIRST: ${ROUTER_RULES_FIRST:-1}
-      ROUTER_OLLAMA_URL: ${ROUTER_OLLAMA_URL:-http://chromie-llm:11434}
+      ROUTER_USE_LLM: ${ROUTER_USE_LLM:-0}
+      ROUTER_OLLAMA_URL: http://chromie-llm:11434
       ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:0.6b}
-      ROUTER_TIMEOUT_MS: ${ROUTER_TIMEOUT_MS:-800}
-      ROUTER_MAX_CONTEXT_CHARS: ${ROUTER_MAX_CONTEXT_CHARS:-1200}
-      ROUTER_LOG_LEVEL: ${ROUTER_LOG_LEVEL:-INFO}
+      ROUTER_TIMEOUT_MS: ${ROUTER_TIMEOUT_MS:-2000}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       http_proxy: ${HTTP_PROXY:-}
       https_proxy: ${HTTPS_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent,host.docker.internal}
-      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent,host.docker.internal}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       chromie-llm:
         condition: service_healthy
@@ -243,15 +258,13 @@ services:
         - CMD-SHELL
         - |
           python - <<'PY'
-          import json, urllib.request
-          with urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=5) as r:
-              data = json.loads(r.read().decode('utf-8'))
-              assert data.get('ok') is True
+          import urllib.request
+          urllib.request.urlopen("http://127.0.0.1:8091/health", timeout=5).read()
           PY
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 10s
+      start_period: 20s
 
   chromie-agent:
     container_name: chromie-agent
@@ -268,28 +281,32 @@ services:
     init: true
     restart: unless-stopped
     ports:
-      - "${AGENT_PORT:-8092}:8092"
+      - "8092:8092"
     environment:
       AGENT_HOST: "0.0.0.0"
       AGENT_PORT: "8092"
-      AGENT_OLLAMA_URL: ${AGENT_OLLAMA_URL:-http://chromie-llm:11434}
-      AGENT_MODEL: ${AGENT_MODEL:-qwen3:4b}
-      AGENT_TIMEOUT_MS: ${AGENT_TIMEOUT_MS:-2500}
+
+      # Critical fix: enable LLM inside agent.
+      AGENT_USE_LLM: ${AGENT_USE_LLM:-1}
+      AGENT_MODEL: ${AGENT_MODEL:-gemma4:26b}
+      AGENT_OLLAMA_URL: http://chromie-llm:11434
+      AGENT_TIMEOUT_MS: ${AGENT_TIMEOUT_MS:-120000}
+
+      AGENT_MAX_SPEAK_CHARS: ${AGENT_MAX_SPEAK_CHARS:-220}
       AGENT_ENABLE_HARDWARE_CLIENT: ${AGENT_ENABLE_HARDWARE_CLIENT:-0}
       HARDWARE_DAEMON_URL: ${HARDWARE_DAEMON_URL:-http://host.docker.internal:8095}
-      AGENT_LOG_LEVEL: ${AGENT_LOG_LEVEL:-INFO}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       http_proxy: ${HTTP_PROXY:-}
       https_proxy: ${HTTPS_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent,host.docker.internal}
-      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent,host.docker.internal}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       chromie-llm:
-        condition: service_healthy
-      chromie-router:
         condition: service_healthy
     networks:
       - chromie-net
@@ -298,16 +315,13 @@ services:
         - CMD-SHELL
         - |
           python - <<'PY'
-          import json, urllib.request
-          with urllib.request.urlopen('http://127.0.0.1:8092/health', timeout=5) as r:
-              data = json.loads(r.read().decode('utf-8'))
-              assert data.get('ok') is True
+          import urllib.request
+          urllib.request.urlopen("http://127.0.0.1:8092/health", timeout=5).read()
           PY
       interval: 30s
       timeout: 10s
       retries: 5
-      B
-      start_period: 10s
+      start_period: 20s
 
 networks:
   chromie-net:

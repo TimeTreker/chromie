@@ -7,12 +7,15 @@ import math
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
 
-load_dotenv(".env.local")
-load_dotenv("../.env")
+ORCH_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = ORCH_DIR.parent
+load_dotenv(ORCH_DIR / ".env.local")
+load_dotenv(PROJECT_ROOT / ".env")
 
 import aiohttp
 import numpy as np
@@ -20,15 +23,15 @@ import sounddevice as sd
 import websockets
 from scipy import signal
 
-from audio_device_manager import AudioDeviceManager
-from readiness import ServiceReadinessGate
-from vad import VAD
-from clients.action_client import ActionClient
-from clients.agent_client import AgentClient
-from clients.router_client import RouterClient
-from runtime.session import SessionTracker, now_ms
-from schemas.agent import AgentResult, SpeechItem
-from schemas.route import RouteDecision
+from orchestrator.audio_device_manager import AudioDeviceManager
+from orchestrator.readiness import ServiceReadinessGate
+from orchestrator.vad import VAD
+from orchestrator.clients.action_client import ActionClient
+from orchestrator.clients.agent_client import AgentClient
+from orchestrator.clients.router_client import RouterClient
+from orchestrator.runtime.session import SessionTracker, now_ms
+from orchestrator.schemas.agent import AgentResult, SpeechItem
+from orchestrator.schemas.route import RouteDecision
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
