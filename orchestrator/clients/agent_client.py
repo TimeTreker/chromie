@@ -28,12 +28,14 @@ class AgentClient:
         route_decision: RouteDecision,
         sid: str | None = None,
         context: dict[str, Any] | None = None,
+        history: list[dict[str, Any]] | None = None,
     ) -> AgentResult:
         req = AgentRequest(
             sid=sid,
             text=text,
             route_decision=route_decision,
             context=context or {},
+            history=history or [],
         )
         timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
         async with session.post(

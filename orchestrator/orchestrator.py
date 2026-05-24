@@ -30,6 +30,7 @@ from orchestrator.clients.action_client import ActionClient
 from orchestrator.clients.agent_client import AgentClient
 from orchestrator.clients.router_client import RouterClient
 from orchestrator.runtime.session import SessionTracker, now_ms
+from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
 
@@ -84,6 +85,16 @@ class VoiceAssistant:
         self.asr_ws = None
         self.http_session: aiohttp.ClientSession | None = None
         self.sessions = SessionTracker(enabled=self.enable_session_timing)
+        self.conversation_state = ConversationStateManager.from_env()
+        logger.info(
+            "Conversation state: enabled=%s conversation_id=%s max_turns=%s idle_s=%s hard_idle_s=%s max_context_chars=%s",
+            self.conversation_state.enabled,
+            self.conversation_state.conversation_id,
+            self.conversation_state.max_turns,
+            self.conversation_state.soft_idle_timeout_sec,
+            self.conversation_state.hard_idle_timeout_sec,
+            self.conversation_state.max_context_chars,
+        )
         self.active_llm_task: asyncio.Task | None = None
         self.is_playing_audio = False
 
@@ -625,10 +636,16 @@ class VoiceAssistant:
             self.maybe_session_done(session_id)
 
     def build_context(self, session_id: str | None) -> dict[str, Any]:
+        conversation = self.conversation_state.snapshot()
         return {
             "is_speaking": self.is_playing_audio,
             "current_generation": self.playback_generation,
             "session_id": session_id,
+            "conversation_id": conversation.get("conversation_id"),
+            "conversation": conversation,
+            "history": conversation.get("history", []),
+            "pending_tasks": conversation.get("pending_tasks", []),
+            "active_pending_tasks": conversation.get("active_pending_tasks", []),
             "robot_state": {
                 "available": not self.action_dry_run,
                 "source": "host_orchestrator",
@@ -636,12 +653,35 @@ class VoiceAssistant:
         }
 
     async def handle_routed_text(self, user_text: str, session_id: str) -> None:
+        boundary = self.conversation_state.prepare_for_user_text(user_text, session_id)
+        if boundary.get("started_new"):
+            self.session_log(
+                session_id,
+                "conversation_boundary: started_new=True conversation_id=%s reason=%s",
+                boundary.get("conversation_id"),
+                boundary.get("reason"),
+            )
+
         if not self.enable_router:
+            self.conversation_state.record_user_turn(
+                session_id,
+                user_text,
+                route="direct_llm",
+                intent="unknown",
+                metadata={"source": "router_disabled"},
+            )
             self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
             return
 
         session = await self.get_http_session()
         context = self.build_context(session_id)
+        self.session_log(
+            session_id,
+            "context_snapshot: conversation_id=%s history_turns=%s pending_tasks=%s",
+            context.get("conversation_id"),
+            len(context.get("history", [])),
+            len(context.get("active_pending_tasks", []) or context.get("pending_tasks", [])),
+        )
         router_start_ms = now_ms()
         self.session_log(session_id, "router_start: text_chars=%s text=%r", len(user_text), user_text)
         try:
@@ -660,8 +700,23 @@ class VoiceAssistant:
         except Exception as exc:
             self.session_log(session_id, "router_exception: router_ms=%.1f error=%s", now_ms() - router_start_ms, exc)
             logger.warning("Router failed; falling back to direct LLM: %s", exc)
+            self.conversation_state.record_user_turn(
+                session_id,
+                user_text,
+                route="direct_llm",
+                intent="router_exception",
+                metadata={"source": "router_exception", "error": str(exc)},
+            )
             self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
             return
+
+        self.conversation_state.record_user_turn(
+            session_id,
+            user_text,
+            route=decision.route,
+            intent=decision.intent,
+            metadata={"source": decision.source, "confidence": decision.confidence},
+        )
 
         if decision.interrupt_current or decision.route == "interrupt":
             await self.interrupt(new_session_id=session_id)
@@ -686,7 +741,14 @@ class VoiceAssistant:
         agent_start_ms = now_ms()
         self.session_log(session_id, "agent_start: route=%s agents=%s intent=%s", decision.route, ",".join(decision.agents), decision.intent)
         try:
-            result = await self.agent_client.run(session, text=user_text, route_decision=decision, sid=session_id, context=context)
+            result = await self.agent_client.run(
+                session,
+                text=user_text,
+                route_decision=decision,
+                sid=session_id,
+                context=context,
+                history=context.get("history", []),
+            )
             self.session_log(
                 session_id,
                 "agent_done: agent_ms=%.1f speak_immediate=%s actions=%s speak_after=%s requires_confirmation=%s",
@@ -696,6 +758,7 @@ class VoiceAssistant:
                 len(result.speak_after),
                 result.requires_confirmation,
             )
+            self.conversation_state.record_agent_result(session_id, result)
             await self.execute_agent_result(result, session_id)
         except Exception as exc:
             self.session_log(session_id, "agent_exception: agent_ms=%.1f error=%s", now_ms() - agent_start_ms, exc)
