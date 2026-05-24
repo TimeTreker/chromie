@@ -3,9 +3,24 @@
 /ollama_data/
 /recordings/
 
-# Ignore Python bytecode cache directories everywhere
-__pycache__/
+# Runtime/generated hardware detection state
+/.chromie/
+/.env.runtime
+/.env.local
 
-# Ignore .env.local
-/orchestrator/.env.local
+# Legacy/root local env should not be committed.
+# Note: if .env is already tracked in git, run: git rm --cached .env
 /.env
+
+# Host orchestrator local audio settings
+/orchestrator/.env.local
+
+# Python bytecode/cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Editor/OS noise
+.DS_Store
+.vscode/
+.idea/

@@ -5,7 +5,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo "[start] Project root: $ROOT_DIR"
-echo "[start] Starting Chromie Docker services..."
+echo "[start] Preparing hardware/runtime environment..."
+
+./scripts/build_runtime_env.sh
+
+set -a
+# shellcheck disable=SC1091
+source .env.runtime
+set +a
 
 ensure_dir() {
   local dir="$1"
@@ -26,13 +33,35 @@ ensure_dir hf_cache
 ensure_dir ollama_data
 ensure_dir recordings
 
-unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
-
-if [ -x "./scripts/detect-cuda-arch.sh" ]; then
+# TTS_CUDA_ARCH should normally come from env/profiles/*.env. If it is missing,
+# fall back to the legacy detector when available.
+if [ -z "${TTS_CUDA_ARCH:-}" ] && [ -x "./scripts/detect-cuda-arch.sh" ]; then
   export TTS_CUDA_ARCH="$(./scripts/detect-cuda-arch.sh)"
-  echo "[start] Detected TTS_CUDA_ARCH=${TTS_CUDA_ARCH}"
-else
-  echo "[start][warn] ./scripts/detect-cuda-arch.sh not found or not executable; using TTS_CUDA_ARCH=${TTS_CUDA_ARCH:-unset}"
+  echo "[start] Detected fallback TTS_CUDA_ARCH=${TTS_CUDA_ARCH}"
+fi
+
+echo "[start] Hardware profile: ${CHROMIE_ACTIVE_PROFILE:-unknown}"
+echo "[start] GPU: ${CHROMIE_NVIDIA_GPU_NAME:-unknown} compute=${CHROMIE_NVIDIA_COMPUTE_CAP:-unknown} cuda_arch=${TTS_CUDA_ARCH:-unset}"
+echo "[start] CPU: ${CHROMIE_CPU_MODEL:-unknown} cores=${CHROMIE_CPU_CORES:-unknown} mem=${CHROMIE_MEM_TOTAL_MIB:-unknown}MiB"
+echo "[start] Agent model: ${AGENT_MODEL:-unset}"
+echo "[start] ASR model: ${ASR_MODEL:-unset}"
+echo "[start] TTS model size: ${TTS_MODEL_SIZE:-unset}"
+
+COMPOSE_ARGS=(--env-file .env.runtime -f docker-compose.yml)
+
+# Optional comma-separated override list, for example:
+# CHROMIE_COMPOSE_OVERRIDE_FILES=docker-compose.jetson.yml,docker-compose.local.yml
+if [ -n "${CHROMIE_COMPOSE_OVERRIDE_FILES:-}" ]; then
+  IFS=',' read -ra override_files <<< "${CHROMIE_COMPOSE_OVERRIDE_FILES}"
+  for file in "${override_files[@]}"; do
+    file="$(echo "$file" | xargs)"
+    [ -n "$file" ] || continue
+    if [ ! -f "$file" ]; then
+      echo "[start][error] Compose override file not found: $file" >&2
+      exit 1
+    fi
+    COMPOSE_ARGS+=(-f "$file")
+  done
 fi
 
 SERVICES=(
@@ -50,6 +79,8 @@ BUILD_SERVICES=(
   chromie-agent
 )
 
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+
 if [[ "${REBUILD_NO_CACHE:-0}" == "1" ]]; then
   export BUILD=1
 fi
@@ -57,38 +88,36 @@ fi
 if [[ "${BUILD:-0}" == "1" ]]; then
   if [[ "${REBUILD_NO_CACHE:-0}" == "1" ]]; then
     echo "[start] Building images with --no-cache..."
-    docker compose build --no-cache "${BUILD_SERVICES[@]}"
+    docker compose "${COMPOSE_ARGS[@]}" build --no-cache "${BUILD_SERVICES[@]}"
   else
     echo "[start] Building images with Docker cache..."
-    docker compose build "${BUILD_SERVICES[@]}"
+    docker compose "${COMPOSE_ARGS[@]}" build "${BUILD_SERVICES[@]}"
   fi
 else
   echo "[start] Skipping image build. Use BUILD=1 to rebuild."
 fi
 
 echo "[start] Starting containers without building..."
-docker compose up -d --no-build "${SERVICES[@]}"
+docker compose "${COMPOSE_ARGS[@]}" up -d --no-build "${SERVICES[@]}"
 
 echo
 echo "[start] Docker service status:"
-docker compose ps
+docker compose "${COMPOSE_ARGS[@]}" ps
 
 echo
 echo "[start] Useful follow-up commands:"
-echo " docker compose logs -f chromie-tts"
-echo " docker compose logs -f chromie-asr"
-echo " docker compose logs -f chromie-router"
-echo " docker compose logs -f chromie-agent"
-echo " ./scripts/verify_tts_gpu.sh"
+echo " docker compose --env-file .env.runtime logs -f chromie-tts"
+echo " docker compose --env-file .env.runtime logs -f chromie-asr"
+echo " docker compose --env-file .env.runtime logs -f chromie-router"
+echo " docker compose --env-file .env.runtime logs -f chromie-agent"
+echo " ./scripts/show_profile.sh"
 echo " ./scripts/warm_ollama.sh"
+echo " ./scripts/start_orchestrator.sh"
 echo
 echo "[start] Build commands:"
-echo " BUILD=1 ./scripts/start_services.sh                  # rebuild using Docker cache"
-echo " REBUILD_NO_CACHE=1 ./scripts/start_services.sh       # rebuild from scratch"
-echo
-echo "[start] To run the host orchestrator:"
-echo " cd orchestrator && source .venv/bin/activate && python orchestrator.py"
+echo " BUILD=1 ./scripts/start_services.sh"
+echo " REBUILD_NO_CACHE=1 ./scripts/start_services.sh"
 
 if [[ "${FOLLOW_LOGS:-0}" == "1" ]]; then
-  docker compose logs -f "${SERVICES[@]}"
+  docker compose "${COMPOSE_ARGS[@]}" logs -f "${SERVICES[@]}"
 fi
