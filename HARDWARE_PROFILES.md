@@ -1,6 +1,6 @@
 # Chromie Hardware Profiles
 
-Chromie now supports a hardware/profile based environment flow.
+Chromie supports a hardware/profile based environment flow.
 
 Startup flow:
 
@@ -74,6 +74,52 @@ AGENT_MODEL=gemma4:e2b
 ```
 
 `.env.local` wins over `.env.common` and hardware profiles.
+
+## TTS variable semantics
+
+Be careful with these two different limits:
+
+```text
+TTS_MAX_TEXT_CHARS  = text character limit before sending text to TTS
+TTS_MAX_LENGTH      = OuteTTS / llama generation token budget
+```
+
+Do **not** use this to make Chromie speak shorter:
+
+```bash
+TTS_MAX_LENGTH=120
+```
+
+That value is too small for OuteTTS generation and can make the model emit zero audio codec tokens. The symptom is:
+
+```text
+0it [00:00, ?it/s]
+torch.cat(): expected a non-empty list of Tensors
+```
+
+Use this instead:
+
+```bash
+TTS_MAX_TEXT_CHARS=120
+```
+
+Recommended generation budgets:
+
+```bash
+# Jetson / small edge profile
+TTS_CONTEXT_SIZE=2048
+TTS_MAX_LENGTH=2048
+MIN_TTS_GENERATION_LENGTH=1024
+TTS_MAX_TEXT_CHARS=120
+
+# Desktop RTX profile
+TTS_CONTEXT_SIZE=4096
+TTS_MAX_LENGTH=4096
+MIN_TTS_GENERATION_LENGTH=1024
+TTS_MAX_TEXT_CHARS=220
+```
+
+`tts/server.py` now clamps very small `TTS_MAX_LENGTH` values up to `MIN_TTS_GENERATION_LENGTH` when possible, and logs both requested and effective generation lengths.
 
 ## Current profiles
 

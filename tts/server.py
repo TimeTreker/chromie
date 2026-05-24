@@ -33,33 +33,80 @@ logging.basicConfig(
 )
 logger = logging.getLogger("chromie-tts")
 
+
+def env_int(name: str, default: int, *, minimum: int | None = None) -> int:
+    raw = os.getenv(name)
+    try:
+        value = int(raw) if raw not in (None, "") else int(default)
+    except ValueError:
+        logger.warning("Invalid integer env %s=%r; using %s", name, raw, default)
+        value = int(default)
+    if minimum is not None and value < minimum:
+        logger.warning("Env %s=%s is below minimum %s; using %s", name, value, minimum, minimum)
+        value = minimum
+    return value
+
+
 HOST = os.getenv("TTS_HOST", "0.0.0.0")
-PORT = int(os.getenv("TTS_PORT", "5000"))
+PORT = env_int("TTS_PORT", 5000, minimum=1)
 MODEL_SIZE = os.getenv("TTS_MODEL_SIZE", "0.6B")
 QUANTIZATION_NAME = os.getenv("TTS_QUANTIZATION", "FP16")
 
-# This is the raw PCM sample rate reported to orchestrator.
-# Orchestrator will resample this source rate to the real speaker output rate.
-TTS_SAMPLE_RATE = int(os.getenv("TTS_SAMPLE_RATE", "44100"))
-TTS_CHUNK_MS = int(os.getenv("TTS_CHUNK_MS", "120"))
+# Raw PCM sample rate reported to orchestrator. The host orchestrator may resample
+# this source rate to the actual speaker output rate.
+TTS_SAMPLE_RATE = env_int("TTS_SAMPLE_RATE", 44100, minimum=8000)
+TTS_CHUNK_MS = env_int("TTS_CHUNK_MS", 120, minimum=20)
+TTS_N_GPU_LAYERS = env_int("TTS_N_GPU_LAYERS", -1)
+TTS_CONTEXT_SIZE = env_int("TTS_CONTEXT_SIZE", 4096, minimum=512)
 
-TTS_N_GPU_LAYERS = int(os.getenv("TTS_N_GPU_LAYERS", "-1"))
-TTS_CONTEXT_SIZE = int(os.getenv("TTS_CONTEXT_SIZE", "4096"))
-TTS_MAX_LENGTH = int(os.getenv("TTS_MAX_LENGTH", "4096"))
-TTS_N_BATCH = int(os.getenv("TTS_N_BATCH", "256"))
-TTS_THREADS = int(os.getenv("TTS_THREADS", "4"))
+# IMPORTANT:
+# TTS_MAX_LENGTH is the OuteTTS/llama generation token budget, not a text
+# character limit. Very small values such as 100/120/180 can make OuteTTS emit
+# zero audio codec tokens, which later fails in DAC decode with:
+#   torch.cat(): expected a non-empty list of Tensors
+# Use TTS_MAX_TEXT_CHARS to limit spoken text length.
+REQUESTED_TTS_MAX_LENGTH = env_int("TTS_MAX_LENGTH", TTS_CONTEXT_SIZE, minimum=1)
+MIN_TTS_GENERATION_LENGTH = env_int("MIN_TTS_GENERATION_LENGTH", 1024, minimum=128)
+
+if TTS_CONTEXT_SIZE < MIN_TTS_GENERATION_LENGTH:
+    logger.warning(
+        "TTS_CONTEXT_SIZE=%s is smaller than MIN_TTS_GENERATION_LENGTH=%s; "
+        "effective generation length will be capped at context size.",
+        TTS_CONTEXT_SIZE,
+        MIN_TTS_GENERATION_LENGTH,
+    )
+
+EFFECTIVE_TTS_MAX_LENGTH = min(
+    max(REQUESTED_TTS_MAX_LENGTH, min(MIN_TTS_GENERATION_LENGTH, TTS_CONTEXT_SIZE)),
+    TTS_CONTEXT_SIZE,
+)
+
+if REQUESTED_TTS_MAX_LENGTH != EFFECTIVE_TTS_MAX_LENGTH:
+    logger.warning(
+        "Adjusted TTS generation length: requested TTS_MAX_LENGTH=%s, "
+        "effective=%s, context=%s, min_generation=%s. "
+        "Use TTS_MAX_TEXT_CHARS to limit text length, not TTS_MAX_LENGTH.",
+        REQUESTED_TTS_MAX_LENGTH,
+        EFFECTIVE_TTS_MAX_LENGTH,
+        TTS_CONTEXT_SIZE,
+        MIN_TTS_GENERATION_LENGTH,
+    )
+
+TTS_N_BATCH = env_int("TTS_N_BATCH", 256, minimum=1)
+TTS_THREADS = env_int("TTS_THREADS", 4, minimum=1)
 TTS_TEMPERATURE = float(os.getenv("TTS_TEMPERATURE", "0.4"))
 TTS_REPETITION_PENALTY = float(os.getenv("TTS_REPETITION_PENALTY", "1.1"))
-MAX_CONCURRENT_SYNTHESIS = int(os.getenv("TTS_MAX_CONCURRENT_SYNTHESIS", "1"))
-TTS_MIN_TEXT_CHARS = int(os.getenv("TTS_MIN_TEXT_CHARS", "4"))
-TTS_MAX_TEXT_CHARS = int(os.getenv("TTS_MAX_TEXT_CHARS", "220"))
-TTS_GENERATION_RETRIES = max(1, int(os.getenv("TTS_GENERATION_RETRIES", "1")))
+MAX_CONCURRENT_SYNTHESIS = env_int("TTS_MAX_CONCURRENT_SYNTHESIS", 1, minimum=1)
+TTS_MIN_TEXT_CHARS = env_int("TTS_MIN_TEXT_CHARS", 4, minimum=1)
+TTS_MAX_TEXT_CHARS = env_int("TTS_MAX_TEXT_CHARS", 220, minimum=TTS_MIN_TEXT_CHARS)
+TTS_GENERATION_RETRIES = env_int("TTS_GENERATION_RETRIES", 1, minimum=1)
 TTS_RESET_LLAMA_STATE = os.getenv("TTS_RESET_LLAMA_STATE", "1").lower() not in {
     "0",
     "false",
     "no",
     "off",
 }
+
 SPEAKER_DIR = Path(os.getenv("SPEAKER_DIR", "/app/speakers"))
 SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -108,19 +155,15 @@ def normalize_tts_text(text: str) -> str:
             cut.rfind("，"),
         )
         text = cut[: last_punct + 1] if last_punct >= 40 else cut
-
     return text.strip()
 
 
 def is_valid_tts_text(text: str) -> bool:
     text = normalize_tts_text(text)
-
     if len(text) < TTS_MIN_TEXT_CHARS:
         return False
-
     if re.fullmatch(r"\d+[\.)]?", text):
         return False
-
     return any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in text)
 
 
@@ -128,7 +171,6 @@ def get_model_version():
     if MODEL_SIZE == "1B":
         logger.info("Using OuteTTS 1B model")
         return Models.VERSION_1_0_SIZE_1B
-
     logger.info("Using OuteTTS 0.6B model")
     return Models.VERSION_1_0_SIZE_0_6B
 
@@ -150,13 +192,11 @@ def log_llama_cpp_backend():
 
         info = llama_cpp.llama_print_system_info().decode(errors="ignore")
         logger.info("llama.cpp system info:\n%s", info)
-
         upper = info.upper()
         if "CUDA" not in upper and "CUBLAS" not in upper:
             logger.warning("llama-cpp-python appears to be CPU-only")
         else:
             logger.info("llama-cpp-python CUDA backend detected")
-
     except Exception as exc:
         logger.warning("Failed to print llama.cpp system info: %s", exc)
 
@@ -164,14 +204,18 @@ def log_llama_cpp_backend():
 def build_model_config():
     logger.info(
         "Loading OuteTTS model: size=%s quantization=%s n_gpu_layers=%s "
-        "n_ctx=%s max_length=%s n_batch=%s n_threads=%s",
+        "n_ctx=%s requested_max_length=%s effective_max_length=%s "
+        "min_generation_length=%s n_batch=%s n_threads=%s max_text_chars=%s",
         MODEL_SIZE,
         QUANTIZATION_NAME,
         TTS_N_GPU_LAYERS,
         TTS_CONTEXT_SIZE,
-        min(TTS_MAX_LENGTH, TTS_CONTEXT_SIZE),
+        REQUESTED_TTS_MAX_LENGTH,
+        EFFECTIVE_TTS_MAX_LENGTH,
+        MIN_TTS_GENERATION_LENGTH,
         TTS_N_BATCH,
         TTS_THREADS,
+        TTS_MAX_TEXT_CHARS,
     )
 
     cfg = outetts.ModelConfig.auto_config(
@@ -179,41 +223,30 @@ def build_model_config():
         backend=Backend.LLAMACPP,
         quantization=get_quantization(),
     )
-
     cfg.n_gpu_layers = TTS_N_GPU_LAYERS
     cfg.max_seq_length = TTS_CONTEXT_SIZE
     cfg.device = "cuda"
     cfg.verbose = True
 
-    # Do not duplicate OuteTTS top-level fields here.
-    # OuteTTS already passes cfg.n_gpu_layers, cfg.max_seq_length, and cfg.verbose
-    # into llama-cpp-python internally.
+    # Do not duplicate OuteTTS top-level fields here. OuteTTS already passes
+    # cfg.n_gpu_layers, cfg.max_seq_length, and cfg.verbose into llama-cpp-python.
     cfg.additional_model_config = {
         "n_batch": TTS_N_BATCH,
         "n_threads": TTS_THREADS,
         "main_gpu": 0,
     }
-
     logger.info("OuteTTS additional_model_config=%s", cfg.additional_model_config)
     logger.info("OuteTTS cfg.n_gpu_layers=%s", getattr(cfg, "n_gpu_layers", None))
     return cfg
 
 
 def load_audio_with_soundfile(path: str, target_sr: int) -> torch.Tensor:
-    """Load speaker reference audio without torchaudio/torchcodec.
-
-    This avoids the torchcodec -> FFmpeg -> CUDA NPP dependency chain. It is enough
-    for normal WAV/FLAC speaker-reference clips.
-    """
-
+    """Load speaker reference audio without torchaudio/torchcodec."""
     wav, sr = sf.read(path, dtype="float32", always_2d=False)
-
     if wav.size == 0:
         raise ValueError(f"Audio file is empty: {path}")
-
     if wav.ndim == 2:
         wav = wav.mean(axis=1)
-
     wav = np.asarray(wav, dtype=np.float32)
 
     if sr != target_sr:
@@ -232,7 +265,6 @@ def load_audio_with_soundfile(path: str, target_sr: int) -> torch.Tensor:
 
 def patch_audio_loader(tts_interface: Interface):
     """Patch OuteTTS audio loader to avoid torchaudio/torchcodec."""
-
     target_sr = int(getattr(tts_interface.audio_codec, "sr", 24000))
 
     def load_audio_without_torchcodec(self, path):
@@ -242,7 +274,6 @@ def patch_audio_loader(tts_interface: Interface):
         load_audio_without_torchcodec,
         tts_interface.audio_codec,
     )
-
     logger.info(
         "Patched OuteTTS speaker audio loader: soundfile/scipy instead of "
         "torchaudio/torchcodec. target_sr=%s",
@@ -252,13 +283,7 @@ def patch_audio_loader(tts_interface: Interface):
 
 @contextlib.contextmanager
 def patch_torch_1d_audio_slice():
-    """Work around an OuteTTS v3 speaker-creation edge case.
-
-    Some OuteTTS versions rebuild speaker audio from raw bytes as a 1D tensor,
-    then slice it as audio[:, start:end]. This patch only handles that exact
-    pattern and does not interfere with tensor[:, None] used by Whisper.
-    """
-
+    """Work around an OuteTTS speaker-creation edge case."""
     original_getitem = torch.Tensor.__getitem__
 
     def safe_getitem(self, index):
@@ -273,7 +298,6 @@ def patch_torch_1d_audio_slice():
             and isinstance(index[1], slice)
         ):
             return original_getitem(self, index[1]).unsqueeze(0)
-
         return original_getitem(self, index)
 
     torch.Tensor.__getitem__ = safe_getitem
@@ -285,7 +309,6 @@ def patch_torch_1d_audio_slice():
 
 def save_speaker_json(speaker, output_json: Path):
     """Save speaker profile safely despite OuteTTS path suffix behavior."""
-
     output_json.parent.mkdir(parents=True, exist_ok=True)
     tmp_base = output_json.parent / f".{output_json.stem}.tmp"
     tmp_candidates = [
@@ -293,29 +316,25 @@ def save_speaker_json(speaker, output_json: Path):
         tmp_base.with_suffix(".json"),
         Path(str(tmp_base) + ".json"),
     ]
-
     for candidate in tmp_candidates:
         if candidate.exists():
             candidate.unlink()
-        with tts_interface_lock:
-            interface.save_speaker(speaker, str(tmp_base))
 
+    with tts_interface_lock:
+        interface.save_speaker(speaker, str(tmp_base))
 
     created_json = None
     for candidate in tmp_candidates:
         if candidate.exists():
             created_json = candidate
             break
-
     if created_json is None:
         raise FileNotFoundError(f"OuteTTS did not create speaker JSON near {tmp_base}")
 
     with created_json.open("r", encoding="utf-8") as file:
         json.load(file)
-
     if output_json.exists():
         output_json.unlink()
-
     created_json.replace(output_json)
     logger.info("Speaker saved to %s", output_json)
 
@@ -326,19 +345,20 @@ def create_speaker_profile_from_wav(speaker_id: str, wav_path: Path, save_as_def
 
     speaker_id = sanitize_speaker_id(speaker_id)
     output_json = SPEAKER_DIR / f"{speaker_id}.json"
-
     logger.info("Creating speaker profile speaker_id=%s wav=%s", speaker_id, wav_path)
 
     with tts_interface_lock:
         with patch_torch_1d_audio_slice():
             speaker = interface.create_speaker(str(wav_path))
         save_speaker_json(speaker, output_json)
-        if save_as_default and speaker_id != "default":
-            default_json = SPEAKER_DIR / "default.json"
-            save_speaker_json(speaker, default_json)
-        speakers_cache[speaker_id] = speaker
-        if save_as_default:
-            speakers_cache["default"] = speaker
+
+    if save_as_default and speaker_id != "default":
+        default_json = SPEAKER_DIR / "default.json"
+        save_speaker_json(speaker, default_json)
+
+    speakers_cache[speaker_id] = speaker
+    if save_as_default:
+        speakers_cache["default"] = speaker
     return speaker
 
 
@@ -348,16 +368,11 @@ interface = Interface(config=build_model_config())
 patch_audio_loader(interface)
 logger.info("TTS model loaded")
 
-def reset_llama_generation_state() -> None:
-    """Clear llama-cpp-python prompt/KV reuse state between independent TTS jobs.
 
-    Unrelated websocket requests should not share llama.cpp generation state.
-    Without this reset, llama-cpp-python can report prefix-match reuse across
-    different TTS requests and eventually corrupt sequence/KV state.
-    """
+def reset_llama_generation_state() -> None:
+    """Clear llama-cpp-python prompt/KV reuse state between independent TTS jobs."""
     if not TTS_RESET_LLAMA_STATE:
         return
-
     try:
         llama = getattr(getattr(interface, "model", None), "model", None)
         reset = getattr(llama, "reset", None)
@@ -402,26 +417,23 @@ def load_default_speaker():
 
 
 def audio_to_pcm16(audio) -> bytes:
+    if audio is None:
+        return b""
     if hasattr(audio, "detach"):
         audio = audio.detach().cpu().numpy()
     elif hasattr(audio, "cpu"):
         audio = audio.cpu().numpy()
-
     audio = np.asarray(audio, dtype=np.float32).reshape(-1)
-
     if audio.size == 0:
         return b""
-
     peak = float(np.max(np.abs(audio)))
     if peak > 1.0:
         audio = audio / peak
-
     return (np.clip(audio, -1.0, 1.0) * 32767.0).astype(np.int16).tobytes()
 
 
 def get_or_load_speaker(speaker_id: str):
     speaker_id = sanitize_speaker_id(speaker_id)
-
     if speaker_id in speakers_cache:
         return speakers_cache[speaker_id]
 
@@ -444,13 +456,10 @@ def get_or_load_speaker(speaker_id: str):
 
 def list_speaker_ids():
     ids = set()
-
     for path in SPEAKER_DIR.glob("*.json"):
         ids.add(path.stem)
-
     for path in SPEAKER_DIR.glob("*.wav"):
         ids.add(path.stem)
-
     ids.update(speakers_cache.keys())
     return sorted(ids)
 
@@ -470,7 +479,6 @@ async def send_json(ws, payload):
 async def synthesize_text(text: str, speaker, ws, request_id: Optional[str] = None):
     async with synthesis_semaphore:
         text = normalize_tts_text(text)
-
         if not is_valid_tts_text(text):
             logger.warning("Skipping invalid TTS text request_id=%s text=%r", request_id, text)
             await send_json(ws, {"type": "end", "request_id": request_id})
@@ -491,6 +499,7 @@ async def synthesize_text(text: str, speaker, ws, request_id: Optional[str] = No
                 "sample_rate": TTS_SAMPLE_RATE,
                 "format": "pcm_s16le",
                 "channels": 1,
+                "max_length": EFFECTIVE_TTS_MAX_LENGTH,
             },
         )
 
@@ -504,25 +513,29 @@ async def synthesize_text(text: str, speaker, ws, request_id: Optional[str] = No
                         temperature=TTS_TEMPERATURE,
                         repetition_penalty=TTS_REPETITION_PENALTY,
                     ),
-                    max_length=min(TTS_MAX_LENGTH, TTS_CONTEXT_SIZE),
+                    max_length=EFFECTIVE_TTS_MAX_LENGTH,
                 )
 
                 generate_start = time.time()
                 output = await generate_tts_serialized(cfg)
                 generate_seconds = time.time() - generate_start
 
-                pcm = audio_to_pcm16(output.audio)
+                audio = getattr(output, "audio", None)
+                pcm = audio_to_pcm16(audio)
                 if not pcm:
-                    raise RuntimeError("OuteTTS generated empty audio")
+                    raise RuntimeError(
+                        "OuteTTS generated empty audio. "
+                        f"effective_max_length={EFFECTIVE_TTS_MAX_LENGTH}, "
+                        f"text_chars={len(text)}. Do not set TTS_MAX_LENGTH too low; "
+                        "use TTS_MAX_TEXT_CHARS to shorten spoken text."
+                    )
 
                 chunk_bytes = int(TTS_SAMPLE_RATE * TTS_CHUNK_MS / 1000) * 2
-
                 for offset in range(0, len(pcm), chunk_bytes):
                     await ws.send(pcm[offset : offset + chunk_bytes])
                     await asyncio.sleep(0)
 
                 audio_seconds = len(pcm) / (TTS_SAMPLE_RATE * 2)
-
                 await send_json(
                     ws,
                     {
@@ -533,7 +546,6 @@ async def synthesize_text(text: str, speaker, ws, request_id: Optional[str] = No
                         "total_seconds": time.time() - start_time,
                     },
                 )
-
                 logger.info(
                     "TTS done request_id=%s attempt=%s audio=%.2fs generate=%.2fs total=%.2fs",
                     request_id,
@@ -543,7 +555,6 @@ async def synthesize_text(text: str, speaker, ws, request_id: Optional[str] = No
                     time.time() - start_time,
                 )
                 return
-
             except Exception as exc:
                 last_error = exc
                 logger.warning(
@@ -596,7 +607,6 @@ async def handle_create_speaker(data: dict, ws):
                 "make_default": make_default,
             },
         )
-
     except Exception as exc:
         logger.error("Speaker creation failed: %s", exc, exc_info=True)
         await send_json(
@@ -612,12 +622,10 @@ async def handle_create_speaker(data: dict, ws):
 async def ws_handler(ws):
     logger.info("New TTS websocket connection")
     active_tasks = set()
-
     try:
         async for msg in ws:
             if not isinstance(msg, str):
                 continue
-
             try:
                 data = json.loads(msg)
             except Exception:
@@ -625,7 +633,6 @@ async def ws_handler(ws):
                 continue
 
             msg_type = data.get("type")
-
             if msg_type in {"health", "ping"}:
                 await send_json(
                     ws,
@@ -636,6 +643,10 @@ async def ws_handler(ws):
                         "gpu_layers": TTS_N_GPU_LAYERS,
                         "reset_llama_state": TTS_RESET_LLAMA_STATE,
                         "single_model_worker": True,
+                        "requested_max_length": REQUESTED_TTS_MAX_LENGTH,
+                        "effective_max_length": EFFECTIVE_TTS_MAX_LENGTH,
+                        "min_generation_length": MIN_TTS_GENERATION_LENGTH,
+                        "max_text_chars": TTS_MAX_TEXT_CHARS,
                         "speakers": list_speaker_ids(),
                     },
                 )
@@ -667,6 +678,7 @@ async def ws_handler(ws):
                     },
                 )
                 continue
+
             if speaker is None:
                 await send_json(
                     ws,
@@ -683,7 +695,6 @@ async def ws_handler(ws):
             )
             active_tasks.add(task)
             task.add_done_callback(active_tasks.discard)
-
     except websockets.exceptions.ConnectionClosed:
         logger.info("TTS websocket closed")
     finally:
@@ -693,11 +704,14 @@ async def ws_handler(ws):
 
 async def main():
     logger.info(
-        "TTS server ready on ws://%s:%s output=%sHz pcm_s16le chunk_ms=%s",
+        "TTS server ready on ws://%s:%s output=%sHz pcm_s16le chunk_ms=%s "
+        "effective_max_length=%s max_text_chars=%s",
         HOST,
         PORT,
         TTS_SAMPLE_RATE,
         TTS_CHUNK_MS,
+        EFFECTIVE_TTS_MAX_LENGTH,
+        TTS_MAX_TEXT_CHARS,
     )
     async with websockets.serve(
         ws_handler,
