@@ -190,3 +190,61 @@ def test_dry_run_executor_triggers_fallback_and_blocks_downstream_on_declined_co
     assert results["stop_after_failure"].status == "success"
     assert results["execute_motion"].status == "blocked"
     assert any(event.type == "fallback_triggered" for event in trace.events)
+
+from app.task_graph.executor import DagToolExecutor
+from app.tool_invocation import FunctionToolInvoker, ToolCallOutcome
+
+
+def test_tool_executor_invokes_registered_handlers_and_resolves_refs() -> None:
+    invoker = FunctionToolInvoker()
+    observed: dict[str, object] = {}
+    invoker.register("soridormi.robot.get_status", lambda args: {"standing": True})
+    invoker.register("soridormi.motion.create_plan", lambda args: {"plan_id": "real-plan-1", "summary": "plan ready"})
+    invoker.register("chromie.ask_confirmation", lambda args: {"confirmed": True, "plan_summary": args["plan_summary"]})
+    invoker.register("soridormi.safety.monitor_motion", lambda args: {"ok": True, "event": None})
+    invoker.register("soridormi.motion.stop", lambda args: {"stopped": True})
+
+    def execute(args):
+        observed["execute_plan_id"] = args["plan_id"]
+        return {"completed": True, "summary": f"executed {args['plan_id']}"}
+
+    invoker.register("soridormi.motion.execute_plan", execute)
+    invoker.register("chromie.report", lambda args: {"reported": True, "message": args["message"]})
+
+    trace = DagToolExecutor(_registry(), invoker).run(_motion_graph())
+
+    assert trace.status == "success"
+    assert observed["execute_plan_id"] == "real-plan-1"
+    assert trace.result_map()["report_done"].output["message"] == "executed real-plan-1"
+
+
+def test_tool_executor_retries_retryable_failures() -> None:
+    attempts = {"count": 0}
+    invoker = FunctionToolInvoker()
+
+    def flaky_listen(args):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            return ToolCallOutcome.failed("microphone warmup", retryable=True)
+        return {"text": "hello", "language": "en"}
+
+    invoker.register("chromie.listen", flaky_listen)
+    graph = TaskGraph.model_validate(
+        {
+            "graph_id": "retry_listen",
+            "nodes": [
+                {
+                    "id": "listen",
+                    "tool": "chromie.listen",
+                    "type": "query",
+                    "retry": {"max_attempts": 2, "backoff_s": 0.0},
+                }
+            ],
+        }
+    )
+
+    trace = DagToolExecutor(build_chromie_registry(), invoker).run(graph)
+    result = trace.result_map()["listen"]
+    assert trace.status == "success"
+    assert result.attempts == 2
+    assert result.output["text"] == "hello"

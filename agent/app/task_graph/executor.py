@@ -3,7 +3,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from app.capabilities.models import CapabilityRegistry, FailurePolicy, ToolCapability
+from app.capabilities.models import CapabilityRegistry, FailurePolicy
+from app.tool_invocation import ToolCallOutcome, ToolInvoker
 
 from .models import ExecutionEvent, ExecutionTrace, NodeResult, TaskGraph, TaskNode
 from .refs import resolve_refs
@@ -21,9 +22,16 @@ class DagDryRunExecutor:
     It is intended for LLM/DAG development before real MCP transports exist.
     """
 
-    def __init__(self, registry: CapabilityRegistry, *, auto_confirm: bool = True) -> None:
+    def __init__(
+        self,
+        registry: CapabilityRegistry,
+        *,
+        auto_confirm: bool = True,
+        tool_invoker: ToolInvoker | None = None,
+    ) -> None:
         self.registry = registry
         self.auto_confirm = auto_confirm
+        self.tool_invoker = tool_invoker
 
     def run(self, graph: TaskGraph, *, validate: bool = True) -> ExecutionTrace:
         if validate:
@@ -134,26 +142,55 @@ class DagDryRunExecutor:
                 finished_at=time.monotonic(),
             )
 
-        if node.tool == "chromie.ask_confirmation" and not self.auto_confirm:
-            return NodeResult(
-                node_id=node.id,
-                tool=node.tool,
-                status="failed_fatal",
-                output={"confirmed": False, "user_text": "dry-run declined"},
-                error="confirmation_declined",
-                started_at=started,
-                finished_at=time.monotonic(),
-            )
+        max_attempts = node.retry.max_attempts if node.retry else 1
+        last_outcome: ToolCallOutcome | None = None
+        for attempt in range(1, max_attempts + 1):
+            outcome = self._invoke_or_simulate(node, args)
+            last_outcome = outcome
+            if outcome.status == "success":
+                return NodeResult(
+                    node_id=node.id,
+                    tool=node.tool,
+                    status="success",
+                    output=outcome.output,
+                    attempts=attempt,
+                    started_at=started,
+                    finished_at=time.monotonic(),
+                )
+            if outcome.status != "failed_retryable" or attempt >= max_attempts:
+                return NodeResult(
+                    node_id=node.id,
+                    tool=node.tool,
+                    status=outcome.status,
+                    output=outcome.output,
+                    error=outcome.error,
+                    attempts=attempt,
+                    started_at=started,
+                    finished_at=time.monotonic(),
+                )
 
-        output = self._simulate_tool_output(node, args)
+        # Unreachable, but keeps type checkers happy.
+        assert last_outcome is not None
         return NodeResult(
             node_id=node.id,
             tool=node.tool,
-            status="success",
-            output=output,
+            status=last_outcome.status,
+            output=last_outcome.output,
+            error=last_outcome.error,
+            attempts=max_attempts,
             started_at=started,
             finished_at=time.monotonic(),
         )
+
+    def _invoke_or_simulate(self, node: TaskNode, args: dict[str, Any]) -> ToolCallOutcome:
+        if node.tool == "chromie.ask_confirmation" and not self.auto_confirm:
+            return ToolCallOutcome.failed(
+                "confirmation_declined",
+                output={"confirmed": False, "user_text": "dry-run declined"},
+            )
+        if self.tool_invoker is not None:
+            return self.tool_invoker.invoke(node.tool, args)
+        return ToolCallOutcome.success(self._simulate_tool_output(node, args))
 
     def _simulate_tool_output(self, node: TaskNode, args: dict[str, Any]) -> dict[str, Any]:
         tool = node.tool
@@ -242,3 +279,15 @@ class DagDryRunExecutor:
         trace.events.append(
             ExecutionEvent(type="node_result", node_id=result.node_id, tool=result.tool, message=result.status, data={"error": result.error})
         )
+
+
+class DagToolExecutor(DagDryRunExecutor):
+    """Execute a TaskGraph through a provided ToolInvoker.
+
+    This is still transport-neutral: the invoker may be a local Python registry,
+    a test double, or a future MCP client. Safety validation remains the same as
+    DagDryRunExecutor.
+    """
+
+    def __init__(self, registry: CapabilityRegistry, tool_invoker: ToolInvoker, *, auto_confirm: bool = True) -> None:
+        super().__init__(registry, auto_confirm=auto_confirm, tool_invoker=tool_invoker)

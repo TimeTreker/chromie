@@ -67,3 +67,27 @@ PYTHONPATH=agent python -m app.task_graph_demo graph.json \
   --dry-run \
   --no-auto-confirm
 ```
+
+## Tool invocation bridge
+
+The first executor was intentionally dry-run only. Chromie now also has a
+transport-neutral `ToolInvoker` interface:
+
+```python
+from app.task_graph import DagToolExecutor
+from app.tool_invocation import FunctionToolInvoker
+```
+
+`DagToolExecutor` uses the same `TaskGraph`, `GraphValidator`, `$ref` handling,
+fallback logic, and trace format as the dry-run executor, but delegates each tool
+call to a registered invoker. The invoker can be an in-process test registry, a
+local Chromie tool adapter, a Soridormi CLI adapter, or a future MCP client.
+
+The boundary is:
+
+```text
+TaskGraph node -> resolved args -> ToolInvoker.invoke(tool_name, args) -> ToolCallOutcome -> NodeResult
+```
+
+This keeps LLM/DAG planning independent from the transport. Real MCP should wrap
+the same `ToolInvoker` protocol rather than changing the DAG schema.

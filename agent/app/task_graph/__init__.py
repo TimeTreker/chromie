@@ -1,6 +1,6 @@
-"""Task graph validation and dry-run execution for Chromie's MCP router."""
+"""Task graph validation and execution for Chromie's MCP router."""
 
-from .executor import DagDryRunExecutor
+from .executor import DagDryRunExecutor, DagToolExecutor
 from .models import (
     ExecutionEvent,
     ExecutionTrace,
@@ -13,6 +13,7 @@ from .validator import GraphValidationReport, GraphValidator
 
 __all__ = [
     "DagDryRunExecutor",
+    "DagToolExecutor",
     "ExecutionEvent",
     "ExecutionTrace",
     "GraphValidationReport",
