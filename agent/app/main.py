@@ -10,6 +10,7 @@ from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field
 
 from .agents import AgentServices
+from .capabilities.local import build_chromie_registry
 from .clients.ollama_client import OllamaClient
 from .runtime import AgentRuntime
 from .schema import AgentResult, AgentRunRequest, HealthResponse
@@ -45,6 +46,7 @@ services = AgentServices(
     max_speak_chars=settings.max_speak_chars,
 )
 runtime = AgentRuntime(services)
+capability_registry = build_chromie_registry()
 
 app = FastAPI(
     title="Chromie Agent",
@@ -75,6 +77,22 @@ async def agents() -> dict:
             "safety_agent": "validates and clamps risky actions",
         },
     }
+
+
+@app.get("/capabilities")
+async def capabilities() -> dict:
+    """Return Chromie's local capability registry.
+
+    The full global registry may also include remote MCP manifests loaded by an
+    agent host. This endpoint exposes the Chromie-side speech/task capabilities.
+    """
+
+    return capability_registry.model_dump()
+
+
+@app.get("/capabilities/llm-context")
+async def capability_llm_context(language: str = "en") -> dict[str, str]:
+    return {"context": capability_registry.llm_context(language=language)}
 
 
 @app.post("/run", response_model=AgentResult)

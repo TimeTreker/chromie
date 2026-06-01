@@ -4,7 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-mkdir -p .chromie
+if [ ! -d ".chromie" ]; then
+    mkdir -p .chromie
+fi
 SYSTEM_INFO_FILE=".chromie/system_info.env"
 ./scripts/collect_system_info.sh > "$SYSTEM_INFO_FILE"
 
