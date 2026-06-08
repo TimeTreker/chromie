@@ -242,6 +242,20 @@ curl -fsS http://127.0.0.1:11434/api/tags
 ./scripts/verify_tts_gpu.sh
 ```
 
+在实际 GPU 主机上运行完整 smoke test：
+
+```bash
+./scripts/gpu_smoke_test.sh
+```
+
+如果需要先启动已有镜像，并额外执行一次真实 TTS 合成：
+
+```bash
+START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
+```
+
+该脚本检查宿主机和容器的 GPU 可见性、服务健康、Ollama 推理、ASR/TTS WebSocket，以及 TTS CUDA backend。麦克风拾音和扬声器音质仍需人工试听验证。
+
 完整链路验证时，可以说一句简短的话，并观察是否依次出现：
 
 1. Orchestrator 检测到语音结束。

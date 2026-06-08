@@ -197,6 +197,20 @@ Verify TTS GPU use:
 ./scripts/verify_tts_gpu.sh
 ```
 
+Run the complete target-machine GPU smoke test after services are running:
+
+```bash
+./scripts/gpu_smoke_test.sh
+```
+
+To start existing images first and include a real TTS generation:
+
+```bash
+START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
+```
+
+The smoke test checks host/container GPU visibility, service health, Ollama inference, ASR/TTS WebSockets, and the TTS CUDA backend. It does not test microphone or speaker quality.
+
 Watch the main logs:
 
 ```bash

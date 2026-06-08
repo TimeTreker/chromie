@@ -24,7 +24,7 @@ docker exec "$SERVICE" bash -lc 'echo "NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_D
 
 echo
 echo "[verify] Checking llama-cpp-python CUDA backend..."
-docker exec "$SERVICE" "$PYTHON_BIN" - <<'PY'
+docker exec -i "$SERVICE" "$PYTHON_BIN" - <<'PY'
 from llama_cpp import llama_cpp
 info = llama_cpp.llama_print_system_info().decode(errors="ignore")
 print(info)
@@ -36,7 +36,7 @@ PY
 
 echo
 echo "[verify] Checking TTS websocket health on localhost:5000 from inside container..."
-docker exec "$SERVICE" "$PYTHON_BIN" - <<'PY'
+docker exec -i "$SERVICE" "$PYTHON_BIN" - <<'PY'
 import asyncio
 import json
 import websockets
