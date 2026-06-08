@@ -117,6 +117,12 @@ Read-only graph execution can be enabled separately with
 `POST /task-graphs/execute-read-only` endpoint preflights the whole graph and
 accepts only side-effect-free `safe_read` and `planning_only` capabilities.
 
+Supervised side effects use `POST /task-graphs/execute-guarded` and require
+`AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=1` plus an operator bearer token in
+`AGENT_TASK_GRAPH_EXECUTION_TOKEN`. Confirmation is bound to named confirmation
+nodes. Physical motion also requires `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1`
+and a covering monitor that reports active before execution.
+
 ## Run locally
 
 ```bash

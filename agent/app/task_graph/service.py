@@ -5,7 +5,11 @@ from pydantic import BaseModel, Field
 from ..capabilities.models import CapabilityRegistry
 from ..tool_invocation import AsyncToolInvoker
 
-from .async_executor import ReadOnlyTaskGraphExecutor
+from .async_executor import (
+    GuardedTaskGraphExecutor,
+    ReadOnlyTaskGraphExecutor,
+    TaskGraphExecutionProofs,
+)
 from .executor import DagDryRunExecutor
 from .models import ExecutionTrace, TaskGraph
 from .validator import GraphValidator
@@ -26,6 +30,11 @@ class TaskGraphExecuteRequest(BaseModel):
     graph: TaskGraph
 
 
+class TaskGraphGuardedExecuteRequest(BaseModel):
+    graph: TaskGraph
+    proofs: TaskGraphExecutionProofs = Field(default_factory=TaskGraphExecutionProofs)
+
+
 class TaskGraphService:
     """Expose safe TaskGraph validation and dry-run execution to the Agent API."""
 
@@ -34,9 +43,13 @@ class TaskGraphService:
         registry: CapabilityRegistry,
         *,
         read_only_invoker: AsyncToolInvoker | None = None,
+        guarded_invoker: AsyncToolInvoker | None = None,
+        allow_physical_motion: bool = False,
     ) -> None:
         self.registry = registry
         self.read_only_invoker = read_only_invoker
+        self.guarded_invoker = guarded_invoker
+        self.allow_physical_motion = allow_physical_motion
         self._traces: dict[str, ExecutionTrace] = {}
 
     def validate(self, graph: TaskGraph) -> TaskGraphValidationResponse:
@@ -53,6 +66,21 @@ class TaskGraphService:
             raise ValueError("TaskGraph validation failed: " + "; ".join(validation.errors))
 
         trace = DagDryRunExecutor(self.registry, auto_confirm=auto_confirm).run(graph, validate=False)
+        self._traces[graph.graph_id] = trace.model_copy(deep=True)
+        return trace
+
+    async def execute_guarded(
+        self,
+        graph: TaskGraph,
+        proofs: TaskGraphExecutionProofs,
+    ) -> ExecutionTrace:
+        if self.guarded_invoker is None:
+            raise RuntimeError("guarded TaskGraph execution is disabled")
+        trace = await GuardedTaskGraphExecutor(
+            self.registry,
+            self.guarded_invoker,
+            allow_physical_motion=self.allow_physical_motion,
+        ).run(graph, proofs)
         self._traces[graph.graph_id] = trace.model_copy(deep=True)
         return trace
 

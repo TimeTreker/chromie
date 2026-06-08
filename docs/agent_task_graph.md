@@ -157,3 +157,38 @@ call. Every node must be `safe_read` or `planning_only` and declare
 This endpoint is disabled by default. It does not accept confirmation or safety
 proofs and therefore cannot execute speech output, writes, safety controls, or
 physical motion.
+
+## Supervised guarded execution
+
+Guarded side effects require an operator-configured bearer token:
+
+```env
+AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=1
+AGENT_TASK_GRAPH_EXECUTION_TOKEN=<long-random-secret>
+```
+
+The caller submits the graph plus `proofs.confirmed_node_ids` to:
+
+```text
+POST /task-graphs/execute-guarded
+Authorization: Bearer <long-random-secret>
+```
+
+Confirmation proofs must name actual confirmation nodes in that graph, and
+tools that require confirmation must depend on those nodes. The coordinator
+represents confirmed nodes locally; it does not invoke `chromie.ask_confirmation`
+as an MCP tool.
+
+Physical motion has a second, independent deployment gate:
+
+```env
+AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1
+```
+
+A monitor node covering the physical node must successfully return `ok: true`
+or `active: true` before motion is invoked. The MCP invoker then independently
+checks confirmation and monitor context again.
+
+This is supervised operator attestation, not yet Chromie's end-user voice
+confirmation workflow. Graph cancellation, emergency fallback orchestration,
+and one-time confirmation grants remain pending.
