@@ -19,7 +19,7 @@ The capability registry, TaskGraph schema, safety validator, dry-run executor, a
 | M2 - Contracts and safety | Complete | Cross-service contracts, confirmation gating, mock hardware flow, and GPU-free regression suite |
 | M3 - Target GPU verification | Tooling complete; target run pending | Automated GPU, service health, Ollama, ASR WebSocket, and TTS backend smoke checks |
 | M4 - TaskGraph production integration | **In progress** | Agent API validation/dry-run, trace inspection, runtime planning integration, and guarded execution boundary |
-| M5 - External capability transport | Planned | Load remote manifests and invoke approved MCP/Soridormi tools through `ToolInvoker` |
+| M5 - External capability transport | Planned | Invoke approved MCP/Soridormi tools through `ToolInvoker` transport adapters |
 | M6 - Extended autonomy | Planned | Vision, richer memory, recovery policies, observability, and longer-running tasks |
 
 ## M4 Exit Criteria
@@ -33,8 +33,8 @@ The capability registry, TaskGraph schema, safety validator, dry-run executor, a
 
 ## Immediate Sequence
 
-1. Expose validation, dry-run, and trace lookup through `chromie-agent`.
-2. Load configured external capability manifests into the Agent registry.
+1. [Complete] Expose validation, dry-run, and trace lookup through `chromie-agent`.
+2. [Complete] Load configured external capability manifests into the Agent registry.
 3. Add an explicit TaskGraph planning path without changing the existing fast conversation path.
 4. Implement MCP/Soridormi transport adapters behind `ToolInvoker`.
 5. Run the target GPU smoke test and then perform supervised hardware acceptance tests.

@@ -87,6 +87,16 @@ These endpoints are the first production-facing slice of
 [M4 - TaskGraph production integration](../ROADMAP.md). Real tool execution
 remains behind the transport-neutral `ToolInvoker` boundary.
 
+### External capabilities
+
+Set `AGENT_CAPABILITY_MANIFESTS` to a comma-separated list of JSON files or
+directories mounted inside the Agent container. The root Compose file mounts
+`./capabilities` read-only at `/app/capabilities`.
+
+Configured manifests are loaded at startup. Missing, malformed, or duplicate
+capabilities stop startup so the active registry cannot silently diverge from
+deployment configuration.
+
 ## Run locally
 
 ```bash

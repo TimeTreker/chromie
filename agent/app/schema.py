@@ -193,6 +193,8 @@ class HealthResponse(BaseModel):
     ollama_url: str | None = None
     use_llm: bool = True
     available_agents: list[str] = Field(default_factory=list)
+    capability_sources: list[str] = Field(default_factory=list)
+    capability_manifest_files: list[str] = Field(default_factory=list)
 
 
 def detect_language(text: str) -> str:

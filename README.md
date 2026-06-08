@@ -178,6 +178,11 @@ The Agent is the primary talking and planning component:
 AGENT_USE_LLM=1
 ```
 
+Trusted external capability manifests can be mounted from `./capabilities` and
+enabled with `AGENT_CAPABILITY_MANIFESTS`. See
+[Capability Registry](docs/agent_capability_registry.md) for the fail-fast
+loading rules and runtime inspection endpoints.
+
 Use `AGENT_MAX_SPEAK_CHARS` or `TTS_MAX_TEXT_CHARS` to shorten speech. `TTS_MAX_LENGTH` is the TTS generation budget and should not be reduced to a small text-length value.
 
 See [Hardware Profiles](HARDWARE_PROFILES.md) for profile selection, CUDA architecture, model sizing, and Jetson limitations.

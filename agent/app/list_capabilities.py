@@ -2,22 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
-from .capabilities.local import build_chromie_registry
-from .capabilities.models import CapabilityBundle
-
-
-def _load_bundles(paths: list[str]) -> list[CapabilityBundle]:
-    bundles: list[CapabilityBundle] = []
-    for raw in paths:
-        path = Path(raw)
-        if path.is_dir():
-            for child in sorted(path.glob("*.json")):
-                bundles.append(CapabilityBundle.load_file(child))
-        else:
-            bundles.append(CapabilityBundle.load_file(path))
-    return bundles
+from .capabilities.loader import build_configured_registry
 
 
 def main() -> None:
@@ -28,7 +14,8 @@ def main() -> None:
     parser.add_argument("--language", default="en", help="Language for --llm-context, e.g. en or zh.")
     args = parser.parse_args()
 
-    registry = build_chromie_registry(_load_bundles(args.manifest))
+    configured = build_configured_registry(args.manifest)
+    registry = configured.registry
     if args.json:
         print(json.dumps(registry.model_dump(), ensure_ascii=False, indent=2))
         return

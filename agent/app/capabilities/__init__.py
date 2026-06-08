@@ -14,12 +14,19 @@ from .models import (
     TransportSpec,
 )
 from .local import chromie_capability_bundle, chromie_manifests
+from .loader import (
+    ConfiguredRegistry,
+    build_configured_registry,
+    load_capability_bundles,
+    parse_manifest_paths,
+)
 
 __all__ = [
     "AgentManifest",
     "AgentStatus",
     "CapabilityBundle",
     "CapabilityRegistry",
+    "ConfiguredRegistry",
     "ConfirmationPolicy",
     "ExecutionPolicy",
     "FailurePolicy",
@@ -29,4 +36,7 @@ __all__ = [
     "TransportSpec",
     "chromie_capability_bundle",
     "chromie_manifests",
+    "build_configured_registry",
+    "load_capability_bundles",
+    "parse_manifest_paths",
 ]

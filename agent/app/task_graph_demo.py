@@ -4,23 +4,10 @@ import argparse
 import json
 from pathlib import Path
 
-from .capabilities.local import build_chromie_registry
-from .capabilities.models import CapabilityBundle
+from .capabilities.loader import build_configured_registry
 from .task_graph.executor import DagDryRunExecutor
 from .task_graph.models import TaskGraph
 from .task_graph.validator import GraphValidator
-
-
-def _load_bundles(paths: list[str]) -> list[CapabilityBundle]:
-    bundles: list[CapabilityBundle] = []
-    for raw in paths:
-        path = Path(raw)
-        if path.is_dir():
-            for child in sorted(path.glob("*.json")):
-                bundles.append(CapabilityBundle.load_file(child))
-        else:
-            bundles.append(CapabilityBundle.load_file(path))
-    return bundles
 
 
 def main() -> None:
@@ -31,7 +18,7 @@ def main() -> None:
     parser.add_argument("--no-auto-confirm", action="store_true", help="Dry-run confirmation nodes as declined.")
     args = parser.parse_args()
 
-    registry = build_chromie_registry(_load_bundles(args.manifest))
+    registry = build_configured_registry(args.manifest).registry
     graph = TaskGraph.model_validate(json.loads(Path(args.graph).read_text(encoding="utf-8")))
     report = GraphValidator(registry).validate(graph)
     if not report.valid:

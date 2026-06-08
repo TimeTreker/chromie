@@ -10,7 +10,7 @@ from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field
 
 from .agents import AgentServices
-from .capabilities.local import build_chromie_registry
+from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .clients.ollama_client import OllamaClient
 from .runtime import AgentRuntime
 from .schema import AgentResult, AgentRunRequest, HealthResponse
@@ -34,6 +34,7 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "160")))
+    capability_manifests: str = Field(default_factory=lambda: os.getenv("AGENT_CAPABILITY_MANIFESTS", ""))
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     mode: Literal["runtime"] = "runtime"
 
@@ -53,8 +54,15 @@ services = AgentServices(
     max_speak_chars=settings.max_speak_chars,
 )
 runtime = AgentRuntime(services)
-capability_registry = build_chromie_registry()
+configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
+capability_registry = configured_registry.registry
 task_graph_service = TaskGraphService(capability_registry)
+logger.info(
+    "loaded capability registry sources=%s manifests=%s tools=%d",
+    ",".join(configured_registry.sources),
+    ",".join(configured_registry.manifest_files) or "<none>",
+    len(capability_registry.list_tools()),
+)
 
 app = FastAPI(
     title="Chromie Agent",
@@ -71,6 +79,8 @@ async def health() -> HealthResponse:
         ollama_url=settings.ollama_url,
         use_llm=settings.use_llm,
         available_agents=runtime.available_agents(),
+        capability_sources=configured_registry.sources,
+        capability_manifest_files=configured_registry.manifest_files,
     )
 
 
@@ -89,13 +99,10 @@ async def agents() -> dict:
 
 @app.get("/capabilities")
 async def capabilities() -> dict:
-    """Return Chromie's local capability registry.
-
-    The full global registry may also include remote MCP manifests loaded by an
-    agent host. This endpoint exposes the Chromie-side speech/task capabilities.
-    """
-
-    return capability_registry.model_dump()
+    payload = capability_registry.model_dump()
+    payload["sources"] = configured_registry.sources
+    payload["manifest_files"] = configured_registry.manifest_files
+    return payload
 
 
 @app.get("/capabilities/llm-context")

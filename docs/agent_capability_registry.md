@@ -39,6 +39,27 @@ PYTHONPATH=agent python -m app.list_capabilities \
   --llm-context --language zh
 ```
 
+## Agent runtime configuration
+
+The production Agent loads external manifests from the comma-separated
+`AGENT_CAPABILITY_MANIFESTS` setting. Files placed in the repository's
+`capabilities/` directory are mounted read-only at `/app/capabilities`.
+
+```env
+AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json
+```
+
+A configured file or directory must exist and every discovered JSON manifest
+must validate. The Agent fails at startup on missing, malformed, or duplicate
+capabilities rather than silently running with a partial registry.
+
+Inspect the active sources and mounted files through:
+
+```text
+GET /health
+GET /capabilities
+```
+
 ## Safety rule
 
 Chromie may plan and route tasks, but it must not receive raw motor, joint, or
