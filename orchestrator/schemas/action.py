@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
+from uuid import uuid4
+
 from pydantic import BaseModel, Field
 
-ActionStatus = Literal["queued", "running", "succeeded", "failed", "cancelled", "skipped"]
+ActionStatus = Literal["accepted", "running", "completed", "failed", "cancelled", "rejected", "skipped"]
 
 
 class ActionCommand(BaseModel):
-    id: str | None = None
+    id: str = Field(default_factory=lambda: f"act_{uuid4().hex[:12]}")
     target: str
     type: str
     params: dict[str, Any] = Field(default_factory=dict)
@@ -18,9 +21,12 @@ class ActionCommand(BaseModel):
 
 
 class ActionResult(BaseModel):
-    id: str | None = None
-    target: str | None = None
-    type: str | None = None
-    status: ActionStatus = "succeeded"
-    message: str | None = None
-    data: dict[str, Any] = Field(default_factory=dict)
+    id: str
+    target: str
+    type: str
+    status: ActionStatus = "completed"
+    message: str = ""
+    result: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None

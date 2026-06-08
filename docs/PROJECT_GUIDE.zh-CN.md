@@ -301,3 +301,19 @@ docker compose --env-file .env.runtime exec chromie-llm ollama list
 - [任务图](agent_task_graph.md)：多步骤任务的校验与执行。
 
 Chromie 的核心设计原则可以概括为：让 Orchestrator 管实时音频，让 Router 快速做决定，让 Agent 负责思考和规划，让每个模型服务保持独立、可观察和可替换。
+
+## 九、运行测试
+
+首次运行时安装轻量测试依赖：
+
+```bash
+INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh
+```
+
+之后直接运行：
+
+```bash
+./scripts/run_tests.sh
+```
+
+这套测试不需要 Docker、GPU、模型、音频设备或真实机器人硬件，覆盖 Router、跨服务数据契约、会话状态、Agent 安全策略、确认拦截和 mock hardware 链路。

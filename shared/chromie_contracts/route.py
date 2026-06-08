@@ -15,6 +15,7 @@ RouteName = Literal[
 ]
 
 Priority = Literal["low", "normal", "high", "urgent"]
+DecisionSource = Literal["rules", "llm", "fallback"]
 
 
 class RouteRequest(BaseModel):
@@ -33,5 +34,9 @@ class RouteDecision(BaseModel):
     priority: Priority = "normal"
     interrupt_current: bool = False
     needs_agent: bool = True
+    should_speak: bool = True
+    speak_first: str | None = None
+    actions: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
+    source: DecisionSource = "fallback"
     metadata: dict[str, Any] = Field(default_factory=dict)

@@ -24,8 +24,9 @@ class ActionCommand(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
     blocking: bool = False
     priority: str = "normal"
-    timeout_ms: int = Field(default=5000, ge=1, le=120000)
+    timeout_ms: int | None = Field(default=None, ge=1, le=120000)
     requires_confirmation: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

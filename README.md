@@ -207,6 +207,22 @@ docker compose --env-file .env.runtime logs -f chromie-tts
 
 For common failures such as model timeouts, duplicate replies, CPU-only TTS, or incorrect playback speed, see [Chromie Operations Runbook](CHROMIE_RUNBOOK.md).
 
+## Tests
+
+Run the GPU-free control-plane suite:
+
+```bash
+INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh
+```
+
+After dependencies are installed, use:
+
+```bash
+./scripts/run_tests.sh
+```
+
+The suite covers Router rules and mode selection, cross-service contracts, conversation state, Agent safety behavior, confirmation gating, and the mock hardware flow. It does not download models or require Docker, CUDA, audio devices, or robot hardware.
+
 ## Development Principles
 
 - Keep Router decisions fast and deterministic.

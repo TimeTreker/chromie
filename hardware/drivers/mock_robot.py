@@ -4,7 +4,10 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
-from schema import ActionCommand, ActionResult, ActionStatus, RobotState
+try:
+    from ..schema import ActionCommand, ActionResult, ActionStatus, RobotState
+except ImportError:  # pragma: no cover - direct script launch
+    from schema import ActionCommand, ActionResult, ActionStatus, RobotState
 
 
 class MockRobotDriver:

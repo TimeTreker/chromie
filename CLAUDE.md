@@ -23,4 +23,5 @@ Treat the repository and current implementation as the source of truth. Do not r
 - Keep TTS generation serialized unless the backend is redesigned for concurrency.
 - Log fallback causes; do not silently hide model or service failures.
 - Use `docker compose --env-file .env.runtime ...` for manual Compose commands.
+- Run `./scripts/run_tests.sh` for control-plane changes.
 - Verify syntax and relevant tests before finishing.

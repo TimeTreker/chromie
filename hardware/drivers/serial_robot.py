@@ -4,7 +4,10 @@ import json
 import os
 from typing import Any
 
-from schema import ActionCommand
+try:
+    from ..schema import ActionCommand
+except ImportError:  # pragma: no cover - direct script launch
+    from schema import ActionCommand
 
 
 class SerialRobotDriver:

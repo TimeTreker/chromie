@@ -10,26 +10,18 @@ from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field
 
+from .config import router_mode_from_env
 from .fallback import fallback_decision
 from .llm_router import OllamaLLMRouter
 from .rules import route_by_rules
 from .schema import HealthResponse, RouteDecision, RouteRequest, finalize_decision
 
 
-def _router_mode_from_env() -> str:
-    explicit_mode = os.getenv("ROUTER_MODE")
-    if explicit_mode:
-        return explicit_mode.strip().lower()
-
-    use_llm = os.getenv("ROUTER_USE_LLM", "0").strip().lower() not in {"0", "false", "no", "off"}
-    return "hybrid" if use_llm else "rules_only"
-
-
 class Settings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv("ROUTER_HOST", "0.0.0.0"))
     port: int = Field(default_factory=lambda: int(os.getenv("ROUTER_PORT", "8091")))
     mode: Literal["rules_only", "llm_only", "hybrid"] = Field(
-        default_factory=_router_mode_from_env
+        default_factory=router_mode_from_env
     )
     rules_first: bool = Field(
         default_factory=lambda: os.getenv("ROUTER_RULES_FIRST", "1").strip().lower()

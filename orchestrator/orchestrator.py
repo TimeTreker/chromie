@@ -777,6 +777,15 @@ class VoiceAssistant:
         for action in result.actions:
             action_start_ms = now_ms()
             self.session_log(session_id, "action_start: id=%s target=%s type=%s blocking=%s dry_run=%s", action.id, action.target, action.type, action.blocking, self.action_dry_run)
+            if action.requires_confirmation:
+                self.session_log(
+                    session_id,
+                    "action_waiting_confirmation: id=%s target=%s type=%s",
+                    action.id,
+                    action.target,
+                    action.type,
+                )
+                continue
             if self.action_dry_run:
                 self.session_log(session_id, "action_dry_run: id=%s target=%s type=%s params=%s", action.id, action.target, action.type, action.params)
                 continue

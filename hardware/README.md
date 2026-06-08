@@ -14,6 +14,8 @@ The daemon exposes a small HTTP API used by `chromie-orchestrator`:
 
 By default it uses the mock driver, so you can test the full route → agent → action flow without real hardware.
 
+The daemon rejects `unsafe.*` actions and any action that still has `requires_confirmation=true`. Confirmation must be resolved by the Orchestrator before an action reaches hardware.
+
 ## Run on host
 
 ```bash

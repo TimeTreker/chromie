@@ -7,8 +7,12 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import ORJSONResponse
 
-from schema import ActionCommand, ActionResult, ActionStatus, HealthResponse, RobotState
-from drivers.mock_robot import MockRobotDriver
+try:
+    from .schema import ActionCommand, ActionResult, HealthResponse, RobotState
+    from .service import HardwareService
+except ImportError:  # pragma: no cover - direct script launch
+    from schema import ActionCommand, ActionResult, HealthResponse, RobotState
+    from service import HardwareService
 
 SERVICE_NAME = "chromie-hardware"
 HARDWARE_DRIVER = os.getenv("HARDWARE_DRIVER", "mock").strip().lower()
@@ -21,9 +25,9 @@ app = FastAPI(
     default_response_class=ORJSONResponse,
 )
 
-# In v1, only mock is enabled by default. Keep real driver wiring explicit.
-driver = MockRobotDriver()
-action_results: dict[str, ActionResult] = {}
+service = HardwareService()
+driver = service.driver
+action_results = service.action_results
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -44,25 +48,12 @@ async def execute_action(command: ActionCommand) -> ActionResult:
     executes. Higher-level planning belongs in chromie-agent; scheduling and
     cancellation belong in host chromie-orchestrator.
     """
-    if command.type.startswith("unsafe."):
-        result = ActionResult(
-            id=command.id,
-            status=ActionStatus.REJECTED,
-            target=command.target,
-            type=command.type,
-            error="unsafe action namespace is rejected",
-        )
-        action_results[command.id] = result
-        return result
-
-    result = await driver.execute(command)
-    action_results[command.id] = result
-    return result
+    return await service.execute(command)
 
 
 @app.get("/actions/{action_id}", response_model=ActionResult)
 async def get_action(action_id: str) -> ActionResult:
-    result = action_results.get(action_id)
+    result = service.get_action(action_id)
     if result is None:
         raise HTTPException(status_code=404, detail=f"unknown action_id: {action_id}")
     return result
