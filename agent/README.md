@@ -107,6 +107,11 @@ registry, and returns it in `AgentResult.task_graphs`.
 Planning does not execute tools. Invalid model output falls back to the existing
 single `tool_executor` action path.
 
+The MCP Streamable HTTP adapter is available behind the async `ToolInvoker`
+boundary. It derives endpoints from loaded manifests and enforces side-effect,
+confirmation, safety-monitor, and safety-control authorization before making a
+remote call. Automatic graph execution is still disabled.
+
 ## Run locally
 
 ```bash

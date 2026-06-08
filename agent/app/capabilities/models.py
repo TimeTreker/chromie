@@ -193,6 +193,9 @@ class CapabilityRegistry:
     def list_agents(self) -> list[AgentManifest]:
         return [self._agents[key] for key in sorted(self._agents)]
 
+    def get_agent(self, agent_id: str) -> AgentManifest:
+        return self._agents[agent_id]
+
     def list_tools(self) -> list[ToolCapability]:
         return [self._tools[key] for key in sorted(self._tools)]
 

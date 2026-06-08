@@ -123,3 +123,21 @@ TaskGraph node -> resolved args -> ToolInvoker.invoke(tool_name, args) -> ToolCa
 
 This keeps LLM/DAG planning independent from the transport. Real MCP should wrap
 the same `ToolInvoker` protocol rather than changing the DAG schema.
+
+## MCP Streamable HTTP adapter
+
+`McpStreamableHttpInvoker` uses the official MCP Python SDK and the URL declared
+by each agent manifest's `TransportSpec`. It normalizes MCP structured content,
+text content, tool errors, transport errors, and timeouts into
+`ToolCallOutcome`.
+
+Invocation is policy-gated independently from graph validation:
+
+- restricted tools are always rejected
+- low-risk side effects require explicit side-effect authorization
+- physical motion additionally requires confirmation and an active safety monitor
+- safety-critical controls require explicit safety-control authorization
+
+The adapter is not yet connected to automatic TaskGraph execution. Planned
+graphs remain observable artifacts until the execution coordinator supplies
+these proofs.

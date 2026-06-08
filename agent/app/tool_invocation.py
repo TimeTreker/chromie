@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+from collections.abc import Awaitable, Callable
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
+
+from .capabilities.models import CapabilityRegistry, ToolCapability
 
 ToolOutcomeStatus = Literal[
     "success",
@@ -45,6 +48,26 @@ class ToolInvoker(Protocol):
         ...
 
 
+class ToolInvocationContext(BaseModel):
+    """Proof supplied by the execution coordinator for guarded side effects."""
+
+    allow_side_effects: bool = False
+    confirmed: bool = False
+    safety_monitor_active: bool = False
+    allow_safety_controls: bool = False
+
+
+class AsyncToolInvoker(Protocol):
+    async def invoke(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> ToolCallOutcome:
+        ...
+
+
 class FunctionToolInvoker:
     """In-process tool registry for tests and local Chromie tools.
 
@@ -79,3 +102,137 @@ class FunctionToolInvoker:
         if not isinstance(raw, dict):
             return ToolCallOutcome.failed(f"handler {tool_name!r} returned {type(raw).__name__}, expected dict")
         return ToolCallOutcome.success(raw)
+
+
+McpCall = Callable[[str, str, dict[str, Any], float], Awaitable[Any]]
+
+
+class McpStreamableHttpInvoker:
+    """Invoke registry-approved tools through MCP Streamable HTTP."""
+
+    def __init__(
+        self,
+        registry: CapabilityRegistry,
+        *,
+        timeout_s: float = 30.0,
+        call: McpCall | None = None,
+    ) -> None:
+        self.registry = registry
+        self.timeout_s = timeout_s
+        self._call = call or self._call_with_sdk
+
+    async def invoke(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> ToolCallOutcome:
+        try:
+            capability = self.registry.get_tool(tool_name)
+            agent = self.registry.get_agent(capability.agent_id)
+        except KeyError:
+            return ToolCallOutcome.failed(f"unknown registered tool {tool_name!r}")
+
+        error = self._policy_error(capability, context or ToolInvocationContext())
+        if error:
+            return ToolCallOutcome.failed(error)
+
+        transport = agent.transport
+        if transport.kind not in {"mcp_streamable_http", "streamable_http"}:
+            return ToolCallOutcome.failed(
+                f"tool {tool_name!r} uses unsupported transport {transport.kind!r}"
+            )
+        if not transport.url:
+            return ToolCallOutcome.failed(f"tool {tool_name!r} has no MCP transport URL")
+
+        timeout_s = capability.execution.timeout_s or self.timeout_s
+        try:
+            raw = await self._call(transport.url, tool_name, args, timeout_s)
+        except TimeoutError as exc:
+            return ToolCallOutcome(status="timeout", error=str(exc) or "MCP tool timeout")
+        except Exception as exc:
+            return ToolCallOutcome.failed(str(exc) or exc.__class__.__name__, retryable=True)
+        return self._normalize_result(raw)
+
+    def _policy_error(
+        self,
+        capability: ToolCapability,
+        context: ToolInvocationContext,
+    ) -> str | None:
+        if not capability.availability.available:
+            return capability.availability.reason or f"tool {capability.name!r} is unavailable"
+        if capability.safety_class == "restricted":
+            return f"restricted tool {capability.name!r} cannot be invoked"
+        if capability.safety_class == "safety_critical":
+            if not context.allow_safety_controls:
+                return f"safety-critical tool {capability.name!r} requires explicit safety-control authorization"
+            return None
+        if capability.safety_class in {"low_risk_action", "physical_motion"} and not context.allow_side_effects:
+            return f"tool {capability.name!r} requires explicit side-effect authorization"
+        if capability.confirmation.required and not context.confirmed:
+            return f"tool {capability.name!r} requires confirmed user approval"
+        if capability.monitoring.requires_safety_monitor and not context.safety_monitor_active:
+            return f"tool {capability.name!r} requires an active safety monitor"
+        return None
+
+    async def _call_with_sdk(
+        self,
+        url: str,
+        tool_name: str,
+        args: dict[str, Any],
+        timeout_s: float,
+    ) -> Any:
+        import httpx
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamable_http_client
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_s)) as http_client:
+            async with streamable_http_client(url, http_client=http_client) as (read, write, _):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    return await session.call_tool(tool_name, args)
+
+    def _normalize_result(self, raw: Any) -> ToolCallOutcome:
+        is_error = bool(self._field(raw, "isError", "is_error", default=False))
+        structured = self._field(raw, "structuredContent", "structured_content")
+        content = self._field(raw, "content", default=[]) or []
+        text_parts = [
+            str(self._field(item, "text"))
+            for item in content
+            if self._field(item, "type") == "text" and self._field(item, "text") is not None
+        ]
+        message = "\n".join(text_parts).strip()
+
+        if is_error:
+            return ToolCallOutcome.failed(message or "MCP tool returned an error")
+        if isinstance(structured, dict):
+            return ToolCallOutcome.success(structured)
+        if message:
+            try:
+                parsed = json.loads(message)
+            except json.JSONDecodeError:
+                return ToolCallOutcome.success({"text": message})
+            if isinstance(parsed, dict):
+                return ToolCallOutcome.success(parsed)
+        return ToolCallOutcome.success({"content": self._jsonable(content)})
+
+    def _field(self, value: Any, *names: str, default: Any = None) -> Any:
+        if isinstance(value, dict):
+            for name in names:
+                if name in value:
+                    return value[name]
+            return default
+        for name in names:
+            if hasattr(value, name):
+                return getattr(value, name)
+        return default
+
+    def _jsonable(self, value: Any) -> Any:
+        if isinstance(value, list):
+            return [self._jsonable(item) for item in value]
+        if isinstance(value, dict):
+            return {key: self._jsonable(item) for key, item in value.items()}
+        if hasattr(value, "model_dump"):
+            return value.model_dump(mode="json")
+        return value
