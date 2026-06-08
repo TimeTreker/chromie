@@ -6,9 +6,13 @@ Chromie's roadmap is organized around deployable milestones. A milestone is comp
 
 ## Current Position
 
-**Current milestone: M4 - TaskGraph production integration (in progress).**
+**Current milestone: M5 - External capability deployment and acceptance (in progress).**
 
-The capability registry, TaskGraph schema, safety validator, dry-run executor, and transport-neutral `ToolInvoker` exist. M4 is moving those pieces from CLI/test-only infrastructure into the running Agent service before any real MCP or robot transport is enabled.
+M4 is complete: TaskGraph planning, validation, dry-run, guarded MCP execution,
+single-use confirmation grants, cancellation, traces, monitor gating, and
+emergency fallback orchestration are integrated into the Agent service. M5
+connects those boundaries to a real Soridormi deployment and validates them on
+the target GPU/robot host.
 
 ## Milestones
 
@@ -18,8 +22,8 @@ The capability registry, TaskGraph schema, safety validator, dry-run executor, a
 | M1 - Realtime voice loop | Complete | ASR, Router, Agent, Ollama, TTS, interruption, playback, and deterministic fallback behavior |
 | M2 - Contracts and safety | Complete | Cross-service contracts, confirmation gating, mock hardware flow, and GPU-free regression suite |
 | M3 - Target GPU verification | Tooling complete; target run pending | Automated GPU, service health, Ollama, ASR WebSocket, and TTS backend smoke checks |
-| M4 - TaskGraph production integration | **In progress** | Agent API validation/dry-run, trace inspection, runtime planning integration, and guarded execution boundary |
-| M5 - External capability transport | Planned | Invoke approved MCP/Soridormi tools through `ToolInvoker` transport adapters |
+| M4 - TaskGraph production integration | Complete | Agent planning, validation, traces, guarded MCP execution, one-time grants, cancellation, and emergency fallbacks |
+| M5 - External capability deployment | **In progress** | Connect a real Soridormi manifest/server and complete target-host acceptance |
 | M6 - Extended autonomy | Planned | Vision, richer memory, recovery policies, observability, and longer-running tasks |
 
 ## M4 Exit Criteria
@@ -31,16 +35,30 @@ The capability registry, TaskGraph schema, safety validator, dry-run executor, a
 - Graph lifecycle, failures, fallbacks, and timing are observable.
 - Integration tests cover valid, invalid, declined-confirmation, and interrupted task flows.
 
-## Immediate Sequence
+## M4 Completion
 
 1. [Complete] Expose validation, dry-run, and trace lookup through `chromie-agent`.
 2. [Complete] Load configured external capability manifests into the Agent registry.
 3. [Complete] Add an explicit TaskGraph planning path without changing the existing fast conversation path.
-4. [In progress] Implement MCP/Soridormi transport adapters behind `ToolInvoker`
-   (Streamable HTTP, read-only execution, and supervised confirmation/monitor-backed
-   execution complete; cancellation and emergency fallback orchestration pending).
-5. Add execution cancellation, one-time confirmation grants, and emergency fallback handling.
-6. Run the target GPU smoke test and then perform supervised hardware acceptance tests.
+4. [Complete] Implement MCP Streamable HTTP behind `ToolInvoker`, including read-only and supervised side-effect execution.
+5. [Complete] Add single-use graph-bound confirmation grants, execution cancellation, and emergency fallback handling.
+
+## M5 Exit Criteria
+
+- A real Soridormi capability manifest loads through `AGENT_CAPABILITY_MANIFESTS`.
+- Chromie validates and executes Soridormi safe-read/planning tools over MCP.
+- A supervised physical graph proves confirmation, monitor activation, and emergency fallback behavior.
+- Cancellation is verified against the real MCP server and robot safety layer.
+- Target GPU smoke tests and supervised hardware acceptance checks pass.
+- Deployment configuration and runbook document the accepted Soridormi endpoint and recovery procedure.
+
+## Immediate Sequence
+
+1. Add or import the production Soridormi capability manifest.
+2. Configure and probe the real MCP Streamable HTTP endpoint.
+3. Run read-only and planning acceptance graphs.
+4. Run supervised motion, cancellation, and emergency-stop acceptance.
+5. Complete the target GPU smoke test and record the accepted deployment profile.
 
 ## Evidence
 
@@ -48,5 +66,7 @@ The capability registry, TaskGraph schema, safety validator, dry-run executor, a
 - `6287f9e`: GPU-free control-plane integration tests
 - `2d41e1b`: target-machine GPU smoke test tooling
 - `2aa0549`, `a0db0f6`, `47618ea`: capability registry, TaskGraph validation/execution, and tool invocation bridge
+- M4 implementation: production APIs, manifest loading, planning, MCP
+  transport, guarded execution, cancellation, and emergency fallbacks
 
 The target GPU smoke test must still be run on the Linux NVIDIA host. That operational check is tracked separately from implementation completion.

@@ -18,6 +18,9 @@ from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .task_graph import (
     ExecutionTrace,
     TaskGraph,
+    TaskGraphCancelResponse,
+    TaskGraphConfirmationGrantRequest,
+    TaskGraphConfirmationGrantResponse,
     TaskGraphDryRunRequest,
     TaskGraphExecuteRequest,
     TaskGraphGuardedExecuteRequest,
@@ -124,6 +127,12 @@ app = FastAPI(
 )
 
 
+def require_task_graph_execution_auth(authorization: str | None) -> None:
+    expected = f"Bearer {settings.task_graph_execution_token}"
+    if not authorization or not secrets.compare_digest(authorization, expected):
+        raise HTTPException(status_code=401, detail="invalid TaskGraph execution authorization")
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     return HealthResponse(
@@ -197,15 +206,43 @@ async def execute_guarded_task_graph(
     request: TaskGraphGuardedExecuteRequest,
     authorization: str | None = Header(default=None),
 ) -> ExecutionTrace:
-    expected = f"Bearer {settings.task_graph_execution_token}"
-    if not authorization or not secrets.compare_digest(authorization, expected):
-        raise HTTPException(status_code=401, detail="invalid TaskGraph execution authorization")
+    require_task_graph_execution_auth(authorization)
     try:
-        return await task_graph_service.execute_guarded(request.graph, request.proofs)
+        return await task_graph_service.execute_guarded(
+            request.graph,
+            request.confirmation_grant,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post(
+    "/task-graphs/confirmation-grants",
+    response_model=TaskGraphConfirmationGrantResponse,
+)
+async def create_task_graph_confirmation_grant(
+    request: TaskGraphConfirmationGrantRequest,
+    authorization: str | None = Header(default=None),
+) -> TaskGraphConfirmationGrantResponse:
+    require_task_graph_execution_auth(authorization)
+    try:
+        return task_graph_service.issue_confirmation_grant(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post(
+    "/task-graphs/{graph_id}/cancel",
+    response_model=TaskGraphCancelResponse,
+)
+async def cancel_task_graph(
+    graph_id: str,
+    authorization: str | None = Header(default=None),
+) -> TaskGraphCancelResponse:
+    require_task_graph_execution_auth(authorization)
+    return task_graph_service.cancel_execution(graph_id)
 
 
 @app.get("/task-graphs/{graph_id}/trace", response_model=ExecutionTrace)

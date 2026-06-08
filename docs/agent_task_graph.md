@@ -18,10 +18,12 @@ The task graph layer provides:
 - `DagToolExecutor` with a transport-neutral `ToolInvoker`
 - Agent API endpoints for validation, dry-run execution, and trace lookup
 
-Chromie does not currently ship an MCP transport in this layer. Real robot execution must remain behind registered safe tools and the existing hardware boundary.
+Chromie ships an MCP Streamable HTTP transport behind `ToolInvoker`. Real
+robot execution remains behind registered capabilities, confirmation grants,
+monitor gating, emergency fallbacks, and the existing hardware boundary.
 
-This work is tracked as **M4 - TaskGraph production integration** in the
-[project roadmap](../ROADMAP.md).
+This layer completed **M4 - TaskGraph production integration**. Real external
+deployment and acceptance are tracked as M5 in the [project roadmap](../ROADMAP.md).
 
 ## Agent API
 
@@ -167,17 +169,26 @@ AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=1
 AGENT_TASK_GRAPH_EXECUTION_TOKEN=<long-random-secret>
 ```
 
-The caller submits the graph plus `proofs.confirmed_node_ids` to:
+The operator first exchanges the exact graph and confirmed node IDs for a
+short-lived grant:
+
+```text
+POST /task-graphs/confirmation-grants
+Authorization: Bearer <long-random-secret>
+```
+
+The returned opaque grant is single-use, expires within at most five minutes,
+and is bound to a hash of the exact graph. The caller then submits:
 
 ```text
 POST /task-graphs/execute-guarded
 Authorization: Bearer <long-random-secret>
 ```
 
-Confirmation proofs must name actual confirmation nodes in that graph, and
-tools that require confirmation must depend on those nodes. The coordinator
-represents confirmed nodes locally; it does not invoke `chromie.ask_confirmation`
-as an MCP tool.
+with `confirmation_grant` beside the graph. Confirmed IDs must name actual
+confirmation nodes, and tools that require confirmation must depend on them.
+The coordinator represents confirmed nodes locally; it does not invoke
+`chromie.ask_confirmation` as an MCP tool.
 
 Physical motion has a second, independent deployment gate:
 
@@ -187,8 +198,19 @@ AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1
 
 A monitor node covering the physical node must successfully return `ok: true`
 or `active: true` before motion is invoked. The MCP invoker then independently
-checks confirmation and monitor context again.
+checks confirmation and monitor context again. Every physical node must also
+declare an `on_failure` target that is a registered emergency-stop safety node.
+
+An authorized caller can cancel an active graph:
+
+```text
+POST /task-graphs/{graph_id}/cancel
+Authorization: Bearer <long-random-secret>
+```
+
+Cancellation propagates to the task awaiting the MCP call. If physical
+execution has started, Chromie invokes the declared emergency-stop fallback and
+records a cancelled trace.
 
 This is supervised operator attestation, not yet Chromie's end-user voice
-confirmation workflow. Graph cancellation, emergency fallback orchestration,
-and one-time confirmation grants remain pending.
+confirmation workflow.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 
 from pydantic import BaseModel, Field
@@ -176,30 +177,77 @@ class GuardedTaskGraphExecutor:
         pending = set(nodes)
         results: dict[str, NodeResult] = {}
         active_monitors: set[str] = set()
+        fallback_targets = self._fallback_targets(graph)
+        current_node: TaskNode | None = None
+        physical_started = False
 
-        while pending:
-            ready = [
-                nodes[node_id]
-                for node_id in pending
-                if all(dep in results and results[dep].status == "success" for dep in nodes[node_id].depends_on)
-            ]
-            if not ready:
-                self._record_blocked(pending, nodes, results, trace)
-                break
-
-            for node in sorted(ready, key=self._execution_priority):
-                pending.remove(node.id)
-                result = await self._execute_node(node, nodes, results, proofs, active_monitors)
-                self._record(trace, results, result)
-                monitor_started = (
-                    result.output.get("ok") is True or result.output.get("active") is True
-                )
-                if node.type == "monitor" and result.status == "success" and monitor_started:
-                    active_monitors.add(node.id)
-                if result.status != "success":
+        try:
+            while pending:
+                ready = [
+                    nodes[node_id]
+                    for node_id in pending
+                    if node_id not in fallback_targets
+                    and all(
+                        dep in results and results[dep].status == "success"
+                        for dep in nodes[node_id].depends_on
+                    )
+                ]
+                if not ready:
+                    dormant_fallbacks = pending & fallback_targets
+                    pending.difference_update(dormant_fallbacks)
+                    if not pending:
+                        break
                     self._record_blocked(pending, nodes, results, trace)
-                    pending.clear()
                     break
+
+                for node in sorted(ready, key=self._execution_priority):
+                    current_node = node
+                    if self._is_physical(node):
+                        physical_started = True
+                    pending.remove(node.id)
+                    result = await self._execute_node(node, nodes, results, proofs, active_monitors)
+                    current_node = None
+                    self._record(trace, results, result)
+                    monitor_started = (
+                        result.output.get("ok") is True or result.output.get("active") is True
+                    )
+                    if node.type == "monitor" and result.status == "success" and monitor_started:
+                        active_monitors.add(node.id)
+                    if result.status != "success":
+                        if self._is_physical(node):
+                            await self._run_emergency_fallback(node, nodes, pending, results, trace)
+                        self._record_blocked(pending, nodes, results, trace)
+                        pending.clear()
+                        break
+        except asyncio.CancelledError:
+            if current_node is not None and current_node.id not in results:
+                self._record(
+                    trace,
+                    results,
+                    NodeResult(
+                        node_id=current_node.id,
+                        tool=current_node.tool,
+                        status="cancelled",
+                        error="execution cancelled",
+                    ),
+                )
+            if physical_started:
+                await asyncio.shield(
+                    self._run_all_emergency_fallbacks(graph, nodes, pending, results, trace)
+                )
+            for node_id in sorted(pending):
+                node = nodes[node_id]
+                if node.id not in results:
+                    self._record(
+                        trace,
+                        results,
+                        NodeResult(node_id=node.id, tool=node.tool, status="cancelled"),
+                    )
+            trace.status = "cancelled"
+            trace.events.append(
+                ExecutionEvent(type="graph_cancelled", message="TaskGraph execution cancelled.")
+            )
+            return trace
 
         trace.status = (
             "success"
@@ -244,6 +292,11 @@ class GuardedTaskGraphExecutor:
             if capability.safety_class == "physical_motion":
                 if not self.allow_physical_motion:
                     raise ValueError("physical TaskGraph execution is disabled")
+                fallback = self._emergency_fallback_node(node, nodes)
+                if fallback is None:
+                    raise ValueError(
+                        f"physical node {node.id!r} requires an emergency-stop fallback target"
+                    )
             if node.tool == "chromie.ask_confirmation":
                 continue
             agent = self.registry.get_agent(capability.agent_id)
@@ -316,6 +369,88 @@ class GuardedTaskGraphExecutor:
     def _execution_priority(self, node: TaskNode) -> tuple[int, str]:
         priority = {"confirmation": 0, "monitor": 1, "safety": 2}.get(node.type, 3)
         return priority, node.id
+
+    def _fallback_targets(self, graph: TaskGraph) -> set[str]:
+        targets: set[str] = set()
+        for node in graph.nodes:
+            for policy in (node.on_failure, node.on_timeout):
+                if policy and policy.target:
+                    targets.add(policy.target)
+            for policy in node.on_event.values():
+                if policy.target:
+                    targets.add(policy.target)
+        return targets
+
+    def _is_physical(self, node: TaskNode) -> bool:
+        capability = self.registry.get_tool(node.tool)
+        return capability.safety_class == "physical_motion" or "physical_motion" in capability.effects
+
+    def _emergency_fallback_node(
+        self,
+        node: TaskNode,
+        nodes: dict[str, TaskNode],
+    ) -> TaskNode | None:
+        target = node.on_failure.target if node.on_failure else None
+        if not target or target not in nodes:
+            return None
+        fallback = nodes[target]
+        capability = self.registry.get_tool(fallback.tool)
+        if (
+            fallback.type == "safety"
+            and capability.safety_class == "safety_critical"
+            and "emergency_stop" in fallback.tool
+        ):
+            return fallback
+        return None
+
+    async def _run_emergency_fallback(
+        self,
+        node: TaskNode,
+        nodes: dict[str, TaskNode],
+        pending: set[str],
+        results: dict[str, NodeResult],
+        trace: ExecutionTrace,
+    ) -> None:
+        fallback = self._emergency_fallback_node(node, nodes)
+        if fallback is None or fallback.id in results:
+            return
+        pending.discard(fallback.id)
+        outcome = await self.invoker.invoke(
+            fallback.tool,
+            fallback.args,
+            context=ToolInvocationContext(allow_safety_controls=True),
+        )
+        self._record(
+            trace,
+            results,
+            NodeResult(
+                node_id=fallback.id,
+                tool=fallback.tool,
+                status=outcome.status,
+                output=outcome.output,
+                error=outcome.error,
+            ),
+        )
+        trace.events.append(
+            ExecutionEvent(
+                type="emergency_fallback",
+                node_id=fallback.id,
+                tool=fallback.tool,
+                message=outcome.status,
+            )
+        )
+
+    async def _run_all_emergency_fallbacks(
+        self,
+        graph: TaskGraph,
+        nodes: dict[str, TaskNode],
+        pending: set[str],
+        results: dict[str, NodeResult],
+        trace: ExecutionTrace,
+    ) -> None:
+        for node in graph.nodes:
+            if self._is_physical(node):
+                await self._run_emergency_fallback(node, nodes, pending, results, trace)
 
     def _transitive_confirmation_nodes(
         self,

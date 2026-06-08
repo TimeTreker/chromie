@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from typing import Any
+from unittest.mock import patch
 
 from agent.app.capabilities.local import build_chromie_registry
 from agent.app.capabilities.models import (
@@ -14,9 +16,12 @@ from agent.app.capabilities.models import (
     ToolCapability,
     TransportSpec,
 )
-from agent.app.task_graph.async_executor import TaskGraphExecutionProofs
 from agent.app.task_graph.models import TaskGraph
-from agent.app.task_graph.service import TaskGraphService
+from agent.app.task_graph.grants import ConfirmationGrantStore
+from agent.app.task_graph.service import (
+    TaskGraphConfirmationGrantRequest,
+    TaskGraphService,
+)
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
 
@@ -54,6 +59,12 @@ def _registry():
                         monitoring=MonitoringPolicy(requires_safety_monitor=True),
                         execution=ExecutionPolicy(side_effect_free=False),
                         default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+                    ),
+                    ToolCapability(
+                        name="remote.emergency_stop",
+                        agent_id="remote.control",
+                        safety_class="safety_critical",
+                        effects=["safety_control"],
                     ),
                 ],
             )
@@ -110,6 +121,12 @@ def _physical_graph() -> TaskGraph:
                     "type": "action",
                     "depends_on": ["confirm"],
                     "args": {"distance_m": 0.1},
+                    "on_failure": {"strategy": "goto", "target": "emergency"},
+                },
+                {
+                    "id": "emergency",
+                    "tool": "remote.emergency_stop",
+                    "type": "safety",
                 },
             ],
         }
@@ -117,6 +134,14 @@ def _physical_graph() -> TaskGraph:
 
 
 class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
+    def _grant(self, service: TaskGraphService, graph: TaskGraph) -> str:
+        return service.issue_confirmation_grant(
+            TaskGraphConfirmationGrantRequest(
+                graph=graph,
+                confirmed_node_ids={"confirm"},
+            )
+        ).confirmation_grant
+
     async def test_confirmed_low_risk_side_effect_executes(self) -> None:
         calls: list[str] = []
 
@@ -130,10 +155,8 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
         )
 
-        trace = await service.execute_guarded(
-            _confirmed_write_graph(),
-            TaskGraphExecutionProofs(confirmed_node_ids={"confirm"}),
-        )
+        graph = _confirmed_write_graph()
+        trace = await service.execute_guarded(graph, self._grant(service, graph))
 
         self.assertEqual(trace.status, "success")
         self.assertEqual(calls, ["remote.write"])
@@ -154,10 +177,11 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "node-bound confirmation proof"):
-            await service.execute_guarded(
-                _confirmed_write_graph(),
-                TaskGraphExecutionProofs(),
-            )
+            graph = _confirmed_write_graph()
+            grant = service.issue_confirmation_grant(
+                TaskGraphConfirmationGrantRequest(graph=graph)
+            ).confirmation_grant
+            await service.execute_guarded(graph, grant)
 
         self.assertEqual(calls, 0)
 
@@ -177,10 +201,8 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             allow_physical_motion=True,
         )
 
-        trace = await service.execute_guarded(
-            _physical_graph(),
-            TaskGraphExecutionProofs(confirmed_node_ids={"confirm"}),
-        )
+        graph = _physical_graph()
+        trace = await service.execute_guarded(graph, self._grant(service, graph))
 
         self.assertEqual(trace.status, "success")
         self.assertEqual(calls, ["remote.monitor", "remote.move"])
@@ -199,14 +221,14 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             allow_physical_motion=True,
         )
 
-        trace = await service.execute_guarded(
-            _physical_graph(),
-            TaskGraphExecutionProofs(confirmed_node_ids={"confirm"}),
-        )
+        graph = _physical_graph()
+        trace = await service.execute_guarded(graph, self._grant(service, graph))
 
         self.assertEqual(trace.status, "failed")
-        self.assertEqual(calls, ["remote.monitor"])
+        self.assertEqual(calls, ["remote.monitor", "remote.emergency_stop"])
         self.assertIn("active safety monitor", trace.result_map()["move"].error or "")
+        self.assertEqual(trace.result_map()["emergency"].status, "success")
+        self.assertTrue(any(event.type == "emergency_fallback" for event in trace.events))
 
     async def test_physical_motion_has_separate_enable_gate(self) -> None:
         calls = 0
@@ -224,12 +246,106 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with self.assertRaisesRegex(ValueError, "physical TaskGraph execution is disabled"):
-            await service.execute_guarded(
-                _physical_graph(),
-                TaskGraphExecutionProofs(confirmed_node_ids={"confirm"}),
-            )
+            graph = _physical_graph()
+            await service.execute_guarded(graph, self._grant(service, graph))
 
         self.assertEqual(calls, 0)
+
+    async def test_confirmation_grant_is_single_use_and_graph_bound(self) -> None:
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float) -> dict[str, Any]:
+            return {"structuredContent": {"written": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+        )
+        graph = _confirmed_write_graph()
+        grant = self._grant(service, graph)
+
+        await service.execute_guarded(graph, grant)
+        with self.assertRaisesRegex(ValueError, "invalid or already used"):
+            await service.execute_guarded(graph, grant)
+
+        other_graph = graph.model_copy(update={"graph_id": "different"}, deep=True)
+        other_grant = self._grant(service, graph)
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            await service.execute_guarded(other_graph, other_grant)
+
+    async def test_cancellation_cancels_inflight_motion_and_runs_emergency_stop(self) -> None:
+        calls: list[str] = []
+        motion_started = asyncio.Event()
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float) -> dict[str, Any]:
+            calls.append(tool)
+            if tool == "remote.monitor":
+                return {"structuredContent": {"active": True}}
+            if tool == "remote.move":
+                motion_started.set()
+                await asyncio.Event().wait()
+            return {"structuredContent": {"stopped": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+            allow_physical_motion=True,
+        )
+        graph = _physical_graph()
+        execution = asyncio.create_task(
+            service.execute_guarded(graph, self._grant(service, graph))
+        )
+        await asyncio.wait_for(motion_started.wait(), timeout=1.0)
+
+        cancellation = service.cancel_execution(graph.graph_id)
+        trace = await asyncio.wait_for(execution, timeout=1.0)
+
+        self.assertTrue(cancellation.cancellation_requested)
+        self.assertEqual(trace.status, "cancelled")
+        self.assertEqual(calls, ["remote.monitor", "remote.move", "remote.emergency_stop"])
+        self.assertEqual(trace.result_map()["move"].status, "cancelled")
+        self.assertEqual(trace.result_map()["emergency"].status, "success")
+        self.assertFalse(service.cancel_execution(graph.graph_id).cancellation_requested)
+
+    async def test_physical_failure_runs_emergency_stop(self) -> None:
+        calls: list[str] = []
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float) -> dict[str, Any]:
+            calls.append(tool)
+            if tool == "remote.monitor":
+                return {"structuredContent": {"active": True}}
+            if tool == "remote.move":
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": "motor controller fault"}],
+                }
+            return {"structuredContent": {"stopped": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+            allow_physical_motion=True,
+        )
+        graph = _physical_graph()
+
+        trace = await service.execute_guarded(graph, self._grant(service, graph))
+
+        self.assertEqual(trace.status, "failed")
+        self.assertEqual(calls, ["remote.monitor", "remote.move", "remote.emergency_stop"])
+        self.assertEqual(trace.result_map()["move"].status, "failed_fatal")
+        self.assertEqual(trace.result_map()["emergency"].status, "success")
+
+    def test_confirmation_grant_expires(self) -> None:
+        store = ConfirmationGrantStore()
+        graph = _confirmed_write_graph()
+        with patch(
+            "agent.app.task_graph.grants.time.time",
+            side_effect=[100.0, 102.0],
+        ):
+            token, _ = store.issue(graph, {"confirm"}, ttl_s=1)
+            with self.assertRaisesRegex(ValueError, "expired"):
+                store.consume(token, graph)
 
 
 if __name__ == "__main__":

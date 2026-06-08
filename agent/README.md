@@ -123,6 +123,11 @@ Supervised side effects use `POST /task-graphs/execute-guarded` and require
 nodes. Physical motion also requires `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1`
 and a covering monitor that reports active before execution.
 
+Use `POST /task-graphs/confirmation-grants` to create a short-lived, single-use
+grant bound to the exact graph, and `POST /task-graphs/{graph_id}/cancel` to
+cancel active execution. Physical cancellation or failure invokes the graph's
+required emergency-stop fallback.
+
 ## Run locally
 
 ```bash
