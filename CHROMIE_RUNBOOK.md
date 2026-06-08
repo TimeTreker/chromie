@@ -42,8 +42,17 @@ DRY_RUN=1 ./scripts/gpu_smoke_test.sh
 
 ## M5 supervised target acceptance
 
-After `.env.local` points to the runtime-backed Soridormi MCP endpoint, run the
-complete target sequence with a safety operator present:
+Start Soridormi's simulator and runtime-backed MCP adapter from the Soridormi
+checkout:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+./scripts/run_runtime_mcp_server.sh
+```
+
+Do not run Soridormi's standalone runtime loop against the same simulator.
+After `.env.local` points to the runtime-backed endpoint, run the complete
+target sequence with a safety operator present:
 
 ```bash
 SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
@@ -53,7 +62,7 @@ SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
 This runs the GPU smoke test, probes the nine-tool Soridormi contract, exercises
 runtime cancellation, and writes logs plus `summary.env` under
 `.chromie/acceptance/<UTC timestamp>/`. Soridormi remains emergency-stopped;
-complete its recovery procedure before further motion.
+restart its MCP process and verify safe simulator state before further motion.
 
 Preview the exact commands without Docker, GPU, or MCP calls:
 

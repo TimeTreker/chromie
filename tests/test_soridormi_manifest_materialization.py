@@ -66,7 +66,7 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["metadata"]["upstream_commit"],
-            "fb006a37102ef1f57f069c7ff7b95a5135f5a204",
+            "027b626e065a274d4d600cecbc0ab1e572a7176a",
         )
         self.assertEqual(
             tool_names,

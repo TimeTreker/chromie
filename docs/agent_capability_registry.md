@@ -103,14 +103,14 @@ zero-motion plan. It rejects a missing planning response contract and never
 invokes `soridormi.motion.execute_plan`.
 
 Add `--guarded-dry-run` to verify confirmed execution, monitor activation, and
-normal stop fallback against Soridormi's network service. The current server
-still wraps a dry-run tool service. Runtime-backed cancellation and supervised
-hardware acceptance remain M5 target-host work.
+normal stop fallback against Soridormi's dry-run network service.
 
-Once the endpoint is backed by the long-running Soridormi runtime, use
+Soridormi `027b626` adds an opt-in runtime-backed simulation adapter. Once that
+adapter is running, use
 `--exercise-runtime-cancellation` on the supervised target. The runner dispatches
 a five-second zero-velocity plan, cancels it, requires the emergency fallback,
-and verifies retained emergency-stop state.
+and verifies retained emergency-stop state. Soridormi hardware mode remains
+disabled until its real `HardwareRobot` backend is implemented.
 
 ## Safety rule
 

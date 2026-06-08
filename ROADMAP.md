@@ -65,21 +65,25 @@ part of the cross-project capability contract.
 8. [Complete dry-run] Verify confirmation, monitor activation, execution, stop fallback, and persistent emergency-stop state over MCP.
 9. [Complete tooling] Add runtime cancellation acceptance with emergency fallback and retained safety-state verification.
 10. [Complete tooling] Add one supervised target runner that captures GPU, MCP contract, cancellation, endpoint, profile, and recovery-state evidence.
-11. [Pending runtime target] Connect the MCP service to Soridormi's long-running runtime and run the supervised target acceptance.
-12. [Pending target evidence] Record the accepted endpoint, hardware profile, GPU results, and completed recovery procedure.
+11. [Complete upstream] Add Soridormi's runtime-backed simulation MCP adapter with preemptive stop, cancellation, emergency stop, and safe hold.
+12. [Pending runtime target] Deploy the runtime adapter with the Soridormi simulator and run the supervised target acceptance.
+13. [Pending hardware backend] Implement Soridormi's real `HardwareRobot` boundary before enabling MCP hardware mode.
+14. [Pending target evidence] Record the accepted endpoint, hardware profile, GPU results, and completed recovery procedure.
 
 ## Immediate Sequence
 
-1. Deploy Soridormi's `soridormi-mcp` container on the target host and configure `SORIDORMI_MCP_URL`.
-2. Replace the local dry-run tool service with a Soridormi runtime-backed adapter.
+1. On the target host, start Soridormi's simulator and `run_runtime_mcp_server.sh`.
+2. Configure Chromie's `SORIDORMI_MCP_URL` for that runtime-backed endpoint.
 3. Run `SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 ./scripts/m5_target_acceptance.sh`.
-4. Complete Soridormi's recovery procedure and retain the generated evidence directory.
+4. Restart the Soridormi MCP process after acceptance, verify safe state, and retain the generated evidence directory.
 5. Record the accepted endpoint, hardware profile, and recovery result in this roadmap.
 
 ## Evidence
 
-- Soridormi `fb006a3`: dedicated MCP container and authoritative nine-tool
-  Streamable HTTP service
+- Soridormi `027b626`: runtime-backed simulation MCP adapter with bounded
+  execution, preemptive stop/cancel/e-stop, safe hold, and dedicated Compose profile
+- Soridormi `fb006a3`: initial dedicated MCP container and authoritative
+  nine-tool Streamable HTTP service
 - June 8, 2026 local cross-process acceptance: 9/9 tools, planning, confirmed
   dry-run execution, monitor activation, stop fallback, and emergency-stop
   state retention
