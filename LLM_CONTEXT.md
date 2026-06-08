@@ -52,6 +52,7 @@ Inside Docker, use service names such as `http://chromie-llm:11434`. From the ho
 
 ## Detailed Documents
 
+- `DEVELOPMENT_CHECKPOINT.md`
 - `README.md`
 - `docs/PROJECT_GUIDE.zh-CN.md`
 - `HARDWARE_PROFILES.md`
