@@ -52,10 +52,18 @@ the target GPU/robot host.
 - Target GPU smoke tests and supervised hardware acceptance checks pass.
 - Deployment configuration and runbook document the accepted Soridormi endpoint and recovery procedure.
 
+## M5 Progress
+
+1. [Complete] Add a safety-scoped Soridormi deployment manifest with a runtime-configured MCP endpoint.
+2. [Complete] Add fail-fast manifest environment expansion and an MCP `tools/list` contract probe.
+3. [Pending target] Probe the real Soridormi server and reconcile its exported tool contracts.
+4. [Pending target] Run read-only, planning, supervised motion, cancellation, and emergency-stop acceptance.
+5. [Pending target] Run the GPU and hardware smoke checks and record the accepted deployment profile.
+
 ## Immediate Sequence
 
-1. Add or import the production Soridormi capability manifest.
-2. Configure and probe the real MCP Streamable HTTP endpoint.
+1. Configure `SORIDORMI_MCP_URL` for the target server and run the contract probe.
+2. Reconcile any missing or renamed tools with Soridormi's exported contract.
 3. Run read-only and planning acceptance graphs.
 4. Run supervised motion, cancellation, and emergency-stop acceptance.
 5. Complete the target GPU smoke test and record the accepted deployment profile.

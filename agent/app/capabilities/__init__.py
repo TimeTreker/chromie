@@ -17,14 +17,17 @@ from .local import chromie_capability_bundle, chromie_manifests
 from .loader import (
     ConfiguredRegistry,
     build_configured_registry,
+    load_capability_bundle,
     load_capability_bundles,
     parse_manifest_paths,
 )
+from .probe import CapabilityProbeResult, probe_mcp_capabilities
 
 __all__ = [
     "AgentManifest",
     "AgentStatus",
     "CapabilityBundle",
+    "CapabilityProbeResult",
     "CapabilityRegistry",
     "ConfiguredRegistry",
     "ConfirmationPolicy",
@@ -37,6 +40,8 @@ __all__ = [
     "chromie_capability_bundle",
     "chromie_manifests",
     "build_configured_registry",
+    "load_capability_bundle",
     "load_capability_bundles",
     "parse_manifest_paths",
+    "probe_mcp_capabilities",
 ]

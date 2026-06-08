@@ -183,6 +183,11 @@ enabled with `AGENT_CAPABILITY_MANIFESTS`. See
 [Capability Registry](docs/agent_capability_registry.md) for the fail-fast
 loading rules and runtime inspection endpoints.
 
+For Soridormi, set
+`AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json` and provide
+`SORIDORMI_MCP_URL`. Probe the live MCP endpoint against the checked-in
+manifest before enabling TaskGraph execution.
+
 Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to opt eligible `tool` routes into
 validated structured planning. Planned graphs are returned for inspection and
 are not executed until a guarded `ToolInvoker` transport is configured.

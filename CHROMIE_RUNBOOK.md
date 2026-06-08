@@ -75,6 +75,27 @@ set +a
 docker compose --env-file .env.runtime exec chromie-llm ollama pull "$AGENT_MODEL"
 ```
 
+## Verify Soridormi MCP capabilities
+
+Add the deployment endpoint and manifest to `.env.local`, then regenerate the
+runtime configuration:
+
+```env
+AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json
+SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp
+```
+
+```bash
+./scripts/build_runtime_env.sh
+docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
+  python -m app.probe_capabilities \
+  --manifest /app/capabilities/soridormi.json
+```
+
+Do not enable read-only or guarded TaskGraph execution until the probe reports
+`status: ready`. A missing tool means the Soridormi server and Chromie manifest
+do not yet share an accepted contract.
+
 ## Watch logs
 
 ```bash

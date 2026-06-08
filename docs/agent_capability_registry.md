@@ -47,11 +47,14 @@ The production Agent loads external manifests from the comma-separated
 
 ```env
 AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json
+SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp
 ```
 
 A configured file or directory must exist and every discovered JSON manifest
 must validate. The Agent fails at startup on missing, malformed, or duplicate
-capabilities rather than silently running with a partial registry.
+capabilities rather than silently running with a partial registry. Manifest
+strings support `${NAME}` references and fail startup when the referenced
+environment variable is absent.
 
 Inspect the active sources and mounted files through:
 
@@ -59,6 +62,29 @@ Inspect the active sources and mounted files through:
 GET /health
 GET /capabilities
 ```
+
+## Soridormi deployment probe
+
+Chromie includes [the Soridormi deployment contract](../capabilities/soridormi.json).
+Its endpoint is supplied through `SORIDORMI_MCP_URL`; the file intentionally
+does not contain a machine-specific address.
+
+Probe the live MCP server before enabling read-only or guarded execution:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=agent python -m app.probe_capabilities \
+  --manifest capabilities/soridormi.json
+```
+
+The probe initializes an MCP Streamable HTTP session, calls `tools/list`, and
+fails when the server omits a required tool or input-schema constraint. Extra
+advertised tools and schema annotations remain unavailable because Chromie
+invokes only registry-approved names and validates against its own manifest.
+
+The checked-in manifest is the Chromie-side contract. M5 deployment acceptance
+still requires the real Soridormi server to advertise the same names and input
+contracts on the target host.
 
 ## Safety rule
 

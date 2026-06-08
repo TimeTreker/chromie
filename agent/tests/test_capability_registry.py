@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from app.capabilities.loader import build_configured_registry, parse_manifest_paths
 from app.capabilities.local import build_chromie_registry
@@ -37,6 +39,23 @@ def test_registry_merges_external_soridormi_manifest() -> None:
     )
     registry = build_chromie_registry([soridormi])
     assert registry.get_tool("soridormi.motion.execute_plan").safety_class == "physical_motion"
+
+
+def test_checked_in_soridormi_manifest_preserves_safety_contract() -> None:
+    manifest_path = Path(__file__).resolve().parents[2] / "capabilities" / "soridormi.json"
+    with patch.dict(
+        os.environ,
+        {"SORIDORMI_MCP_URL": "http://soridormi:8000/mcp"},
+    ):
+        registry = build_configured_registry([str(manifest_path)]).registry
+
+    execute = registry.get_tool("soridormi.motion.execute_plan")
+    emergency_stop = registry.get_tool("soridormi.safety.emergency_stop")
+    assert execute.confirmation.required
+    assert execute.monitoring.requires_safety_monitor
+    assert execute.execution.side_effect_free is False
+    assert emergency_stop.safety_class == "safety_critical"
+    assert emergency_stop.llm_visible is False
 
 
 def test_restricted_tools_are_hidden_from_llm() -> None:
@@ -105,3 +124,93 @@ def test_configured_registry_rejects_missing_manifest_path() -> None:
 
 def test_parse_manifest_paths_ignores_blank_entries() -> None:
     assert parse_manifest_paths(" one.json, ,two.json ") == ["one.json", "two.json"]
+
+
+def test_configured_registry_expands_manifest_environment_variables() -> None:
+    with TemporaryDirectory() as temporary_directory:
+        manifest_path = Path(temporary_directory) / "external.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "source": "external-test",
+                    "agents": [
+                        {
+                            "agent_id": "external.status",
+                            "transport": {
+                                "kind": "mcp_streamable_http",
+                                "url": "${EXTERNAL_MCP_URL}",
+                            },
+                            "tools": [],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        with patch.dict(os.environ, {"EXTERNAL_MCP_URL": "http://robot:8000/mcp"}):
+            configured = build_configured_registry([str(manifest_path)])
+
+        assert (
+            configured.registry.get_agent("external.status").transport.url
+            == "http://robot:8000/mcp"
+        )
+
+
+def test_configured_registry_rejects_missing_manifest_environment_variable() -> None:
+    with TemporaryDirectory() as temporary_directory:
+        manifest_path = Path(temporary_directory) / "external.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "source": "external-test",
+                    "agents": [
+                        {
+                            "agent_id": "external.status",
+                            "transport": {
+                                "kind": "mcp_streamable_http",
+                                "url": "${MISSING_MCP_URL}",
+                            },
+                            "tools": [],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            try:
+                build_configured_registry([str(manifest_path)])
+            except ValueError as exc:
+                assert "requires non-empty environment variable MISSING_MCP_URL" in str(exc)
+            else:
+                raise AssertionError("missing manifest environment variable unexpectedly loaded")
+
+
+def test_configured_registry_rejects_empty_manifest_environment_variable() -> None:
+    with TemporaryDirectory() as temporary_directory:
+        manifest_path = Path(temporary_directory) / "external.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "source": "external-test",
+                    "agents": [
+                        {
+                            "agent_id": "external.status",
+                            "transport": {
+                                "kind": "mcp_streamable_http",
+                                "url": "${EMPTY_MCP_URL}",
+                            },
+                            "tools": [],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        with patch.dict(os.environ, {"EMPTY_MCP_URL": ""}):
+            try:
+                build_configured_registry([str(manifest_path)])
+            except ValueError as exc:
+                assert "requires non-empty environment variable EMPTY_MCP_URL" in str(exc)
+            else:
+                raise AssertionError("empty manifest environment variable unexpectedly loaded")

@@ -95,7 +95,16 @@ directories mounted inside the Agent container. The root Compose file mounts
 
 Configured manifests are loaded at startup. Missing, malformed, or duplicate
 capabilities stop startup so the active registry cannot silently diverge from
-deployment configuration.
+deployment configuration. Manifest strings can reference required environment
+variables such as `${SORIDORMI_MCP_URL}`.
+
+Verify a live server against its manifest before enabling execution:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=. python -m app.probe_capabilities \
+  --manifest ../capabilities/soridormi.json
+```
 
 ### TaskGraph planning
 
