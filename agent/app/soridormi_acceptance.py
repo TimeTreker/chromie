@@ -45,6 +45,14 @@ class SoridormiRuntimeCancellationAcceptanceReport(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class SoridormiRuntimePreflightReport(BaseModel):
+    endpoint: str
+    backend: str
+    mode: str
+    emergency_stop: bool
+    status: dict[str, Any]
+
+
 class _ExecutePlanObserver:
     def __init__(self, invoker: AsyncToolInvoker, started: asyncio.Event) -> None:
         self._invoker = invoker
@@ -60,6 +68,30 @@ class _ExecutePlanObserver:
         if tool_name == "soridormi.motion.execute_plan":
             self._started.set()
         return await self._invoker.invoke(tool_name, args, context=context)
+
+
+def require_soridormi_runtime_status(
+    status: dict[str, Any],
+    *,
+    expected_backend: str = "runtime",
+    expected_mode: str = "sim",
+) -> tuple[str, str]:
+    backend = str(status.get("backend", ""))
+    mode = str(status.get("mode", ""))
+    if backend != expected_backend:
+        raise RuntimeError(
+            f"Soridormi backend is {backend or 'missing'!r}; "
+            f"expected {expected_backend!r}"
+        )
+    if mode != expected_mode:
+        raise RuntimeError(
+            f"Soridormi mode is {mode or 'missing'!r}; expected {expected_mode!r}"
+        )
+    if status.get("emergency_stop") is not False:
+        raise RuntimeError(
+            "Soridormi runtime preflight requires emergency_stop=false"
+        )
+    return backend, mode
 
 
 def build_soridormi_planning_graph(
@@ -139,6 +171,51 @@ def build_soridormi_guarded_graph(
                 },
             ],
         }
+    )
+
+
+async def run_soridormi_runtime_preflight(
+    registry: CapabilityRegistry,
+    *,
+    invoker: AsyncToolInvoker,
+    expected_backend: str = "runtime",
+    expected_mode: str = "sim",
+    probe: CapabilityProbe | None = None,
+) -> SoridormiRuntimePreflightReport:
+    probe_results = await (
+        probe(registry)
+        if probe is not None
+        else probe_mcp_capabilities(registry)
+    )
+    failed_endpoints = [result.url for result in probe_results if not result.ok]
+    if failed_endpoints:
+        raise ValueError(
+            "Soridormi MCP capability probe failed for: "
+            + ", ".join(failed_endpoints)
+        )
+    if len(probe_results) != 1:
+        raise RuntimeError(
+            "Soridormi runtime preflight requires exactly one MCP endpoint"
+        )
+
+    outcome = await invoker.invoke("soridormi.robot.get_status", {})
+    if outcome.status != "success":
+        raise RuntimeError(
+            "Soridormi runtime status failed: "
+            + (outcome.error or outcome.status)
+        )
+    status = outcome.output
+    backend, mode = require_soridormi_runtime_status(
+        status,
+        expected_backend=expected_backend,
+        expected_mode=expected_mode,
+    )
+    return SoridormiRuntimePreflightReport(
+        endpoint=probe_results[0].url,
+        backend=backend,
+        mode=mode,
+        emergency_stop=bool(status["emergency_stop"]),
+        status=status,
     )
 
 
@@ -324,6 +401,9 @@ async def _run(
     manifest: str,
     commands: list[dict[str, Any]],
     *,
+    runtime_preflight: bool,
+    expected_backend: str,
+    expected_mode: str,
     guarded_dry_run: bool,
     exercise_emergency_stop: bool,
     exercise_runtime_cancellation: bool,
@@ -331,13 +411,29 @@ async def _run(
 ) -> int:
     configured = build_configured_registry([manifest])
     invoker = McpStreamableHttpInvoker(configured.registry)
+    if runtime_preflight:
+        report = await run_soridormi_runtime_preflight(
+            configured.registry,
+            invoker=invoker,
+            expected_backend=expected_backend,
+            expected_mode=expected_mode,
+        )
+        print(json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        return 0
+
     planning_trace = await run_soridormi_planning_acceptance(
         configured.registry,
         commands=commands,
         invoker=invoker,
     )
     if exercise_runtime_cancellation:
-        plan_id = planning_trace.result_map()["plan"].output["plan_id"]
+        planning_results = planning_trace.result_map()
+        require_soridormi_runtime_status(
+            planning_results["status"].output,
+            expected_backend=expected_backend,
+            expected_mode=expected_mode,
+        )
+        plan_id = planning_results["plan"].output["plan_id"]
         cancellation, status = (
             await run_soridormi_runtime_cancellation_acceptance(
                 configured.registry,
@@ -412,6 +508,14 @@ def main() -> None:
     )
     execution_group = parser.add_mutually_exclusive_group()
     execution_group.add_argument(
+        "--runtime-preflight",
+        action="store_true",
+        help=(
+            "Probe the MCP contract and require a ready runtime-backed endpoint "
+            "without creating or executing a plan."
+        ),
+    )
+    execution_group.add_argument(
         "--guarded-dry-run",
         action="store_true",
         help="Also verify confirmation, monitoring, dry-run execution, and stop fallback.",
@@ -428,6 +532,16 @@ def main() -> None:
         "--exercise-emergency-stop",
         action="store_true",
         help="Set and verify Soridormi emergency stop. Restart Soridormi afterwards.",
+    )
+    parser.add_argument(
+        "--expected-backend",
+        default="runtime",
+        help="Required get_status backend for --runtime-preflight.",
+    )
+    parser.add_argument(
+        "--expected-mode",
+        default="sim",
+        help="Required get_status mode for --runtime-preflight.",
     )
     parser.add_argument(
         "--cancel-after-s",
@@ -454,6 +568,9 @@ def main() -> None:
             _run(
                 args.manifest,
                 commands,
+                runtime_preflight=args.runtime_preflight,
+                expected_backend=args.expected_backend,
+                expected_mode=args.expected_mode,
                 guarded_dry_run=args.guarded_dry_run,
                 exercise_emergency_stop=args.exercise_emergency_stop,
                 exercise_runtime_cancellation=args.exercise_runtime_cancellation,

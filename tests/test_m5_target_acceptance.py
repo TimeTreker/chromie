@@ -60,9 +60,17 @@ class M5TargetAcceptanceTests(unittest.TestCase):
             self.assertIn("M5_ACCEPTANCE_GPU=Test\\ GPU", summary)
             self.assertIn("M5_ACCEPTANCE_RECOVERY_STATE=not_exercised", summary)
             self.assertTrue((evidence / "gpu-smoke.log").is_file())
-            self.assertTrue((evidence / "capability-probe.log").is_file())
+            self.assertTrue((evidence / "runtime-preflight.json").is_file())
+            self.assertTrue(
+                (evidence / "runtime-preflight.stderr.log").is_file()
+            )
             self.assertTrue((evidence / "runtime-cancellation.log").is_file())
+            self.assertIn("--runtime-preflight", result.stdout)
             self.assertIn("--exercise-runtime-cancellation", result.stdout)
+            self.assertLess(
+                result.stdout.index("--runtime-preflight"),
+                result.stdout.index("gpu_smoke_test.sh"),
+            )
 
     def test_missing_endpoint_records_failed_initialization(self) -> None:
         with tempfile.TemporaryDirectory(dir=ROOT) as temp_dir:

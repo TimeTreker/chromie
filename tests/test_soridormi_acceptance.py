@@ -10,9 +10,11 @@ from agent.app.capabilities.loader import build_configured_registry
 from agent.app.capabilities.probe import CapabilityProbeResult
 from agent.app.soridormi_acceptance import (
     build_soridormi_guarded_graph,
+    require_soridormi_runtime_status,
     run_soridormi_guarded_dry_run_acceptance,
     run_soridormi_planning_acceptance,
     run_soridormi_runtime_cancellation_acceptance,
+    run_soridormi_runtime_preflight,
 )
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
@@ -129,6 +131,104 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
                 ],
                 invoker=McpStreamableHttpInvoker(registry, call=call),
                 probe=probe,
+            )
+
+    async def test_runtime_preflight_requires_runtime_backend_and_ready_state(
+        self,
+    ) -> None:
+        registry = self._registry()
+
+        async def probe(_registry):
+            return [
+                CapabilityProbeResult(
+                    url="http://soridormi:8000/mcp",
+                    expected_schemas={},
+                    advertised_schemas={},
+                )
+            ]
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            self.assertEqual(tool, "soridormi.robot.get_status")
+            return {
+                "structuredContent": {
+                    "backend": "runtime",
+                    "mode": "sim",
+                    "emergency_stop": False,
+                    "robot_time": 12.5,
+                }
+            }
+
+        report = await run_soridormi_runtime_preflight(
+            registry,
+            invoker=McpStreamableHttpInvoker(registry, call=call),
+            probe=probe,
+        )
+
+        self.assertEqual(report.endpoint, "http://soridormi:8000/mcp")
+        self.assertEqual(report.backend, "runtime")
+        self.assertEqual(report.mode, "sim")
+        self.assertFalse(report.emergency_stop)
+
+    async def test_runtime_preflight_rejects_dry_run_endpoint(self) -> None:
+        registry = self._registry()
+
+        async def probe(_registry):
+            return [
+                CapabilityProbeResult(
+                    url="http://soridormi:8000/mcp",
+                    expected_schemas={},
+                    advertised_schemas={},
+                )
+            ]
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            return {
+                "structuredContent": {
+                    "backend": "local_tool_dry_run",
+                    "mode": "sim",
+                    "emergency_stop": False,
+                }
+            }
+
+        with self.assertRaisesRegex(RuntimeError, "expected 'runtime'"):
+            await run_soridormi_runtime_preflight(
+                registry,
+                invoker=McpStreamableHttpInvoker(registry, call=call),
+                probe=probe,
+            )
+
+    async def test_runtime_preflight_rejects_active_emergency_stop(self) -> None:
+        registry = self._registry()
+
+        async def probe(_registry):
+            return [
+                CapabilityProbeResult(
+                    url="http://soridormi:8000/mcp",
+                    expected_schemas={},
+                    advertised_schemas={},
+                )
+            ]
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            return {
+                "structuredContent": {
+                    "backend": "runtime",
+                    "mode": "sim",
+                    "emergency_stop": True,
+                }
+            }
+
+        with self.assertRaisesRegex(RuntimeError, "emergency_stop=false"):
+            await run_soridormi_runtime_preflight(
+                registry,
+                invoker=McpStreamableHttpInvoker(registry, call=call),
+                probe=probe,
+            )
+
+    def test_runtime_status_guard_rejects_missing_identity(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "backend is 'missing'"):
+            require_soridormi_runtime_status(
+                {"mode": "sim", "emergency_stop": False}
             )
 
     async def test_guarded_dry_run_executes_and_verifies_stop_fallback(self) -> None:

@@ -66,9 +66,10 @@ part of the cross-project capability contract.
 9. [Complete tooling] Add runtime cancellation acceptance with emergency fallback and retained safety-state verification.
 10. [Complete tooling] Add one supervised target runner that captures GPU, MCP contract, cancellation, endpoint, profile, and recovery-state evidence.
 11. [Complete upstream] Add Soridormi's runtime-backed simulation MCP adapter with preemptive stop, cancellation, emergency stop, and safe hold.
-12. [Pending runtime target] Deploy the runtime adapter with the Soridormi simulator and run the supervised target acceptance.
-13. [Pending hardware backend] Implement Soridormi's real `HardwareRobot` boundary before enabling MCP hardware mode.
-14. [Pending target evidence] Record the accepted endpoint, hardware profile, GPU results, and completed recovery procedure.
+12. [Complete tooling] Fail target acceptance before GPU checks unless Soridormi reports the runtime backend, expected mode, and a cleared emergency stop.
+13. [Pending runtime target] Deploy the runtime adapter with the Soridormi simulator and run the supervised target acceptance.
+14. [Pending hardware backend] Implement Soridormi's real `HardwareRobot` boundary before enabling MCP hardware mode.
+15. [Pending target evidence] Record the accepted endpoint, hardware profile, GPU results, and completed recovery procedure.
 
 ## Immediate Sequence
 

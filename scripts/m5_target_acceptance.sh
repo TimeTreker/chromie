@@ -62,6 +62,36 @@ run_logged() {
   "$@" 2>&1 | tee "$log_file"
 }
 
+run_json_logged() {
+  local phase="$1"
+  local json_file="$2"
+  local stderr_file="$3"
+  shift 3
+
+  FAILED_PHASE="$phase"
+  printf '\n[m5-acceptance] %s\n' "$phase"
+  if [ "$M5_DRY_RUN" = "1" ]; then
+    printf '[m5-acceptance][DRY-RUN] '
+    printf '%q ' "$@"
+    printf '\n'
+    printf '{"dry_run":true}\n' > "$json_file"
+    printf 'DRY-RUN: ' > "$stderr_file"
+    printf '%q ' "$@" >> "$stderr_file"
+    printf '\n' >> "$stderr_file"
+    return 0
+  fi
+
+  if ! "$@" > "$json_file" 2> "$stderr_file"; then
+    cat "$stderr_file" >&2
+    cat "$json_file"
+    return 1
+  fi
+  cat "$stderr_file" >&2
+  cat "$json_file"
+  python3 -c 'import json, sys; json.load(open(sys.argv[1], encoding="utf-8"))' \
+    "$json_file"
+}
+
 if [ "$M5_DRY_RUN" != "1" ]; then
   run_logged \
     "Generate runtime configuration" \
@@ -88,24 +118,26 @@ if [ -n "${CHROMIE_COMPOSE_OVERRIDE_FILES:-}" ]; then
   done
 fi
 
+run_json_logged \
+  "Preflight runtime-backed Soridormi endpoint" \
+  "$EVIDENCE_DIR/runtime-preflight.json" \
+  "$EVIDENCE_DIR/runtime-preflight.stderr.log" \
+  docker compose "${COMPOSE_ARGS[@]}" run -T --rm --no-deps chromie-agent \
+  python -m app.soridormi_acceptance \
+  --manifest /app/capabilities/soridormi.json \
+  --runtime-preflight
+
 run_logged \
   "Run target GPU smoke test" \
   "$EVIDENCE_DIR/gpu-smoke.log" \
   env START_SERVICES="$START_SERVICES" RUN_TTS_SYNTHESIS="$RUN_TTS_SYNTHESIS" \
   ./scripts/gpu_smoke_test.sh
 
-run_logged \
-  "Probe Soridormi MCP contract" \
-  "$EVIDENCE_DIR/capability-probe.log" \
-  docker compose "${COMPOSE_ARGS[@]}" run --rm --no-deps chromie-agent \
-  python -m app.probe_capabilities \
-  --manifest /app/capabilities/soridormi.json
-
 RECOVERY_STATE="emergency_stop_may_be_active_verify_before_motion"
 run_logged \
   "Exercise runtime cancellation and emergency fallback" \
   "$EVIDENCE_DIR/runtime-cancellation.log" \
-  docker compose "${COMPOSE_ARGS[@]}" run --rm --no-deps chromie-agent \
+  docker compose "${COMPOSE_ARGS[@]}" run -T --rm --no-deps chromie-agent \
   python -m app.soridormi_acceptance \
   --manifest /app/capabilities/soridormi.json \
   --exercise-runtime-cancellation

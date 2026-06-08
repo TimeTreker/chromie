@@ -59,8 +59,9 @@ SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
   ./scripts/m5_target_acceptance.sh
 ```
 
-This runs the GPU smoke test, probes the nine-tool Soridormi contract, exercises
-runtime cancellation, and writes logs plus `summary.env` under
+This first rejects endpoints that do not report `backend=runtime`, `mode=sim`,
+and `emergency_stop=false`. It then runs the GPU smoke test, exercises runtime
+cancellation, and writes logs plus `summary.env` under
 `.chromie/acceptance/<UTC timestamp>/`. Soridormi remains emergency-stopped;
 restart its MCP process and verify safe simulator state before further motion.
 
