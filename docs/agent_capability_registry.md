@@ -78,13 +78,26 @@ PYTHONPATH=agent python -m app.probe_capabilities \
 ```
 
 The probe initializes an MCP Streamable HTTP session, calls `tools/list`, and
-fails when the server omits a required tool or input-schema constraint. Extra
-advertised tools and schema annotations remain unavailable because Chromie
-invokes only registry-approved names and validates against its own manifest.
+fails when the server omits a required tool or declares incompatible input
+constraints. Extra advertised tools and schema annotations remain unavailable
+because Chromie invokes only registry-approved names and validates against its
+own manifest.
 
 The checked-in manifest is the Chromie-side contract. M5 deployment acceptance
 still requires the real Soridormi server to advertise the same names and input
 contracts on the target host.
+
+Once the probe reports ready, run the read/planning acceptance graph:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json
+```
+
+This command probes first, reads robot status, then requests a bounded
+zero-motion plan. It rejects a missing planning response contract and never
+invokes `soridormi.motion.execute_plan`.
 
 ## Safety rule
 

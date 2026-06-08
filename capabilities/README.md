@@ -31,6 +31,16 @@ PYTHONPATH=agent python -m app.probe_capabilities \
 ```
 
 Extra server tools are reported but do not become available to Chromie. Missing
-tools or server input schemas that omit manifest constraints fail the probe.
+tools or incompatible declared input constraints fail the probe.
+
+After a successful probe, run safe read/planning acceptance:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json
+```
+
+The default request creates a zero-motion plan and does not execute hardware.
 
 Do not expose raw motor, joint, or torque controls through these manifests.

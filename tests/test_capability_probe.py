@@ -9,7 +9,11 @@ from agent.app.capabilities.models import (
     ToolCapability,
     TransportSpec,
 )
-from agent.app.capabilities.probe import probe_mcp_capabilities
+from agent.app.capabilities.probe import (
+    _collect_tool_pages,
+    _schema_satisfies_contract,
+    probe_mcp_capabilities,
+)
 
 
 def _registry() -> CapabilityRegistry:
@@ -114,6 +118,63 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
     async def test_probe_requires_an_mcp_endpoint(self) -> None:
         with self.assertRaisesRegex(ValueError, "no MCP Streamable HTTP endpoints"):
             await probe_mcp_capabilities(CapabilityRegistry())
+
+    async def test_collect_tool_pages_follows_next_cursor(self) -> None:
+        calls: list[str | None] = []
+
+        async def list_page(cursor: str | None):
+            calls.append(cursor)
+            if cursor is None:
+                return {"remote.status": {}}, "page-2"
+            return {"remote.plan": {}}, None
+
+        schemas = await _collect_tool_pages(list_page)
+
+        self.assertEqual(calls, [None, "page-2"])
+        self.assertEqual(set(schemas), {"remote.status", "remote.plan"})
+
+    async def test_collect_tool_pages_rejects_repeated_cursor(self) -> None:
+        async def list_page(cursor: str | None):
+            return {}, "same-cursor"
+
+        with self.assertRaisesRegex(ValueError, "repeated pagination cursor"):
+            await _collect_tool_pages(list_page)
+
+    def test_schema_comparison_handles_unordered_constraints(self) -> None:
+        expected = {
+            "type": "object",
+            "required": ["vx", "duration_s"],
+            "properties": {
+                "vx": {"type": "number", "minimum": -0.2, "maximum": 0.2},
+            },
+        }
+        actual = {
+            "type": "object",
+            "required": ["duration_s", "vx"],
+            "properties": {
+                "vx": {"type": "number", "minimum": -0.2, "maximum": 0.2},
+            },
+        }
+
+        self.assertTrue(_schema_satisfies_contract(actual, expected))
+
+    def test_schema_comparison_rejects_incompatible_stricter_constraints(self) -> None:
+        expected = {
+            "type": "object",
+            "required": ["vx"],
+            "properties": {
+                "vx": {"type": "number", "maximum": 0.2},
+            },
+        }
+        actual = {
+            "type": "object",
+            "required": ["vx", "mode"],
+            "properties": {
+                "vx": {"type": "number", "maximum": 0.1},
+            },
+        }
+
+        self.assertFalse(_schema_satisfies_contract(actual, expected))
 
 
 if __name__ == "__main__":

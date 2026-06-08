@@ -106,6 +106,17 @@ PYTHONPATH=. python -m app.probe_capabilities \
   --manifest ../capabilities/soridormi.json
 ```
 
+Run safe status/planning acceptance with:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=. python -m app.soridormi_acceptance \
+  --manifest ../capabilities/soridormi.json
+```
+
+The default command requests a zero-motion plan and does not enable physical
+execution.
+
 ### TaskGraph planning
 
 Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to let `tool` routes ask the configured

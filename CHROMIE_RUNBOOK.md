@@ -96,6 +96,18 @@ Do not enable read-only or guarded TaskGraph execution until the probe reports
 `status: ready`. A missing tool means the Soridormi server and Chromie manifest
 do not yet share an accepted contract.
 
+Run the safe status/planning acceptance after the probe succeeds:
+
+```bash
+docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
+  python -m app.soridormi_acceptance \
+  --manifest /app/capabilities/soridormi.json
+```
+
+The default planning request contains zero velocity and yaw. It calls only
+`soridormi.robot.get_status` and `soridormi.motion.create_plan`; it never calls
+the physical execution tool.
+
 ## Watch logs
 
 ```bash

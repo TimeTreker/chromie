@@ -9,6 +9,8 @@ from .models import CapabilityRegistry
 
 McpToolSchemas = dict[str, dict[str, Any]]
 McpToolLister = Callable[[str, float], Awaitable[McpToolSchemas]]
+McpToolPage = tuple[McpToolSchemas, str | None]
+McpToolPageLister = Callable[[str | None], Awaitable[McpToolPage]]
 
 
 @dataclass(frozen=True)
@@ -30,7 +32,7 @@ class CapabilityProbeResult:
         return frozenset(
             name
             for name in self.expected_schemas.keys() & self.advertised_schemas.keys()
-            if not _contains_schema(
+            if not _schema_satisfies_contract(
                 self.advertised_schemas[name],
                 self.expected_schemas[name],
             )
@@ -74,28 +76,74 @@ async def probe_mcp_capabilities(
     return results
 
 
-def _contains_schema(actual: Any, expected: Any) -> bool:
+def _schema_satisfies_contract(
+    actual: Any,
+    expected: Any,
+    *,
+    field_name: str | None = None,
+) -> bool:
     if isinstance(expected, dict):
         return isinstance(actual, dict) and all(
-            key in actual and _contains_schema(actual[key], value)
+            key in actual
+            and _schema_satisfies_contract(
+                actual[key],
+                value,
+                field_name=key,
+            )
             for key, value in expected.items()
         )
     if isinstance(expected, list):
+        if not isinstance(actual, list):
+            return False
+        if field_name in {"enum", "required", "type"}:
+            return _unordered_equal(actual, expected)
         return (
-            isinstance(actual, list)
-            and len(actual) == len(expected)
+            len(actual) == len(expected)
             and all(
-                _contains_schema(actual_item, expected_item)
+                _schema_satisfies_contract(actual_item, expected_item)
                 for actual_item, expected_item in zip(actual, expected)
             )
         )
     return actual == expected
 
 
+def _unordered_equal(actual: list[Any], expected: list[Any]) -> bool:
+    unmatched = list(actual)
+    for expected_item in expected:
+        for index, actual_item in enumerate(unmatched):
+            if actual_item == expected_item:
+                unmatched.pop(index)
+                break
+        else:
+            return False
+    return not unmatched
+
+
+async def _collect_tool_pages(list_page: McpToolPageLister) -> McpToolSchemas:
+    schemas: McpToolSchemas = {}
+    cursor: str | None = None
+    seen_cursors: set[str] = set()
+    while True:
+        page, next_cursor = await list_page(cursor)
+        duplicates = schemas.keys() & page.keys()
+        if duplicates:
+            raise ValueError(
+                f"MCP tools/list returned duplicate tools across pages: {sorted(duplicates)}"
+            )
+        schemas.update(page)
+        if not next_cursor:
+            return schemas
+        if next_cursor in seen_cursors:
+            raise ValueError(f"MCP tools/list repeated pagination cursor {next_cursor!r}")
+        seen_cursors.add(next_cursor)
+        cursor = next_cursor
+
+
 async def _list_tools_with_sdk(url: str, timeout_s: float) -> McpToolSchemas:
     import httpx
     from mcp import ClientSession
     from mcp.client.streamable_http import streamable_http_client
+    from mcp.types import PaginatedRequestParams
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_s)) as http_client:
         async with streamable_http_client(url, http_client=http_client) as (
@@ -105,8 +153,17 @@ async def _list_tools_with_sdk(url: str, timeout_s: float) -> McpToolSchemas:
         ):
             async with ClientSession(read, write) as session:
                 await session.initialize()
-                response = await session.list_tools()
-                return {
-                    tool.name: tool.inputSchema
-                    for tool in response.tools
-                }
+
+                async def list_page(cursor: str | None) -> McpToolPage:
+                    params = (
+                        PaginatedRequestParams(cursor=cursor)
+                        if cursor is not None
+                        else None
+                    )
+                    response = await session.list_tools(params=params)
+                    return (
+                        {tool.name: tool.inputSchema for tool in response.tools},
+                        response.nextCursor,
+                    )
+
+                return await _collect_tool_pages(list_page)
