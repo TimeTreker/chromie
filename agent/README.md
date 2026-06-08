@@ -77,6 +77,16 @@ Output:
 }
 ```
 
+### TaskGraph endpoints
+
+- `POST /task-graphs/validate`: validate a graph against the active capability registry.
+- `POST /task-graphs/dry-run`: simulate a validated graph without calling hardware or MCP tools.
+- `GET /task-graphs/{graph_id}/trace`: return the most recent in-memory dry-run trace for a graph.
+
+These endpoints are the first production-facing slice of
+[M4 - TaskGraph production integration](../ROADMAP.md). Real tool execution
+remains behind the transport-neutral `ToolInvoker` boundary.
+
 ## Run locally
 
 ```bash

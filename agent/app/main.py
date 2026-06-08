@@ -5,7 +5,7 @@ import os
 import time
 from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field
 
@@ -14,6 +14,13 @@ from .capabilities.local import build_chromie_registry
 from .clients.ollama_client import OllamaClient
 from .runtime import AgentRuntime
 from .schema import AgentResult, AgentRunRequest, HealthResponse
+from .task_graph import (
+    ExecutionTrace,
+    TaskGraph,
+    TaskGraphDryRunRequest,
+    TaskGraphService,
+    TaskGraphValidationResponse,
+)
 
 
 class Settings(BaseModel):
@@ -47,6 +54,7 @@ services = AgentServices(
 )
 runtime = AgentRuntime(services)
 capability_registry = build_chromie_registry()
+task_graph_service = TaskGraphService(capability_registry)
 
 app = FastAPI(
     title="Chromie Agent",
@@ -93,6 +101,27 @@ async def capabilities() -> dict:
 @app.get("/capabilities/llm-context")
 async def capability_llm_context(language: str = "en") -> dict[str, str]:
     return {"context": capability_registry.llm_context(language=language)}
+
+
+@app.post("/task-graphs/validate", response_model=TaskGraphValidationResponse)
+async def validate_task_graph(graph: TaskGraph) -> TaskGraphValidationResponse:
+    return task_graph_service.validate(graph)
+
+
+@app.post("/task-graphs/dry-run", response_model=ExecutionTrace)
+async def dry_run_task_graph(request: TaskGraphDryRunRequest) -> ExecutionTrace:
+    try:
+        return task_graph_service.dry_run(request.graph, auto_confirm=request.auto_confirm)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/task-graphs/{graph_id}/trace", response_model=ExecutionTrace)
+async def get_task_graph_trace(graph_id: str) -> ExecutionTrace:
+    trace = task_graph_service.get_trace(graph_id)
+    if trace is None:
+        raise HTTPException(status_code=404, detail=f"No TaskGraph trace found for {graph_id!r}")
+    return trace
 
 
 @app.post("/run", response_model=AgentResult)

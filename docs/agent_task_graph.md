@@ -16,8 +16,30 @@ The task graph layer provides:
 - blocked-node propagation
 - `DagDryRunExecutor` for trace development without calling real MCP servers
 - `DagToolExecutor` with a transport-neutral `ToolInvoker`
+- Agent API endpoints for validation, dry-run execution, and trace lookup
 
 Chromie does not currently ship an MCP transport in this layer. Real robot execution must remain behind registered safe tools and the existing hardware boundary.
+
+This work is tracked as **M4 - TaskGraph production integration** in the
+[project roadmap](../ROADMAP.md).
+
+## Agent API
+
+Validate a graph without executing it:
+
+```text
+POST /task-graphs/validate
+```
+
+Dry-run a graph and retain its latest trace in Agent memory:
+
+```text
+POST /task-graphs/dry-run
+GET /task-graphs/{graph_id}/trace
+```
+
+The dry-run endpoint never calls a real MCP server or hardware device. Invalid
+graphs return HTTP 422 and are not stored as execution traces.
 
 ## Example physical-motion graph
 

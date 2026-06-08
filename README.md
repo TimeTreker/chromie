@@ -4,6 +4,8 @@ Chromie is a local, GPU-accelerated realtime voice assistant stack. It combines 
 
 中文读者可以从 [Chromie 中文项目指南](docs/PROJECT_GUIDE.zh-CN.md) 开始，了解架构、部署、验证与常见问题。
 
+Project progress and the active milestone are tracked in [Chromie Roadmap](ROADMAP.md). The current milestone is **M4 - TaskGraph production integration**.
+
 ## Architecture
 
 ```text
@@ -248,6 +250,7 @@ The suite covers Router rules and mode selection, cross-service contracts, conve
 
 ## Documentation
 
+- [Roadmap](ROADMAP.md): current milestone, completed foundations, and acceptance criteria
 - [中文项目指南](docs/PROJECT_GUIDE.zh-CN.md): Chinese architecture, setup, verification, and troubleshooting guide
 - [Hardware Profiles](HARDWARE_PROFILES.md): runtime environment generation and hardware-specific defaults
 - [Operations Runbook](CHROMIE_RUNBOOK.md): frequent startup and diagnostic commands

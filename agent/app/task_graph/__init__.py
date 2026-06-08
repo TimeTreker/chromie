@@ -9,6 +9,7 @@ from .models import (
     TaskGraph,
     TaskNode,
 )
+from .service import TaskGraphDryRunRequest, TaskGraphService, TaskGraphValidationResponse
 from .validator import GraphValidationReport, GraphValidator
 
 __all__ = [
@@ -21,5 +22,8 @@ __all__ = [
     "NodeResult",
     "RetryPolicy",
     "TaskGraph",
+    "TaskGraphDryRunRequest",
+    "TaskGraphService",
+    "TaskGraphValidationResponse",
     "TaskNode",
 ]

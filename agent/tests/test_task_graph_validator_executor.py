@@ -12,6 +12,7 @@ from app.capabilities.models import (
 )
 from app.task_graph.executor import DagDryRunExecutor
 from app.task_graph.models import TaskGraph
+from app.task_graph.service import TaskGraphService
 from app.task_graph.validator import GraphValidator
 
 
@@ -190,6 +191,46 @@ def test_dry_run_executor_triggers_fallback_and_blocks_downstream_on_declined_co
     assert results["stop_after_failure"].status == "success"
     assert results["execute_motion"].status == "blocked"
     assert any(event.type == "fallback_triggered" for event in trace.events)
+
+
+def test_task_graph_service_validates_runs_and_retains_trace() -> None:
+    service = TaskGraphService(build_chromie_registry())
+    graph = TaskGraph.model_validate(
+        {
+            "graph_id": "service_report",
+            "nodes": [
+                {
+                    "id": "report",
+                    "tool": "chromie.report",
+                    "type": "report",
+                    "args": {"message": "TaskGraph service is reachable."},
+                }
+            ],
+        }
+    )
+
+    validation = service.validate(graph)
+    assert validation.valid
+
+    trace = service.dry_run(graph)
+    assert trace.status == "success"
+    assert service.get_trace(graph.graph_id).result_map()["report"].output["reported"] is True
+
+
+def test_task_graph_service_rejects_invalid_graph_without_storing_trace() -> None:
+    service = TaskGraphService(build_chromie_registry())
+    graph = TaskGraph.model_validate(
+        {"graph_id": "invalid_service_graph", "nodes": [{"id": "bad", "tool": "missing.tool"}]}
+    )
+
+    try:
+        service.dry_run(graph)
+    except ValueError as exc:
+        assert "unknown tool" in str(exc)
+    else:
+        raise AssertionError("invalid TaskGraph unexpectedly ran")
+
+    assert service.get_trace(graph.graph_id) is None
 
 from app.task_graph.executor import DagToolExecutor
 from app.tool_invocation import FunctionToolInvoker, ToolCallOutcome
