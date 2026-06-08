@@ -19,12 +19,12 @@ CapabilityProbe = Callable[
 ]
 
 
-def build_soridormi_read_only_graph(
+def build_soridormi_planning_graph(
     commands: list[dict[str, Any]],
 ) -> TaskGraph:
     return TaskGraph.model_validate(
         {
-            "graph_id": "soridormi-read-only-acceptance",
+            "graph_id": "soridormi-planning-acceptance",
             "created_by": "system",
             "summary": "Read Soridormi status and create a zero-motion plan.",
             "nodes": [
@@ -45,7 +45,7 @@ def build_soridormi_read_only_graph(
     )
 
 
-async def run_soridormi_read_only_acceptance(
+async def run_soridormi_planning_acceptance(
     registry: CapabilityRegistry,
     *,
     commands: list[dict[str, Any]],
@@ -64,13 +64,13 @@ async def run_soridormi_read_only_acceptance(
             + ", ".join(failed_endpoints)
         )
 
-    graph = build_soridormi_read_only_graph(commands)
+    graph = build_soridormi_planning_graph(commands)
     trace = await TaskGraphService(
         registry,
-        read_only_invoker=invoker,
-    ).execute_read_only(graph)
+        planning_invoker=invoker,
+    ).execute_planning(graph)
     if trace.status != "success":
-        raise RuntimeError("Soridormi read-only acceptance graph failed")
+        raise RuntimeError("Soridormi planning acceptance graph failed")
 
     results = trace.result_map()
     plan_output = results["plan"].output
@@ -84,7 +84,7 @@ async def run_soridormi_read_only_acceptance(
 
 async def _run(manifest: str, commands: list[dict[str, Any]]) -> int:
     configured = build_configured_registry([manifest])
-    trace = await run_soridormi_read_only_acceptance(
+    trace = await run_soridormi_planning_acceptance(
         configured.registry,
         commands=commands,
         invoker=McpStreamableHttpInvoker(configured.registry),

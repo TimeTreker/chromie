@@ -28,7 +28,7 @@ class ReadOnlyTaskGraphExecutor:
     async def run(self, graph: TaskGraph) -> ExecutionTrace:
         report = GraphValidator(self.registry).validate(graph)
         report.raise_for_errors()
-        self._preflight_read_only(graph)
+        self._preflight(graph)
 
         trace = ExecutionTrace(
             graph_id=graph.graph_id,
@@ -77,7 +77,7 @@ class ReadOnlyTaskGraphExecutor:
         )
         return trace
 
-    def _preflight_read_only(self, graph: TaskGraph) -> None:
+    def _preflight(self, graph: TaskGraph) -> None:
         if not graph.nodes:
             raise ValueError("read-only TaskGraph execution requires at least one node")
         unsafe: list[str] = []
@@ -143,6 +143,37 @@ class ReadOnlyTaskGraphExecutor:
                 data={"error": result.error},
             )
         )
+
+
+class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
+    """Execute safe reads and non-physical planning tools, including plan creation."""
+
+    def _preflight(self, graph: TaskGraph) -> None:
+        if not graph.nodes:
+            raise ValueError("planning TaskGraph execution requires at least one node")
+        unsafe: list[str] = []
+        for node in graph.nodes:
+            capability = self.registry.get_tool(node.tool)
+            if capability.safety_class == "safe_read":
+                if not capability.execution.side_effect_free:
+                    unsafe.append(f"{node.id}:{node.tool}[side_effect_free=false]")
+                continue
+            if capability.safety_class == "planning_only":
+                prohibited_effects = {
+                    "physical_motion",
+                    "safety_control",
+                } & set(capability.effects)
+                if prohibited_effects:
+                    unsafe.append(
+                        f"{node.id}:{node.tool}[effects={sorted(prohibited_effects)}]"
+                    )
+                continue
+            unsafe.append(f"{node.id}:{node.tool}[{capability.safety_class}]")
+        if unsafe:
+            raise ValueError(
+                "planning TaskGraph execution rejected unsafe nodes: "
+                + ", ".join(unsafe)
+            )
 
 
 class GuardedTaskGraphExecutor:
@@ -215,7 +246,15 @@ class GuardedTaskGraphExecutor:
                         active_monitors.add(node.id)
                     if result.status != "success":
                         if self._is_physical(node):
-                            await self._run_emergency_fallback(node, nodes, pending, results, trace)
+                            await self._run_failure_fallback(
+                                node,
+                                result.status,
+                                nodes,
+                                pending,
+                                results,
+                                trace,
+                            )
+                        pending.difference_update(fallback_targets)
                         self._record_blocked(pending, nodes, results, trace)
                         pending.clear()
                         break
@@ -235,7 +274,7 @@ class GuardedTaskGraphExecutor:
                 await asyncio.shield(
                     self._run_all_emergency_fallbacks(graph, nodes, pending, results, trace)
                 )
-            for node_id in sorted(pending):
+            for node_id in sorted(pending - fallback_targets):
                 node = nodes[node_id]
                 if node.id not in results:
                     self._record(
@@ -292,8 +331,18 @@ class GuardedTaskGraphExecutor:
             if capability.safety_class == "physical_motion":
                 if not self.allow_physical_motion:
                     raise ValueError("physical TaskGraph execution is disabled")
-                fallback = self._emergency_fallback_node(node, nodes)
-                if fallback is None:
+                if self._failure_fallback_node(node, nodes) is None:
+                    raise ValueError(
+                        f"physical node {node.id!r} requires a stop fallback target"
+                    )
+                if (
+                    node.on_timeout is not None
+                    and self._failure_fallback_node(node, nodes, status="timeout") is None
+                ):
+                    raise ValueError(
+                        f"physical node {node.id!r} requires a stop timeout target"
+                    )
+                if self._emergency_fallback_node(node, nodes) is None:
                     raise ValueError(
                         f"physical node {node.id!r} requires an emergency-stop fallback target"
                     )
@@ -385,12 +434,15 @@ class GuardedTaskGraphExecutor:
         capability = self.registry.get_tool(node.tool)
         return capability.safety_class == "physical_motion" or "physical_motion" in capability.effects
 
-    def _emergency_fallback_node(
+    def _failure_fallback_node(
         self,
         node: TaskNode,
         nodes: dict[str, TaskNode],
+        *,
+        status: str = "failed_fatal",
     ) -> TaskNode | None:
-        target = node.on_failure.target if node.on_failure else None
+        policy = node.on_timeout if status == "timeout" and node.on_timeout else node.on_failure
+        target = policy.target if policy else None
         if not target or target not in nodes:
             return None
         fallback = nodes[target]
@@ -398,20 +450,41 @@ class GuardedTaskGraphExecutor:
         if (
             fallback.type == "safety"
             and capability.safety_class == "safety_critical"
-            and "emergency_stop" in fallback.tool
+            and "stop" in fallback.tool
         ):
             return fallback
         return None
 
-    async def _run_emergency_fallback(
+    def _emergency_fallback_node(
         self,
         node: TaskNode,
+        nodes: dict[str, TaskNode],
+    ) -> TaskNode | None:
+        policies = [node.on_failure, *node.on_event.values()]
+        for policy in policies:
+            target = policy.target if policy else None
+            if not target or target not in nodes:
+                continue
+            fallback = nodes[target]
+            capability = self.registry.get_tool(fallback.tool)
+            if (
+                fallback.type == "safety"
+                and capability.safety_class == "safety_critical"
+                and "emergency_stop" in fallback.tool
+            ):
+                return fallback
+        return None
+
+    async def _run_fallback(
+        self,
+        fallback: TaskNode | None,
         nodes: dict[str, TaskNode],
         pending: set[str],
         results: dict[str, NodeResult],
         trace: ExecutionTrace,
+        *,
+        event_type: str,
     ) -> None:
-        fallback = self._emergency_fallback_node(node, nodes)
         if fallback is None or fallback.id in results:
             return
         pending.discard(fallback.id)
@@ -433,11 +506,51 @@ class GuardedTaskGraphExecutor:
         )
         trace.events.append(
             ExecutionEvent(
-                type="emergency_fallback",
+                type=event_type,
                 node_id=fallback.id,
                 tool=fallback.tool,
                 message=outcome.status,
             )
+        )
+
+    async def _run_failure_fallback(
+        self,
+        node: TaskNode,
+        status: str,
+        nodes: dict[str, TaskNode],
+        pending: set[str],
+        results: dict[str, NodeResult],
+        trace: ExecutionTrace,
+    ) -> None:
+        fallback = self._failure_fallback_node(node, nodes, status=status)
+        await self._run_fallback(
+            fallback,
+            nodes,
+            pending,
+            results,
+            trace,
+            event_type=(
+                "emergency_fallback"
+                if fallback and "emergency_stop" in fallback.tool
+                else "stop_fallback"
+            ),
+        )
+
+    async def _run_emergency_fallback(
+        self,
+        node: TaskNode,
+        nodes: dict[str, TaskNode],
+        pending: set[str],
+        results: dict[str, NodeResult],
+        trace: ExecutionTrace,
+    ) -> None:
+        await self._run_fallback(
+            self._emergency_fallback_node(node, nodes),
+            nodes,
+            pending,
+            results,
+            trace,
+            event_type="emergency_fallback",
         )
 
     async def _run_all_emergency_fallbacks(

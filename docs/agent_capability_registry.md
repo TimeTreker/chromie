@@ -5,8 +5,9 @@ DAG planner, MCP clients, TTS/ASR, user confirmation, and cross-agent task
 orchestration.
 
 Soridormi and other robot/body subsystems should not own this global registry.
-Instead they export local MCP-ready capability manifests, and Chromie aggregates
-those manifests with its own `chromie.*` tools.
+Soridormi is Chromie's robot cerebellum: it owns embodied planning, safety,
+policy execution, and feedback. It exports an MCP-ready capability manifest,
+and Chromie aggregates that contract with its own `chromie.*` tools.
 
 ## Boundary
 
@@ -66,8 +67,10 @@ GET /capabilities
 ## Soridormi deployment probe
 
 Chromie includes [the Soridormi deployment contract](../capabilities/soridormi.json).
-Its endpoint is supplied through `SORIDORMI_MCP_URL`; the file intentionally
-does not contain a machine-specific address.
+It is materialized from the `TimeTreker/soridormi` export and records the
+upstream commit in `metadata`. Its endpoint is supplied through
+`SORIDORMI_MCP_URL`; the file intentionally does not contain a machine-specific
+address.
 
 Probe the live MCP server before enabling read-only or guarded execution:
 
@@ -98,6 +101,11 @@ PYTHONPATH=agent python -m app.soridormi_acceptance \
 This command probes first, reads robot status, then requests a bounded
 zero-motion plan. It rejects a missing planning response contract and never
 invokes `soridormi.motion.execute_plan`.
+
+Soridormi `main` currently exposes the authoritative manifest and local
+dry-run tool implementation, but describes the final stdio/HTTP MCP server as
+future work. Chromie is ready for Streamable HTTP; live M5 acceptance waits for
+that Soridormi wrapper or an equivalent deployment adapter.
 
 ## Safety rule
 

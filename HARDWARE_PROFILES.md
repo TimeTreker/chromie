@@ -124,10 +124,37 @@ TTS_MAX_TEXT_CHARS=220
 ## Current profiles
 
 - `default`
+- `nvidia_ada`
+- `nvidia_blackwell`
 - `rtx4090`
+- `rtx4090_laptop`
 - `rtx5090`
 - `jetson_orin_nano_super`
 - `jetson_agx_orin`
 - `jetson_thor`
 
-Jetson profiles define runtime/model choices, but ARM64/Jetson-compatible Dockerfiles or a Jetson compose override may still be required before full Jetson deployment.
+Detection prefers the Jetson device-tree model, then the NVIDIA GPU name, then
+compute capability and memory as a fallback. RTX 4090 Laptop GPUs use a separate
+profile because their typical VRAM and power envelope differ from the desktop
+RTX 4090.
+
+| Popular hardware | Automatic profile |
+|---|---|
+| GeForce RTX 5090 | `rtx5090` |
+| GeForce RTX 4090 | `rtx4090` |
+| GeForce RTX 4090 Laptop GPU | `rtx4090_laptop` |
+| GeForce RTX 5080/5070 class | `nvidia_blackwell` |
+| GeForce RTX 4080/4070 class | `nvidia_ada` |
+| Jetson AGX Thor | `jetson_thor` |
+| Jetson AGX Orin | `jetson_agx_orin` |
+| Jetson Orin Nano Super | `jetson_orin_nano_super` |
+
+Other NVIDIA GPUs remain compatible and select a conservative architecture
+profile by GPU name, compute capability, and VRAM where possible. A profile can
+still be chosen in `.env.local`. Model sizing is deliberately based on
+available VRAM and power limits, not only the marketing family name.
+
+GPU type is not part of Chromie's service or Soridormi integration contract.
+It affects model size, latency, CUDA images, and deployment validation. Jetson
+profiles define runtime/model choices, but ARM64/Jetson-compatible images or a
+Compose override may still be required for full deployment.

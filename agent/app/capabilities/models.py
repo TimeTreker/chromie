@@ -148,6 +148,8 @@ class CapabilityBundle(BaseModel):
     schema_version: str = "0.1"
     source: str = "chromie"
     agents: list[AgentManifest] = Field(default_factory=list)
+    dag_contract: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def load_file(cls, path: str | Path) -> "CapabilityBundle":

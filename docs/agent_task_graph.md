@@ -160,6 +160,25 @@ This endpoint is disabled by default. It does not accept confirmation or safety
 proofs and therefore cannot execute speech output, writes, safety controls, or
 physical motion.
 
+## Planning execution coordinator
+
+Some planning tools create server-side plan IDs and therefore correctly declare
+`side_effect_free=false` even though they cannot move hardware. Enable these
+with:
+
+```env
+AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1
+```
+
+```text
+POST /task-graphs/execute-planning
+```
+
+This coordinator accepts `safe_read` nodes only when they are side-effect-free,
+and accepts `planning_only` nodes such as
+`soridormi.motion.create_plan`. It rejects low-risk actions, safety controls,
+restricted tools, and physical motion before the first MCP call.
+
 ## Supervised guarded execution
 
 Guarded side effects require an operator-configured bearer token:
@@ -199,7 +218,9 @@ AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1
 A monitor node covering the physical node must successfully return `ok: true`
 or `active: true` before motion is invoked. The MCP invoker then independently
 checks confirmation and monitor context again. Every physical node must also
-declare an `on_failure` target that is a registered emergency-stop safety node.
+declare an `on_failure` target that is a registered stop safety node and an
+emergency-stop target through `on_failure` or `on_event`. Ordinary failures use
+the stop fallback; cancellation and emergency paths use emergency stop.
 
 An authorized caller can cancel an active graph:
 

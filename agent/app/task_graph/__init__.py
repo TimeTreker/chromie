@@ -2,6 +2,7 @@
 
 from .async_executor import (
     GuardedTaskGraphExecutor,
+    PlanningTaskGraphExecutor,
     ReadOnlyTaskGraphExecutor,
     TaskGraphExecutionProofs,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "GraphValidator",
     "GuardedTaskGraphExecutor",
     "NodeResult",
+    "PlanningTaskGraphExecutor",
     "RetryPolicy",
     "ReadOnlyTaskGraphExecutor",
     "TaskGraph",

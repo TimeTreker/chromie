@@ -11,8 +11,9 @@ Chromie's roadmap is organized around deployable milestones. A milestone is comp
 M4 is complete: TaskGraph planning, validation, dry-run, guarded MCP execution,
 single-use confirmation grants, cancellation, traces, monitor gating, and
 emergency fallback orchestration are integrated into the Agent service. M5
-connects those boundaries to a real Soridormi deployment and validates them on
-the target GPU/robot host.
+connects those boundaries to Soridormi, the robot cerebellum, and validates
+them on a target GPU/robot host. Hardware profiles are deployment choices, not
+part of the cross-project capability contract.
 
 ## Milestones
 
@@ -57,20 +58,25 @@ the target GPU/robot host.
 1. [Complete] Add a safety-scoped Soridormi deployment manifest with a runtime-configured MCP endpoint.
 2. [Complete] Add fail-fast manifest environment expansion and a paginated MCP `tools/list` name/schema contract probe.
 3. [Complete] Add a probe-gated, zero-motion status/planning acceptance runner.
-4. [Pending target] Probe the real Soridormi server and reconcile its exported tool contracts.
-5. [Pending target] Run read-only/planning and supervised motion, cancellation, and emergency-stop acceptance.
-6. [Pending target] Run the GPU and hardware smoke checks and record the accepted deployment profile.
+4. [Complete] Materialize all nine tools and DAG hints from Soridormi `main` rather than maintaining a duplicate hand-written contract.
+5. [Complete] Separate stateful non-physical planning execution from strictly read-only execution.
+6. [Pending Soridormi] Deploy a Streamable HTTP MCP wrapper around Soridormi's current local dry-run tool core.
+7. [Pending target] Probe the real Soridormi server and run read/planning acceptance.
+8. [Pending target] Run supervised motion, cancellation, and emergency-stop acceptance.
+9. [Pending target] Run the GPU and hardware smoke checks and record the accepted deployment profile.
 
 ## Immediate Sequence
 
-1. Configure `SORIDORMI_MCP_URL` for the target server and run the contract probe.
-2. Reconcile any missing or renamed tools with Soridormi's exported contract.
-3. Run the probe-gated zero-motion read-only and planning acceptance graph.
+1. Add or deploy Soridormi's network MCP Streamable HTTP wrapper.
+2. Configure `SORIDORMI_MCP_URL` and run the contract probe.
+3. Run the probe-gated zero-motion status/planning acceptance graph.
 4. Run supervised motion, cancellation, and emergency-stop acceptance.
 5. Complete the target GPU smoke test and record the accepted deployment profile.
 
 ## Evidence
 
+- Soridormi `f265369`: authoritative nine-tool manifest and DAG contract
+  materialized into Chromie's M5 integration boundary
 - `47a60a3`: documentation consolidation and runtime configuration alignment
 - `6287f9e`: GPU-free control-plane integration tests
 - `2d41e1b`: target-machine GPU smoke test tooling

@@ -9,6 +9,7 @@ from ..tool_invocation import AsyncToolInvoker
 
 from .async_executor import (
     GuardedTaskGraphExecutor,
+    PlanningTaskGraphExecutor,
     ReadOnlyTaskGraphExecutor,
     TaskGraphExecutionProofs,
 )
@@ -64,11 +65,13 @@ class TaskGraphService:
         registry: CapabilityRegistry,
         *,
         read_only_invoker: AsyncToolInvoker | None = None,
+        planning_invoker: AsyncToolInvoker | None = None,
         guarded_invoker: AsyncToolInvoker | None = None,
         allow_physical_motion: bool = False,
     ) -> None:
         self.registry = registry
         self.read_only_invoker = read_only_invoker
+        self.planning_invoker = planning_invoker
         self.guarded_invoker = guarded_invoker
         self.allow_physical_motion = allow_physical_motion
         self._traces: dict[str, ExecutionTrace] = {}
@@ -166,6 +169,16 @@ class TaskGraphService:
         if self.read_only_invoker is None:
             raise RuntimeError("read-only TaskGraph execution is disabled")
         trace = await ReadOnlyTaskGraphExecutor(self.registry, self.read_only_invoker).run(graph)
+        self._traces[graph.graph_id] = trace.model_copy(deep=True)
+        return trace
+
+    async def execute_planning(self, graph: TaskGraph) -> ExecutionTrace:
+        if self.planning_invoker is None:
+            raise RuntimeError("planning TaskGraph execution is disabled")
+        trace = await PlanningTaskGraphExecutor(
+            self.registry,
+            self.planning_invoker,
+        ).run(graph)
         self._traces[graph.graph_id] = trace.model_copy(deep=True)
         return trace
 

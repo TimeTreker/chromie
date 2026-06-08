@@ -4,51 +4,284 @@
   "agents": [
     {
       "agent_id": "soridormi.robot",
-      "display_name": "Soridormi Robot",
-      "description": "Safety-scoped robot status, planning, motion, and emergency controls.",
+      "display_name": "Soridormi Robot State Agent",
+      "description": "Read-only Soridormi robot status, mode, and battery state.",
       "version": "0.1.0",
+      "llm_visible": true,
       "transport": {
         "kind": "mcp_streamable_http",
-        "url": "${SORIDORMI_MCP_URL}"
+        "module": null,
+        "command": null,
+        "args": [],
+        "url": "${SORIDORMI_MCP_URL}",
+        "env": {}
+      },
+      "status": {
+        "available": true,
+        "reason": null,
+        "details": {
+          "mode": "sim"
+        }
       },
       "tags": [
+        "soridormi",
         "robot",
-        "mcp",
-        "physical"
+        "state"
       ],
       "tools": [
         {
           "name": "soridormi.robot.get_status",
           "agent_id": "soridormi.robot",
-          "description": "Read the robot mode, pose summary, battery, and active safety state.",
+          "display_name": "Get Soridormi status",
+          "description": "Read Soridormi status including mode, backend, safety state, and active task metadata.",
+          "version": "0.1.0",
+          "llm_visible": true,
           "input_schema": {
             "type": "object",
             "properties": {}
           },
           "output_schema": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "standing": {
+                "type": "boolean"
+              },
+              "fallen": {
+                "type": "boolean"
+              },
+              "emergency_stop": {
+                "type": "boolean"
+              }
+            }
           },
           "effects": [
             "read_only"
           ],
           "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "requires": [],
+            "reason": null
+          },
           "execution": {
-            "timeout_s": 5,
-            "side_effect_free": true,
-            "idempotent": true
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use before planning or executing robot movement."
           }
         },
         {
-          "name": "soridormi.motion.create_plan",
+          "name": "soridormi.robot.get_mode",
           "agent_id": "soridormi.robot",
-          "description": "Create a bounded robot motion plan without moving hardware.",
+          "display_name": null,
+          "description": "Read the current Soridormi runtime mode such as sim, hardware_dry_run, or hardware.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "effects": [
+            "read_only"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.robot.get_battery",
+          "agent_id": "soridormi.robot",
+          "display_name": null,
+          "description": "Read battery percentage and power safety status when available.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "percent": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "critical": {
+                "type": "boolean"
+              }
+            }
+          },
+          "effects": [
+            "read_only"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "requires": [],
+            "reason": "Sim may return null battery percent."
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        }
+      ]
+    },
+    {
+      "agent_id": "soridormi.motion",
+      "display_name": "Soridormi Motion Agent",
+      "description": "Create and execute short velocity-command motion plans. Does not expose raw motor commands.",
+      "version": "0.1.0",
+      "llm_visible": true,
+      "transport": {
+        "kind": "mcp_streamable_http",
+        "module": null,
+        "command": null,
+        "args": [],
+        "url": "${SORIDORMI_MCP_URL}",
+        "env": {}
+      },
+      "status": {
+        "available": true,
+        "reason": null,
+        "details": {
+          "mode": "sim"
+        }
+      },
+      "tags": [
+        "soridormi",
+        "motion",
+        "robot"
+      ],
+      "tools": [
+        {
+          "name": "soridormi.motion.create_plan",
+          "agent_id": "soridormi.motion",
+          "display_name": "Create Soridormi motion plan",
+          "description": "Create a bounded short-range velocity-command plan. This does not move the robot.",
+          "version": "0.1.0",
+          "llm_visible": true,
           "input_schema": {
             "type": "object",
             "properties": {
               "commands": {
                 "type": "array",
-                "minItems": 1,
-                "maxItems": 20,
                 "items": {
                   "type": "object",
                   "properties": {
@@ -70,7 +303,10 @@
                     "duration_s": {
                       "type": "number",
                       "minimum": 0.05,
-                      "maximum": 5
+                      "maximum": 5.0
+                    },
+                    "label": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -79,7 +315,9 @@
                     "yaw",
                     "duration_s"
                   ]
-                }
+                },
+                "minItems": 1,
+                "maxItems": 8
               }
             },
             "required": [
@@ -94,6 +332,12 @@
               },
               "summary": {
                 "type": "string"
+              },
+              "estimated_duration_s": {
+                "type": "number"
+              },
+              "requires_confirmation": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -106,51 +350,65 @@
             "creates_plan"
           ],
           "safety_class": "planning_only",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
           "execution": {
-            "timeout_s": 10,
-            "side_effect_free": true,
-            "idempotent": true
-          }
-        },
-        {
-          "name": "soridormi.safety.monitor_motion",
-          "agent_id": "soridormi.robot",
-          "description": "Activate and report the safety monitor covering a motion execution.",
-          "input_schema": {
-            "type": "object",
-            "properties": {}
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 2.0,
+            "idempotent": true,
+            "side_effect_free": false
           },
-          "output_schema": {
-            "type": "object",
-            "properties": {
-              "active": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "active"
-            ]
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
           },
-          "effects": [
-            "read_only",
-            "safety_control"
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [
+            "invalid_command",
+            "duration_too_long",
+            "velocity_limit_exceeded"
           ],
-          "safety_class": "safety_critical",
-          "execution": {
-            "timeout_s": 5,
-            "side_effect_free": true,
-            "idempotent": true
+          "default_failure_policy": {
+            "strategy": "ask_user",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use for short movements like walking forward a little, turning, or stopping.",
+            "when_not_to_use": "Do not use for named-location navigation; use a future nav agent instead."
           }
         },
         {
           "name": "soridormi.motion.execute_plan",
-          "agent_id": "soridormi.robot",
-          "description": "Execute a previously validated bounded motion plan.",
+          "agent_id": "soridormi.motion",
+          "display_name": "Execute Soridormi motion plan",
+          "description": "Execute a previously created and validated Soridormi motion plan.",
+          "version": "0.1.0",
+          "llm_visible": true,
           "input_schema": {
             "type": "object",
             "properties": {
               "plan_id": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               }
             },
             "required": [
@@ -166,25 +424,41 @@
               "summary": {
                 "type": "string"
               }
-            },
-            "required": [
-              "completed"
-            ]
+            }
           },
           "effects": [
             "physical_motion"
           ],
           "safety_class": "physical_motion",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run"
+            ],
+            "requires": [
+              "robot_standing",
+              "not_emergency_stopped"
+            ],
+            "reason": null
+          },
           "execution": {
             "can_run_parallel": false,
-            "exclusive_group": "robot_motion",
-            "timeout_s": 30,
+            "exclusive_group": "soridormi.robot_motion",
+            "timeout_s": 15.0,
             "idempotent": false,
             "side_effect_free": false
           },
           "confirmation": {
             "required": true,
-            "reason": "The plan moves physical hardware."
+            "reason": "This tool can move the robot.",
+            "required_in_modes": [
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "skippable_in_modes": [
+              "sim"
+            ]
           },
           "monitoring": {
             "requires_safety_monitor": true,
@@ -192,20 +466,276 @@
               "soridormi.safety.monitor_motion"
             ],
             "hard_interrupt_events": [
-              "obstacle",
               "fall_detected",
-              "emergency_stop"
+              "emergency_stop",
+              "collision_risk",
+              "low_battery_critical"
             ]
           },
+          "failure_modes": [
+            "plan_not_found",
+            "plan_expired",
+            "motion_failed",
+            "safety_interrupted",
+            "timeout"
+          ],
           "default_failure_policy": {
-            "strategy": "emergency_stop"
+            "strategy": "stop_and_report",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use only after create_plan succeeds and Chromie has handled user confirmation."
           }
         },
         {
+          "name": "soridormi.motion.stop",
+          "agent_id": "soridormi.motion",
+          "display_name": null,
+          "description": "Stop current Soridormi motion as quickly as the safe command layer allows.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "stopped": {
+                "type": "boolean"
+              }
+            }
+          },
+          "effects": [
+            "physical_motion",
+            "safety_control"
+          ],
+          "safety_class": "safety_critical",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": false,
+            "exclusive_group": "soridormi.robot_motion",
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [
+            "runtime_unreachable"
+          ],
+          "default_failure_policy": {
+            "strategy": "emergency_stop",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.motion.cancel",
+          "agent_id": "soridormi.motion",
+          "display_name": null,
+          "description": "Cancel the current Soridormi motion plan and transition to stop.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "cancelled": {
+                "type": "boolean"
+              }
+            }
+          },
+          "effects": [
+            "physical_motion",
+            "safety_control"
+          ],
+          "safety_class": "safety_critical",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": false,
+            "exclusive_group": "soridormi.robot_motion",
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "emergency_stop",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        }
+      ]
+    },
+    {
+      "agent_id": "soridormi.safety",
+      "display_name": "Soridormi Safety Agent",
+      "description": "Soridormi safety validation, motion monitoring, and emergency stop capabilities.",
+      "version": "0.1.0",
+      "llm_visible": true,
+      "transport": {
+        "kind": "mcp_streamable_http",
+        "module": null,
+        "command": null,
+        "args": [],
+        "url": "${SORIDORMI_MCP_URL}",
+        "env": {}
+      },
+      "status": {
+        "available": true,
+        "reason": null,
+        "details": {
+          "mode": "sim"
+        }
+      },
+      "tags": [
+        "soridormi",
+        "safety"
+      ],
+      "tools": [
+        {
+          "name": "soridormi.safety.monitor_motion",
+          "agent_id": "soridormi.safety",
+          "display_name": null,
+          "description": "Monitor safety state while a Soridormi physical-motion node is running.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "during_node_id": {
+                "type": "string"
+              }
+            }
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            }
+          },
+          "effects": [
+            "read_only",
+            "safety_control"
+          ],
+          "safety_class": "safety_critical",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 60.0,
+            "idempotent": false,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [
+            "monitor_unavailable",
+            "fall_detected",
+            "emergency_stop",
+            "collision_risk"
+          ],
+          "default_failure_policy": {
+            "strategy": "emergency_stop",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
           "name": "soridormi.safety.emergency_stop",
-          "agent_id": "soridormi.robot",
-          "description": "Immediately request the robot safety layer to stop physical motion.",
-          "llm_visible": false,
+          "agent_id": "soridormi.safety",
+          "display_name": null,
+          "description": "Hard-stop Soridormi and abort robot motion. This safety tool can preempt other tasks.",
+          "version": "0.1.0",
+          "llm_visible": true,
           "input_schema": {
             "type": "object",
             "properties": {
@@ -220,24 +750,107 @@
               "stopped": {
                 "type": "boolean"
               }
-            },
-            "required": [
-              "stopped"
-            ]
+            }
           },
           "effects": [
+            "physical_motion",
             "safety_control"
           ],
           "safety_class": "safety_critical",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "requires": [],
+            "reason": null
+          },
           "execution": {
             "can_run_parallel": false,
-            "exclusive_group": "robot_motion",
-            "timeout_s": 5,
+            "exclusive_group": "soridormi.robot_motion",
+            "timeout_s": 1.0,
             "idempotent": true,
             "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [
+            "runtime_unreachable"
+          ],
+          "default_failure_policy": {
+            "strategy": "emergency_stop",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use immediately for fall, collision risk, emergency stop, or user stop/cancel."
           }
         }
       ]
     }
-  ]
+  ],
+  "dag_contract": {
+    "schema_version": "0.1",
+    "source": "soridormi",
+    "mode": "sim",
+    "tool_prefix": "soridormi.",
+    "host_required_tools": [
+      "chromie.ask_confirmation",
+      "chromie.report"
+    ],
+    "physical_motion_tools": [
+      "soridormi.motion.execute_plan"
+    ],
+    "planning_tools": [
+      "soridormi.motion.create_plan"
+    ],
+    "safety_tools": [
+      "soridormi.safety.monitor_motion",
+      "soridormi.motion.stop",
+      "soridormi.safety.emergency_stop"
+    ],
+    "default_short_motion_sequence": [
+      "soridormi.robot.get_status",
+      "soridormi.motion.create_plan",
+      "chromie.ask_confirmation",
+      "soridormi.safety.monitor_motion during soridormi.motion.execute_plan",
+      "soridormi.motion.execute_plan",
+      "chromie.report"
+    ],
+    "rules": [
+      "Soridormi tools do not implement Chromie speech, TTS, ASR, or user confirmation.",
+      "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
+      "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
+      "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",
+      "Do not expose raw motor, joint, or torque controls to LLM-generated graphs.",
+      "stop and emergency_stop may preempt any running motion task."
+    ],
+    "fallback_recommendations": {
+      "soridormi.motion.execute_plan": {
+        "on_failure": "soridormi.motion.stop then chromie.report",
+        "on_timeout": "soridormi.motion.stop then chromie.report",
+        "on_safety_event": "soridormi.safety.emergency_stop then chromie.report"
+      }
+    }
+  },
+  "metadata": {
+    "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
+    "transport_overlay": "mcp_streamable_http",
+    "upstream_commit": "f265369094c118fffaa338a58ab3a5875cfa654a"
+  }
 }

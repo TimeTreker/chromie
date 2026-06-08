@@ -3,6 +3,22 @@
 Place trusted external capability bundle JSON files in this directory. Docker
 mounts it read-only at `/app/capabilities` inside `chromie-agent`.
 
+`soridormi.json` is generated from Soridormi's authoritative capability export,
+then overlaid with Chromie's MCP Streamable HTTP endpoint placeholder. Do not
+hand-edit its tools or schemas.
+
+Refresh it from a local Soridormi checkout:
+
+```bash
+PYTHONPATH=../soridormi/src \
+  python -m soridormi_runtime.mcp.export_capabilities \
+  --mode sim > /tmp/soridormi-export.json
+
+PYTHONPATH=agent python -m app.materialize_soridormi_manifest \
+  /tmp/soridormi-export.json capabilities/soridormi.json \
+  --upstream-commit "$(git -C ../soridormi rev-parse HEAD)"
+```
+
 Enable one file:
 
 ```env
@@ -42,5 +58,10 @@ PYTHONPATH=agent python -m app.soridormi_acceptance \
 ```
 
 The default request creates a zero-motion plan and does not execute hardware.
+
+Soridormi `main` currently provides this manifest and an in-process/local CLI
+dry-run tool core. Its own documentation states that the final network MCP
+server is still pending. `SORIDORMI_MCP_URL` must therefore point to a deployed
+Streamable HTTP wrapper before the probe or acceptance command can pass.
 
 Do not expose raw motor, joint, or torque controls through these manifests.

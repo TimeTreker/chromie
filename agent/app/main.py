@@ -50,6 +50,10 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
+    enable_planning_task_graph_execution: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION", "0").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
     enable_guarded_task_graph_execution: bool = Field(
         default_factory=lambda: os.getenv("AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION", "0").strip().lower()
         not in {"0", "false", "no", "off"}
@@ -94,6 +98,11 @@ read_only_invoker = (
     if settings.enable_read_only_task_graph_execution
     else None
 )
+planning_invoker = (
+    McpStreamableHttpInvoker(capability_registry)
+    if settings.enable_planning_task_graph_execution
+    else None
+)
 if settings.enable_physical_task_graph_execution and not settings.enable_guarded_task_graph_execution:
     raise ValueError(
         "AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION is required when physical TaskGraph execution is enabled"
@@ -110,6 +119,7 @@ guarded_invoker = (
 task_graph_service = TaskGraphService(
     capability_registry,
     read_only_invoker=read_only_invoker,
+    planning_invoker=planning_invoker,
     guarded_invoker=guarded_invoker,
     allow_physical_motion=settings.enable_physical_task_graph_execution,
 )
@@ -145,6 +155,7 @@ async def health() -> HealthResponse:
         capability_manifest_files=configured_registry.manifest_files,
         task_graph_planning_enabled=task_graph_planner is not None,
         read_only_task_graph_execution_enabled=read_only_invoker is not None,
+        planning_task_graph_execution_enabled=planning_invoker is not None,
         guarded_task_graph_execution_enabled=guarded_invoker is not None,
         physical_task_graph_execution_enabled=(
             guarded_invoker is not None and settings.enable_physical_task_graph_execution
@@ -195,6 +206,16 @@ async def dry_run_task_graph(request: TaskGraphDryRunRequest) -> ExecutionTrace:
 async def execute_read_only_task_graph(request: TaskGraphExecuteRequest) -> ExecutionTrace:
     try:
         return await task_graph_service.execute_read_only(request.graph)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/task-graphs/execute-planning", response_model=ExecutionTrace)
+async def execute_planning_task_graph(request: TaskGraphExecuteRequest) -> ExecutionTrace:
+    try:
+        return await task_graph_service.execute_planning(request.graph)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:

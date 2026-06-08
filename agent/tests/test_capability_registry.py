@@ -55,7 +55,7 @@ def test_checked_in_soridormi_manifest_preserves_safety_contract() -> None:
     assert execute.monitoring.requires_safety_monitor
     assert execute.execution.side_effect_free is False
     assert emergency_stop.safety_class == "safety_critical"
-    assert emergency_stop.llm_visible is False
+    assert emergency_stop.llm_visible is True
 
 
 def test_restricted_tools_are_hidden_from_llm() -> None:

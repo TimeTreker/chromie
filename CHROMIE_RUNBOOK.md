@@ -83,6 +83,7 @@ runtime configuration:
 ```env
 AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json
 SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp
+AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1
 ```
 
 ```bash
@@ -107,6 +108,11 @@ docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
 The default planning request contains zero velocity and yaw. It calls only
 `soridormi.robot.get_status` and `soridormi.motion.create_plan`; it never calls
 the physical execution tool.
+
+Soridormi `main` currently ships the exported contract and local dry-run tool
+core, not the final network MCP server. If the endpoint does not exist yet,
+deploy the Soridormi Streamable HTTP wrapper before continuing with live M5
+acceptance.
 
 ## Watch logs
 

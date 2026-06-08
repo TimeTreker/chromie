@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from agent.app.capabilities.loader import build_configured_registry
 from agent.app.capabilities.probe import CapabilityProbeResult
-from agent.app.soridormi_acceptance import run_soridormi_read_only_acceptance
+from agent.app.soridormi_acceptance import run_soridormi_planning_acceptance
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
 
@@ -49,7 +49,7 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             }
 
         commands = [{"vx": 0.0, "vy": 0.0, "yaw": 0.0, "duration_s": 0.05}]
-        trace = await run_soridormi_read_only_acceptance(
+        trace = await run_soridormi_planning_acceptance(
             registry,
             commands=commands,
             invoker=McpStreamableHttpInvoker(registry, call=call),
@@ -84,7 +84,7 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             return {}
 
         with self.assertRaisesRegex(ValueError, "capability probe failed"):
-            await run_soridormi_read_only_acceptance(
+            await run_soridormi_planning_acceptance(
                 registry,
                 commands=[],
                 invoker=McpStreamableHttpInvoker(registry, call=call),
@@ -111,7 +111,7 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             return {"structuredContent": {"plan_id": "missing-summary"}}
 
         with self.assertRaisesRegex(RuntimeError, "missing required fields"):
-            await run_soridormi_read_only_acceptance(
+            await run_soridormi_planning_acceptance(
                 registry,
                 commands=[
                     {

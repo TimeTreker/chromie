@@ -58,7 +58,10 @@ docker compose version
 conda --version
 ```
 
-RTX 4090, RTX 5090, and several Jetson profiles are included. Jetson profiles define model and runtime choices, but ARM64-compatible images or a Compose override may still be required for a complete deployment.
+RTX 5090, RTX 4090 desktop/laptop, Jetson Thor, and Jetson Orin profiles are
+detected automatically. GPU type changes model sizing and deployment details,
+not Chromie's architecture or its Soridormi contract. Other NVIDIA GPUs use a
+conservative fallback or an explicit `.env.local` profile override.
 
 ## Quick Start
 
@@ -188,12 +191,22 @@ For Soridormi, set
 `SORIDORMI_MCP_URL`. Probe the live MCP endpoint against the checked-in
 manifest before enabling TaskGraph execution.
 
+Soridormi is the robot cerebellum: it owns embodied planning, safety, policy
+execution, and robot feedback. Chromie owns conversation, global planning,
+confirmation, and orchestration. The checked-in manifest is materialized from
+[Soridormi's exported contract](https://github.com/TimeTreker/soridormi) with
+only the deployment transport changed to MCP Streamable HTTP.
+
 Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to opt eligible `tool` routes into
 validated structured planning. Planned graphs are returned for inspection and
 are not executed until a guarded `ToolInvoker` transport is configured.
 
 `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION=1` separately enables MCP execution
 for graphs containing only side-effect-free read and planning capabilities.
+
+`AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1` enables safe reads plus
+stateful `planning_only` tools such as Soridormi plan creation. It still rejects
+speech, writes, safety controls, and physical motion.
 
 Guarded side effects and physical motion have separate, default-off deployment
 gates. See [Task Graph](docs/agent_task_graph.md) for operator authorization,

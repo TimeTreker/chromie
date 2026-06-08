@@ -61,6 +61,12 @@ def _registry():
                         default_failure_policy=FailurePolicy(strategy="stop_and_report"),
                     ),
                     ToolCapability(
+                        name="remote.stop",
+                        agent_id="remote.control",
+                        safety_class="safety_critical",
+                        effects=["safety_control"],
+                    ),
+                    ToolCapability(
                         name="remote.emergency_stop",
                         agent_id="remote.control",
                         safety_class="safety_critical",
@@ -334,6 +340,136 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trace.status, "failed")
         self.assertEqual(calls, ["remote.monitor", "remote.move", "remote.emergency_stop"])
         self.assertEqual(trace.result_map()["move"].status, "failed_fatal")
+        self.assertEqual(trace.result_map()["emergency"].status, "success")
+
+    async def test_normal_failure_uses_stop_with_emergency_path_declared(self) -> None:
+        calls: list[str] = []
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            calls.append(tool)
+            if tool == "remote.monitor":
+                return {"structuredContent": {"active": True}}
+            if tool == "remote.move":
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": "motion fault"}],
+                }
+            return {"structuredContent": {"stopped": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+            allow_physical_motion=True,
+        )
+        payload = _physical_graph().model_dump(mode="json")
+        move = next(node for node in payload["nodes"] if node["id"] == "move")
+        move["on_failure"] = {"strategy": "goto", "target": "stop"}
+        move["on_event"] = {
+            "safety_event": {"strategy": "goto", "target": "emergency"}
+        }
+        payload["nodes"].append(
+            {
+                "id": "stop",
+                "tool": "remote.stop",
+                "type": "safety",
+            }
+        )
+        graph = TaskGraph.model_validate(payload)
+
+        trace = await service.execute_guarded(graph, self._grant(service, graph))
+
+        self.assertEqual(trace.status, "failed")
+        self.assertEqual(calls, ["remote.monitor", "remote.move", "remote.stop"])
+        self.assertEqual(trace.result_map()["stop"].status, "success")
+        self.assertNotIn("emergency", trace.result_map())
+        self.assertTrue(any(event.type == "stop_fallback" for event in trace.events))
+
+    async def test_timeout_uses_on_timeout_stop(self) -> None:
+        calls: list[str] = []
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            calls.append(tool)
+            if tool == "remote.monitor":
+                return {"structuredContent": {"active": True}}
+            if tool == "remote.move":
+                raise TimeoutError("motion timed out")
+            return {"structuredContent": {"stopped": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+            allow_physical_motion=True,
+        )
+        payload = _physical_graph().model_dump(mode="json")
+        move = next(node for node in payload["nodes"] if node["id"] == "move")
+        move["on_timeout"] = {"strategy": "goto", "target": "stop"}
+        payload["nodes"].append(
+            {
+                "id": "stop",
+                "tool": "remote.stop",
+                "type": "safety",
+            }
+        )
+        graph = TaskGraph.model_validate(payload)
+
+        trace = await service.execute_guarded(graph, self._grant(service, graph))
+
+        self.assertEqual(trace.status, "failed")
+        self.assertEqual(calls, ["remote.monitor", "remote.move", "remote.stop"])
+        self.assertEqual(trace.result_map()["move"].status, "timeout")
+        self.assertEqual(trace.result_map()["stop"].status, "success")
+        self.assertNotIn("emergency", trace.result_map())
+
+    async def test_cancellation_uses_emergency_path_not_normal_stop(self) -> None:
+        calls: list[str] = []
+        motion_started = asyncio.Event()
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            calls.append(tool)
+            if tool == "remote.monitor":
+                return {"structuredContent": {"active": True}}
+            if tool == "remote.move":
+                motion_started.set()
+                await asyncio.Event().wait()
+            return {"structuredContent": {"stopped": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+            allow_physical_motion=True,
+        )
+        payload = _physical_graph().model_dump(mode="json")
+        payload["graph_id"] = "physical-cancel-with-stop"
+        move = next(node for node in payload["nodes"] if node["id"] == "move")
+        move["on_failure"] = {"strategy": "goto", "target": "stop"}
+        move["on_event"] = {
+            "safety_event": {"strategy": "goto", "target": "emergency"}
+        }
+        payload["nodes"].append(
+            {
+                "id": "stop",
+                "tool": "remote.stop",
+                "type": "safety",
+            }
+        )
+        graph = TaskGraph.model_validate(payload)
+        execution = asyncio.create_task(
+            service.execute_guarded(graph, self._grant(service, graph))
+        )
+        await asyncio.wait_for(motion_started.wait(), timeout=1.0)
+
+        service.cancel_execution(graph.graph_id)
+        trace = await asyncio.wait_for(execution, timeout=1.0)
+
+        self.assertEqual(trace.status, "cancelled")
+        self.assertEqual(
+            calls,
+            ["remote.monitor", "remote.move", "remote.emergency_stop"],
+        )
+        self.assertNotIn("stop", trace.result_map())
         self.assertEqual(trace.result_map()["emergency"].status, "success")
 
     def test_confirmation_grant_expires(self) -> None:

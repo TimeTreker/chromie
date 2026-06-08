@@ -117,6 +117,17 @@ PYTHONPATH=. python -m app.soridormi_acceptance \
 The default command requests a zero-motion plan and does not enable physical
 execution.
 
+Soridormi plan creation is intentionally stateful even though it cannot move
+hardware. Enable it separately with:
+
+```env
+AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1
+```
+
+This exposes `POST /task-graphs/execute-planning`, which accepts only
+`safe_read` and `planning_only` nodes. Physical and safety-control tools remain
+behind guarded execution.
+
 ### TaskGraph planning
 
 Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to let `tool` routes ask the configured
