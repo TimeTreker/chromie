@@ -126,6 +126,22 @@ Add `--exercise-emergency-stop` only on a disposable or restartable Soridormi
 process. The command verifies retained e-stop state and intentionally leaves
 that process stopped.
 
+On the supervised target host, verify cancellation against the runtime-backed
+MCP adapter with:
+
+```bash
+docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
+  python -m app.soridormi_acceptance \
+  --manifest /app/capabilities/soridormi.json \
+  --exercise-runtime-cancellation
+```
+
+The default cancellation plan holds zero velocity for five seconds. Chromie
+waits until `execute_plan` is dispatched, cancels the graph after one second,
+requires the emergency fallback to succeed, and verifies retained e-stop
+state. This intentionally leaves Soridormi stopped; complete its documented
+recovery procedure before any further motion.
+
 Chromie and Soridormi remain separate deployments. Start `soridormi-mcp` from
 the Soridormi repository, then point Chromie at its published endpoint.
 

@@ -129,6 +129,19 @@ PYTHONPATH=. python -m app.soridormi_acceptance \
 This requires `dry_run_only=true`, exercises confirmation and monitoring, and
 proves the normal `motion.stop` fallback. It is not hardware acceptance.
 
+Against a runtime-backed MCP adapter on a supervised target, verify in-flight
+cancellation and the safety layer with:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=. python -m app.soridormi_acceptance \
+  --manifest ../capabilities/soridormi.json \
+  --exercise-runtime-cancellation
+```
+
+This uses a five-second zero-velocity plan by default and intentionally leaves
+Soridormi emergency-stopped after verifying the cancellation fallback.
+
 Soridormi plan creation is intentionally stateful even though it cannot move
 hardware. Enable it separately with:
 

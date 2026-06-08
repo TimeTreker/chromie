@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ from agent.app.soridormi_acceptance import (
     build_soridormi_guarded_graph,
     run_soridormi_guarded_dry_run_acceptance,
     run_soridormi_planning_acceptance,
+    run_soridormi_runtime_cancellation_acceptance,
 )
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
@@ -217,6 +219,70 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(emergency, {"stopped": True})
         self.assertEqual(status, {"emergency_stop": True})
+
+    async def test_runtime_cancellation_uses_emergency_fallback_and_checks_state(
+        self,
+    ) -> None:
+        registry = self._registry()
+        calls: list[str] = []
+        emergency_active = False
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            nonlocal emergency_active
+            calls.append(tool)
+            if tool == "soridormi.safety.monitor_motion":
+                return {"structuredContent": {"active": True}}
+            if tool == "soridormi.motion.execute_plan":
+                await asyncio.Event().wait()
+            if tool == "soridormi.safety.emergency_stop":
+                emergency_active = True
+                return {"structuredContent": {"stopped": True}}
+            if tool == "soridormi.robot.get_status":
+                return {
+                    "structuredContent": {
+                        "emergency_stop": emergency_active,
+                    }
+                }
+            raise AssertionError(f"unexpected tool call: {tool}")
+
+        trace, status = await run_soridormi_runtime_cancellation_acceptance(
+            registry,
+            plan_id="long-running-plan",
+            invoker=McpStreamableHttpInvoker(registry, call=call),
+            cancel_after_s=0,
+        )
+
+        self.assertEqual(trace.status, "cancelled")
+        self.assertEqual(trace.result_map()["execute"].status, "cancelled")
+        self.assertEqual(trace.result_map()["emergency"].status, "success")
+        self.assertEqual(status, {"emergency_stop": True})
+        self.assertEqual(
+            calls,
+            [
+                "soridormi.safety.monitor_motion",
+                "soridormi.motion.execute_plan",
+                "soridormi.safety.emergency_stop",
+                "soridormi.robot.get_status",
+            ],
+        )
+
+    async def test_runtime_cancellation_rejects_completed_operation(self) -> None:
+        registry = self._registry()
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            if tool == "soridormi.safety.monitor_motion":
+                return {"structuredContent": {"active": True}}
+            if tool == "soridormi.motion.execute_plan":
+                return {"structuredContent": {"completed": True}}
+            raise AssertionError(f"unexpected tool call: {tool}")
+
+        with self.assertRaisesRegex(RuntimeError, "completed before cancellation"):
+            await run_soridormi_runtime_cancellation_acceptance(
+                registry,
+                plan_id="short-plan",
+                invoker=McpStreamableHttpInvoker(registry, call=call),
+                cancel_after_s=0,
+            )
 
     def test_guarded_graph_declares_normal_and_emergency_recovery(self) -> None:
         graph = build_soridormi_guarded_graph("plan-1")

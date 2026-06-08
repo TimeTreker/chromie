@@ -107,6 +107,11 @@ normal stop fallback against Soridormi's network service. The current server
 still wraps a dry-run tool service. Runtime-backed cancellation and supervised
 hardware acceptance remain M5 target-host work.
 
+Once the endpoint is backed by the long-running Soridormi runtime, use
+`--exercise-runtime-cancellation` on the supervised target. The runner dispatches
+a five-second zero-velocity plan, cancels it, requires the emergency fallback,
+and verifies retained emergency-stop state.
+
 ## Safety rule
 
 Chromie may plan and route tasks, but it must not receive raw motor, joint, or

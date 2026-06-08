@@ -19,6 +19,7 @@ from .task_graph.service import (
 from .tool_invocation import (
     AsyncToolInvoker,
     McpStreamableHttpInvoker,
+    ToolCallOutcome,
     ToolInvocationContext,
 )
 
@@ -35,6 +36,30 @@ class SoridormiDryRunAcceptanceReport(BaseModel):
     emergency_stop: dict[str, Any] | None = None
     status_after_emergency_stop: dict[str, Any] | None = None
     notes: list[str] = Field(default_factory=list)
+
+
+class SoridormiRuntimeCancellationAcceptanceReport(BaseModel):
+    planning: ExecutionTrace
+    cancellation: ExecutionTrace
+    status_after_cancellation: dict[str, Any]
+    notes: list[str] = Field(default_factory=list)
+
+
+class _ExecutePlanObserver:
+    def __init__(self, invoker: AsyncToolInvoker, started: asyncio.Event) -> None:
+        self._invoker = invoker
+        self._started = started
+
+    async def invoke(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> ToolCallOutcome:
+        if tool_name == "soridormi.motion.execute_plan":
+            self._started.set()
+        return await self._invoker.invoke(tool_name, args, context=context)
 
 
 def build_soridormi_planning_graph(
@@ -230,12 +255,79 @@ async def run_soridormi_guarded_dry_run_acceptance(
     return guarded_trace, failure_trace, emergency_output, status_output
 
 
+async def run_soridormi_runtime_cancellation_acceptance(
+    registry: CapabilityRegistry,
+    *,
+    plan_id: str,
+    invoker: AsyncToolInvoker,
+    cancel_after_s: float = 1.0,
+    start_timeout_s: float = 10.0,
+) -> tuple[ExecutionTrace, dict[str, Any]]:
+    if cancel_after_s < 0:
+        raise ValueError("cancel_after_s must be non-negative")
+
+    execution_started = asyncio.Event()
+    service = TaskGraphService(
+        registry,
+        guarded_invoker=_ExecutePlanObserver(invoker, execution_started),
+        allow_physical_motion=True,
+    )
+    graph = build_soridormi_guarded_graph(
+        plan_id,
+        graph_id="soridormi-runtime-cancellation-acceptance",
+    )
+    grant = service.issue_confirmation_grant(
+        TaskGraphConfirmationGrantRequest(
+            graph=graph,
+            confirmed_node_ids={"confirm"},
+        )
+    )
+    execution = asyncio.create_task(
+        service.execute_guarded(graph, grant.confirmation_grant)
+    )
+    try:
+        await asyncio.wait_for(execution_started.wait(), timeout=start_timeout_s)
+        await asyncio.sleep(cancel_after_s)
+        cancellation = service.cancel_execution(graph.graph_id)
+        if not cancellation.cancellation_requested:
+            raise RuntimeError(
+                "Soridormi operation completed before cancellation was requested"
+            )
+        trace = await asyncio.wait_for(execution, timeout=start_timeout_s)
+    except (Exception, asyncio.CancelledError):
+        if not execution.done():
+            service.cancel_execution(graph.graph_id)
+            await asyncio.gather(execution, return_exceptions=True)
+        raise
+
+    results = trace.result_map()
+    if (
+        trace.status != "cancelled"
+        or results.get("execute") is None
+        or results["execute"].status != "cancelled"
+        or results.get("emergency") is None
+        or results["emergency"].status != "success"
+    ):
+        raise RuntimeError(
+            "Soridormi runtime cancellation did not complete the emergency fallback"
+        )
+
+    status = await invoker.invoke("soridormi.robot.get_status", {})
+    if status.status != "success" or status.output.get("emergency_stop") is not True:
+        raise RuntimeError(
+            "Soridormi runtime did not retain emergency-stop state after cancellation"
+        )
+    return trace, status.output
+
+
 async def _run(
     manifest: str,
     commands: list[dict[str, Any]],
     *,
     guarded_dry_run: bool,
     exercise_emergency_stop: bool,
+    exercise_runtime_cancellation: bool,
+    cancel_after_s: float,
 ) -> int:
     configured = build_configured_registry([manifest])
     invoker = McpStreamableHttpInvoker(configured.registry)
@@ -244,6 +336,28 @@ async def _run(
         commands=commands,
         invoker=invoker,
     )
+    if exercise_runtime_cancellation:
+        plan_id = planning_trace.result_map()["plan"].output["plan_id"]
+        cancellation, status = (
+            await run_soridormi_runtime_cancellation_acceptance(
+                configured.registry,
+                plan_id=plan_id,
+                invoker=invoker,
+                cancel_after_s=cancel_after_s,
+            )
+        )
+        report = SoridormiRuntimeCancellationAcceptanceReport(
+            planning=planning_trace,
+            cancellation=cancellation,
+            status_after_cancellation=status,
+            notes=[
+                "Cancellation reached an in-flight runtime operation and completed the emergency fallback.",
+                "Emergency stop remains active; follow the Soridormi recovery procedure before more motion.",
+            ],
+        )
+        print(json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        return 0
+
     if not guarded_dry_run:
         print(
             json.dumps(
@@ -291,25 +405,50 @@ def main() -> None:
     parser.add_argument("--manifest", required=True)
     parser.add_argument(
         "--commands-json",
-        default='[{"vx":0.0,"vy":0.0,"yaw":0.0,"duration_s":0.05}]',
-        help="Bounded planning commands. The default requests no physical movement.",
+        help=(
+            "Bounded planning commands. Defaults to a 0.05-second zero-motion plan, "
+            "or a 5-second zero-motion plan for runtime cancellation."
+        ),
     )
-    parser.add_argument(
+    execution_group = parser.add_mutually_exclusive_group()
+    execution_group.add_argument(
         "--guarded-dry-run",
         action="store_true",
         help="Also verify confirmation, monitoring, dry-run execution, and stop fallback.",
+    )
+    execution_group.add_argument(
+        "--exercise-runtime-cancellation",
+        action="store_true",
+        help=(
+            "Cancel an in-flight runtime-backed plan, verify emergency fallback, "
+            "and leave Soridormi emergency-stopped."
+        ),
     )
     parser.add_argument(
         "--exercise-emergency-stop",
         action="store_true",
         help="Set and verify Soridormi emergency stop. Restart Soridormi afterwards.",
     )
+    parser.add_argument(
+        "--cancel-after-s",
+        type=float,
+        default=1.0,
+        help="Seconds to wait after execute_plan is dispatched before cancelling it.",
+    )
     args = parser.parse_args()
-    commands = json.loads(args.commands_json)
+    commands_json = args.commands_json
+    if commands_json is None:
+        duration_s = 5.0 if args.exercise_runtime_cancellation else 0.05
+        commands_json = (
+            f'[{{"vx":0.0,"vy":0.0,"yaw":0.0,"duration_s":{duration_s}}}]'
+        )
+    commands = json.loads(commands_json)
     if not isinstance(commands, list):
         raise SystemExit("--commands-json must decode to a JSON array")
     if args.exercise_emergency_stop and not args.guarded_dry_run:
         raise SystemExit("--exercise-emergency-stop requires --guarded-dry-run")
+    if args.cancel_after_s < 0:
+        raise SystemExit("--cancel-after-s must be non-negative")
     raise SystemExit(
         asyncio.run(
             _run(
@@ -317,6 +456,8 @@ def main() -> None:
                 commands,
                 guarded_dry_run=args.guarded_dry_run,
                 exercise_emergency_stop=args.exercise_emergency_stop,
+                exercise_runtime_cancellation=args.exercise_runtime_cancellation,
+                cancel_after_s=args.cancel_after_s,
             )
         )
     )

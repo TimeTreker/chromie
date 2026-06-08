@@ -63,8 +63,9 @@ part of the cross-project capability contract.
 6. [Complete] Add Soridormi's dedicated Streamable HTTP MCP container without merging the Chromie and Soridormi deployments.
 7. [Complete local] Probe the real Soridormi server and run cross-process read/planning acceptance.
 8. [Complete dry-run] Verify confirmation, monitor activation, execution, stop fallback, and persistent emergency-stop state over MCP.
-9. [Pending runtime target] Connect the MCP service to Soridormi's long-running runtime and verify cancellation against its safety layer.
-10. [Pending target] Run the GPU and supervised hardware checks and record the accepted deployment profile.
+9. [Complete tooling] Add runtime cancellation acceptance with emergency fallback and retained safety-state verification.
+10. [Pending runtime target] Connect the MCP service to Soridormi's long-running runtime and run cancellation acceptance against its safety layer.
+11. [Pending target] Run the GPU and supervised hardware checks and record the accepted deployment profile.
 
 ## Immediate Sequence
 
