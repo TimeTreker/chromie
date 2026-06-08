@@ -86,9 +86,9 @@ constraints. Extra advertised tools and schema annotations remain unavailable
 because Chromie invokes only registry-approved names and validates against its
 own manifest.
 
-The checked-in manifest is the Chromie-side contract. M5 deployment acceptance
-still requires the real Soridormi server to advertise the same names and input
-contracts on the target host.
+The checked-in manifest is the Chromie-side contract. Soridormi's dedicated
+MCP container now advertises the same names and input contracts; target-host
+deployment must still run the probe before execution is enabled.
 
 Once the probe reports ready, run the read/planning acceptance graph:
 
@@ -102,10 +102,10 @@ This command probes first, reads robot status, then requests a bounded
 zero-motion plan. It rejects a missing planning response contract and never
 invokes `soridormi.motion.execute_plan`.
 
-Soridormi `main` currently exposes the authoritative manifest and local
-dry-run tool implementation, but describes the final stdio/HTTP MCP server as
-future work. Chromie is ready for Streamable HTTP; live M5 acceptance waits for
-that Soridormi wrapper or an equivalent deployment adapter.
+Add `--guarded-dry-run` to verify confirmed execution, monitor activation, and
+normal stop fallback against Soridormi's network service. The current server
+still wraps a dry-run tool service. Runtime-backed cancellation and supervised
+hardware acceptance remain M5 target-host work.
 
 ## Safety rule
 

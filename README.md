@@ -197,6 +197,10 @@ confirmation, and orchestration. The checked-in manifest is materialized from
 [Soridormi's exported contract](https://github.com/TimeTreker/soridormi) with
 only the deployment transport changed to MCP Streamable HTTP.
 
+The projects remain separate deployments: Soridormi publishes a dedicated
+`soridormi-mcp` container, while `chromie-agent` connects to it through
+`SORIDORMI_MCP_URL`. Chromie does not embed Soridormi in its own images.
+
 Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to opt eligible `tool` routes into
 validated structured planning. Planned graphs are returned for inspection and
 are not executed until a guarded `ToolInvoker` transport is configured.

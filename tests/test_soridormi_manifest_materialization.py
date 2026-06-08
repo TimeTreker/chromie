@@ -65,6 +65,10 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
             "https://github.com/TimeTreker/soridormi.git",
         )
         self.assertEqual(
+            payload["metadata"]["upstream_commit"],
+            "fb006a37102ef1f57f069c7ff7b95a5135f5a204",
+        )
+        self.assertEqual(
             tool_names,
             {
                 "soridormi.robot.get_status",

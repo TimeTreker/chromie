@@ -115,10 +115,12 @@ class McpStreamableHttpInvoker:
         registry: CapabilityRegistry,
         *,
         timeout_s: float = 30.0,
+        trust_env: bool = False,
         call: McpCall | None = None,
     ) -> None:
         self.registry = registry
         self.timeout_s = timeout_s
+        self.trust_env = trust_env
         self._call = call or self._call_with_sdk
 
     async def invoke(
@@ -187,7 +189,10 @@ class McpStreamableHttpInvoker:
         from mcp import ClientSession
         from mcp.client.streamable_http import streamable_http_client
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_s)) as http_client:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(timeout_s),
+            trust_env=self.trust_env,
+        ) as http_client:
             async with streamable_http_client(url, http_client=http_client) as (read, write, _):
                 async with ClientSession(read, write) as session:
                     await session.initialize()

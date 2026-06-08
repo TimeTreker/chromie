@@ -60,23 +60,27 @@ part of the cross-project capability contract.
 3. [Complete] Add a probe-gated, zero-motion status/planning acceptance runner.
 4. [Complete] Materialize all nine tools and DAG hints from Soridormi `main` rather than maintaining a duplicate hand-written contract.
 5. [Complete] Separate stateful non-physical planning execution from strictly read-only execution.
-6. [Pending Soridormi] Deploy a Streamable HTTP MCP wrapper around Soridormi's current local dry-run tool core.
-7. [Pending target] Probe the real Soridormi server and run read/planning acceptance.
-8. [Pending target] Run supervised motion, cancellation, and emergency-stop acceptance.
-9. [Pending target] Run the GPU and hardware smoke checks and record the accepted deployment profile.
+6. [Complete] Add Soridormi's dedicated Streamable HTTP MCP container without merging the Chromie and Soridormi deployments.
+7. [Complete local] Probe the real Soridormi server and run cross-process read/planning acceptance.
+8. [Complete dry-run] Verify confirmation, monitor activation, execution, stop fallback, and persistent emergency-stop state over MCP.
+9. [Pending runtime target] Connect the MCP service to Soridormi's long-running runtime and verify cancellation against its safety layer.
+10. [Pending target] Run the GPU and supervised hardware checks and record the accepted deployment profile.
 
 ## Immediate Sequence
 
-1. Add or deploy Soridormi's network MCP Streamable HTTP wrapper.
-2. Configure `SORIDORMI_MCP_URL` and run the contract probe.
-3. Run the probe-gated zero-motion status/planning acceptance graph.
-4. Run supervised motion, cancellation, and emergency-stop acceptance.
-5. Complete the target GPU smoke test and record the accepted deployment profile.
+1. Deploy Soridormi's `soridormi-mcp` container on the target host and configure `SORIDORMI_MCP_URL`.
+2. Replace the local dry-run tool service with a Soridormi runtime-backed adapter.
+3. Verify cancellation and emergency recovery against a long-running runtime operation.
+4. Complete the target GPU smoke test and supervised robot acceptance.
+5. Record the accepted endpoint, hardware profile, and recovery evidence.
 
 ## Evidence
 
-- Soridormi `f265369`: authoritative nine-tool manifest and DAG contract
-  materialized into Chromie's M5 integration boundary
+- Soridormi `fb006a3`: dedicated MCP container and authoritative nine-tool
+  Streamable HTTP service
+- June 8, 2026 local cross-process acceptance: 9/9 tools, planning, confirmed
+  dry-run execution, monitor activation, stop fallback, and emergency-stop
+  state retention
 - `47a60a3`: documentation consolidation and runtime configuration alignment
 - `6287f9e`: GPU-free control-plane integration tests
 - `2d41e1b`: target-machine GPU smoke test tooling

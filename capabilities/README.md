@@ -59,9 +59,19 @@ PYTHONPATH=agent python -m app.soridormi_acceptance \
 
 The default request creates a zero-motion plan and does not execute hardware.
 
-Soridormi `main` currently provides this manifest and an in-process/local CLI
-dry-run tool core. Its own documentation states that the final network MCP
-server is still pending. `SORIDORMI_MCP_URL` must therefore point to a deployed
-Streamable HTTP wrapper before the probe or acceptance command can pass.
+Soridormi `main` provides a dedicated `soridormi-mcp` container around its
+current dry-run tool core. Chromie remains in its own containers and connects
+through `SORIDORMI_MCP_URL`.
+
+Verify the guarded dry-run boundary with:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json \
+  --guarded-dry-run
+```
+
+This is network integration evidence, not supervised robot hardware evidence.
 
 Do not expose raw motor, joint, or torque controls through these manifests.

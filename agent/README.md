@@ -117,6 +117,18 @@ PYTHONPATH=. python -m app.soridormi_acceptance \
 The default command requests a zero-motion plan and does not enable physical
 execution.
 
+Against Soridormi's disposable dry-run MCP process, verify the guarded path:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=. python -m app.soridormi_acceptance \
+  --manifest ../capabilities/soridormi.json \
+  --guarded-dry-run
+```
+
+This requires `dry_run_only=true`, exercises confirmation and monitoring, and
+proves the normal `motion.stop` fallback. It is not hardware acceptance.
+
 Soridormi plan creation is intentionally stateful even though it cannot move
 hardware. Enable it separately with:
 

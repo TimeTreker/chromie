@@ -109,10 +109,25 @@ The default planning request contains zero velocity and yaw. It calls only
 `soridormi.robot.get_status` and `soridormi.motion.create_plan`; it never calls
 the physical execution tool.
 
-Soridormi `main` currently ships the exported contract and local dry-run tool
-core, not the final network MCP server. If the endpoint does not exist yet,
-deploy the Soridormi Streamable HTTP wrapper before continuing with live M5
-acceptance.
+Run the full dry-run acceptance against Soridormi's dedicated MCP container:
+
+```bash
+docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
+  python -m app.soridormi_acceptance \
+  --manifest /app/capabilities/soridormi.json \
+  --guarded-dry-run
+```
+
+This verifies confirmation, monitor activation, dry-run execution, and
+`soridormi.motion.stop` fallback over the network. It requires
+`dry_run_only=true` and does not accept the result as hardware evidence.
+
+Add `--exercise-emergency-stop` only on a disposable or restartable Soridormi
+process. The command verifies retained e-stop state and intentionally leaves
+that process stopped.
+
+Chromie and Soridormi remain separate deployments. Start `soridormi-mcp` from
+the Soridormi repository, then point Chromie at its published endpoint.
 
 ## Watch logs
 

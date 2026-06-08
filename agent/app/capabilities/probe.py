@@ -145,7 +145,10 @@ async def _list_tools_with_sdk(url: str, timeout_s: float) -> McpToolSchemas:
     from mcp.client.streamable_http import streamable_http_client
     from mcp.types import PaginatedRequestParams
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_s)) as http_client:
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(timeout_s),
+        trust_env=False,
+    ) as http_client:
         async with streamable_http_client(url, http_client=http_client) as (
             read,
             write,
