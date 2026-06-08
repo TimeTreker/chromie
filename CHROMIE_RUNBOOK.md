@@ -40,6 +40,29 @@ Preview the checks without running Docker or GPU commands:
 DRY_RUN=1 ./scripts/gpu_smoke_test.sh
 ```
 
+## M5 supervised target acceptance
+
+After `.env.local` points to the runtime-backed Soridormi MCP endpoint, run the
+complete target sequence with a safety operator present:
+
+```bash
+SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
+  ./scripts/m5_target_acceptance.sh
+```
+
+This runs the GPU smoke test, probes the nine-tool Soridormi contract, exercises
+runtime cancellation, and writes logs plus `summary.env` under
+`.chromie/acceptance/<UTC timestamp>/`. Soridormi remains emergency-stopped;
+complete its recovery procedure before further motion.
+
+Preview the exact commands without Docker, GPU, or MCP calls:
+
+```bash
+SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
+SORIDORMI_MCP_URL=http://target-soridormi:8000/mcp \
+  ./scripts/m5_target_acceptance.sh
+```
+
 ## Verify only one orchestrator
 
 ```bash

@@ -64,16 +64,17 @@ part of the cross-project capability contract.
 7. [Complete local] Probe the real Soridormi server and run cross-process read/planning acceptance.
 8. [Complete dry-run] Verify confirmation, monitor activation, execution, stop fallback, and persistent emergency-stop state over MCP.
 9. [Complete tooling] Add runtime cancellation acceptance with emergency fallback and retained safety-state verification.
-10. [Pending runtime target] Connect the MCP service to Soridormi's long-running runtime and run cancellation acceptance against its safety layer.
-11. [Pending target] Run the GPU and supervised hardware checks and record the accepted deployment profile.
+10. [Complete tooling] Add one supervised target runner that captures GPU, MCP contract, cancellation, endpoint, profile, and recovery-state evidence.
+11. [Pending runtime target] Connect the MCP service to Soridormi's long-running runtime and run the supervised target acceptance.
+12. [Pending target evidence] Record the accepted endpoint, hardware profile, GPU results, and completed recovery procedure.
 
 ## Immediate Sequence
 
 1. Deploy Soridormi's `soridormi-mcp` container on the target host and configure `SORIDORMI_MCP_URL`.
 2. Replace the local dry-run tool service with a Soridormi runtime-backed adapter.
-3. Verify cancellation and emergency recovery against a long-running runtime operation.
-4. Complete the target GPU smoke test and supervised robot acceptance.
-5. Record the accepted endpoint, hardware profile, and recovery evidence.
+3. Run `SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 ./scripts/m5_target_acceptance.sh`.
+4. Complete Soridormi's recovery procedure and retain the generated evidence directory.
+5. Record the accepted endpoint, hardware profile, and recovery result in this roadmap.
 
 ## Evidence
 

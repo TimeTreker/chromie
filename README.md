@@ -251,6 +251,16 @@ START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
 
 The smoke test checks host/container GPU visibility, service health, Ollama inference, ASR/TTS WebSockets, and the TTS CUDA backend. It does not test microphone or speaker quality.
 
+For M5 target acceptance, combine the GPU checks with Soridormi contract and
+runtime-cancellation evidence:
+
+```bash
+SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
+  ./scripts/m5_target_acceptance.sh
+```
+
+The generated evidence is stored under `.chromie/acceptance/`.
+
 Watch the main logs:
 
 ```bash
