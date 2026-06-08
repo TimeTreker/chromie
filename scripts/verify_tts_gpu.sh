@@ -4,11 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [ ! -f .env.runtime ]; then
+  ./scripts/build_runtime_env.sh
+fi
+
 SERVICE="${TTS_SERVICE:-chromie-tts}"
 PYTHON_BIN="${TTS_PYTHON_BIN:-/opt/venv/bin/python}"
 
 echo "[verify] Checking Docker service: $SERVICE"
-docker compose ps "$SERVICE"
+docker compose --env-file .env.runtime ps "$SERVICE"
 
 echo
 echo "[verify] Checking NVIDIA visibility inside container..."
@@ -51,4 +55,4 @@ asyncio.run(main())
 PY
 
 echo
-echo "[verify] Done. For RTX4090 laptop, confirm TTS_N_GPU_LAYERS=-1 and look in TTS logs for CUDA/GGML layer offload messages."
+echo "[verify] Done. Confirm TTS_N_GPU_LAYERS=-1 and inspect TTS logs for CUDA/GGML layer offload messages."

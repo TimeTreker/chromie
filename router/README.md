@@ -66,19 +66,24 @@ Example response:
 ```env
 ROUTER_HOST=0.0.0.0
 ROUTER_PORT=8091
-ROUTER_MODE=hybrid
+ROUTER_USE_LLM=0
 ROUTER_RULES_FIRST=1
 ROUTER_OLLAMA_URL=http://chromie-llm:11434
 ROUTER_MODEL=qwen3:0.6b
-ROUTER_TIMEOUT_MS=800
-ROUTER_LLM_TIMEOUT_MS=800
+ROUTER_TIMEOUT_MS=1500
 ROUTER_CONFIDENCE_THRESHOLD=0.55
-ROUTER_LOG_LEVEL=INFO
+LOG_LEVEL=INFO
 ```
 
-## Docker Compose snippet
+`ROUTER_USE_LLM=0` selects `rules_only` mode unless `ROUTER_MODE` is explicitly set. Set `ROUTER_MODE=hybrid` or `llm_only` only when LLM routing is intentionally enabled.
 
-Add the content from `compose.snippet.yml` into the root `docker-compose.yml` under `services:`.
+## Docker Compose
+
+The service is already integrated into the root `docker-compose.yml`. Start it through:
+
+```bash
+./scripts/start_services.sh
+```
 
 ## Orchestrator URL
 

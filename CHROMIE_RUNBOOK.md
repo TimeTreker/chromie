@@ -11,7 +11,7 @@ bash scripts/start_services.sh
 ## Warm Ollama
 
 ```bash
-bash scripts/warm_ollama.sh "${AGENT_MODEL:-gemma4:26b}"
+./scripts/warm_ollama.sh
 ```
 
 ## Start host orchestrator
@@ -36,28 +36,31 @@ pkill -f "start_orchestrator.sh"
 ## Check Docker env
 
 ```bash
-docker compose exec chromie-agent env | grep -E "AGENT_USE_LLM|AGENT_OLLAMA_URL|AGENT_MODEL|AGENT_TIMEOUT_MS"
-docker compose exec chromie-router env | grep -E "ROUTER_USE_LLM|ROUTER_OLLAMA_URL|ROUTER_MODEL|ROUTER_TIMEOUT_MS"
+docker compose --env-file .env.runtime exec chromie-agent env | grep -E "AGENT_USE_LLM|AGENT_OLLAMA_URL|AGENT_MODEL|AGENT_TIMEOUT_MS"
+docker compose --env-file .env.runtime exec chromie-router env | grep -E "ROUTER_USE_LLM|ROUTER_OLLAMA_URL|ROUTER_MODEL|ROUTER_TIMEOUT_MS"
 ```
 
 ## Check installed models
 
 ```bash
-docker compose exec chromie-llm ollama list
+docker compose --env-file .env.runtime exec chromie-llm ollama list
 ```
 
 Pull model:
 
 ```bash
-docker compose exec chromie-llm ollama pull gemma4:26b
+set -a
+source .env.runtime
+set +a
+docker compose --env-file .env.runtime exec chromie-llm ollama pull "$AGENT_MODEL"
 ```
 
 ## Watch logs
 
 ```bash
-docker compose logs -f chromie-agent
-docker compose logs -f chromie-llm
-docker compose logs -f chromie-tts
+docker compose --env-file .env.runtime logs -f chromie-agent
+docker compose --env-file .env.runtime logs -f chromie-llm
+docker compose --env-file .env.runtime logs -f chromie-tts
 ```
 
 ## TTS duplicate diagnosis

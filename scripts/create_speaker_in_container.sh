@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+if [ ! -f .env.runtime ]; then
+  ./scripts/build_runtime_env.sh
+fi
+
 WAV_PATH="${1:-/app/speakers/chromie_voice.wav}"
 SPEAKER_ID="${2:-chromie_voice}"
 MAKE_DEFAULT="0"
@@ -12,7 +19,7 @@ fi
 # Ask the running chromie-tts websocket server to create the speaker profile.
 # This uses the patched speaker creation built into tts/server.py and avoids
 # torchaudio/torchcodec/FFmpeg/NPP.
-docker compose exec -T \
+docker compose --env-file .env.runtime exec -T \
   -e WAV_PATH="$WAV_PATH" \
   -e SPEAKER_ID="$SPEAKER_ID" \
   -e MAKE_DEFAULT="$MAKE_DEFAULT" \

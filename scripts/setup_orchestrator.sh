@@ -11,7 +11,7 @@ echo "[setup] Orchestrator dir: $ORCH_DIR"
 
 if [[ ! -f ".env.local" ]]; then
   cp .env.local.example .env.local
-  echo "[setup] Created orchestrator/.env.local from example. Edit INPUT_DEVICE_INDEX and OUTPUT_DEVICE_INDEX after running list_devices.py."
+  echo "[setup] Created orchestrator/.env.local from example. Edit ORCH_INPUT_DEVICE and ORCH_OUTPUT_DEVICE after running list_devices.py."
 else
   echo "[setup] orchestrator/.env.local already exists; keeping it."
 fi
@@ -36,8 +36,11 @@ echo
 echo "[setup] Listing audio devices:"
 python list_devices.py
 
+cd "$ROOT_DIR"
+
 echo
 echo "[setup] Done. Next steps:"
-echo "  1. Edit $ORCH_DIR/.env.local and set INPUT_DEVICE_INDEX / OUTPUT_DEVICE_INDEX."
+echo "  1. Edit $ORCH_DIR/.env.local and set ORCH_INPUT_DEVICE / ORCH_OUTPUT_DEVICE."
 echo "  2. Start Docker services: ./scripts/start_services.sh"
-echo "  3. Run orchestrator: cd orchestrator && source .venv/bin/activate && python orchestrator.py"
+echo "  3. Activate orchestrator/.venv if this script created it."
+echo "  4. Run orchestrator: python -m orchestrator.orchestrator"

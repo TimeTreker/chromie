@@ -20,14 +20,14 @@ class Settings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv("AGENT_HOST", "0.0.0.0"))
     port: int = Field(default_factory=lambda: int(os.getenv("AGENT_PORT", "8092")))
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_OLLAMA_URL", "http://chromie-llm:11434"))
-    model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL", "qwen3:4b"))
-    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS", "2500")))
+    model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL", "gemma4:e2b"))
+    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS", "30000")))
     use_llm: bool = Field(
         default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "120")))
-    log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", "INFO"))
+    max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "160")))
+    log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     mode: Literal["runtime"] = "runtime"
 
 

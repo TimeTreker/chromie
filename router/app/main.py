@@ -16,11 +16,20 @@ from .rules import route_by_rules
 from .schema import HealthResponse, RouteDecision, RouteRequest, finalize_decision
 
 
+def _router_mode_from_env() -> str:
+    explicit_mode = os.getenv("ROUTER_MODE")
+    if explicit_mode:
+        return explicit_mode.strip().lower()
+
+    use_llm = os.getenv("ROUTER_USE_LLM", "0").strip().lower() not in {"0", "false", "no", "off"}
+    return "hybrid" if use_llm else "rules_only"
+
+
 class Settings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv("ROUTER_HOST", "0.0.0.0"))
     port: int = Field(default_factory=lambda: int(os.getenv("ROUTER_PORT", "8091")))
     mode: Literal["rules_only", "llm_only", "hybrid"] = Field(
-        default_factory=lambda: os.getenv("ROUTER_MODE", "hybrid").strip().lower()
+        default_factory=_router_mode_from_env
     )
     rules_first: bool = Field(
         default_factory=lambda: os.getenv("ROUTER_RULES_FIRST", "1").strip().lower()
@@ -33,7 +42,7 @@ class Settings(BaseModel):
     confidence_threshold: float = Field(
         default_factory=lambda: float(os.getenv("ROUTER_CONFIDENCE_THRESHOLD", "0.55"))
     )
-    log_level: str = Field(default_factory=lambda: os.getenv("ROUTER_LOG_LEVEL", "INFO"))
+    log_level: str = Field(default_factory=lambda: os.getenv("ROUTER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
 
 
 settings = Settings()

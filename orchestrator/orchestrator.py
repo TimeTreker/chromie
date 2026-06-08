@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 ORCH_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = ORCH_DIR.parent
+load_dotenv(PROJECT_ROOT / ".env.runtime")
 load_dotenv(ORCH_DIR / ".env.local")
-load_dotenv(PROJECT_ROOT / ".env")
 
 import aiohttp
 import numpy as np
@@ -168,8 +168,11 @@ class VoiceAssistant:
         self.output_stream_lock = asyncio.Lock()
         self.output_write_lock = asyncio.Lock()
         self.playback_chunk_ms = int(os.getenv("ORCH_PLAYBACK_CHUNK_MS", "80"))
-        self.recordings_dir = os.getenv("RECORDINGS_DIR", "../recordings")
-        os.makedirs(self.recordings_dir, exist_ok=True)
+        recordings_dir = Path(os.getenv("RECORDINGS_DIR", "recordings")).expanduser()
+        if not recordings_dir.is_absolute():
+            recordings_dir = PROJECT_ROOT / recordings_dir
+        self.recordings_dir = str(recordings_dir.resolve())
+        recordings_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def session_id(self) -> str | None:

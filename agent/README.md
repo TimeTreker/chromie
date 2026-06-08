@@ -95,10 +95,15 @@ docker run --rm -p 8092:8092 \
 
 ## Compose
 
-See `compose.snippet.yml`.
+The service is already integrated into the root `docker-compose.yml`. Use the root startup and generated runtime configuration:
+
+```bash
+./scripts/start_services.sh
+```
 
 ## Notes
 
 - `speaker_agent` decides wording only. It does not play audio.
 - Real hardware execution should stay in the host orchestrator or a host hardware daemon.
 - The service can work without Ollama. It will fall back to deterministic short replies.
+- Model and timeout defaults should normally come from the selected hardware profile, not component-local hardcoded values.

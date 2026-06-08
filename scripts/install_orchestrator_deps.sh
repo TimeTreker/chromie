@@ -25,11 +25,11 @@ fi
 mkdir -p "$STATE_DIR"
 
 if command -v sha256sum >/dev/null 2>&1; then
-  CURRENT_HASH="$(sha256sum "$REQ_FILE" | awk '{print $1}')"
+  REQUIREMENTS_HASH="$(sha256sum "$REQ_FILE" | awk '{print $1}')"
 elif command -v shasum >/dev/null 2>&1; then
-  CURRENT_HASH="$(shasum -a 256 "$REQ_FILE" | awk '{print $1}')"
+  REQUIREMENTS_HASH="$(shasum -a 256 "$REQ_FILE" | awk '{print $1}')"
 else
-  CURRENT_HASH="$(python - <<'PY'
+  REQUIREMENTS_HASH="$(python - <<'PY'
 from pathlib import Path
 import hashlib
 path = Path("orchestrator/requirements.txt")
@@ -37,6 +37,9 @@ print(hashlib.sha256(path.read_bytes()).hexdigest())
 PY
 )"
 fi
+
+PYTHON_ID="$(python -c 'import sys; print(f"{sys.executable}|{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")')"
+CURRENT_HASH="${REQUIREMENTS_HASH}|${PYTHON_ID}"
 
 PREVIOUS_HASH=""
 if [ -f "$HASH_FILE" ]; then

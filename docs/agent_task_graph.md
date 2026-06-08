@@ -6,7 +6,7 @@ any MCP tool call can execute.
 
 ## Scope
 
-This patch adds only schema, validation, and deterministic dry-run tracing:
+The task graph layer provides:
 
 - `TaskGraph` / `TaskNode`
 - `$ref` argument references such as `make_plan.output.plan_id`
@@ -15,8 +15,9 @@ This patch adds only schema, validation, and deterministic dry-run tracing:
 - fallback target validation
 - blocked-node propagation
 - `DagDryRunExecutor` for trace development without calling real MCP servers
+- `DagToolExecutor` with a transport-neutral `ToolInvoker`
 
-It does not start MCP transports, call real tools, or move Soridormi.
+Chromie does not currently ship an MCP transport in this layer. Real robot execution must remain behind registered safe tools and the existing hardware boundary.
 
 ## Example physical-motion graph
 
@@ -70,8 +71,7 @@ PYTHONPATH=agent python -m app.task_graph_demo graph.json \
 
 ## Tool invocation bridge
 
-The first executor was intentionally dry-run only. Chromie now also has a
-transport-neutral `ToolInvoker` interface:
+Chromie also has a transport-neutral `ToolInvoker` interface:
 
 ```python
 from app.task_graph import DagToolExecutor
