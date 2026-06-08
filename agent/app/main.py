@@ -18,6 +18,7 @@ from .task_graph import (
     ExecutionTrace,
     TaskGraph,
     TaskGraphDryRunRequest,
+    TaskGraphPlanner,
     TaskGraphService,
     TaskGraphValidationResponse,
 )
@@ -34,6 +35,10 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "160")))
+    enable_task_graph_planning: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_ENABLE_TASK_GRAPH_PLANNING", "0").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
     capability_manifests: str = Field(default_factory=lambda: os.getenv("AGENT_CAPABILITY_MANIFESTS", ""))
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     mode: Literal["runtime"] = "runtime"
@@ -48,14 +53,20 @@ logging.basicConfig(
 logger = logging.getLogger("chromie.agent")
 
 ollama_client = OllamaClient(settings.ollama_url, settings.model, timeout_ms=settings.timeout_ms)
+configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
+capability_registry = configured_registry.registry
+task_graph_planner = (
+    TaskGraphPlanner(capability_registry, ollama_client)
+    if settings.enable_task_graph_planning and settings.use_llm
+    else None
+)
 services = AgentServices(
     ollama=ollama_client,
     use_llm=settings.use_llm,
     max_speak_chars=settings.max_speak_chars,
+    task_graph_planner=task_graph_planner,
 )
 runtime = AgentRuntime(services)
-configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
-capability_registry = configured_registry.registry
 task_graph_service = TaskGraphService(capability_registry)
 logger.info(
     "loaded capability registry sources=%s manifests=%s tools=%d",
@@ -81,6 +92,7 @@ async def health() -> HealthResponse:
         available_agents=runtime.available_agents(),
         capability_sources=configured_registry.sources,
         capability_manifest_files=configured_registry.manifest_files,
+        task_graph_planning_enabled=task_graph_planner is not None,
     )
 
 

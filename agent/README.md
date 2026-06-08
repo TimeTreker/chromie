@@ -97,6 +97,16 @@ Configured manifests are loaded at startup. Missing, malformed, or duplicate
 capabilities stop startup so the active registry cannot silently diverge from
 deployment configuration.
 
+### TaskGraph planning
+
+Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to let `tool` routes ask the configured
+LLM for a structured plan. The Agent replaces model-provided graph identity,
+marks the graph as LLM-authored, validates it against the active capability
+registry, and returns it in `AgentResult.task_graphs`.
+
+Planning does not execute tools. Invalid model output falls back to the existing
+single `tool_executor` action path.
+
 ## Run locally
 
 ```bash

@@ -35,7 +35,7 @@ The capability registry, TaskGraph schema, safety validator, dry-run executor, a
 
 1. [Complete] Expose validation, dry-run, and trace lookup through `chromie-agent`.
 2. [Complete] Load configured external capability manifests into the Agent registry.
-3. Add an explicit TaskGraph planning path without changing the existing fast conversation path.
+3. [Complete] Add an explicit TaskGraph planning path without changing the existing fast conversation path.
 4. Implement MCP/Soridormi transport adapters behind `ToolInvoker`.
 5. Run the target GPU smoke test and then perform supervised hardware acceptance tests.
 

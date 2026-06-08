@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..clients.ollama_client import OllamaClient
 from ..schema import AgentResult, AgentRunRequest
+
+if TYPE_CHECKING:
+    from ..task_graph.planner import TaskGraphPlanner
 
 
 @dataclass(slots=True)
@@ -13,6 +16,7 @@ class AgentServices:
     ollama: OllamaClient | None = None
     use_llm: bool = True
     max_speak_chars: int = 120
+    task_graph_planner: "TaskGraphPlanner | None" = None
 
 
 class BaseAgent(ABC):

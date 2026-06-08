@@ -754,10 +754,11 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "agent_done: agent_ms=%.1f speak_immediate=%s actions=%s speak_after=%s requires_confirmation=%s",
+                "agent_done: agent_ms=%.1f speak_immediate=%s actions=%s task_graphs=%s speak_after=%s requires_confirmation=%s",
                 now_ms() - agent_start_ms,
                 len(result.speak_immediate),
                 len(result.actions),
+                len(result.task_graphs),
                 len(result.speak_after),
                 result.requires_confirmation,
             )
@@ -772,6 +773,14 @@ class VoiceAssistant:
         await self.reset_playback_ordering()
         for item in result.speak_immediate:
             await self.schedule_tts_sentence(item.text, session_id)
+
+        for graph in result.task_graphs:
+            self.session_log(
+                session_id,
+                "task_graph_planned: graph_id=%s nodes=%s execution=disabled",
+                graph.get("graph_id", "<missing>"),
+                len(graph.get("nodes", [])),
+            )
 
         session = await self.get_http_session()
         for action in result.actions:

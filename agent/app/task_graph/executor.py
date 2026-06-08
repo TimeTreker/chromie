@@ -3,8 +3,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from app.capabilities.models import CapabilityRegistry, FailurePolicy
-from app.tool_invocation import ToolCallOutcome, ToolInvoker
+from ..capabilities.models import CapabilityRegistry, FailurePolicy
+from ..tool_invocation import ToolCallOutcome, ToolInvoker
 
 from .models import ExecutionEvent, ExecutionTrace, NodeResult, TaskGraph, TaskNode
 from .refs import resolve_refs

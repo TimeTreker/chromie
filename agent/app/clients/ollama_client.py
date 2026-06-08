@@ -72,6 +72,9 @@ class OllamaClient:
         if options:
             payload["options"] = options
 
+        if response_format == "json":
+            payload["format"] = "json"
+
         url = f"{self.base_url}/api/generate"
         timeout = httpx.Timeout(self.timeout_ms / 1000.0)
 

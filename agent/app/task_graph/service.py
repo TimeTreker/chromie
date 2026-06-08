@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app.capabilities.models import CapabilityRegistry
+from ..capabilities.models import CapabilityRegistry
 
 from .executor import DagDryRunExecutor
 from .models import ExecutionTrace, TaskGraph

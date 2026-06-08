@@ -130,6 +130,7 @@ class AgentResult(BaseModel):
     actions: list[ActionCommand] = Field(default_factory=list)
     speak_after: list[SpeakItem] = Field(default_factory=list)
     memory_updates: list[MemoryUpdate] = Field(default_factory=list)
+    task_graphs: list[dict[str, Any]] = Field(default_factory=list)
     requires_confirmation: bool = False
     reason: str | None = None
     handled_by: list[str] = Field(default_factory=list)
@@ -195,6 +196,7 @@ class HealthResponse(BaseModel):
     available_agents: list[str] = Field(default_factory=list)
     capability_sources: list[str] = Field(default_factory=list)
     capability_manifest_files: list[str] = Field(default_factory=list)
+    task_graph_planning_enabled: bool = False
 
 
 def detect_language(text: str) -> str:

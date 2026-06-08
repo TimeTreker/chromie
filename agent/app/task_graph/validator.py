@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.capabilities.models import CapabilityRegistry, ToolCapability
+from ..capabilities.models import CapabilityRegistry, ToolCapability
 
 from .models import TaskGraph, TaskNode
 from .refs import iter_refs, ref_node_id

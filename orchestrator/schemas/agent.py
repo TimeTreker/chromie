@@ -34,6 +34,7 @@ class AgentResult(BaseModel):
     actions: list[ActionCommand] = Field(default_factory=list)
     speak_after: list[SpeechItem] = Field(default_factory=list)
     memory_updates: list[dict[str, Any]] = Field(default_factory=list)
+    task_graphs: list[dict[str, Any]] = Field(default_factory=list)
     requires_confirmation: bool = False
     reason: str | None = None
     handled_by: list[str] = Field(default_factory=list)

@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.capabilities.models import FailurePolicy
+from ..capabilities.models import FailurePolicy
 
 NodeType = Literal["query", "plan", "action", "monitor", "confirmation", "report", "safety"]
 CreatedBy = Literal["llm", "system", "user"]

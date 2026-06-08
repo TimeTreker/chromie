@@ -41,6 +41,16 @@ GET /task-graphs/{graph_id}/trace
 The dry-run endpoint never calls a real MCP server or hardware device. Invalid
 graphs return HTTP 422 and are not stored as execution traces.
 
+## Agent planning path
+
+With `AGENT_ENABLE_TASK_GRAPH_PLANNING=1`, requests routed to `tool_agent` may
+produce a validated graph in `AgentResult.task_graphs`. Conversation and robot
+action routes keep their existing deterministic paths.
+
+The planner exposes only registered LLM-visible capabilities, filters request
+context to an allowlist, replaces model-provided graph IDs, and validates the
+result before returning it. These graphs are plans, not executable actions.
+
 ## Example physical-motion graph
 
 A safe short-motion graph should include:
