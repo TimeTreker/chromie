@@ -197,6 +197,7 @@ class HealthResponse(BaseModel):
     capability_sources: list[str] = Field(default_factory=list)
     capability_manifest_files: list[str] = Field(default_factory=list)
     task_graph_planning_enabled: bool = False
+    read_only_task_graph_execution_enabled: bool = False
 
 
 def detect_language(text: str) -> str:

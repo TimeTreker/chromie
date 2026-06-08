@@ -141,3 +141,19 @@ Invocation is policy-gated independently from graph validation:
 The adapter is not yet connected to automatic TaskGraph execution. Planned
 graphs remain observable artifacts until the execution coordinator supplies
 these proofs.
+
+## Read-only execution coordinator
+
+Set `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION=1` to enable:
+
+```text
+POST /task-graphs/execute-read-only
+```
+
+The coordinator validates and preflights the entire graph before the first MCP
+call. Every node must be `safe_read` or `planning_only` and declare
+`side_effect_free=true`. If any node fails that policy, no node is invoked.
+
+This endpoint is disabled by default. It does not accept confirmation or safety
+proofs and therefore cannot execute speech output, writes, safety controls, or
+physical motion.

@@ -112,6 +112,11 @@ boundary. It derives endpoints from loaded manifests and enforces side-effect,
 confirmation, safety-monitor, and safety-control authorization before making a
 remote call. Automatic graph execution is still disabled.
 
+Read-only graph execution can be enabled separately with
+`AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION=1`. The
+`POST /task-graphs/execute-read-only` endpoint preflights the whole graph and
+accepts only side-effect-free `safe_read` and `planning_only` capabilities.
+
 ## Run locally
 
 ```bash

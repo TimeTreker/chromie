@@ -18,10 +18,12 @@ from .task_graph import (
     ExecutionTrace,
     TaskGraph,
     TaskGraphDryRunRequest,
+    TaskGraphExecuteRequest,
     TaskGraphPlanner,
     TaskGraphService,
     TaskGraphValidationResponse,
 )
+from .tool_invocation import McpStreamableHttpInvoker
 
 
 class Settings(BaseModel):
@@ -37,6 +39,10 @@ class Settings(BaseModel):
     max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "160")))
     enable_task_graph_planning: bool = Field(
         default_factory=lambda: os.getenv("AGENT_ENABLE_TASK_GRAPH_PLANNING", "0").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    enable_read_only_task_graph_execution: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     capability_manifests: str = Field(default_factory=lambda: os.getenv("AGENT_CAPABILITY_MANIFESTS", ""))
@@ -67,7 +73,15 @@ services = AgentServices(
     task_graph_planner=task_graph_planner,
 )
 runtime = AgentRuntime(services)
-task_graph_service = TaskGraphService(capability_registry)
+read_only_invoker = (
+    McpStreamableHttpInvoker(capability_registry)
+    if settings.enable_read_only_task_graph_execution
+    else None
+)
+task_graph_service = TaskGraphService(
+    capability_registry,
+    read_only_invoker=read_only_invoker,
+)
 logger.info(
     "loaded capability registry sources=%s manifests=%s tools=%d",
     ",".join(configured_registry.sources),
@@ -93,6 +107,7 @@ async def health() -> HealthResponse:
         capability_sources=configured_registry.sources,
         capability_manifest_files=configured_registry.manifest_files,
         task_graph_planning_enabled=task_graph_planner is not None,
+        read_only_task_graph_execution_enabled=read_only_invoker is not None,
     )
 
 
@@ -131,6 +146,16 @@ async def validate_task_graph(graph: TaskGraph) -> TaskGraphValidationResponse:
 async def dry_run_task_graph(request: TaskGraphDryRunRequest) -> ExecutionTrace:
     try:
         return task_graph_service.dry_run(request.graph, auto_confirm=request.auto_confirm)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/task-graphs/execute-read-only", response_model=ExecutionTrace)
+async def execute_read_only_task_graph(request: TaskGraphExecuteRequest) -> ExecutionTrace:
+    try:
+        return await task_graph_service.execute_read_only(request.graph)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

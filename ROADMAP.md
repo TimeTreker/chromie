@@ -37,7 +37,8 @@ The capability registry, TaskGraph schema, safety validator, dry-run executor, a
 2. [Complete] Load configured external capability manifests into the Agent registry.
 3. [Complete] Add an explicit TaskGraph planning path without changing the existing fast conversation path.
 4. [In progress] Implement MCP/Soridormi transport adapters behind `ToolInvoker`
-   (Streamable HTTP adapter and policy guards complete; execution coordinator wiring pending).
+   (Streamable HTTP adapter, policy guards, and default-off read-only execution complete;
+   confirmation/monitor-backed side-effect execution pending).
 5. Run the target GPU smoke test and then perform supervised hardware acceptance tests.
 
 ## Evidence

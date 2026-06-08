@@ -187,6 +187,9 @@ Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to opt eligible `tool` routes into
 validated structured planning. Planned graphs are returned for inspection and
 are not executed until a guarded `ToolInvoker` transport is configured.
 
+`AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION=1` separately enables MCP execution
+for graphs containing only side-effect-free read and planning capabilities.
+
 Use `AGENT_MAX_SPEAK_CHARS` or `TTS_MAX_TEXT_CHARS` to shorten speech. `TTS_MAX_LENGTH` is the TTS generation budget and should not be reduced to a small text-length value.
 
 See [Hardware Profiles](HARDWARE_PROFILES.md) for profile selection, CUDA architecture, model sizing, and Jetson limitations.

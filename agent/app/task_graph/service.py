@@ -3,7 +3,9 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from ..capabilities.models import CapabilityRegistry
+from ..tool_invocation import AsyncToolInvoker
 
+from .async_executor import ReadOnlyTaskGraphExecutor
 from .executor import DagDryRunExecutor
 from .models import ExecutionTrace, TaskGraph
 from .validator import GraphValidator
@@ -20,11 +22,21 @@ class TaskGraphDryRunRequest(BaseModel):
     auto_confirm: bool = True
 
 
+class TaskGraphExecuteRequest(BaseModel):
+    graph: TaskGraph
+
+
 class TaskGraphService:
     """Expose safe TaskGraph validation and dry-run execution to the Agent API."""
 
-    def __init__(self, registry: CapabilityRegistry) -> None:
+    def __init__(
+        self,
+        registry: CapabilityRegistry,
+        *,
+        read_only_invoker: AsyncToolInvoker | None = None,
+    ) -> None:
         self.registry = registry
+        self.read_only_invoker = read_only_invoker
         self._traces: dict[str, ExecutionTrace] = {}
 
     def validate(self, graph: TaskGraph) -> TaskGraphValidationResponse:
@@ -41,6 +53,13 @@ class TaskGraphService:
             raise ValueError("TaskGraph validation failed: " + "; ".join(validation.errors))
 
         trace = DagDryRunExecutor(self.registry, auto_confirm=auto_confirm).run(graph, validate=False)
+        self._traces[graph.graph_id] = trace.model_copy(deep=True)
+        return trace
+
+    async def execute_read_only(self, graph: TaskGraph) -> ExecutionTrace:
+        if self.read_only_invoker is None:
+            raise RuntimeError("read-only TaskGraph execution is disabled")
+        trace = await ReadOnlyTaskGraphExecutor(self.registry, self.read_only_invoker).run(graph)
         self._traces[graph.graph_id] = trace.model_copy(deep=True)
         return trace
 
