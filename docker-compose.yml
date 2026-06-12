@@ -269,7 +269,8 @@ services:
   chromie-agent:
     container_name: chromie-agent
     build:
-      context: ./agent
+      context: .
+      dockerfile: agent/Dockerfile
       args:
         HTTP_PROXY: ${HTTP_PROXY:-}
         HTTPS_PROXY: ${HTTPS_PROXY:-}

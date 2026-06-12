@@ -4,9 +4,13 @@ Chromie is a local, GPU-accelerated realtime voice assistant stack. It combines 
 
 中文读者可以从 [Chromie 中文项目指南](docs/PROJECT_GUIDE.zh-CN.md) 开始，了解架构、部署、验证与常见问题。
 
-Project progress and the active milestone are tracked in [Chromie Roadmap](ROADMAP.md). The current milestone is **M5 - External capability deployment and acceptance**.
+Project progress and the active milestone are tracked in [Chromie Roadmap](ROADMAP.md).
+The current engineering milestone is **M6 - Interaction Agent and Skill
+Runtime**. M5 target-host evidence remains an operational acceptance track.
 
 ## Architecture
+
+Current implementation:
 
 ```text
 host microphone
@@ -25,6 +29,21 @@ chromie-tts              OuteTTS / llama.cpp speech synthesis
   ↓
 host orchestrator        playback and optional hardware actions
 ```
+
+Target interaction mainline:
+
+```text
+microphone -> ASR -> Interaction Agent
+  -> validated Skill Runtime
+  -> local speech provider -> TTS -> speaker
+  -> Soridormi MCP provider -> named body skill -> robot
+```
+
+The Interaction Agent produces structured speech and skill requests. It never
+executes MCP calls or low-level robot controls directly. See
+[Interaction Agent and Skill Runtime](docs/interaction_agent_skill_runtime.md)
+for the architecture, ownership boundary, implementation stages, and MuJoCo
+acceptance gates.
 
 The central runtime boundary is:
 
@@ -191,6 +210,19 @@ For Soridormi, set
 `SORIDORMI_MCP_URL`. Probe the live MCP endpoint against the checked-in
 manifest before enabling TaskGraph execution.
 
+The I3/I4 structured interaction path is available behind:
+
+```env
+ORCH_ENABLE_INTERACTION_RESPONSE=1
+ORCH_ENABLE_SORIDORMI_SKILLS=1
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
+```
+
+Keep `ORCH_ENABLE_SORIDORMI_SKILLS=0` for speech-only rollout. Named body
+skills fail closed when the provider is disabled. In MuJoCo,
+`ORCH_AUTO_CONFIRM_SIM_SKILLS=1` applies Soridormi's declared
+simulation-only confirmation exemption; it does not exempt hardware actions.
+
 Soridormi is the robot cerebellum: it owns embodied planning, safety, policy
 execution, and robot feedback. Chromie owns conversation, global planning,
 confirmation, and orchestration. The checked-in manifest is materialized from
@@ -289,8 +321,11 @@ The suite covers Router rules and mode selection, cross-service contracts, conve
 
 ## Development Principles
 
-- Keep Router decisions fast and deterministic.
-- Keep conversation intelligence and action planning in the Agent.
+- Keep interruption, stop, emergency, and unusable-audio decisions fast and
+  deterministic.
+- Keep semantic routing, conversation, and high-level skill choice in the
+  Interaction Agent.
+- Execute only validated, registered skills through the trusted Skill Runtime.
 - Keep realtime audio, interruption, playback, and action execution in the Orchestrator.
 - Let only the Orchestrator call ASR, TTS, playback, and host hardware.
 - Serialize TTS generation unless the backend is explicitly designed for concurrency.
@@ -299,6 +334,7 @@ The suite covers Router rules and mode selection, cross-service contracts, conve
 ## Documentation
 
 - [Roadmap](ROADMAP.md): current milestone, completed foundations, and acceptance criteria
+- [Interaction Agent and Skill Runtime](docs/interaction_agent_skill_runtime.md): target voice, speech, skill, and Soridormi execution architecture
 - [中文项目指南](docs/PROJECT_GUIDE.zh-CN.md): Chinese architecture, setup, verification, and troubleshooting guide
 - [Hardware Profiles](HARDWARE_PROFILES.md): runtime environment generation and hardware-specific defaults
 - [Operations Runbook](CHROMIE_RUNBOOK.md): frequent startup and diagnostic commands

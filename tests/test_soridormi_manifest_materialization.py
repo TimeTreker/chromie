@@ -66,7 +66,7 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["metadata"]["upstream_commit"],
-            "027b626e065a274d4d600cecbc0ab1e572a7176a",
+            "a092dc704f1ab797fb1d4f542696fe75026eb171",
         )
         self.assertEqual(
             tool_names,
@@ -78,6 +78,9 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
                 "soridormi.motion.execute_plan",
                 "soridormi.motion.stop",
                 "soridormi.motion.cancel",
+                "soridormi.skill.list",
+                "soridormi.skill.create_plan",
+                "soridormi.skill.execute_plan",
                 "soridormi.safety.monitor_motion",
                 "soridormi.safety.emergency_stop",
             },

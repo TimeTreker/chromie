@@ -625,6 +625,320 @@
       ]
     },
     {
+      "agent_id": "soridormi.skill",
+      "display_name": "Soridormi Named Skill Agent",
+      "description": "Discover, validate, plan, and execute named Soridormi body skills without exposing generated joint or policy actions.",
+      "version": "0.1.0",
+      "llm_visible": true,
+      "transport": {
+        "kind": "mcp_streamable_http",
+        "module": null,
+        "command": null,
+        "args": [],
+        "url": "${SORIDORMI_MCP_URL}",
+        "env": {}
+      },
+      "status": {
+        "available": true,
+        "reason": null,
+        "details": {
+          "mode": "sim"
+        }
+      },
+      "tags": [
+        "soridormi",
+        "skill",
+        "robot"
+      ],
+      "tools": [
+        {
+          "name": "soridormi.skill.list",
+          "agent_id": "soridormi.skill",
+          "display_name": "List Soridormi named skills",
+          "description": "Return authoritative named body-skill metadata, parameter schemas, safety properties, and live mode availability.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "skills": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            },
+            "required": [
+              "mode",
+              "skills"
+            ]
+          },
+          "effects": [
+            "read_only"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 2.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use to discover exact named body skills and argument schemas before creating a skill plan."
+          }
+        },
+        {
+          "name": "soridormi.skill.create_plan",
+          "agent_id": "soridormi.skill",
+          "display_name": "Create Soridormi named skill plan",
+          "description": "Validate a named body skill and create an opaque Soridormi execution plan. Generated body controls remain internal.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "skill_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "profile": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "skill_id"
+            ]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "plan_id": {
+                "type": "string"
+              },
+              "skill_id": {
+                "type": "string"
+              },
+              "execution": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "estimated_duration_s": {
+                "type": "number"
+              },
+              "requires_confirmation": {
+                "type": "boolean"
+              },
+              "interruptible": {
+                "type": "boolean"
+              },
+              "fallback": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "plan_id",
+              "skill_id",
+              "summary"
+            ]
+          },
+          "effects": [
+            "planning_only",
+            "creates_plan"
+          ],
+          "safety_class": "planning_only",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 2.0,
+            "idempotent": false,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [
+            "unknown_skill",
+            "skill_unavailable",
+            "invalid_parameters"
+          ],
+          "default_failure_policy": {
+            "strategy": "ask_user",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.skill.execute_plan",
+          "agent_id": "soridormi.skill",
+          "display_name": "Execute Soridormi named skill plan",
+          "description": "Execute a previously validated named body-skill plan through the Soridormi runtime.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "plan_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "plan_id"
+            ]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "completed": {
+                "type": "boolean"
+              },
+              "skill_id": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "completed",
+              "skill_id",
+              "summary"
+            ]
+          },
+          "effects": [
+            "physical_motion"
+          ],
+          "safety_class": "physical_motion",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim"
+            ],
+            "requires": [
+              "not_emergency_stopped"
+            ],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": false,
+            "exclusive_group": "soridormi.robot_motion",
+            "timeout_s": 30.0,
+            "idempotent": false,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": true,
+            "reason": "This tool executes a body skill.",
+            "required_in_modes": [
+              "hardware_dry_run",
+              "hardware"
+            ],
+            "skippable_in_modes": [
+              "sim"
+            ]
+          },
+          "monitoring": {
+            "requires_safety_monitor": true,
+            "recommended_monitor_tools": [
+              "soridormi.safety.monitor_motion"
+            ],
+            "hard_interrupt_events": [
+              "fall_detected",
+              "emergency_stop",
+              "collision_risk",
+              "low_battery_critical"
+            ]
+          },
+          "failure_modes": [
+            "plan_not_found",
+            "skill_execution_failed",
+            "safety_interrupted",
+            "timeout"
+          ],
+          "default_failure_policy": {
+            "strategy": "stop_and_report",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        }
+      ]
+    },
+    {
       "agent_id": "soridormi.safety",
       "display_name": "Soridormi Safety Agent",
       "description": "Soridormi safety validation, motion monitoring, and emergency stop capabilities.",
@@ -814,10 +1128,12 @@
       "chromie.report"
     ],
     "physical_motion_tools": [
-      "soridormi.motion.execute_plan"
+      "soridormi.motion.execute_plan",
+      "soridormi.skill.execute_plan"
     ],
     "planning_tools": [
-      "soridormi.motion.create_plan"
+      "soridormi.motion.create_plan",
+      "soridormi.skill.create_plan"
     ],
     "safety_tools": [
       "soridormi.safety.monitor_motion",
@@ -837,11 +1153,18 @@
       "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
       "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
       "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",
+      "Chromie must cover soridormi.skill.execute_plan with soridormi.safety.monitor_motion.",
+      "Chromie must use soridormi.skill.create_plan before soridormi.skill.execute_plan.",
       "Do not expose raw motor, joint, or torque controls to LLM-generated graphs.",
       "stop and emergency_stop may preempt any running motion task."
     ],
     "fallback_recommendations": {
       "soridormi.motion.execute_plan": {
+        "on_failure": "soridormi.motion.stop then chromie.report",
+        "on_timeout": "soridormi.motion.stop then chromie.report",
+        "on_safety_event": "soridormi.safety.emergency_stop then chromie.report"
+      },
+      "soridormi.skill.execute_plan": {
         "on_failure": "soridormi.motion.stop then chromie.report",
         "on_timeout": "soridormi.motion.stop then chromie.report",
         "on_safety_event": "soridormi.safety.emergency_stop then chromie.report"
@@ -851,6 +1174,6 @@
   "metadata": {
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "027b626e065a274d4d600cecbc0ab1e572a7176a"
+    "upstream_commit": "a092dc704f1ab797fb1d4f542696fe75026eb171"
   }
 }

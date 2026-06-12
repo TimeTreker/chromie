@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class ConversationStateTests(unittest.TestCase):
@@ -62,3 +63,20 @@ class ConversationStateTests(unittest.TestCase):
 
         self.assertFalse(manager.enabled)
         self.assertEqual(manager.max_turns, 4)
+
+    def test_interaction_response_records_speech_and_named_skill(self) -> None:
+        manager = ConversationStateManager()
+
+        manager.record_agent_result(
+            "s1",
+            InteractionResponse(
+                speech=[{"text": "Hello."}],
+                skills=[{"skill_id": "soridormi.nod_yes"}],
+            ),
+        )
+
+        self.assertEqual(manager.get_history()[-1]["text"], "Hello.")
+        self.assertEqual(
+            manager.snapshot()["active_pending_tasks"][-1]["summary"],
+            "soridormi.nod_yes",
+        )

@@ -214,3 +214,9 @@ The service is already integrated into the root `docker-compose.yml`. Use the ro
 - Real hardware execution should stay in the host orchestrator or a host hardware daemon.
 - The service can work without Ollama. It will fall back to deterministic short replies.
 - Model and timeout defaults should normally come from the selected hardware profile, not component-local hardcoded values.
+# Interaction response
+
+`POST /interaction` accepts the same request as `POST /run` and returns the
+shared `InteractionResponse` contract. During the I3 migration it adapts the
+existing `AgentResult`; callers can adopt the new contract before the native
+single-agent structured-output path replaces that adapter.

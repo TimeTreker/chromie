@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from .agents import AgentServices
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .clients.ollama_client import OllamaClient
+from .interaction import AgentResultInteractionAdapter
 from .runtime import AgentRuntime
 from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .task_graph import (
@@ -29,6 +30,11 @@ from .task_graph import (
     TaskGraphValidationResponse,
 )
 from .tool_invocation import McpStreamableHttpInvoker
+
+try:
+    from chromie_contracts.interaction import InteractionResponse
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class Settings(BaseModel):
@@ -93,6 +99,7 @@ services = AgentServices(
     task_graph_planner=task_graph_planner,
 )
 runtime = AgentRuntime(services)
+interaction_adapter = AgentResultInteractionAdapter()
 read_only_invoker = (
     McpStreamableHttpInvoker(capability_registry)
     if settings.enable_read_only_task_graph_execution
@@ -293,6 +300,27 @@ async def run_agent(request: AgentRunRequest) -> AgentResult:
     )
     result.trace.append(f"runtime: total_ms={elapsed_ms:.1f}")
     return result
+
+
+@app.post("/interaction", response_model=InteractionResponse)
+async def run_interaction(request: AgentRunRequest) -> InteractionResponse:
+    start = time.perf_counter()
+    legacy_result = await runtime.run(request)
+    response = interaction_adapter.convert(legacy_result)
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    response.metadata["runtime_ms"] = round(elapsed_ms, 1)
+    logger.info(
+        "interaction sid=%s route=%s intent=%s status=%s speech=%d skills=%d confirmation=%s ms=%.1f",
+        request.sid,
+        request.route_decision.route,
+        request.route_decision.intent,
+        response.status,
+        len(response.speech),
+        len(response.skills),
+        response.requires_confirmation,
+        elapsed_ms,
+    )
+    return response
 
 
 if __name__ == "__main__":

@@ -50,12 +50,19 @@ def test_checked_in_soridormi_manifest_preserves_safety_contract() -> None:
         registry = build_configured_registry([str(manifest_path)]).registry
 
     execute = registry.get_tool("soridormi.motion.execute_plan")
+    named_list = registry.get_tool("soridormi.skill.list")
+    named_plan = registry.get_tool("soridormi.skill.create_plan")
+    named_execute = registry.get_tool("soridormi.skill.execute_plan")
     emergency_stop = registry.get_tool("soridormi.safety.emergency_stop")
     assert execute.confirmation.required
     assert execute.monitoring.requires_safety_monitor
     assert execute.execution.side_effect_free is False
     assert emergency_stop.safety_class == "safety_critical"
     assert emergency_stop.llm_visible is True
+    assert named_list.safety_class == "safe_read"
+    assert named_plan.input_schema["required"] == ["skill_id"]
+    assert named_execute.confirmation.required
+    assert named_execute.monitoring.requires_safety_monitor
 
 
 def test_restricted_tools_are_hidden_from_llm() -> None:

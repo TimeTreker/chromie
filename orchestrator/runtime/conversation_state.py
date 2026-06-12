@@ -420,7 +420,7 @@ class ConversationStateManager:
             data = {}
 
         speech_parts: list[str] = []
-        for key in ("speak_immediate", "speak_after"):
+        for key in ("speak_immediate", "speak_after", "speech"):
             for item in data.get(key, []) or []:
                 text = item.get("text") if isinstance(item, dict) else getattr(item, "text", None)
                 text = self._compact_text(text)
@@ -429,14 +429,28 @@ class ConversationStateManager:
         if speech_parts:
             self.record_assistant_turn(sid, " ".join(speech_parts), metadata={"source": "agent_result"})
 
-        actions = data.get("actions", []) or []
+        actions = data.get("actions", []) or data.get("skills", []) or []
         if actions:
             action_summaries: list[str] = []
             for action in actions[:3]:
                 if isinstance(action, dict):
-                    action_summaries.append(str(action.get("type") or action.get("target") or "action"))
+                    action_summaries.append(
+                        str(
+                            action.get("skill_id")
+                            or action.get("type")
+                            or action.get("target")
+                            or "action"
+                        )
+                    )
                 else:
-                    action_summaries.append(str(getattr(action, "type", None) or getattr(action, "target", None) or "action"))
+                    action_summaries.append(
+                        str(
+                            getattr(action, "skill_id", None)
+                            or getattr(action, "type", None)
+                            or getattr(action, "target", None)
+                            or "action"
+                        )
+                    )
             self.record_pending_task(
                 sid=sid,
                 task_type="robot_action",

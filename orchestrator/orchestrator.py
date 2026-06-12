@@ -31,8 +31,13 @@ from orchestrator.clients.agent_client import AgentClient
 from orchestrator.clients.router_client import RouterClient
 from orchestrator.runtime.session import SessionTracker, now_ms
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.interaction_coordinator import (
+    InteractionRuntimeCoordinator,
+    build_soridormi_invoker,
+)
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
+from shared.chromie_contracts.interaction import InteractionResponse
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -57,6 +62,18 @@ class VoiceAssistant:
 
         self.enable_router = env_bool("ORCH_ENABLE_ROUTER", False)
         self.enable_agent = env_bool("ORCH_ENABLE_AGENT", False)
+        self.enable_interaction_response = env_bool(
+            "ORCH_ENABLE_INTERACTION_RESPONSE",
+            False,
+        )
+        self.enable_soridormi_skills = env_bool(
+            "ORCH_ENABLE_SORIDORMI_SKILLS",
+            False,
+        )
+        self.auto_confirm_sim_skills = env_bool(
+            "ORCH_AUTO_CONFIRM_SIM_SKILLS",
+            True,
+        )
         self.router_url = os.getenv("ROUTER_URL", "http://127.0.0.1:8091")
         self.agent_url = os.getenv("AGENT_URL", "http://127.0.0.1:8092")
         self.action_executor_url = os.getenv("ACTION_EXECUTOR_URL", "http://127.0.0.1:8095")
@@ -96,6 +113,7 @@ class VoiceAssistant:
             self.conversation_state.max_context_chars,
         )
         self.active_llm_task: asyncio.Task | None = None
+        self.active_interaction_task: asyncio.Task | None = None
         self.is_playing_audio = False
 
         self.audio_mgr = AudioDeviceManager()
@@ -173,6 +191,31 @@ class VoiceAssistant:
             recordings_dir = PROJECT_ROOT / recordings_dir
         self.recordings_dir = str(recordings_dir.resolve())
         recordings_dir.mkdir(parents=True, exist_ok=True)
+
+        soridormi_invoker = None
+        if self.enable_soridormi_skills:
+            manifest_path = Path(
+                os.getenv(
+                    "ORCH_SORIDORMI_MANIFEST",
+                    str(PROJECT_ROOT / "capabilities" / "soridormi.json"),
+                )
+            ).expanduser()
+            if not manifest_path.is_absolute():
+                manifest_path = PROJECT_ROOT / manifest_path
+            soridormi_invoker = build_soridormi_invoker(
+                manifest_path=manifest_path,
+            )
+        self.interaction_runtime = InteractionRuntimeCoordinator(
+            self._schedule_interaction_speech,
+            soridormi_invoker=soridormi_invoker,
+            auto_confirm_sim=self.auto_confirm_sim_skills,
+        )
+        logger.info(
+            "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s",
+            self.enable_interaction_response,
+            self.enable_soridormi_skills,
+            self.auto_confirm_sim_skills,
+        )
 
     @property
     def session_id(self) -> str | None:
@@ -547,6 +590,19 @@ class VoiceAssistant:
         self.active_synthesis_tasks.add(task)
         task.add_done_callback(self.active_synthesis_tasks.discard)
 
+    async def _schedule_interaction_speech(
+        self,
+        args: dict[str, Any],
+    ) -> dict[str, Any]:
+        metadata = args.get("metadata")
+        session_id = (
+            metadata.get("session_id")
+            if isinstance(metadata, dict)
+            else None
+        )
+        await self.schedule_tts_sentence(str(args.get("text") or ""), session_id)
+        return {"scheduled": True}
+
     async def reset_playback_ordering(self):
         async with self.order_lock:
             self.synthesis_order = 0
@@ -744,6 +800,31 @@ class VoiceAssistant:
         agent_start_ms = now_ms()
         self.session_log(session_id, "agent_start: route=%s agents=%s intent=%s", decision.route, ",".join(decision.agents), decision.intent)
         try:
+            if self.enable_interaction_response:
+                response = await self.agent_client.run_interaction(
+                    session,
+                    text=user_text,
+                    route_decision=decision,
+                    sid=session_id,
+                    context=context,
+                    history=context.get("history", []),
+                )
+                self.session_log(
+                    session_id,
+                    "interaction_done: agent_ms=%.1f speech=%s skills=%s requires_confirmation=%s",
+                    now_ms() - agent_start_ms,
+                    len(response.speech),
+                    len(response.skills),
+                    response.requires_confirmation,
+                )
+                self.conversation_state.record_agent_result(session_id, response)
+                task = asyncio.create_task(
+                    self.execute_interaction_response(response, session_id)
+                )
+                self.active_interaction_task = task
+                task.add_done_callback(self._interaction_task_done)
+                return
+
             result = await self.agent_client.run(
                 session,
                 text=user_text,
@@ -768,6 +849,74 @@ class VoiceAssistant:
             self.session_log(session_id, "agent_exception: agent_ms=%.1f error=%s", now_ms() - agent_start_ms, exc)
             logger.warning("Agent failed; falling back to direct LLM: %s", exc, exc_info=True)
             self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
+
+    def _interaction_task_done(self, task: asyncio.Task) -> None:
+        if self.active_interaction_task is task:
+            self.active_interaction_task = None
+        if task.cancelled():
+            return
+        error = task.exception()
+        if error is not None:
+            logger.error(
+                "Interaction runtime task failed: %s",
+                error,
+                exc_info=error,
+            )
+
+    async def execute_interaction_response(
+        self,
+        response: InteractionResponse,
+        session_id: str | None,
+    ) -> None:
+        await self.reset_playback_ordering()
+        started_ms = now_ms()
+        try:
+            execution = await self.interaction_runtime.execute(
+                response,
+                session_id=session_id,
+            )
+            self.session_log(
+                session_id,
+                "skill_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
+                execution.status,
+                len(execution.results),
+                len(execution.traces),
+                now_ms() - started_ms,
+            )
+            for result in execution.results:
+                self.session_log(
+                    session_id,
+                    "skill_result: request_id=%s skill_id=%s status=%s reason=%s message=%s",
+                    result.request_id,
+                    result.skill_id,
+                    result.status,
+                    result.reason_code,
+                    result.message,
+                )
+        except asyncio.CancelledError:
+            self.session_log(
+                session_id,
+                "skill_runtime_cancelled: runtime_ms=%.1f",
+                now_ms() - started_ms,
+            )
+            raise
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "skill_runtime_exception: runtime_ms=%.1f error=%s",
+                now_ms() - started_ms,
+                exc,
+            )
+            raise
+        finally:
+            state = self.sessions.state.get(session_id or "")
+            if state is not None:
+                state["llm_done"] = True
+                state["response_chars"] = state.get(
+                    "response_chars",
+                    0,
+                ) + sum(len(item.text) for item in response.speech)
+            self.maybe_session_done(session_id)
 
     async def execute_agent_result(self, result: AgentResult, session_id: str | None) -> None:
         await self.reset_playback_ordering()
@@ -818,6 +967,9 @@ class VoiceAssistant:
         self.playback_generation += 1
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
+        if self.active_interaction_task and not self.active_interaction_task.done():
+            self.active_interaction_task.cancel()
+        await self.interaction_runtime.cancel_all()
         for task in list(self.active_synthesis_tasks):
             if not task.done():
                 task.cancel()

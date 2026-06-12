@@ -1,0 +1,555 @@
+from __future__ import annotations
+
+import asyncio
+import inspect
+from collections.abc import Awaitable, Callable
+from datetime import datetime, timezone
+from typing import Any, Protocol
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from shared.chromie_contracts.interaction import (
+    InteractionResponse,
+    InteractionSpeech,
+    SkillRequest,
+    SkillResult,
+    SkillTrace,
+    SkillTraceEvent,
+    reject_forbidden_low_level_fields,
+)
+
+
+class SkillDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    skill_id: str = Field(min_length=1)
+    version: str = Field(default="0.1.0", min_length=1)
+    provider_id: str = Field(min_length=1)
+    description: str = ""
+    input_schema: dict[str, Any] = Field(default_factory=dict)
+    output_schema: dict[str, Any] = Field(default_factory=dict)
+    available: bool = True
+    unavailable_reason: str | None = None
+    requires_confirmation: bool = False
+    interruptible: bool = True
+    can_run_parallel: bool = True
+    exclusive_group: str | None = None
+    timeout_ms: int = Field(default=30000, ge=1, le=120000)
+    idempotent: bool = False
+    requires_safety_monitor: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("input_schema", "output_schema", "metadata")
+    @classmethod
+    def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
+
+
+class SkillRegistry:
+    def __init__(self) -> None:
+        self._skills: dict[str, SkillDefinition] = {}
+
+    def register(self, definition: SkillDefinition) -> None:
+        if definition.skill_id in self._skills:
+            raise ValueError(f"duplicate skill_id: {definition.skill_id}")
+        self._skills[definition.skill_id] = definition
+
+    def get(self, skill_id: str) -> SkillDefinition:
+        try:
+            return self._skills[skill_id]
+        except KeyError as exc:
+            raise ValueError(f"unknown skill {skill_id!r}") from exc
+
+    def list(self) -> list[SkillDefinition]:
+        return [self._skills[skill_id] for skill_id in sorted(self._skills)]
+
+    def import_soridormi_catalog(
+        self,
+        skills: list[dict[str, Any]],
+        *,
+        provider_id: str = "soridormi.mcp",
+        version: str = "0.1.0",
+        requires_confirmation: bool = True,
+    ) -> None:
+        for item in skills:
+            upstream_id = str(item.get("skill_id", "")).strip()
+            if not upstream_id:
+                raise ValueError("Soridormi skill catalog entry has no skill_id")
+            self.register(
+                SkillDefinition(
+                    skill_id=f"soridormi.{upstream_id}",
+                    version=str(item.get("version") or version),
+                    provider_id=provider_id,
+                    description=str(item.get("description") or ""),
+                    input_schema=dict(item.get("parameters_schema") or {}),
+                    available=bool(item.get("available", False)),
+                    unavailable_reason=item.get("unavailable_reason"),
+                    requires_confirmation=bool(
+                        item.get("requires_confirmation", requires_confirmation)
+                    ),
+                    interruptible=bool(item.get("interruptible", False)),
+                    can_run_parallel=True,
+                    exclusive_group="soridormi.robot_motion",
+                    timeout_ms=max(
+                        1,
+                        int(float(item.get("timeout_s") or 30.0) * 1000),
+                    ),
+                    idempotent=False,
+                    requires_safety_monitor=False,
+                    metadata={
+                        "upstream_skill_id": upstream_id,
+                        "execution": item.get("execution"),
+                        "fallback": item.get("fallback"),
+                        "hardware_enabled": item.get("hardware_enabled"),
+                        "provider_managed_safety_monitor": True,
+                    },
+                )
+            )
+
+
+class SkillExecutionContext(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    interaction_id: str
+    confirmed: bool = False
+    safety_monitor_active: bool = False
+    trace: SkillTrace
+
+
+class SkillProvider(Protocol):
+    provider_id: str
+
+    async def execute(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> SkillResult:
+        ...
+
+    async def cancel(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> None:
+        ...
+
+
+class RuntimeAuthorization(BaseModel):
+    confirmed_request_ids: set[str] = Field(default_factory=set)
+    safety_monitor_active: bool = False
+
+
+class SkillRuntimeResult(BaseModel):
+    interaction_id: str
+    status: str
+    results: list[SkillResult] = Field(default_factory=list)
+    traces: list[SkillTrace] = Field(default_factory=list)
+
+
+class SkillRuntime:
+    def __init__(self, registry: SkillRegistry) -> None:
+        self.registry = registry
+        self._providers: dict[str, SkillProvider] = {}
+        self._exclusive_locks: dict[str, asyncio.Lock] = {}
+        self._active: dict[str, tuple[asyncio.Task[SkillResult], SkillRequest, SkillDefinition, SkillExecutionContext]] = {}
+        self._active_lock = asyncio.Lock()
+
+    def register_provider(self, provider: SkillProvider) -> None:
+        if provider.provider_id in self._providers:
+            raise ValueError(f"duplicate skill provider: {provider.provider_id}")
+        self._providers[provider.provider_id] = provider
+
+    async def execute(
+        self,
+        response: InteractionResponse,
+        *,
+        authorization: RuntimeAuthorization | None = None,
+    ) -> SkillRuntimeResult:
+        authorization = authorization or RuntimeAuthorization()
+        scheduled = self._scheduled_requests(response)
+        validated = [self._validate_request(request, authorization) for request in scheduled]
+        results: list[SkillResult] = []
+        traces: list[SkillTrace] = []
+
+        try:
+            pending_parallel: list[tuple[SkillRequest, SkillDefinition]] = []
+            for request, definition in validated:
+                if request.timing == "parallel" and definition.can_run_parallel:
+                    pending_parallel.append((request, definition))
+                    continue
+                if pending_parallel:
+                    batch_results, batch_traces = await self._run_parallel(
+                        response.interaction_id,
+                        pending_parallel,
+                        authorization,
+                    )
+                    results.extend(batch_results)
+                    traces.extend(batch_traces)
+                    pending_parallel = []
+                result, trace = await self._run_one(
+                    response.interaction_id,
+                    request,
+                    definition,
+                    authorization,
+                )
+                results.append(result)
+                traces.append(trace)
+            if pending_parallel:
+                batch_results, batch_traces = await self._run_parallel(
+                    response.interaction_id,
+                    pending_parallel,
+                    authorization,
+                )
+                results.extend(batch_results)
+                traces.extend(batch_traces)
+        except asyncio.CancelledError:
+            await asyncio.shield(self.cancel_all())
+            return SkillRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="cancelled",
+                results=results,
+                traces=traces,
+            )
+
+        status = "completed" if all(result.status == "completed" for result in results) else "failed"
+        return SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status=status,
+            results=results,
+            traces=traces,
+        )
+
+    async def cancel_all(self) -> None:
+        async with self._active_lock:
+            active = list(self._active.values())
+        for task, request, definition, context in active:
+            if request.cancellable and definition.interruptible:
+                task.cancel()
+        await asyncio.gather(
+            *(
+                self._providers[definition.provider_id].cancel(
+                    request,
+                    definition,
+                    context,
+                )
+                for _, request, definition, context in active
+                if request.cancellable and definition.interruptible
+            ),
+            return_exceptions=True,
+        )
+        await asyncio.gather(*(item[0] for item in active), return_exceptions=True)
+
+    def _scheduled_requests(self, response: InteractionResponse) -> list[SkillRequest]:
+        before: list[SkillRequest] = []
+        after: list[SkillRequest] = []
+        for speech in response.speech:
+            request = self._speech_request(speech)
+            (after if speech.timing == "after_skills" else before).append(request)
+        return [*before, *response.skills, *after]
+
+    def _speech_request(self, speech: InteractionSpeech) -> SkillRequest:
+        return SkillRequest(
+            request_id=speech.id,
+            skill_id="chromie.speak",
+            args={
+                "text": speech.text,
+                "style": speech.style,
+                "priority": speech.priority,
+                "interruptible": speech.interruptible,
+                "metadata": speech.metadata,
+            },
+            timing=(
+                "sequential"
+                if speech.timing in {"sequential", "after_skills"}
+                else "parallel"
+            ),
+            timeout_ms=speech.timeout_ms,
+            cancellable=speech.interruptible,
+        )
+
+    def _validate_request(
+        self,
+        request: SkillRequest,
+        authorization: RuntimeAuthorization,
+    ) -> tuple[SkillRequest, SkillDefinition]:
+        definition = self.registry.get(request.skill_id)
+        if definition.provider_id not in self._providers:
+            raise ValueError(
+                f"skill {request.skill_id!r} has no registered provider {definition.provider_id!r}"
+            )
+        if request.skill_version and request.skill_version != definition.version:
+            raise ValueError(
+                f"skill {request.skill_id!r} version {request.skill_version!r} "
+                f"does not match registered version {definition.version!r}"
+            )
+        if not definition.available:
+            reason = definition.unavailable_reason or "unavailable"
+            raise ValueError(f"skill {request.skill_id!r} is unavailable: {reason}")
+        _validate_json_schema(request.args, definition.input_schema, path="args")
+        confirmed = request.request_id in authorization.confirmed_request_ids
+        if (request.requires_confirmation or definition.requires_confirmation) and not confirmed:
+            raise ValueError(f"skill {request.skill_id!r} requires confirmation")
+        if definition.requires_safety_monitor and not authorization.safety_monitor_active:
+            raise ValueError(f"skill {request.skill_id!r} requires an active safety monitor")
+        return request, definition
+
+    async def _run_parallel(
+        self,
+        interaction_id: str,
+        items: list[tuple[SkillRequest, SkillDefinition]],
+        authorization: RuntimeAuthorization,
+    ) -> tuple[list[SkillResult], list[SkillTrace]]:
+        completed = await asyncio.gather(
+            *(
+                self._run_one(interaction_id, request, definition, authorization)
+                for request, definition in items
+            )
+        )
+        return [item[0] for item in completed], [item[1] for item in completed]
+
+    async def _run_one(
+        self,
+        interaction_id: str,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        authorization: RuntimeAuthorization,
+    ) -> tuple[SkillResult, SkillTrace]:
+        provider = self._providers[definition.provider_id]
+        trace = SkillTrace(
+            interaction_id=interaction_id,
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            provider_id=definition.provider_id,
+            events=[SkillTraceEvent(type="validated")],
+        )
+        context = SkillExecutionContext(
+            interaction_id=interaction_id,
+            confirmed=request.request_id in authorization.confirmed_request_ids,
+            safety_monitor_active=authorization.safety_monitor_active,
+            trace=trace,
+        )
+        timeout_s = (request.timeout_ms or definition.timeout_ms) / 1000.0
+
+        async def invoke() -> SkillResult:
+            lock = (
+                self._exclusive_locks.setdefault(definition.exclusive_group, asyncio.Lock())
+                if definition.exclusive_group
+                else None
+            )
+            if lock is None:
+                return await provider.execute(request, definition, context)
+            async with lock:
+                return await provider.execute(request, definition, context)
+
+        task = asyncio.create_task(invoke())
+        async with self._active_lock:
+            self._active[request.request_id] = (task, request, definition, context)
+        trace.events.append(SkillTraceEvent(type="started"))
+        try:
+            result = await asyncio.wait_for(task, timeout=timeout_s)
+        except TimeoutError:
+            await provider.cancel(request, definition, context)
+            result = SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="timed_out",
+                provider_id=definition.provider_id,
+                reason_code="timeout",
+                message=f"skill exceeded {timeout_s:.3f}s timeout",
+            )
+        except asyncio.CancelledError:
+            if request.cancellable and definition.interruptible:
+                await asyncio.shield(provider.cancel(request, definition, context))
+            trace.status = "cancelled"
+            trace.finished_at = datetime.now(timezone.utc)
+            trace.events.append(SkillTraceEvent(type="cancelled"))
+            raise
+        except Exception as exc:
+            result = SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="failed",
+                provider_id=definition.provider_id,
+                reason_code="provider_error",
+                message=str(exc) or exc.__class__.__name__,
+            )
+        finally:
+            async with self._active_lock:
+                self._active.pop(request.request_id, None)
+
+        result.trace_id = trace.trace_id
+        trace.status = result.status
+        trace.finished_at = datetime.now(timezone.utc)
+        trace.events.append(
+            SkillTraceEvent(
+                type=result.status,
+                message=result.message,
+                data={"reason_code": result.reason_code},
+            )
+        )
+        return result, trace
+
+
+SpeechHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
+
+
+class LocalSpeechSkillProvider:
+    provider_id = "chromie.local_speech"
+
+    def __init__(self, handler: SpeechHandler) -> None:
+        self._handler = handler
+        self.cancelled_request_ids: set[str] = set()
+
+    async def execute(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> SkillResult:
+        raw = self._handler(request.args)
+        output = await raw if inspect.isawaitable(raw) else raw
+        return SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            skill_version=definition.version,
+            status="completed",
+            provider_id=self.provider_id,
+            output=output,
+        )
+
+    async def cancel(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> None:
+        self.cancelled_request_ids.add(request.request_id)
+
+
+class MockSkillProvider:
+    def __init__(
+        self,
+        provider_id: str = "mock",
+        *,
+        delay_s: float = 0.0,
+    ) -> None:
+        self.provider_id = provider_id
+        self.delay_s = delay_s
+        self.calls: list[SkillRequest] = []
+        self.cancelled_request_ids: list[str] = []
+
+    async def execute(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> SkillResult:
+        self.calls.append(request)
+        if self.delay_s:
+            await asyncio.sleep(self.delay_s)
+        return SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            skill_version=definition.version,
+            status="completed",
+            provider_id=self.provider_id,
+            output={"args": request.args},
+        )
+
+    async def cancel(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> None:
+        self.cancelled_request_ids.append(request.request_id)
+
+
+def local_speech_definition() -> SkillDefinition:
+    return SkillDefinition(
+        skill_id="chromie.speak",
+        version="1.0.0",
+        provider_id=LocalSpeechSkillProvider.provider_id,
+        description="Speak text through Chromie's TTS and playback path.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "minLength": 1},
+                "style": {"type": "string"},
+                "priority": {"type": "string"},
+                "interruptible": {"type": "boolean"},
+                "metadata": {"type": "object"},
+            },
+            "required": ["text"],
+            "additionalProperties": False,
+        },
+        timeout_ms=30000,
+        interruptible=True,
+        can_run_parallel=True,
+        exclusive_group="chromie.audio",
+    )
+
+
+def _validate_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> None:
+    if not schema:
+        return
+    schema_type = schema.get("type")
+    allowed_types = schema_type if isinstance(schema_type, list) else [schema_type] if schema_type else []
+    if allowed_types and not any(_matches_type(value, item) for item in allowed_types):
+        raise ValueError(f"{path} expected {allowed_types}, got {type(value).__name__}")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ValueError(f"{path} must be one of {schema['enum']}")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            raise ValueError(f"{path} is below minimum {schema['minimum']}")
+        if "maximum" in schema and value > schema["maximum"]:
+            raise ValueError(f"{path} exceeds maximum {schema['maximum']}")
+    if isinstance(value, str):
+        if "minLength" in schema and len(value) < schema["minLength"]:
+            raise ValueError(f"{path} is shorter than {schema['minLength']}")
+        if "maxLength" in schema and len(value) > schema["maxLength"]:
+            raise ValueError(f"{path} is longer than {schema['maxLength']}")
+    if isinstance(value, dict):
+        properties = schema.get("properties", {})
+        for required in schema.get("required", []):
+            if required not in value:
+                raise ValueError(f"{path} is missing required field {required!r}")
+        if schema.get("additionalProperties") is False:
+            unknown = sorted(set(value) - set(properties))
+            if unknown:
+                raise ValueError(f"{path} has unknown fields: {unknown}")
+        for key, item in value.items():
+            child_schema = properties.get(key)
+            if isinstance(child_schema, dict):
+                _validate_json_schema(item, child_schema, path=f"{path}.{key}")
+    if isinstance(value, list):
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            raise ValueError(f"{path} has fewer than {schema['minItems']} items")
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            raise ValueError(f"{path} has more than {schema['maxItems']} items")
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            for index, item in enumerate(value):
+                _validate_json_schema(item, item_schema, path=f"{path}[{index}]")
+
+
+def _matches_type(value: Any, schema_type: str) -> bool:
+    if schema_type == "null":
+        return value is None
+    if schema_type == "object":
+        return isinstance(value, dict)
+    if schema_type == "array":
+        return isinstance(value, list)
+    if schema_type == "string":
+        return isinstance(value, str)
+    if schema_type == "boolean":
+        return isinstance(value, bool)
+    if schema_type == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if schema_type == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return True

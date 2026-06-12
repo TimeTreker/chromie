@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 import aiohttp
+from shared.chromie_contracts.interaction import InteractionResponse
 
 try:
     from schemas.agent import AgentRequest, AgentResult
@@ -52,3 +53,33 @@ class AgentClient:
         timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
         async with session.get(f"{self.base_url}/health", timeout=timeout) as resp:
             return await resp.json()
+
+    async def run_interaction(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        text: str,
+        route_decision: RouteDecision,
+        sid: str | None = None,
+        context: dict[str, Any] | None = None,
+        history: list[dict[str, Any]] | None = None,
+    ) -> InteractionResponse:
+        req = AgentRequest(
+            sid=sid,
+            text=text,
+            route_decision=route_decision,
+            context=context or {},
+            history=history or [],
+        )
+        timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
+        async with session.post(
+            f"{self.base_url}/interaction",
+            json=req.model_dump(mode="json"),
+            timeout=timeout,
+        ) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                raise RuntimeError(
+                    f"Agent interaction endpoint returned HTTP {resp.status}: {body[:500]}"
+                )
+            return InteractionResponse.model_validate_json(body)
