@@ -57,6 +57,9 @@ This is Level A evidence only.
 ./scripts/start_orchestrator.sh
 python scripts/m13_voice_acceptance.py --dry-run \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
+python scripts/m13_voice_acceptance.py --preflight-only \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi --start-services
 ```
 
 Live commands and recovery procedures are maintained in

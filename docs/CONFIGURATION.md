@@ -265,7 +265,9 @@ variables are not a supported production-selection mechanism in this revision.
   real microphone and speaker. Automated modes also accept `--tts-url`,
   `--tts-speaker-id`, and `--virtual-mic-sink`. The runner generates a temporary
   `ORCH_RUNTIME_OVERRIDE_FILE`, enables `ORCH_EVENT_LOG_PATH`, and writes below
-  `.chromie/acceptance/m13/`. Its capability probe defaults to
+  `.chromie/acceptance/m13/`. Use `--preflight-only` to check Docker, the
+  automatic runtime, audio backend, and required endpoints without starting
+  services or creating evidence. Its capability probe defaults to
   `--probe-runtime container`, executing inside `chromie-agent`. Host-loopback
   Soridormi URLs are translated to `host.docker.internal`; the Compose service
   supplies the Linux `host-gateway` mapping. `--probe-runtime host` is an

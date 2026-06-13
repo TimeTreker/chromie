@@ -65,7 +65,7 @@ RUNTIME_REEXEC_ENV = "CHROMIE_M13_RUNTIME_REEXEC"
 def ensure_acceptance_runtime(argv: Sequence[str]) -> None:
     """Re-exec automatic modes in the managed host environment when needed."""
 
-    if "--dry-run" in argv:
+    if "--dry-run" in argv or "--preflight-only" in argv:
         return
     mode = "synthetic"
     if "--mode" in argv:
@@ -390,6 +390,167 @@ class CheckResult:
     name: str
     passed: bool
     detail: str
+
+
+def tcp_endpoint_check(name: str, endpoint: str) -> CheckResult:
+    parsed = urlsplit(endpoint)
+    host = parsed.hostname
+    if not host:
+        return CheckResult(name, False, f"invalid endpoint: {endpoint}")
+    try:
+        if parsed.port is not None:
+            port = parsed.port
+        elif parsed.scheme in {"https", "wss"}:
+            port = 443
+        else:
+            port = 80
+    except ValueError as exc:
+        return CheckResult(name, False, f"invalid endpoint: {exc}")
+    try:
+        with socket.create_connection((host, port), timeout=2):
+            pass
+    except OSError as exc:
+        return CheckResult(name, False, f"{host}:{port} is unreachable: {exc}")
+    return CheckResult(name, True, f"{host}:{port} is reachable")
+
+
+def acceptance_readiness(
+    args: argparse.Namespace,
+    selected: Sequence[str],
+) -> list[CheckResult]:
+    """Check prerequisites without creating or modifying acceptance evidence."""
+
+    checks: list[CheckResult] = []
+    build_script = ROOT / "scripts" / "build_runtime_env.sh"
+    checks.append(
+        CheckResult(
+            "runtime configuration",
+            build_script.is_file() and os.access(build_script, os.X_OK),
+            (
+                f"{build_script.relative_to(ROOT)} is executable"
+                if build_script.is_file() and os.access(build_script, os.X_OK)
+                else f"{build_script.relative_to(ROOT)} is missing or not executable"
+            ),
+        )
+    )
+
+    docker = shutil.which("docker")
+    checks.append(
+        CheckResult(
+            "Docker CLI",
+            docker is not None,
+            docker or "docker was not found on PATH",
+        )
+    )
+    if docker is not None:
+        try:
+            daemon = subprocess.run(
+                [docker, "info"],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            daemon_detail = (
+                "Docker daemon is reachable"
+                if daemon.returncode == 0
+                else (
+                    daemon.stderr.strip()
+                    or daemon.stdout.strip()
+                    or f"docker info exited {daemon.returncode}"
+                )
+            )
+            checks.append(
+                CheckResult("Docker daemon", daemon.returncode == 0, daemon_detail)
+            )
+        except subprocess.TimeoutExpired:
+            checks.append(
+                CheckResult(
+                    "Docker daemon",
+                    False,
+                    "docker info timed out after 15 seconds",
+                )
+            )
+
+    if args.mode in {"synthetic", "virtual-mic"}:
+        websockets_available = importlib.util.find_spec("websockets") is not None
+        managed_conda = shutil.which("conda")
+        checks.append(
+            CheckResult(
+                "automatic acceptance runtime",
+                websockets_available or managed_conda is not None,
+                (
+                    "websockets is importable"
+                    if websockets_available
+                    else (
+                        f"managed runtime is available through {managed_conda}"
+                        if managed_conda
+                        else "neither websockets nor a managed conda runtime is available"
+                    )
+                ),
+            )
+        )
+        if args.start_services:
+            checks.append(
+                CheckResult(
+                    "TTS endpoint",
+                    True,
+                    "Chromie services will be started by --start-services",
+                )
+            )
+        else:
+            checks.append(tcp_endpoint_check("TTS endpoint", args.tts_url))
+
+    if args.mode == "virtual-mic":
+        backend = PulseVirtualMicrophone.available_backend()
+        checks.append(
+            CheckResult(
+                "virtual microphone backend",
+                backend is not None,
+                backend or "neither PulseAudio nor PipeWire tools are available",
+            )
+        )
+
+    needs_soridormi = bool(BODY_CASES.intersection(selected))
+    if needs_soridormi:
+        if args.soridormi_mcp_url:
+            checks.append(
+                tcp_endpoint_check("Soridormi MCP endpoint", args.soridormi_mcp_url)
+            )
+        else:
+            checks.append(
+                CheckResult(
+                    "Soridormi MCP endpoint",
+                    False,
+                    "--soridormi-mcp-url or SORIDORMI_MCP_URL is required",
+                )
+            )
+        if args.soridormi_repo:
+            repo = Path(args.soridormi_repo).expanduser()
+            checks.append(
+                CheckResult(
+                    "Soridormi repository",
+                    repo.is_dir() and (repo / ".git").exists(),
+                    (
+                        f"{repo} is available"
+                        if repo.is_dir() and (repo / ".git").exists()
+                        else f"{repo} is not a Git repository"
+                    ),
+                )
+            )
+
+    return checks
+
+
+def print_readiness(checks: Sequence[CheckResult]) -> bool:
+    print("Voice-to-MuJoCo Alpha acceptance readiness")
+    for check in checks:
+        marker = "PASS" if check.passed else "FAIL"
+        print(f"[{marker}] {check.name}: {check.detail}")
+    passed = all(check.passed for check in checks)
+    print(f"Overall: {'ready' if passed else 'not ready'}")
+    return passed
 
 
 @dataclass(frozen=True)
@@ -1360,10 +1521,23 @@ def run_acceptance(args: argparse.Namespace) -> int:
     if args.case_timeout_s <= 0:
         raise ValueError("--case-timeout-s must be greater than zero")
     needs_soridormi = bool(BODY_CASES.intersection(selected))
-    if needs_soridormi and not args.soridormi_mcp_url and not args.dry_run:
+    if (
+        needs_soridormi
+        and not args.soridormi_mcp_url
+        and not args.dry_run
+        and not args.preflight_only
+    ):
         raise ValueError(
             "Body-skill cases require --soridormi-mcp-url or SORIDORMI_MCP_URL"
         )
+    if args.preflight_only:
+        return 0 if print_readiness(acceptance_readiness(args, selected)) else 1
+    if not args.dry_run:
+        readiness = acceptance_readiness(args, selected)
+        if not print_readiness(readiness):
+            raise RuntimeError(
+                "Acceptance prerequisites are not ready; no evidence bundle was created"
+            )
 
     metadata = build_metadata(args, selected)
     if metadata["chromie"]["dirty"] and not args.allow_dirty and not args.dry_run:
@@ -1798,6 +1972,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--start-services", action="store_true")
+    parser.add_argument(
+        "--preflight-only",
+        action="store_true",
+        help=(
+            "Check acceptance prerequisites and exit without starting services "
+            "or creating an evidence bundle."
+        ),
+    )
     parser.add_argument(
         "--allow-dirty",
         action="store_true",

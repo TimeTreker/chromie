@@ -186,7 +186,21 @@ speaker-to-microphone feedback.
 ### Automatic synthetic acceptance
 
 Start the five Chromie services and a supervised MuJoCo-backed Soridormi MCP
-endpoint, then run:
+endpoint. Check all prerequisites before creating an evidence bundle:
+
+```bash
+python scripts/m13_voice_acceptance.py \
+  --preflight-only \
+  --mode synthetic \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+The preflight checks the generated-runtime script, Docker CLI and daemon,
+automatic Python runtime, TTS startup plan, and the external Soridormi endpoint
+and repository. It does not start services or create evidence. Once it reports
+`Overall: ready`, run:
 
 ```bash
 python scripts/m13_voice_acceptance.py \

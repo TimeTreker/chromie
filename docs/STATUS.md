@@ -44,7 +44,7 @@ Target validation or Release readiness.
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; microphone retention still open | Available in structured path |
 | Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Provider flag off |
 | Conversation state across VAD utterances | Implemented in host memory | Boundary, follow-up, and limit tests | Available in the host Orchestrator | Enabled by `.env.common` |
-| Structured acceptance evidence capture | JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and three explicit modes implemented | Synthetic/virtual-mic framing, isolation, and bundle-verification tests | Only supervised mode is release-closing; reviewed bundle still open | Acceptance-only |
+| Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and three explicit modes implemented | Preflight, synthetic/virtual-mic framing, isolation, and bundle-verification tests | Only supervised mode is release-closing; reviewed bundle still open | Acceptance-only |
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |

@@ -287,6 +287,18 @@ Skill Runtime, response TTS, and Soridormi without relying on a person speaking:
 
 ```bash
 python scripts/m13_voice_acceptance.py \
+  --preflight-only \
+  --mode synthetic \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+This reports all local blockers without starting services or creating an
+evidence directory. After it reports `Overall: ready`, run:
+
+```bash
+python scripts/m13_voice_acceptance.py \
   --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \

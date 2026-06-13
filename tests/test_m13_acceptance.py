@@ -12,7 +12,9 @@ from unittest import mock
 from scripts.m13_voice_acceptance import (
     AcceptanceAudioDriver,
     CASES,
+    CheckResult,
     FULL_CASE_ORDER,
+    acceptance_readiness,
     analyze_case,
     build_parser,
     capability_probe_invocation,
@@ -26,6 +28,7 @@ from scripts.m13_voice_acceptance import (
     parse_case_list,
     prompt_verdict,
     redact_env_file,
+    run_acceptance,
     wait_for_any_event,
     wait_for_case_checks,
     write_override_file,
@@ -77,6 +80,115 @@ class M13AcceptanceTests(unittest.TestCase):
         ])
         self.assertEqual(command[-3:], ["--mode", "synthetic", "--allow-dirty"])
         self.assertEqual(environment["CHROMIE_M13_RUNTIME_REEXEC"], "1")
+
+    def test_preflight_does_not_reexec_managed_runtime(self) -> None:
+        with (
+            mock.patch(
+                "scripts.m13_voice_acceptance.importlib.util.find_spec",
+                return_value=None,
+            ),
+            mock.patch("scripts.m13_voice_acceptance.os.execvpe") as execvpe,
+        ):
+            ensure_acceptance_runtime(["--preflight-only"])
+
+        execvpe.assert_not_called()
+
+    def test_preflight_reports_missing_docker_and_soridormi(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "--preflight-only",
+                "--cases",
+                "speech-skill",
+                "--soridormi-mcp-url",
+                "http://127.0.0.1:8000/mcp",
+                "--soridormi-repo",
+                "/missing/soridormi",
+                "--start-services",
+            ]
+        )
+        with (
+            mock.patch(
+                "scripts.m13_voice_acceptance.shutil.which",
+                side_effect=lambda command: None,
+            ),
+            mock.patch(
+                "scripts.m13_voice_acceptance.importlib.util.find_spec",
+                return_value=object(),
+            ),
+            mock.patch(
+                "scripts.m13_voice_acceptance.socket.create_connection",
+                side_effect=ConnectionRefusedError("refused"),
+            ),
+        ):
+            checks = acceptance_readiness(args, ["speech-skill"])
+
+        failures = {item.name: item.detail for item in checks if not item.passed}
+        self.assertIn("Docker CLI", failures)
+        self.assertIn("Soridormi MCP endpoint", failures)
+        self.assertIn("Soridormi repository", failures)
+
+    def test_speech_only_preflight_allows_services_to_start_later(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "--preflight-only",
+                "--cases",
+                "speech-only",
+                "--start-services",
+            ]
+        )
+        daemon = subprocess.CompletedProcess(
+            args=["docker", "info"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+        with (
+            mock.patch(
+                "scripts.m13_voice_acceptance.shutil.which",
+                side_effect=lambda command: (
+                    "/usr/bin/docker" if command == "docker" else None
+                ),
+            ),
+            mock.patch(
+                "scripts.m13_voice_acceptance.subprocess.run",
+                return_value=daemon,
+            ),
+            mock.patch(
+                "scripts.m13_voice_acceptance.importlib.util.find_spec",
+                return_value=object(),
+            ),
+        ):
+            checks = acceptance_readiness(args, ["speech-only"])
+
+        self.assertTrue(all(item.passed for item in checks))
+        self.assertEqual(
+            next(item.detail for item in checks if item.name == "TTS endpoint"),
+            "Chromie services will be started by --start-services",
+        )
+
+    def test_preflight_only_does_not_create_evidence_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            evidence_root = Path(temp_dir) / "evidence"
+            args = build_parser().parse_args(
+                [
+                    "--preflight-only",
+                    "--cases",
+                    "speech-only",
+                    "--evidence-root",
+                    str(evidence_root),
+                ]
+            )
+            with (
+                mock.patch(
+                    "scripts.m13_voice_acceptance.acceptance_readiness",
+                    return_value=[CheckResult("test", True, "ready")],
+                ),
+                mock.patch("builtins.print"),
+            ):
+                result = run_acceptance(args)
+
+            self.assertEqual(result, 0)
+            self.assertFalse(evidence_root.exists())
 
     def test_audio_injection_packet_round_trip(self) -> None:
         payload = (b"\x01\x00" * 320)
