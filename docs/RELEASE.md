@@ -9,8 +9,8 @@ been published.
 
 Treat `main` as a development branch and the current revision as supervised
 alpha validation material. The release generator intentionally refuses a
-publishable bundle while the tracked spoken-confirmation blocker remains or a
-real M13 evidence bundle does not pass. See
+publishable bundle while tracked spoken approval/denial evidence remains open
+or a real M13 evidence bundle does not pass. See
 [Current Implementation Status](STATUS.md).
 
 ## Recommended first release scope

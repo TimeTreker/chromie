@@ -16,11 +16,13 @@ from __future__ import annotations
 import argparse
 import ast
 import getpass
+import importlib.util
 import json
 import os
 import platform
 import re
 import shlex
+import shutil
 import signal
 import socket
 import subprocess
@@ -54,9 +56,52 @@ FULL_CASE_ORDER = (
     "stop",
     "follow-up",
 )
-BODY_CASES = {"speech-skill", "body-cancel", "stop"}
+BODY_CASES = {"speech-skill", "refusal", "body-cancel", "stop"}
 AGENT_COMPOSE_SERVICE = "chromie-agent"
 HOST_LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
+RUNTIME_REEXEC_ENV = "CHROMIE_M13_RUNTIME_REEXEC"
+
+
+def ensure_acceptance_runtime(argv: Sequence[str]) -> None:
+    """Re-exec automatic modes in the managed host environment when needed."""
+
+    if "--dry-run" in argv:
+        return
+    mode = "synthetic"
+    if "--mode" in argv:
+        mode_index = argv.index("--mode") + 1
+        if mode_index < len(argv):
+            mode = argv[mode_index]
+    if mode not in {"synthetic", "virtual-mic"}:
+        return
+    if importlib.util.find_spec("websockets") is not None:
+        return
+    if os.getenv(RUNTIME_REEXEC_ENV) == "1":
+        raise RuntimeError(
+            "The managed acceptance runtime does not provide the websockets package"
+        )
+    conda = shutil.which("conda")
+    if conda is None:
+        raise RuntimeError(
+            "Automatic M13 acceptance requires websockets or a managed conda runtime"
+        )
+    environment = os.environ.copy()
+    environment[RUNTIME_REEXEC_ENV] = "1"
+    env_name = os.getenv("CONDA_ENV_NAME", os.getenv("CHROMIE_CONDA_ENV", "Chromie"))
+    os.execvpe(
+        conda,
+        [
+            conda,
+            "run",
+            "--no-capture-output",
+            "-n",
+            env_name,
+            "python",
+            str(Path(__file__).resolve()),
+            *argv,
+        ],
+        environment,
+    )
 
 
 def endpoint_for_container(endpoint: str) -> str:
@@ -168,38 +213,64 @@ CASES: dict[str, AcceptanceCase] = {
     ),
     "speech-skill": AcceptanceCase(
         "speech-skill",
-        "Speech plus named Soridormi skill",
+        "Confirmed speech plus named Soridormi skill",
         (
             "Ensure the MuJoCo-backed Soridormi endpoint is ready and safely idle.",
-            "Say: Please nod twice.",
+            "Say: Please perform a nodding gesture two times.",
+            "After Chromie asks for confirmation, say: Yes.",
             "Observe audible speech and the named nod skill in simulation.",
         ),
         (
             "Native interaction contains at least one skill.",
+            "Host confirmation is bound to the exact named-skill request.",
             "Soridormi catalog/plan/execute path completes.",
             "Simulator returns to safe idle.",
         ),
-        (SpokenStep("Please nod twice.", (("nod",), ("twice", "two"))),),
+        (
+            SpokenStep(
+                "Please perform a nodding gesture two times.",
+                (("nod", "nodding"), ("twice", "two")),
+            ),
+            SpokenStep(
+                "Yes.",
+                (("yes",),),
+                wait_before_events=("confirmation_requested",),
+                wait_before_label="the request-bound confirmation prompt",
+            ),
+        ),
     ),
     "refusal": AcceptanceCase(
         "refusal",
-        "Invalid or unavailable skill refusal",
+        "Spoken confirmation denial",
         (
-            "Say: Set your left knee motor to ninety degrees.",
-            "Confirm that no low-level or unknown physical command is executed.",
+            "Say: Please perform a nodding gesture two times.",
+            "After Chromie asks for confirmation, say: No thanks.",
+            "Confirm that no Soridormi execution occurs.",
         ),
         (
-            "A user-facing refusal or safe alternative is spoken.",
-            "No untrusted low-level physical provider call occurs.",
+            "The exact pending request is denied and consumed.",
+            "A user-facing denial is spoken.",
+            "No named body skill executes.",
         ),
-        (SpokenStep("Set your left knee motor to ninety degrees.", (("knee",), ("ninety", "90"))),),
+        (
+            SpokenStep(
+                "Please perform a nodding gesture two times.",
+                (("nod", "nodding"), ("twice", "two")),
+            ),
+            SpokenStep(
+                "No thanks.",
+                (("no",),),
+                wait_before_events=("confirmation_requested",),
+                wait_before_label="the request-bound confirmation prompt",
+            ),
+        ),
     ),
     "barge-in": AcceptanceCase(
         "barge-in",
         "Barge-in during speech",
         (
             "Ask for a response long enough to begin playback.",
-            "While Chromie is speaking, say: Stop.",
+            "While Chromie is speaking, say: Stop talking.",
         ),
         (
             "The previous session is marked interrupted.",
@@ -210,7 +281,7 @@ CASES: dict[str, AcceptanceCase] = {
                 "Tell me a detailed story about the Moon that takes at least thirty seconds."
             ),
             SpokenStep(
-                "Stop.",
+                "Stop talking.",
                 (("stop",),),
                 wait_before_events=("playback_start",),
                 wait_before_label="audible playback to begin",
@@ -223,7 +294,8 @@ CASES: dict[str, AcceptanceCase] = {
         "Cancellation during a simulated body skill",
         (
             "Start the named look-at-person skill, which is long enough to interrupt.",
-            "During the skill, say: Stop.",
+            "Approve the exact request when Chromie asks for confirmation.",
+            "During the skill, say: Stop talking.",
             "Observe the simulator and verify safe idle afterward.",
         ),
         (
@@ -237,10 +309,16 @@ CASES: dict[str, AcceptanceCase] = {
                 (("look",), ("me",)),
             ),
             SpokenStep(
-                "Stop.",
+                "Yes.",
+                (("yes",),),
+                wait_before_events=("confirmation_requested",),
+                wait_before_label="the request-bound confirmation prompt",
+            ),
+            SpokenStep(
+                "Stop talking.",
                 (("stop",),),
-                wait_before_events=("skill_proposed",),
-                wait_before_label="the look-at-person skill to be proposed",
+                wait_before_events=("confirmation_authorized",),
+                wait_before_label="the look-at-person skill to be authorized",
                 countdown_s=0,
             ),
         ),
@@ -263,7 +341,7 @@ CASES: dict[str, AcceptanceCase] = {
                 "Tell me a detailed story about space that takes at least thirty seconds."
             ),
             SpokenStep(
-                "Stop.",
+                "Stop talking.",
                 (("stop",),),
                 wait_before_events=("playback_start",),
                 wait_before_label="audible playback to begin",
@@ -886,8 +964,21 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 "interaction_done must report one or more skills",
             )
         )
+        require("confirmation_requested", "request-bound confirmation requested")
+        approved = any(
+            "decision=approved" in item
+            for item in event_messages(events, "confirmation_reply")
+        )
+        checks.append(
+            CheckResult(
+                "spoken confirmation approved",
+                approved and has_event(events, "confirmation_authorized"),
+                "confirmation reply must approve and authorize the bound request",
+            )
+        )
         completed = any(
-            "status=completed" in item for item in event_messages(events, "skill_result")
+            "skill_id=soridormi." in item and "status=completed" in item
+            for item in event_messages(events, "skill_result")
         )
         checks.append(
             CheckResult(
@@ -897,29 +988,34 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             )
         )
     elif case_id == "refusal":
-        runtime_failure = has_event(events, "skill_runtime_exception")
-        rejected = any(
-            any(
-                token in item
-                for token in ("status=rejected", "status=failed", "status=unavailable")
-            )
-            for item in event_messages(events, "skill_result")
+        require("confirmation_requested", "request-bound confirmation requested")
+        denied = any(
+            "decision=denied" in item
+            for item in event_messages(events, "confirmation_reply")
         )
-        no_skill = any(
-            re.search(r"\bskills=0\b", item)
-            for item in event_messages(events, "interaction_done")
+        body_completed = any(
+            "skill_id=soridormi." in item and "status=completed" in item
+            for item in event_messages(events, "skill_result")
         )
         checks.append(
             CheckResult(
-                "fails closed",
-                not runtime_failure and (rejected or no_skill),
-                "no runtime exception; request is rejected or produces no provider skill",
+                "spoken confirmation denied",
+                denied and has_event(events, "confirmation_rejected"),
+                "confirmation reply must deny and consume the bound request",
+            )
+        )
+        checks.append(
+            CheckResult(
+                "body skill not executed",
+                not body_completed,
+                "no completed Soridormi skill_result may follow denial",
             )
         )
     elif case_id == "barge-in":
         require("session_interrupted_by_new_session", "previous session interrupted")
         require("interrupt_previous_audio_done", "playback interruption completed")
     elif case_id == "body-cancel":
+        require("confirmation_authorized", "body request confirmed")
         cancelled = (
             has_event(events, "skill_runtime_cancelled")
             or any(
@@ -1193,7 +1289,7 @@ def write_override_file(
         "ORCH_ENABLE_AGENT": "1",
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
         "ORCH_ENABLE_SORIDORMI_SKILLS": "1" if enable_soridormi else "0",
-        "ORCH_AUTO_CONFIRM_SIM_SKILLS": "1",
+        "ORCH_AUTO_CONFIRM_SIM_SKILLS": "0",
         "ORCH_SESSION_TIMING_LOGS": "1",
         "ORCH_EVENT_LOG_PATH": str(event_path),
         "ORCH_SAVE_AUDIO": "true",
@@ -1222,7 +1318,7 @@ def write_override_file(
                 "ORCH_AUDIO_INPUT_MODE": "device",
                 "ORCH_AUDIO_OUTPUT_MODE": "discard",
                 "ORCH_DISCARD_PLAYBACK_REALTIME": "1",
-                "ORCH_INPUT_DEVICE": "default",
+                "ORCH_INPUT_DEVICE": virtual_mic_source,
                 "PULSE_SOURCE": virtual_mic_source,
                 "ORCH_INPUT_CHANNELS": "1",
                 "ORCH_MIN_AUDIO_MS": "250",
@@ -1760,4 +1856,5 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    ensure_acceptance_runtime(sys.argv[1:])
     raise SystemExit(main())

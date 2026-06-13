@@ -54,6 +54,7 @@ class InteractionRuntimeCoordinator:
         response: InteractionResponse,
         *,
         session_id: str | None,
+        confirmed_request_ids: set[str] | None = None,
     ) -> SkillRuntimeResult:
         prepared = self._with_session_metadata(response, session_id)
         body_requests = [
@@ -64,21 +65,50 @@ class InteractionRuntimeCoordinator:
         if body_requests:
             await self._ensure_soridormi_catalog()
 
-        confirmed_request_ids: set[str] = set()
+        authorized_request_ids = set(confirmed_request_ids or ())
         if (
             body_requests
             and self.soridormi_mode == "sim"
             and self.auto_confirm_sim
         ):
-            confirmed_request_ids.update(
+            authorized_request_ids.update(
                 request.request_id for request in body_requests
             )
         return await self.runtime.execute(
             prepared,
             authorization=RuntimeAuthorization(
-                confirmed_request_ids=confirmed_request_ids,
+                confirmed_request_ids=authorized_request_ids,
             ),
         )
+
+    async def confirmation_request_ids(
+        self,
+        response: InteractionResponse,
+    ) -> set[str]:
+        body_requests = [
+            request
+            for request in response.skills
+            if request.skill_id.startswith("soridormi.")
+        ]
+        if body_requests:
+            await self._ensure_soridormi_catalog()
+
+        required = {
+            request.request_id
+            for request in response.skills
+            if request.requires_confirmation
+            or self.registry.get(request.skill_id).requires_confirmation
+        }
+        if response.requires_confirmation and not required:
+            required.update(request.request_id for request in response.skills)
+        if (
+            self.soridormi_mode == "sim"
+            and self.auto_confirm_sim
+        ):
+            required.difference_update(
+                request.request_id for request in body_requests
+            )
+        return required
 
     async def cancel_all(self) -> None:
         await self.runtime.cancel_all()

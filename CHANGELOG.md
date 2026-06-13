@@ -18,6 +18,8 @@ yet published an official release.
 - Shared process-local resource arbitration and bounded parallel read/planning
   execution.
 - Short-term host conversation state across VAD utterances.
+- Host-owned spoken request-bound confirmation with exact request fingerprints,
+  expiry, single-use approval, deterministic denial, and evidence events.
 - Hardware-aware generated runtime configuration and multiple NVIDIA profiles.
 - GPU, Soridormi, text-interaction, and supervised target acceptance tooling.
 - Correlated JSONL session-event evidence that cannot break the realtime loop.
@@ -50,9 +52,8 @@ yet published an official release.
 
 ### Still open before the first alpha release
 
-- Non-skippable confirmation dialogue.
 - Reviewed reference-host microphone/MuJoCo M13 evidence bundle.
-- Spoken request-bound confirmation dialogue and evidence.
+- Clean automatic and supervised spoken approval/denial evidence.
 - Reference-target GPU/audio evidence and supervised recovery evidence.
 - Published GitHub prerelease; candidate artifacts and compatibility declaration
   are prepared but intentionally blocked.

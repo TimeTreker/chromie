@@ -9,8 +9,9 @@ streaming TTS, and optional named robot skills provided by Soridormi.
 > end-to-end voice acceptance**. Native `/interaction`, structured session-event
 > evidence, three voice-acceptance modes (`synthetic`, `virtual-mic`, and
 > `supervised`), evidence verification, and `v0.1.0-alpha.1` candidate packaging
-> are implemented. M13 remains open until spoken request-bound confirmation and
-> a reviewed supervised reference-host bundle are completed. See
+> are implemented. Spoken request-bound confirmation is implemented and included
+> in the seven-case matrix. M13 remains open until clean automatic reruns and a
+> reviewed supervised reference-host bundle are completed. See
 > [Current Implementation Status](docs/STATUS.md).
 
 中文说明见 [Chromie 中文项目指南](docs/PROJECT_GUIDE.zh-CN.md)。
@@ -26,6 +27,8 @@ streaming TTS, and optional named robot skills provided by Soridormi.
   runtime, with strict validation and an explicit legacy-adapter rollback mode.
 - A trusted Skill Runtime with speech and Soridormi named-skill providers,
   bounded scheduling, confirmation checks, timeout, cancellation, and traces.
+- Host-owned spoken confirmation with exact request/argument binding, expiry,
+  single-use approval, deterministic denial, and correlated evidence events.
 - Capability-registry validation and live MCP schema probing.
 - TaskGraph planning, dry run, read-only/planning execution, guarded execution,
   one-time confirmation grants, cancellation, emergency fallbacks, and bounded
@@ -266,8 +269,9 @@ python scripts/m13_voice_acceptance.py \
   --start-services
 ```
 
-This mode requires `pactl` and `paplay`. It creates and removes a temporary null
-sink, sends the generated WAV files through its monitor source, and discards
+This mode uses `pactl`/`paplay` when available or native
+`pw-cli`/`pw-cat`/`pw-dump` on PipeWire. It creates and removes a temporary
+null sink, sends generated WAV files through its monitor source, and discards
 response playback while preserving real-time playback timing for interruption
 tests.
 

@@ -23,6 +23,6 @@
   ],
   "release_state": "candidate",
   "m13_closure_blockers": [
-    "spoken request-bound confirmation dialogue is not yet implemented and evidenced"
+    "clean automatic and supervised spoken approval/denial evidence is not yet retained"
   ]
 }

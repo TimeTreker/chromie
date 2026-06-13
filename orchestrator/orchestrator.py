@@ -32,6 +32,7 @@ from orchestrator.clients.action_client import ActionClient
 from orchestrator.clients.agent_client import AgentClient
 from orchestrator.clients.router_client import RouterClient
 from orchestrator.runtime.session import SessionTracker, now_ms
+from orchestrator.runtime.confirmation import ConfirmationDialogue
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
@@ -105,6 +106,9 @@ class VoiceAssistant:
         self.http_session: aiohttp.ClientSession | None = None
         self.sessions = SessionTracker(enabled=self.enable_session_timing)
         self.conversation_state = ConversationStateManager.from_env()
+        self.confirmation_dialogue = ConfirmationDialogue(
+            ttl_s=float(os.getenv("ORCH_CONFIRMATION_TTL_SEC", "20")),
+        )
         logger.info(
             "Conversation state: enabled=%s conversation_id=%s max_turns=%s idle_s=%s hard_idle_s=%s max_context_chars=%s",
             self.conversation_state.enabled,
@@ -262,10 +266,11 @@ class VoiceAssistant:
             auto_confirm_sim=self.auto_confirm_sim_skills,
         )
         logger.info(
-            "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s",
+            "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s confirmation_ttl_s=%.1f",
             self.enable_interaction_response,
             self.enable_soridormi_skills,
             self.auto_confirm_sim_skills,
+            self.confirmation_dialogue.ttl_s,
         )
 
     @property
@@ -779,6 +784,9 @@ class VoiceAssistant:
         }
 
     async def handle_routed_text(self, user_text: str, session_id: str) -> None:
+        if await self._handle_confirmation_reply(user_text, session_id):
+            return
+
         boundary = self.conversation_state.prepare_for_user_text(user_text, session_id)
         if boundary.get("started_new"):
             self.session_log(
@@ -895,12 +903,15 @@ class VoiceAssistant:
                         request.cancellable,
                         request.requires_confirmation,
                     )
+                if await self._stage_interaction_confirmation(
+                    response,
+                    session_id,
+                    language=decision.language,
+                ):
+                    return
+
                 self.conversation_state.record_agent_result(session_id, response)
-                task = asyncio.create_task(
-                    self.execute_interaction_response(response, session_id)
-                )
-                self.active_interaction_task = task
-                task.add_done_callback(self._interaction_task_done)
+                self._launch_interaction(response, session_id)
                 return
 
             result = await self.agent_client.run(
@@ -928,6 +939,174 @@ class VoiceAssistant:
             logger.warning("Agent failed; falling back to direct LLM: %s", exc, exc_info=True)
             self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
 
+    async def _stage_interaction_confirmation(
+        self,
+        response: InteractionResponse,
+        session_id: str,
+        *,
+        language: str | None,
+    ) -> bool:
+        confirmation_request_ids = (
+            await self.interaction_runtime.confirmation_request_ids(response)
+        )
+        if not confirmation_request_ids:
+            return False
+
+        pending = self.confirmation_dialogue.begin(
+            response,
+            confirmed_request_ids=confirmation_request_ids,
+            origin_session_id=session_id,
+            conversation_id=self.conversation_state.conversation_id,
+            language=language,
+        )
+        self.session_log(
+            session_id,
+            "confirmation_requested: confirmation_id=%s interaction_id=%s "
+            "request_ids=%s fingerprint=%s expires_at=%.3f",
+            pending.confirmation_id,
+            response.interaction_id,
+            ",".join(sorted(pending.confirmed_request_ids)),
+            pending.fingerprint,
+            pending.expires_at,
+        )
+        prompt_response = self._host_speech_response(
+            pending.prompt,
+            style="confirm",
+        )
+        self.conversation_state.record_agent_result(
+            session_id,
+            prompt_response,
+        )
+        self.conversation_state.record_pending_task(
+            sid=session_id,
+            task_type="confirmation",
+            status="awaiting_confirmation",
+            summary=", ".join(
+                request.skill_id
+                for request in response.skills
+                if request.request_id in pending.confirmed_request_ids
+            ),
+            metadata={
+                "confirmation_id": pending.confirmation_id,
+                "interaction_id": response.interaction_id,
+                "fingerprint": pending.fingerprint,
+                "expires_at": pending.expires_at,
+            },
+        )
+        self._launch_interaction(prompt_response, session_id)
+        return True
+
+    async def _handle_confirmation_reply(
+        self,
+        user_text: str,
+        session_id: str,
+    ) -> bool:
+        resolution = self.confirmation_dialogue.resolve(user_text)
+        if resolution.decision == "not_confirmation":
+            return False
+
+        self.conversation_state.record_user_turn(
+            session_id,
+            user_text,
+            route="confirmation",
+            intent=f"confirmation_{resolution.decision}",
+            metadata={
+                "confirmation_id": resolution.confirmation_id,
+                "fingerprint": resolution.fingerprint,
+            },
+        )
+        self.session_log(
+            session_id,
+            "confirmation_reply: confirmation_id=%s decision=%s fingerprint=%s",
+            resolution.confirmation_id,
+            resolution.decision,
+            resolution.fingerprint,
+        )
+        if resolution.confirmation_id:
+            pending_status = {
+                "approved": "done",
+                "expired": "expired",
+            }.get(resolution.decision, "cancelled")
+            self.conversation_state.update_pending_task_status(
+                metadata_key="confirmation_id",
+                metadata_value=resolution.confirmation_id,
+                status=pending_status,
+            )
+
+        if resolution.decision == "approved":
+            assert resolution.response is not None
+            self.session_log(
+                session_id,
+                "confirmation_authorized: confirmation_id=%s interaction_id=%s "
+                "request_ids=%s fingerprint=%s",
+                resolution.confirmation_id,
+                resolution.response.interaction_id,
+                ",".join(sorted(resolution.confirmed_request_ids)),
+                resolution.fingerprint,
+            )
+            self.conversation_state.record_agent_result(
+                session_id,
+                resolution.response,
+            )
+            self._launch_interaction(
+                resolution.response,
+                session_id,
+                confirmed_request_ids=set(resolution.confirmed_request_ids),
+            )
+            return True
+
+        self.session_log(
+            session_id,
+            "confirmation_rejected: confirmation_id=%s reason=%s fingerprint=%s",
+            resolution.confirmation_id,
+            resolution.decision,
+            resolution.fingerprint,
+        )
+        response = self._host_speech_response(
+            resolution.message,
+            style="warning" if resolution.decision in {"ambiguous", "expired"} else "brief",
+        )
+        self.conversation_state.record_agent_result(session_id, response)
+        self._launch_interaction(response, session_id)
+        return True
+
+    def _host_speech_response(
+        self,
+        text: str,
+        *,
+        style: str,
+    ) -> InteractionResponse:
+        return InteractionResponse(
+            speech=[
+                {
+                    "text": text,
+                    "style": style,
+                    "timing": "immediate",
+                    "priority": "high",
+                    "interruptible": True,
+                    "metadata": {"source": "host_confirmation_dialogue"},
+                }
+            ],
+            metadata={"source": "host_confirmation_dialogue"},
+        )
+
+    def _launch_interaction(
+        self,
+        response: InteractionResponse,
+        session_id: str | None,
+        *,
+        confirmed_request_ids: set[str] | None = None,
+    ) -> None:
+        task = asyncio.create_task(
+            self.execute_interaction_response(
+                response,
+                session_id,
+                confirmed_request_ids=confirmed_request_ids,
+            )
+        )
+        self.active_interaction_task = task
+        task.add_done_callback(self._interaction_task_done)
+
     def _interaction_task_done(self, task: asyncio.Task) -> None:
         if self.active_interaction_task is task:
             self.active_interaction_task = None
@@ -945,6 +1124,8 @@ class VoiceAssistant:
         self,
         response: InteractionResponse,
         session_id: str | None,
+        *,
+        confirmed_request_ids: set[str] | None = None,
     ) -> None:
         await self.reset_playback_ordering()
         started_ms = now_ms()
@@ -952,6 +1133,7 @@ class VoiceAssistant:
             execution = await self.interaction_runtime.execute(
                 response,
                 session_id=session_id,
+                confirmed_request_ids=confirmed_request_ids,
             )
             self.session_log(
                 session_id,

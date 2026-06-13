@@ -407,6 +407,27 @@ class ConversationStateManager:
         )
         self.last_activity_ms = _now_ms()
 
+    def update_pending_task_status(
+        self,
+        *,
+        metadata_key: str,
+        metadata_value: Any,
+        status: str,
+    ) -> bool:
+        if not self.enabled:
+            return False
+        for task in reversed(self._pending_tasks):
+            metadata = task.get("metadata")
+            if not isinstance(metadata, dict):
+                continue
+            if metadata.get(metadata_key) != metadata_value:
+                continue
+            task["status"] = status
+            task["updated_ms"] = _now_ms()
+            self.last_activity_ms = _now_ms()
+            return True
+        return False
+
     def record_agent_result(self, sid: str | None, result: Any) -> None:
         """Record assistant speech and lightweight task hints from AgentResult."""
         if not self.enabled:

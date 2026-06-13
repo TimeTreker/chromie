@@ -31,7 +31,8 @@ A higher level does not replace lower-level regression tests.
 ./scripts/run_tests.sh
 ```
 
-At the verified snapshot this runs 155 current tests and 20 legacy Agent tests.
+At the current working revision this runs 169 current tests and 20 legacy Agent
+tests.
 It also runs the documentation consistency checker.
 
 ## Level B — deployed service checks
@@ -222,8 +223,9 @@ The verifier reports the bundle as valid automated evidence but
 
 ### Automatic virtual-microphone acceptance
 
-`virtual-mic` mode requires PulseAudio or PipeWire's Pulse compatibility layer
-and the `pactl` and `paplay` commands:
+`virtual-mic` mode requires PulseAudio or PipeWire. It uses `pactl`/`paplay`
+when available and otherwise falls back to native
+`pw-cli`/`pw-cat`/`pw-dump` tools:
 
 ```bash
 python scripts/m13_voice_acceptance.py \
@@ -300,10 +302,10 @@ order below; only `supervised` adds physical audio and operator observations.
 | Case | User input | Required evidence |
 |---|---|---|
 | Speech only | General question | ASR final text, interaction ID, speech request, TTS request ID, audible output, no body skill. |
-| Speech plus body skill | “Nod” or equivalent | Speech and named skill, live catalog import, plan/monitor/execute results, safe idle. |
-| Refusal | Invalid/unavailable or unconfirmed skill | No remote physical execution, clear refusal reason, user-facing speech. |
+| Speech plus body skill | “Nod” or equivalent, then “Yes” | Action-specific prompt, exact request fingerprint, approval event, live catalog import, plan/monitor/execute results, safe idle. |
+| Refusal | Valid body request, then “No thanks” | Bound denial event, no remote physical execution, user-facing speech. |
 | Barge-in | Interrupt while speaking | Playback generation cancelled and no duplicate stale speech. |
-| Body cancellation | Interrupt a cancellable simulated skill | Provider cancel invoked, execution marked cancelled, safe idle verified. |
+| Body cancellation | Confirm, then interrupt a cancellable simulated skill | Bound approval, provider cancel invoked, execution marked cancelled, safe idle verified. |
 | Stop/emergency | Explicit stop during active work | Deterministic operational route, active work stopped, retained safety state and recovery notes. |
 | Follow-up | Context-dependent second utterance | Same conversation ID when policy requires, bounded history, correct reference resolution. |
 
@@ -313,6 +315,7 @@ For every case retain:
 - `.env.runtime` profile name without secrets;
 - audio device names, sample rates, and VAD thresholds;
 - Router decision, Agent/interaction metadata, skill results, and correlated IDs;
+- confirmation ID, exact request fingerprint, expiry, and approval or denial;
 - timing logs and operator pass/fail notes;
 - simulator/hardware state before and after the case;
 - recovery confirmation when stop or emergency behavior is exercised.

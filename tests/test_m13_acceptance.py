@@ -17,6 +17,7 @@ from scripts.m13_voice_acceptance import (
     build_parser,
     capability_probe_invocation,
     endpoint_for_container,
+    ensure_acceptance_runtime,
     events_for_sessions,
     extract_asr_text,
     friendly_event_line,
@@ -30,7 +31,7 @@ from scripts.m13_voice_acceptance import (
     write_override_file,
 )
 from orchestrator.audio_injection import encode_audio_packet, read_audio_packet
-from scripts.acceptance_audio import AudioFixture
+from scripts.acceptance_audio import AudioFixture, PulseVirtualMicrophone
 from scripts.verify_m13_evidence import REQUIRED_FILES, verify_bundle
 import scripts.prepare_alpha_release as release_module
 
@@ -46,6 +47,36 @@ class M13AcceptanceTests(unittest.TestCase):
     def test_synthetic_mode_is_the_default(self) -> None:
         args = build_parser().parse_args([])
         self.assertEqual(args.mode, "synthetic")
+
+    def test_automatic_mode_reexecs_in_managed_runtime_when_needed(self) -> None:
+        with (
+            mock.patch(
+                "scripts.m13_voice_acceptance.importlib.util.find_spec",
+                return_value=None,
+            ),
+            mock.patch(
+                "scripts.m13_voice_acceptance.shutil.which",
+                return_value="/usr/bin/conda",
+            ),
+            mock.patch(
+                "scripts.m13_voice_acceptance.os.execvpe",
+            ) as execvpe,
+            mock.patch.dict("os.environ", {}, clear=True),
+        ):
+            ensure_acceptance_runtime(["--mode", "synthetic", "--allow-dirty"])
+
+        command = execvpe.call_args.args[1]
+        environment = execvpe.call_args.args[2]
+        self.assertEqual(command[:6], [
+            "/usr/bin/conda",
+            "run",
+            "--no-capture-output",
+            "-n",
+            "Chromie",
+            "python",
+        ])
+        self.assertEqual(command[-3:], ["--mode", "synthetic", "--allow-dirty"])
+        self.assertEqual(environment["CHROMIE_M13_RUNTIME_REEXEC"], "1")
 
     def test_audio_injection_packet_round_trip(self) -> None:
         payload = (b"\x01\x00" * 320)
@@ -111,8 +142,59 @@ class M13AcceptanceTests(unittest.TestCase):
             )
             text = path.read_text()
             self.assertIn("PULSE_SOURCE=chromie_test.monitor", text)
+            self.assertIn("ORCH_INPUT_DEVICE=chromie_test.monitor", text)
             self.assertIn("ORCH_AUDIO_INPUT_MODE=device", text)
             self.assertIn("ORCH_AUDIO_OUTPUT_MODE=discard", text)
+
+    def test_virtual_mic_selects_native_pipewire_fallback(self) -> None:
+        available = {"pw-cli", "pw-cat", "pw-dump"}
+        with mock.patch(
+            "scripts.acceptance_audio.shutil.which",
+            side_effect=lambda name: f"/usr/bin/{name}" if name in available else None,
+        ):
+            self.assertEqual(
+                PulseVirtualMicrophone.available_backend(),
+                "pipewire",
+            )
+
+    def test_native_pipewire_virtual_mic_lifecycle(self) -> None:
+        microphone = PulseVirtualMicrophone("chromie_test")
+        fixture = AudioFixture(
+            text="Yes.",
+            pcm16=b"",
+            sample_rate=44100,
+            channels=1,
+            path=Path("/tmp/yes.wav"),
+        )
+        completed = SimpleNamespace(returncode=0, stdout="")
+        with (
+            mock.patch.object(
+                PulseVirtualMicrophone,
+                "require_tools",
+                return_value="pipewire",
+            ),
+            mock.patch.object(
+                microphone,
+                "_pipewire_node_id",
+                return_value=70,
+            ),
+            mock.patch(
+                "scripts.acceptance_audio.subprocess.run",
+                return_value=completed,
+            ) as run,
+        ):
+            microphone.start()
+            microphone.play(fixture)
+            microphone.stop()
+
+        self.assertEqual(microphone.backend, None)
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[0][:3], ["pw-cli", "create-node", "adapter"])
+        self.assertEqual(
+            commands[1],
+            ["pw-cat", "--playback", "--target", "chromie_test", "/tmp/yes.wav"],
+        )
+        self.assertEqual(commands[2], ["pw-cli", "destroy", "70"])
 
     def test_container_endpoint_translates_host_loopback(self) -> None:
         self.assertEqual(
@@ -290,6 +372,13 @@ class M13AcceptanceTests(unittest.TestCase):
             "body-cancel",
             [
                 event(
+                    "confirmation_authorized",
+                    "confirmation_authorized: confirmation_id=confirm-1 "
+                    "interaction_id=interaction-1 request_ids=body-1 "
+                    "fingerprint=abc",
+                    "body-session",
+                ),
+                event(
                     "skill_runtime_done",
                     "skill_runtime_done: status=cancelled results=0 traces=0",
                     "body-session",
@@ -298,6 +387,80 @@ class M13AcceptanceTests(unittest.TestCase):
                     "interrupt_previous_audio_done",
                     "interrupt_previous_audio_done: playback_generation=2",
                     "stop-session",
+                ),
+            ],
+        )
+
+        self.assertTrue(all(item.passed for item in checks))
+
+    def test_speech_skill_requires_bound_spoken_approval(self) -> None:
+        checks = analyze_case(
+            "speech-skill",
+            [
+                event("asr_final", "asr_final: text='Please nod twice.'", "sid-1"),
+                event("router_done", "router_done: route=robot_action", "sid-1"),
+                event(
+                    "interaction_done",
+                    "interaction_done: speech=1 skills=1 requires_confirmation=True",
+                    "sid-1",
+                ),
+                event(
+                    "confirmation_requested",
+                    "confirmation_requested: confirmation_id=confirm-1",
+                    "sid-1",
+                ),
+                event(
+                    "confirmation_reply",
+                    "confirmation_reply: confirmation_id=confirm-1 decision=approved",
+                    "sid-2",
+                ),
+                event(
+                    "confirmation_authorized",
+                    "confirmation_authorized: confirmation_id=confirm-1",
+                    "sid-2",
+                ),
+                event(
+                    "skill_result",
+                    "skill_result: request_id=nod-1 skill_id=soridormi.nod_yes "
+                    "status=completed",
+                    "sid-2",
+                ),
+            ],
+        )
+
+        self.assertTrue(all(item.passed for item in checks))
+
+    def test_refusal_requires_denial_and_no_body_completion(self) -> None:
+        checks = analyze_case(
+            "refusal",
+            [
+                event("asr_final", "asr_final: text='Please nod twice.'", "sid-1"),
+                event("router_done", "router_done: route=robot_action", "sid-1"),
+                event(
+                    "interaction_done",
+                    "interaction_done: speech=1 skills=1 requires_confirmation=True",
+                    "sid-1",
+                ),
+                event(
+                    "confirmation_requested",
+                    "confirmation_requested: confirmation_id=confirm-1",
+                    "sid-1",
+                ),
+                event(
+                    "confirmation_reply",
+                    "confirmation_reply: confirmation_id=confirm-1 decision=denied",
+                    "sid-2",
+                ),
+                event(
+                    "confirmation_rejected",
+                    "confirmation_rejected: confirmation_id=confirm-1 reason=denied",
+                    "sid-2",
+                ),
+                event(
+                    "skill_result",
+                    "skill_result: request_id=speech-1 skill_id=chromie.speak "
+                    "status=completed",
+                    "sid-2",
                 ),
             ],
         )

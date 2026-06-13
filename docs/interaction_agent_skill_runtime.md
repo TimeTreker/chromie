@@ -15,12 +15,13 @@ Implemented now:
 - Soridormi named-skill discovery and execution;
 - bounded scheduling and exclusive groups;
 - timeouts, traces, cancellation, and barge-in propagation;
+- host-owned spoken request-bound confirmation with expiry and denial;
 - simulation-only auto-confirm exemptions;
 - deterministic text-driven live Soridormi acceptance.
 
 Open M13 gates:
 
-- complete a non-skippable spoken, request-bound confirmation dialogue;
+- rerun the automatic matrix with spoken approval and denial evidence;
 - run and review the implemented seven-case microphone/MuJoCo evidence flow on
   the reference host;
 - close applicable target-evidence tracks and publish the prepared alpha
@@ -166,24 +167,25 @@ Runtime state is in memory. It is not a durable job queue.
 
 ## Confirmation
 
-Implemented foundations:
+Implemented behavior:
 
 - per-request and per-definition confirmation flags;
 - authorization by exact request ID;
 - simulation-mode catalog exemptions;
 - rejection when required confirmation is absent;
 - TaskGraph graph-bound confirmation grants on the Agent side.
+- an explicit host-generated, action-specific spoken prompt;
+- bounded affirmative and negative phrase matching before Router or Agent use;
+- SHA-256 binding to the exact interaction, request IDs, versions, arguments,
+  timing, timeout, and metadata;
+- short-lived, single-use approval with changed-request and replay rejection;
+- fail-closed denial for ambiguity, expiry, or negative replies;
+- correlated `confirmation_requested`, `confirmation_reply`,
+  `confirmation_authorized`, and `confirmation_rejected` evidence events.
 
-Still required for M13 completion:
-
-1. speak an explicit, action-specific confirmation prompt;
-2. accept only a bounded affirmative/negative reply;
-3. bind approval to the exact request/arguments and expiry;
-4. reject silence, ambiguity, replay, or changed arguments;
-5. allow interruption and denial at every stage;
-6. retain acceptance evidence for both approval and refusal paths.
-
-No hardware motion should use simulation auto-confirm behavior.
+Only one confirmation is pending in the host process at a time. Its default
+expiry is 20 seconds and is configurable with `ORCH_CONFIRMATION_TTL_SEC`.
+No hardware motion uses simulation auto-confirm behavior.
 
 ## Failure and fallback behavior
 
@@ -202,6 +204,7 @@ No hardware motion should use simulation auto-confirm behavior.
 ORCH_ENABLE_INTERACTION_RESPONSE=0
 ORCH_ENABLE_SORIDORMI_SKILLS=0
 ORCH_AUTO_CONFIRM_SIM_SKILLS=0
+ORCH_CONFIRMATION_TTL_SEC=20
 ORCH_SKILL_MAX_CONCURRENCY=8
 AGENT_INTERACTION_OUTPUT_MODE=native
 AGENT_NATIVE_INTERACTION_FALLBACK=0

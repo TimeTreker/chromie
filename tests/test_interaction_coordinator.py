@@ -120,6 +120,38 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 session_id="sid-1",
             )
 
+    async def test_request_bound_confirmation_authorizes_only_exact_request(self) -> None:
+        invoker = _SoridormiInvoker()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            soridormi_invoker=invoker,
+            auto_confirm_sim=False,
+        )
+        response = InteractionResponse(
+            skills=[
+                {
+                    "request_id": "nod-1",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                }
+            ]
+        )
+
+        request_ids = await coordinator.confirmation_request_ids(response)
+        self.assertEqual(request_ids, {"nod-1"})
+
+        with self.assertRaisesRegex(ValueError, "requires confirmation"):
+            await coordinator.execute(response, session_id="sid-1")
+
+        result = await coordinator.execute(
+            response,
+            session_id="sid-2",
+            confirmed_request_ids=request_ids,
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertTrue(invoker.calls[-1][2].confirmed)
+
 
 if __name__ == "__main__":
     unittest.main()

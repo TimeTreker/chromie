@@ -37,6 +37,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `0` | Use Agent `/interaction` and the trusted Skill Runtime instead of `/run`. |
 | `ORCH_ENABLE_SORIDORMI_SKILLS` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_AUTO_CONFIRM_SIM_SKILLS` | `1` | Apply only Soridormi-declared simulation confirmation exemptions. |
+| `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Use native structured output for `/interaction`; set `legacy-adapter` only for rollback. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | Opt in to legacy adapter fallback after native schema validation fails. Default-off preserves fail-closed behavior. |
 | `AGENT_ENABLE_TASK_GRAPH_PLANNING` | `0` | Let tool routes ask the LLM for a validated TaskGraph. |

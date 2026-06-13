@@ -108,6 +108,24 @@ class ConversationStateTests(unittest.TestCase):
             "weather lookup",
         )
 
+    def test_confirmation_pending_task_can_be_closed(self) -> None:
+        manager = ConversationStateManager()
+        manager.record_pending_task(
+            sid="s1",
+            task_type="confirmation",
+            status="awaiting_confirmation",
+            metadata={"confirmation_id": "confirm-1"},
+        )
+
+        updated = manager.update_pending_task_status(
+            metadata_key="confirmation_id",
+            metadata_value="confirm-1",
+            status="done",
+        )
+
+        self.assertTrue(updated)
+        self.assertEqual(manager.snapshot()["active_pending_tasks"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

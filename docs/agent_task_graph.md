@@ -157,8 +157,9 @@ Properties:
 - storage is process-local;
 - issuance requires the execution bearer token.
 
-The API proves control-plane binding. It does not by itself implement the full
-spoken user-confirmation dialogue required by M13.
+The API proves TaskGraph control-plane binding. The separate host Orchestrator
+implements the spoken request-bound confirmation dialogue used by the
+InteractionResponse and Skill Runtime path.
 
 ## Cancellation and traces
 

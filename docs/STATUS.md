@@ -37,6 +37,7 @@ Target validation or Release readiness.
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo path exists | Host rollout flag off |
 | Native structured Interaction Agent | Implemented with direct `InteractionSpeech`/`SkillRequest` accumulation | Native route, TaskGraph, validation, fail-closed, fallback, and compatibility-mode tests | Microphone retention still open | Agent default |
 | Trusted host Skill Runtime | Implemented | Scheduling, confirmation, timeout, cancellation, and isolation tests | Text-to-live-MuJoCo acceptance exists | Used only by structured path |
+| Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean automatic and supervised approval/denial bundles still open | Structured path; simulator exemption configurable |
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; microphone retention still open | Available in structured path |
 | Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Provider flag off |
 | Conversation state across VAD utterances | Implemented in host memory | Boundary, follow-up, and limit tests | Available in the host Orchestrator | Enabled by `.env.common` |
@@ -60,9 +61,9 @@ The repository test command is:
 ./scripts/run_tests.sh
 ```
 
-At the verified revision it runs:
+At the current working revision it runs:
 
-- **155** current `unittest` cases under `tests/`;
+- **169** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -73,15 +74,14 @@ real robot safety.
 
 M13 is not closed until all of the following are complete:
 
-1. Non-skippable confirmation is represented as an actual spoken user
-   dialogue and produces request-bound authorization evidence.
-2. The automatic `synthetic` and `virtual-mic` matrices pass for regression,
+1. The automatic `synthetic` and `virtual-mic` matrices pass with retained
+   spoken approval and denial evidence,
    then `scripts/m13_voice_acceptance.py --mode supervised` is run on the
    reference host for all seven cases and
    `scripts/verify_m13_evidence.py --require-clean` passes.
-3. The retained bundle is reviewed for audible quality, simulator safe idle,
+2. The retained bundle is reviewed for audible quality, simulator safe idle,
    cancellation/recovery behavior, correlated IDs, and absence of secrets.
-4. The candidate compatibility file has no remaining M13 closure blockers and
+3. The candidate compatibility file has no remaining M13 closure blockers and
    a clean release bundle is generated from the accepted revision.
 
 ## Open target-evidence tracks

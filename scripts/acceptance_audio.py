@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import shutil
 import subprocess
+import time
 import uuid
 import wave
 from dataclasses import dataclass
@@ -109,19 +111,32 @@ class PulseVirtualMicrophone:
         self.sink_name = sink_name
         self.source_name = f"{sink_name}.monitor"
         self.module_id: str | None = None
+        self.node_id: int | None = None
+        self.backend: str | None = None
 
     @staticmethod
-    def require_tools() -> None:
-        missing = [name for name in ("pactl", "paplay") if shutil.which(name) is None]
-        if missing:
+    def available_backend() -> str | None:
+        if all(shutil.which(name) for name in ("pactl", "paplay")):
+            return "pulse"
+        if all(shutil.which(name) for name in ("pw-cli", "pw-cat", "pw-dump")):
+            return "pipewire"
+        return None
+
+    @classmethod
+    def require_tools(cls) -> str:
+        backend = cls.available_backend()
+        if backend is None:
             raise RuntimeError(
-                "virtual-mic mode requires PulseAudio/PipeWire-Pulse tools: "
-                + ", ".join(missing)
+                "virtual-mic mode requires pactl/paplay or pw-cli/pw-cat/pw-dump"
             )
+        return backend
 
     def start(self) -> None:
-        self.require_tools()
-        if self.module_id is not None:
+        if self.module_id is not None or self.node_id is not None:
+            return
+        self.backend = self.require_tools()
+        if self.backend == "pipewire":
+            self._start_pipewire()
             return
         completed = subprocess.run(
             [
@@ -146,8 +161,18 @@ class PulseVirtualMicrophone:
             raise RuntimeError("pactl did not return a module ID for the virtual sink")
 
     def play(self, fixture: AudioFixture, *, timeout_s: float = 60.0) -> None:
+        if self.backend == "pipewire":
+            command = [
+                "pw-cat",
+                "--playback",
+                "--target",
+                self.sink_name,
+                str(fixture.path),
+            ]
+        else:
+            command = ["paplay", f"--device={self.sink_name}", str(fixture.path)]
         completed = subprocess.run(
-            ["paplay", f"--device={self.sink_name}", str(fixture.path)],
+            command,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -161,6 +186,16 @@ class PulseVirtualMicrophone:
             )
 
     def stop(self) -> None:
+        if self.node_id is not None:
+            subprocess.run(
+                ["pw-cli", "destroy", str(self.node_id)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            self.node_id = None
+            self.backend = None
+            return
         if self.module_id is None:
             return
         subprocess.run(
@@ -170,6 +205,61 @@ class PulseVirtualMicrophone:
             check=False,
         )
         self.module_id = None
+        self.backend = None
+
+    def _start_pipewire(self) -> None:
+        completed = subprocess.run(
+            [
+                "pw-cli",
+                "create-node",
+                "adapter",
+                (
+                    "{ factory.name=support.null-audio-sink "
+                    f"node.name={self.sink_name} "
+                    "node.description=\"Chromie M13 Test Input\" "
+                    "media.class=Audio/Sink object.linger=true "
+                    "audio.position=[ FL FR ] }"
+                ),
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(
+                "Failed to create the virtual microphone sink with pw-cli: "
+                + completed.stdout.strip()
+            )
+        for _ in range(50):
+            self.node_id = self._pipewire_node_id()
+            if self.node_id is not None:
+                return
+            time.sleep(0.1)
+        raise RuntimeError(
+            f"PipeWire created no visible node named {self.sink_name!r}"
+        )
+
+    def _pipewire_node_id(self) -> int | None:
+        completed = subprocess.run(
+            ["pw-dump"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return None
+        try:
+            objects = json.loads(completed.stdout)
+        except json.JSONDecodeError:
+            return None
+        for item in objects:
+            info = item.get("info") if isinstance(item, dict) else None
+            props = info.get("props") if isinstance(info, dict) else None
+            if isinstance(props, dict) and props.get("node.name") == self.sink_name:
+                return int(item["id"])
+        return None
 
     def __enter__(self) -> "PulseVirtualMicrophone":
         self.start()
