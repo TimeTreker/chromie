@@ -185,6 +185,18 @@ tool-call sequence. Use `--scenarios` for a subset and `--output` to retain a
 machine-readable JSON summary. This is automated contract evidence, not live
 simulator or hardware validation.
 
+The matrix also records total scenario and terminal latency. Defaults require
+each scenario to finish within 1000 ms, timeout terminal handling within 500
+ms, and operator cancellation terminal handling within 250 ms. Override these
+with `--max-scenario-ms`, `--max-timeout-terminal-ms`, and
+`--max-cancel-terminal-ms` for a declared target environment. A threshold
+violation fails the matrix and is retained in the JSON result.
+
+After every scenario, the runner reads `soridormi.robot.get_status`. A scenario
+passes only when the status call succeeds, `active_task` is empty, and
+`emergency_stop` is explicitly false. The retained result includes the complete
+high-level status snapshot and aggregate safe-idle count.
+
 The shared provider conformance suite verifies the same high-level contract for
 `sim` and a no-motion `hardware_dry_run` skeleton:
 

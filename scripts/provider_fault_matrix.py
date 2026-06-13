@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -19,7 +20,19 @@ from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
 
-MATRIX_VERSION = "1.0"
+MATRIX_VERSION = "1.1"
+
+
+@dataclass(frozen=True)
+class MatrixThresholds:
+    max_scenario_ms: float = 1000.0
+    max_timeout_terminal_ms: float = 500.0
+    max_cancel_terminal_ms: float = 250.0
+
+    def __post_init__(self) -> None:
+        for name, value in asdict(self).items():
+            if value <= 0:
+                raise ValueError(f"{name} must be greater than zero")
 
 
 @dataclass(frozen=True)
@@ -48,6 +61,11 @@ class ScenarioResult:
     actual_speech: tuple[str, ...]
     expected_calls: tuple[str, ...]
     actual_calls: tuple[str, ...]
+    elapsed_ms: float
+    terminal_latency_ms: float | None
+    safe_idle: bool
+    post_status: dict[str, Any]
+    threshold_violations: tuple[str, ...]
 
 
 STANDARD_CALLS = (
@@ -56,6 +74,7 @@ STANDARD_CALLS = (
     "soridormi.safety.monitor_motion",
     "soridormi.skill.execute_plan",
 )
+STATUS_CALL = "soridormi.robot.get_status"
 CANCEL_CALLS = (*STANDARD_CALLS, "soridormi.motion.cancel")
 GENERIC_FAILURE = ("I could not complete that movement safely.",)
 TIMEOUT_FAILURE = (
@@ -72,7 +91,7 @@ SCENARIOS = (
         "completed",
         None,
         ("Done.",),
-        STANDARD_CALLS,
+        (*STANDARD_CALLS, STATUS_CALL),
     ),
     FaultScenario(
         "plan_timeout",
@@ -80,7 +99,7 @@ SCENARIOS = (
         "timed_out",
         "plan_timeout",
         TIMEOUT_FAILURE,
-        STANDARD_CALLS[:2],
+        (*STANDARD_CALLS[:2], STATUS_CALL),
     ),
     FaultScenario(
         "plan_disconnect",
@@ -88,7 +107,7 @@ SCENARIOS = (
         "failed",
         "plan_failed_retryable",
         GENERIC_FAILURE,
-        STANDARD_CALLS[:2],
+        (*STANDARD_CALLS[:2], STATUS_CALL),
     ),
     FaultScenario(
         "malformed_plan",
@@ -96,7 +115,7 @@ SCENARIOS = (
         "failed",
         "invalid_plan_response",
         GENERIC_FAILURE,
-        STANDARD_CALLS[:2],
+        (*STANDARD_CALLS[:2], STATUS_CALL),
     ),
     FaultScenario(
         "monitor_refused",
@@ -104,7 +123,7 @@ SCENARIOS = (
         "refused",
         "safety_monitor_refused",
         SAFETY_FAILURE,
-        STANDARD_CALLS[:3],
+        (*STANDARD_CALLS[:3], STATUS_CALL),
     ),
     FaultScenario(
         "monitor_timeout",
@@ -112,7 +131,7 @@ SCENARIOS = (
         "timed_out",
         "monitor_timeout",
         TIMEOUT_FAILURE,
-        STANDARD_CALLS[:3],
+        (*STANDARD_CALLS[:3], STATUS_CALL),
     ),
     FaultScenario(
         "execute_incomplete",
@@ -120,7 +139,7 @@ SCENARIOS = (
         "failed",
         "execution_incomplete",
         GENERIC_FAILURE,
-        STANDARD_CALLS,
+        (*STANDARD_CALLS, STATUS_CALL),
     ),
     FaultScenario(
         "execute_skill_mismatch",
@@ -128,7 +147,7 @@ SCENARIOS = (
         "failed",
         "execution_skill_mismatch",
         GENERIC_FAILURE,
-        STANDARD_CALLS,
+        (*STANDARD_CALLS, STATUS_CALL),
     ),
     FaultScenario(
         "execute_timeout",
@@ -136,7 +155,7 @@ SCENARIOS = (
         "timed_out",
         "execute_timeout",
         TIMEOUT_FAILURE,
-        STANDARD_CALLS,
+        (*STANDARD_CALLS, STATUS_CALL),
     ),
     FaultScenario(
         "execute_disconnect",
@@ -144,7 +163,7 @@ SCENARIOS = (
         "failed",
         "execute_failed_retryable",
         GENERIC_FAILURE,
-        STANDARD_CALLS,
+        (*STANDARD_CALLS, STATUS_CALL),
     ),
     FaultScenario(
         "runtime_timeout_cancel",
@@ -152,7 +171,7 @@ SCENARIOS = (
         "timed_out",
         "timeout",
         TIMEOUT_FAILURE,
-        CANCEL_CALLS,
+        (*CANCEL_CALLS, STATUS_CALL),
         request_timeout_ms=10,
     ),
     FaultScenario(
@@ -161,7 +180,7 @@ SCENARIOS = (
         None,
         None,
         ("Starting.",),
-        CANCEL_CALLS,
+        (*CANCEL_CALLS, STATUS_CALL),
         operator_cancel=True,
     ),
 )
@@ -173,6 +192,7 @@ class ScenarioInvoker:
         self.scenario = scenario
         self.calls: list[str] = []
         self.execute_started = asyncio.Event()
+        self.execute_started_at: float | None = None
 
     async def invoke(
         self,
@@ -230,6 +250,7 @@ class ScenarioInvoker:
                 )
             return ToolCallOutcome.success({"ok": True, "event": None})
         if tool_name == "soridormi.skill.execute_plan":
+            self.execute_started_at = time.perf_counter()
             self.execute_started.set()
             if scenario_id in {"runtime_timeout_cancel", "operator_cancel"}:
                 await asyncio.sleep(5)
@@ -256,10 +277,65 @@ class ScenarioInvoker:
             )
         if tool_name == "soridormi.motion.cancel":
             return ToolCallOutcome.success({"cancelled": True})
+        if tool_name == STATUS_CALL:
+            return ToolCallOutcome.success(
+                {
+                    "mode": "sim",
+                    "active_task": None,
+                    "emergency_stop": False,
+                }
+            )
         return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
 
 
-async def run_scenario(scenario: FaultScenario) -> ScenarioResult:
+def threshold_violations(
+    scenario: FaultScenario,
+    *,
+    elapsed_ms: float,
+    terminal_latency_ms: float | None,
+    thresholds: MatrixThresholds,
+) -> tuple[str, ...]:
+    violations: list[str] = []
+    if elapsed_ms > thresholds.max_scenario_ms:
+        violations.append(
+            f"scenario elapsed {elapsed_ms:.3f}ms exceeds "
+            f"{thresholds.max_scenario_ms:.3f}ms"
+        )
+    if (
+        scenario.expected_body_status == "timed_out"
+        and terminal_latency_ms is not None
+        and terminal_latency_ms > thresholds.max_timeout_terminal_ms
+    ):
+        violations.append(
+            f"timeout terminal latency {terminal_latency_ms:.3f}ms exceeds "
+            f"{thresholds.max_timeout_terminal_ms:.3f}ms"
+        )
+    if (
+        scenario.operator_cancel
+        and terminal_latency_ms is not None
+        and terminal_latency_ms > thresholds.max_cancel_terminal_ms
+    ):
+        violations.append(
+            f"cancel terminal latency {terminal_latency_ms:.3f}ms exceeds "
+            f"{thresholds.max_cancel_terminal_ms:.3f}ms"
+        )
+    return tuple(violations)
+
+
+def is_safe_idle(status: dict[str, Any]) -> bool:
+    return (
+        status.get("active_task") is None
+        and status.get("emergency_stop") is False
+    )
+
+
+async def run_scenario(
+    scenario: FaultScenario,
+    *,
+    thresholds: MatrixThresholds | None = None,
+) -> ScenarioResult:
+    thresholds = thresholds or MatrixThresholds()
+    started_at = time.perf_counter()
     spoken: list[str] = []
     invoker = ScenarioInvoker(scenario)
     coordinator = InteractionRuntimeCoordinator(
@@ -287,8 +363,15 @@ async def run_scenario(scenario: FaultScenario) -> ScenarioResult:
     )
     if scenario.operator_cancel:
         await asyncio.wait_for(invoker.execute_started.wait(), timeout=1)
+        invoker.execute_started_at = time.perf_counter()
         task.cancel()
     execution = await task
+    execution_finished_at = time.perf_counter()
+    terminal_latency_ms = (
+        (execution_finished_at - invoker.execute_started_at) * 1000
+        if invoker.execute_started_at is not None
+        else None
+    )
     body_result = next(
         (
             result
@@ -300,13 +383,32 @@ async def run_scenario(scenario: FaultScenario) -> ScenarioResult:
     actual_body_status = body_result.status if body_result else None
     actual_reason = body_result.reason_code if body_result else None
     actual_speech = tuple(spoken)
+    status_outcome = await invoker.invoke(STATUS_CALL, {})
+    post_status = (
+        status_outcome.output
+        if status_outcome.status == "success"
+        else {
+            "status": status_outcome.status,
+            "error": status_outcome.error,
+        }
+    )
+    safe_idle = status_outcome.status == "success" and is_safe_idle(post_status)
+    elapsed_ms = (time.perf_counter() - started_at) * 1000
     actual_calls = tuple(invoker.calls)
+    violations = threshold_violations(
+        scenario,
+        elapsed_ms=elapsed_ms,
+        terminal_latency_ms=terminal_latency_ms,
+        thresholds=thresholds,
+    )
     passed = (
         execution.status == scenario.expected_status
         and actual_body_status == scenario.expected_body_status
         and actual_reason == scenario.expected_reason
         and actual_speech == scenario.expected_speech
         and actual_calls == scenario.expected_calls
+        and safe_idle
+        and not violations
     )
     return ScenarioResult(
         scenario_id=scenario.scenario_id,
@@ -321,22 +423,64 @@ async def run_scenario(scenario: FaultScenario) -> ScenarioResult:
         actual_speech=actual_speech,
         expected_calls=scenario.expected_calls,
         actual_calls=actual_calls,
+        elapsed_ms=round(elapsed_ms, 3),
+        terminal_latency_ms=(
+            round(terminal_latency_ms, 3)
+            if terminal_latency_ms is not None
+            else None
+        ),
+        safe_idle=safe_idle,
+        post_status=post_status,
+        threshold_violations=violations,
     )
 
 
 async def run_matrix(
     scenario_ids: Sequence[str] | None = None,
+    *,
+    thresholds: MatrixThresholds | None = None,
 ) -> dict[str, Any]:
+    thresholds = thresholds or MatrixThresholds()
     selected = (
         list(SCENARIOS)
         if not scenario_ids
         else [SCENARIOS_BY_ID[scenario_id] for scenario_id in scenario_ids]
     )
-    results = [await run_scenario(scenario) for scenario in selected]
+    results = [
+        await run_scenario(scenario, thresholds=thresholds)
+        for scenario in selected
+    ]
+    status_counts: dict[str, int] = {}
+    reason_counts: dict[str, int] = {}
+    for result in results:
+        status_counts[result.actual_status] = (
+            status_counts.get(result.actual_status, 0) + 1
+        )
+        if result.actual_reason:
+            reason_counts[result.actual_reason] = (
+                reason_counts.get(result.actual_reason, 0) + 1
+            )
+    terminal_latencies = [
+        result.terminal_latency_ms
+        for result in results
+        if result.terminal_latency_ms is not None
+    ]
     return {
         "matrix_version": MATRIX_VERSION,
         "passed": all(result.passed for result in results),
         "scenario_count": len(results),
+        "thresholds_ms": asdict(thresholds),
+        "summary": {
+            "passed_count": sum(result.passed for result in results),
+            "failed_count": sum(not result.passed for result in results),
+            "safe_idle_count": sum(result.safe_idle for result in results),
+            "status_counts": status_counts,
+            "reason_counts": reason_counts,
+            "max_elapsed_ms": max(result.elapsed_ms for result in results),
+            "max_terminal_latency_ms": (
+                max(terminal_latencies) if terminal_latencies else None
+            ),
+        },
         "results": [asdict(result) for result in results],
     }
 
@@ -361,12 +505,20 @@ def main() -> int:
         help="Comma-separated scenario IDs or 'all'.",
     )
     parser.add_argument("--output", help="Optional JSON output path.")
+    parser.add_argument("--max-scenario-ms", type=float, default=1000.0)
+    parser.add_argument("--max-timeout-terminal-ms", type=float, default=500.0)
+    parser.add_argument("--max-cancel-terminal-ms", type=float, default=250.0)
     args = parser.parse_args()
     try:
         selected = parse_scenario_ids(args.scenarios)
+        thresholds = MatrixThresholds(
+            max_scenario_ms=args.max_scenario_ms,
+            max_timeout_terminal_ms=args.max_timeout_terminal_ms,
+            max_cancel_terminal_ms=args.max_cancel_terminal_ms,
+        )
     except ValueError as exc:
         parser.error(str(exc))
-    payload = asyncio.run(run_matrix(selected))
+    payload = asyncio.run(run_matrix(selected, thresholds=thresholds))
     rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         output_path = Path(args.output).expanduser()

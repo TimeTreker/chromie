@@ -291,8 +291,16 @@ To retain a focused replayable summary:
 ```bash
 python scripts/provider_fault_matrix.py \
   --scenarios monitor_refused,execute_timeout,operator_cancel \
+  --max-cancel-terminal-ms 250 \
   --output .chromie/provider-fault-matrix.json
 ```
+
+The JSON summary includes status and reason distributions, maximum elapsed
+time, maximum terminal latency, active thresholds, and per-scenario threshold
+violations. Declare tighter target thresholds explicitly rather than changing
+the scenario semantics. Every scenario also ends with
+`soridormi.robot.get_status`; a non-empty `active_task`, active emergency stop,
+or failed status read fails the matrix.
 
 Run the provider-neutral conformance contract against both local no-motion
 profiles:

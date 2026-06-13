@@ -1,6 +1,6 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `56db778`
+**Last committed Chromie base:** `94ecef0`
 **Pinned Soridormi capability revision:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
 **Verified date:** 2026-06-14
 **Current focus:** Robust simulation and provider readiness development while
@@ -32,8 +32,8 @@ release gate.
    `hardware_dry_run` providers when available.
 2. Run the versioned Chromie fault matrix against Soridormi-owned injected
    faults when that endpoint is available.
-3. Add thresholds for timeout, cancellation,
-   and safe terminal behavior.
+3. Retain live scenario summaries against declared target thresholds and verify
+   safe idle from Soridormi status.
 4. On Linux, resume the full `synthetic`, `virtual-mic`, and `supervised` alpha
    matrices.
 5. Clear the compatibility blocker and publish `0.1.0-alpha.1` only after that
@@ -45,7 +45,7 @@ conformance work. Do not start physical motion ahead of that gate.
 ## Verification baseline
 
 ```text
-189 current unittest cases passed
+192 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```
