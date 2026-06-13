@@ -1,7 +1,7 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Verified base revision:** `665c7a5` plus the current provider-readiness patch;
+**Verified base revision:** `4ba7d1d` plus the current provider-readiness patch;
 release tooling records the exact packaged revision
 **Verified date:** 2026-06-14
 **Current focus:** **Robust simulation and provider readiness development;
@@ -45,7 +45,7 @@ Target validation or Release readiness.
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean automatic and supervised approval/denial bundles still open | Structured path; simulator exemption configurable |
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; microphone retention still open | Available in structured path |
 | Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Provider flag off |
-| Provider failure normalization | Strict plan/monitor/completion validation, stable timeout/cancellation terminal states, and deterministic language-matched speech fallback that suppresses false completion speech | Malformed completion, mismatched identity, disconnect-during-cancel, timeout, fallback, and completion-suppression tests | Fault-injected live scenario retention remains open | Used by Soridormi named skills |
+| Provider failure normalization | Strict plan/monitor/completion validation, stable timeout/cancellation terminal states, deterministic language-matched speech fallback, and a versioned 12-scenario replayable fault matrix | Matrix plus malformed completion, mismatched identity, disconnect-during-cancel, timeout, fallback, and completion-suppression tests | Soridormi-owned live fault injection and retention remain open | Used by Soridormi named skills |
 | Conversation state across VAD utterances | Implemented in host memory | Boundary, follow-up, and limit tests | Available in the host Orchestrator | Enabled by `.env.common` |
 | Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and three explicit modes implemented | Preflight, synthetic/virtual-mic framing, isolation, and bundle-verification tests | Only supervised mode is release-closing; reviewed bundle still open | Acceptance-only |
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
@@ -69,7 +69,7 @@ The repository test command is:
 
 At the current working revision it runs:
 
-- **183** current `unittest` cases under `tests/`;
+- **186** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 

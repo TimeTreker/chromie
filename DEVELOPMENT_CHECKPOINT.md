@@ -1,6 +1,6 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `3ecbd90`
+**Last committed Chromie base:** `4ba7d1d`
 **Pinned Soridormi capability revision:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
 **Verified date:** 2026-06-14
 **Current focus:** Robust simulation and provider readiness development while
@@ -28,10 +28,11 @@ release gate.
 
 ## Next sequence
 
-1. Add repeatable provider fault scenarios and stable expected terminal states.
-2. Define provider conformance cases shared by simulator and future no-motion
+1. Define provider conformance cases shared by simulator and future no-motion
    physical-provider skeletons.
-3. Add replayable scenario summaries and thresholds for timeout, cancellation,
+2. Run the versioned Chromie fault matrix against Soridormi-owned injected
+   faults when that endpoint is available.
+3. Add thresholds for timeout, cancellation,
    and safe terminal behavior.
 4. On Linux, resume the full `synthetic`, `virtual-mic`, and `supervised` alpha
    matrices.
@@ -44,7 +45,7 @@ conformance work. Do not start physical motion ahead of that gate.
 ## Verification baseline
 
 ```text
-183 current unittest cases passed
+186 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```
@@ -63,6 +64,7 @@ python scripts/m13_voice_acceptance.py --dry-run \
 python scripts/m13_voice_acceptance.py --preflight-only \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi --start-services
+python scripts/provider_fault_matrix.py
 ```
 
 Live commands and recovery procedures are maintained in

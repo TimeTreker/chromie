@@ -168,6 +168,23 @@ SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
 The scripts, environment variables, and evidence directory retain the
 historical `m13` identifier for compatibility.
 
+## Provider fault matrix
+
+The Chromie-side provider matrix runs without Docker, audio devices, a live MCP
+endpoint, or MuJoCo:
+
+```bash
+python scripts/provider_fault_matrix.py
+```
+
+It executes versioned deterministic scenarios for plan, safety-monitor,
+execution, timeout, disconnect, malformed-result, runtime-cancellation, and
+operator-cancellation behavior. Each result compares the interaction terminal
+state, body-skill terminal state, reason code, user-facing speech, and exact
+tool-call sequence. Use `--scenarios` for a subset and `--output` to retain a
+machine-readable JSON summary. This is automated contract evidence, not live
+simulator or hardware validation.
+
 `scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.

@@ -280,6 +280,20 @@ SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
 
 The command names and evidence paths retain the historical `m13` identifier.
 
+Before live simulator work, run the dependency-free provider fault matrix:
+
+```bash
+python scripts/provider_fault_matrix.py
+```
+
+To retain a focused replayable summary:
+
+```bash
+python scripts/provider_fault_matrix.py \
+  --scenarios monitor_refused,execute_timeout,operator_cancel \
+  --output .chromie/provider-fault-matrix.json
+```
+
 Run the automatic synthetic matrix first. It generates input WAV files with the
 existing TTS service and injects them through the Orchestrator's private stdin
 audio path, so the test still crosses VAD, ASR, Router, native Agent output,
