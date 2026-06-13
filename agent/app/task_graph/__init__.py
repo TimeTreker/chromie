@@ -23,6 +23,7 @@ from .service import (
     TaskGraphConfirmationGrantRequest,
     TaskGraphConfirmationGrantResponse,
     TaskGraphGuardedExecuteRequest,
+    TaskGraphSchedulerStatus,
     TaskGraphService,
     TaskGraphValidationResponse,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "TaskGraphExecuteRequest",
     "TaskGraphExecutionProofs",
     "TaskGraphGuardedExecuteRequest",
+    "TaskGraphSchedulerStatus",
     "TaskGraphPlanner",
     "TaskGraphService",
     "TaskGraphValidationResponse",

@@ -344,9 +344,24 @@ async def run_soridormi_runtime_cancellation_acceptance(
         raise ValueError("cancel_after_s must be non-negative")
 
     execution_started = asyncio.Event()
+    previous_call_started = None
+    observed_invoker: AsyncToolInvoker = invoker
+    if isinstance(invoker, McpStreamableHttpInvoker):
+        previous_call_started = invoker.call_started
+
+        def call_started(tool_name: str) -> None:
+            if previous_call_started is not None:
+                previous_call_started(tool_name)
+            if tool_name == "soridormi.motion.execute_plan":
+                execution_started.set()
+
+        invoker.call_started = call_started
+    else:
+        observed_invoker = _ExecutePlanObserver(invoker, execution_started)
+
     service = TaskGraphService(
         registry,
-        guarded_invoker=_ExecutePlanObserver(invoker, execution_started),
+        guarded_invoker=observed_invoker,
         allow_physical_motion=True,
     )
     graph = build_soridormi_guarded_graph(
@@ -365,6 +380,14 @@ async def run_soridormi_runtime_cancellation_acceptance(
     try:
         await asyncio.wait_for(execution_started.wait(), timeout=start_timeout_s)
         await asyncio.sleep(cancel_after_s)
+        try:
+            await asyncio.wait_for(asyncio.shield(execution), timeout=0.01)
+        except TimeoutError:
+            pass
+        else:
+            raise RuntimeError(
+                "Soridormi operation completed before cancellation was requested"
+            )
         cancellation = service.cancel_execution(graph.graph_id)
         if not cancellation.cancellation_requested:
             raise RuntimeError(
@@ -376,6 +399,9 @@ async def run_soridormi_runtime_cancellation_acceptance(
             service.cancel_execution(graph.graph_id)
             await asyncio.gather(execution, return_exceptions=True)
         raise
+    finally:
+        if isinstance(invoker, McpStreamableHttpInvoker):
+            invoker.call_started = previous_call_started
 
     results = trace.result_map()
     if (
@@ -386,7 +412,8 @@ async def run_soridormi_runtime_cancellation_acceptance(
         or results["emergency"].status != "success"
     ):
         raise RuntimeError(
-            "Soridormi runtime cancellation did not complete the emergency fallback"
+            "Soridormi runtime cancellation did not complete the emergency fallback: "
+            f"trace={trace.model_dump(mode='json')}"
         )
 
     status = await invoker.invoke("soridormi.robot.get_status", {})

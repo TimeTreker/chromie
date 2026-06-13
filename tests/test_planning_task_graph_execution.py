@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from typing import Any
 
@@ -138,6 +139,41 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaisesRegex(ValueError, "physical_motion"):
             await service.execute_planning(graph)
+
+    async def test_independent_planning_nodes_can_overlap(self) -> None:
+        active = 0
+        peak = 0
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0.02)
+            active -= 1
+            return {"structuredContent": {"ok": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            planning_invoker=McpStreamableHttpInvoker(registry, call=call),
+            enable_parallel_execution=True,
+            max_concurrency=2,
+        )
+        graph = TaskGraph.model_validate(
+            {
+                "graph_id": "parallel-planning",
+                "created_by": "system",
+                "nodes": [
+                    {"id": "plan-a", "tool": "remote.create_plan", "type": "plan"},
+                    {"id": "plan-b", "tool": "remote.create_plan", "type": "plan"},
+                ],
+            }
+        )
+
+        trace = await service.execute_planning(graph)
+
+        self.assertEqual(trace.status, "success")
+        self.assertEqual(peak, 2)
 
 
 if __name__ == "__main__":

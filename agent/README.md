@@ -173,6 +173,17 @@ Read-only graph execution can be enabled separately with
 `POST /task-graphs/execute-read-only` endpoint preflights the whole graph and
 accepts only side-effect-free `safe_read` and `planning_only` capabilities.
 
+Independent read-only and planning nodes can run concurrently with:
+
+```env
+AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION=1
+AGENT_TASK_GRAPH_MAX_CONCURRENCY=4
+```
+
+This path is default-off, bounded, honors capability `can_run_parallel` and
+`exclusive_group` policy, and returns results in deterministic node order.
+Guarded and physical execution remain sequential.
+
 Supervised side effects use `POST /task-graphs/execute-guarded` and require
 `AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=1` plus an operator bearer token in
 `AGENT_TASK_GRAPH_EXECUTION_TOKEN`. Confirmation is bound to named confirmation

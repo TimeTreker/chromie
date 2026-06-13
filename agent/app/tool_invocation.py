@@ -105,6 +105,7 @@ class FunctionToolInvoker:
 
 
 McpCall = Callable[[str, str, dict[str, Any], float], Awaitable[Any]]
+McpCallStarted = Callable[[str], None]
 
 
 class McpStreamableHttpInvoker:
@@ -117,10 +118,13 @@ class McpStreamableHttpInvoker:
         timeout_s: float = 30.0,
         trust_env: bool = False,
         call: McpCall | None = None,
+        call_started: McpCallStarted | None = None,
     ) -> None:
         self.registry = registry
         self.timeout_s = timeout_s
         self.trust_env = trust_env
+        self.call_started = call_started
+        self._uses_sdk_call = call is None
         self._call = call or self._call_with_sdk
 
     async def invoke(
@@ -150,12 +154,27 @@ class McpStreamableHttpInvoker:
 
         timeout_s = capability.execution.timeout_s or self.timeout_s
         try:
+            if not self._uses_sdk_call and self.call_started is not None:
+                self.call_started(tool_name)
             raw = await self._call(transport.url, tool_name, args, timeout_s)
         except TimeoutError as exc:
             return ToolCallOutcome(status="timeout", error=str(exc) or "MCP tool timeout")
         except Exception as exc:
-            return ToolCallOutcome.failed(str(exc) or exc.__class__.__name__, retryable=True)
+            return ToolCallOutcome.failed(
+                self._exception_message(exc),
+                retryable=True,
+            )
         return self._normalize_result(raw)
+
+    @classmethod
+    def _exception_message(cls, exc: BaseException) -> str:
+        if isinstance(exc, BaseExceptionGroup):
+            nested = "; ".join(
+                cls._exception_message(item)
+                for item in exc.exceptions
+            )
+            return f"{exc.__class__.__name__}: {nested}"
+        return str(exc) or exc.__class__.__name__
 
     def _policy_error(
         self,
@@ -196,6 +215,8 @@ class McpStreamableHttpInvoker:
             async with streamable_http_client(url, http_client=http_client) as (read, write, _):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
+                    if self.call_started is not None:
+                        self.call_started(tool_name)
                     return await session.call_tool(tool_name, args)
 
     def _normalize_result(self, raw: Any) -> ToolCallOutcome:

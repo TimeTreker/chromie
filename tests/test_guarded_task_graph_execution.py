@@ -168,6 +168,106 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, ["remote.write"])
         self.assertTrue(trace.result_map()["confirm"].output["confirmed"])
 
+    async def test_independent_guarded_non_physical_nodes_can_overlap(self) -> None:
+        active = 0
+        peak = 0
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0.02)
+            active -= 1
+            return {"structuredContent": {"written": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+            enable_parallel_execution=True,
+            max_concurrency=2,
+        )
+        graph = TaskGraph.model_validate(
+            {
+                "graph_id": "parallel-guarded-write",
+                "created_by": "user",
+                "nodes": [
+                    {
+                        "id": "confirm",
+                        "tool": "chromie.ask_confirmation",
+                        "type": "confirmation",
+                        "args": {"question": "Write both values?"},
+                    },
+                    {
+                        "id": "write-a",
+                        "tool": "remote.write",
+                        "type": "action",
+                        "depends_on": ["confirm"],
+                    },
+                    {
+                        "id": "write-b",
+                        "tool": "remote.write",
+                        "type": "action",
+                        "depends_on": ["confirm"],
+                    },
+                ],
+            }
+        )
+
+        trace = await service.execute_guarded(
+            graph,
+            self._grant(service, graph),
+        )
+
+        self.assertEqual(trace.status, "success")
+        self.assertEqual(peak, 2)
+        self.assertEqual(
+            [result.node_id for result in trace.node_results],
+            ["confirm", "write-a", "write-b"],
+        )
+
+    async def test_parallel_flag_keeps_physical_nodes_sequential(self) -> None:
+        active = 0
+        peak = 0
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+            if tool == "remote.monitor":
+                return {"structuredContent": {"active": True}}
+            return {"structuredContent": {"completed": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+            allow_physical_motion=True,
+            enable_parallel_execution=True,
+            max_concurrency=4,
+        )
+        graph = _physical_graph()
+
+        trace = await service.execute_guarded(
+            graph,
+            self._grant(service, graph),
+        )
+
+        self.assertEqual(trace.status, "success")
+        self.assertEqual(peak, 1)
+
     async def test_missing_confirmation_rejects_before_remote_call(self) -> None:
         calls = 0
 
@@ -281,14 +381,24 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancellation_cancels_inflight_motion_and_runs_emergency_stop(self) -> None:
         calls: list[str] = []
         motion_started = asyncio.Event()
+        emergency_applied = asyncio.Event()
+        motion_transport_cancelled = False
 
         async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float) -> dict[str, Any]:
+            nonlocal motion_transport_cancelled
             calls.append(tool)
             if tool == "remote.monitor":
                 return {"structuredContent": {"active": True}}
             if tool == "remote.move":
                 motion_started.set()
-                await asyncio.Event().wait()
+                try:
+                    await emergency_applied.wait()
+                except asyncio.CancelledError:
+                    motion_transport_cancelled = True
+                    raise
+                return {"structuredContent": {"completed": False}}
+            if tool == "remote.emergency_stop":
+                emergency_applied.set()
             return {"structuredContent": {"stopped": True}}
 
         registry = _registry()
@@ -311,6 +421,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, ["remote.monitor", "remote.move", "remote.emergency_stop"])
         self.assertEqual(trace.result_map()["move"].status, "cancelled")
         self.assertEqual(trace.result_map()["emergency"].status, "success")
+        self.assertFalse(motion_transport_cancelled)
         self.assertFalse(service.cancel_execution(graph.graph_id).cancellation_requested)
 
     async def test_physical_failure_runs_emergency_stop(self) -> None:
@@ -341,6 +452,46 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, ["remote.monitor", "remote.move", "remote.emergency_stop"])
         self.assertEqual(trace.result_map()["move"].status, "failed_fatal")
         self.assertEqual(trace.result_map()["emergency"].status, "success")
+
+    async def test_emergency_fallback_retries_transient_transport_failure(self) -> None:
+        emergency_attempts = 0
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ):
+            nonlocal emergency_attempts
+            if tool == "remote.monitor":
+                return {"structuredContent": {"active": True}}
+            if tool == "remote.move":
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": "motion fault"}],
+                }
+            if tool == "remote.emergency_stop":
+                emergency_attempts += 1
+                if emergency_attempts == 1:
+                    raise ConnectionError("transient transport reset")
+            return {"structuredContent": {"stopped": True}}
+
+        registry = _registry()
+        registry.get_tool("remote.emergency_stop").execution.idempotent = True
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(registry, call=call),
+            allow_physical_motion=True,
+        )
+        graph = _physical_graph()
+
+        trace = await service.execute_guarded(
+            graph,
+            self._grant(service, graph),
+        )
+
+        self.assertEqual(trace.result_map()["emergency"].status, "success")
+        self.assertEqual(trace.result_map()["emergency"].attempts, 2)
 
     async def test_normal_failure_uses_stop_with_emergency_path_declared(self) -> None:
         calls: list[str] = []
@@ -425,6 +576,7 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancellation_uses_emergency_path_not_normal_stop(self) -> None:
         calls: list[str] = []
         motion_started = asyncio.Event()
+        emergency_applied = asyncio.Event()
 
         async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
             calls.append(tool)
@@ -432,7 +584,10 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
                 return {"structuredContent": {"active": True}}
             if tool == "remote.move":
                 motion_started.set()
-                await asyncio.Event().wait()
+                await emergency_applied.wait()
+                return {"structuredContent": {"completed": False}}
+            if tool == "remote.emergency_stop":
+                emergency_applied.set()
             return {"structuredContent": {"stopped": True}}
 
         registry = _registry()

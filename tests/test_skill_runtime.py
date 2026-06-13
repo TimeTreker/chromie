@@ -27,6 +27,8 @@ def _body_definition(
     timeout_ms: int = 1000,
     requires_confirmation: bool = False,
     interruptible: bool = True,
+    can_run_parallel: bool = True,
+    exclusive_group: str | None = "soridormi.robot_motion",
 ) -> SkillDefinition:
     return SkillDefinition(
         skill_id=skill_id,
@@ -43,7 +45,8 @@ def _body_definition(
         timeout_ms=timeout_ms,
         requires_confirmation=requires_confirmation,
         interruptible=interruptible,
-        exclusive_group="soridormi.robot_motion",
+        can_run_parallel=can_run_parallel,
+        exclusive_group=exclusive_group,
     )
 
 
@@ -129,6 +132,205 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         timestamps = dict(events)
         self.assertLess(timestamps["body_start"], timestamps["speech_end"])
         self.assertLess(timestamps["speech_start"], timestamps["body_end"])
+
+    async def test_parallel_batch_is_bounded_and_results_stay_ordered(self) -> None:
+        active = 0
+        peak = 0
+
+        class VariableProvider(MockSkillProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                nonlocal active, peak
+                active += 1
+                peak = max(peak, active)
+                await asyncio.sleep(float(request.args["delay_s"]))
+                active -= 1
+                return await super().execute(request, definition, context)
+
+        registry = SkillRegistry()
+        for index in range(3):
+            registry.register(
+                SkillDefinition(
+                    skill_id=f"test.skill_{index}",
+                    provider_id="mock.body",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"delay_s": {"type": "number"}},
+                        "required": ["delay_s"],
+                        "additionalProperties": False,
+                    },
+                    exclusive_group=None,
+                )
+            )
+        provider = VariableProvider("mock.body")
+        runtime = SkillRuntime(registry, max_concurrency=2)
+
+        runtime.register_provider(provider)
+        execution = await runtime.execute(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": f"request-{index}",
+                        "skill_id": f"test.skill_{index}",
+                        "args": {"delay_s": delay},
+                        "timing": "parallel",
+                    }
+                    for index, delay in enumerate((0.04, 0.01, 0.02))
+                ]
+            )
+        )
+
+        self.assertEqual(peak, 2)
+        self.assertEqual(
+            [result.request_id for result in execution.results],
+            ["request-0", "request-1", "request-2"],
+        )
+
+    async def test_exclusive_group_spans_concurrent_interactions(self) -> None:
+        active = 0
+        peak = 0
+
+        class ExclusiveProvider(MockSkillProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                nonlocal active, peak
+                active += 1
+                peak = max(peak, active)
+                await asyncio.sleep(0.02)
+                active -= 1
+                return await super().execute(request, definition, context)
+
+        registry = SkillRegistry()
+        registry.register(_body_definition())
+        provider = ExclusiveProvider("mock.body")
+        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime.register_provider(provider)
+
+        await asyncio.gather(
+            runtime.execute(
+                InteractionResponse(
+                    interaction_id="interaction-a",
+                    skills=[
+                        {
+                            "request_id": "same-request",
+                            "skill_id": "soridormi.nod_yes",
+                        }
+                    ],
+                )
+            ),
+            runtime.execute(
+                InteractionResponse(
+                    interaction_id="interaction-b",
+                    skills=[
+                        {
+                            "request_id": "same-request",
+                            "skill_id": "soridormi.nod_yes",
+                        }
+                    ],
+                )
+            ),
+        )
+
+        self.assertEqual(peak, 1)
+
+    async def test_duplicate_request_ids_do_not_collide_across_interactions(self) -> None:
+        cancelled_interactions: list[str] = []
+
+        class CollisionProvider(MockSkillProvider):
+            async def cancel(self, request, definition, context):  # type: ignore[no-untyped-def]
+                cancelled_interactions.append(context.interaction_id)
+                await super().cancel(request, definition, context)
+
+        provider = CollisionProvider("mock.body", delay_s=5)
+        registry = SkillRegistry()
+        registry.register(
+            _body_definition(
+                exclusive_group=None,
+            )
+        )
+        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime.register_provider(provider)
+
+        executions = [
+            asyncio.create_task(
+                runtime.execute(
+                    InteractionResponse(
+                        interaction_id=interaction_id,
+                        skills=[
+                            {
+                                "request_id": "shared-request",
+                                "skill_id": "soridormi.nod_yes",
+                            }
+                        ],
+                    )
+                )
+            )
+            for interaction_id in ("interaction-a", "interaction-b")
+        ]
+        while len(provider.calls) < 2:
+            await asyncio.sleep(0)
+
+        await runtime.cancel_all()
+        results = await asyncio.gather(*executions)
+
+        self.assertEqual(set(cancelled_interactions), {"interaction-a", "interaction-b"})
+        self.assertEqual([result.status for result in results], ["cancelled", "cancelled"])
+
+    async def test_cancelling_one_execution_does_not_cancel_another_interaction(self) -> None:
+        release_keep = asyncio.Event()
+
+        class IsolatedProvider(MockSkillProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                if context.interaction_id == "keep":
+                    await release_keep.wait()
+                else:
+                    await asyncio.Event().wait()
+                return await super().execute(request, definition, context)
+
+        provider = IsolatedProvider("mock.body")
+        registry = SkillRegistry()
+        registry.register(_body_definition(exclusive_group=None))
+        runtime = SkillRuntime(registry, max_concurrency=2)
+        runtime.register_provider(provider)
+
+        cancel_task = asyncio.create_task(
+            runtime.execute(
+                InteractionResponse(
+                    interaction_id="cancel",
+                    skills=[
+                        {
+                            "request_id": "cancel-request",
+                            "skill_id": "soridormi.nod_yes",
+                        }
+                    ],
+                )
+            )
+        )
+        keep_task = asyncio.create_task(
+            runtime.execute(
+                InteractionResponse(
+                    interaction_id="keep",
+                    skills=[
+                        {
+                            "request_id": "keep-request",
+                            "skill_id": "soridormi.nod_yes",
+                        }
+                    ],
+                )
+            )
+        )
+        while len(provider.calls) < 2:
+            await asyncio.sleep(0)
+
+        cancel_task.cancel()
+        cancelled = await cancel_task
+        status = runtime.scheduler_status()
+        release_keep.set()
+        kept = await keep_task
+
+        self.assertEqual(cancelled.status, "cancelled")
+        self.assertIn("keep", status.active_interaction_ids)
+        self.assertNotIn("cancel", status.active_interaction_ids)
+        self.assertEqual(kept.status, "completed")
 
     async def test_sequential_requests_preserve_order(self) -> None:
         provider = MockSkillProvider("mock.body")

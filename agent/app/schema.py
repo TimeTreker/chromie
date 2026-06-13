@@ -199,6 +199,11 @@ class HealthResponse(BaseModel):
     task_graph_planning_enabled: bool = False
     read_only_task_graph_execution_enabled: bool = False
     planning_task_graph_execution_enabled: bool = False
+    parallel_task_graph_execution_enabled: bool = False
+    task_graph_max_concurrency: int = 1
+    task_graph_active_count: int = 0
+    task_graph_waiting_count: int = 0
+    active_task_graph_ids: list[str] = Field(default_factory=list)
     guarded_task_graph_execution_enabled: bool = False
     physical_task_graph_execution_enabled: bool = False
 

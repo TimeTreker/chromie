@@ -1,6 +1,6 @@
 # Chromie Roadmap
 
-Last reviewed: June 12, 2026
+Last reviewed: June 13, 2026
 
 Chromie's roadmap is organized around deployable milestones. A milestone is complete only when its code, contracts, tests, and relevant operating documentation agree.
 
@@ -46,6 +46,30 @@ MCP-backed Soridormi body execution.
 3. [Complete] Add an explicit TaskGraph planning path without changing the existing fast conversation path.
 4. [Complete] Implement MCP Streamable HTTP behind `ToolInvoker`, including read-only and supervised side-effect execution.
 5. [Complete] Add single-use graph-bound confirmation grants, execution cancellation, and emergency fallback handling.
+
+## TaskGraph Scheduling Evolution
+
+The post-M4 scheduling plan is accepted with safety amendments. Chromie will
+extend the existing TaskGraph executors and Skill Runtime around a common
+scheduling/reliability contract; it will not add a separate
+`CapabilityDAGRunner`.
+
+1. [Complete local C0] Freeze concurrency, ordering, timeout, retry, and cancellation
+   semantics with characterization tests.
+2. [Complete local C1] Extract execution-local run state and a common bounded resource
+   arbitration contract, with one in-process arbiter per execution host.
+3. [Complete local C2] Enable independent read-only/planning node concurrency behind
+   default-off feature flags with pre-dispatch sequential fallback.
+4. [Complete local C3] Prove timeout, retry, failure-policy, trace, and cancellation
+   parity in sequential and parallel modes.
+5. [Complete local C4] Integrate guarded non-physical work while physical motion,
+   confirmation, monitors, stop, and emergency paths remain conservative.
+6. [Complete simulation C5] Roll out through development and MuJoCo evidence before
+   considering broader enablement.
+
+The detailed decision, amendments, gates, and test matrix are in
+[TaskGraph concurrency and shared scheduling
+decision](docs/task_graph_concurrency_decision.md).
 
 ## M5 Exit Criteria
 
@@ -127,6 +151,20 @@ The detailed design and gates are in
 
 ## Evidence
 
+- June 13, 2026 TaskGraph scheduling C0-C2: shared bounded in-process
+  resource arbiter, explicit execution-local read/planning state, bounded Skill
+  Runtime batches, deterministic parallel TaskGraph results, same-host
+  exclusive groups, non-parallel capability exclusion, retry/backoff and
+  timeout coverage, default-off rollout flags, and sequential fallback; 112
+  unittest cases plus 20 legacy Agent tests pass, and the rebuilt Agent image
+  loads the enabled scheduler configuration
+- June 13, 2026 TaskGraph scheduling C3-C5: sequential/parallel failure-policy
+  parity, sibling cancellation, partial deterministic traces, guarded
+  non-physical concurrency, scheduler health diagnostics, per-interaction
+  Skill Runtime cancellation, and physical-request cleanup before emergency
+  fallback; 122 unittest cases plus 20 legacy Agent tests pass, the live
+  capability probe reports 12/12 tools, and MuJoCo runtime cancellation leaves
+  `active_task=null` with `emergency_stop=true`
 - June 12, 2026 Chromie I0/I1: interaction contract round trips, nested
   low-level-field rejection, registry/schema/version validation, local speech,
   opaque Soridormi MCP planning/execution, parallel and sequential scheduling,

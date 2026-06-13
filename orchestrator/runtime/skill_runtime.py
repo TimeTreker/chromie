@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from shared.chromie_runtime import ResourceArbiter
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -148,12 +149,35 @@ class SkillRuntimeResult(BaseModel):
     traces: list[SkillTrace] = Field(default_factory=list)
 
 
+class SkillRuntimeSchedulerStatus(BaseModel):
+    max_concurrency: int
+    active_count: int
+    waiting_count: int
+    serial_active: bool
+    serial_waiters: int
+    active_interaction_ids: list[str] = Field(default_factory=list)
+
+
 class SkillRuntime:
-    def __init__(self, registry: SkillRegistry) -> None:
+    def __init__(
+        self,
+        registry: SkillRegistry,
+        *,
+        max_concurrency: int = 8,
+        resource_arbiter: ResourceArbiter | None = None,
+    ) -> None:
         self.registry = registry
         self._providers: dict[str, SkillProvider] = {}
-        self._exclusive_locks: dict[str, asyncio.Lock] = {}
-        self._active: dict[str, tuple[asyncio.Task[SkillResult], SkillRequest, SkillDefinition, SkillExecutionContext]] = {}
+        self._resource_arbiter = resource_arbiter or ResourceArbiter(max_concurrency)
+        self._active: dict[
+            tuple[str, str],
+            tuple[
+                asyncio.Task[SkillResult],
+                SkillRequest,
+                SkillDefinition,
+                SkillExecutionContext,
+            ],
+        ] = {}
         self._active_lock = asyncio.Lock()
 
     def register_provider(self, provider: SkillProvider) -> None:
@@ -205,7 +229,9 @@ class SkillRuntime:
                 results.extend(batch_results)
                 traces.extend(batch_traces)
         except asyncio.CancelledError:
-            await asyncio.shield(self.cancel_all())
+            await asyncio.shield(
+                self.cancel_interaction(response.interaction_id)
+            )
             return SkillRuntimeResult(
                 interaction_id=response.interaction_id,
                 status="cancelled",
@@ -222,8 +248,23 @@ class SkillRuntime:
         )
 
     async def cancel_all(self) -> None:
+        await self._cancel_matching(lambda _: True)
+
+    async def cancel_interaction(self, interaction_id: str) -> None:
+        await self._cancel_matching(
+            lambda key: key[0] == interaction_id
+        )
+
+    async def _cancel_matching(
+        self,
+        predicate: Callable[[tuple[str, str]], bool],
+    ) -> None:
         async with self._active_lock:
-            active = list(self._active.values())
+            active = [
+                item
+                for key, item in self._active.items()
+                if predicate(key)
+            ]
         for task, request, definition, context in active:
             if request.cancellable and definition.interruptible:
                 task.cancel()
@@ -240,6 +281,19 @@ class SkillRuntime:
             return_exceptions=True,
         )
         await asyncio.gather(*(item[0] for item in active), return_exceptions=True)
+
+    def scheduler_status(self) -> SkillRuntimeSchedulerStatus:
+        snapshot = self._resource_arbiter.snapshot()
+        return SkillRuntimeSchedulerStatus(
+            max_concurrency=snapshot.max_concurrency,
+            active_count=snapshot.active_count,
+            waiting_count=snapshot.waiting_count,
+            serial_active=snapshot.serial_active,
+            serial_waiters=snapshot.serial_waiters,
+            active_interaction_ids=sorted(
+                {interaction_id for interaction_id, _ in self._active}
+            ),
+        )
 
     def _scheduled_requests(self, response: InteractionResponse) -> list[SkillRequest]:
         before: list[SkillRequest] = []
@@ -333,19 +387,16 @@ class SkillRuntime:
         timeout_s = (request.timeout_ms or definition.timeout_ms) / 1000.0
 
         async def invoke() -> SkillResult:
-            lock = (
-                self._exclusive_locks.setdefault(definition.exclusive_group, asyncio.Lock())
-                if definition.exclusive_group
-                else None
-            )
-            if lock is None:
-                return await provider.execute(request, definition, context)
-            async with lock:
+            async with self._resource_arbiter.claim(
+                can_run_parallel=definition.can_run_parallel,
+                exclusive_group=definition.exclusive_group,
+            ):
                 return await provider.execute(request, definition, context)
 
         task = asyncio.create_task(invoke())
+        active_key = (interaction_id, request.request_id)
         async with self._active_lock:
-            self._active[request.request_id] = (task, request, definition, context)
+            self._active[active_key] = (task, request, definition, context)
         trace.events.append(SkillTraceEvent(type="started"))
         try:
             result = await asyncio.wait_for(task, timeout=timeout_s)
@@ -379,7 +430,7 @@ class SkillRuntime:
             )
         finally:
             async with self._active_lock:
-                self._active.pop(request.request_id, None)
+                self._active.pop(active_key, None)
 
         result.trace_id = trace.trace_id
         trace.status = result.status

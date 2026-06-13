@@ -326,6 +326,7 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
         registry = self._registry()
         calls: list[str] = []
         emergency_active = False
+        emergency_applied = asyncio.Event()
 
         async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
             nonlocal emergency_active
@@ -333,9 +334,11 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             if tool == "soridormi.safety.monitor_motion":
                 return {"structuredContent": {"active": True}}
             if tool == "soridormi.motion.execute_plan":
-                await asyncio.Event().wait()
+                await emergency_applied.wait()
+                return {"structuredContent": {"completed": False}}
             if tool == "soridormi.safety.emergency_stop":
                 emergency_active = True
+                emergency_applied.set()
                 return {"structuredContent": {"stopped": True}}
             if tool == "soridormi.robot.get_status":
                 return {

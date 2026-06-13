@@ -1,6 +1,6 @@
-# Chromie Shared Contracts
+# Chromie Shared Packages
 
-Shared Pydantic schemas for Chromie control-plane services.
+Dependency-light contracts and runtime primitives shared by Chromie processes.
 
 Use this package to keep JSON contracts consistent between:
 
@@ -9,7 +9,14 @@ Use this package to keep JSON contracts consistent between:
 - Docker `chromie-agent`
 - host `chromie-hardware-daemon`
 
-The package is intentionally small and dependency-light.
+The directory currently provides:
+
+- `chromie_contracts`: Pydantic control-plane schemas;
+- `chromie_runtime`: asyncio scheduling primitives used by Agent TaskGraph and
+  host Skill Runtime.
+
+Each process owns its own `ResourceArbiter` instance. This is not a distributed
+lock; Soridormi remains responsible for cross-process robot exclusivity.
 
 ## Install locally during development
 
@@ -24,4 +31,5 @@ Then import:
 from chromie_contracts.route import RouteDecision
 from chromie_contracts.agent import AgentResult
 from chromie_contracts.action import ActionCommand
+from chromie_runtime import ResourceArbiter
 ```

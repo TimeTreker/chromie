@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 
 from pydantic import BaseModel, Field
+
+try:
+    from chromie_runtime import ResourceArbiter
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_runtime import ResourceArbiter
 
 from ..capabilities.models import CapabilityRegistry
 from ..tool_invocation import AsyncToolInvoker
@@ -57,6 +63,16 @@ class TaskGraphCancelResponse(BaseModel):
     cancellation_requested: bool
 
 
+class TaskGraphSchedulerStatus(BaseModel):
+    parallel_enabled: bool
+    max_concurrency: int
+    active_count: int
+    waiting_count: int
+    serial_active: bool
+    serial_waiters: int
+    active_graph_ids: list[str] = Field(default_factory=list)
+
+
 class TaskGraphService:
     """Expose safe TaskGraph validation and dry-run execution to the Agent API."""
 
@@ -68,12 +84,21 @@ class TaskGraphService:
         planning_invoker: AsyncToolInvoker | None = None,
         guarded_invoker: AsyncToolInvoker | None = None,
         allow_physical_motion: bool = False,
+        enable_parallel_execution: bool = False,
+        max_concurrency: int = 4,
     ) -> None:
         self.registry = registry
         self.read_only_invoker = read_only_invoker
         self.planning_invoker = planning_invoker
         self.guarded_invoker = guarded_invoker
         self.allow_physical_motion = allow_physical_motion
+        self.enable_parallel_execution = enable_parallel_execution
+        self.max_concurrency = max_concurrency
+        self._resource_arbiter = (
+            ResourceArbiter(max_concurrency)
+            if enable_parallel_execution
+            else None
+        )
         self._traces: dict[str, ExecutionTrace] = {}
         self._grants = ConfirmationGrantStore()
         self._active_executions: dict[str, asyncio.Task[ExecutionTrace]] = {}
@@ -118,6 +143,9 @@ class TaskGraphService:
                 self.registry,
                 self.guarded_invoker,
                 allow_physical_motion=self.allow_physical_motion,
+                parallel_enabled=self.enable_parallel_execution,
+                resource_arbiter=self._resource_arbiter,
+                max_concurrency=self.max_concurrency,
             ).run(graph, proofs)
             self._traces[graph.graph_id] = trace.model_copy(deep=True)
             return trace
@@ -168,19 +196,74 @@ class TaskGraphService:
     async def execute_read_only(self, graph: TaskGraph) -> ExecutionTrace:
         if self.read_only_invoker is None:
             raise RuntimeError("read-only TaskGraph execution is disabled")
-        trace = await ReadOnlyTaskGraphExecutor(self.registry, self.read_only_invoker).run(graph)
-        self._traces[graph.graph_id] = trace.model_copy(deep=True)
-        return trace
+        return await self._execute_tracked(
+            graph,
+            ReadOnlyTaskGraphExecutor(
+                self.registry,
+                self.read_only_invoker,
+                parallel_enabled=self.enable_parallel_execution,
+                resource_arbiter=self._resource_arbiter,
+                max_concurrency=self.max_concurrency,
+            ).run(graph),
+        )
 
     async def execute_planning(self, graph: TaskGraph) -> ExecutionTrace:
         if self.planning_invoker is None:
             raise RuntimeError("planning TaskGraph execution is disabled")
-        trace = await PlanningTaskGraphExecutor(
-            self.registry,
-            self.planning_invoker,
-        ).run(graph)
-        self._traces[graph.graph_id] = trace.model_copy(deep=True)
-        return trace
+        return await self._execute_tracked(
+            graph,
+            PlanningTaskGraphExecutor(
+                self.registry,
+                self.planning_invoker,
+                parallel_enabled=self.enable_parallel_execution,
+                resource_arbiter=self._resource_arbiter,
+                max_concurrency=self.max_concurrency,
+            ).run(graph),
+        )
+
+    async def _execute_tracked(
+        self,
+        graph: TaskGraph,
+        execution: Awaitable[ExecutionTrace],
+    ) -> ExecutionTrace:
+        if graph.graph_id in self._active_executions:
+            if hasattr(execution, "close"):
+                execution.close()
+            raise RuntimeError(f"TaskGraph {graph.graph_id!r} is already running")
+        task = asyncio.current_task()
+        if task is None:
+            if hasattr(execution, "close"):
+                execution.close()
+            raise RuntimeError("TaskGraph execution requires an asyncio task")
+        self._active_executions[graph.graph_id] = task
+        try:
+            trace = await execution
+            self._traces[graph.graph_id] = trace.model_copy(deep=True)
+            return trace
+        finally:
+            self._active_executions.pop(graph.graph_id, None)
+
+    def scheduler_status(self) -> TaskGraphSchedulerStatus:
+        if self._resource_arbiter is None:
+            return TaskGraphSchedulerStatus(
+                parallel_enabled=False,
+                max_concurrency=self.max_concurrency,
+                active_count=0,
+                waiting_count=0,
+                serial_active=False,
+                serial_waiters=0,
+                active_graph_ids=sorted(self._active_executions),
+            )
+        snapshot = self._resource_arbiter.snapshot()
+        return TaskGraphSchedulerStatus(
+            parallel_enabled=True,
+            max_concurrency=snapshot.max_concurrency,
+            active_count=snapshot.active_count,
+            waiting_count=snapshot.waiting_count,
+            serial_active=snapshot.serial_active,
+            serial_waiters=snapshot.serial_waiters,
+            active_graph_ids=sorted(self._active_executions),
+        )
 
     def get_trace(self, graph_id: str) -> ExecutionTrace | None:
         trace = self._traces.get(graph_id)

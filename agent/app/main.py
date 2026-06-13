@@ -25,6 +25,7 @@ from .task_graph import (
     TaskGraphDryRunRequest,
     TaskGraphExecuteRequest,
     TaskGraphGuardedExecuteRequest,
+    TaskGraphSchedulerStatus,
     TaskGraphPlanner,
     TaskGraphService,
     TaskGraphValidationResponse,
@@ -59,6 +60,20 @@ class Settings(BaseModel):
     enable_planning_task_graph_execution: bool = Field(
         default_factory=lambda: os.getenv("AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION", "0").strip().lower()
         not in {"0", "false", "no", "off"}
+    )
+    enable_parallel_task_graph_execution: bool = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION",
+            "0",
+        ).strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    task_graph_max_concurrency: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_TASK_GRAPH_MAX_CONCURRENCY", "4")
+        ),
+        ge=1,
+        le=64,
     )
     enable_guarded_task_graph_execution: bool = Field(
         default_factory=lambda: os.getenv("AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION", "0").strip().lower()
@@ -129,6 +144,8 @@ task_graph_service = TaskGraphService(
     planning_invoker=planning_invoker,
     guarded_invoker=guarded_invoker,
     allow_physical_motion=settings.enable_physical_task_graph_execution,
+    enable_parallel_execution=settings.enable_parallel_task_graph_execution,
+    max_concurrency=settings.task_graph_max_concurrency,
 )
 logger.info(
     "loaded capability registry sources=%s manifests=%s tools=%d",
@@ -152,6 +169,7 @@ def require_task_graph_execution_auth(authorization: str | None) -> None:
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
+    scheduler = task_graph_service.scheduler_status()
     return HealthResponse(
         ok=True,
         model=settings.model,
@@ -163,6 +181,13 @@ async def health() -> HealthResponse:
         task_graph_planning_enabled=task_graph_planner is not None,
         read_only_task_graph_execution_enabled=read_only_invoker is not None,
         planning_task_graph_execution_enabled=planning_invoker is not None,
+        parallel_task_graph_execution_enabled=(
+            settings.enable_parallel_task_graph_execution
+        ),
+        task_graph_max_concurrency=settings.task_graph_max_concurrency,
+        task_graph_active_count=scheduler.active_count,
+        task_graph_waiting_count=scheduler.waiting_count,
+        active_task_graph_ids=scheduler.active_graph_ids,
         guarded_task_graph_execution_enabled=guarded_invoker is not None,
         physical_task_graph_execution_enabled=(
             guarded_invoker is not None and settings.enable_physical_task_graph_execution
@@ -279,6 +304,11 @@ async def get_task_graph_trace(graph_id: str) -> ExecutionTrace:
     if trace is None:
         raise HTTPException(status_code=404, detail=f"No TaskGraph trace found for {graph_id!r}")
     return trace
+
+
+@app.get("/task-graphs/scheduler/status", response_model=TaskGraphSchedulerStatus)
+async def get_task_graph_scheduler_status() -> TaskGraphSchedulerStatus:
+    return task_graph_service.scheduler_status()
 
 
 @app.post("/run", response_model=AgentResult)

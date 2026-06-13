@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,13 @@ class InteractionRuntimeCoordinator:
     ) -> None:
         self.registry = SkillRegistry()
         self.registry.register(local_speech_definition())
-        self.runtime = SkillRuntime(self.registry)
+        self.runtime = SkillRuntime(
+            self.registry,
+            max_concurrency=max(
+                1,
+                int(os.getenv("ORCH_SKILL_MAX_CONCURRENCY", "8")),
+            ),
+        )
         self.runtime.register_provider(LocalSpeechSkillProvider(speech_scheduler))
         self.soridormi_invoker = soridormi_invoker
         self.auto_confirm_sim = auto_confirm_sim

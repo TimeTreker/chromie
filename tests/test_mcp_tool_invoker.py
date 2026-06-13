@@ -56,6 +56,35 @@ def _registry():
 
 
 class McpToolInvokerTests(unittest.IsolatedAsyncioTestCase):
+    async def test_call_started_callback_runs_at_dispatch(self) -> None:
+        events: list[str] = []
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            events.append(f"call:{tool}")
+            return {"structuredContent": {"standing": True}}
+
+        invoker = McpStreamableHttpInvoker(
+            _registry(),
+            call=call,
+            call_started=lambda tool: events.append(f"started:{tool}"),
+        )
+
+        outcome = await invoker.invoke("soridormi.robot.get_status", {})
+
+        self.assertEqual(outcome.status, "success")
+        self.assertEqual(
+            events,
+            [
+                "started:soridormi.robot.get_status",
+                "call:soridormi.robot.get_status",
+            ],
+        )
+
     async def test_safe_read_uses_manifest_transport_and_structured_content(self) -> None:
         calls: list[tuple[str, str, dict[str, Any], float]] = []
 

@@ -25,6 +25,11 @@ monitor gating, emergency fallbacks, and the existing hardware boundary.
 This layer completed **M4 - TaskGraph production integration**. Real external
 deployment and acceptance are tracked as M5 in the [project roadmap](../ROADMAP.md).
 
+The accepted concurrency direction is to extend these executors and share
+scheduling/reliability semantics with Skill Runtime, not to add a separate DAG
+runner. See [TaskGraph concurrency and shared scheduling
+decision](task_graph_concurrency_decision.md).
+
 ## Agent API
 
 Validate a graph without executing it:
@@ -179,6 +184,49 @@ and accepts `planning_only` nodes such as
 `soridormi.motion.create_plan`. It rejects low-risk actions, safety controls,
 restricted tools, and physical motion before the first MCP call.
 
+## Parallel read and planning execution
+
+Independent read-only and planning nodes can use the shared bounded scheduler:
+
+```env
+AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION=1
+AGENT_TASK_GRAPH_MAX_CONCURRENCY=4
+```
+
+The feature is disabled by default. When disabled, the service selects the
+existing sequential executor behavior before invoking any node.
+
+When enabled:
+
+- only dependency-ready nodes overlap;
+- the configured limit bounds active work across concurrent read/planning
+  graphs in the Agent process;
+- `can_run_parallel=false` excludes all other work while that capability runs;
+- matching `exclusive_group` values serialize across graph executions;
+- node results and result trace events are recorded in deterministic node-ID
+  order, regardless of completion order;
+- node/capability timeouts and node retry/backoff remain active.
+- failure policies can skip, provide defaults, activate validated fallback
+  nodes, or abort and cancel still-running siblings;
+- cancellation retains a partial trace and affects only the requested graph.
+
+Guarded execution may use the same flag for independent non-physical
+`safe_read`, `planning_only`, and `low_risk_action` nodes. Confirmation nodes,
+monitors, safety controls, and all physical-motion nodes remain sequential.
+Disabling the flag affects subsequent executions; an in-flight graph is never
+replayed through the sequential executor.
+
+Scheduler diagnostics are available from:
+
+```text
+GET /health
+GET /task-graphs/scheduler/status
+```
+
+They report the configured mode and limit, active/waiting work, serial claims,
+and active graph IDs. Trace events include deterministic `sequence` and
+`stable_order` presentation metadata.
+
 ## Supervised guarded execution
 
 Guarded side effects require an operator-configured bearer token:
@@ -229,9 +277,11 @@ POST /task-graphs/{graph_id}/cancel
 Authorization: Bearer <long-random-secret>
 ```
 
-Cancellation propagates to the task awaiting the MCP call. If physical
-execution has started, Chromie invokes the declared emergency-stop fallback and
-records a cancelled trace.
+Cancellation marks the physical node cancelled while preserving the in-flight
+MCP request long enough for the declared emergency-stop fallback to preempt it.
+Chromie then drains the original request as cleanup and records the cancelled
+trace. The live acceptance hook observes the actual MCP `tools/call` dispatch
+boundary, so it does not confuse client-session setup with in-flight motion.
 
 This is supervised operator attestation, not yet Chromie's end-user voice
 confirmation workflow.
