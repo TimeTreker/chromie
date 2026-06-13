@@ -38,6 +38,9 @@ Publish a narrowly scoped alpha proving the complete voice, interaction,
 confirmation, named-skill, cancellation, and recovery loop in MuJoCo.
 
 The implementation is complete. Remaining work is evidence and release closure.
+The Linux/GPU, virtual-microphone, and supervised runs are currently deferred
+until development returns to the reference environment. This milestone remains
+an open release gate; its scope is frozen except for defects.
 
 ### Exit criteria
 
@@ -58,6 +61,10 @@ The acceptance scripts and evidence directories still use the historical `m13`
 name. That identifier is retained for compatibility only.
 
 ## Next phase - Robust simulation and provider readiness
+
+Local engineering work is now proceeding here while the alpha target-validation
+gate waits for Linux. Starting this work does not close the alpha, remove its
+release blocker, or make the candidate publishable.
 
 ### Objective
 

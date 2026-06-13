@@ -460,6 +460,66 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execution.results[0].status, "timed_out")
         self.assertEqual(provider.cancelled_request_ids, ["nod-1"])
 
+    async def test_cancel_failure_does_not_override_timeout(self) -> None:
+        class FailingCancelProvider(MockSkillProvider):
+            async def cancel(self, request, definition, context):  # type: ignore[no-untyped-def]
+                raise ConnectionError("provider disconnected during cancellation")
+
+        provider = FailingCancelProvider("mock.body", delay_s=0.2)
+        registry = SkillRegistry()
+        registry.register(_body_definition(timeout_ms=10))
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(provider)
+
+        execution = await runtime.execute(
+            InteractionResponse(
+                skills=[{"request_id": "nod-1", "skill_id": "soridormi.nod_yes"}]
+            )
+        )
+
+        self.assertEqual(execution.status, "failed")
+        self.assertEqual(execution.results[0].status, "timed_out")
+        self.assertEqual(execution.results[0].reason_code, "timeout")
+        self.assertIn(
+            "provider cancellation failed",
+            execution.results[0].message,
+        )
+
+    async def test_cancel_failure_does_not_override_interruption(self) -> None:
+        class FailingCancelProvider(MockSkillProvider):
+            cancel_attempts = 0
+
+            async def cancel(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.cancel_attempts += 1
+                raise ConnectionError("provider disconnected during cancellation")
+
+        provider = FailingCancelProvider("mock.body", delay_s=5)
+        registry = SkillRegistry()
+        registry.register(_body_definition())
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(provider)
+        task = asyncio.create_task(
+            runtime.execute(
+                InteractionResponse(
+                    skills=[
+                        {
+                            "request_id": "nod-1",
+                            "skill_id": "soridormi.nod_yes",
+                        }
+                    ]
+                )
+            )
+        )
+        while not provider.calls:
+            await asyncio.sleep(0)
+
+        task.cancel()
+        execution = await task
+
+        self.assertEqual(execution.status, "cancelled")
+        self.assertEqual(runtime.scheduler_status().active_count, 0)
+        self.assertEqual(provider.cancel_attempts, 1)
+
     async def test_interruption_cancels_all_cancellable_children(self) -> None:
         speech_provider = LocalSpeechSkillProvider(
             lambda args: asyncio.sleep(5, result={"spoken": True})

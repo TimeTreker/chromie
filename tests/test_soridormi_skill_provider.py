@@ -14,8 +14,13 @@ from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class _RecordingInvoker:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        overrides: dict[str, ToolCallOutcome] | None = None,
+    ) -> None:
         self.calls: list[tuple[str, dict[str, Any], ToolInvocationContext | None]] = []
+        self.overrides = overrides or {}
 
     async def invoke(
         self,
@@ -25,6 +30,8 @@ class _RecordingInvoker:
         context: ToolInvocationContext | None = None,
     ) -> ToolCallOutcome:
         self.calls.append((tool_name, args, context))
+        if tool_name in self.overrides:
+            return self.overrides[tool_name]
         if tool_name == "soridormi.skill.create_plan":
             return ToolCallOutcome.success(
                 {
@@ -145,6 +152,65 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                     safety_monitor_active=True,
                 ),
             )
+
+    async def test_execute_requires_explicit_completed_true(self) -> None:
+        invoker = _RecordingInvoker(
+            overrides={
+                "soridormi.skill.execute_plan": ToolCallOutcome.success(
+                    {"skill_id": "nod_yes"}
+                )
+            }
+        )
+
+        execution = await self._runtime(invoker).execute(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "nod-1",
+                        "skill_id": "soridormi.nod_yes",
+                        "args": {"count": 1},
+                    }
+                ]
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids={"nod-1"},
+                safety_monitor_active=True,
+            ),
+        )
+
+        self.assertEqual(execution.status, "failed")
+        self.assertEqual(execution.results[0].reason_code, "execution_incomplete")
+
+    async def test_execute_rejects_mismatched_skill_identity(self) -> None:
+        invoker = _RecordingInvoker(
+            overrides={
+                "soridormi.skill.execute_plan": ToolCallOutcome.success(
+                    {"completed": True, "skill_id": "wave_hand"}
+                )
+            }
+        )
+
+        execution = await self._runtime(invoker).execute(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "nod-1",
+                        "skill_id": "soridormi.nod_yes",
+                        "args": {"count": 1},
+                    }
+                ]
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids={"nod-1"},
+                safety_monitor_active=True,
+            ),
+        )
+
+        self.assertEqual(execution.status, "failed")
+        self.assertEqual(
+            execution.results[0].reason_code,
+            "execution_skill_mismatch",
+        )
 
 
 if __name__ == "__main__":

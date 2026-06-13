@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from typing import Any, Protocol
@@ -18,6 +19,8 @@ from shared.chromie_contracts.interaction import (
     SkillTraceEvent,
     reject_forbidden_low_level_fields,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SkillDefinition(BaseModel):
@@ -114,6 +117,7 @@ class SkillExecutionContext(BaseModel):
     interaction_id: str
     confirmed: bool = False
     safety_monitor_active: bool = False
+    provider_cancel_requested: bool = False
     trace: SkillTrace
 
 
@@ -270,7 +274,8 @@ class SkillRuntime:
                 task.cancel()
         await asyncio.gather(
             *(
-                self._providers[definition.provider_id].cancel(
+                self._cancel_provider(
+                    self._providers[definition.provider_id],
                     request,
                     definition,
                     context,
@@ -401,7 +406,12 @@ class SkillRuntime:
         try:
             result = await asyncio.wait_for(task, timeout=timeout_s)
         except TimeoutError:
-            await provider.cancel(request, definition, context)
+            cancel_error = await self._cancel_provider(
+                provider,
+                request,
+                definition,
+                context,
+            )
             result = SkillResult(
                 request_id=request.request_id,
                 skill_id=request.skill_id,
@@ -409,11 +419,25 @@ class SkillRuntime:
                 status="timed_out",
                 provider_id=definition.provider_id,
                 reason_code="timeout",
-                message=f"skill exceeded {timeout_s:.3f}s timeout",
+                message=(
+                    f"skill exceeded {timeout_s:.3f}s timeout"
+                    + (
+                        f"; provider cancellation failed: {cancel_error}"
+                        if cancel_error
+                        else ""
+                    )
+                ),
             )
         except asyncio.CancelledError:
             if request.cancellable and definition.interruptible:
-                await asyncio.shield(provider.cancel(request, definition, context))
+                await asyncio.shield(
+                    self._cancel_provider(
+                        provider,
+                        request,
+                        definition,
+                        context,
+                    )
+                )
             trace.status = "cancelled"
             trace.finished_at = datetime.now(timezone.utc)
             trace.events.append(SkillTraceEvent(type="cancelled"))
@@ -443,6 +467,31 @@ class SkillRuntime:
             )
         )
         return result, trace
+
+    async def _cancel_provider(
+        self,
+        provider: SkillProvider,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> str | None:
+        if context.provider_cancel_requested:
+            return None
+        context.provider_cancel_requested = True
+        try:
+            await provider.cancel(request, definition, context)
+        except Exception as exc:
+            message = str(exc) or exc.__class__.__name__
+            logger.warning(
+                "Skill provider cancellation failed request_id=%s skill_id=%s "
+                "provider_id=%s error=%s",
+                request.request_id,
+                request.skill_id,
+                definition.provider_id,
+                message,
+            )
+            return message
+        return None
 
 
 SpeechHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]

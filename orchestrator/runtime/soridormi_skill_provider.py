@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Protocol
 
 from agent.app.tool_invocation import (
@@ -10,6 +11,8 @@ from agent.app.tool_invocation import (
 from shared.chromie_contracts.interaction import SkillRequest, SkillResult
 
 from .skill_runtime import SkillDefinition, SkillExecutionContext
+
+logger = logging.getLogger(__name__)
 
 
 class SoridormiInvoker(AsyncToolInvoker, Protocol):
@@ -91,15 +94,35 @@ class SoridormiMcpSkillProvider:
         failure = self._failure_result(request, definition, executed, stage="execute")
         if failure:
             return failure
-        completed = executed.output.get("completed")
+        completed = executed.output.get("completed") is True
+        executed_skill_id = executed.output.get("skill_id")
+        if executed_skill_id is not None and executed_skill_id != upstream_skill_id:
+            return SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                output=executed.output,
+                reason_code="execution_skill_mismatch",
+                message=(
+                    "Soridormi completed a different skill than the requested "
+                    f"{upstream_skill_id!r}"
+                ),
+            )
         return SkillResult(
             request_id=request.request_id,
             skill_id=request.skill_id,
             skill_version=definition.version,
-            status="completed" if completed is not False else "failed",
+            status="completed" if completed else "failed",
             provider_id=self.provider_id,
             output=executed.output,
-            reason_code=None if completed is not False else "execution_incomplete",
+            reason_code=None if completed else "execution_incomplete",
+            message=(
+                ""
+                if completed
+                else "Soridormi did not explicitly report skill completion"
+            ),
         )
 
     async def cancel(
@@ -108,11 +131,20 @@ class SoridormiMcpSkillProvider:
         definition: SkillDefinition,
         context: SkillExecutionContext,
     ) -> None:
-        await self.invoker.invoke(
+        outcome = await self.invoker.invoke(
             "soridormi.motion.cancel",
             {},
             context=ToolInvocationContext(allow_safety_controls=True),
         )
+        if outcome.status != "success":
+            message = outcome.error or f"cancel returned {outcome.status}"
+            logger.warning(
+                "Soridormi cancellation failed request_id=%s skill_id=%s: %s",
+                request.request_id,
+                request.skill_id,
+                message,
+            )
+            raise RuntimeError(message)
 
     def _failure_result(
         self,

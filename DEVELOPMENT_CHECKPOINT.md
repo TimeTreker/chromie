@@ -1,9 +1,10 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `05ce82c304051f57456a8190fe501aaf596a2df3`
+**Last committed Chromie base:** `665c7a5`
 **Pinned Soridormi capability revision:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
 **Verified date:** 2026-06-14
-**Current focus:** Voice-to-MuJoCo alpha evidence and release
+**Current focus:** Robust simulation and provider readiness development while
+Voice-to-MuJoCo alpha target evidence is deferred to Linux
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -20,20 +21,21 @@ The alpha implementation is present:
 - seven-case synthetic, virtual-microphone, and supervised acceptance;
 - evidence verification and alpha packaging.
 
-The next work is operational evidence, not another interaction architecture
-rewrite.
+The alpha implementation remains frozen except for defects. Linux/GPU,
+virtual-microphone, and supervised evidence is intentionally deferred. Current
+local development begins the robust-simulation phase without clearing any alpha
+release gate.
 
 ## Next sequence
 
-1. Confirm the GPU-free baseline with `./scripts/run_tests.sh`.
-2. Start the five Chromie services and a runtime-backed MuJoCo Soridormi MCP
-   endpoint.
-3. Run and retain the full `synthetic` alpha matrix.
-4. Run and retain the full `virtual-mic` matrix.
-5. Commit the candidate revision, run the complete `supervised` matrix, and
-   review audio, safe idle, cancellation, recovery, IDs, and privacy.
-6. Clear the compatibility blocker only after evidence passes.
-7. Generate and publish the narrowly scoped `0.1.0-alpha.1` prerelease.
+1. Normalize Soridormi malformed-result, timeout, disconnect, and cancellation
+   behavior in Chromie.
+2. Add repeatable provider fault scenarios and stable expected terminal states.
+3. Add deterministic user-facing fallback for failed embodied skills.
+4. On Linux, resume the full `synthetic`, `virtual-mic`, and `supervised` alpha
+   matrices.
+5. Clear the compatibility blocker and publish `0.1.0-alpha.1` only after that
+   retained evidence passes.
 
 After the alpha, begin the combined fault-injected simulation and provider
 conformance work. Do not start physical motion ahead of that gate.
@@ -41,7 +43,7 @@ conformance work. Do not start physical motion ahead of that gate.
 ## Verification baseline
 
 ```text
-170 current unittest cases passed
+178 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```
