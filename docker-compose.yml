@@ -315,6 +315,8 @@ services:
       https_proxy: ${HTTPS_PROXY:-}
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
       no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+    # Required on Linux when Agent-side probes or runtime calls target a
+    # Soridormi MCP server running on the Docker host.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

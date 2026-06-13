@@ -57,13 +57,20 @@ agent or tool identifiers fail registry construction.
 
 ## Verify a live capability server
 
-From the `agent` directory:
+Prefer the deployed Agent container from the repository root:
 
 ```bash
-SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-PYTHONPATH=. python -m app.probe_capabilities \
-  --manifest ../capabilities/soridormi.json
+./scripts/build_runtime_env.sh
+docker compose --env-file .env.runtime up -d chromie-agent
+docker compose --env-file .env.runtime exec -T \
+  -e SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp \
+  chromie-agent \
+  python -m app.probe_capabilities \
+  --manifest /app/capabilities/soridormi.json
 ```
+
+For host-only development, install `agent/requirements.txt` and run the module
+with `PYTHONPATH=agent`.
 
 The probe compares the declared manifest with the live MCP surface. Safe
 acceptance commands are documented in

@@ -11,6 +11,8 @@ from unittest import mock
 from scripts.m13_voice_acceptance import (
     FULL_CASE_ORDER,
     analyze_case,
+    capability_probe_invocation,
+    endpoint_for_container,
     parse_case_list,
     redact_env_file,
 )
@@ -25,6 +27,44 @@ def event(name: str, message: str, sid: str = "sid-1") -> dict[str, object]:
 class M13AcceptanceTests(unittest.TestCase):
     def test_parse_all_cases_preserves_release_order(self) -> None:
         self.assertEqual(parse_case_list("all"), list(FULL_CASE_ORDER))
+
+    def test_container_endpoint_translates_host_loopback(self) -> None:
+        self.assertEqual(
+            endpoint_for_container("http://127.0.0.1:8000/mcp"),
+            "http://host.docker.internal:8000/mcp",
+        )
+        self.assertEqual(
+            endpoint_for_container("http://localhost:8000/mcp?mode=sim"),
+            "http://host.docker.internal:8000/mcp?mode=sim",
+        )
+        self.assertEqual(
+            endpoint_for_container("http://soridormi:8000/mcp"),
+            "http://soridormi:8000/mcp",
+        )
+
+    def test_container_probe_uses_agent_runtime_and_mounted_manifest(self) -> None:
+        command, environment, endpoint = capability_probe_invocation(
+            runtime="container",
+            endpoint="http://127.0.0.1:8000/mcp",
+        )
+        self.assertIsNone(environment)
+        self.assertEqual(endpoint, "http://host.docker.internal:8000/mcp")
+        self.assertIn("chromie-agent", command)
+        self.assertIn("SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp", command)
+        self.assertEqual(command[-2:], ["--manifest", "/app/capabilities/soridormi.json"])
+
+    def test_host_probe_remains_an_explicit_development_option(self) -> None:
+        command, environment, endpoint = capability_probe_invocation(
+            runtime="host",
+            endpoint="http://127.0.0.1:8000/mcp",
+        )
+        self.assertEqual(command[0], __import__("sys").executable)
+        self.assertEqual(endpoint, "http://127.0.0.1:8000/mcp")
+        self.assertEqual(environment["PYTHONPATH"], "agent")
+        self.assertEqual(
+            environment["SORIDORMI_MCP_URL"],
+            "http://127.0.0.1:8000/mcp",
+        )
 
     def test_speech_only_checks_require_native_zero_skill_completion(self) -> None:
         checks = analyze_case(

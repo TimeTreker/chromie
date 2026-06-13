@@ -242,7 +242,11 @@ variables are not a supported production-selection mechanism in this revision.
 - Guided M13 voice acceptance uses CLI flags on
   `scripts/m13_voice_acceptance.py`; it generates a temporary
   `ORCH_RUNTIME_OVERRIDE_FILE`, enables `ORCH_EVENT_LOG_PATH`, and writes below
-  `.chromie/acceptance/m13/`.
+  `.chromie/acceptance/m13/`. Its capability probe defaults to
+  `--probe-runtime container`, executing inside `chromie-agent`. Host-loopback
+  Soridormi URLs are translated to `host.docker.internal`; the Compose service
+  supplies the Linux `host-gateway` mapping. `--probe-runtime host` is an
+  explicit development fallback and requires `agent/requirements.txt`.
 - Alpha release preparation uses CLI flags on
   `scripts/prepare_alpha_release.py`; generated bundles live below
   `.chromie/releases/`.

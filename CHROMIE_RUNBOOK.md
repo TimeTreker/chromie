@@ -171,12 +171,21 @@ Set the live endpoint:
 export SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
 
-Probe schema compatibility:
+Probe schema compatibility in the deployed Agent environment:
 
 ```bash
-PYTHONPATH=agent python -m app.probe_capabilities \
-  --manifest capabilities/soridormi.json
+./scripts/build_runtime_env.sh
+docker compose --env-file .env.runtime up -d chromie-agent
+docker compose --env-file .env.runtime exec -T \
+  -e SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp \
+  chromie-agent \
+  python -m app.probe_capabilities \
+  --manifest /app/capabilities/soridormi.json
 ```
+
+The Agent service has `host.docker.internal:host-gateway` configured for Linux.
+Use a Docker service hostname instead when Soridormi is attached to the same
+network.
 
 List the active Agent registry:
 
@@ -280,7 +289,11 @@ python scripts/m13_voice_acceptance.py \
 ```
 
 Add `--start-services` when the five containers are not already healthy. The
-runner presents and records speech-only, named-skill, refusal, barge-in, body
+runner remains a host-side audio/evidence controller, but it runs the capability
+probe inside `chromie-agent` by default and rewrites host-loopback MCP URLs to
+`host.docker.internal` for that command. Use `--probe-runtime host` only for an
+explicit local-development probe with Agent dependencies installed. The runner
+presents and records speech-only, named-skill, refusal, barge-in, body
 cancellation, explicit stop, and conversation follow-up cases. It writes
 revisions, redacted runtime configuration, audio devices, correlated JSONL
 session events, Orchestrator logs, recordings, automated checks, and operator

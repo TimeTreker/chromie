@@ -212,14 +212,25 @@ Run target GPU checks:
 START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
 ```
 
-Run Soridormi contract and text-interaction checks:
+Run Soridormi contract and text-interaction checks. The capability probe is
+run inside the Agent container so it uses the deployed Agent dependencies:
 
 ```bash
-export SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
-PYTHONPATH=agent python -m app.probe_capabilities \
-  --manifest capabilities/soridormi.json
-PYTHONPATH=. python scripts/interaction_text_acceptance.py nod
+./scripts/build_runtime_env.sh
+docker compose --env-file .env.runtime up -d chromie-agent
+docker compose --env-file .env.runtime exec -T \
+  -e SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp \
+  chromie-agent \
+  python -m app.probe_capabilities \
+  --manifest /app/capabilities/soridormi.json
+
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+  PYTHONPATH=. python scripts/interaction_text_acceptance.py nod
 ```
+
+On Linux, Compose maps `host.docker.internal` through
+`host-gateway`. If Soridormi is another container on the same Docker network,
+use its service DNS name instead.
 
 See [Acceptance and Evidence](docs/ACCEPTANCE.md) before claiming simulator,
 target, or hardware validation.
@@ -229,8 +240,15 @@ Run the guided M13 microphone/MuJoCo matrix on the reference host:
 ```bash
 python scripts/m13_voice_acceptance.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --soridormi-repo ../soridormi
+  --soridormi-repo ../soridormi \
+  --start-services
 ```
+
+The host runner controls audio and evidence capture, while the Soridormi
+capability probe runs in `chromie-agent` by default. Host-loopback MCP URLs are
+automatically translated to `host.docker.internal` for that probe. Use
+`--probe-runtime host` only in a development environment with
+`agent/requirements.txt` installed.
 
 Verify the resulting evidence bundle:
 

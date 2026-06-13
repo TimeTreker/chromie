@@ -58,13 +58,23 @@ speaker quality.
 
 ## Level C — Soridormi contract and simulator
 
-Probe the live MCP endpoint before execution:
+Probe the live MCP endpoint before execution. Prefer the Agent container so
+the probe uses the same MCP SDK and dependency versions as the deployed Agent:
 
 ```bash
-export SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
-PYTHONPATH=agent python -m app.probe_capabilities \
-  --manifest capabilities/soridormi.json
+./scripts/build_runtime_env.sh
+docker compose --env-file .env.runtime up -d chromie-agent
+docker compose --env-file .env.runtime exec -T \
+  -e SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp \
+  chromie-agent \
+  python -m app.probe_capabilities \
+  --manifest /app/capabilities/soridormi.json
 ```
+
+`docker-compose.yml` maps `host.docker.internal` to the Linux host gateway for
+`chromie-agent`. When Soridormi runs in the same Docker network, pass its
+service hostname instead. A host-side probe remains available for development
+after installing `agent/requirements.txt`.
 
 Run safe status and zero-motion planning:
 
@@ -178,8 +188,14 @@ python scripts/m13_voice_acceptance.py \
 ```
 
 Omit `--start-services` when the five Chromie containers are already healthy.
-The runner uses `ORCH_RUNTIME_OVERRIDE_FILE` so it does not edit `.env.local` or
-`.env.runtime`. Evidence is written under:
+The host process still owns microphone, speaker, and evidence capture, but the
+capability probe runs in `chromie-agent` by default. A loopback URL such as
+`http://127.0.0.1:8000/mcp` is translated to
+`http://host.docker.internal:8000/mcp` only for the container-side probe. Use
+`--probe-runtime host` only when the host Python environment has
+`agent/requirements.txt` installed. The runner uses
+`ORCH_RUNTIME_OVERRIDE_FILE` so it does not edit `.env.local` or `.env.runtime`.
+Evidence is written under:
 
 ```text
 .chromie/acceptance/m13/<UTC acceptance id>/

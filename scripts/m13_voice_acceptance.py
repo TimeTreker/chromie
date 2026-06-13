@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+from urllib.parse import urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "m13"
@@ -37,6 +38,82 @@ FULL_CASE_ORDER = (
     "follow-up",
 )
 BODY_CASES = {"speech-skill", "body-cancel", "stop"}
+AGENT_COMPOSE_SERVICE = "chromie-agent"
+HOST_LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
+
+
+def endpoint_for_container(endpoint: str) -> str:
+    """Translate a host-loopback URL for access from a Docker container."""
+
+    parsed = urlsplit(endpoint)
+    if parsed.hostname not in HOST_LOOPBACK_NAMES:
+        return endpoint
+
+    userinfo = ""
+    if parsed.username is not None:
+        userinfo = parsed.username
+        if parsed.password is not None:
+            userinfo += f":{parsed.password}"
+        userinfo += "@"
+    port = f":{parsed.port}" if parsed.port is not None else ""
+    return urlunsplit(
+        (
+            parsed.scheme,
+            f"{userinfo}host.docker.internal{port}",
+            parsed.path,
+            parsed.query,
+            parsed.fragment,
+        )
+    )
+
+
+def capability_probe_invocation(
+    *,
+    runtime: str,
+    endpoint: str,
+) -> tuple[list[str], dict[str, str] | None, str]:
+    """Build the capability-probe command for the selected runtime."""
+
+    if runtime == "container":
+        effective_endpoint = endpoint_for_container(endpoint)
+        return (
+            [
+                "docker",
+                "compose",
+                "--env-file",
+                ".env.runtime",
+                "exec",
+                "-T",
+                "-e",
+                f"SORIDORMI_MCP_URL={effective_endpoint}",
+                AGENT_COMPOSE_SERVICE,
+                "python",
+                "-m",
+                "app.probe_capabilities",
+                "--manifest",
+                "/app/capabilities/soridormi.json",
+            ],
+            None,
+            effective_endpoint,
+        )
+
+    if runtime == "host":
+        environment = os.environ.copy()
+        environment["PYTHONPATH"] = "agent"
+        environment["SORIDORMI_MCP_URL"] = endpoint
+        return (
+            [
+                sys.executable,
+                "-m",
+                "app.probe_capabilities",
+                "--manifest",
+                "capabilities/soridormi.json",
+            ],
+            environment,
+            endpoint,
+        )
+
+    raise ValueError(f"Unsupported probe runtime: {runtime}")
 
 
 @dataclass(frozen=True)
@@ -625,6 +702,15 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
             "dry_run": args.dry_run,
             "allow_dirty": args.allow_dirty,
             "orchestrator_timeout_s": args.orchestrator_timeout_s,
+            "probe_runtime": args.probe_runtime,
+            "probe_service": (
+                AGENT_COMPOSE_SERVICE if args.probe_runtime == "container" else None
+            ),
+            "probe_endpoint": (
+                endpoint_for_container(args.soridormi_mcp_url)
+                if args.probe_runtime == "container" and args.soridormi_mcp_url
+                else args.soridormi_mcp_url
+            ),
         },
     }
 
@@ -761,18 +847,12 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 timeout=args.service_timeout_s,
             )
         if needs_soridormi:
-            probe_env = os.environ.copy()
-            probe_env["PYTHONPATH"] = "agent"
-            if args.soridormi_mcp_url:
-                probe_env["SORIDORMI_MCP_URL"] = args.soridormi_mcp_url
+            probe_command, probe_env, _ = capability_probe_invocation(
+                runtime=args.probe_runtime,
+                endpoint=args.soridormi_mcp_url,
+            )
             run_command(
-                [
-                    sys.executable,
-                    "-m",
-                    "app.probe_capabilities",
-                    "--manifest",
-                    "capabilities/soridormi.json",
-                ],
+                probe_command,
                 evidence_dir / "soridormi-probe.log",
                 env=probe_env,
                 check=True,
@@ -908,6 +988,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.getenv("SORIDORMI_MCP_URL"),
     )
     parser.add_argument("--soridormi-repo")
+    parser.add_argument(
+        "--probe-runtime",
+        choices=("container", "host"),
+        default="container",
+        help=(
+            "Run the Soridormi capability probe in the Agent container "
+            "(recommended) or in the host Python environment."
+        ),
+    )
     parser.add_argument("--start-services", action="store_true")
     parser.add_argument(
         "--allow-dirty",
