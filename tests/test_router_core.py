@@ -12,14 +12,16 @@ from router.app.schema import RouteRequest
 
 class RouterCoreTests(unittest.TestCase):
     def test_rules_route_interrupt_without_agent(self) -> None:
-        decision = route_by_rules(RouteRequest(sid="s1", text="stop"))
+        for text in ("stop", "Stop!", "cancel?"):
+            with self.subTest(text=text):
+                decision = route_by_rules(RouteRequest(sid="s1", text=text))
 
-        self.assertIsNotNone(decision)
-        assert decision is not None
-        self.assertEqual(decision.route, "interrupt")
-        self.assertTrue(decision.interrupt_current)
-        self.assertFalse(decision.needs_agent)
-        self.assertFalse(decision.should_speak)
+                self.assertIsNotNone(decision)
+                assert decision is not None
+                self.assertEqual(decision.route, "interrupt")
+                self.assertTrue(decision.interrupt_current)
+                self.assertFalse(decision.needs_agent)
+                self.assertFalse(decision.should_speak)
 
     def test_rules_route_robot_action(self) -> None:
         decision = route_by_rules(RouteRequest(sid="s2", text="turn left"))

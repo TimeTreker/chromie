@@ -920,15 +920,22 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         require("session_interrupted_by_new_session", "previous session interrupted")
         require("interrupt_previous_audio_done", "playback interruption completed")
     elif case_id == "body-cancel":
-        cancelled = has_event(events, "skill_runtime_cancelled") or any(
-            "status=cancelled" in item
-            for item in event_messages(events, "skill_result")
+        cancelled = (
+            has_event(events, "skill_runtime_cancelled")
+            or any(
+                "status=cancelled" in item
+                for item in event_messages(events, "skill_runtime_done")
+            )
+            or any(
+                "status=cancelled" in item
+                for item in event_messages(events, "skill_result")
+            )
         )
         checks.append(
             CheckResult(
                 "active skill cancelled",
                 cancelled,
-                "skill_runtime_cancelled or cancelled skill_result is required",
+                "cancelled Skill Runtime completion or cancelled skill_result is required",
             )
         )
         require("interrupt_previous_audio_done", "interruption completed")

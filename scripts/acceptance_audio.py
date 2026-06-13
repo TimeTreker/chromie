@@ -9,8 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from orchestrator.clients.tts_client import TTSClient
-
 
 @dataclass(frozen=True)
 class AudioFixture:
@@ -51,6 +49,8 @@ async def _generate_fixtures_async(
     default_sample_rate: int,
     timeout_s: float,
 ) -> dict[str, AudioFixture]:
+    from orchestrator.clients.tts_client import TTSClient
+
     client = TTSClient(tts_url, default_sample_rate=default_sample_rate)
     fixtures: dict[str, AudioFixture] = {}
     for index, text in enumerate(dict.fromkeys(texts), start=1):

@@ -285,6 +285,25 @@ class M13AcceptanceTests(unittest.TestCase):
             self.assertEqual(len(events), 4)
             self.assertTrue(all(item.passed for item in checks))
 
+    def test_body_cancel_accepts_cancelled_runtime_completion(self) -> None:
+        checks = analyze_case(
+            "body-cancel",
+            [
+                event(
+                    "skill_runtime_done",
+                    "skill_runtime_done: status=cancelled results=0 traces=0",
+                    "body-session",
+                ),
+                event(
+                    "interrupt_previous_audio_done",
+                    "interrupt_previous_audio_done: playback_generation=2",
+                    "stop-session",
+                ),
+            ],
+        )
+
+        self.assertTrue(all(item.passed for item in checks))
+
     def test_followup_requires_two_utterances_in_same_conversation(self) -> None:
         checks = analyze_case(
             "follow-up",
