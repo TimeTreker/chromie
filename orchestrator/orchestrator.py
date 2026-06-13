@@ -884,6 +884,15 @@ class VoiceAssistant:
                     context=context,
                     history=context.get("history", []),
                 )
+                response = response.model_copy(
+                    deep=True,
+                    update={
+                        "metadata": {
+                            **response.metadata,
+                            "language": decision.language,
+                        }
+                    },
+                )
                 self.session_log(
                     session_id,
                     "interaction_done: agent_ms=%.1f speech=%s skills=%s requires_confirmation=%s",

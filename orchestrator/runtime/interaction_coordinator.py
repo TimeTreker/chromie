@@ -8,7 +8,7 @@ from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry
 from agent.app.tool_invocation import AsyncToolInvoker, McpStreamableHttpInvoker
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
 
 from .skill_runtime import (
     LocalSpeechSkillProvider,
@@ -74,11 +74,130 @@ class InteractionRuntimeCoordinator:
             authorized_request_ids.update(
                 request.request_id for request in body_requests
             )
-        return await self.runtime.execute(
-            prepared,
+        after_skills_speech = [
+            speech for speech in prepared.speech if speech.timing == "after_skills"
+        ]
+        primary = (
+            prepared.model_copy(
+                deep=True,
+                update={
+                    "speech": [
+                        speech
+                        for speech in prepared.speech
+                        if speech.timing != "after_skills"
+                    ]
+                },
+            )
+            if body_requests and after_skills_speech
+            else prepared
+        )
+        execution = await self.runtime.execute(
+            primary,
             authorization=RuntimeAuthorization(
                 confirmed_request_ids=authorized_request_ids,
             ),
+        )
+        if not body_requests:
+            return execution
+
+        body_results = [
+            result
+            for result in execution.results
+            if result.skill_id.startswith("soridormi.")
+        ]
+        failed_body_results = [
+            result
+            for result in body_results
+            if result.status in {"failed", "refused", "timed_out"}
+        ]
+        if execution.status == "cancelled":
+            return execution
+        if failed_body_results:
+            fallback = InteractionResponse(
+                interaction_id=prepared.interaction_id,
+                speech=[
+                    {
+                        "text": self._body_failure_message(
+                            failed_body_results,
+                            language=str(prepared.metadata.get("language") or ""),
+                        ),
+                        "timing": "sequential",
+                        "style": "warning",
+                        "priority": "high",
+                        "interruptible": True,
+                        "metadata": {
+                            "source": "host_body_failure_fallback",
+                            "failed_request_ids": [
+                                result.request_id for result in failed_body_results
+                            ],
+                            "session_id": session_id,
+                        },
+                    }
+                ],
+                metadata={"source": "host_body_failure_fallback"},
+            )
+            fallback_execution = await self.runtime.execute(fallback)
+            return self._merge_executions(
+                execution,
+                fallback_execution,
+                status="failed",
+            )
+
+        if after_skills_speech:
+            followup = InteractionResponse(
+                interaction_id=prepared.interaction_id,
+                speech=after_skills_speech,
+                metadata=prepared.metadata,
+            )
+            followup_execution = await self.runtime.execute(followup)
+            return self._merge_executions(
+                execution,
+                followup_execution,
+                status=(
+                    "completed"
+                    if followup_execution.status == "completed"
+                    else "failed"
+                ),
+            )
+        return execution
+
+    def _body_failure_message(
+        self,
+        results: list[SkillResult],
+        *,
+        language: str,
+    ) -> str:
+        zh = language.lower().startswith("zh")
+        if any(result.status == "refused" for result in results):
+            return (
+                "安全检查未通过，我没有执行这个动作。"
+                if zh
+                else "The safety check did not pass, so I did not perform that movement."
+            )
+        if any(result.status == "timed_out" for result in results):
+            return (
+                "动作执行超时，我无法确认它已安全完成。"
+                if zh
+                else "The movement timed out, and I could not confirm it completed safely."
+            )
+        return (
+            "我无法安全完成这个动作。"
+            if zh
+            else "I could not complete that movement safely."
+        )
+
+    def _merge_executions(
+        self,
+        first: SkillRuntimeResult,
+        second: SkillRuntimeResult,
+        *,
+        status: str,
+    ) -> SkillRuntimeResult:
+        return SkillRuntimeResult(
+            interaction_id=first.interaction_id,
+            status=status,
+            results=[*first.results, *second.results],
+            traces=[*first.traces, *second.traces],
         )
 
     async def confirmation_request_ids(

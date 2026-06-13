@@ -195,7 +195,11 @@ No hardware motion uses simulation auto-confirm behavior.
 - Unknown, unavailable, or version-mismatched skills fail closed.
 - Disabled Soridormi support does not fall back to the legacy hardware daemon.
 - Provider timeout or cancellation is reflected in `SkillResult` and trace.
-- Speech-only fallback may continue when safe, but must not claim a failed action
+- A failed, refused, or timed-out Soridormi skill suppresses its pending
+  `after_skills` completion speech and schedules one deterministic,
+  language-matched host warning. The warning never retries or substitutes an
+  action.
+- Speech-only fallback may continue when safe, but never claims a failed action
   completed.
 - Interruption must stop playback and cancel the owning interaction without
   cancelling unrelated work.

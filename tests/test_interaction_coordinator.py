@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from typing import Any
 
@@ -11,8 +12,17 @@ from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class _SoridormiInvoker:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        execute_outcome: ToolCallOutcome | None = None,
+        monitor_outcome: ToolCallOutcome | None = None,
+        execute_delay_s: float = 0,
+    ) -> None:
         self.calls: list[tuple[str, dict[str, Any], ToolInvocationContext | None]] = []
+        self.execute_outcome = execute_outcome
+        self.monitor_outcome = monitor_outcome
+        self.execute_delay_s = execute_delay_s
 
     async def invoke(
         self,
@@ -49,8 +59,14 @@ class _SoridormiInvoker:
         if tool_name == "soridormi.skill.create_plan":
             return ToolCallOutcome.success({"plan_id": "plan-1"})
         if tool_name == "soridormi.safety.monitor_motion":
+            if self.monitor_outcome is not None:
+                return self.monitor_outcome
             return ToolCallOutcome.success({"ok": True, "event": None})
         if tool_name == "soridormi.skill.execute_plan":
+            if self.execute_delay_s:
+                await asyncio.sleep(self.execute_delay_s)
+            if self.execute_outcome is not None:
+                return self.execute_outcome
             return ToolCallOutcome.success(
                 {"completed": True, "skill_id": "nod_yes"}
             )
@@ -151,6 +167,151 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, "completed")
         self.assertTrue(invoker.calls[-1][2].confirmed)
+
+    async def test_failed_body_skill_replaces_completion_speech_with_safe_fallback(
+        self,
+    ) -> None:
+        spoken: list[dict[str, Any]] = []
+        invoker = _SoridormiInvoker(
+            execute_outcome=ToolCallOutcome.success(
+                {"completed": False, "skill_id": "nod_yes"}
+            )
+        )
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(args) or {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                speech=[
+                    {"text": "Starting.", "timing": "immediate"},
+                    {"text": "Done.", "timing": "after_skills"},
+                ],
+                skills=[
+                    {
+                        "request_id": "nod-1",
+                        "skill_id": "soridormi.nod_yes",
+                    }
+                ],
+                metadata={"language": "en-US"},
+            ),
+            session_id="sid-failure",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(
+            [item["text"] for item in spoken],
+            ["Starting.", "I could not complete that movement safely."],
+        )
+        self.assertEqual(
+            spoken[-1]["metadata"]["source"],
+            "host_body_failure_fallback",
+        )
+        self.assertNotIn("Done.", [item["text"] for item in spoken])
+
+    async def test_timed_out_body_skill_uses_language_matched_fallback(self) -> None:
+        spoken: list[str] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(
+                execute_outcome=ToolCallOutcome(
+                    status="timeout",
+                    error="simulated timeout",
+                )
+            ),
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                skills=[{"skill_id": "soridormi.nod_yes"}],
+                metadata={"language": "zh-CN"},
+            ),
+            session_id="sid-timeout",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(
+            spoken,
+            ["动作执行超时，我无法确认它已安全完成。"],
+        )
+        self.assertEqual(result.results[0].status, "timed_out")
+
+    async def test_refused_body_skill_reports_failed_safety_check(self) -> None:
+        spoken: list[str] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(
+                monitor_outcome=ToolCallOutcome.success(
+                    {"ok": False, "event": "workspace blocked"}
+                )
+            ),
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                skills=[{"skill_id": "soridormi.nod_yes"}],
+                metadata={"language": "en-US"},
+            ),
+            session_id="sid-refused",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.results[0].status, "refused")
+        self.assertEqual(
+            spoken,
+            [
+                "The safety check did not pass, so I did not perform that movement."
+            ],
+        )
+
+    async def test_successful_body_skill_keeps_after_skills_speech(self) -> None:
+        spoken: list[str] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(),
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                speech=[{"text": "Done.", "timing": "after_skills"}],
+                skills=[{"skill_id": "soridormi.nod_yes"}],
+            ),
+            session_id="sid-success",
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(spoken, ["Done."])
+
+    async def test_cancelled_body_skill_suppresses_all_terminal_speech(self) -> None:
+        spoken: list[str] = []
+        invoker = _SoridormiInvoker(execute_delay_s=5)
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+        task = asyncio.create_task(
+            coordinator.execute(
+                InteractionResponse(
+                    speech=[
+                        {"text": "Starting.", "timing": "immediate"},
+                        {"text": "Done.", "timing": "after_skills"},
+                    ],
+                    skills=[{"skill_id": "soridormi.nod_yes"}],
+                ),
+                session_id="sid-cancelled",
+            )
+        )
+        while not any(
+            call[0] == "soridormi.skill.execute_plan" for call in invoker.calls
+        ):
+            await asyncio.sleep(0)
+
+        task.cancel()
+        result = await task
+
+        self.assertEqual(result.status, "cancelled")
+        self.assertEqual(spoken, ["Starting."])
 
 
 if __name__ == "__main__":

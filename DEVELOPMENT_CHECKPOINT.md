@@ -1,6 +1,6 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `665c7a5`
+**Last committed Chromie base:** `3ecbd90`
 **Pinned Soridormi capability revision:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
 **Verified date:** 2026-06-14
 **Current focus:** Robust simulation and provider readiness development while
@@ -28,10 +28,11 @@ release gate.
 
 ## Next sequence
 
-1. Normalize Soridormi malformed-result, timeout, disconnect, and cancellation
-   behavior in Chromie.
-2. Add repeatable provider fault scenarios and stable expected terminal states.
-3. Add deterministic user-facing fallback for failed embodied skills.
+1. Add repeatable provider fault scenarios and stable expected terminal states.
+2. Define provider conformance cases shared by simulator and future no-motion
+   physical-provider skeletons.
+3. Add replayable scenario summaries and thresholds for timeout, cancellation,
+   and safe terminal behavior.
 4. On Linux, resume the full `synthetic`, `virtual-mic`, and `supervised` alpha
    matrices.
 5. Clear the compatibility blocker and publish `0.1.0-alpha.1` only after that
@@ -43,7 +44,7 @@ conformance work. Do not start physical motion ahead of that gate.
 ## Verification baseline
 
 ```text
-178 current unittest cases passed
+183 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```
