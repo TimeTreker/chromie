@@ -9,12 +9,18 @@ from types import SimpleNamespace
 from unittest import mock
 
 from scripts.m13_voice_acceptance import (
+    CASES,
     FULL_CASE_ORDER,
     analyze_case,
     capability_probe_invocation,
     endpoint_for_container,
+    extract_asr_text,
+    guide_spoken_step,
     parse_case_list,
+    prompt_verdict,
     redact_env_file,
+    wait_for_any_event,
+    wait_for_case_checks,
 )
 from scripts.verify_m13_evidence import REQUIRED_FILES, verify_bundle
 import scripts.prepare_alpha_release as release_module
@@ -66,6 +72,60 @@ class M13AcceptanceTests(unittest.TestCase):
             "http://127.0.0.1:8000/mcp",
         )
 
+    def test_extract_asr_text_handles_repr_rendering(self) -> None:
+        self.assertEqual(
+            extract_asr_text(
+                event("asr_final", "asr_final: asr_ms=12.0 text_chars=5 text='hello'")
+            ),
+            "hello",
+        )
+
+    def test_wait_for_any_event_only_reads_after_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "events.jsonl"
+            path.write_text(
+                json.dumps(event("asr_final", "text='old'")) + "\n"
+                + json.dumps(event("router_done", "route=chat")) + "\n"
+            )
+            self.assertIsNone(
+                wait_for_any_event(
+                    path,
+                    marker=1,
+                    event_names=("asr_final",),
+                    timeout_s=0.01,
+                    poll_s=0.001,
+                )
+            )
+
+    def test_guided_step_reports_detected_transcript(self) -> None:
+        case = CASES["speech-only"]
+        detected = event(
+            "asr_final",
+            "asr_final: asr_ms=12.0 text_chars=5 text='hello'",
+        )
+        with mock.patch(
+            "scripts.m13_voice_acceptance.wait_for_any_event",
+            return_value=detected,
+        ), mock.patch("scripts.m13_voice_acceptance.print_countdown"), mock.patch(
+            "builtins.print"
+        ):
+            result = guide_spoken_step(
+                case=case,
+                step=case.spoken_steps[0],
+                step_index=1,
+                events_path=Path("unused.jsonl"),
+                case_marker=0,
+                countdown_s=3,
+                asr_timeout_s=20,
+                trigger_timeout_s=60,
+            )
+        self.assertTrue(result.passed)
+        self.assertIn("hello", result.detail)
+
+    def test_empty_operator_verdict_defaults_to_pass(self) -> None:
+        with mock.patch("builtins.input", return_value=""):
+            self.assertEqual(prompt_verdict(), "pass")
+
     def test_speech_only_checks_require_native_zero_skill_completion(self) -> None:
         checks = analyze_case(
             "speech-only",
@@ -77,6 +137,26 @@ class M13AcceptanceTests(unittest.TestCase):
             ],
         )
         self.assertTrue(all(item.passed for item in checks))
+
+    def test_wait_for_case_checks_returns_when_evidence_is_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "events.jsonl"
+            records = [
+                event("asr_final", "asr_final: text='hello'"),
+                event("router_done", "router_done: route=chat"),
+                event("interaction_done", "interaction_done: speech=1 skills=0"),
+                event("session_done", "session_done: played_tts=1"),
+            ]
+            path.write_text("".join(json.dumps(item) + "\n" for item in records))
+            events, checks = wait_for_case_checks(
+                "speech-only",
+                path,
+                marker=0,
+                timeout_s=0.1,
+                poll_s=0.001,
+            )
+            self.assertEqual(len(events), 4)
+            self.assertTrue(all(item.passed for item in checks))
 
     def test_followup_requires_two_utterances_in_same_conversation(self) -> None:
         checks = analyze_case(

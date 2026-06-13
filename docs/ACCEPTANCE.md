@@ -201,6 +201,35 @@ Evidence is written under:
 .chromie/acceptance/m13/<UTC acceptance id>/
 ```
 
+### Operator interaction
+
+The runner no longer relies on an ambiguous open-ended speaking window. For
+each required utterance it:
+
+1. asks the operator to press Enter when ready;
+2. displays a three-second countdown;
+3. prints a prominent `SPEAK NOW` banner with the exact phrase;
+4. waits up to 20 seconds for a new `asr_final` event;
+5. prints the recognized transcript;
+6. waits up to 60 seconds for the event-based case checks to pass.
+
+Cases with a second utterance are also synchronized to runtime evidence. For
+example, barge-in and explicit-stop cases wait for `playback_start` before
+showing the immediate `Stop.` cue, while follow-up waits for the first
+`session_done` event.
+
+An operator verdict is requested only after every automated check passes. An
+ASR timeout or missing required event automatically marks the case failed and,
+by default, stops the run. This prevents a human `pass` from overriding missing
+machine evidence. Use `--continue-after-failure` only when collecting additional
+diagnostic evidence after a known failure. Relevant tuning options are:
+
+```text
+--countdown-s 3
+--asr-timeout-s 20
+--case-timeout-s 60
+```
+
 A command-only rehearsal is available and must never be counted as target
 evidence:
 

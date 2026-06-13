@@ -299,6 +299,23 @@ revisions, redacted runtime configuration, audio devices, correlated JSONL
 session events, Orchestrator logs, recordings, automated checks, and operator
 notes below `.chromie/acceptance/m13/<id>/`.
 
+Interactive behavior is intentionally explicit:
+
+1. Read the case instructions and press Enter once when ready.
+2. Wait for the `3`, `2`, `1` countdown and the `SPEAK NOW` banner.
+3. Speak the displayed phrase only after that banner appears.
+4. The runner waits for `asr_final`, prints the recognized text, and waits for
+   the required case events automatically.
+5. Only when all automated checks pass does it ask for one audible/visual
+   operator verdict. Press Enter to accept the default `pass`, or enter `f` or
+   `s` with notes.
+
+There is no second "case settled" Enter prompt. If ASR is not detected within
+20 seconds, or required case evidence is still missing after 60 seconds, the
+case is marked failed automatically and the run stops. Use
+`--continue-after-failure` only for exploratory evidence collection. Timing can
+be adjusted with `--countdown-s`, `--asr-timeout-s`, and `--case-timeout-s`.
+
 Verify the completed bundle:
 
 ```bash

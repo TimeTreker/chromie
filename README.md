@@ -250,6 +250,13 @@ automatically translated to `host.docker.internal` for that probe. Use
 `--probe-runtime host` only in a development environment with
 `agent/requirements.txt` installed.
 
+For each utterance, press Enter once when ready. The runner displays a
+three-second countdown followed by a prominent `SPEAK NOW` prompt, waits for
+`asr_final`, and prints the detected transcript. It then waits for the case
+events automatically. An operator verdict is requested only after all automated
+checks pass; missing ASR or required events automatically fail the case and stop
+the run by default.
+
 Verify the resulting evidence bundle:
 
 ```bash
