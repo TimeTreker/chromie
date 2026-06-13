@@ -1,77 +1,85 @@
 # External Capability Manifests
 
-Place trusted external capability bundle JSON files in this directory. Docker
-mounts it read-only at `/app/capabilities` inside `chromie-agent`.
+This directory contains trusted capability snapshots consumed by
+`chromie-agent`. Docker mounts it read-only at `/app/capabilities`.
 
-`soridormi.json` is generated from Soridormi's authoritative capability export,
-then overlaid with Chromie's MCP Streamable HTTP endpoint placeholder. Do not
-hand-edit its tools or schemas.
+The manifests are policy inputs, not informal tool descriptions. They define
+agent identities, tool schemas, side-effect classes, confirmation requirements,
+safety monitors, fallbacks, parallelism policy, and transport metadata used by
+TaskGraph validation and execution.
 
-Refresh it from a local Soridormi checkout:
+## Soridormi snapshot
+
+[`soridormi.json`](soridormi.json) is generated from Soridormi's authoritative
+capability export and then materialized with Chromie's MCP Streamable HTTP
+transport placeholder. The checked-in snapshot contains four agent records and
+twelve tool records and identifies upstream Soridormi commit:
+
+```text
+a092dc704f1ab797fb1d4f542696fe75026eb171
+```
+
+Do not hand-edit exported tools, schemas, or safety policy. Refresh the source
+export and rematerialize the file instead.
+
+## Refresh from a Soridormi checkout
+
+From the Chromie repository root, with Soridormi checked out at
+`../soridormi`:
 
 ```bash
 PYTHONPATH=../soridormi/src \
-  python -m soridormi_runtime.mcp.export_capabilities \
+python -m soridormi_runtime.mcp.export_capabilities \
   --mode sim > /tmp/soridormi-export.json
 
 PYTHONPATH=agent python -m app.materialize_soridormi_manifest \
-  /tmp/soridormi-export.json capabilities/soridormi.json \
+  /tmp/soridormi-export.json \
+  capabilities/soridormi.json \
   --upstream-commit "$(git -C ../soridormi rev-parse HEAD)"
 ```
 
-Enable one file:
+Review the resulting diff, run the capability and contract tests, and record the
+compatible Soridormi revision in release notes.
+
+## Configure the Agent
 
 ```env
 AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json
 SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp
 ```
 
-Enable every JSON file in the directory:
+`${SORIDORMI_MCP_URL}` is resolved when the Agent loads the manifest. An unset
+required variable fails startup rather than leaving a partially configured
+registry.
 
-```env
-AGENT_CAPABILITY_MANIFESTS=/app/capabilities
-```
+Multiple manifest paths or directories may be separated by commas. Duplicate
+agent or tool identifiers fail registry construction.
 
-Multiple files or directories are comma-separated. Configured paths are
-required to exist and parse successfully; otherwise the Agent fails at startup.
-Manifest strings may reference required environment variables as `${NAME}`.
-Chromie fails startup when a referenced variable is missing.
+## Verify a live capability server
 
-Before enabling execution, verify that the configured MCP server advertises
-every tool declared by the manifest:
+From the `agent` directory:
 
 ```bash
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-PYTHONPATH=agent python -m app.probe_capabilities \
-  --manifest capabilities/soridormi.json
+PYTHONPATH=. python -m app.probe_capabilities \
+  --manifest ../capabilities/soridormi.json
 ```
 
-Extra server tools are reported but do not become available to Chromie. Missing
-tools or incompatible declared input constraints fail the probe.
+The probe compares the declared manifest with the live MCP surface. Safe
+acceptance commands are documented in
+[`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md).
 
-After a successful probe, run safe read/planning acceptance:
+## Two registries with different purposes
 
-```bash
-SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-PYTHONPATH=agent python -m app.soridormi_acceptance \
-  --manifest capabilities/soridormi.json
-```
+Chromie currently has two related but distinct capability views:
 
-The default request creates a zero-motion plan and does not execute hardware.
+1. The Agent capability registry is a startup-loaded, static manifest view used
+   for TaskGraph planning, validation, policy, and MCP invocation.
+2. The Orchestrator Skill Registry is a runtime catalog of trusted named skills
+   used by `InteractionResponse` and the host Skill Runtime.
 
-Soridormi `main` provides a dedicated `soridormi-mcp` container around its
-current dry-run tool core. Chromie remains in its own containers and connects
-through `SORIDORMI_MCP_URL`.
-
-Verify the guarded dry-run boundary with:
-
-```bash
-SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-PYTHONPATH=agent python -m app.soridormi_acceptance \
-  --manifest capabilities/soridormi.json \
-  --guarded-dry-run
-```
-
-This is network integration evidence, not supervised robot hardware evidence.
-
-Do not expose raw motor, joint, or torque controls through these manifests.
+They share the principle that the model selects validated named capabilities,
+not raw motor or joint commands, but they are not the same in-memory object.
+The native structured Agent path now emits Skill Runtime requests directly,
+while the host registry remains the final provider and execution authority.
+Future catalog-alignment work must not bypass either policy layer.

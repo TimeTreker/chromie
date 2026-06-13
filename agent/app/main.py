@@ -13,8 +13,12 @@ from pydantic import BaseModel, Field
 from .agents import AgentServices
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .clients.ollama_client import OllamaClient
-from .interaction import AgentResultInteractionAdapter
-from .runtime import AgentRuntime
+from .interaction import (
+    AgentResultInteractionAdapter,
+    InteractionOutputCoordinator,
+    NativeInteractionOutputError,
+)
+from .runtime import AgentRuntime, InteractionRuntime
 from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .task_graph import (
     ExecutionTrace,
@@ -49,6 +53,16 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "160")))
+    interaction_output_mode: Literal["native", "legacy-adapter"] = Field(
+        default_factory=lambda: os.getenv("AGENT_INTERACTION_OUTPUT_MODE", "native")
+    )
+    native_interaction_fallback: bool = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_NATIVE_INTERACTION_FALLBACK",
+            "0",
+        ).strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
     enable_task_graph_planning: bool = Field(
         default_factory=lambda: os.getenv("AGENT_ENABLE_TASK_GRAPH_PLANNING", "0").strip().lower()
         not in {"0", "false", "no", "off"}
@@ -114,7 +128,15 @@ services = AgentServices(
     task_graph_planner=task_graph_planner,
 )
 runtime = AgentRuntime(services)
+interaction_runtime = InteractionRuntime(services)
 interaction_adapter = AgentResultInteractionAdapter()
+interaction_output = InteractionOutputCoordinator(
+    interaction_runtime,
+    runtime,
+    mode=settings.interaction_output_mode,
+    fallback_to_legacy=settings.native_interaction_fallback,
+    adapter=interaction_adapter,
+)
 read_only_invoker = (
     McpStreamableHttpInvoker(capability_registry)
     if settings.enable_read_only_task_graph_execution
@@ -192,6 +214,8 @@ async def health() -> HealthResponse:
         physical_task_graph_execution_enabled=(
             guarded_invoker is not None and settings.enable_physical_task_graph_execution
         ),
+        interaction_output_mode=settings.interaction_output_mode,
+        native_interaction_fallback_enabled=settings.native_interaction_fallback,
     )
 
 
@@ -335,16 +359,26 @@ async def run_agent(request: AgentRunRequest) -> AgentResult:
 @app.post("/interaction", response_model=InteractionResponse)
 async def run_interaction(request: AgentRunRequest) -> InteractionResponse:
     start = time.perf_counter()
-    legacy_result = await runtime.run(request)
-    response = interaction_adapter.convert(legacy_result)
+    try:
+        response = await interaction_output.run(request)
+    except NativeInteractionOutputError as exc:
+        logger.exception(
+            "native_interaction_validation_failed sid=%s route=%s intent=%s fallback=%s",
+            request.sid,
+            request.route_decision.route,
+            request.route_decision.intent,
+            settings.native_interaction_fallback,
+        )
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     elapsed_ms = (time.perf_counter() - start) * 1000.0
     response.metadata["runtime_ms"] = round(elapsed_ms, 1)
     logger.info(
-        "interaction sid=%s route=%s intent=%s status=%s speech=%d skills=%d confirmation=%s ms=%.1f",
+        "interaction sid=%s route=%s intent=%s status=%s output_mode=%s speech=%d skills=%d confirmation=%s ms=%.1f",
         request.sid,
         request.route_decision.route,
         request.route_decision.intent,
         response.status,
+        response.metadata.get("interaction_output_mode"),
         len(response.speech),
         len(response.skills),
         response.requires_confirmation,

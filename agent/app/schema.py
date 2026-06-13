@@ -186,6 +186,9 @@ class AgentResult(BaseModel):
             self.requires_confirmation = True
         return action
 
+    def add_task_graph(self, graph: dict[str, Any]) -> None:
+        self.task_graphs.append(graph)
+
 
 class HealthResponse(BaseModel):
     ok: bool = True
@@ -206,6 +209,8 @@ class HealthResponse(BaseModel):
     active_task_graph_ids: list[str] = Field(default_factory=list)
     guarded_task_graph_execution_enabled: bool = False
     physical_task_graph_execution_enabled: bool = False
+    interaction_output_mode: str = "native"
+    native_interaction_fallback_enabled: bool = False
 
 
 def detect_language(text: str) -> str:

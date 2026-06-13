@@ -1,233 +1,186 @@
 # Chromie Agent
 
-`chromie-agent` is a CPU-only multi-agent runtime for Chromie.
+`chromie-agent` is Chromie's containerized reasoning, compatibility-response,
+structured-interaction, capability-registry, and TaskGraph service. It listens
+on port `8092` by default.
 
-It receives a `RouteDecision` from `chromie-router`, runs one or more specialized agents, and returns a unified `AgentResult` for the host orchestrator to execute.
+For the authoritative project status, see [`../docs/STATUS.md`](../docs/STATUS.md).
+For the complete HTTP surface, see
+[`../docs/API_REFERENCE.md`](../docs/API_REFERENCE.md).
 
-The agent service does **not** talk to ASR or TTS directly. The host orchestrator remains the only component that calls ASR, TTS, playback, and hardware execution.
+## Current implementation boundary
 
-## Responsibilities
+The Agent:
 
-- Convert a route decision into a speech/action plan.
-- Host multiple specialized agents in one small Docker service.
-- Keep model/environment compatibility separate from ASR/TTS.
-- Return JSON only; do not touch microphone, speakers, or robot hardware directly.
+- accepts text, routing decisions, and bounded context;
+- returns the established `AgentResult` contract from `POST /run`;
+- returns the strict `InteractionResponse` contract from `POST /interaction`;
+- loads and validates trusted external capability manifests at startup;
+- plans, validates, simulates, and—behind explicit gates—executes TaskGraphs;
+- never opens the microphone, plays audio, or controls robot hardware directly.
 
-## Agents included
+The host Orchestrator owns realtime audio, conversation state, interruption, and
+the trusted Skill Runtime. Soridormi owns embodied planning, execution policy,
+resource exclusivity, cancellation, emergency behavior, and hardware
+commissioning.
 
-- `conversation_agent`: short spoken chat responses.
-- `speaker_agent`: normalizes wording, brevity, and speech style.
-- `robot_pose_controller_agent`: head/body/gesture pose plans.
-- `motion_planner_agent`: simple high-level movement plans.
-- `safety_agent`: validates and clamps robot actions.
-- `tool_agent`: returns tool actions for a future executor.
-- `memory_agent`: returns memory updates/actions.
-- `vision_agent`: placeholder for future vision requests.
+`POST /interaction` now uses `InteractionRuntime` by default. Specialized agents
+write through a native accumulator that creates `InteractionSpeech` and
+`SkillRequest` objects as the pipeline runs; the endpoint does not convert a
+final `AgentResult`. The serialized result is validated again against the strict
+shared contract before it is returned.
 
-## API
+`AgentResultInteractionAdapter` remains available for rollback through
+`AGENT_INTERACTION_OUTPUT_MODE=legacy-adapter`. Native validation fallback is
+separate and default-off; enable it only with
+`AGENT_NATIVE_INTERACTION_FALLBACK=1`.
 
-### `GET /health`
+## Specialized agents
 
-Returns service status and available agents.
+| Agent | Current behavior |
+|---|---|
+| `conversation_agent` | Produces short conversational speech with Ollama or deterministic fallback behavior. |
+| `speaker_agent` | Normalizes wording, brevity, and speaking style. It never plays audio. |
+| `robot_pose_controller_agent` | Produces legacy high-level pose/head/gesture action proposals. |
+| `motion_planner_agent` | Produces legacy high-level movement proposals. |
+| `safety_agent` | Rejects or clamps unsafe legacy action proposals. |
+| `tool_agent` | Produces a validated TaskGraph when LLM TaskGraph planning is enabled; otherwise emits a compatibility `tool.*` action that this repository does not automatically execute. |
+| `memory_agent` | Produces memory updates and compatibility `memory.store` actions. Chromie's current conversation state is process-local and not a durable memory store. |
+| `vision_agent` | Produces a compatibility `vision.query` proposal. No vision executor is included in this repository. |
 
-### `GET /agents`
+## HTTP API
 
-Lists known agents.
+Core endpoints:
 
-### `POST /run`
+- `GET /health`
+- `GET /agents`
+- `GET /capabilities`
+- `GET /capabilities/llm-context?language=en`
+- `POST /run`
+- `POST /interaction`
 
-Input:
+TaskGraph endpoints:
 
-```json
-{
-  "sid": "abc123",
-  "text": "转过来看着我",
-  "route_decision": {
-    "route": "robot_action",
-    "agents": ["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
-    "intent": "look_at_user",
-    "confidence": 0.94,
-    "language": "zh-CN"
-  },
-  "context": {
-    "robot_state": {"is_moving": false},
-    "user_state": {"distance_m": 1.2}
-  }
-}
-```
+- `POST /task-graphs/validate`
+- `POST /task-graphs/dry-run`
+- `POST /task-graphs/execute-read-only`
+- `POST /task-graphs/execute-planning`
+- `POST /task-graphs/confirmation-grants`
+- `POST /task-graphs/execute-guarded`
+- `POST /task-graphs/{graph_id}/cancel`
+- `GET /task-graphs/{graph_id}/trace`
+- `GET /task-graphs/scheduler/status`
 
-Output:
+Guarded execution, confirmation grants, and cancellation require
+`Authorization: Bearer <AGENT_TASK_GRAPH_EXECUTION_TOKEN>`. Validation, dry-run,
+capability inspection, traces, and scheduler status are currently not protected
+by that token; deploy the service only on a trusted network boundary.
 
-```json
-{
-  "status": "ok",
-  "speak_immediate": [
-    {"text": "好的，我看着你。", "style": "brief", "priority": "normal", "interruptible": true}
-  ],
-  "actions": [
-    {
-      "target": "robot_pose_controller",
-      "type": "head.look_at_user",
-      "params": {"duration_ms": 3000},
-      "blocking": false
-    }
-  ],
-  "speak_after": [],
-  "memory_updates": []
-}
-```
+## Feature gates
 
-### TaskGraph endpoints
+Risk-bearing behavior is default-off.
 
-- `POST /task-graphs/validate`: validate a graph against the active capability registry.
-- `POST /task-graphs/dry-run`: simulate a validated graph without calling hardware or MCP tools.
-- `GET /task-graphs/{graph_id}/trace`: return the most recent in-memory dry-run trace for a graph.
+| Variable | Default | Effect |
+|---|---:|---|
+| `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
+| `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
+| `AGENT_ENABLE_TASK_GRAPH_PLANNING` | `0` | Allow LLM-authored TaskGraph planning for tool routes. |
+| `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION` | `0` | Enable side-effect-free read-only execution. |
+| `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION` | `0` | Enable stateful `planning_only` execution. |
+| `AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION` | `0` | Permit eligible independent nodes to use bounded parallel scheduling. |
+| `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | `4` | Process-local scheduler concurrency bound. |
+| `AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION` | `0` | Enable authorized guarded side effects. Requires an execution token. |
+| `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` | `0` | Permit physical nodes after confirmation and active-monitor proof. Requires guarded execution. |
 
-These endpoints are the first production-facing slice of
-[M4 - TaskGraph production integration](../ROADMAP.md). Real tool execution
-remains behind the transport-neutral `ToolInvoker` boundary.
+See [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md) for all settings.
 
-### External capabilities
+## Capability manifests
 
-Set `AGENT_CAPABILITY_MANIFESTS` to a comma-separated list of JSON files or
-directories mounted inside the Agent container. The root Compose file mounts
-`./capabilities` read-only at `/app/capabilities`.
+`AGENT_CAPABILITY_MANIFESTS` is a comma-separated list of JSON files or
+directories. The root Compose deployment mounts `./capabilities` read-only at
+`/app/capabilities`.
 
-Configured manifests are loaded at startup. Missing, malformed, or duplicate
-capabilities stop startup so the active registry cannot silently diverge from
-deployment configuration. Manifest strings can reference required environment
-variables such as `${SORIDORMI_MCP_URL}`.
+Startup fails on missing files, malformed manifests, unresolved required
+environment variables, duplicate capability identifiers, or incompatible
+registry content. This is intentional: runtime policy must not silently diverge
+from deployment configuration.
 
-Verify a live server against its manifest before enabling execution:
+The checked-in Soridormi snapshot is materialized from Soridormi's authoritative
+export and pinned to upstream commit
+`a092dc704f1ab797fb1d4f542696fe75026eb171`. See
+[`../capabilities/README.md`](../capabilities/README.md).
+
+## TaskGraph behavior
+
+TaskGraph planning and execution are separate operations. A graph returned in
+`AgentResult.task_graphs` is never automatically dispatched.
+
+- Validation resolves every node against the active registry.
+- Dry-run simulates policy and dependency behavior without remote MCP calls.
+- Read-only execution accepts only eligible side-effect-free capabilities.
+- Planning execution additionally accepts stateful `planning_only` capabilities.
+- Guarded execution requires explicit authorization, graph-bound confirmation,
+  and the capability's safety policy.
+- Physical execution additionally requires an active covering monitor and an
+  emergency fallback.
+- Parallel execution is bounded and honors `can_run_parallel` and
+  `exclusive_group`; physical work remains sequential.
+- Traces and confirmation grants are retained in process memory only.
+
+Detailed semantics are in
+[`../docs/agent_task_graph.md`](../docs/agent_task_graph.md) and
+[`../docs/task_graph_concurrency_decision.md`](../docs/task_graph_concurrency_decision.md).
+
+## Soridormi verification
+
+From the `agent` directory with development dependencies installed:
 
 ```bash
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
 PYTHONPATH=. python -m app.probe_capabilities \
   --manifest ../capabilities/soridormi.json
-```
 
-Run safe status/planning acceptance with:
-
-```bash
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
 PYTHONPATH=. python -m app.soridormi_acceptance \
   --manifest ../capabilities/soridormi.json
 ```
 
-The default command requests a zero-motion plan and does not enable physical
-execution.
-
-Against Soridormi's disposable dry-run MCP process, verify the guarded path:
-
-```bash
-SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-PYTHONPATH=. python -m app.soridormi_acceptance \
-  --manifest ../capabilities/soridormi.json \
-  --guarded-dry-run
-```
-
-This requires `dry_run_only=true`, exercises confirmation and monitoring, and
-proves the normal `motion.stop` fallback. It is not hardware acceptance.
-
-Against a runtime-backed MCP adapter on a supervised target, verify in-flight
-cancellation and the safety layer with:
-
-```bash
-SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-PYTHONPATH=. python -m app.soridormi_acceptance \
-  --manifest ../capabilities/soridormi.json \
-  --exercise-runtime-cancellation
-```
-
-This uses a five-second zero-velocity plan by default and intentionally leaves
-Soridormi emergency-stopped after verifying the cancellation fallback.
-
-Soridormi plan creation is intentionally stateful even though it cannot move
-hardware. Enable it separately with:
-
-```env
-AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1
-```
-
-This exposes `POST /task-graphs/execute-planning`, which accepts only
-`safe_read` and `planning_only` nodes. Physical and safety-control tools remain
-behind guarded execution.
-
-### TaskGraph planning
-
-Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to let `tool` routes ask the configured
-LLM for a structured plan. The Agent replaces model-provided graph identity,
-marks the graph as LLM-authored, validates it against the active capability
-registry, and returns it in `AgentResult.task_graphs`.
-
-Planning does not execute tools. Invalid model output falls back to the existing
-single `tool_executor` action path.
-
-The MCP Streamable HTTP adapter is available behind the async `ToolInvoker`
-boundary. It derives endpoints from loaded manifests and enforces side-effect,
-confirmation, safety-monitor, and safety-control authorization before making a
-remote call. Automatic graph execution is still disabled.
-
-Read-only graph execution can be enabled separately with
-`AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION=1`. The
-`POST /task-graphs/execute-read-only` endpoint preflights the whole graph and
-accepts only side-effect-free `safe_read` and `planning_only` capabilities.
-
-Independent read-only and planning nodes can run concurrently with:
-
-```env
-AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION=1
-AGENT_TASK_GRAPH_MAX_CONCURRENCY=4
-```
-
-This path is default-off, bounded, honors capability `can_run_parallel` and
-`exclusive_group` policy, and returns results in deterministic node order.
-Guarded and physical execution remain sequential.
-
-Supervised side effects use `POST /task-graphs/execute-guarded` and require
-`AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=1` plus an operator bearer token in
-`AGENT_TASK_GRAPH_EXECUTION_TOKEN`. Confirmation is bound to named confirmation
-nodes. Physical motion also requires `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1`
-and a covering monitor that reports active before execution.
-
-Use `POST /task-graphs/confirmation-grants` to create a short-lived, single-use
-grant bound to the exact graph, and `POST /task-graphs/{graph_id}/cancel` to
-cancel active execution. Physical cancellation or failure invokes the graph's
-required emergency-stop fallback.
+The default acceptance uses safe status/planning behavior and does not authorize
+physical motion. Additional guarded dry-run and runtime-cancellation modes are
+documented in [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md).
 
 ## Run locally
 
-```bash
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8092
-```
-
-## Docker
+From the repository root:
 
 ```bash
-docker build -t chromie-agent ./agent
-docker run --rm -p 8092:8092 \
-  -e AGENT_OLLAMA_URL=http://host.docker.internal:11434 \
-  chromie-agent
+python -m venv .venv
+source .venv/bin/activate
+pip install -r agent/requirements.txt
+PYTHONPATH=agent uvicorn app.main:app --host 0.0.0.0 --port 8092
 ```
 
-## Compose
+The service can run with `AGENT_USE_LLM=0`; deterministic fallbacks remain
+available for control-plane testing.
 
-The service is already integrated into the root `docker-compose.yml`. Use the root startup and generated runtime configuration:
+## Build the container
+
+The Dockerfile requires the repository root as build context:
+
+```bash
+docker build -f agent/Dockerfile -t chromie-agent .
+```
+
+Normally start the complete service set through:
 
 ```bash
 ./scripts/start_services.sh
 ```
 
-## Notes
+## Known limitations
 
-- `speaker_agent` decides wording only. It does not play audio.
-- Real hardware execution should stay in the host orchestrator or a host hardware daemon.
-- The service can work without Ollama. It will fall back to deterministic short replies.
-- Model and timeout defaults should normally come from the selected hardware profile, not component-local hardcoded values.
-# Interaction response
-
-`POST /interaction` accepts the same request as `POST /run` and returns the
-shared `InteractionResponse` contract. During the I3 migration it adapts the
-existing `AgentResult`; callers can adopt the new contract before the native
-single-agent structured-output path replaces that adapter.
+- Native `/interaction` output is implemented; spoken request-bound confirmation and reviewed reference-host microphone evidence remain open.
+- Tool, memory, and vision compatibility actions are proposals, not built-in executors.
+- TaskGraph scheduler, grants, and traces are process-local rather than durable or distributed.
+- Cross-process robot exclusivity is enforced by Soridormi, not by the Agent's local scheduler.
+- Enabling physical execution is not equivalent to hardware commissioning or target acceptance.

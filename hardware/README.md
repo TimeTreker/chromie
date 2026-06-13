@@ -1,49 +1,72 @@
 # Chromie Hardware Daemon
 
-Host-side hardware executor for Chromie robot actions.
+This directory contains Chromie's legacy host-side compatibility daemon. It
+supports the original `AgentResult.actions` path and GPU-free control-plane
+tests. It is not the primary embodiment boundary for the current M13
+interaction architecture.
 
-This module is intentionally designed to run on the **host**, not in Docker, because real robot hardware often needs direct access to serial ports, USB devices, GPIO, cameras, motor SDKs, audio devices, or realtime scheduling.
+New robot-body behavior must be exposed as validated named skills through the
+host Skill Runtime and Soridormi MCP. Soridormi owns embodied planning,
+resource policy, stop/emergency behavior, simulator integration, and real
+hardware commissioning.
 
-The daemon exposes a small HTTP API used by `chromie-orchestrator`:
+## Current implementation status
 
-- `GET /health`
-- `GET /state`
-- `POST /actions`
-- `GET /actions/{action_id}`
-- `POST /emergency_stop`
+The daemon currently instantiates `HardwareService()` with `MockRobotDriver`.
+Although `HARDWARE_DRIVER` and serial-related environment names/files exist in
+the repository, `daemon.py` does not select a serial or production driver. In
+this revision, every daemon launch therefore uses the mock driver.
 
-By default it uses the mock driver, so you can test the full route → agent → action flow without real hardware.
+Do not treat the presence of serial adapter code or configuration names as
+hardware acceptance evidence.
 
-The daemon rejects `unsafe.*` actions and any action that still has `requires_confirmation=true`. Confirmation must be resolved by the Orchestrator before an action reaches hardware.
+## HTTP API
 
-## Run on host
+Default address: `http://127.0.0.1:8095`
+
+- `GET /health` — service, driver, and state summary
+- `GET /state` — current mock robot state
+- `POST /actions` — submit a compatibility action
+- `GET /actions/{action_id}` — retrieve the retained result
+- `POST /emergency_stop` — set the mock emergency-stop state
+- `POST /reset_emergency_stop` — clear the mock emergency-stop state
+
+Results are retained in process memory only.
+
+The service rejects:
+
+- actions with `requires_confirmation=true`; confirmation must be resolved
+  before this boundary;
+- action types in the `unsafe.*` namespace.
+
+Those checks are compatibility safeguards, not a substitute for Soridormi's
+physical safety contract.
+
+## Run on the host
+
+From the repository root:
 
 ```bash
-cd hardware
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python daemon.py
+python3 -m venv hardware/.venv
+source hardware/.venv/bin/activate
+pip install -r hardware/requirements.txt
+python -m hardware.daemon
 ```
 
-Default server:
-
-```text
-http://127.0.0.1:8095
-```
-
-## Environment variables
+Configuration actually consumed by `daemon.py`:
 
 ```env
 HARDWARE_HOST=127.0.0.1
 HARDWARE_PORT=8095
 HARDWARE_DRIVER=mock
-HARDWARE_SERIAL_PORT=/dev/ttyUSB0
-HARDWARE_SERIAL_BAUD=115200
-HARDWARE_ACTION_TIMEOUT_MS=5000
 ```
 
-## Example action
+`HARDWARE_DRIVER` is reported as deployment intent but is not currently wired
+to driver selection. `HARDWARE_SERIAL_PORT`, `HARDWARE_SERIAL_BAUD`, and
+`HARDWARE_ACTION_TIMEOUT_MS` should not be documented as active daemon behavior
+until implementation selects and uses them.
+
+## Example mock action
 
 ```bash
 curl -X POST http://127.0.0.1:8095/actions \
@@ -57,6 +80,7 @@ curl -X POST http://127.0.0.1:8095/actions \
 
 ## Design rule
 
-The daemon should execute **safe, validated, low-level actions** only.
-
-It should not talk to ASR/TTS/LLM. It should not decide what Chromie should say. It should only execute hardware actions requested by the host orchestrator.
+Do not add LLM-visible raw motor, torque, joint-target, or actuator-control
+interfaces here. The strict interaction contracts reject such low-level fields,
+and production embodiment belongs behind Soridormi's named, schema-validated,
+safety-scoped skills.

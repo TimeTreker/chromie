@@ -1,379 +1,240 @@
-# Chromie-Soridormi Voice and Body Interaction Plan
+# Interaction Agent and Skill Runtime
 
-Status: planned
+## Current status
 
-Last reviewed: June 12, 2026
+The structured interaction architecture is implemented across M6-M12 and is the
+main focus of M13 completion.
 
-## Goal
+Implemented now:
 
-Build the reusable interaction mainline in which a person speaks naturally and
-the robot can answer through speech, body action, or both:
+- strict shared interaction contracts;
+- native `POST /interaction` output plus explicit compatibility rollback;
+- host Interaction Coordinator;
+- trusted Skill Registry and providers;
+- local speech as a named runtime skill;
+- Soridormi named-skill discovery and execution;
+- bounded scheduling and exclusive groups;
+- timeouts, traces, cancellation, and barge-in propagation;
+- simulation-only auto-confirm exemptions;
+- deterministic text-driven live Soridormi acceptance.
 
-```text
-microphone
-  -> ASR
-  -> Interaction Agent
-  -> trusted Skill Runtime
-  -> local speech and Soridormi body-skill providers
-  -> speaker and robot
-```
+Open M13 gates:
 
-The first end-to-end acceptance example is:
+- complete a non-skippable spoken, request-bound confirmation dialogue;
+- run and review the implemented seven-case microphone/MuJoCo evidence flow on
+  the reference host;
+- close applicable target-evidence tracks and publish the prepared alpha
+  candidate only after all blockers are removed.
 
-```text
-user: "hello"
-robot: says "hello" and performs nod_yes
-```
+## Design goal
 
-This is an acceptance example, not a special-case implementation. The same
-contracts must support general requests such as looking, walking, stopping,
-answering without motion, acting without speech, and asking for clarification.
-
-## Ownership Boundary
-
-Chromie is the robot brain. It owns:
-
-- microphone session, VAD, interruption, ASR, TTS, and playback;
-- conversation, memory, semantic intent, and high-level planning;
-- selection of zero or more registered skills;
-- coordination of speech and body skills;
-- the trusted Skill Runtime, including validation, scheduling, cancellation,
-  confirmation, and traces.
-
-Soridormi is the robot cerebellum and body runtime. It owns:
-
-- authoritative body-skill definitions and availability;
-- body-skill argument validation and safety refusal;
-- translation from named skills to bounded plans;
-- MuJoCo or hardware execution, status, stop, and safe hold;
-- low-level policy, controller, joint, and motor boundaries.
-
-Chromie must never send raw joint targets, motor commands, or `action_14d`.
-Soridormi must never receive raw natural language as a low-level control input.
-
-## Target Architecture
+The language model may propose speech and validated named skills. It must not
+emit or authorize raw robot controls.
 
 ```text
-host microphone
-  -> deterministic pre-router
-       silence/noise handling
-       interruption, stop, and emergency paths
-  -> ASR
-  -> Interaction Agent LLM
-       understand intent
-       generate natural-language reply
-       select zero or more structured skills
-  -> InteractionResponse
-       speech[]
-       skills[]
-       coordination
-  -> Chromie Skill Runtime
-       schema and registry validation
-       availability and precondition checks
-       confirmation and safety policy
-       scheduling, timeout, cancellation, and traces
-  -> providers
-       LocalSpeechSkillProvider -> TTS/playback
-       SoridormiMcpSkillProvider -> MCP client
-       CompositeSkillProvider -> registered compositions
-  -> Soridormi MCP server
-       named-skill validation and planning
-       runtime-backed execution
-       status, cancel, stop, and safe hold
-  -> MuJoCo, then hardware after its separate safety gates
+user speech
+  -> deterministic operational controls
+  -> structured interaction reasoning
+  -> strict InteractionResponse
+  -> trusted host Skill Runtime
+      -> speech provider
+      -> Soridormi named-skill provider
 ```
 
-The MCP server remains part of the Soridormi deployment. Chromie's Skill
-Runtime calls it through an MCP provider; it does not absorb the server or
-Soridormi's execution authority.
+The execution boundary—not the model—owns validation, availability,
+confirmation, resource policy, timeout, cancellation, and provider calls.
 
-## Interaction Agent
+## Shared contracts
 
-One capable LLM should own semantic understanding, conversation, routing, and
-high-level skill composition. This component is called the Interaction Agent.
-It replaces duplicate semantic decisions split between a small LLM router and a
-talking LLM.
+`InteractionResponse` contains:
 
-A deterministic pre-router remains necessary for operations that must not wait
-for an LLM:
+- `interaction_id`;
+- status: `ok`, `clarify`, `refused`, `ignored`, or `error`;
+- zero or more `InteractionSpeech` items;
+- zero or more `SkillRequest` items;
+- aggregate confirmation requirement;
+- bounded metadata and reason information.
 
-- silence and unusable audio;
-- playback interruption and barge-in;
-- explicit stop/cancel;
-- emergency stop;
-- service-unavailable fallback.
+Speech timing supports `immediate`, `parallel`, `sequential`, and
+`after_skills`. Skill timing supports `parallel` and `sequential`.
 
-The Interaction Agent proposes an output. It does not directly invoke MCP,
-hardware, or low-level actions.
+The models use strict schemas and recursively reject known low-level fields such
+as raw joint targets, motor commands, actuator controls, and torque commands,
+including when nested in metadata or arguments.
 
-## Interaction Contract
+A valid contract is still only a request. The runtime resolves each skill
+against a trusted definition and provider before execution.
 
-The response contract must represent speech only, action only, speech plus
-action, clarification, refusal, and no response. A representative result is:
+## Current Agent implementation
 
-```json
-{
-  "speech": [
-    {
-      "text": "Hello, nice to see you.",
-      "timing": "immediate"
-    }
-  ],
-  "skills": [
-    {
-      "skill_id": "soridormi.nod_yes",
-      "args": {
-        "count": 2,
-        "amplitude": "small"
-      },
-      "timing": "parallel"
-    }
-  ],
-  "requires_confirmation": false
-}
+`POST /interaction` accepts the same `AgentRunRequest` as `POST /run`:
+
+1. run the specialized-agent pipeline with `InteractionDraft`;
+2. create `InteractionSpeech` and `SkillRequest` objects as agents add speech,
+   actions, or TaskGraphs;
+3. serialize and revalidate the complete `InteractionResponse` contract;
+4. return native output with `interaction_output_mode=native` metadata.
+
+`POST /run` continues to use `AgentResult`. The old
+`AgentResultInteractionAdapter` is retained only for explicit rollback mode or
+opt-in native-validation fallback. Native validation failures are fail-closed by
+default.
+
+The native path preserves:
+
+- deterministic interrupt, stop, and emergency handling outside model control;
+- registry-filtered named skills only;
+- schema validation and low-level-field rejection;
+- deterministic fallback when model output is invalid;
+- no direct TTS, MCP, or hardware call from the Agent.
+
+## Host Interaction Coordinator
+
+The coordinator:
+
+- registers `chromie.speak` locally;
+- loads the Soridormi named-skill catalog when the provider is enabled;
+- attaches session metadata;
+- translates speech items into Skill Runtime requests;
+- computes applicable simulation confirmation exemptions;
+- executes the complete response through one runtime;
+- exposes interaction-scoped cancellation.
+
+The coordinator does not invent an unregistered skill when catalog loading
+fails. Body requests fail closed.
+
+## Skill Registry and definitions
+
+Each trusted `SkillDefinition` describes:
+
+- stable skill ID and version;
+- provider ID;
+- input schema;
+- availability and reason when unavailable;
+- confirmation and monitor requirements;
+- timeout, interruptibility, idempotency, and parallelism;
+- exclusive resource group;
+- provider-specific metadata.
+
+The host registry is distinct from the Agent capability registry. The former
+controls runtime provider execution; the latter controls TaskGraph planning and
+MCP policy. The native Agent path and host runtime keep these registries separate;
+provider resolution and execution authorization remain host-owned.
+
+## Local speech provider
+
+`InteractionSpeech` is converted to a `chromie.speak` request. The provider
+calls the Orchestrator's speech scheduler, which coordinates TTS streaming and
+playback. Interruptible speech is cancellable during barge-in.
+
+Speech participates in the same timing model as other skills:
+
+- immediate/parallel speech may overlap eligible work;
+- sequential speech waits in order;
+- `after_skills` speech runs after body/tool requests.
+
+## Soridormi provider
+
+The provider discovers named skills from the live Soridormi catalog and
+registers host definitions. A body-skill execution uses Soridormi's managed
+sequence rather than sending low-level controls:
+
+1. create a plan for the named skill;
+2. establish or verify required safety monitoring;
+3. execute the plan;
+4. propagate result and trace data;
+5. on cancellation, call Soridormi's motion-cancel boundary and preserve
+   stop/emergency behavior.
+
+Robot skills share an exclusive resource group so conflicting motion is not run
+concurrently. Soridormi remains authoritative when requests arrive from
+multiple Chromie processes.
+
+## Runtime scheduling
+
+`SkillRuntime` validates the full scheduled sequence before dispatch and then:
+
+- groups eligible parallel requests;
+- respects `can_run_parallel` and exclusive groups;
+- bounds work with `ORCH_SKILL_MAX_CONCURRENCY`;
+- applies effective timeouts;
+- records one trace per request;
+- keeps result order deterministic;
+- scopes cancellation to the interaction.
+
+Runtime state is in memory. It is not a durable job queue.
+
+## Confirmation
+
+Implemented foundations:
+
+- per-request and per-definition confirmation flags;
+- authorization by exact request ID;
+- simulation-mode catalog exemptions;
+- rejection when required confirmation is absent;
+- TaskGraph graph-bound confirmation grants on the Agent side.
+
+Still required for M13 completion:
+
+1. speak an explicit, action-specific confirmation prompt;
+2. accept only a bounded affirmative/negative reply;
+3. bind approval to the exact request/arguments and expiry;
+4. reject silence, ambiguity, replay, or changed arguments;
+5. allow interruption and denial at every stage;
+6. retain acceptance evidence for both approval and refusal paths.
+
+No hardware motion should use simulation auto-confirm behavior.
+
+## Failure and fallback behavior
+
+- Invalid interaction contracts fail before execution.
+- Unknown, unavailable, or version-mismatched skills fail closed.
+- Disabled Soridormi support does not fall back to the legacy hardware daemon.
+- Provider timeout or cancellation is reflected in `SkillResult` and trace.
+- Speech-only fallback may continue when safe, but must not claim a failed action
+  completed.
+- Interruption must stop playback and cancel the owning interaction without
+  cancelling unrelated work.
+
+## Feature gates
+
+```env
+ORCH_ENABLE_INTERACTION_RESPONSE=0
+ORCH_ENABLE_SORIDORMI_SKILLS=0
+ORCH_AUTO_CONFIRM_SIM_SKILLS=0
+ORCH_SKILL_MAX_CONCURRENCY=8
+AGENT_INTERACTION_OUTPUT_MODE=native
+AGENT_NATIVE_INTERACTION_FALLBACK=0
 ```
 
-Required contract concepts:
+Defaults remain conservative. Enable structured speech-only rollout before
+Soridormi skills, then close simulator acceptance before any supervised hardware
+work.
 
-- stable skill identifier and version;
-- typed arguments;
-- sequential or parallel timing;
-- timeout and cancellation behavior;
-- confirmation requirement;
-- idempotency or request identity;
-- result, refusal, failure reason, and trace identity.
+## Acceptance
 
-Raw joints, motor commands, controller outputs, and `action_14d` are forbidden
-fields at this boundary.
+The deterministic text-driven live Soridormi flow is exercised by:
 
-## Skill Registry
-
-Chromie maintains the global registry used by the Interaction Agent and Skill
-Runtime. Entries can be backed by:
-
-- local providers, such as speech;
-- MCP providers, such as Soridormi body skills;
-- composite providers, which coordinate registered skills.
-
-Soridormi remains authoritative for body-skill schemas and live availability.
-Chromie imports that metadata instead of maintaining a divergent hand-written
-copy.
-
-Initial body skills for integration:
-
-- `soridormi.nod_yes`;
-- `soridormi.look_at_person`;
-- `soridormi.express_attention`;
-- bounded walking and turning skills;
-- `soridormi.stop`.
-
-Unavailable hardware skills must remain visible as unavailable and must fail
-with an explicit reason.
-
-## Relationship to TaskGraph
-
-TaskGraph remains useful as an internal representation for complex,
-multi-provider execution. It is not the primary user-facing output of the
-Interaction Agent.
-
-The expected layering is:
-
-```text
-InteractionResponse
-  -> validated SkillRequest objects
-  -> optional internal TaskGraph for scheduling
-  -> provider calls
+```bash
+./scripts/interaction_text_acceptance.py
 ```
 
-This keeps ordinary speech and gestures simple while preserving the existing
-guarded graph executor for complex tasks.
+It covers Router, native Agent interaction output, strict contracts,
+trusted Skill Runtime scheduling, live Soridormi MCP, and a test speech
+scheduler. It deliberately does not prove microphone capture, real TTS
+playback, or hardware motion.
 
-## Implementation Plan
+The complete M13 microphone matrix and evidence requirements are maintained in
+[`ACCEPTANCE.md`](ACCEPTANCE.md). Run and verify it with:
 
-### I0 - Freeze Cross-Project Contracts
+```bash
+python scripts/m13_voice_acceptance.py \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+python scripts/verify_m13_evidence.py --require-clean \
+  .chromie/acceptance/m13/<acceptance-id>
+```
 
-Status: complete in Chromie as of June 12, 2026.
-
-Deliver:
-
-- `InteractionResponse`, `SkillRequest`, `SkillResult`, and `SkillTrace`
-  schemas;
-- provider, cancellation, timing, and confirmation contracts;
-- registry metadata and versioning rules;
-- explicit forbidden low-level fields.
-
-Gate:
-
-- schema round-trip tests pass;
-- unknown skills and invalid arguments are rejected;
-- raw joint, motor, and `action_14d` fields are rejected;
-- Chromie and Soridormi contract fixtures agree.
-
-### I1 - Build the Chromie Skill Runtime
-
-Status: complete in Chromie as of June 12, 2026. Production Orchestrator
-wiring remains I4.
-
-Deliver:
-
-- skill registry and provider interface;
-- local speech provider;
-- MCP body-skill provider;
-- sequential and parallel scheduler;
-- timeout, cancellation, confirmation, and trace handling;
-- compatibility adapter for current Agent results and TaskGraph execution.
-
-Gate:
-
-- speech-only request completes;
-- action-only dry-run reaches the mock provider;
-- parallel speech/body scheduling and sequential scheduling pass tests;
-- interruption cancels all cancellable child work;
-- no provider can bypass registry and policy validation.
-
-### I2 - Expose Named Soridormi Skills over MCP
-
-Status: complete in Soridormi and imported into Chromie's checked-in capability
-fixture as of June 12, 2026.
-
-Deliver:
-
-- authoritative named-skill catalog with schemas and availability;
-- named-skill plan and execution tools, separate from the existing bounded
-  velocity-plan contract;
-- runtime-backed status, cancellation, stop, and safe hold;
-- adapters from social skills to the scripted keyframe executor and from
-  locomotion skills to the existing controller/runtime.
-
-Gate:
-
-- `nod_yes`, `look_at_person`, and `express_attention` execute in MuJoCo
-  through MCP;
-- invalid and unavailable requests return stable refusal reasons;
-- cancellation leaves Soridormi in a safe state;
-- current velocity-plan clients remain compatible.
-
-### I3 - Implement the Interaction Agent
-
-Status: in progress. Chromie now exposes `POST /interaction`, returning the I0
-`InteractionResponse` contract. The endpoint currently adapts the established
-multi-agent result and translates known pose actions to Soridormi named skills;
-the single semantic structured-output LLM path remains to be implemented.
-
-Deliver:
-
-- one semantic LLM path for understanding, reply generation, and skill choice;
-- registry-aware structured output;
-- validation repair and deterministic fallback;
-- deterministic pre-router for interrupt, stop, emergency, and unusable input;
-- migration path from the current Router/Agent split.
-
-Gate:
-
-- factual conversation produces speech only;
-- an explicit gesture can produce action only;
-- a greeting can produce speech and `nod_yes`;
-- ambiguous or unsafe requests clarify or refuse;
-- stop and emergency paths do not depend on LLM completion.
-
-### I4 - Connect Orchestrator Execution
-
-Status: in progress. The host Orchestrator can consume `POST /interaction`
-behind `ORCH_ENABLE_INTERACTION_RESPONSE`, schedule local speech through the
-trusted runtime, lazily import Soridormi's live named-skill catalog, execute
-opaque named-skill plans over MCP, and cancel active runtime work on
-interruption. Headless text-input acceptance now passes against the live
-MuJoCo-backed Soridormi runtime. The production rollout remains default-off
-pending native Interaction Agent output and microphone acceptance.
-
-Deliver:
-
-- Orchestrator execution of validated Interaction Agent results;
-- TTS/body parallelism and ordering;
-- barge-in, session lifecycle, cancellation, and trace correlation;
-- removal of the current log-only body-plan behavior from the production path.
-
-Gate:
-
-- [Passed headless] text input reaches the Agent compatibility adapter, trusted
-  Skill Runtime, local speech, Soridormi MCP, and real MuJoCo execution;
-- microphone input reaches ASR, Interaction Agent, Skill Runtime, TTS, and
-  Soridormi;
-- one utterance produces one coordinated response;
-- interruption stops speech and body work without leaving an orphaned plan.
-
-### I5 - Cross-Project MuJoCo Acceptance
-
-Run both deployments and retain evidence for:
-
-| User request | Expected result |
-|---|---|
-| "Hello" | speech plus `nod_yes` |
-| "Look at me" | acknowledgement plus `look_at_person` |
-| "Are you listening?" | speech plus `express_attention` |
-| "Nod" | `nod_yes`, with optional brief speech |
-| "Stop" | immediate speech/body cancellation and safe hold |
-| Unsupported or unsafe action | clarification or explicit refusal |
-
-Gate:
-
-- traces correlate ASR text, InteractionResponse, Skill Runtime, MCP request,
-  and Soridormi execution;
-- no raw low-level command crosses the brain/body boundary;
-- stop latency meets the agreed bound;
-- no test leaves an executing plan, emergency latch, or fallen robot.
-
-### I6 - Hardware Enablement
-
-Hardware is not part of the initial mainline. Begin only after:
-
-- all I5 MuJoCo gates pass;
-- Soridormi H3-H5 hardware commissioning gates pass;
-- each enabled skill has hardware-specific limits and availability;
-- supervised stop and recovery procedures are accepted.
-
-## Development Order
-
-Implement in this order:
-
-1. I0 contracts.
-2. I1 Skill Runtime with mock providers.
-3. I2 Soridormi named-skill MCP support.
-4. I3 Interaction Agent structured output.
-5. I4 Orchestrator execution.
-6. I5 full MuJoCo voice-to-speech-and-action acceptance.
-7. I6 hardware enablement later.
-
-The mainline is the priority. Model fine-tuning and small optimizations should
-wait unless a measured failure blocks an acceptance gate.
-
-## Current Gap Summary
-
-Available now:
-
-- Chromie realtime microphone, ASR, conversation, TTS, interruption, registry,
-  guarded MCP invocation, TaskGraph validation, cancellation, and traces;
-- Chromie interaction contracts and trusted Skill Runtime with registry
-  validation, local speech, mock and Soridormi MCP providers, sequential and
-  parallel scheduling, confirmation, timeout, cancellation, traces, and legacy
-  AgentResult/TaskGraph adapters;
-- Soridormi runtime-backed MCP transport, bounded velocity plans, named-skill
-  discovery/planning/execution, status, cancellation, emergency stop, safe
-  hold, and scripted social skills.
-
-Still required:
-
-- native Interaction Agent structured speech-plus-skills generation without
-  the compatibility adapter;
-- text-input acceptance of the flagged production Orchestrator loop and
-  microphone acceptance through ASR and TTS;
-- the remaining coordinated speech/body acceptance matrix and retained trace
-  evidence.
-
-Headless evidence retained on June 12, 2026:
-
-- live capability probe advertised all 12 expected Soridormi MCP tools;
-- `nod` produced local speech and completed a non-dry-run
-  `soridormi.nod_yes` MuJoCo execution in 7.177 seconds;
-- cancellation after 0.5 seconds completed in 0.563 seconds and left
-  `active_task` clear with the emergency stop unlatched.
+The runner records correlated JSONL session events through
+`ORCH_EVENT_LOG_PATH`, redacted runtime configuration, audio devices, logs,
+recordings, automated checks, and operator notes. Tooling existence is not
+reference-host evidence.

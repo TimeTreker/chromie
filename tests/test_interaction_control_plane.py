@@ -4,8 +4,7 @@ import unittest
 from typing import Any
 
 from agent.app.agents import AgentServices
-from agent.app.interaction import AgentResultInteractionAdapter
-from agent.app.runtime import AgentRuntime
+from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentRunRequest
 from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import (
@@ -75,7 +74,7 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(decision)
         assert decision is not None
 
-        legacy_result = await AgentRuntime(
+        response = await InteractionRuntime(
             AgentServices(ollama=None, use_llm=False)
         ).run(
             AgentRunRequest(
@@ -84,7 +83,6 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
                 route_decision=decision.model_dump(mode="json"),
             )
         )
-        response = AgentResultInteractionAdapter().convert(legacy_result)
         spoken: list[str] = []
         invoker = _NamedSkillInvoker()
         execution = await InteractionRuntimeCoordinator(

@@ -1,73 +1,105 @@
 # Chromie Voice Assistant
 
-Chromie is a local, GPU-accelerated realtime voice assistant stack. It combines speech recognition, fast intent routing, multi-agent reasoning, a local Ollama model, and streaming speech synthesis.
+Chromie is a local, GPU-accelerated realtime voice assistant and embodied-agent
+orchestration stack. It combines host-side audio/VAD/playback, containerized
+ASR, deterministic routing, local Ollama reasoning, structured interaction,
+streaming TTS, and optional named robot skills provided by Soridormi.
 
-中文读者可以从 [Chromie 中文项目指南](docs/PROJECT_GUIDE.zh-CN.md) 开始，了解架构、部署、验证与常见问题。
+> **Current status:** the repository is at **M13 — Native Interaction Agent and
+> end-to-end voice acceptance**. Native `/interaction`, structured session-event
+> evidence, the guided microphone/MuJoCo acceptance runner, evidence verification,
+> and `v0.1.0-alpha.1` candidate packaging are implemented. M13 remains open until
+> spoken request-bound confirmation and a real reference-host evidence bundle are
+> completed and reviewed. See [Current Implementation Status](docs/STATUS.md).
 
-Project progress and the active milestone are tracked in [Chromie Roadmap](ROADMAP.md).
-The current engineering milestone is **M6 - Interaction Agent and Skill
-Runtime**. M5 target-host evidence remains an operational acceptance track.
+中文说明见 [Chromie 中文项目指南](docs/PROJECT_GUIDE.zh-CN.md)。
 
-## Architecture
+## What works today
 
-Current implementation:
+- A five-service Docker stack: ASR, TTS, Ollama, Router, and Agent.
+- A host Orchestrator for microphone capture, VAD, barge-in, playback, short-term
+  conversation state, and trusted Skill Runtime coordination.
+- The established `RouteDecision -> AgentResult` voice path with deterministic
+  fallback behavior.
+- A shared `InteractionResponse` contract and native `POST /interaction`
+  runtime, with strict validation and an explicit legacy-adapter rollback mode.
+- A trusted Skill Runtime with speech and Soridormi named-skill providers,
+  bounded scheduling, confirmation checks, timeout, cancellation, and traces.
+- Capability-registry validation and live MCP schema probing.
+- TaskGraph planning, dry run, read-only/planning execution, guarded execution,
+  one-time confirmation grants, cancellation, emergency fallbacks, and bounded
+  parallel non-physical work.
+- GPU-free regression tests plus GPU, simulator, and supervised target
+  acceptance tooling.
+- Correlated JSONL session-event capture and a guided seven-case microphone/
+  MuJoCo evidence runner.
+- Versioned `v0.1.0-alpha.1` candidate notes, compatibility declaration, source
+  archive generation, checksums, and strict release gating.
+
+## What is not closed yet
+
+- Non-skippable body-skill confirmation is not yet a complete spoken,
+  request-bound user dialogue.
+- The guided microphone matrix and evidence verifier exist, but no real
+  reference-host bundle is committed or declared accepted in this snapshot.
+- The alpha packaging path is prepared but intentionally non-publishable while
+  tracked M13 blockers remain.
+- M3 GPU and M5 supervised target evidence remain open operational tracks.
+- Jetson profiles are configuration profiles, not proof of complete ARM64 image
+  compatibility.
+- The host hardware daemon is a legacy mock compatibility path; real embodied
+  execution belongs in Soridormi.
+- No official release package or compatibility guarantee exists yet.
+
+## Runtime architecture
 
 ```text
-host microphone
-  ↓
-host orchestrator        audio capture, VAD, interruption, session state
-  ↓
-chromie-asr              Faster-Whisper speech recognition
-  ↓
-chromie-router           fast route and intent decision
-  ↓
-chromie-agent            conversation, planning, safety, tools, memory
-  ↓
-chromie-llm              Ollama model server
-  ↓
-chromie-tts              OuteTTS / llama.cpp speech synthesis
-  ↓
-host orchestrator        playback and optional hardware actions
+Host
+  microphone -> VAD -> Orchestrator
+                    -> ASR WebSocket
+                    -> Router HTTP
+                    -> Agent HTTP
+                    -> trusted Skill Runtime
+                         -> local speech -> TTS WebSocket -> speaker
+                         -> Soridormi named skill -> MCP -> simulator/robot
+
+Docker
+  chromie-asr     Faster-Whisper
+  chromie-tts     OuteTTS / llama.cpp
+  chromie-llm     Ollama
+  chromie-router  deterministic and optional LLM routing
+  chromie-agent   conversation, native interaction, capabilities, TaskGraph
 ```
 
-Target interaction mainline:
+Ownership rules:
 
-```text
-microphone -> ASR -> Interaction Agent
-  -> validated Skill Runtime
-  -> local speech provider -> TTS -> speaker
-  -> Soridormi MCP provider -> named body skill -> robot
-```
+- The host Orchestrator owns realtime audio, playback, interruption, session
+  state, and Skill Runtime coordination.
+- The Agent proposes speech, named skills, and TaskGraphs. It does not access
+  microphone, speakers, MCP, or robot hardware directly.
+- Soridormi owns embodied planning, execution policy, safety monitoring,
+  stop/emergency behavior, resource exclusivity, and hardware commissioning.
+- The legacy host hardware daemon is retained for mock/control-plane
+  compatibility only.
 
-The Interaction Agent produces structured speech and skill requests. It never
-executes MCP calls or low-level robot controls directly. See
-[Interaction Agent and Skill Runtime](docs/interaction_agent_skill_runtime.md)
-for the architecture, ownership boundary, implementation stages, and MuJoCo
-acceptance gates.
+## Deployment modes
 
-The central runtime boundary is:
-
-> ASR, Router, Agent, LLM, and TTS run in Docker. The Orchestrator runs on the host because it owns microphone input, playback, audio-device selection, VAD, and interruption.
-
-| Service | Runs on | Port | Purpose |
-|---|---|---:|---|
-| `chromie-asr` | Docker | `9001` | WebSocket speech recognition |
-| `chromie-tts` | Docker | `5000` | WebSocket speech synthesis |
-| `chromie-llm` | Docker | `11434` | Ollama model server |
-| `chromie-router` | Docker | `8091` | Lightweight route and intent decision |
-| `chromie-agent` | Docker | `8092` | Conversation and action planning |
-| Orchestrator | Host | n/a | Realtime audio and service coordination |
-| Hardware daemon | Host, optional | `8095` | Robot action execution |
+| Mode | Key settings | Current support state |
+|---|---|---|
+| Compatibility voice | defaults from `.env.common` | Main working voice path |
+| Structured speech-only | `ORCH_ENABLE_INTERACTION_RESPONSE=1`, Soridormi skills off | Implemented; useful for rollout validation |
+| Structured MuJoCo | structured path plus `ORCH_ENABLE_SORIDORMI_SKILLS=1` and live MCP URL | Implemented behind flags; headless text acceptance exists |
+| Physical hardware | guarded feature gates plus commissioned Soridormi hardware | Experimental; not release ready |
 
 ## Requirements
 
-The current desktop deployment targets Linux with:
+The primary deployment target is Linux with:
 
-- Docker and Docker Compose
-- an NVIDIA GPU, driver, and NVIDIA Container Toolkit
-- Conda for the host Orchestrator
-- a microphone and speaker
-- enough disk space for Hugging Face, Ollama, and TTS model caches
+- Docker and Docker Compose;
+- an NVIDIA GPU, driver, and NVIDIA Container Toolkit;
+- Python 3.11 and Conda or an equivalent host environment;
+- a microphone and speaker;
+- disk space for Hugging Face, Ollama, and TTS caches.
 
 Check the basics:
 
@@ -77,91 +109,55 @@ docker compose version
 conda --version
 ```
 
-RTX 5090, RTX 4090 desktop/laptop, Jetson Thor, and Jetson Orin profiles are
-detected automatically. GPU type changes model sizing and deployment details,
-not Chromie's architecture or its Soridormi contract. Other NVIDIA GPUs use a
-conservative fallback or an explicit `.env.local` profile override.
+## Quick start
 
-## Quick Start
-
-### 1. Configure local overrides
-
-Chromie generates `.env.runtime` from:
-
-```text
-.env.common
-  + env/profiles/<detected-profile>.env
-  + .env.local
-```
-
-Create the optional machine-local override file and inspect the selected profile:
+### 1. Select and inspect the hardware profile
 
 ```bash
 cp .env.local.example .env.local
 ./scripts/show_profile.sh
 ```
 
-Only put local overrides in `.env.local`. Do not edit generated `.env.runtime`.
+Chromie generates `.env.runtime` from `.env.common`, the selected
+`env/profiles/*.env`, and `.env.local`. Do not edit `.env.runtime` directly.
 
-### 2. Start Docker services
-
-Build images on the first run:
+### 2. Build and start Docker services
 
 ```bash
 BUILD=1 ./scripts/start_services.sh
 ```
 
-On later runs:
+Later starts can omit `BUILD=1`:
 
 ```bash
 ./scripts/start_services.sh
 ```
 
-The script creates `hf_cache/`, `ollama_data/`, and `recordings/`, generates `.env.runtime`, and starts all five Docker services.
-
-### 3. Prepare the Ollama model
-
-Check installed models:
-
-```bash
-docker compose --env-file .env.runtime exec chromie-llm ollama list
-```
-
-If the `AGENT_MODEL` shown by `./scripts/show_profile.sh` is missing, pull that exact model:
+### 3. Pull and warm the selected Ollama model
 
 ```bash
 set -a
 source .env.runtime
 set +a
-docker compose --env-file .env.runtime exec chromie-llm ollama pull "$AGENT_MODEL"
-```
 
-Warm the selected model:
-
-```bash
+docker compose --env-file .env.runtime exec chromie-llm \
+  ollama pull "$AGENT_MODEL"
 ./scripts/warm_ollama.sh
 ```
 
-### 4. Select host audio devices
-
-Create and activate the Conda environment if it does not already exist, then install the host dependencies:
+### 4. Configure host audio
 
 ```bash
 conda create -n Chromie python=3.11 -y
 conda activate Chromie
 ./scripts/install_orchestrator_deps.sh
-```
 
-The environment name can be changed with `CHROMIE_CONDA_ENV` in `.env.local`.
-
-Create the host audio configuration and list available devices:
-
-```bash
 cp orchestrator/.env.local.example orchestrator/.env.local
 python orchestrator/list_devices.py
 ```
 
-Set `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE` in `orchestrator/.env.local`. Prefer explicit hardware devices over generic entries such as `default`, `sysdefault`, `pipewire`, or monitor devices.
+Set explicit `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE` values in
+`orchestrator/.env.local` when possible.
 
 ### 5. Start the host Orchestrator
 
@@ -169,92 +165,39 @@ Set `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE` in `orchestrator/.env.local`. P
 ./scripts/start_orchestrator.sh
 ```
 
-The script activates the Conda environment named by `CHROMIE_CONDA_ENV`, installs changed host dependencies, warms Ollama, and runs:
+Run only one Orchestrator process. The startup script uses a host lock to avoid
+duplicate microphone sessions and repeated speech.
 
-```bash
-python -m orchestrator.orchestrator
-```
+## Enable structured interaction
 
-Run only one Orchestrator process. The startup script uses a lock file to prevent duplicate microphone sessions and duplicate spoken replies.
-
-## Configuration
-
-Hardware-specific defaults live in `env/profiles/*.env`; `.env.local` has the highest generated-config priority. Common overrides include:
+Speech-only structured rollout:
 
 ```env
-CHROMIE_HARDWARE_PROFILE=rtx4090
-AGENT_MODEL=gemma4:e2b
-ROUTER_USE_LLM=0
-AGENT_MAX_SPEAK_CHARS=160
+ORCH_ENABLE_INTERACTION_RESPONSE=1
+ORCH_ENABLE_SORIDORMI_SKILLS=0
 ```
 
-Keep the Router deterministic by default:
-
-```env
-ROUTER_USE_LLM=0
-```
-
-The Agent is the primary talking and planning component:
-
-```env
-AGENT_USE_LLM=1
-```
-
-Trusted external capability manifests can be mounted from `./capabilities` and
-enabled with `AGENT_CAPABILITY_MANIFESTS`. See
-[Capability Registry](docs/agent_capability_registry.md) for the fail-fast
-loading rules and runtime inspection endpoints.
-
-For Soridormi, set
-`AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json` and provide
-`SORIDORMI_MCP_URL`. Probe the live MCP endpoint against the checked-in
-manifest before enabling TaskGraph execution.
-
-The I3/I4 structured interaction path is available behind:
+MuJoCo-backed named skills:
 
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=1
+ORCH_SORIDORMI_MANIFEST=capabilities/soridormi.json
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
 
-Keep `ORCH_ENABLE_SORIDORMI_SKILLS=0` for speech-only rollout. Named body
-skills fail closed when the provider is disabled. In MuJoCo,
-`ORCH_AUTO_CONFIRM_SIM_SKILLS=1` applies Soridormi's declared
-simulation-only confirmation exemption; it does not exempt hardware actions.
-
-Soridormi is the robot cerebellum: it owns embodied planning, safety, policy
-execution, and robot feedback. Chromie owns conversation, global planning,
-confirmation, and orchestration. The checked-in manifest is materialized from
-[Soridormi's exported contract](https://github.com/TimeTreker/soridormi) with
-only the deployment transport changed to MCP Streamable HTTP.
-
-The projects remain separate deployments: Soridormi publishes a dedicated
-`soridormi-mcp` container, while `chromie-agent` connects to it through
-`SORIDORMI_MCP_URL`. Chromie does not embed Soridormi in its own images.
-
-Set `AGENT_ENABLE_TASK_GRAPH_PLANNING=1` to opt eligible `tool` routes into
-validated structured planning. Planned graphs are returned for inspection and
-are not executed until a guarded `ToolInvoker` transport is configured.
-
-`AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION=1` separately enables MCP execution
-for graphs containing only side-effect-free read and planning capabilities.
-
-`AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1` enables safe reads plus
-stateful `planning_only` tools such as Soridormi plan creation. It still rejects
-speech, writes, safety controls, and physical motion.
-
-Guarded side effects and physical motion have separate, default-off deployment
-gates. See [Task Graph](docs/agent_task_graph.md) for operator authorization,
-node-bound confirmation, and safety-monitor requirements.
-
-Use `AGENT_MAX_SPEAK_CHARS` or `TTS_MAX_TEXT_CHARS` to shorten speech. `TTS_MAX_LENGTH` is the TTS generation budget and should not be reduced to a small text-length value.
-
-See [Hardware Profiles](HARDWARE_PROFILES.md) for profile selection, CUDA architecture, model sizing, and Jetson limitations.
+Keep all physical TaskGraph gates off unless the deployment is supervised and
+Soridormi is commissioned. See [Configuration Reference](docs/CONFIGURATION.md).
 
 ## Verify
 
-Check container health:
+Run GPU-free tests and documentation checks:
+
+```bash
+./scripts/run_tests.sh
+```
+
+Check deployed services:
 
 ```bash
 docker compose --env-file .env.runtime ps
@@ -263,85 +206,83 @@ curl -fsS http://127.0.0.1:8092/health
 curl -fsS http://127.0.0.1:11434/api/tags
 ```
 
-Verify TTS GPU use:
-
-```bash
-./scripts/verify_tts_gpu.sh
-```
-
-Run the complete target-machine GPU smoke test after services are running:
-
-```bash
-./scripts/gpu_smoke_test.sh
-```
-
-To start existing images first and include a real TTS generation:
+Run target GPU checks:
 
 ```bash
 START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
 ```
 
-The smoke test checks host/container GPU visibility, service health, Ollama inference, ASR/TTS WebSockets, and the TTS CUDA backend. It does not test microphone or speaker quality.
-
-For M5 target acceptance, combine the GPU checks with Soridormi contract and
-runtime-cancellation evidence:
+Run Soridormi contract and text-interaction checks:
 
 ```bash
-SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
-  ./scripts/m5_target_acceptance.sh
+export SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
+PYTHONPATH=agent python -m app.probe_capabilities \
+  --manifest capabilities/soridormi.json
+PYTHONPATH=. python scripts/interaction_text_acceptance.py nod
 ```
 
-The generated evidence is stored under `.chromie/acceptance/`.
+See [Acceptance and Evidence](docs/ACCEPTANCE.md) before claiming simulator,
+target, or hardware validation.
 
-Watch the main logs:
+Run the guided M13 microphone/MuJoCo matrix on the reference host:
 
 ```bash
-docker compose --env-file .env.runtime logs -f chromie-agent
-docker compose --env-file .env.runtime logs -f chromie-llm
-docker compose --env-file .env.runtime logs -f chromie-tts
+python scripts/m13_voice_acceptance.py \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 ```
 
-For common failures such as model timeouts, duplicate replies, CPU-only TTS, or incorrect playback speed, see [Chromie Operations Runbook](CHROMIE_RUNBOOK.md).
-
-## Tests
-
-Run the GPU-free control-plane suite:
+Verify the resulting evidence bundle:
 
 ```bash
-INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh
+python scripts/verify_m13_evidence.py --require-clean \
+  .chromie/acceptance/m13/<acceptance-id>
 ```
 
-After dependencies are installed, use:
+Prepare a non-publishable packaging rehearsal while the spoken-confirmation
+blocker remains:
 
 ```bash
-./scripts/run_tests.sh
+python scripts/prepare_alpha_release.py --preview \
+  --evidence-dir .chromie/acceptance/m13/<acceptance-id>
 ```
 
-The suite covers Router rules and mode selection, cross-service contracts, conversation state, Agent safety behavior, confirmation gating, and the mock hardware flow. It does not download models or require Docker, CUDA, audio devices, or robot hardware.
+## Repository layout
 
-## Development Principles
+| Path | Purpose |
+|---|---|
+| `asr/` | Faster-Whisper WebSocket service |
+| `tts/` | OuteTTS streaming WebSocket service and speaker tooling |
+| `router/` | Route rules and optional LLM routing service |
+| `agent/` | Multi-agent runtime, native interaction output, compatibility adapter, capability registry, and TaskGraph APIs |
+| `orchestrator/` | Host audio loop, conversation state, interaction coordination, and Skill Runtime |
+| `shared/` | Pydantic contracts and shared scheduling primitive |
+| `capabilities/` | Trusted external capability manifests |
+| `hardware/` | Legacy mock compatibility daemon |
+| `scripts/` | Startup, profile, test, evidence, smoke, and release tooling |
+| `docs/` | Status, architecture, API, configuration, acceptance, and release documentation |
+| `release/` | Candidate version, compatibility declaration, and human-written release notes |
 
-- Keep interruption, stop, emergency, and unusable-audio decisions fast and
-  deterministic.
-- Keep semantic routing, conversation, and high-level skill choice in the
-  Interaction Agent.
-- Execute only validated, registered skills through the trusted Skill Runtime.
-- Keep realtime audio, interruption, playback, and action execution in the Orchestrator.
-- Let only the Orchestrator call ASR, TTS, playback, and host hardware.
-- Serialize TTS generation unless the backend is explicitly designed for concurrency.
-- Keep fallbacks and timing visible in logs.
+## Safety principles
+
+- Model output never bypasses schema and policy validation.
+- Low-level motor, joint, torque, and actuator fields are forbidden in shared
+  interaction contracts.
+- Confirmation, monitoring, cancellation, stop, and emergency paths are
+  separate from normal reasoning.
+- Simulation exemptions do not apply to hardware.
+- Physical motion remains default-off and Soridormi-owned.
 
 ## Documentation
 
-- [Roadmap](ROADMAP.md): current milestone, completed foundations, and acceptance criteria
-- [Interaction Agent and Skill Runtime](docs/interaction_agent_skill_runtime.md): target voice, speech, skill, and Soridormi execution architecture
-- [中文项目指南](docs/PROJECT_GUIDE.zh-CN.md): Chinese architecture, setup, verification, and troubleshooting guide
-- [Hardware Profiles](HARDWARE_PROFILES.md): runtime environment generation and hardware-specific defaults
-- [Operations Runbook](CHROMIE_RUNBOOK.md): frequent startup and diagnostic commands
-- [Orchestrator](orchestrator/README.md): host realtime audio runtime
-- [Router](router/README.md): routing API and configuration
-- [Agent](agent/README.md): multi-agent API and responsibilities
-- [Hardware](hardware/README.md): optional host hardware daemon
-- [Conversation State](docs/conversation_state.md): multi-turn context and conversation boundaries
-- [Capability Registry](docs/agent_capability_registry.md): available Agent tools and safety visibility
-- [Task Graph](docs/agent_task_graph.md): validated multi-step task planning and execution
+Use [Documentation Index and Governance](docs/README.md) as the map. The most
+important documents are:
+
+- [Current Implementation Status](docs/STATUS.md)
+- [Roadmap](ROADMAP.md)
+- [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md)
+- [Operations Runbook](CHROMIE_RUNBOOK.md)
+- [Configuration Reference](docs/CONFIGURATION.md)
+- [API Reference](docs/API_REFERENCE.md)
+- [Acceptance and Evidence](docs/ACCEPTANCE.md)
+- [Release and Packaging](docs/RELEASE.md)

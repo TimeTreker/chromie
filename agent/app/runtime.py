@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from pydantic import ValidationError
 
 from .agents import (
     AgentServices,
@@ -15,13 +16,19 @@ from .agents import (
     VisionAgent,
 )
 from .dispatcher import selected_agents
+from .interaction import InteractionDraft, NativeInteractionOutputError
 from .schema import AgentResult, AgentRunRequest
+
+try:
+    from chromie_contracts.interaction import InteractionResponse
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.interaction import InteractionResponse
 
 logger = logging.getLogger("chromie.agent.runtime")
 
 
-class AgentRuntime:
-    """Multi-agent runtime hosted inside the chromie-agent container."""
+class _AgentPipeline:
+    """Shared specialized-agent pipeline for legacy and native accumulators."""
 
     def __init__(self, services: AgentServices) -> None:
         self.services = services
@@ -40,9 +47,12 @@ class AgentRuntime:
     def available_agents(self) -> list[str]:
         return sorted(self.agents)
 
-    async def run(self, request: AgentRunRequest) -> AgentResult:
+    async def _run_pipeline(
+        self,
+        request: AgentRunRequest,
+        result: AgentResult | InteractionDraft,
+    ) -> AgentResult | InteractionDraft:
         decision = request.route_decision
-        result = AgentResult()
 
         if decision.route == "ignore":
             result.status = "ignored"
@@ -67,6 +77,33 @@ class AgentRuntime:
                 logger.warning("unknown agent requested: %s", agent_name)
                 result.trace.append(f"runtime: unknown agent {agent_name}")
                 continue
-            result = await agent.run(request, result)
+            # Specialized agents intentionally accept the shared helper surface
+            # implemented by both AgentResult and InteractionDraft.
+            result = await agent.run(request, result)  # type: ignore[arg-type,assignment]
 
         return result
+
+
+class AgentRuntime(_AgentPipeline):
+    """Established AgentResult runtime retained for `/run` compatibility."""
+
+    async def run(self, request: AgentRunRequest) -> AgentResult:
+        result = await self._run_pipeline(request, AgentResult())
+        if not isinstance(result, AgentResult):  # pragma: no cover - defensive
+            raise TypeError("legacy Agent runtime returned a non-AgentResult value")
+        return result
+
+
+class InteractionRuntime(_AgentPipeline):
+    """Native InteractionResponse runtime used by `/interaction`."""
+
+    async def run(self, request: AgentRunRequest) -> InteractionResponse:
+        result = await self._run_pipeline(request, InteractionDraft())
+        if not isinstance(result, InteractionDraft):  # pragma: no cover - defensive
+            raise TypeError("native interaction runtime returned a non-InteractionDraft value")
+        try:
+            return result.to_response()
+        except ValidationError as exc:
+            raise NativeInteractionOutputError(
+                f"native InteractionResponse validation failed: {exc}"
+            ) from exc

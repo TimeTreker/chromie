@@ -459,9 +459,14 @@ class ConversationStateManager:
                 metadata={"action_count": len(actions)},
             )
 
-        # Future agents can emit pending task state as memory_updates without a
-        # schema change. The conversation agent will see these on the next turn.
-        for update in data.get("memory_updates", []) or []:
+        # AgentResult exposes memory_updates at the top level. Native
+        # InteractionResponse keeps them in metadata so the shared wire
+        # contract remains narrow. Support both representations.
+        memory_updates = data.get("memory_updates", []) or []
+        metadata = data.get("metadata")
+        if not memory_updates and isinstance(metadata, dict):
+            memory_updates = metadata.get("memory_updates", []) or []
+        for update in memory_updates:
             if not isinstance(update, dict):
                 continue
             update_type = str(update.get("type") or "")

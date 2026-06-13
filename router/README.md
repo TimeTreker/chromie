@@ -1,94 +1,90 @@
-# chromie-router
+# Chromie Router
 
-`chromie-router` is a small CPU-only routing service for Chromie.
+`chromie-router` is a CPU-only routing service on port `8091` by default. It
+turns user text and bounded session context into a validated `RouteDecision`.
+It never opens audio devices, performs speech recognition or synthesis, invokes
+skills, or controls hardware.
 
-It receives ASR text from the host orchestrator and returns a structured `RouteDecision`.
-It does not touch microphone, speaker, ASR, TTS, robot hardware, CUDA, PyTorch, or model weights.
-
-## Responsibilities
+## Processing modes
 
 ```text
-text + session context
-  -> rule router
-  -> optional Ollama router
-  -> JSON schema validation
+text + bounded context
+  -> deterministic rules (optional first pass)
+  -> optional Ollama route classifier
+  -> schema finalization
   -> RouteDecision
 ```
 
-## API
+Supported modes:
 
-### `GET /health`
+- `rules_only` — deterministic rules followed by a deterministic fallback;
+- `hybrid` — rules first when enabled, then Ollama for unmatched requests;
+- `llm_only` — send routing decisions directly to Ollama.
 
-```bash
-curl http://127.0.0.1:8091/health
-```
+`ROUTER_USE_LLM=0` selects `rules_only` unless `ROUTER_MODE` is explicitly set.
+Operational commands such as interruption should continue to use deterministic
+routing even when a conversational model is available.
 
-### `POST /route`
+## HTTP API
+
+- `GET /health` — active mode, model, Ollama URL, and rules-first flag
+- `GET /routes` — route and specialized-agent identifiers known by the service
+- `POST /route` — produce one `RouteDecision`
+
+Example:
 
 ```bash
 curl -s http://127.0.0.1:8091/route \
-  -H 'content-type: application/json' \
+  -H 'Content-Type: application/json' \
   -d '{
     "sid": "demo",
     "text": "转过来看着我",
     "language": "zh-CN",
-    "context": {
-      "is_speaking": false,
-      "robot_state": {
-        "is_moving": false
-      }
-    }
+    "context": {"is_speaking": false, "robot_state": {"is_moving": false}}
   }' | jq
 ```
 
-Example response:
+A route decision is advisory control-plane data. It does not authorize or
+execute a tool, named skill, or physical action.
 
-```json
-{
-  "route": "robot_action",
-  "agents": ["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
-  "intent": "look_at_user",
-  "confidence": 0.95,
-  "language": "zh-CN",
-  "priority": "normal",
-  "interrupt_current": false,
-  "needs_agent": true,
-  "should_speak": true,
-  "speak_first": null,
-  "actions": [],
-  "reason": "Matched robot pose rule",
-  "source": "rules"
-}
-```
-
-## Environment
+## Configuration
 
 ```env
 ROUTER_HOST=0.0.0.0
 ROUTER_PORT=8091
+ROUTER_MODE=rules_only
 ROUTER_USE_LLM=0
 ROUTER_RULES_FIRST=1
 ROUTER_OLLAMA_URL=http://chromie-llm:11434
 ROUTER_MODEL=qwen3:0.6b
-ROUTER_TIMEOUT_MS=1500
+ROUTER_TIMEOUT_MS=800
+ROUTER_LLM_TIMEOUT_MS=800
 ROUTER_CONFIDENCE_THRESHOLD=0.55
-LOG_LEVEL=INFO
+ROUTER_LOG_LEVEL=INFO
 ```
 
-`ROUTER_USE_LLM=0` selects `rules_only` mode unless `ROUTER_MODE` is explicitly set. Set `ROUTER_MODE=hybrid` or `llm_only` only when LLM routing is intentionally enabled.
+The host Orchestrator normally connects through:
 
-## Docker Compose
+```env
+ROUTER_URL=http://127.0.0.1:8091
+```
 
-The service is already integrated into the root `docker-compose.yml`. Start it through:
+See [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md) for precedence and
+profile behavior.
+
+## Start
+
+Use the repository-level service launcher:
 
 ```bash
 ./scripts/start_services.sh
 ```
 
-## Orchestrator URL
+For local development from the repository root:
 
-Because the orchestrator runs on the host, use:
-
-```env
-ROUTER_URL=http://127.0.0.1:8091
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r router/requirements.txt
+PYTHONPATH=router uvicorn app.main:app --host 0.0.0.0 --port 8091
 ```

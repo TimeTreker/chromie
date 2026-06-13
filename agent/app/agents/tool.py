@@ -23,7 +23,7 @@ class ToolAgent(BaseAgent):
                     language=self.language(request),
                     context=request.context,
                 )
-                result.task_graphs.append(graph.model_dump(mode="json"))
+                result.add_task_graph(graph.model_dump(mode="json"))
                 result.add_speak_immediate(
                     "我已经准备好一个执行计划。" if self.is_zh(request) else "I prepared a task plan.",
                     style="brief",

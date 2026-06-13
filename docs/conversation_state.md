@@ -1,54 +1,82 @@
 # Conversation State
 
-Chromie keeps short-term conversation continuity in the host Orchestrator.
+## Status
 
-## Model
+Implemented, process-local, bounded, and covered by automated tests. It is not a
+durable memory service and does not persist across Orchestrator restart.
 
-```text
-conversation_id = continuous conversation scope
-sid             = one VAD utterance and voice turn
-task_id         = optional long-running tool or robot task
-```
+## Identity model
 
-The Orchestrator stores recent turns and pending-task hints in memory, then sends a snapshot to the Agent in `context` and `history`.
+Chromie uses two related identifiers:
 
-## Conversation Boundaries
+- `sid`: a per-utterance/session-turn identifier used for tracing requests;
+- `conversation_id`: a longer-lived identifier shared across related turns.
 
-A new conversation starts when:
+A new SID does not automatically start a new conversation. The store keeps the
+conversation identifier until a reset phrase, configured topic boundary, hard
+idle expiry, or process restart.
 
-- the user explicitly resets the topic;
-- the hard idle timeout expires;
-- the soft idle timeout expires and the next utterance looks like a new topic.
+## Stored state
 
-The current conversation is retained when there is an active pending task or the user uses follow-up language referring to an earlier turn.
+The host store can retain bounded representations of:
+
+- recent user and assistant turns;
+- active interaction metadata;
+- pending task hints;
+- follow-up context;
+- the current conversation identifier and timestamps.
+
+Limits are enforced for turn count, text length, context size, pending tasks,
+and idle age. Older content is trimmed rather than allowed to grow without
+bound.
+
+The state is intended to improve short conversational continuity. It should not
+be treated as authoritative robot state, a durable user profile, or a database
+of completed side effects.
+
+## Boundaries and reset behavior
+
+Configured reset phrases clear the active conversational context. New-topic
+starters and idle thresholds can cause a fresh conversation boundary. Follow-up
+phrases help preserve context for short dependent questions.
+
+Operational interruption does not erase the entire conversation by default,
+but active interaction and pending execution metadata must be updated so an
+interrupted action is not later represented as completed.
 
 ## Configuration
 
-Defaults live in `.env.common`; machine-specific overrides belong in `.env.local`.
+Preferred names:
 
 ```env
 ORCH_ENABLE_CONVERSATION_STATE=1
-ORCH_CONVERSATION_ID=local_default
+ORCH_CONVERSATION_ID=
 ORCH_CONVERSATION_MAX_TURNS=12
-ORCH_CONVERSATION_IDLE_TIMEOUT_SEC=180
-ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC=900
-ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS=260
-ORCH_CONVERSATION_MAX_CONTEXT_CHARS=2200
+ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS=1200
+ORCH_CONVERSATION_MAX_CONTEXT_CHARS=6000
 ORCH_CONVERSATION_MAX_PENDING_TASKS=8
+ORCH_CONVERSATION_IDLE_TIMEOUT_SEC=300
+ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC=1800
+ORCH_CONVERSATION_RESET_PHRASES=
+ORCH_CONVERSATION_NEW_TOPIC_STARTERS=
+ORCH_CONVERSATION_FOLLOWUP_PHRASES=
 ```
 
-Optional phrase lists use `|` as the separator:
+Legacy `ORCH_CONTEXT_*` aliases remain accepted for compatibility. Use the
+current names in new deployments. Exact defaults and precedence are documented
+in [`CONFIGURATION.md`](CONFIGURATION.md).
 
-```env
-ORCH_CONVERSATION_RESET_PHRASES=new topic|start over|换个话题|重新开始
-ORCH_CONVERSATION_FOLLOWUP_PHRASES=when|answer|result|what about|刚才|结果|什么时候
-```
+## Privacy and durability
 
-## Implementation
+The default state lives only in memory, which reduces accidental long-term
+retention but does not make the content non-sensitive. Logs, optional audio
+recordings, acceptance artifacts, and external service logs may still contain
+user text or voice data.
 
-- `orchestrator/runtime/conversation_state.py` owns boundaries, turn history, and pending-task state.
-- `orchestrator/orchestrator.py` records turns and builds context snapshots.
-- `orchestrator/clients/agent_client.py` sends context and history to the Agent.
-- `agent/app/agents/conversation.py` incorporates the context into conversation prompts.
+Before adding durable memory:
 
-Useful logs include `conversation_boundary`, `context_snapshot`, and Agent `history_turns` / `pending_tasks` fields.
+- define explicit user consent and deletion behavior;
+- separate conversational hints from verified system state;
+- encrypt and scope stored data;
+- avoid allowing model-written memory to authorize future side effects;
+- add migration, retention, and redaction tests.

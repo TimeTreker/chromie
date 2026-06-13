@@ -80,3 +80,34 @@ class ConversationStateTests(unittest.TestCase):
             manager.snapshot()["active_pending_tasks"][-1]["summary"],
             "soridormi.nod_yes",
         )
+
+    def test_native_interaction_metadata_records_memory_update(self) -> None:
+        manager = ConversationStateManager()
+
+        manager.record_agent_result(
+            "s1",
+            InteractionResponse(
+                metadata={
+                    "memory_updates": [
+                        {
+                            "type": "pending_task",
+                            "key": "weather",
+                            "value": {
+                                "type": "weather",
+                                "status": "pending",
+                                "summary": "weather lookup",
+                            },
+                        }
+                    ]
+                }
+            ),
+        )
+
+        self.assertEqual(
+            manager.snapshot()["active_pending_tasks"][-1]["summary"],
+            "weather lookup",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

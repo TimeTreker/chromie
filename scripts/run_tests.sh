@@ -8,6 +8,8 @@ if [[ "${INSTALL_TEST_DEPS:-0}" == "1" ]]; then
   python -m pip install -r requirements-test.txt
 fi
 
+python scripts/check_docs.py
+
 python -m unittest discover -s tests -v
 
 # The original Agent tests use plain pytest-style functions but do not depend on

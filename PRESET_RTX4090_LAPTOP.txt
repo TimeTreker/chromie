@@ -1,1 +1,8 @@
-This package is configured for RTX4090_LAPTOP.
+Legacy note only.
+
+Chromie no longer ships as a package fixed to RTX 4090 Laptop. Hardware is
+detected dynamically and can be overridden with:
+
+CHROMIE_HARDWARE_PROFILE=rtx4090_laptop
+
+See HARDWARE_PROFILES.md and run ./scripts/show_profile.sh.

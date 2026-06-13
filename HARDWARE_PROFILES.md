@@ -1,160 +1,121 @@
 # Chromie Hardware Profiles
 
-Chromie supports a hardware/profile based environment flow.
-
-Startup flow:
+Chromie detects a hardware profile, combines it with common and local settings,
+and generates `.env.runtime`.
 
 ```text
 collect system info
-→ detect hardware profile
-→ merge .env.common + env/profiles/<profile>.env + .env.local
-→ generate .env.runtime
-→ build/start/warm/orchestrator use .env.runtime
+-> detect/override profile
+-> .env.common + env/profiles/<profile>.env + .env.local
+-> .env.runtime
 ```
+
+Profiles select model size, timeout, CUDA architecture, and resource defaults.
+They do not change Chromie’s service contracts or Soridormi safety boundary.
 
 ## Files
 
-- `.env.common`: shared defaults committed to git.
-- `env/profiles/*.env`: hardware-specific build/runtime profiles committed to git.
-- `.env.local`: user overrides, not committed.
-- `.env.runtime`: generated file, not committed.
-- `.chromie/system_info.env`: generated hardware/system detection results, not committed.
+| File | Purpose |
+|---|---|
+| `.env.common` | Shared committed defaults and feature gates |
+| `env/profiles/*.env` | Hardware-specific committed values |
+| `.env.local` | Machine-local overrides; do not commit |
+| `.env.runtime` | Generated merged environment; do not edit or commit |
+| `.chromie/system_info.env` | Generated detection facts |
 
 ## Commands
 
-Show detected profile and key variables:
-
 ```bash
 ./scripts/show_profile.sh
-```
-
-Start Docker services:
-
-```bash
-./scripts/start_services.sh
-```
-
-Build with cache:
-
-```bash
+./scripts/build_runtime_env.sh
 BUILD=1 ./scripts/start_services.sh
-```
-
-Build from scratch:
-
-```bash
-REBUILD_NO_CACHE=1 ./scripts/start_services.sh
-```
-
-Warm the agent LLM model:
-
-```bash
 ./scripts/warm_ollama.sh
-```
-
-Start the host orchestrator:
-
-```bash
 ./scripts/start_orchestrator.sh
 ```
 
-## Override profile manually
+Override detection in `.env.local`:
 
-Copy the local example:
-
-```bash
-cp .env.local.example .env.local
+```env
+CHROMIE_HARDWARE_PROFILE=rtx4090_laptop
 ```
 
-Then edit `.env.local`:
+## Current profiles
 
-```bash
-CHROMIE_HARDWARE_PROFILE=rtx5090
-AGENT_MODEL=gemma4:e2b
-```
+| Profile | Intended class | ASR default | Agent model default | TTS context |
+|---|---|---|---|---:|
+| `default` | Unknown/conservative | `tiny.en` | `gemma4:e2b` | 2048 |
+| `nvidia_ada` | RTX 4080/4070 class | `base.en` | `gemma4:e2b` | 2048 |
+| `nvidia_blackwell` | RTX 5080/5070 and laptop Blackwell | `base.en` | `gemma4:e2b` | 2048 |
+| `rtx4090` | Desktop RTX 4090 | `small.en` | `gemma4:e2b` | 4096 |
+| `rtx4090_laptop` | RTX 4090 Laptop GPU | `small.en` | `gemma4:e2b` | 4096 |
+| `rtx5090` | Desktop RTX 5090 | `small.en` | `gemma4:26b` | 4096 |
+| `jetson_orin_nano_super` | 8 GB shared-memory Orin edge target | `tiny.en` | `gemma4:e2b` | 2048 |
+| `jetson_agx_orin` | AGX Orin | `base.en` | `gemma4:e2b` | 2048 |
+| `jetson_thor` | AGX Thor placeholder profile | `small.en` | `gemma4:26b` | 4096 |
 
-`.env.local` wins over `.env.common` and hardware profiles.
+Automatic detection prefers:
 
-## TTS variable semantics
+1. Jetson device-tree model;
+2. exact NVIDIA GPU name;
+3. compute capability and available memory;
+4. `default` fallback.
 
-Be careful with these two different limits:
+The RTX 4090 Laptop check occurs before the desktop family check.
+
+## Detection limitations
+
+- Multi-GPU systems use the first `nvidia-smi` result.
+- Unknown vendor strings may fall back by compute capability and memory.
+- `jetson_thor` uses a provisional CUDA architecture value until verified on
+  the actual toolchain.
+- Jetson profiles do **not** prove that the current x86-oriented Dockerfiles and
+  base images work on ARM64. A Jetson-specific image/Compose path may still be
+  required.
+- A detected profile is not target acceptance evidence.
+
+## TTS limits
+
+These variables have different meanings:
 
 ```text
-TTS_MAX_TEXT_CHARS  = text character limit before sending text to TTS
-TTS_MAX_LENGTH      = OuteTTS / llama generation token budget
+TTS_MAX_TEXT_CHARS       text length sent to TTS
+TTS_MAX_LENGTH           OuteTTS generation-token budget
+MIN_TTS_GENERATION_LENGTH minimum safe generation budget
 ```
 
-Do **not** use this to make Chromie speak shorter:
+Do not use a small `TTS_MAX_LENGTH` such as 100 or 120 to shorten speech. That
+can produce zero audio codec tokens. Use `TTS_MAX_TEXT_CHARS` instead.
 
-```bash
-TTS_MAX_LENGTH=120
-```
+Typical values:
 
-That value is too small for OuteTTS generation and can make the model emit zero audio codec tokens. The symptom is:
-
-```text
-0it [00:00, ?it/s]
-torch.cat(): expected a non-empty list of Tensors
-```
-
-Use this instead:
-
-```bash
-TTS_MAX_TEXT_CHARS=120
-```
-
-Recommended generation budgets:
-
-```bash
-# Jetson / small edge profile
+```env
+# Smaller edge profile
 TTS_CONTEXT_SIZE=2048
 TTS_MAX_LENGTH=2048
 MIN_TTS_GENERATION_LENGTH=1024
 TTS_MAX_TEXT_CHARS=120
 
-# Desktop RTX profile
+# Desktop profile
 TTS_CONTEXT_SIZE=4096
 TTS_MAX_LENGTH=4096
 MIN_TTS_GENERATION_LENGTH=1024
 TTS_MAX_TEXT_CHARS=220
 ```
 
-`tts/server.py` now clamps very small `TTS_MAX_LENGTH` values up to `MIN_TTS_GENERATION_LENGTH` when possible, and logs both requested and effective generation lengths.
+The TTS server clamps an unsafe generation length when the context allows and
+logs the requested and effective values.
 
-## Current profiles
+## Model and timeout pairing
 
-- `default`
-- `nvidia_ada`
-- `nvidia_blackwell`
-- `rtx4090`
-- `rtx4090_laptop`
-- `rtx5090`
-- `jetson_orin_nano_super`
-- `jetson_agx_orin`
-- `jetson_thor`
+`ORCH_AGENT_TIMEOUT_MS` must exceed `AGENT_TIMEOUT_MS`; the hardware profiles
+already preserve that relationship. Large-model profiles also require model
+warming before the microphone loop opens.
 
-Detection prefers the Jetson device-tree model, then the NVIDIA GPU name, then
-compute capability and memory as a fallback. RTX 4090 Laptop GPUs use a separate
-profile because their typical VRAM and power envelope differ from the desktop
-RTX 4090.
+## Local overrides
 
-| Popular hardware | Automatic profile |
-|---|---|
-| GeForce RTX 5090 | `rtx5090` |
-| GeForce RTX 4090 | `rtx4090` |
-| GeForce RTX 4090 Laptop GPU | `rtx4090_laptop` |
-| GeForce RTX 5080/5070 class | `nvidia_blackwell` |
-| GeForce RTX 4080/4070 class | `nvidia_ada` |
-| Jetson AGX Thor | `jetson_thor` |
-| Jetson AGX Orin | `jetson_agx_orin` |
-| Jetson Orin Nano Super | `jetson_orin_nano_super` |
+Use `.env.local` for machine-specific model changes, Compose overrides, proxies,
+and rollout gates. Avoid editing profile files for one machine unless the
+change is intended for every machine of that class.
 
-Other NVIDIA GPUs remain compatible and select a conservative architecture
-profile by GPU name, compute capability, and VRAM where possible. A profile can
-still be chosen in `.env.local`. Model sizing is deliberately based on
-available VRAM and power limits, not only the marketing family name.
-
-GPU type is not part of Chromie's service or Soridormi integration contract.
-It affects model size, latency, CUDA images, and deployment validation. Jetson
-profiles define runtime/model choices, but ARM64/Jetson-compatible images or a
-Compose override may still be required for full deployment.
+The old `PRESET_RTX4090_LAPTOP.txt` file is now only a legacy pointer; profile
+selection is dynamic.

@@ -1,35 +1,62 @@
 # Chromie Shared Packages
 
-Dependency-light contracts and runtime primitives shared by Chromie processes.
+`shared/` contains dependency-light contracts and process-local runtime
+primitives used across Chromie's control plane.
 
-Use this package to keep JSON contracts consistent between:
+## `chromie_contracts`
 
-- host `chromie-orchestrator`
-- Docker `chromie-router`
-- Docker `chromie-agent`
-- host `chromie-hardware-daemon`
+The contract package keeps JSON boundaries consistent between the host
+Orchestrator, Router, Agent, compatibility hardware daemon, tests, and
+acceptance tools. It includes:
 
-The directory currently provides:
+- route requests and `RouteDecision`;
+- agent requests, `AgentResult`, speech, memory, and compatibility actions;
+- strict `InteractionResponse`, `InteractionSpeech`, `SkillRequest`,
+  `SkillResult`, and `SkillTrace` contracts;
+- hardware action and robot-state contracts;
+- conversation-state structures.
 
-- `chromie_contracts`: Pydantic control-plane schemas;
-- `chromie_runtime`: asyncio scheduling primitives used by Agent TaskGraph and
-  host Skill Runtime.
+Interaction models use `extra="forbid"` and recursively reject known low-level
+motor, joint, torque, actuator, and raw-control field names. This prevents a
+model or adapter from smuggling low-level embodiment commands through metadata
+or nested skill arguments.
 
-Each process owns its own `ResourceArbiter` instance. This is not a distributed
-lock; Soridormi remains responsible for cross-process robot exclusivity.
+Contract validation is necessary but not sufficient authorization. A valid
+`SkillRequest` must still resolve through the trusted Skill Registry and pass
+provider, confirmation, resource, timeout, and cancellation policy.
 
-## Install locally during development
+## `chromie_runtime`
+
+The runtime package provides the shared asyncio `ResourceArbiter` used by:
+
+- Agent TaskGraph execution;
+- host Skill Runtime scheduling.
+
+It enforces bounded concurrency and named exclusive groups within one Python
+process. Each process has its own arbiter. It is not a distributed lock and
+cannot coordinate Agent and Orchestrator processes by itself. Cross-process
+robot exclusivity remains Soridormi's responsibility.
+
+## Development install
+
+From the repository root:
 
 ```bash
-cd shared
-pip install -e .
+pip install -e shared
 ```
 
-Then import:
+Example imports:
 
 ```python
+from chromie_contracts.interaction import InteractionResponse, SkillRequest
 from chromie_contracts.route import RouteDecision
-from chromie_contracts.agent import AgentResult
-from chromie_contracts.action import ActionCommand
 from chromie_runtime import ResourceArbiter
+```
+
+Run the repository test suite after changing a contract because compatibility,
+serialization, API, Skill Runtime, and TaskGraph tests all depend on this
+package:
+
+```bash
+./scripts/run_tests.sh
 ```

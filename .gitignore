@@ -15,8 +15,13 @@
 # Host orchestrator local audio settings
 /orchestrator/.env.local
 
-# Python bytecode/cache
+# Python bytecode/cache and test/tool output
 __pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 *.py[cod]
 *$py.class
 

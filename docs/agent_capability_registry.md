@@ -1,118 +1,103 @@
-# Chromie Global Agent Capability Registry
+# Agent Capability Registry
 
-Chromie owns the global capability registry because it hosts the LLM router,
-DAG planner, MCP clients, TTS/ASR, user confirmation, and cross-agent task
-orchestration.
+## Status
 
-Soridormi and other robot/body subsystems should not own this global registry.
-Soridormi is Chromie's robot cerebellum: it owns embodied planning, safety,
-policy execution, and feedback. It exports an MCP-ready capability manifest,
-and Chromie aggregates that contract with its own `chromie.*` tools.
+Implemented and automatically tested. The current checked-in Soridormi
+manifest is a static deployment snapshot; live compatibility and target
+acceptance remain separate evidence.
 
-## Boundary
+The registry is used by Agent TaskGraph planning, validation, LLM context,
+policy checks, and MCP invocation. It does not replace the host Orchestrator's
+runtime Skill Registry.
 
-- **Chromie**: global registry, LLM capability context, speech, listening,
-  confirmation, reporting, DAG planning.
-- **Soridormi**: local robot-body manifest and tools such as
-  `soridormi.robot.get_status`, `soridormi.motion.create_plan`,
-  `soridormi.motion.execute_plan`, and `soridormi.safety.emergency_stop`.
+## Source of truth
 
-## CLI
+Chromie consumes externally generated manifests. For Soridormi, the authoritative
+source is Soridormi's capability export. Chromie materializes transport metadata
+and records the upstream commit rather than hand-maintaining tool schemas.
 
-List only Chromie's local tools:
+Current snapshot:
+
+- four agent records;
+- twelve tool records;
+- upstream Soridormi commit
+  `a092dc704f1ab797fb1d4f542696fe75026eb171`;
+- MCP endpoint resolved from `${SORIDORMI_MCP_URL}`.
+
+Refresh instructions are in
+[`../capabilities/README.md`](../capabilities/README.md).
+
+## Startup behavior
+
+`AGENT_CAPABILITY_MANIFESTS` accepts a comma-separated list of files or
+directories. Registry construction is fail-fast for:
+
+- missing configured paths;
+- malformed JSON or schema violations;
+- unresolved required environment placeholders;
+- duplicate agent identifiers;
+- duplicate tool identifiers;
+- invalid safety, fallback, or dependency references.
+
+The Agent logs loaded sources, manifest files, and total tool count at startup.
+`GET /health` and `GET /capabilities` expose the active view.
+
+## Capability policy represented
+
+Each tool can declare information such as:
+
+- JSON input/output schemas;
+- side-effect class (`safe_read`, `planning_only`, guarded effects, physical);
+- confirmation requirement;
+- safety monitor and emergency fallback relationships;
+- whether parallel execution is permitted;
+- an `exclusive_group` for resource serialization;
+- transport-neutral invocation metadata.
+
+The registry enables validation and policy decisions; it does not itself execute
+a tool. Real calls cross a `ToolInvoker` boundary.
+
+## LLM visibility
+
+`GET /capabilities/llm-context?language=en` returns the filtered context used for
+planning. The model receives only the descriptions intended for planning, not
+deployment secrets or unrestricted low-level controls. Restricted safety and
+control capabilities remain policy-governed even when they are present in the
+registry.
+
+Model output is never trusted as registry truth. Graph identity is replaced by
+the service, capability references are resolved again, arguments are validated,
+and execution is separately gated.
+
+## Agent registry versus Skill Registry
+
+The two registries solve different problems:
+
+| Registry | Owner | Lifetime | Used for |
+|---|---|---|---|
+| Agent capability registry | Agent process | Loaded at startup | TaskGraph planning, validation, policy, MCP transport |
+| Skill Registry | Host Orchestrator | Runtime/provider registration | `InteractionResponse` named-skill resolution and execution |
+
+The native structured Agent path generates Skill Runtime requests directly,
+while preserving the host's provider and execution boundary. It must not expose
+raw MCP tool names or motor-level fields as a shortcut; runtime registry
+resolution remains mandatory.
+
+## Inspection and verification
 
 ```bash
-PYTHONPATH=agent python -m app.list_capabilities
+curl -s http://127.0.0.1:8092/capabilities | jq
+curl -s 'http://127.0.0.1:8092/capabilities/llm-context?language=en' | jq -r .context
 ```
 
-Merge an external Soridormi capability export:
+Probe the live Soridormi server:
 
 ```bash
-PYTHONPATH=agent python -m app.list_capabilities \
-  --manifest /path/to/soridormi_capabilities.json
-```
-
-Generate the LLM-facing capability context:
-
-```bash
-PYTHONPATH=agent python -m app.list_capabilities \
-  --manifest /path/to/soridormi_capabilities.json \
-  --llm-context --language zh
-```
-
-## Agent runtime configuration
-
-The production Agent loads external manifests from the comma-separated
-`AGENT_CAPABILITY_MANIFESTS` setting. Files placed in the repository's
-`capabilities/` directory are mounted read-only at `/app/capabilities`.
-
-```env
-AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json
-SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp
-```
-
-A configured file or directory must exist and every discovered JSON manifest
-must validate. The Agent fails at startup on missing, malformed, or duplicate
-capabilities rather than silently running with a partial registry. Manifest
-strings support `${NAME}` references and fail startup when the referenced
-environment variable is absent.
-
-Inspect the active sources and mounted files through:
-
-```text
-GET /health
-GET /capabilities
-```
-
-## Soridormi deployment probe
-
-Chromie includes [the Soridormi deployment contract](../capabilities/soridormi.json).
-It is materialized from the `TimeTreker/soridormi` export and records the
-upstream commit in `metadata`. Its endpoint is supplied through
-`SORIDORMI_MCP_URL`; the file intentionally does not contain a machine-specific
-address.
-
-Probe the live MCP server before enabling read-only or guarded execution:
-
-```bash
+cd agent
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-PYTHONPATH=agent python -m app.probe_capabilities \
-  --manifest capabilities/soridormi.json
+PYTHONPATH=. python -m app.probe_capabilities \
+  --manifest ../capabilities/soridormi.json
 ```
 
-The probe initializes an MCP Streamable HTTP session, calls `tools/list`, and
-fails when the server omits a required tool or declares incompatible input
-constraints. Extra advertised tools and schema annotations remain unavailable
-because Chromie invokes only registry-approved names and validates against its
-own manifest.
-
-The checked-in manifest is the Chromie-side contract. Soridormi's dedicated
-MCP container now advertises the same names and input contracts; target-host
-deployment must still run the probe before execution is enabled.
-
-Once the probe reports ready, run the read/planning acceptance graph:
-
-```bash
-SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-PYTHONPATH=agent python -m app.soridormi_acceptance \
-  --manifest capabilities/soridormi.json
-```
-
-This command probes first, reads robot status, then requests a bounded
-zero-motion plan. It rejects a missing planning response contract and never
-invokes `soridormi.motion.execute_plan`.
-
-Add `--guarded-dry-run` to verify confirmed execution, monitor activation, and
-normal stop fallback against Soridormi's dry-run network service.
-
-Soridormi `027b626` adds an opt-in runtime-backed simulation adapter. Once that
-adapter is running, use
-`--exercise-runtime-cancellation` on the supervised target. The runner dispatches
-a five-second zero-velocity plan, cancels it, requires the emergency fallback,
-and verifies retained emergency-stop state. Soridormi hardware mode remains
-disabled until its real `HardwareRobot` backend is implemented.
-
-## Safety rule
-
-Chromie may plan and route tasks, but it must not receive raw motor, joint, or
-torque tools. Robot movement must remain behind Soridormi's safe MCP tools.
+A successful probe demonstrates live surface compatibility. It is not evidence
+that guarded or physical execution has been accepted on target hardware.

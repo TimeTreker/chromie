@@ -1,198 +1,346 @@
 # Chromie Operations Runbook
 
-This file is optional. It summarizes the commands most often needed while debugging Chromie.
+This runbook contains commands and recovery procedures. Use
+[Current Implementation Status](docs/STATUS.md) for claims about completion and
+[Configuration Reference](docs/CONFIGURATION.md) for variable semantics.
 
-## Start services
+Run commands from the repository root unless stated otherwise.
+
+## 1. Inspect configuration
 
 ```bash
-bash scripts/start_services.sh
+cp -n .env.local.example .env.local
+./scripts/show_profile.sh
 ```
 
-## Warm Ollama
+Generated files:
+
+```text
+.env.runtime
+.chromie/system_info.env
+```
+
+Do not hand-edit `.env.runtime`.
+
+## 2. Start Docker services
+
+First build:
 
 ```bash
+BUILD=1 ./scripts/start_services.sh
+```
+
+Normal start:
+
+```bash
+./scripts/start_services.sh
+```
+
+Clean rebuild:
+
+```bash
+REBUILD_NO_CACHE=1 ./scripts/start_services.sh
+```
+
+Stop services:
+
+```bash
+docker compose --env-file .env.runtime down
+```
+
+## 3. Prepare Ollama
+
+```bash
+set -a
+source .env.runtime
+set +a
+
+docker compose --env-file .env.runtime exec chromie-llm ollama list
+docker compose --env-file .env.runtime exec chromie-llm \
+  ollama pull "$AGENT_MODEL"
 ./scripts/warm_ollama.sh
 ```
 
-## Start host orchestrator
+## 4. Configure and start host audio
 
 ```bash
-bash scripts/start_orchestrator.sh
+conda create -n Chromie python=3.11 -y
+conda activate Chromie
+./scripts/install_orchestrator_deps.sh
+cp -n orchestrator/.env.local.example orchestrator/.env.local
+python orchestrator/list_devices.py
 ```
 
-## GPU smoke test
-
-Check already-running services:
+Set `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE`, then start:
 
 ```bash
+./scripts/start_orchestrator.sh
+```
+
+Manual launch, after dependencies are installed:
+
+```bash
+./scripts/build_runtime_env.sh
+python -m orchestrator.orchestrator
+```
+
+Do not launch from inside `orchestrator/`; repository-relative imports and paths
+assume the project root.
+
+## 5. Select the interaction mode
+
+### Compatibility voice path
+
+Use the defaults:
+
+```env
+ORCH_ENABLE_ROUTER=1
+ORCH_ENABLE_AGENT=1
+ORCH_ENABLE_INTERACTION_RESPONSE=0
+```
+
+### Structured speech-only path
+
+```env
+ORCH_ENABLE_INTERACTION_RESPONSE=1
+ORCH_ENABLE_SORIDORMI_SKILLS=0
+```
+
+### Structured MuJoCo path
+
+```env
+ORCH_ENABLE_INTERACTION_RESPONSE=1
+ORCH_ENABLE_SORIDORMI_SKILLS=1
+ORCH_AUTO_CONFIRM_SIM_SKILLS=1
+ORCH_SORIDORMI_MANIFEST=capabilities/soridormi.json
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
+```
+
+Restart the Orchestrator after changing host feature gates.
+
+## 6. Health checks
+
+```bash
+docker compose --env-file .env.runtime ps
+curl -fsS http://127.0.0.1:8091/health | python -m json.tool
+curl -fsS http://127.0.0.1:8091/routes | python -m json.tool
+curl -fsS http://127.0.0.1:8092/health | python -m json.tool
+curl -fsS http://127.0.0.1:8092/capabilities | python -m json.tool
+curl -fsS http://127.0.0.1:8092/task-graphs/scheduler/status | python -m json.tool
+curl -fsS http://127.0.0.1:11434/api/tags | python -m json.tool
+```
+
+## 7. Automated tests
+
+```bash
+./scripts/run_tests.sh
+```
+
+Documentation-only check:
+
+```bash
+python scripts/check_docs.py
+```
+
+## 8. GPU and TTS verification
+
+```bash
+./scripts/verify_tts_gpu.sh
 ./scripts/gpu_smoke_test.sh
 ```
 
-Start existing images first and synthesize a short TTS sample:
+Start existing images and generate real TTS audio:
 
 ```bash
 START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
 ```
 
-Preview the checks without running Docker or GPU commands:
+Dry-run the planned checks:
 
 ```bash
 DRY_RUN=1 ./scripts/gpu_smoke_test.sh
 ```
 
-## M5 supervised target acceptance
+A dry run is not target evidence.
 
-Start Soridormi's simulator and runtime-backed MCP adapter from the Soridormi
-checkout:
+## 9. Soridormi capability checks
+
+Set the live endpoint:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
-./scripts/run_runtime_mcp_server.sh
+export SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
 
-Do not run Soridormi's standalone runtime loop against the same simulator.
-After `.env.local` points to the runtime-backed endpoint, run the complete
-target sequence with a safety operator present:
+Probe schema compatibility:
+
+```bash
+PYTHONPATH=agent python -m app.probe_capabilities \
+  --manifest capabilities/soridormi.json
+```
+
+List the active Agent registry:
+
+```bash
+PYTHONPATH=agent python -m app.list_capabilities \
+  --manifest capabilities/soridormi.json
+```
+
+Generate LLM-visible context:
+
+```bash
+PYTHONPATH=agent python -m app.list_capabilities \
+  --manifest capabilities/soridormi.json \
+  --llm-context --language en
+```
+
+Safe status and zero-motion planning acceptance:
+
+```bash
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json
+```
+
+Runtime-backed simulator preflight:
+
+```bash
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json \
+  --runtime-preflight \
+  --expected-backend runtime \
+  --expected-mode sim
+```
+
+## 10. Structured text acceptance
+
+```bash
+PYTHONPATH=. python scripts/interaction_text_acceptance.py nod
+```
+
+Cancellation example:
+
+```bash
+PYTHONPATH=. python scripts/interaction_text_acceptance.py nod \
+  --cancel-after-s 0.2
+```
+
+This is headless evidence. It does not use the microphone or physical speaker.
+
+## 11. Guarded recovery acceptance
+
+Disposable Soridormi dry-run process:
+
+```bash
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json \
+  --guarded-dry-run
+```
+
+Only add `--exercise-emergency-stop` when the process may be restarted.
+
+Supervised runtime cancellation:
+
+```bash
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json \
+  --exercise-runtime-cancellation
+```
+
+This intentionally leaves Soridormi emergency-stopped. Follow the Soridormi
+recovery procedure and verify ready/safe-idle state before further motion.
+
+## 12. M3/M5 target evidence
 
 ```bash
 SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
   ./scripts/m5_target_acceptance.sh
 ```
 
-This first rejects endpoints that do not report `backend=runtime`, `mode=sim`,
-and `emergency_stop=false`. It then runs the GPU smoke test, exercises runtime
-cancellation, and writes logs plus `summary.env` under
-`.chromie/acceptance/<UTC timestamp>/`. Soridormi remains emergency-stopped;
-restart its MCP process and verify safe simulator state before further motion.
+Evidence appears under `.chromie/acceptance/<id>/`. The runner combines runtime
+preflight, GPU smoke, and cancellation/emergency fallback. After it passes,
+record the recovery result; the script itself leaves e-stop active.
 
-Preview the exact commands without Docker, GPU, or MCP calls:
+Command rehearsal:
 
 ```bash
 SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
-SORIDORMI_MCP_URL=http://target-soridormi:8000/mcp \
+  SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
   ./scripts/m5_target_acceptance.sh
 ```
 
-## Verify only one orchestrator
+## 13. M13 microphone acceptance
+
+Commit the candidate revision, then use the guided runner against a supervised
+MuJoCo-backed endpoint. A dirty tree is rejected unless `--allow-dirty` is used
+for explicitly exploratory evidence:
 
 ```bash
-pgrep -af "orchestrator"
+python scripts/m13_voice_acceptance.py \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 ```
 
-Kill all old ones:
+Add `--start-services` when the five containers are not already healthy. The
+runner presents and records speech-only, named-skill, refusal, barge-in, body
+cancellation, explicit stop, and conversation follow-up cases. It writes
+revisions, redacted runtime configuration, audio devices, correlated JSONL
+session events, Orchestrator logs, recordings, automated checks, and operator
+notes below `.chromie/acceptance/m13/<id>/`.
+
+Verify the completed bundle:
 
 ```bash
-pkill -f "python.*orchestrator"
-pkill -f "start_orchestrator.sh"
+python scripts/verify_m13_evidence.py --require-clean \
+  .chromie/acceptance/m13/<id>
 ```
 
-## Check Docker env
+A dry run is only a command rehearsal and cannot close M13. Review recordings
+and transcribed event details for privacy before sharing evidence.
+
+## 14. Logs
 
 ```bash
-docker compose --env-file .env.runtime exec chromie-agent env | grep -E "AGENT_USE_LLM|AGENT_OLLAMA_URL|AGENT_MODEL|AGENT_TIMEOUT_MS"
-docker compose --env-file .env.runtime exec chromie-router env | grep -E "ROUTER_USE_LLM|ROUTER_OLLAMA_URL|ROUTER_MODEL|ROUTER_TIMEOUT_MS"
-```
-
-## Check installed models
-
-```bash
-docker compose --env-file .env.runtime exec chromie-llm ollama list
-```
-
-Pull model:
-
-```bash
-set -a
-source .env.runtime
-set +a
-docker compose --env-file .env.runtime exec chromie-llm ollama pull "$AGENT_MODEL"
-```
-
-## Verify Soridormi MCP capabilities
-
-Add the deployment endpoint and manifest to `.env.local`, then regenerate the
-runtime configuration:
-
-```env
-AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json
-SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp
-AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1
-```
-
-```bash
-./scripts/build_runtime_env.sh
-docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
-  python -m app.probe_capabilities \
-  --manifest /app/capabilities/soridormi.json
-```
-
-Do not enable read-only or guarded TaskGraph execution until the probe reports
-`status: ready`. A missing tool means the Soridormi server and Chromie manifest
-do not yet share an accepted contract.
-
-Run the safe status/planning acceptance after the probe succeeds:
-
-```bash
-docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
-  python -m app.soridormi_acceptance \
-  --manifest /app/capabilities/soridormi.json
-```
-
-The default planning request contains zero velocity and yaw. It calls only
-`soridormi.robot.get_status` and `soridormi.motion.create_plan`; it never calls
-the physical execution tool.
-
-Run the full dry-run acceptance against Soridormi's dedicated MCP container:
-
-```bash
-docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
-  python -m app.soridormi_acceptance \
-  --manifest /app/capabilities/soridormi.json \
-  --guarded-dry-run
-```
-
-This verifies confirmation, monitor activation, dry-run execution, and
-`soridormi.motion.stop` fallback over the network. It requires
-`dry_run_only=true` and does not accept the result as hardware evidence.
-
-Add `--exercise-emergency-stop` only on a disposable or restartable Soridormi
-process. The command verifies retained e-stop state and intentionally leaves
-that process stopped.
-
-On the supervised target host, verify cancellation against the runtime-backed
-MCP adapter with:
-
-```bash
-docker compose --env-file .env.runtime run --rm --no-deps chromie-agent \
-  python -m app.soridormi_acceptance \
-  --manifest /app/capabilities/soridormi.json \
-  --exercise-runtime-cancellation
-```
-
-The default cancellation plan holds zero velocity for five seconds. Chromie
-waits until `execute_plan` is dispatched, cancels the graph after one second,
-requires the emergency fallback to succeed, and verifies retained e-stop
-state. This intentionally leaves Soridormi stopped; complete its documented
-recovery procedure before any further motion.
-
-Chromie and Soridormi remain separate deployments. Start `soridormi-mcp` from
-the Soridormi repository, then point Chromie at its published endpoint.
-
-## Watch logs
-
-```bash
+docker compose --env-file .env.runtime logs -f chromie-asr
+docker compose --env-file .env.runtime logs -f chromie-router
 docker compose --env-file .env.runtime logs -f chromie-agent
 docker compose --env-file .env.runtime logs -f chromie-llm
 docker compose --env-file .env.runtime logs -f chromie-tts
 ```
 
-## TTS duplicate diagnosis
+Useful Agent inspection:
 
-Two different request IDs with the same text means two requests were sent:
-
-```text
-request_id=aaaa1111-0 text="..."
-request_id=bbbb2222-0 text="..."
+```bash
+curl -fsS http://127.0.0.1:8092/health | python -m json.tool
+curl -fsS 'http://127.0.0.1:8092/capabilities/llm-context?language=en' \
+  | python -m json.tool
 ```
 
-Usually two orchestrator processes are running.
+## 15. Common recovery
+
+### Duplicate replies
+
+Verify only one Orchestrator owns the microphone:
+
+```bash
+pgrep -af 'orchestrator\.orchestrator'
+```
+
+The normal startup script uses `/tmp/chromie-orchestrator.lock`.
+
+### TTS produces no audio
+
+- Inspect `chromie-tts` logs.
+- Verify `TTS_MAX_LENGTH` is a generation budget, not a character limit.
+- Use `TTS_MAX_TEXT_CHARS` to shorten speech.
+- Run `./scripts/verify_tts_gpu.sh`.
+
+### Named skill fails before execution
+
+- Confirm `ORCH_ENABLE_SORIDORMI_SKILLS=1`.
+- Confirm `SORIDORMI_MCP_URL` is exported where the manifest is loaded.
+- Run the capability probe.
+- Compare live tool schemas to the pinned manifest revision.
+
+### Emergency stop remains active
+
+This is expected after cancellation/emergency acceptance. Do not bypass it in
+Chromie. Follow Soridormi’s recovery process, then re-run status/preflight.

@@ -1,115 +1,127 @@
 # Development Checkpoint
 
-Checkpoint date: June 8, 2026
+**Chromie base revision:** `8c448e2de2cd8a602b0d48e31461f9be9f1b8d08`; pin the exact post-patch revision in acceptance/release manifests
+**Soridormi manifest revision:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
+**Verified date:** 2026-06-13
+**Current milestone:** **M13 — Native Interaction Agent and end-to-end voice acceptance**
 
-## Revisions
+This is the exact resume point for the supplied repository snapshot. Current
+status authority is [docs/STATUS.md](docs/STATUS.md).
 
-- Chromie: `11e4952` (`main`, pushed to `origin/main`)
-- Soridormi: `027b626` (`main`, pushed to `origin/main`)
+## What is already present
 
-The Chromie checkpoint commit containing this file may be newer than the
-revision above. Use the Git tag documented below as the exact resume point.
+- Five-service Docker runtime and host Orchestrator.
+- Hardware-profile detection and generated `.env.runtime`.
+- Realtime audio/VAD/ASR/TTS/playback and interruption.
+- Deterministic Router and multi-agent `/run` path.
+- Short-term conversation state across VAD utterances.
+- Strict interaction contracts and `POST /interaction`.
+- Native `InteractionRuntime` output with direct `InteractionSpeech` and
+  `SkillRequest` accumulation.
+- Strict native-output validation, fail-closed behavior, explicit compatibility
+  mode, and opt-in legacy fallback.
+- `AgentResultInteractionAdapter` retained for rollback compatibility, including
+  named-skill translation for nod, head shake, and look-at-user actions.
+- Trusted Skill Runtime with local speech and Soridormi providers.
+- Live Soridormi named-skill catalog import and opaque plan/monitor/execute
+  sequence.
+- Capability registry, manifest materialization, schema probe, and acceptance
+  tools.
+- TaskGraph planning, validation, dry run, read-only/planning/guarded execution,
+  confirmation grants, cancellation, traces, and shared scheduling.
+- Headless text-to-live-MuJoCo structured interaction acceptance.
+- Correlated JSONL session-event evidence, guided seven-case microphone runner, and strict evidence verifier.
+- `0.1.0-alpha.1` candidate notes, compatibility metadata, archive/checksum generator, and release gate.
 
-## Current Milestone
+## What is not complete
 
-M5 external capability deployment is implementation-complete through the
-runtime-backed simulation boundary. The remaining work requires a Linux NVIDIA
-target with Soridormi simulator assets.
+- Complete non-skippable confirmation conversation.
+- Reviewed reference-host output from the guided microphone-driven M13 matrix.
+- Retained target GPU and supervised M5 evidence.
+- Verified Jetson container packaging.
+- Physical hardware release support.
+- Published alpha release; candidate packaging and compatibility policy are prepared but blocked.
 
-Completed:
+## Verification baseline
 
-- Nine-tool Soridormi MCP contract and schema probe.
-- Safe planning and guarded dry-run acceptance.
-- Runtime-backed Soridormi simulation adapter.
-- Preemptive stop, cancellation, emergency stop, and safe hold.
-- Chromie runtime cancellation acceptance.
-- Supervised target runner with evidence capture.
-- Fail-fast runtime preflight requiring:
-  - `backend=runtime`
-  - `mode=sim`
-  - `emergency_stop=false`
+Run:
 
-Pending:
-
-- Run runtime-backed acceptance on the Linux NVIDIA simulator target.
-- Retain `.chromie/acceptance/<timestamp>/` evidence.
-- Implement Soridormi `HardwareRobot` before enabling real hardware MCP mode.
-
-## Verification
-
-Chromie:
-
-```text
-93 passed
+```bash
+./scripts/run_tests.sh
 ```
 
-Soridormi focused MCP suite:
+At this checkpoint the expected baseline is:
 
 ```text
-21 passed
+138 current unittest cases passed
+20 legacy Agent tests passed
+documentation checks passed
 ```
 
-Soridormi full suite on this macOS host:
+This is GPU-free evidence only.
 
-```text
-475 passed, 1 skipped, 4 unrelated Bash 3.2 portability failures
-```
+## Resume sequence
 
-The four failures are in existing shell wrappers using newer Bash features.
-
-## Resume Sequence
-
-On the Linux NVIDIA target:
-
-1. Check out the tagged revisions in both repositories.
-2. Populate Soridormi policy/simulator assets.
-3. Start the Soridormi simulator:
+1. Confirm the clean baseline:
 
    ```bash
-   ./scripts/run_sim_server.sh \
-     --backend mujoco \
-     --profile open_duck_forward \
-     --no-viewer
+   ./scripts/run_tests.sh
    ```
 
-4. Start Soridormi's runtime-backed MCP adapter:
+2. Verify native interaction mode and rollback controls in:
 
-   ```bash
-   ./scripts/run_runtime_mcp_server.sh
+   ```text
+   agent/app/main.py
+   agent/app/interaction.py
+   agent/app/runtime.py
+   docs/interaction_agent_skill_runtime.md
+   docs/STATUS.md
    ```
 
-5. Configure Chromie's `.env.local` with the reachable endpoint:
+3. Keep stop, cancel, emergency, silence, and unusable-audio handling
+   deterministic.
+4. Add request-bound confirmation dialogue and tests for approve, decline,
+   timeout, interruption, and replay rejection.
+5. Run the complete guided microphone/MuJoCo matrix with
+   `scripts/m13_voice_acceptance.py`, then verify it with
+   `scripts/verify_m13_evidence.py --require-clean`.
+6. Review private speech, audible quality, simulator safe idle, cancellation,
+   and recovery notes; close applicable M3/M5 target evidence tracks.
+7. Remove the spoken-confirmation blocker only after implementation/evidence,
+   then generate the clean alpha bundle with
+   `scripts/prepare_alpha_release.py`.
 
-   ```env
-   AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json
-   SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp
-   AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1
-   ```
+## Useful commands
 
-6. Run supervised target acceptance:
-
-   ```bash
-   SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
-     ./scripts/m5_target_acceptance.sh
-   ```
-
-7. Restart the Soridormi MCP process after acceptance and verify safe simulator
-   state before any further motion.
-8. Record the accepted endpoint, hardware profile, GPU results, and recovery
-   result in `ROADMAP.md`.
-
-## Safety Notes
-
-- Do not run Soridormi's standalone runtime loop and runtime MCP adapter against
-  the same robot backend simultaneously.
-- The runtime adapter currently rejects hardware modes.
-- Acceptance intentionally leaves Soridormi emergency-stopped.
-- Do not bypass the target preflight or the supervision acknowledgement.
-
-## Checkpoint Tag
-
-Both repositories use:
-
-```text
-checkpoint-m5-runtime-target-ready-2026-06-08
+```bash
+./scripts/show_profile.sh
+BUILD=1 ./scripts/start_services.sh
+./scripts/start_orchestrator.sh
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/m13_voice_acceptance.py --dry-run \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
+
+With a live Soridormi endpoint:
+
+```bash
+export SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
+PYTHONPATH=agent python -m app.probe_capabilities \
+  --manifest capabilities/soridormi.json
+PYTHONPATH=. python scripts/interaction_text_acceptance.py nod
+```
+
+## Safety invariants
+
+- Do not replace named skills with raw robot controls.
+- Do not let model output authorize itself.
+- Do not treat simulation auto-confirmation as hardware confirmation.
+- Keep physical execution default-off and Soridormi-owned.
+- Keep cancellation and emergency fallbacks active during refactors.
+- The host hardware daemon is mock compatibility only.
+
+## Historical checkpoint
+
+The earlier tag `checkpoint-m5-runtime-target-ready-2026-06-08` remains useful
+for historical comparison. It is not the current project status.

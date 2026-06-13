@@ -19,6 +19,21 @@ if [ -f ".env.runtime" ]; then
   set +a
 fi
 
+# Optional late-bound overrides are useful for supervised acceptance runs. They
+# are sourced after .env.runtime so the runner can enable evidence capture and
+# structured interaction without editing the operator's tracked/local config.
+if [ -n "${ORCH_RUNTIME_OVERRIDE_FILE:-}" ]; then
+  if [ ! -f "$ORCH_RUNTIME_OVERRIDE_FILE" ]; then
+    echo "[orchestrator][error] Override file not found: $ORCH_RUNTIME_OVERRIDE_FILE" >&2
+    exit 1
+  fi
+  echo "[orchestrator] Loading runtime overrides: $ORCH_RUNTIME_OVERRIDE_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ORCH_RUNTIME_OVERRIDE_FILE"
+  set +a
+fi
+
 CONDA_ENV_NAME="${CONDA_ENV_NAME:-${CHROMIE_CONDA_ENV:-Chromie}}"
 echo "[orchestrator] Using conda env: $CONDA_ENV_NAME"
 
