@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/reference_robot_candidate.schema.json",
+  "title": "Chromie Reference Robot Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_id",
+    "candidate_state",
+    "identity",
+    "host",
+    "network",
+    "power_constraints",
+    "revisions",
+    "initial_low_risk_skill",
+    "unsupported",
+    "safety",
+    "calibration_artifacts",
+    "procedures",
+    "approvals"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "candidate_state": {
+      "enum": ["draft", "ready_for_no_motion_review", "selected"]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vendor",
+        "model",
+        "serial_number",
+        "controller",
+        "firmware",
+        "sensors"
+      ],
+      "properties": {
+        "vendor": {"type": "string"},
+        "model": {"type": "string"},
+        "serial_number": {"type": "string"},
+        "controller": {"type": "string"},
+        "firmware": {"type": "string"},
+        "sensors": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "os_version", "architecture"],
+      "properties": {
+        "os": {"type": "string"},
+        "os_version": {"type": "string"},
+        "architecture": {"type": "string"}
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topology", "isolated_control_network"],
+      "properties": {
+        "topology": {"type": "string"},
+        "isolated_control_network": {"type": "boolean"}
+      }
+    },
+    "power_constraints": {"type": "string"},
+    "revisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chromie",
+        "soridormi",
+        "provider_manifest",
+        "provider_configuration_sha256"
+      ],
+      "properties": {
+        "chromie": {"type": "string"},
+        "soridormi": {"type": "string"},
+        "provider_manifest": {"type": "string"},
+        "provider_configuration_sha256": {"type": "string"}
+      }
+    },
+    "initial_low_risk_skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skill_id",
+        "workspace",
+        "max_speed",
+        "max_payload",
+        "supervision",
+        "abort_conditions"
+      ],
+      "properties": {
+        "skill_id": {"type": "string"},
+        "workspace": {"type": "string"},
+        "max_speed": {"type": "string"},
+        "max_payload": {"type": "string"},
+        "supervision": {"const": "direct_operator"},
+        "abort_conditions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "unsupported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skills", "configurations", "operating_conditions"],
+      "properties": {
+        "skills": {"type": "array", "items": {"type": "string"}},
+        "configurations": {"type": "array", "items": {"type": "string"}},
+        "operating_conditions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_motion_enabled",
+        "emergency_stop_independently_tested",
+        "emergency_stop_procedure",
+        "emergency_stop_evidence",
+        "emergency_stop_tested_at",
+        "emergency_stop_operator"
+      ],
+      "properties": {
+        "physical_motion_enabled": {"const": false},
+        "emergency_stop_independently_tested": {"type": "boolean"},
+        "emergency_stop_procedure": {"type": "string"},
+        "emergency_stop_evidence": {"type": "string"},
+        "emergency_stop_tested_at": {"type": "string"},
+        "emergency_stop_operator": {"type": "string"}
+      }
+    },
+    "calibration_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "path", "sha256", "captured_at"],
+        "properties": {
+          "name": {"type": "string"},
+          "path": {"type": "string"},
+          "sha256": {"type": "string"},
+          "captured_at": {"type": "string"}
+        }
+      }
+    },
+    "procedures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stop",
+        "recovery",
+        "communication_loss",
+        "observable_safe_idle"
+      ],
+      "properties": {
+        "stop": {"type": "string"},
+        "recovery": {"type": "string"},
+        "communication_loss": {"type": "string"},
+        "observable_safe_idle": {"type": "string"}
+      }
+    },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["responsible_operator", "safety_reviewer", "reviewed_at"],
+      "properties": {
+        "responsible_operator": {"type": "string"},
+        "safety_reviewer": {"type": "string"},
+        "reviewed_at": {"type": "string"}
+      }
+    }
+  }
+}

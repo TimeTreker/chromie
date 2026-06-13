@@ -1,6 +1,6 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `c41561f`
+**Last committed Chromie base:** `a12b2e9`
 **Pinned Soridormi capability revision:** `4afb4bc6411db4a4194e97349d9466a62efd2f24`
 **Verified date:** 2026-06-14
 **Current focus:** Physical pilot preparation while Voice-to-MuJoCo alpha
@@ -31,7 +31,9 @@ fault-injection scenarios. This does not clear any alpha release gate.
 
 1. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
-   `docs/ROBOT_COMMISSIONING.md`.
+   `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
+   `commissioning/reference_robot_candidate.schema.json` contract and keep the
+   real manifest under ignored `.chromie/commissioning/`.
 2. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
@@ -47,7 +49,7 @@ checklist.
 ## Verification baseline
 
 ```text
-202 current unittest cases passed
+211 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```
@@ -69,6 +71,8 @@ python scripts/m13_voice_acceptance.py --preflight-only \
 python scripts/provider_fault_matrix.py
 python scripts/provider_conformance.py
 python scripts/verify_provider_readiness.py preflight
+python scripts/verify_robot_candidate.py \
+  commissioning/reference_robot_candidate.example.json --allow-draft
 ```
 
 Live commands and recovery procedures are maintained in

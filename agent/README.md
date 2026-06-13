@@ -107,7 +107,7 @@ from deployment configuration.
 
 The checked-in Soridormi snapshot is materialized from Soridormi's authoritative
 export and pinned to upstream commit
-`a092dc704f1ab797fb1d4f542696fe75026eb171`. See
+`4afb4bc6411db4a4194e97349d9466a62efd2f24`. See
 [`../capabilities/README.md`](../capabilities/README.md).
 
 ## TaskGraph behavior

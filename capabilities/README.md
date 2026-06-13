@@ -16,7 +16,7 @@ transport placeholder. The checked-in snapshot contains four agent records and
 twelve tool records and identifies upstream Soridormi commit:
 
 ```text
-a092dc704f1ab797fb1d4f542696fe75026eb171
+4afb4bc6411db4a4194e97349d9466a62efd2f24
 ```
 
 Do not hand-edit exported tools, schemas, or safety policy. Refresh the source

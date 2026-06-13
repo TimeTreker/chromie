@@ -21,7 +21,7 @@ Current snapshot:
 - four agent records;
 - twelve tool records;
 - upstream Soridormi commit
-  `a092dc704f1ab797fb1d4f542696fe75026eb171`;
+  `4afb4bc6411db4a4194e97349d9466a62efd2f24`;
 - MCP endpoint resolved from `${SORIDORMI_MCP_URL}`.
 
 Refresh instructions are in

@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "candidate_id": "replace-me",
+  "candidate_state": "draft",
+  "identity": {
+    "vendor": "",
+    "model": "",
+    "serial_number": "",
+    "controller": "",
+    "firmware": "",
+    "sensors": []
+  },
+  "host": {
+    "os": "",
+    "os_version": "",
+    "architecture": ""
+  },
+  "network": {
+    "topology": "",
+    "isolated_control_network": false
+  },
+  "power_constraints": "",
+  "revisions": {
+    "chromie": "",
+    "soridormi": "",
+    "provider_manifest": "capabilities/soridormi.json",
+    "provider_configuration_sha256": ""
+  },
+  "initial_low_risk_skill": {
+    "skill_id": "",
+    "workspace": "",
+    "max_speed": "",
+    "max_payload": "",
+    "supervision": "direct_operator",
+    "abort_conditions": []
+  },
+  "unsupported": {
+    "skills": [],
+    "configurations": [],
+    "operating_conditions": []
+  },
+  "safety": {
+    "physical_motion_enabled": false,
+    "emergency_stop_independently_tested": false,
+    "emergency_stop_procedure": "",
+    "emergency_stop_evidence": "",
+    "emergency_stop_tested_at": "",
+    "emergency_stop_operator": ""
+  },
+  "calibration_artifacts": [],
+  "procedures": {
+    "stop": "",
+    "recovery": "",
+    "communication_loss": "",
+    "observable_safe_idle": ""
+  },
+  "approvals": {
+    "responsible_operator": "",
+    "safety_reviewer": "",
+    "reviewed_at": ""
+  }
+}

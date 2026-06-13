@@ -1,7 +1,7 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Verified base revision:** `c41561f` plus the current provider-readiness patch;
+**Verified base revision:** `a12b2e9` plus the current candidate-gate patch;
 release tooling records the exact packaged revision
 **Verified date:** 2026-06-14
 **Current focus:** **Physical pilot preparation; Voice-to-MuJoCo alpha target
@@ -61,6 +61,7 @@ Target validation or Release readiness.
 | Stateful planning-only TaskGraph execution | Implemented | Planning policy and concurrency tests | Safe Soridormi plan creation acceptance exists | Flag off |
 | Guarded side-effect execution | Implemented | Authorization, one-time grant, confirmation, monitor, fallback, and cancellation tests | Soridormi dry-run and runtime-cancellation tooling exists | Flag off; bearer token required |
 | Physical TaskGraph execution | Policy path implemented | Safety and sequential-execution tests | Supervised hardware acceptance remains open | Separate flag off |
+| Reference robot candidate gate | Versioned schema, intentionally incomplete template, and fail-closed semantic verifier implemented | Identity, revision, timestamp, emergency-stop, calibration, exclusion, low-level-field, and no-motion authorization tests | No real candidate has been recorded or selected | Preparation only; cannot authorize motion |
 | Shared bounded scheduling and resource arbitration | Implemented | Agent and Orchestrator concurrency tests | MuJoCo interaction path exercises the policy | Parallel flags off |
 | Hardware profile detection and generated `.env.runtime` | Implemented | Profile-detection tests | Desktop and Jetson packaging evidence is incomplete | Automatic |
 | Host hardware daemon | Legacy mock compatibility implementation | Hardware/control-plane tests | No production hardware claim | Optional; mock driver only |
@@ -76,7 +77,7 @@ The repository test command is:
 
 At the current working revision it runs:
 
-- **204** current `unittest` cases under `tests/`;
+- **211** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 

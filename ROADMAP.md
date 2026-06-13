@@ -119,6 +119,10 @@ progressive, supervised rollout. Until the candidate identity, independent
 emergency stop, and no-motion prerequisites are reviewed, development remains
 in preparation and does not authorize physical motion.
 
+The first preparation gate is a versioned, machine-readable candidate manifest.
+It must pin hardware and software identity, define one bounded low-risk skill,
+record exclusions, and fail closed on missing safety or calibration evidence.
+
 ### Sequence
 
 1. no-motion health and state inspection;
@@ -132,6 +136,8 @@ in preparation and does not authorize physical motion.
 ### Exit criteria
 
 - exact hardware, firmware, sensors, drivers, and Soridormi revision are pinned;
+- the candidate verifier reports `selected_for_pilot=true` while continuing to
+  report `physical_motion_authorized=false`;
 - calibration and latency measurements are retained;
 - physical stop and recovery evidence is reviewed;
 - communication loss and stale-command cases fail closed;

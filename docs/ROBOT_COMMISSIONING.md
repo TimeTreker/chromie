@@ -9,6 +9,20 @@ terminal behavior.
 
 ## Candidate identity
 
+Start from the versioned candidate contract:
+
+```bash
+python scripts/verify_robot_candidate.py \
+  commissioning/reference_robot_candidate.example.json \
+  --allow-draft
+```
+
+The checked-in example is intentionally incomplete. Store the real candidate
+under ignored `.chromie/commissioning/` when it contains serial numbers,
+network details, or operator identities. The verifier distinguishes structural
+validity, readiness for no-motion review, and final candidate selection. It
+always reports `physical_motion_authorized=false`.
+
 - [ ] Record robot vendor, model, serial number, controller, firmware, sensors,
   host OS, network topology, and power constraints.
 - [ ] Pin the Chromie and Soridormi revisions and the provider configuration.
@@ -17,6 +31,13 @@ terminal behavior.
 - [ ] List unsupported skills, configurations, and operating conditions.
 
 Reject a candidate whose exact hardware or software identity cannot be pinned.
+Before marking a candidate selected, the default verifier command must pass:
+
+```bash
+python scripts/verify_robot_candidate.py \
+  .chromie/commissioning/reference_robot_candidate.json \
+  --write-report .chromie/commissioning/candidate-verification.json
+```
 
 ## No-motion prerequisites
 
@@ -93,6 +114,7 @@ python scripts/provider_conformance.py --compare \
 
 The candidate can be selected as the first reference robot only when:
 
+- `verify_robot_candidate.py` reports `selected_for_pilot=true`;
 - every no-motion prerequisite and contract gate passes;
 - the retained evidence identifies exact revisions and configuration;
 - measured latencies satisfy the declared thresholds;
@@ -102,6 +124,10 @@ The candidate can be selected as the first reference robot only when:
 
 Any missing identity, low-level contract leak, unsafe-idle result, trace drift,
 unreviewed stop behavior, or threshold failure rejects the candidate.
+
+Candidate selection still does not enable
+`AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` or authorize a Soridormi hardware
+command. Motion requires the later supervised Physical pilot gate.
 
 The completed directory must pass:
 

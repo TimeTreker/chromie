@@ -279,6 +279,21 @@ The verifier rejects local-stub conformance output, missing profiles or
 scenarios, version drift, threshold violations, unsafe-idle results, dirty
 revisions when required, and missing operator review.
 
+## Reference robot candidate preflight
+
+Physical pilot preparation uses a separate machine-readable candidate record:
+
+```bash
+python scripts/verify_robot_candidate.py \
+  .chromie/commissioning/reference_robot_candidate.json
+```
+
+The report separates structural validity, readiness for no-motion review, and
+selection for the pilot. Missing identity, unpinned revisions, absent
+emergency-stop evidence, missing calibration hashes, unspecified limits or
+exclusions, invalid timestamps, and unknown fields all fail closed. Candidate
+selection never authorizes physical motion.
+
 `scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.
