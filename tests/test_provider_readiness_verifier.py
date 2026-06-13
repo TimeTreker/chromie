@@ -57,16 +57,14 @@ class ProviderReadinessVerifierTests(unittest.IsolatedAsyncioTestCase):
             },
         }
 
-    def test_checked_in_manifest_reports_upstream_readiness_gaps(self) -> None:
+    def test_checked_in_manifest_passes_provider_readiness_preflight(self) -> None:
         report = manifest_preflight(Path("capabilities/soridormi.json"))
 
-        self.assertFalse(report["passed"])
-        self.assertTrue(
-            any("hardware_shadow" in error for error in report["errors"])
-        )
-        self.assertIn(
-            "Manifest metadata.provider_readiness is missing",
-            report["errors"],
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["errors"], [])
+        self.assertEqual(
+            report["upstream_commit"],
+            "4afb4bc6411db4a4194e97349d9466a62efd2f24",
         )
 
     def test_ready_manifest_passes_preflight(self) -> None:

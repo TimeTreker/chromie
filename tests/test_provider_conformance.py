@@ -157,6 +157,32 @@ class ProviderConformanceTests(unittest.IsolatedAsyncioTestCase):
             ["hardware_shadow high-level trace differs from sim"],
         )
 
+    def test_profile_parity_normalizes_opaque_plan_identity(self) -> None:
+        common_checks = [{"name": "execute call", "passed": True}]
+        reports = [
+            {
+                "mode": mode,
+                "checks": common_checks,
+                "trace": [
+                    {
+                        "tool_name": "soridormi.skill.execute_plan",
+                        "args": {"plan_id": plan_id},
+                        "authorization": {"allow_side_effects": True},
+                        "outcome": {"status": "success"},
+                    }
+                ],
+            }
+            for mode, plan_id in (
+                ("sim", "sim-generated-plan"),
+                ("hardware_shadow", "shadow-generated-plan"),
+            )
+        ]
+
+        parity = compare_profiles(reports)
+
+        self.assertTrue(parity["passed"])
+        self.assertEqual(parity["mismatches"], [])
+
     async def test_retained_profile_evidence_can_be_compared(self) -> None:
         payload = await run_profiles(
             ["sim", "hardware_shadow", "hardware_dry_run"]

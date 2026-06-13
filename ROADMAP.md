@@ -30,7 +30,7 @@ capability foundations:
 The old M0-M12 numbering remains visible only in historical commits, tool names,
 and evidence references. It should not drive new scope.
 
-## Current focus - Voice-to-MuJoCo alpha
+## Open release track - Voice-to-MuJoCo alpha
 
 ### Objective
 
@@ -60,13 +60,18 @@ unattended operation.
 The acceptance scripts and evidence directories still use the historical `m13`
 name. That identifier is retained for compatibility only.
 
-## Next phase - Robust simulation and provider readiness
+## Completed phase - Robust simulation and provider readiness
 
-The Chromie-side implementation and automated verification for this milestone
-are complete. Milestone closure now waits for live Soridormi simulator,
-hardware-shadow, hardware-dry-run, and fault-injection evidence on the reference
-environment. This work does not close the alpha, remove its release blocker, or
-make the candidate publishable.
+This milestone is complete for the high-level provider contract. Soridormi
+revision `4afb4bc6411db4a4194e97349d9466a62efd2f24` supplies live no-motion
+`sim`, `hardware_shadow`, and `hardware_dry_run` profiles plus test-only fault
+injection. All three profiles pass conformance and parity, and the live
+16-scenario fault matrix passes its terminal-state, latency, and safe-idle
+checks.
+
+The retained run used a local macOS ARM64 MCP endpoint and did not command
+MuJoCo actuators or physical hardware. Linux/GPU Voice-to-MuJoCo evidence and
+supervised physical evidence remain separate release tracks.
 
 ### Objective
 
@@ -105,12 +110,14 @@ conformance must be designed and verified together.
 - no model-facing contract contains device-specific low-level controls;
 - a commissioning checklist is sufficient to select the first reference robot.
 
-## Physical pilot
+## Current phase - Physical pilot preparation
 
 ### Objective
 
-Commission one explicitly supported robot configuration through a progressive,
-supervised rollout.
+Select and prepare one explicitly supported robot configuration for a
+progressive, supervised rollout. Until the candidate identity, independent
+emergency stop, and no-motion prerequisites are reviewed, development remains
+in preparation and does not authorize physical motion.
 
 ### Sequence
 

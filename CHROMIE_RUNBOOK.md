@@ -302,6 +302,17 @@ the scenario semantics. Every scenario also ends with
 `soridormi.robot.get_status`; a non-empty `active_task`, active emergency stop,
 or failed status read fails the matrix.
 
+Run the live form serially against a dedicated no-motion Soridormi endpoint;
+do not run conformance concurrently because fault configuration is endpoint
+state:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+python scripts/provider_fault_matrix.py --live \
+  --manifest capabilities/soridormi.json \
+  --output .chromie/provider-readiness/fault-matrix.json
+```
+
 Run the provider-neutral conformance contract against both local no-motion
 profiles:
 
@@ -309,7 +320,7 @@ profiles:
 python scripts/provider_conformance.py
 ```
 
-The live form is restricted to `sim` or `hardware_dry_run`:
+The live form is restricted to one explicit safe profile:
 
 ```bash
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \

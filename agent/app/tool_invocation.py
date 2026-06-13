@@ -231,7 +231,22 @@ class McpStreamableHttpInvoker:
         message = "\n".join(text_parts).strip()
 
         if is_error:
-            return ToolCallOutcome.failed(message or "MCP tool returned an error")
+            error = message or "MCP tool returned an error"
+            lowered = error.lower()
+            if "timeout" in lowered or "timed out" in lowered:
+                return ToolCallOutcome(status="timeout", error=error)
+            retryable = any(
+                marker in lowered
+                for marker in (
+                    "connection",
+                    "disconnect",
+                    "restart",
+                    "status drop",
+                    "status_drop",
+                    "dropped status",
+                )
+            )
+            return ToolCallOutcome.failed(error, retryable=retryable)
         if isinstance(structured, dict):
             return ToolCallOutcome.success(structured)
         if message:

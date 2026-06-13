@@ -164,6 +164,42 @@ class McpToolInvokerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error_outcome.error, "robot unavailable")
         self.assertEqual(timeout_outcome.status, "timeout")
 
+    async def test_mcp_provider_faults_preserve_retryable_and_timeout_semantics(self) -> None:
+        responses = iter(
+            [
+                {
+                    "isError": True,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "injected provider disconnect",
+                        }
+                    ],
+                },
+                {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "injected plan_timeout"}
+                    ],
+                },
+            ]
+        )
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            return next(responses)
+
+        invoker = McpStreamableHttpInvoker(_registry(), call=call)
+        disconnected = await invoker.invoke("soridormi.robot.get_status", {})
+        timed_out = await invoker.invoke("soridormi.robot.get_status", {})
+
+        self.assertEqual(disconnected.status, "failed_retryable")
+        self.assertEqual(timed_out.status, "timeout")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -186,6 +186,16 @@ Use `--scenarios` for a subset and `--output` to retain a machine-readable JSON
 summary. This is automated contract evidence, not live simulator or hardware
 validation.
 
+Against a Soridormi endpoint that declares hidden test controls, run the same
+matrix through the real MCP transport:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+python scripts/provider_fault_matrix.py --live \
+  --manifest capabilities/soridormi.json \
+  --output .chromie/provider-readiness/fault-matrix.json
+```
+
 The matrix also records total scenario and terminal latency. Defaults require
 each scenario to finish within 1000 ms, timeout terminal handling within 500
 ms, and operator cancellation terminal handling within 250 ms. Override these
@@ -244,8 +254,8 @@ The fault-injection declaration lives under
 `metadata.provider_readiness.fault_injection`. It names test-only
 `configure_tool` and `clear_tool` capabilities, which must be
 `llm_visible=false`, plus the supported versioned scenario IDs. The checked-in
-manifest currently fails this preflight because the pinned upstream revision
-does not yet declare hardware shadow or live fault injection.
+manifest is pinned to a Soridormi revision that declares all three safe modes
+and the hidden live fault-injection contract.
 
 Retained target evidence uses one directory containing:
 

@@ -189,9 +189,9 @@ def check_project_direction(errors: list[str]) -> None:
     roadmap = ROADMAP.read_text(encoding="utf-8")
     for heading in (
         "## Completed foundations",
-        "## Current focus - Voice-to-MuJoCo alpha",
-        "## Next phase - Robust simulation and provider readiness",
-        "## Physical pilot",
+        "## Open release track - Voice-to-MuJoCo alpha",
+        "## Completed phase - Robust simulation and provider readiness",
+        "## Current phase - Physical pilot preparation",
         "## Later work",
     ):
         if heading not in roadmap:

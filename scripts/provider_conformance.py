@@ -197,15 +197,21 @@ def report(
 
 
 def trace_signature(profile: dict[str, Any]) -> list[dict[str, Any]]:
-    return [
-        {
-            "tool_name": entry.get("tool_name"),
-            "args": entry.get("args"),
-            "authorization": entry.get("authorization"),
-            "status": entry.get("outcome", {}).get("status"),
-        }
-        for entry in profile.get("trace", [])
-    ]
+    signature: list[dict[str, Any]] = []
+    for entry in profile.get("trace", []):
+        tool_name = entry.get("tool_name")
+        args = dict(entry.get("args") or {})
+        if tool_name == "soridormi.skill.execute_plan" and "plan_id" in args:
+            args["plan_id"] = "<opaque-plan-id>"
+        signature.append(
+            {
+                "tool_name": tool_name,
+                "args": args,
+                "authorization": entry.get("authorization"),
+                "status": entry.get("outcome", {}).get("status"),
+            }
+        )
+    return signature
 
 
 def compare_profiles(reports: Sequence[dict[str, Any]]) -> dict[str, Any]:

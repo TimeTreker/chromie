@@ -12,6 +12,8 @@ yet published an official release.
   terminal results and expanded the deterministic fault matrix to 16 scenarios.
 - Added provider-readiness manifest preflight, explicit live/stub evidence
   provenance, and strict target evidence bundle verification.
+- Added live Soridormi-owned fault injection, three safe no-motion provider
+  modes, MCP error normalization, and opaque-plan-aware profile parity.
 
 ### Implemented in the current development snapshot
 

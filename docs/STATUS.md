@@ -1,13 +1,13 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Verified base revision:** `868da56` plus the current readiness-verifier patch;
+**Verified base revision:** `c41561f` plus the current provider-readiness patch;
 release tooling records the exact packaged revision
 **Verified date:** 2026-06-14
-**Current focus:** **Robust simulation and provider readiness target validation;
-Voice-to-MuJoCo alpha target validation also remains open**
+**Current focus:** **Physical pilot preparation; Voice-to-MuJoCo alpha target
+validation remains open**
 **Version candidate:** `0.1.0-alpha.1` (prepared, not published)
-**Soridormi capability snapshot:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
+**Soridormi capability snapshot:** `4afb4bc6411db4a4194e97349d9466a62efd2f24`
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
 current implementation, automated evidence, target evidence, and release
@@ -16,10 +16,11 @@ readiness.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
-Chromie-side implementation and automated verification for the current
-milestone are complete. Target validation remains open because no live
-Soridormi simulator, hardware-shadow, hardware-dry-run, or fault-injection
-endpoint was available for retained evidence.
+The provider-readiness milestone is complete. A live local Soridormi MCP
+endpoint passed the `sim`, recommendation-only `hardware_shadow`, and no-motion
+`hardware_dry_run` conformance profiles, profile parity, and all 16 injected
+fault scenarios. This is no-motion provider-contract evidence from macOS ARM64;
+it is not Linux/GPU MuJoCo, audio-device, or physical-robot evidence.
 
 ## Status vocabulary
 
@@ -50,8 +51,8 @@ Target validation or Release readiness.
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean automatic and supervised approval/denial bundles still open | Structured path; simulator exemption configurable |
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; microphone retention still open | Available in structured path |
 | Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Provider flag off |
-| Provider failure normalization | Strict catalog/availability/plan/monitor/completion validation, stable timeout/cancellation terminal states, deterministic language-matched speech fallback, and a versioned 16-scenario replayable fault matrix with configurable latency thresholds, status snapshots, and safe-idle enforcement | Matrix, threshold and safe-idle evaluation, provider restart, unavailable skill, deterministic jitter, dropped monitor status, malformed completion, mismatched identity, disconnect-during-cancel, timeout, fallback, and completion-suppression tests | Soridormi-owned live fault injection and target threshold retention remain open | Used by Soridormi named skills |
-| Provider conformance | Shared versioned checks and replayable high-level traces for simulator, recommendation-only hardware shadow, and no-motion hardware dry-run profiles, plus manifest preflight and strict retained-evidence verification | Local three-profile parity, trace-drift detection, profile-specific no-motion proofs, unsafe-output rejection, manifest-gap detection, and complete/unsafe bundle tests | Pinned Soridormi manifest currently lacks hardware-shadow and live fault-injection declarations; live retention remains open | Test tooling; real hardware mode refused |
+| Provider failure normalization | Strict catalog/availability/plan/monitor/completion validation, stable timeout/cancellation terminal states, deterministic language-matched speech fallback, and a versioned 16-scenario replayable fault matrix with configurable latency thresholds, status snapshots, and safe-idle enforcement | Matrix, threshold and safe-idle evaluation, provider restart, unavailable skill, deterministic jitter, dropped monitor status, malformed completion, mismatched identity, disconnect-during-cancel, timeout, fallback, and completion-suppression tests | Live Soridormi-owned injection passed 16/16 scenarios; all ended safe-idle with no threshold violations | Used by Soridormi named skills |
+| Provider conformance | Shared versioned checks and replayable high-level traces for simulator, recommendation-only hardware shadow, and no-motion hardware dry-run profiles, plus manifest preflight and strict retained-evidence verification | Local three-profile parity, trace-drift detection, opaque-identity normalization, profile-specific no-motion proofs, unsafe-output rejection, manifest preflight, and complete/unsafe bundle tests | Live no-motion `sim`, `hardware_shadow`, and `hardware_dry_run` profiles passed with parity; real hardware mode remains refused | Test tooling; real hardware mode refused |
 | Conversation state across VAD utterances | Implemented in host memory | Boundary, follow-up, and limit tests | Available in the host Orchestrator | Enabled by `.env.common` |
 | Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and three explicit modes implemented | Preflight, synthetic/virtual-mic framing, isolation, and bundle-verification tests | Only supervised mode is release-closing; reviewed bundle still open | Acceptance-only |
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
@@ -75,7 +76,7 @@ The repository test command is:
 
 At the current working revision it runs:
 
-- **202** current `unittest` cases under `tests/`;
+- **204** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -121,10 +122,9 @@ These legacy evidence tracks remain open but do not define the current delivery:
   fails closed unless an operator explicitly enables adapter fallback.
 - The checked-in Soridormi manifest is a pinned contract snapshot; the live
   endpoint must be probed before execution is enabled.
-- Provider-readiness preflight currently reports that the pinned Soridormi
-  snapshot lacks hardware-shadow coverage and test-only fault-injection
-  declarations. Target validation cannot close until an updated upstream
-  capability snapshot passes.
+- Provider-readiness preflight passes for the pinned Soridormi snapshot.
+  Physical motion still requires an exact robot selection and supervised
+  commissioning evidence.
 - Jetson profiles select model/runtime values, but this repository does not yet
   include verified Jetson-specific Dockerfiles or Compose overrides.
 - The host hardware daemon currently constructs `MockRobotDriver` regardless of

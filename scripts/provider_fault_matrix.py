@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -16,8 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
-from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+from agent.app.tool_invocation import (
+    AsyncToolInvoker,
+    ToolCallOutcome,
+    ToolInvocationContext,
+)
+from orchestrator.runtime.interaction_coordinator import (
+    InteractionRuntimeCoordinator,
+    build_soridormi_invoker,
+)
 from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
 
 MATRIX_VERSION = "1.2"
@@ -338,6 +346,60 @@ class ScenarioInvoker:
         return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
 
 
+class LiveScenarioInvoker:
+    def __init__(self, delegate: AsyncToolInvoker) -> None:
+        self.delegate = delegate
+        self.calls: list[str] = []
+        self.execute_started = asyncio.Event()
+        self.execute_started_at: float | None = None
+
+    async def invoke(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> ToolCallOutcome:
+        self.calls.append(tool_name)
+        if tool_name == "soridormi.skill.execute_plan":
+            self.execute_started_at = time.perf_counter()
+            self.execute_started.set()
+        return await self.delegate.invoke(tool_name, args, context=context)
+
+
+class LiveFaultController:
+    def __init__(self, url: str) -> None:
+        self.url = url
+
+    async def configure(self, scenario_id: str) -> None:
+        await self._call(
+            "soridormi.testing.configure_fault",
+            {"scenario_id": scenario_id},
+        )
+
+    async def clear(self) -> None:
+        await self._call("soridormi.testing.clear_faults", {})
+
+    async def _call(self, tool_name: str, args: dict[str, Any]) -> None:
+        import httpx
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamable_http_client
+
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0),
+            trust_env=False,
+        ) as http_client:
+            async with streamable_http_client(
+                self.url,
+                http_client=http_client,
+            ) as (read, write, _):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    result = await session.call_tool(tool_name, args)
+        if bool(getattr(result, "isError", getattr(result, "is_error", False))):
+            raise RuntimeError(f"{tool_name} failed: {result}")
+
+
 def threshold_violations(
     scenario: FaultScenario,
     *,
@@ -383,11 +445,13 @@ async def run_scenario(
     scenario: FaultScenario,
     *,
     thresholds: MatrixThresholds | None = None,
+    invoker: ScenarioInvoker | LiveScenarioInvoker | None = None,
+    request_timeout_override_ms: int | None = None,
 ) -> ScenarioResult:
     thresholds = thresholds or MatrixThresholds()
     started_at = time.perf_counter()
     spoken: list[str] = []
-    invoker = ScenarioInvoker(scenario)
+    invoker = invoker or ScenarioInvoker(scenario)
     coordinator = InteractionRuntimeCoordinator(
         lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
         soridormi_invoker=invoker,
@@ -403,7 +467,11 @@ async def run_scenario(
                 "request_id": "fault-matrix-request",
                 "skill_id": "soridormi.nod_yes",
                 "args": {"count": 2},
-                "timeout_ms": scenario.request_timeout_ms,
+                "timeout_ms": (
+                    request_timeout_override_ms
+                    if request_timeout_override_ms is not None
+                    else scenario.request_timeout_ms
+                ),
             }
         ],
         metadata={"language": "en-US", "fault_scenario": scenario.scenario_id},
@@ -500,6 +568,56 @@ async def run_matrix(
         await run_scenario(scenario, thresholds=thresholds)
         for scenario in selected
     ]
+    payload = _matrix_payload(results, thresholds=thresholds)
+    payload["evidence_source"] = "local_stub"
+    return payload
+
+
+async def run_live_matrix(
+    manifest: Path,
+    scenario_ids: Sequence[str] | None = None,
+    *,
+    thresholds: MatrixThresholds | None = None,
+) -> dict[str, Any]:
+    url = os.environ.get("SORIDORMI_MCP_URL")
+    if not url:
+        raise ValueError("SORIDORMI_MCP_URL is required for --live")
+    thresholds = thresholds or MatrixThresholds()
+    selected = (
+        list(SCENARIOS)
+        if not scenario_ids
+        else [SCENARIOS_BY_ID[scenario_id] for scenario_id in scenario_ids]
+    )
+    delegate = build_soridormi_invoker(manifest_path=manifest)
+    controller = LiveFaultController(url)
+    results: list[ScenarioResult] = []
+    for scenario in selected:
+        await controller.configure(scenario.scenario_id)
+        try:
+            results.append(
+                await run_scenario(
+                    scenario,
+                    thresholds=thresholds,
+                    invoker=LiveScenarioInvoker(delegate),
+                    request_timeout_override_ms=(
+                        300
+                        if scenario.scenario_id == "runtime_timeout_cancel"
+                        else None
+                    ),
+                )
+            )
+        finally:
+            await controller.clear()
+    payload = _matrix_payload(results, thresholds=thresholds)
+    payload["evidence_source"] = "live"
+    return payload
+
+
+def _matrix_payload(
+    results: Sequence[ScenarioResult],
+    *,
+    thresholds: MatrixThresholds,
+) -> dict[str, Any]:
     status_counts: dict[str, int] = {}
     reason_counts: dict[str, int] = {}
     for result in results:
@@ -558,6 +676,8 @@ def main() -> int:
     parser.add_argument("--max-scenario-ms", type=float, default=1000.0)
     parser.add_argument("--max-timeout-terminal-ms", type=float, default=500.0)
     parser.add_argument("--max-cancel-terminal-ms", type=float, default=250.0)
+    parser.add_argument("--live", action="store_true")
+    parser.add_argument("--manifest", default="capabilities/soridormi.json")
     args = parser.parse_args()
     try:
         selected = parse_scenario_ids(args.scenarios)
@@ -568,7 +688,18 @@ def main() -> int:
         )
     except ValueError as exc:
         parser.error(str(exc))
-    payload = asyncio.run(run_matrix(selected, thresholds=thresholds))
+    try:
+        payload = asyncio.run(
+            run_live_matrix(
+                Path(args.manifest),
+                selected,
+                thresholds=thresholds,
+            )
+            if args.live
+            else run_matrix(selected, thresholds=thresholds)
+        )
+    except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
+        parser.error(str(exc))
     rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         output_path = Path(args.output).expanduser()

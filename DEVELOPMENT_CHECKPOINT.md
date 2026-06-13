@@ -1,10 +1,10 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `868da56`
-**Pinned Soridormi capability revision:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
+**Last committed Chromie base:** `c41561f`
+**Pinned Soridormi capability revision:** `4afb4bc6411db4a4194e97349d9466a62efd2f24`
 **Verified date:** 2026-06-14
-**Current focus:** Robust simulation and provider readiness target validation
-while Voice-to-MuJoCo alpha target evidence is deferred to Linux
+**Current focus:** Physical pilot preparation while Voice-to-MuJoCo alpha
+target evidence is deferred to Linux
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -23,24 +23,21 @@ The alpha implementation is present:
 
 The alpha implementation remains frozen except for defects. Linux/GPU,
 virtual-microphone, and supervised evidence is intentionally deferred. The
-Chromie-side robust-simulation and provider-readiness implementation is now
-complete without clearing any alpha release gate. Milestone closure waits for
-live Soridormi provider and fault-injection evidence.
+robust-simulation and provider-readiness milestone is complete with live
+no-motion MCP conformance, three-profile parity, and 16/16 Soridormi-owned
+fault-injection scenarios. This does not clear any alpha release gate.
 
 ## Next sequence
 
-1. Update the pinned Soridormi capability snapshot after upstream adds
-   `hardware_shadow`, dry-run named skills, and test-only fault injection; run
-   `verify_provider_readiness.py preflight` until it passes.
-2. Run the shared conformance suite against live Soridormi `sim`,
-   `hardware_shadow`, and `hardware_dry_run` providers when available and
-   retain their traces and parity result.
-3. Run the versioned Chromie fault matrix against Soridormi-owned injected
-   faults when that endpoint is available.
-4. Verify the complete provider-readiness bundle with `--require-clean`.
-5. On Linux, resume the full `synthetic`, `virtual-mic`, and `supervised` alpha
+1. Select one reference-robot candidate and complete the identity,
+   independent emergency-stop, software, network, and workspace sections of
+   `docs/ROBOT_COMMISSIONING.md`.
+2. Keep all physical-motion gates off while validating no-motion health,
+   calibration artifact ownership, stop/recovery procedures, and operator
+   responsibilities.
+3. On Linux, resume the full `synthetic`, `virtual-mic`, and `supervised` alpha
    matrices.
-6. Clear the compatibility blocker and publish `0.1.0-alpha.1` only after that
+4. Clear the compatibility blocker and publish `0.1.0-alpha.1` only after that
    retained evidence passes.
 
 Do not start physical motion until the robust-simulation and provider-readiness
