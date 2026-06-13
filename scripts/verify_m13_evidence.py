@@ -80,11 +80,11 @@ def verify_bundle(
         errors.append(f"Unknown acceptance mode: {mode!r}")
     if mode != "supervised" and not allow_automated:
         errors.append(
-            f"Acceptance mode {mode!r} is automated evidence and cannot close M13; "
+            f"Acceptance mode {mode!r} is automated evidence and cannot close the alpha release gate; "
             "run --mode supervised for release-closing evidence"
         )
     if runner.get("dry_run"):
-        errors.append("Dry-run evidence cannot close M13")
+        errors.append("Dry-run evidence cannot close the alpha release gate")
     if int(metadata.get("event_count") or 0) <= 0:
         errors.append("metadata.json reports no structured session events")
 
@@ -213,7 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--allow-automated",
         action="store_true",
-        help="Validate synthetic/virtual-mic evidence without treating it as M13-closing.",
+        help="Validate synthetic/virtual-mic evidence without treating it as release-closing.",
     )
     parser.add_argument("--write-report", type=Path)
     return parser

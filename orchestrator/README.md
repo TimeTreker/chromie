@@ -19,7 +19,7 @@ For authoritative status and configuration, see:
 - TTS streams PCM synthesis; the Orchestrator plays and interrupts it.
 - The Skill Runtime resolves and schedules trusted named skills.
 - Soridormi plans and executes embodied skills and owns physical safety.
-- `hardware/daemon.py` is a legacy mock compatibility boundary, not the M13
+- `hardware/daemon.py` is a legacy mock compatibility boundary, not the alpha
   embodiment path.
 
 The Agent does not call TTS, MCP, or hardware. The language model is never the
@@ -114,7 +114,7 @@ ORCH_AUDIO_INPUT_MODE=device
 ORCH_AUDIO_OUTPUT_MODE=device
 ```
 
-The M13 automatic runner can instead set:
+The alpha automatic runner can instead set:
 
 ```text
 ORCH_AUDIO_INPUT_MODE=stdin
@@ -182,10 +182,11 @@ arbitration is process-local; Soridormi is the cross-process robot authority.
 
 ## Confirmation status
 
-The contracts and runtime carry confirmation requirements, and simulation-only
-auto-confirm exemptions are implemented. The complete non-skippable spoken
-confirmation dialogue—prompt, bounded reply, grant binding, expiry, denial, and
-interruption—is not yet closed and remains an M13 acceptance gate.
+The non-skippable spoken confirmation dialogue is implemented with an
+action-specific prompt, bounded reply matching, request binding, expiry,
+single-use approval, deterministic denial, and operational-interrupt
+passthrough. Simulation-only auto-confirm exemptions remain separate. Retained
+automatic and supervised approval/denial evidence is still an alpha gate.
 
 ## Diagnostics
 

@@ -1,15 +1,16 @@
-# CLAUDE.md
+# AGENTS.md
 
 Guidance for coding agents working on Chromie.
 
 ## Read first
 
-1. `docs/STATUS.md` — current implementation and evidence authority
-2. `ROADMAP.md` — milestone intent and exit criteria
-3. `DEVELOPMENT_CHECKPOINT.md` — exact resume point
-4. `README.md` and the relevant component README
-5. `docs/ACCEPTANCE.md` — required validation level
-6. `docs/README.md` — documentation ownership and update rules
+1. `docs/PROJECT_CHARTER.md` — stable goal, boundaries, and non-goals
+2. `docs/STATUS.md` — current implementation and evidence authority
+3. `ROADMAP.md` — milestone intent and exit criteria
+4. `DEVELOPMENT_CHECKPOINT.md` — exact resume point
+5. `README.md` and the relevant component README
+6. `docs/ACCEPTANCE.md` — required validation level
+7. `docs/README.md` — documentation ownership and update rules
 
 Treat current source and tests as truth. Historical patches, tags, exported
 archives, and old milestone prose are context only.
@@ -38,7 +39,7 @@ archives, and old milestone prose are context only.
 - Do not fabricate microphone, GPU, simulator, or hardware evidence. Use
   synthetic/virtual-mic modes for automated regression and supervised mode for
   release-closing microphone/speaker evidence with operator notes.
-- Do not remove release blockers or mark M13 complete unless the corresponding
+- Do not remove release blockers or publish the alpha unless the corresponding
   implementation and evidence are present.
 
 ## Required checks

@@ -257,7 +257,7 @@ PYTHONPATH=agent python -m app.soridormi_acceptance \
 This intentionally leaves Soridormi emergency-stopped. Follow the Soridormi
 recovery procedure and verify ready/safe-idle state before further motion.
 
-## 12. M3/M5 target evidence
+## 12. Legacy target evidence
 
 ```bash
 SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
@@ -276,7 +276,9 @@ SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
   ./scripts/m5_target_acceptance.sh
 ```
 
-## 13. M13 voice acceptance
+## 13. Alpha voice acceptance
+
+The command names and evidence paths retain the historical `m13` identifier.
 
 Run the automatic synthetic matrix first. It generates input WAV files with the
 existing TTS service and injects them through the Orchestrator's private stdin
@@ -311,9 +313,10 @@ python scripts/m13_voice_acceptance.py \
   --start-services
 ```
 
-This requires `pactl` and `paplay`. The runner creates a temporary null sink,
-uses its monitor through `PULSE_SOURCE`, and removes the module during cleanup.
-If a previous process was killed before cleanup, unload the stale module with
+The runner uses `pactl`/`paplay` when available or native
+`pw-cli`/`pw-cat`/`pw-dump` on PipeWire. It creates a temporary null sink, uses
+its monitor as the input source, and removes it during cleanup. If a PulseAudio
+run was killed before cleanup, unload the stale module with
 `pactl list short modules` followed by `pactl unload-module <id>`.
 
 Finally, commit the candidate revision and run the real reference-host matrix:
@@ -336,7 +339,8 @@ python scripts/verify_m13_evidence.py --require-clean \
   .chromie/acceptance/m13/<id>
 ```
 
-Automatic bundles are useful regression evidence but cannot close M13 because
+Automatic bundles are useful regression evidence but cannot close the alpha
+release gate because
 they do not prove a real microphone, speaker, human pronunciation, room
 conditions, or operator-observed simulator safety.
 

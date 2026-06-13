@@ -1,11 +1,9 @@
 # API and Protocol Reference
 
-Verified against repository revision
-`8c448e2de2cd8a602b0d48e31461f9be9f1b8d08`.
-
 This document describes interfaces implemented in this repository. Soridormi
 is a separate deployment; only its checked-in capability contract is summarized
-here.
+here. Current revision and verification status are maintained in
+[STATUS.md](STATUS.md).
 
 ## Router HTTP API — port 8091
 

@@ -31,7 +31,7 @@ A higher level does not replace lower-level regression tests.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 169 current tests and 20 legacy Agent
+At the current working revision this runs 170 current tests and 20 legacy Agent
 tests.
 It also runs the documentation consistency checker.
 
@@ -137,7 +137,7 @@ This dispatches a long zero-velocity plan, cancels it, requires the emergency
 fallback, and verifies retained e-stop state. Complete Soridormi’s recovery
 procedure before further motion.
 
-## Level D — M3/M5 target runner
+## Level D - legacy target runner
 
 ```bash
 SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
@@ -163,7 +163,10 @@ SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
   ./scripts/m5_target_acceptance.sh
 ```
 
-## M13 voice acceptance modes
+## Alpha voice acceptance modes
+
+The scripts, environment variables, and evidence directory retain the
+historical `m13` identifier for compatibility.
 
 `scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
@@ -293,7 +296,7 @@ python scripts/m13_voice_acceptance.py --dry-run \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-## M13 microphone acceptance matrix
+## Alpha microphone acceptance matrix
 
 Run from the repository root with the structured path enabled and a live
 MuJoCo-backed Soridormi endpoint. All three modes execute these cases in the
@@ -335,7 +338,7 @@ text and operator-visible context may contain private speech.
 
 - Do not count a dry run as simulator or hardware evidence.
 - Do not count a simulator exemption as hardware confirmation.
-- Do not mark M13 closed from text-input acceptance alone.
+- Do not publish the alpha from text-input acceptance alone.
 - Do not publish logs containing execution tokens or private environment data.
 - Record failure evidence as well as successful reruns; otherwise regressions are
   difficult to diagnose.

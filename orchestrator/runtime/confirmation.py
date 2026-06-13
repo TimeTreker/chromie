@@ -16,6 +16,7 @@ ConfirmationDecision = Literal[
     "denied",
     "ambiguous",
     "expired",
+    "operational_interrupt",
     "no_pending",
     "not_confirmation",
 ]
@@ -58,7 +59,18 @@ _NEGATIVE_PHRASES = frozenset(
         "算了",
     }
 )
-_OPERATIONAL_INTERRUPT_PHRASES = frozenset({"stop", "cancel", "停止", "取消"})
+_OPERATIONAL_INTERRUPT_PHRASES = frozenset(
+    {
+        "stop",
+        "cancel",
+        "emergency",
+        "emergency stop",
+        "停止",
+        "取消",
+        "急停",
+        "紧急停止",
+    }
+)
 _SENSITIVE_ARGUMENT_PARTS = ("password", "secret", "token", "credential", "key")
 
 
@@ -154,6 +166,12 @@ class ConfirmationDialogue:
             return ConfirmationResolution(decision="not_confirmation")
 
         self._pending = None
+        if normalized in _OPERATIONAL_INTERRUPT_PHRASES:
+            return self._resolution(
+                pending,
+                "operational_interrupt",
+                "The pending action was cancelled.",
+            )
         if pending.expires_at <= self._clock():
             return self._resolution(
                 pending,

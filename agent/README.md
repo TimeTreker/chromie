@@ -179,7 +179,9 @@ Normally start the complete service set through:
 
 ## Known limitations
 
-- Native `/interaction` output is implemented; spoken request-bound confirmation and reviewed reference-host microphone evidence remain open.
+- Native `/interaction` output and host request-bound confirmation are
+  implemented; retained automatic and reviewed reference-host microphone
+  evidence remain open.
 - Tool, memory, and vision compatibility actions are proposals, not built-in executors.
 - TaskGraph scheduler, grants, and traces are process-local rather than durable or distributed.
 - Cross-process robot exclusivity is enforced by Soridormi, not by the Agent's local scheduler.

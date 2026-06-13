@@ -10,7 +10,7 @@ been published.
 Treat `main` as a development branch and the current revision as supervised
 alpha validation material. The release generator intentionally refuses a
 publishable bundle while tracked spoken approval/denial evidence remains open
-or a real M13 evidence bundle does not pass. See
+or a real alpha evidence bundle does not pass. See
 [Current Implementation Status](STATUS.md).
 
 ## Recommended first release scope
@@ -98,7 +98,8 @@ The release process must also probe the live endpoint and retain the result.
 
 ### Documentation
 
-- `docs/STATUS.md`, `ROADMAP.md`, and `DEVELOPMENT_CHECKPOINT.md` agree.
+- `docs/PROJECT_CHARTER.md`, `docs/STATUS.md`, `ROADMAP.md`, and
+  `DEVELOPMENT_CHECKPOINT.md` agree.
 - All local Markdown links pass `python scripts/check_docs.py`.
 - Configuration defaults and feature gates match source and examples.
 - API reference contains every implemented Router, Agent, and hardware endpoint.
@@ -112,7 +113,7 @@ The release process must also probe the live endpoint and retain the result.
 - The selected Ollama, ASR, and TTS models are documented and obtainable.
 - Structured interaction and Soridormi compatibility are probed against the pinned revision.
 
-### M13 acceptance
+### Alpha acceptance
 
 - Native `InteractionResponse` generation is enabled and validated; compatibility rollback is documented.
 - Non-skippable spoken confirmation dialogue is verified and request-bound.

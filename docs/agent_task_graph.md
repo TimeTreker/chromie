@@ -2,7 +2,8 @@
 
 ## Status
 
-Implemented through the M12 reliability checkpoint and used as part of the M13
+Implemented as part of the structured embodiment foundation and used by the
+current alpha
 platform. Validation, dry-run, read-only execution, planning execution, guarded
 execution, confirmation grants, cancellation, bounded concurrency, traces, and
 scheduler inspection are present and automatically tested.

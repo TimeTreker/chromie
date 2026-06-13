@@ -1,8 +1,8 @@
 # Configuration Reference
 
-Verified against the M13 implementation derived from base revision
-`8c448e2de2cd8a602b0d48e31461f9be9f1b8d08`. Release manifests record the
-exact post-patch revision used for acceptance.
+This document owns runtime variable semantics. Current revision and verification
+status are maintained in [STATUS.md](STATUS.md); release manifests record the
+exact revision used for acceptance.
 
 ## Precedence and generated files
 
@@ -71,7 +71,7 @@ limitations.
 
 ## Host audio modes
 
-Normal operation uses physical devices. The M13 runner supplies temporary
+Normal operation uses physical devices. The alpha runner supplies temporary
 late-bound values for automatic acceptance; do not persist them in production
 configuration unless you are intentionally building a test harness.
 
@@ -258,7 +258,8 @@ variables are not a supported production-selection mechanism in this revision.
   `TTS_SMOKE_SPEAKER`.
 - Supervised target acceptance: `SUPERVISED_ACCEPTANCE=1`, `M5_DRY_RUN`,
   `M5_EVIDENCE_ROOT`, `M5_ACCEPTANCE_ID`, `M5_EVIDENCE_DIR`.
-- M13 voice acceptance uses CLI flags on `scripts/m13_voice_acceptance.py`.
+- Alpha voice acceptance uses CLI flags on the legacy-named
+  `scripts/m13_voice_acceptance.py`.
   `--mode synthetic` is the fully automatic default; `--mode virtual-mic`
   exercises a PulseAudio/PipeWire monitor source; `--mode supervised` uses the
   real microphone and speaker. Automated modes also accept `--tts-url`,

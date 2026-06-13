@@ -44,6 +44,35 @@ class ConfirmationDialogueTests(unittest.TestCase):
 
         self.assertEqual(dialogue.resolve("Stop!").decision, "not_confirmation")
         self.assertEqual(dialogue.resolve("Cancel.").decision, "not_confirmation")
+        self.assertEqual(
+            dialogue.resolve("Emergency stop!").decision,
+            "not_confirmation",
+        )
+
+    def test_operational_interrupt_cancels_pending_and_reaches_router(self) -> None:
+        for phrase in ("Stop!", "Cancel.", "Emergency stop!", "急停！"):
+            with self.subTest(phrase=phrase):
+                dialogue = ConfirmationDialogue(clock=lambda: 100.0)
+                pending = dialogue.begin(
+                    _response(),
+                    confirmed_request_ids={"nod-1"},
+                    origin_session_id="sid-1",
+                    conversation_id="conversation-1",
+                )
+
+                resolution = dialogue.resolve(phrase)
+
+                self.assertEqual(
+                    resolution.decision,
+                    "operational_interrupt",
+                )
+                self.assertEqual(
+                    resolution.confirmation_id,
+                    pending.confirmation_id,
+                )
+                self.assertIsNone(resolution.response)
+                self.assertIsNone(dialogue.pending)
+                self.assertEqual(dialogue.resolve("yes").decision, "no_pending")
 
     def test_denial_and_ambiguous_reply_never_return_request(self) -> None:
         dialogue = ConfirmationDialogue(clock=lambda: 100.0)

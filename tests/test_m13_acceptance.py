@@ -578,7 +578,7 @@ class M13AcceptanceTests(unittest.TestCase):
             release_report = verify_bundle(root)
             self.assertFalse(release_report["passed"])
             self.assertTrue(
-                any("cannot close M13" in item for item in release_report["errors"])
+                any("cannot close the alpha" in item for item in release_report["errors"])
             )
             automated_report = verify_bundle(root, allow_automated=True)
             self.assertTrue(automated_report["passed"], automated_report)
@@ -600,7 +600,7 @@ class M13AcceptanceTests(unittest.TestCase):
                 json.dumps(
                     {
                         "chromie": {"version": "0.1.0-alpha.1"},
-                        "m13_closure_blockers": ["confirmation pending"],
+                        "release_gate_blockers": ["confirmation pending"],
                     }
                 )
             )

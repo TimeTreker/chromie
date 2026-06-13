@@ -8,11 +8,12 @@ refactors.
 
 Read:
 
-1. `docs/STATUS.md`
-2. `ROADMAP.md`
-3. `DEVELOPMENT_CHECKPOINT.md`
-4. the relevant component README
-5. `docs/ACCEPTANCE.md` for the evidence level affected by the change
+1. `docs/PROJECT_CHARTER.md`
+2. `docs/STATUS.md`
+3. `ROADMAP.md`
+4. `DEVELOPMENT_CHECKPOINT.md`
+5. the relevant component README
+6. `docs/ACCEPTANCE.md` for the evidence level affected by the change
 
 ## Development setup
 

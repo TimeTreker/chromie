@@ -1005,6 +1005,22 @@ class VoiceAssistant:
         if resolution.decision == "not_confirmation":
             return False
 
+        if resolution.decision == "operational_interrupt":
+            self.session_log(
+                session_id,
+                "confirmation_rejected: confirmation_id=%s reason=%s fingerprint=%s",
+                resolution.confirmation_id,
+                resolution.decision,
+                resolution.fingerprint,
+            )
+            if resolution.confirmation_id:
+                self.conversation_state.update_pending_task_status(
+                    metadata_key="confirmation_id",
+                    metadata_value=resolution.confirmation_id,
+                    status="cancelled",
+                )
+            return False
+
         self.conversation_state.record_user_turn(
             session_id,
             user_text,

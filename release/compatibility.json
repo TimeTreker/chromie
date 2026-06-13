@@ -22,7 +22,7 @@
     "unattended deployment"
   ],
   "release_state": "candidate",
-  "m13_closure_blockers": [
+  "release_gate_blockers": [
     "clean automatic and supervised spoken approval/denial evidence is not yet retained"
   ]
 }

@@ -2,8 +2,8 @@
 
 ## Current status
 
-The structured interaction architecture is implemented across M6-M12 and is the
-main focus of M13 completion.
+The structured interaction architecture is part of the completed structured
+embodiment foundation and is exercised by the current alpha acceptance work.
 
 Implemented now:
 
@@ -19,7 +19,7 @@ Implemented now:
 - simulation-only auto-confirm exemptions;
 - deterministic text-driven live Soridormi acceptance.
 
-Open M13 gates:
+Open alpha gates:
 
 - rerun the automatic matrix with spoken approval and denial evidence;
 - run and review the implemented seven-case microphone/MuJoCo evidence flow on
@@ -180,6 +180,8 @@ Implemented behavior:
   timing, timeout, and metadata;
 - short-lived, single-use approval with changed-request and replay rejection;
 - fail-closed denial for ambiguity, expiry, or negative replies;
+- operational stop, cancel, and emergency phrases cancel the pending approval
+  and pass through to the deterministic Router control path;
 - correlated `confirmation_requested`, `confirmation_reply`,
   `confirmation_authorized`, and `confirmation_rejected` evidence events.
 
@@ -227,7 +229,7 @@ trusted Skill Runtime scheduling, live Soridormi MCP, and a test speech
 scheduler. It deliberately does not prove microphone capture, real TTS
 playback, or hardware motion.
 
-The complete M13 microphone matrix and evidence requirements are maintained in
+The complete alpha microphone matrix and evidence requirements are maintained in
 [`ACCEPTANCE.md`](ACCEPTANCE.md). Run and verify it with:
 
 ```bash

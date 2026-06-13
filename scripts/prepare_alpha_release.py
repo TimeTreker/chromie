@@ -107,10 +107,12 @@ def prepare_release(args: argparse.Namespace) -> Path:
         raise ValueError(
             f"Compatibility version {declared_version!r} does not match VERSION {version!r}"
         )
-    blockers = compatibility.get("m13_closure_blockers") or []
+    blockers = compatibility.get("release_gate_blockers")
+    if blockers is None:
+        blockers = compatibility.get("m13_closure_blockers") or []
     if blockers and not args.preview:
         raise RuntimeError(
-            "Release candidate still has tracked M13 blockers:\n- "
+            "Release candidate still has tracked blockers:\n- "
             + "\n- ".join(str(item) for item in blockers)
             + "\nUse --preview only for a non-publishable packaging rehearsal."
         )
@@ -119,7 +121,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
     evidence_report = verify_bundle(evidence_dir, require_clean=args.require_clean_evidence)
     if not evidence_report["passed"] and not args.preview:
         raise RuntimeError(
-            "M13 evidence verification failed:\n- "
+            "Alpha evidence verification failed:\n- "
             + "\n- ".join(evidence_report["errors"])
         )
 

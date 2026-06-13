@@ -17,13 +17,10 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 DOC_INDEX = ROOT / "docs" / "README.md"
 API_REFERENCE = ROOT / "docs" / "API_REFERENCE.md"
+PROJECT_CHARTER = ROOT / "docs" / "PROJECT_CHARTER.md"
+ROADMAP = ROOT / "ROADMAP.md"
 
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
-CURRENT_MILESTONE_RE = re.compile(
-    r"current(?: engineering)? milestone[^\n]{0,80}\bM(\d+)\b",
-    re.IGNORECASE,
-)
-
 STATUS_FILES = [
     ROOT / "README.md",
     ROOT / "ROADMAP.md",
@@ -69,6 +66,13 @@ STALE_PHRASES = {
     "currently implemented by adapting the `/run` result": "native InteractionRuntime is now the default",
     "the native interaction agent is not present yet": "native InteractionRuntime is implemented",
     "replace `agentresultinteractionadapter` with native": "native output is already implemented",
+    "non-skippable body-skill confirmation is not yet a complete spoken": "spoken request-bound confirmation is implemented",
+    "complete non-skippable confirmation conversation": "spoken request-bound confirmation is implemented",
+    "add request-bound confirmation dialogue": "spoken request-bound confirmation is implemented",
+    "spoken-confirmation blocker remains": "only retained confirmation evidence remains open",
+    "8c448e2de2cd8a602b0d48e31461f9be9f1b8d08": "stale repository snapshot revision",
+    "current engineering milestone: **m13": "historical milestone numbering is no longer the delivery model",
+    "active milestone: m13": "historical milestone numbering is no longer the delivery model",
 }
 
 
@@ -152,19 +156,13 @@ def check_document_index(errors: list[str]) -> None:
             )
 
 
-def check_current_milestone(errors: list[str]) -> None:
+def check_current_focus(errors: list[str]) -> None:
     for path in STATUS_FILES:
         text = path.read_text(encoding="utf-8")
-        matches = CURRENT_MILESTONE_RE.findall(text)
-        if not matches:
-            # Some files use a compact heading/table declaration rather than
-            # prose. Requiring the token still prevents silent status loss.
-            if "M13" not in text:
-                errors.append(f"{path.relative_to(ROOT)} does not declare M13")
-            continue
-        if any(match != "13" for match in matches):
+        if "Voice-to-MuJoCo alpha" not in text:
             errors.append(
-                f"{path.relative_to(ROOT)} has a non-M13 current milestone declaration: {matches}"
+                f"{path.relative_to(ROOT)} does not declare the current "
+                "Voice-to-MuJoCo alpha focus"
             )
 
     for path in markdown_files():
@@ -174,6 +172,50 @@ def check_current_milestone(errors: list[str]) -> None:
                 errors.append(
                     f"{path.relative_to(ROOT)} contains stale phrase {phrase!r}: {reason}"
                 )
+
+
+def check_project_direction(errors: list[str]) -> None:
+    charter = PROJECT_CHARTER.read_text(encoding="utf-8")
+    for heading in (
+        "## Mission",
+        "## System boundaries",
+        "## Engineering principles",
+        "## Non-goals",
+        "## Definition of success",
+    ):
+        if heading not in charter:
+            errors.append(f"docs/PROJECT_CHARTER.md is missing {heading!r}")
+
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    for heading in (
+        "## Completed foundations",
+        "## Current focus - Voice-to-MuJoCo alpha",
+        "## Next phase - Robust simulation and provider readiness",
+        "## Physical pilot",
+        "## Later work",
+    ):
+        if heading not in roadmap:
+            errors.append(f"ROADMAP.md is missing {heading!r}")
+    for obsolete in (
+        "## M13 ",
+        "## M14 ",
+        "## M15 ",
+        "## M16 ",
+        "## R1 ",
+        "## R2 ",
+        "## R3 ",
+    ):
+        if obsolete in roadmap:
+            errors.append(f"ROADMAP.md still contains obsolete section {obsolete!r}")
+    if "Earlier work previously labeled M0-M12" not in roadmap:
+        errors.append("ROADMAP.md does not collapse historical M0-M12 work")
+    for question in (
+        "Does it close the active milestone",
+        "Is the behavior owned by Chromie or Soridormi",
+        "Is the required evidence level explicit",
+    ):
+        if question not in roadmap:
+            errors.append(f"ROADMAP.md is missing anti-drift check: {question!r}")
 
 
 def fastapi_routes(path: Path) -> set[str]:
@@ -214,7 +256,8 @@ def main() -> int:
     errors: list[str] = []
     check_local_links(errors)
     check_document_index(errors)
-    check_current_milestone(errors)
+    check_current_focus(errors)
+    check_project_direction(errors)
     check_api_reference(errors)
 
     if errors:
@@ -225,7 +268,8 @@ def main() -> int:
 
     print(
         "Documentation checks passed: "
-        f"{len(markdown_files())} Markdown files, local links, M13 status, and API routes."
+        f"{len(markdown_files())} Markdown files, project direction, "
+        "local links, current focus, and API routes."
     )
     return 0
 

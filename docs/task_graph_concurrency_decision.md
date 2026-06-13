@@ -2,7 +2,7 @@
 
 ## Decision status
 
-Accepted and implemented across M11-M12 for eligible non-physical Agent
+Accepted and implemented for eligible non-physical Agent
 TaskGraph execution and host Skill Runtime scheduling.
 
 The decision is:
