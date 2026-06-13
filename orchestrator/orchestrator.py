@@ -6,6 +6,7 @@ import logging
 import math
 import os
 import re
+import sys
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -24,6 +25,7 @@ import websockets
 from scipy import signal
 
 from orchestrator.audio_device_manager import AudioDeviceManager
+from orchestrator.audio_injection import read_audio_packet
 from orchestrator.readiness import ServiceReadinessGate
 from orchestrator.vad import VAD
 from orchestrator.clients.action_client import ActionClient
@@ -116,9 +118,51 @@ class VoiceAssistant:
         self.active_interaction_task: asyncio.Task | None = None
         self.is_playing_audio = False
 
+        self.audio_input_mode = os.getenv("ORCH_AUDIO_INPUT_MODE", "device").strip().lower()
+        self.audio_output_mode = os.getenv("ORCH_AUDIO_OUTPUT_MODE", "device").strip().lower()
+        if self.audio_input_mode not in {"device", "stdin"}:
+            raise ValueError(
+                "ORCH_AUDIO_INPUT_MODE must be 'device' or 'stdin', got "
+                f"{self.audio_input_mode!r}"
+            )
+        if self.audio_output_mode not in {"device", "discard"}:
+            raise ValueError(
+                "ORCH_AUDIO_OUTPUT_MODE must be 'device' or 'discard', got "
+                f"{self.audio_output_mode!r}"
+            )
+        self.discard_playback_realtime = env_bool(
+            "ORCH_DISCARD_PLAYBACK_REALTIME",
+            True,
+        )
+
         self.audio_mgr = AudioDeviceManager()
-        self.input_params = self.audio_mgr.get_input_params()
-        self.output_params = self.audio_mgr.get_output_params()
+        if self.audio_input_mode == "device":
+            self.input_params = self.audio_mgr.get_input_params()
+        else:
+            injected_rate = int(os.getenv("ORCH_INPUT_RATE", "16000"))
+            injected_channels = int(os.getenv("ORCH_INPUT_CHANNELS", "1"))
+            self.input_params = {
+                "name": "framed PCM16 stdin injection",
+                "device": None,
+                "rate": injected_rate,
+                "channels": injected_channels,
+                "blocksize": max(1, int(injected_rate * 30 / 1000)),
+                "block_ms": 30,
+                "latency": "none",
+            }
+        if self.audio_output_mode == "device":
+            self.output_params = self.audio_mgr.get_output_params()
+        else:
+            discard_rate = int(os.getenv("ORCH_OUTPUT_RATE", str(self.default_tts_rate)))
+            self.output_params = {
+                "name": "discarded acceptance playback",
+                "device": None,
+                "rate": discard_rate,
+                "channels": 1,
+                "blocksize": 0,
+                "block_ms": self.playback_chunk_ms if hasattr(self, "playback_chunk_ms") else 80,
+                "latency": "none",
+            }
         self.input_rate = self.input_params["rate"]
         self.input_channels = self.input_params["channels"]
         self.input_device = self.input_params["device"]
@@ -152,6 +196,12 @@ class VoiceAssistant:
             self.output_latency,
         )
         logger.info(
+            "Audio modes: input=%s output=%s discard_realtime=%s",
+            self.audio_input_mode,
+            self.audio_output_mode,
+            self.discard_playback_realtime,
+        )
+        logger.info(
             "Control plane: router=%s enabled=%s agent=%s enabled=%s action_url=%s dry_run=%s",
             self.router_url,
             self.enable_router,
@@ -172,6 +222,7 @@ class VoiceAssistant:
 
         self.loop: asyncio.AbstractEventLoop | None = None
         self.mic_queue: asyncio.Queue = asyncio.Queue(maxsize=50)
+        self._vad_leftover = b""
         self.playback_queue: asyncio.Queue = asyncio.Queue()
         self.playback_task: asyncio.Task | None = None
         self.active_synthesis_tasks: set[asyncio.Task] = set()
@@ -391,6 +442,22 @@ class VoiceAssistant:
         pcm = self.resample_int16_bytes(audio_bytes, source_rate or self.default_tts_rate, self.output_rate)
         samples = np.frombuffer(pcm, dtype=np.int16)
         if samples.size == 0:
+            return
+        if self.audio_output_mode == "discard":
+            frames_per_chunk = max(
+                1,
+                int(self.output_rate * self.playback_chunk_ms / 1000),
+            )
+            for offset in range(0, samples.size, frames_per_chunk):
+                if self.is_stale_playback(generation, session_id):
+                    raise asyncio.CancelledError(
+                        "Discarded playback interrupted by newer session"
+                    )
+                if self.discard_playback_realtime:
+                    chunk_frames = min(frames_per_chunk, samples.size - offset)
+                    await asyncio.sleep(chunk_frames / self.output_rate)
+                else:
+                    await asyncio.sleep(0)
             return
         output = self.mono_to_output_channels(samples)
         await self.ensure_output_stream()
@@ -817,6 +884,17 @@ class VoiceAssistant:
                     len(response.skills),
                     response.requires_confirmation,
                 )
+                for request in response.skills:
+                    self.session_log(
+                        session_id,
+                        "skill_proposed: request_id=%s skill_id=%s timing=%s "
+                        "cancellable=%s requires_confirmation=%s",
+                        request.request_id,
+                        request.skill_id,
+                        request.timing,
+                        request.cancellable,
+                        request.requires_confirmation,
+                    )
                 self.conversation_state.record_agent_result(session_id, response)
                 task = asyncio.create_task(
                     self.execute_interaction_response(response, session_id)
@@ -1055,11 +1133,31 @@ class VoiceAssistant:
                 pass
             self.asr_ws = None
 
+    async def _feed_vad_pcm16(self, pcm_16k: bytes) -> None:
+        frame_bytes_target = int(
+            self.target_asr_rate * self.frame_duration_ms / 1000
+        ) * 2
+        buffered = self._vad_leftover + pcm_16k
+        offset = 0
+        while offset + frame_bytes_target <= len(buffered):
+            frame = buffered[offset : offset + frame_bytes_target]
+            offset += frame_bytes_target
+            started, ended, vad_audio = self.vad.process_chunk(frame)
+            if started:
+                logger.info("VAD detected voice")
+            if ended and vad_audio:
+                if self.active_asr_task is None or self.active_asr_task.done():
+                    self.active_asr_task = asyncio.create_task(
+                        self.handle_vad_audio(vad_audio)
+                    )
+                else:
+                    logger.warning("ASR is still processing; dropping new utterance")
+        self._vad_leftover = buffered[offset:]
+        await asyncio.sleep(0)
+
     async def mic_stream(self):
         logger.info("Opening microphone with sounddevice")
         self.loop = asyncio.get_running_loop()
-        frame_bytes_target = int(self.target_asr_rate * self.frame_duration_ms / 1000) * 2
-        leftover = b""
         with sd.InputStream(
             samplerate=self.input_rate,
             channels=self.input_channels,
@@ -1070,23 +1168,57 @@ class VoiceAssistant:
             callback=self.mic_callback,
         ):
             logger.info("Microphone started")
+            logger.info("Audio input started: mode=device")
             while True:
                 audio = await self.mic_queue.get()
-                pcm_16k = leftover + self.prepare_mic_chunk_for_asr(audio)
-                offset = 0
-                while offset + frame_bytes_target <= len(pcm_16k):
-                    frame = pcm_16k[offset : offset + frame_bytes_target]
-                    offset += frame_bytes_target
-                    started, ended, vad_audio = self.vad.process_chunk(frame)
-                    if started:
-                        logger.info("VAD detected voice")
-                    if ended and vad_audio:
-                        if self.active_asr_task is None or self.active_asr_task.done():
-                            self.active_asr_task = asyncio.create_task(self.handle_vad_audio(vad_audio))
-                        else:
-                            logger.warning("ASR is still processing; dropping new utterance")
-                leftover = pcm_16k[offset:]
-                await asyncio.sleep(0)
+                pcm_16k = self.prepare_mic_chunk_for_asr(audio)
+                await self._feed_vad_pcm16(pcm_16k)
+
+    async def injected_audio_stream(self):
+        """Consume framed PCM16 utterances from stdin for acceptance testing.
+
+        The binary framing is intentionally available only through inherited
+        stdin. It does not open a network control port in normal operation.
+        Each packet is treated as microphone input and still passes through
+        Chromie's VAD and ASR path.
+        """
+
+        logger.info("Audio input started: mode=stdin protocol=CAUD/v1")
+        while True:
+            packet = await asyncio.to_thread(read_audio_packet, sys.stdin.buffer)
+            if packet is None:
+                logger.info("Injected audio input reached EOF")
+                return
+            samples = np.frombuffer(packet.pcm16, dtype=np.int16)
+            if packet.channels > 1:
+                samples = samples.reshape(-1, packet.channels).mean(axis=1).astype(
+                    np.int16
+                )
+            pcm = samples.astype(np.int16, copy=False).tobytes()
+            pcm_16k = self.resample_int16_bytes(
+                pcm,
+                packet.sample_rate,
+                self.target_asr_rate,
+            )
+            duration_ms = len(pcm_16k) / (self.target_asr_rate * 2) * 1000.0
+            logger.info(
+                "Injected audio received: source_rate=%s channels=%s bytes=%s "
+                "resampled_ms=%.1f",
+                packet.sample_rate,
+                packet.channels,
+                len(packet.pcm16),
+                duration_ms,
+            )
+            await self._feed_vad_pcm16(pcm_16k)
+            # Ensure the VAD sees enough trailing silence to close the utterance.
+            silence_ms = max(
+                900,
+                int(os.getenv("ORCH_VAD_SILENCE_MS", "650")) + 150,
+            )
+            silence = b"\x00\x00" * int(
+                self.target_asr_rate * silence_ms / 1000
+            )
+            await self._feed_vad_pcm16(silence)
 
     async def run(self):
         gate = ServiceReadinessGate(
@@ -1103,7 +1235,10 @@ class VoiceAssistant:
         )
         self.asr_ws = await gate.wait_until_ready()
         self.playback_task = asyncio.create_task(self.playback_worker())
-        await self.mic_stream()
+        if self.audio_input_mode == "stdin":
+            await self.injected_audio_stream()
+        else:
+            await self.mic_stream()
 
     async def cleanup(self):
         if self.active_llm_task and not self.active_llm_task.done():

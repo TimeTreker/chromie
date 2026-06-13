@@ -31,7 +31,7 @@ A higher level does not replace lower-level regression tests.
 ./scripts/run_tests.sh
 ```
 
-At the verified snapshot this runs 138 current tests and 20 legacy Agent tests.
+At the verified snapshot this runs 155 current tests and 20 legacy Agent tests.
 It also runs the documentation consistency checker.
 
 ## Level B — deployed service checks
@@ -162,99 +162,140 @@ SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
   ./scripts/m5_target_acceptance.sh
 ```
 
-## M13 guided microphone acceptance
+## M13 voice acceptance modes
 
-The repository includes an operator-guided runner. It starts the host
-Orchestrator with late-bound acceptance overrides, keeps native output and
-validation fallback settings explicit, and records:
+`scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
+correlated JSONL events, exact revisions, redacted configuration, generated or
+captured audio, Orchestrator logs, and per-case checks.
 
-- exact Chromie and pinned Soridormi revisions;
-- a redacted `.env.runtime` snapshot;
-- audio-device discovery and Compose state;
-- correlated JSONL session events from `SessionTracker`;
-- Orchestrator logs and optional raw input/output recordings;
-- automated event checks plus an operator verdict and notes for every case.
+| Mode | Input path | Operator interaction | What it proves | Release-closing |
+|---|---|---|---|---:|
+| `synthetic` (default) | Chromie TTS WAV -> framed Orchestrator stdin -> VAD -> ASR | None | Reproducible speech/control-plane/Skill Runtime regression | No |
+| `virtual-mic` | Chromie TTS WAV -> Pulse/PipeWire null sink monitor -> normal host capture -> VAD -> ASR | None | Host audio-device capture plus the automated control path | No |
+| `supervised` | Real microphone -> normal host capture -> VAD -> ASR | Audible/visual verdict after machine checks pass | Reference-host microphone, speaker, pronunciation, and observed simulator behavior | Yes |
 
-Commit the candidate revision first, then run from the repository root against a
-supervised MuJoCo-backed Soridormi endpoint. The runner rejects a dirty worktree
-by default; `--allow-dirty` is only for exploratory evidence and cannot satisfy
-a clean release gate.
+The automatic modes intentionally use response playback `discard` mode. Audio
+is paced in real time, so `playback_start`, barge-in, cancellation, and stale
+playback checks still execute without requiring a physical speaker or risking
+speaker-to-microphone feedback.
+
+### Automatic synthetic acceptance
+
+Start the five Chromie services and a supervised MuJoCo-backed Soridormi MCP
+endpoint, then run:
 
 ```bash
 python scripts/m13_voice_acceptance.py \
+  --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --start-services
 ```
 
-Omit `--start-services` when the five Chromie containers are already healthy.
-The host process still owns microphone, speaker, and evidence capture, but the
-capability probe runs in `chromie-agent` by default. A loopback URL such as
-`http://127.0.0.1:8000/mcp` is translated to
-`http://host.docker.internal:8000/mcp` only for the container-side probe. Use
-`--probe-runtime host` only when the host Python environment has
-`agent/requirements.txt` installed. The runner uses
-`ORCH_RUNTIME_OVERRIDE_FILE` so it does not edit `.env.local` or `.env.runtime`.
-Evidence is written under:
+The runner generates each unique test utterance once through the existing TTS
+WebSocket service and stores it under:
 
 ```text
-.chromie/acceptance/m13/<UTC acceptance id>/
+.chromie/acceptance/m13/<id>/generated-input/
 ```
 
-### Operator interaction
+It then injects a private framed PCM16 stream through the Orchestrator process's
+stdin. No network injection endpoint is opened. The Orchestrator resamples the
+packet, feeds normal VAD frames, sends the resulting utterance to ASR, and uses
+the same Router, Agent, Skill Runtime, TTS, and Soridormi paths as a microphone
+session.
 
-The runner no longer relies on an ambiguous open-ended speaking window. For
-each required utterance it:
+This mode is the recommended first run because it removes pronunciation,
+microphone selection, room noise, and operator timing from the result. It is
+also intentionally optimistic: Chromie's TTS voice is generally easier for its
+ASR to recognize than arbitrary human speech.
 
-1. asks the operator to press Enter when ready;
-2. displays a three-second countdown;
-3. prints a prominent `SPEAK NOW` banner with the exact phrase;
-4. waits up to 20 seconds for a new `asr_final` event;
-5. prints the recognized transcript;
-6. waits up to 60 seconds for the event-based case checks to pass.
+Verify automatic evidence with:
 
-Cases with a second utterance are also synchronized to runtime evidence. For
-example, barge-in and explicit-stop cases wait for `playback_start` before
-showing the immediate `Stop.` cue, while follow-up waits for the first
-`session_done` event.
+```bash
+python scripts/verify_m13_evidence.py --allow-automated \
+  .chromie/acceptance/m13/<id>
+```
 
-An operator verdict is requested only after every automated check passes. An
-ASR timeout or missing required event automatically marks the case failed and,
-by default, stops the run. This prevents a human `pass` from overriding missing
-machine evidence. Use `--continue-after-failure` only when collecting additional
-diagnostic evidence after a known failure. Relevant tuning options are:
+The verifier reports the bundle as valid automated evidence but
+`release_eligible=false`.
+
+### Automatic virtual-microphone acceptance
+
+`virtual-mic` mode requires PulseAudio or PipeWire's Pulse compatibility layer
+and the `pactl` and `paplay` commands:
+
+```bash
+python scripts/m13_voice_acceptance.py \
+  --mode virtual-mic \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+The runner creates a temporary null sink named `chromie_m13_test` by default,
+sets its monitor as `PULSE_SOURCE` for the Orchestrator, plays each generated WAV
+into that sink, and unloads the module during cleanup. Override the sink name
+with `--virtual-mic-sink` when needed.
+
+This mode exercises normal `sounddevice` capture, sample-rate conversion, host
+buffering, VAD, and ASR. It still does not prove a physical microphone or
+speaker.
+
+### Final supervised acceptance
+
+Commit the candidate revision first, then run:
+
+```bash
+python scripts/m13_voice_acceptance.py \
+  --mode supervised \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+For each utterance the runner displays a countdown and `SPEAK NOW`, waits for
+`asr_final`, shows expected and recognized text, and prints the current
+session's Router, interaction, skill, playback, cancellation, and completion
+events. It asks for an audible/visual operator verdict only after all machine
+checks pass. Missing ASR or required runtime events automatically fail the case.
+
+Only a clean, passing `supervised` bundle can satisfy the release verifier:
+
+```bash
+python scripts/verify_m13_evidence.py --require-clean \
+  .chromie/acceptance/m13/<id>
+```
+
+The host runner uses `ORCH_RUNTIME_OVERRIDE_FILE` and does not edit the
+operator's `.env.local` or generated `.env.runtime`. The Soridormi capability
+probe runs inside `chromie-agent` by default; host-loopback endpoints are
+translated to `host.docker.internal` only for that container command.
+
+### Shared controls
 
 ```text
---countdown-s 3
+--cases all|speech-only,speech-skill,...
 --asr-timeout-s 20
+--asr-retries 1
 --case-timeout-s 60
+--continue-after-failure
+--tts-url ws://127.0.0.1:5000
+--tts-speaker-id default
 ```
 
-A command-only rehearsal is available and must never be counted as target
-evidence:
+A command-only rehearsal remains non-evidence:
 
 ```bash
 python scripts/m13_voice_acceptance.py --dry-run \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-After all cases pass, verify the bundle mechanically:
-
-```bash
-python scripts/verify_m13_evidence.py --require-clean \
-  .chromie/acceptance/m13/<UTC acceptance id>
-```
-
-The verifier requires all seven cases, nonempty correlated events, native mode,
-Soridormi skills enabled, fallback disabled, exact revisions, and passing
-operator/automated verdicts. Human review is still required for audible quality,
-simulator safe idle, recovery notes, and privacy.
-
 ## M13 microphone acceptance matrix
 
 Run from the repository root with the structured path enabled and a live
-MuJoCo-backed Soridormi endpoint. The guided runner presents these cases in the
-order below.
+MuJoCo-backed Soridormi endpoint. All three modes execute these cases in the
+order below; only `supervised` adds physical audio and operator observations.
 
 | Case | User input | Required evidence |
 |---|---|---|

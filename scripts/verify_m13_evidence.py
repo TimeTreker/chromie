@@ -38,6 +38,7 @@ def verify_bundle(
     evidence_dir: Path,
     *,
     require_clean: bool = False,
+    allow_automated: bool = False,
 ) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -73,7 +74,16 @@ def verify_bundle(
 
     if metadata.get("status") != "passed":
         errors.append(f"Acceptance status is not passed: {metadata.get('status')!r}")
-    if metadata.get("runner", {}).get("dry_run"):
+    runner = metadata.get("runner") or {}
+    mode = str(runner.get("mode") or "supervised")
+    if mode not in {"synthetic", "virtual-mic", "supervised"}:
+        errors.append(f"Unknown acceptance mode: {mode!r}")
+    if mode != "supervised" and not allow_automated:
+        errors.append(
+            f"Acceptance mode {mode!r} is automated evidence and cannot close M13; "
+            "run --mode supervised for release-closing evidence"
+        )
+    if runner.get("dry_run"):
         errors.append("Dry-run evidence cannot close M13")
     if int(metadata.get("event_count") or 0) <= 0:
         errors.append("metadata.json reports no structured session events")
@@ -108,9 +118,12 @@ def verify_bundle(
 
     for case_id in sorted(REQUIRED_CASES & set(by_id)):
         item = by_id[case_id]
-        if item.get("operator_verdict") != "pass":
+        verdict = item.get("operator_verdict")
+        expected_verdicts = {"pass"} if mode == "supervised" else {"automated"}
+        if verdict not in expected_verdicts:
             errors.append(
-                f"Case {case_id} operator verdict is {item.get('operator_verdict')!r}"
+                f"Case {case_id} verdict is {verdict!r}; expected one of "
+                f"{sorted(expected_verdicts)} for mode {mode!r}"
             )
         checks = item.get("checks")
         if not isinstance(checks, list) or not checks:
@@ -143,9 +156,39 @@ def verify_bundle(
         "AGENT_INTERACTION_OUTPUT_MODE=native",
         "AGENT_NATIVE_INTERACTION_FALLBACK=0",
     }
+    if mode == "synthetic":
+        required_overrides.update(
+            {
+                "ORCH_AUDIO_INPUT_MODE=stdin",
+                "ORCH_AUDIO_OUTPUT_MODE=discard",
+            }
+        )
+    elif mode == "virtual-mic":
+        required_overrides.update(
+            {
+                "ORCH_AUDIO_INPUT_MODE=device",
+                "ORCH_AUDIO_OUTPUT_MODE=discard",
+                "PULSE_SOURCE=",
+            }
+        )
+    else:
+        required_overrides.update(
+            {
+                "ORCH_AUDIO_INPUT_MODE=device",
+                "ORCH_AUDIO_OUTPUT_MODE=device",
+            }
+        )
     for value in sorted(required_overrides):
         if value not in override_text:
             errors.append(f"Acceptance override is missing: {value}")
+
+    if mode in {"synthetic", "virtual-mic"}:
+        generated_dir = evidence_dir / "generated-input"
+        manifest_path = generated_dir / "manifest.json"
+        if not manifest_path.is_file():
+            errors.append("Automated evidence is missing generated-input/manifest.json")
+        if not any(generated_dir.glob("*.wav")):
+            errors.append("Automated evidence contains no generated input WAV files")
 
     return {
         "schema_version": 1,
@@ -158,6 +201,8 @@ def verify_bundle(
         "chromie_version": chromie.get("version"),
         "soridormi_revision": manifest.get("upstream_commit"),
         "case_count": len(by_id),
+        "mode": mode,
+        "release_eligible": mode == "supervised" and not errors,
     }
 
 
@@ -165,13 +210,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("evidence_dir", type=Path)
     parser.add_argument("--require-clean", action="store_true")
+    parser.add_argument(
+        "--allow-automated",
+        action="store_true",
+        help="Validate synthetic/virtual-mic evidence without treating it as M13-closing.",
+    )
     parser.add_argument("--write-report", type=Path)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    report = verify_bundle(args.evidence_dir, require_clean=args.require_clean)
+    report = verify_bundle(
+        args.evidence_dir,
+        require_clean=args.require_clean,
+        allow_automated=args.allow_automated,
+    )
     rendered = json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     if args.write_report:
         args.write_report.parent.mkdir(parents=True, exist_ok=True)

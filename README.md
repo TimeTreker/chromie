@@ -7,10 +7,11 @@ streaming TTS, and optional named robot skills provided by Soridormi.
 
 > **Current status:** the repository is at **M13 — Native Interaction Agent and
 > end-to-end voice acceptance**. Native `/interaction`, structured session-event
-> evidence, the guided microphone/MuJoCo acceptance runner, evidence verification,
-> and `v0.1.0-alpha.1` candidate packaging are implemented. M13 remains open until
-> spoken request-bound confirmation and a real reference-host evidence bundle are
-> completed and reviewed. See [Current Implementation Status](docs/STATUS.md).
+> evidence, three voice-acceptance modes (`synthetic`, `virtual-mic`, and
+> `supervised`), evidence verification, and `v0.1.0-alpha.1` candidate packaging
+> are implemented. M13 remains open until spoken request-bound confirmation and
+> a reviewed supervised reference-host bundle are completed. See
+> [Current Implementation Status](docs/STATUS.md).
 
 中文说明见 [Chromie 中文项目指南](docs/PROJECT_GUIDE.zh-CN.md)。
 
@@ -31,8 +32,9 @@ streaming TTS, and optional named robot skills provided by Soridormi.
   parallel non-physical work.
 - GPU-free regression tests plus GPU, simulator, and supervised target
   acceptance tooling.
-- Correlated JSONL session-event capture and a guided seven-case microphone/
-  MuJoCo evidence runner.
+- Correlated JSONL session-event capture and a seven-case voice/MuJoCo runner
+  with fully automatic TTS-generated input, a PulseAudio/PipeWire virtual
+  microphone path, and final supervised real-microphone validation.
 - Versioned `v0.1.0-alpha.1` candidate notes, compatibility declaration, source
   archive generation, checksums, and strict release gating.
 
@@ -40,8 +42,8 @@ streaming TTS, and optional named robot skills provided by Soridormi.
 
 - Non-skippable body-skill confirmation is not yet a complete spoken,
   request-bound user dialogue.
-- The guided microphone matrix and evidence verifier exist, but no real
-  reference-host bundle is committed or declared accepted in this snapshot.
+- Synthetic and virtual-microphone evidence are repeatable regression evidence,
+  but they do not replace a reviewed supervised reference-host bundle.
 - The alpha packaging path is prepared but intentionally non-publishable while
   tracked M13 blockers remain.
 - M3 GPU and M5 supervised target evidence remain open operational tracks.
@@ -235,10 +237,46 @@ use its service DNS name instead.
 See [Acceptance and Evidence](docs/ACCEPTANCE.md) before claiming simulator,
 target, or hardware validation.
 
-Run the guided M13 microphone/MuJoCo matrix on the reference host:
+Run the automatic M13 voice/MuJoCo matrix first. The default `synthetic` mode
+uses Chromie TTS to generate reproducible WAV fixtures, injects framed PCM16 into
+the host Orchestrator, and still exercises VAD, ASR, Router, native Agent output,
+Skill Runtime, TTS response generation, and Soridormi:
 
 ```bash
 python scripts/m13_voice_acceptance.py \
+  --mode synthetic \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+No microphone, speaker, pronunciation, or operator verdict is used in this
+mode. Every generated input WAV is retained under `generated-input/`, and the
+terminal prints the recognized transcript, Router result, proposed skill, and
+final skill status.
+
+To exercise the host audio capture path without a person speaking, use a
+temporary PulseAudio/PipeWire monitor source:
+
+```bash
+python scripts/m13_voice_acceptance.py \
+  --mode virtual-mic \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+This mode requires `pactl` and `paplay`. It creates and removes a temporary null
+sink, sends the generated WAV files through its monitor source, and discards
+response playback while preserving real-time playback timing for interruption
+tests.
+
+The final release-closing run must use the real microphone, speaker, and an
+operator-observed MuJoCo instance:
+
+```bash
+python scripts/m13_voice_acceptance.py \
+  --mode supervised \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --start-services
@@ -250,14 +288,14 @@ automatically translated to `host.docker.internal` for that probe. Use
 `--probe-runtime host` only in a development environment with
 `agent/requirements.txt` installed.
 
-For each utterance, press Enter once when ready. The runner displays a
-three-second countdown followed by a prominent `SPEAK NOW` prompt, waits for
-`asr_final`, and prints the detected transcript. It then waits for the case
-events automatically. An operator verdict is requested only after all automated
-checks pass; missing ASR or required events automatically fail the case and stop
-the run by default.
+Verify automatic evidence for regression purposes:
 
-Verify the resulting evidence bundle:
+```bash
+python scripts/verify_m13_evidence.py --allow-automated \
+  .chromie/acceptance/m13/<acceptance-id>
+```
+
+Verify release-closing supervised evidence without `--allow-automated`:
 
 ```bash
 python scripts/verify_m13_evidence.py --require-clean \

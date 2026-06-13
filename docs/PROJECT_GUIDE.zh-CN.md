@@ -284,47 +284,103 @@ SUPERVISED_ACCEPTANCE=1 ./scripts/m5_target_acceptance.sh
 完整说明见 [`ACCEPTANCE.md`](ACCEPTANCE.md) 和
 [`../CHROMIE_RUNBOOK.md`](../CHROMIE_RUNBOOK.md)。
 
-## 10. M13 完整麦克风验收矩阵
+## 10. M13 语音验收的三种模式
 
-先提交候选 revision，再在参考主机和受监督的 MuJoCo-backed Soridormi 上运行。
-工具默认拒绝脏工作区；`--allow-dirty` 只用于探索性证据，不能满足正式发布门槛：
+`scripts/m13_voice_acceptance.py` 现在把测试分成三层：
+
+| 模式 | 输入链路 | 是否需要人工 | 能证明什么 | 能否关闭 M13 |
+|---|---|---:|---|---:|
+| `synthetic`（默认） | Chromie TTS 生成 WAV -> Orchestrator stdin 注入 -> VAD -> ASR | 否 | 可重复的完整语音控制链和 Skill Runtime 回归 | 否 |
+| `virtual-mic` | TTS WAV -> Pulse/PipeWire 虚拟声卡 monitor -> 正常音频采集 -> VAD -> ASR | 否 | 增加宿主机音频设备和缓冲链路验证 | 否 |
+| `supervised` | 真人麦克风 -> 正常音频采集 -> VAD -> ASR | 是 | 真实麦克风、扬声器、发音、房间环境和可视化安全状态 | 是 |
+
+### 10.1 自动 synthetic 模式
+
+先启动 Soridormi MuJoCo/MCP 服务，然后运行：
 
 ```bash
 python scripts/m13_voice_acceptance.py \
+  --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --soridormi-repo ../soridormi
+  --soridormi-repo ../soridormi \
+  --start-services
 ```
 
-该工具会按顺序引导并记录七项：纯语音、语音加命名技能、拒绝、barge-in、
-具身技能取消、显式 stop、会话 follow-up。证据目录包含：精确 commit、脱敏后的
-运行环境、音频设备、JSONL 会话事件、Orchestrator 日志、录音、自动检查以及
-操作员结论和备注。
+脚本会先调用现有 TTS WebSocket，把七项案例需要的句子生成成 WAV，并保存在：
 
-每次需要说话时，操作顺序如下：
+```text
+.chromie/acceptance/m13/<验收编号>/generated-input/
+```
 
-1. 阅读案例说明，准备好后只按一次 Enter；
-2. 等待终端显示 `3`、`2`、`1` 倒计时；
-3. 只有看到醒目的 `SPEAK NOW` 后才说出屏幕上的句子；
-4. 工具会自动等待 `asr_final` 并回显识别文本；
-5. 工具继续自动等待案例所需事件，不再要求第二次按 Enter 表示“已稳定”；
-6. 只有自动检查全部通过后，才询问一次听觉或视觉结果。直接按 Enter 表示
-   `pass`，也可以输入 `f` 或 `s`。
+随后它通过 Orchestrator 进程继承的 stdin 发送带采样率、声道数和长度的 PCM16
+帧。该测试入口不会开放 HTTP 或网络端口。注入音频仍然经过 VAD、ASR、Router、
+原生 `/interaction`、Skill Runtime、响应 TTS 和 Soridormi。终端会自动显示：
 
-如果 20 秒内没有检测到 ASR，或 60 秒内仍缺少核心事件，案例会自动失败且默认
-停止整个验收，人工 `pass` 不能覆盖缺失的机器证据。探索性排查时可使用
-`--continue-after-failure`；等待时间可通过 `--countdown-s`、
-`--asr-timeout-s` 和 `--case-timeout-s` 调整。
+```text
+生成文本 -> ASR 实际识别 -> Router route/intent -> 提议的 skill -> skill 结果 -> session 结果
+```
 
-完成后执行：
+此模式不需要说话，也不询问人工 pass/fail。它适合先排除发音、麦克风选择、噪声
+和操作时机问题。但因为输入语音来自 Chromie 自己的 TTS，结果通常比真人语音更
+理想，不能替代最终人工验收。
+
+自动证据用以下命令验证：
+
+```bash
+python scripts/verify_m13_evidence.py --allow-automated \
+  .chromie/acceptance/m13/<验收编号>
+```
+
+### 10.2 virtual-mic 模式
+
+若宿主机使用 PulseAudio 或 PipeWire-Pulse，并安装了 `pactl`、`paplay`：
+
+```bash
+python scripts/m13_voice_acceptance.py \
+  --mode virtual-mic \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+脚本会创建临时 null sink，将它的 monitor 设为 Orchestrator 的 `PULSE_SOURCE`，
+再把 TTS WAV 播放到该 sink。这样会经过正常 `sounddevice` 输入、宿主机缓冲、
+采样率转换、VAD 和 ASR。脚本退出时会卸载临时模块。
+
+### 10.3 最终 supervised 模式
+
+提交候选 revision 后，在参考主机上运行：
+
+```bash
+python scripts/m13_voice_acceptance.py \
+  --mode supervised \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+每次需要说话时，操作顺序为：
+
+1. 准备好后按一次 Enter；
+2. 等待 `3`、`2`、`1` 和 `SPEAK NOW`；
+3. 说出屏幕上的句子；
+4. 查看“期望句子”和“ASR 实际识别”；
+5. 查看当前 session 的 Router、interaction、skill 和完成状态；
+6. 只有机器检查全部通过后，才确认一次真实听觉或 MuJoCo 视觉结果。
+
+最终发布证据必须使用：
 
 ```bash
 python scripts/verify_m13_evidence.py --require-clean \
   .chromie/acceptance/m13/<验收编号>
 ```
 
-dry-run 只能演练命令，不能作为目标证据。除此之外，仍需单独实现和验证不可跳过、
-与请求绑定的语音确认对话。在真实证据包通过并完成隐私、安全空闲与恢复审核前，
-不应把 M13 标记为完成。
+不带 `--allow-automated` 的 verifier 会拒绝 synthetic/virtual-mic 包，从而避免把
+自动闭环误当成真实麦克风和操作员安全证据。
+
+三种模式都按顺序执行：纯语音、语音加命名技能、拒绝、barge-in、具身技能取消、
+显式 stop、会话 follow-up。仍需单独实现和验证不可跳过、与请求绑定的语音确认
+对话；在 supervised 证据通过并完成隐私、安全空闲与恢复审核前，M13 不能关闭。
 
 ## 11. 已知限制
 

@@ -25,12 +25,14 @@ voice acceptance.**
 
 M6–M12 are implemented to local or simulator gates. Native structured
 `/interaction`, strict validation, compatibility controls, correlated session
-evidence, the guided seven-case microphone runner, evidence verification, and
-alpha candidate packaging are now implemented. M13 remains open because:
+evidence, automatic TTS-generated and virtual-microphone seven-case runners,
+final supervised microphone validation, evidence verification, and alpha
+candidate packaging are now implemented. M13 remains open because:
 
 1. non-skippable skill confirmation is not yet a complete spoken,
    request-bound conversation flow;
-2. the guided matrix has not yet produced a reviewed reference-host bundle;
+2. the automatic matrices and final supervised matrix have not yet produced a
+   reviewed reference-host bundle;
 3. older target-evidence tracks remain open and no alpha has been published.
 
 ## Milestone map
@@ -161,7 +163,8 @@ Evidence requirements are defined in
 3. **Completed:** retain the compatibility adapter behind
    `AGENT_INTERACTION_OUTPUT_MODE`, with opt-in validation fallback controlled by
    `AGENT_NATIVE_INTERACTION_FALLBACK`.
-4. **Completed:** add correlated JSONL session-event capture, a guided
+4. **Completed:** add correlated JSONL session-event capture, synthetic,
+   virtual-microphone, and supervised
    microphone/MuJoCo runner, redacted environment/audio metadata, and per-case
    operator verdicts.
 5. **Tooling completed; target run pending:** execute all seven cases on the

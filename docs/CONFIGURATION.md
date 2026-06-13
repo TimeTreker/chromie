@@ -68,6 +68,24 @@ Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
 See [Hardware Profiles](../HARDWARE_PROFILES.md) for profile values and Jetson
 limitations.
 
+## Host audio modes
+
+Normal operation uses physical devices. The M13 runner supplies temporary
+late-bound values for automatic acceptance; do not persist them in production
+configuration unless you are intentionally building a test harness.
+
+| Variable | Values | Purpose |
+|---|---|---|
+| `ORCH_AUDIO_INPUT_MODE` | `device` (default), `stdin` | Select normal `sounddevice` capture or framed PCM16 packets inherited through Orchestrator stdin. |
+| `ORCH_AUDIO_OUTPUT_MODE` | `device` (default), `discard` | Select physical playback or headless paced playback. |
+| `ORCH_DISCARD_PLAYBACK_REALTIME` | `1` | Preserve audio duration and interruption timing when output is discarded. |
+| `PULSE_SOURCE` | Pulse/PipeWire source name | Used by `virtual-mic` mode to select the temporary null-sink monitor. |
+
+The stdin packet protocol is local to the parent/child process relationship and
+does not expose an HTTP or socket injection endpoint. It carries PCM16 sample
+rate, channel count, and payload length; injected audio still passes through
+VAD and ASR.
+
 ## Service endpoints
 
 | Variable | Typical host value |
@@ -239,8 +257,11 @@ variables are not a supported production-selection mechanism in this revision.
   `TTS_SMOKE_SPEAKER`.
 - Supervised target acceptance: `SUPERVISED_ACCEPTANCE=1`, `M5_DRY_RUN`,
   `M5_EVIDENCE_ROOT`, `M5_ACCEPTANCE_ID`, `M5_EVIDENCE_DIR`.
-- Guided M13 voice acceptance uses CLI flags on
-  `scripts/m13_voice_acceptance.py`; it generates a temporary
+- M13 voice acceptance uses CLI flags on `scripts/m13_voice_acceptance.py`.
+  `--mode synthetic` is the fully automatic default; `--mode virtual-mic`
+  exercises a PulseAudio/PipeWire monitor source; `--mode supervised` uses the
+  real microphone and speaker. Automated modes also accept `--tts-url`,
+  `--tts-speaker-id`, and `--virtual-mic-sink`. The runner generates a temporary
   `ORCH_RUNTIME_OVERRIDE_FILE`, enables `ORCH_EVENT_LOG_PATH`, and writes below
   `.chromie/acceptance/m13/`. Its capability probe defaults to
   `--probe-runtime container`, executing inside `chromie-agent`. Host-loopback

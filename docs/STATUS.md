@@ -31,7 +31,7 @@ Target validation or Release readiness.
 | Capability | Implementation | Automated evidence | Target or live evidence | Default deployment state |
 |---|---|---|---|---|
 | Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | Target GPU smoke tooling exists; retained target run is still required | Main runtime |
-| Realtime microphone/VAD/ASR/TTS/playback loop | Implemented | Component, event-writer, and control-plane tests | Guided seven-case runner and verifier implemented; real reference-host bundle still open | Enabled after host audio setup |
+| Realtime microphone/VAD/ASR/TTS/playback loop | Implemented | Component tests plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Supervised real-microphone/speaker reference-host bundle still open | Enabled after host audio setup |
 | Deterministic Router operational controls | Implemented | Router rule tests | Exercised by deployed smoke test | Enabled by `.env.common` |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Used by the current voice loop | Enabled by `.env.common` |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo path exists | Host rollout flag off |
@@ -40,7 +40,7 @@ Target validation or Release readiness.
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; microphone retention still open | Available in structured path |
 | Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Provider flag off |
 | Conversation state across VAD utterances | Implemented in host memory | Boundary, follow-up, and limit tests | Available in the host Orchestrator | Enabled by `.env.common` |
-| Structured acceptance evidence capture | JSONL session events, redacted runtime snapshot, audio-device log, recordings, case checks, and operator notes implemented | Session evidence and bundle-verification tests | Must be run on the reference host | Acceptance-only |
+| Structured acceptance evidence capture | JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and three explicit modes implemented | Synthetic/virtual-mic framing, isolation, and bundle-verification tests | Only supervised mode is release-closing; reviewed bundle still open | Acceptance-only |
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |
@@ -62,7 +62,7 @@ The repository test command is:
 
 At the verified revision it runs:
 
-- **138** current `unittest` cases under `tests/`;
+- **155** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -75,8 +75,10 @@ M13 is not closed until all of the following are complete:
 
 1. Non-skippable confirmation is represented as an actual spoken user
    dialogue and produces request-bound authorization evidence.
-2. `scripts/m13_voice_acceptance.py` is run on the reference host for all seven
-   cases and `scripts/verify_m13_evidence.py --require-clean` passes.
+2. The automatic `synthetic` and `virtual-mic` matrices pass for regression,
+   then `scripts/m13_voice_acceptance.py --mode supervised` is run on the
+   reference host for all seven cases and
+   `scripts/verify_m13_evidence.py --require-clean` passes.
 3. The retained bundle is reviewed for audible quality, simulator safe idle,
    cancellation/recovery behavior, correlated IDs, and absence of secrets.
 4. The candidate compatibility file has no remaining M13 closure blockers and
@@ -91,8 +93,9 @@ engineering milestone:
   retain the results.
 - **M5:** run `scripts/m5_target_acceptance.sh` with a supervised,
   runtime-backed Soridormi endpoint and complete the documented recovery step.
-- **Audio:** retain microphone and speaker device information, timing logs, and
-  pass/fail notes for the M13 acceptance matrix.
+- **Audio:** automatic synthetic and virtual-microphone modes are implemented;
+  retain real microphone/speaker device information, timing logs, and pass/fail
+  notes from the supervised M13 matrix.
 - **Hardware:** real motion remains experimental until Soridormi commissioning,
   confirmation, monitor, cancellation, stop, and recovery evidence are all
   retained for the exact hardware configuration.

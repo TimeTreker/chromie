@@ -276,55 +276,69 @@ SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
   ./scripts/m5_target_acceptance.sh
 ```
 
-## 13. M13 microphone acceptance
+## 13. M13 voice acceptance
 
-Commit the candidate revision, then use the guided runner against a supervised
-MuJoCo-backed endpoint. A dirty tree is rejected unless `--allow-dirty` is used
-for explicitly exploratory evidence:
+Run the automatic synthetic matrix first. It generates input WAV files with the
+existing TTS service and injects them through the Orchestrator's private stdin
+audio path, so the test still crosses VAD, ASR, Router, native Agent output,
+Skill Runtime, response TTS, and Soridormi without relying on a person speaking:
 
 ```bash
 python scripts/m13_voice_acceptance.py \
+  --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --soridormi-repo ../soridormi
+  --soridormi-repo ../soridormi \
+  --start-services
 ```
 
-Add `--start-services` when the five containers are not already healthy. The
-runner remains a host-side audio/evidence controller, but it runs the capability
-probe inside `chromie-agent` by default and rewrites host-loopback MCP URLs to
-`host.docker.internal` for that command. Use `--probe-runtime host` only for an
-explicit local-development probe with Agent dependencies installed. The runner
-presents and records speech-only, named-skill, refusal, barge-in, body
-cancellation, explicit stop, and conversation follow-up cases. It writes
-revisions, redacted runtime configuration, audio devices, correlated JSONL
-session events, Orchestrator logs, recordings, automated checks, and operator
-notes below `.chromie/acceptance/m13/<id>/`.
+The run is fully automatic. The terminal displays generated fixture paths, ASR
+transcripts, Router results, proposed skill IDs, skill results, and final case
+verdicts. Validate this regression evidence with:
 
-Interactive behavior is intentionally explicit:
+```bash
+python scripts/verify_m13_evidence.py --allow-automated \
+  .chromie/acceptance/m13/<id>
+```
 
-1. Read the case instructions and press Enter once when ready.
-2. Wait for the `3`, `2`, `1` countdown and the `SPEAK NOW` banner.
-3. Speak the displayed phrase only after that banner appears.
-4. The runner waits for `asr_final`, prints the recognized text, and waits for
-   the required case events automatically.
-5. Only when all automated checks pass does it ask for one audible/visual
-   operator verdict. Press Enter to accept the default `pass`, or enter `f` or
-   `s` with notes.
+To include the host audio-device capture path without using a physical
+microphone, run:
 
-There is no second "case settled" Enter prompt. If ASR is not detected within
-20 seconds, or required case evidence is still missing after 60 seconds, the
-case is marked failed automatically and the run stops. Use
-`--continue-after-failure` only for exploratory evidence collection. Timing can
-be adjusted with `--countdown-s`, `--asr-timeout-s`, and `--case-timeout-s`.
+```bash
+python scripts/m13_voice_acceptance.py \
+  --mode virtual-mic \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
 
-Verify the completed bundle:
+This requires `pactl` and `paplay`. The runner creates a temporary null sink,
+uses its monitor through `PULSE_SOURCE`, and removes the module during cleanup.
+If a previous process was killed before cleanup, unload the stale module with
+`pactl list short modules` followed by `pactl unload-module <id>`.
+
+Finally, commit the candidate revision and run the real reference-host matrix:
+
+```bash
+python scripts/m13_voice_acceptance.py \
+  --mode supervised \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+In supervised mode, press Enter once when ready, wait for `SPEAK NOW`, and speak
+the displayed phrase. The runner prints the ASR result and session-scoped
+pipeline trace. It asks for an audible/visual verdict only after all automated
+checks pass. Verify release-closing evidence without `--allow-automated`:
 
 ```bash
 python scripts/verify_m13_evidence.py --require-clean \
   .chromie/acceptance/m13/<id>
 ```
 
-A dry run is only a command rehearsal and cannot close M13. Review recordings
-and transcribed event details for privacy before sharing evidence.
+Automatic bundles are useful regression evidence but cannot close M13 because
+they do not prove a real microphone, speaker, human pronunciation, room
+conditions, or operator-observed simulator safety.
 
 ## 14. Logs
 

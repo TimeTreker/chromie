@@ -30,13 +30,13 @@ status authority is [docs/STATUS.md](docs/STATUS.md).
 - TaskGraph planning, validation, dry run, read-only/planning/guarded execution,
   confirmation grants, cancellation, traces, and shared scheduling.
 - Headless text-to-live-MuJoCo structured interaction acceptance.
-- Correlated JSONL session-event evidence, guided seven-case microphone runner, and strict evidence verifier.
+- Correlated JSONL session-event evidence plus synthetic, virtual-microphone, and supervised seven-case runners with a strict evidence verifier.
 - `0.1.0-alpha.1` candidate notes, compatibility metadata, archive/checksum generator, and release gate.
 
 ## What is not complete
 
 - Complete non-skippable confirmation conversation.
-- Reviewed reference-host output from the guided microphone-driven M13 matrix.
+- Reviewed reference-host output from the final supervised M13 matrix; automatic synthetic and virtual-microphone modes are implementation/regression evidence only.
 - Retained target GPU and supervised M5 evidence.
 - Verified Jetson container packaging.
 - Physical hardware release support.
@@ -53,7 +53,7 @@ Run:
 At this checkpoint the expected baseline is:
 
 ```text
-138 current unittest cases passed
+155 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```
@@ -82,9 +82,10 @@ This is GPU-free evidence only.
    deterministic.
 4. Add request-bound confirmation dialogue and tests for approve, decline,
    timeout, interruption, and replay rejection.
-5. Run the complete guided microphone/MuJoCo matrix with
-   `scripts/m13_voice_acceptance.py`, then verify it with
-   `scripts/verify_m13_evidence.py --require-clean`.
+5. Run `scripts/m13_voice_acceptance.py --mode synthetic`, then
+   `--mode virtual-mic`, and finally the complete `--mode supervised`
+   microphone/MuJoCo matrix. Verify automatic bundles with
+   `--allow-automated` and the final bundle with `--require-clean`.
 6. Review private speech, audible quality, simulator safe idle, cancellation,
    and recovery notes; close applicable M3/M5 target evidence tracks.
 7. Remove the spoken-confirmation blocker only after implementation/evidence,

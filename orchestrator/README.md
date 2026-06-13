@@ -86,7 +86,7 @@ Orchestrator then fills still-unset host values from
 `orchestrator/.env.local`. Values already exported by the launching process
 retain precedence. `scripts/start_orchestrator.sh` can additionally source an
 `ORCH_RUNTIME_OVERRIDE_FILE` after `.env.runtime`; this is intended for
-supervised acceptance runs that must not rewrite local configuration.
+acceptance runs that must not rewrite local configuration.
 
 Prepare the host environment:
 
@@ -104,6 +104,33 @@ Set explicit `ORCH_INPUT_DEVICE` and `ORCH_OUTPUT_DEVICE` values. Relative
 Conversation settings have both current `ORCH_CONVERSATION_*` names and legacy
 `ORCH_CONTEXT_*` aliases. New deployments should use the conversation-prefixed
 names documented in [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md).
+
+## Acceptance audio modes
+
+Normal operation uses:
+
+```text
+ORCH_AUDIO_INPUT_MODE=device
+ORCH_AUDIO_OUTPUT_MODE=device
+```
+
+The M13 automatic runner can instead set:
+
+```text
+ORCH_AUDIO_INPUT_MODE=stdin
+ORCH_AUDIO_OUTPUT_MODE=discard
+ORCH_DISCARD_PLAYBACK_REALTIME=1
+```
+
+In stdin mode the Orchestrator accepts a bounded binary PCM16 framing protocol
+only through its inherited standard input. It does not open a network test
+endpoint. The injected stream is resampled and fed through the same VAD and ASR
+path used by the microphone. Discard output mode keeps playback timing and
+interruption checks while avoiding a physical speaker.
+
+`virtual-mic` acceptance keeps `ORCH_AUDIO_INPUT_MODE=device`, sets
+`PULSE_SOURCE` to a temporary null-sink monitor, and uses discard output to
+avoid feedback.
 
 ## Start
 

@@ -35,8 +35,9 @@ archives, and old milestone prose are context only.
 - Run the Orchestrator from repository root with
   `python -m orchestrator.orchestrator`.
 - Keep TTS generation serialized unless the backend ownership model changes.
-- Do not fabricate microphone, GPU, simulator, or hardware evidence. Use the
-  guided runner and retain operator notes.
+- Do not fabricate microphone, GPU, simulator, or hardware evidence. Use
+  synthetic/virtual-mic modes for automated regression and supervised mode for
+  release-closing microphone/speaker evidence with operator notes.
 - Do not remove release blockers or mark M13 complete unless the corresponding
   implementation and evidence are present.
 

@@ -21,10 +21,12 @@ yet published an official release.
 - Hardware-aware generated runtime configuration and multiple NVIDIA profiles.
 - GPU, Soridormi, text-interaction, and supervised target acceptance tooling.
 - Correlated JSONL session-event evidence that cannot break the realtime loop.
-- Guided seven-case microphone/MuJoCo runner with redacted configuration,
-  audio-device capture, automated checks, and operator verdicts.
-- Strict M13 evidence verifier for native mode, clean revisions, all cases, and
-  correlated sessions.
+- Three-mode seven-case voice/MuJoCo runner: automatic TTS-generated stdin
+  injection, PulseAudio/PipeWire virtual microphone capture, and final
+  supervised real-microphone evidence.
+- Strict M13 evidence verifier for native mode, clean revisions, all cases,
+  correlated sessions, and separation of automated from release-closing
+  supervised evidence.
 - `0.1.0-alpha.1` candidate version, compatibility declaration, release notes,
   source archive generation, manifest, tests log, and checksums.
 
