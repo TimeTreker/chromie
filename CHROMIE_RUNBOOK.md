@@ -294,6 +294,20 @@ python scripts/provider_fault_matrix.py \
   --output .chromie/provider-fault-matrix.json
 ```
 
+Run the provider-neutral conformance contract against both local no-motion
+profiles:
+
+```bash
+python scripts/provider_conformance.py
+```
+
+The live form is restricted to `sim` or `hardware_dry_run`:
+
+```bash
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+python scripts/provider_conformance.py --live --profile sim
+```
+
 Run the automatic synthetic matrix first. It generates input WAV files with the
 existing TTS service and injects them through the Orchestrator's private stdin
 audio path, so the test still crosses VAD, ASR, Router, native Agent output,

@@ -185,6 +185,19 @@ tool-call sequence. Use `--scenarios` for a subset and `--output` to retain a
 machine-readable JSON summary. This is automated contract evidence, not live
 simulator or hardware validation.
 
+The shared provider conformance suite verifies the same high-level contract for
+`sim` and a no-motion `hardware_dry_run` skeleton:
+
+```bash
+python scripts/provider_conformance.py
+```
+
+It checks the versioned catalog, opaque plan identity, safety monitor,
+authorized explicit completion, cancellation, and rejection of low-level
+device fields. It refuses real `hardware` mode. When a safe live endpoint is
+available, use `--live --profile sim` or `--live --profile hardware_dry_run`
+with `SORIDORMI_MCP_URL` configured.
+
 `scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.
