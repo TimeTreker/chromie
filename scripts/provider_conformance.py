@@ -146,6 +146,49 @@ def report(mode: str, checks: Sequence[ConformanceCheck]) -> dict[str, Any]:
     }
 
 
+def compare_profiles(reports: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    if len(reports) < 2:
+        return {
+            "passed": True,
+            "compared_modes": [report["mode"] for report in reports],
+            "mismatches": [],
+        }
+    ignored_checks = {"safe provider mode", "no-motion proof"}
+    baseline = reports[0]
+    baseline_checks = {
+        check["name"]: check["passed"]
+        for check in baseline["checks"]
+        if check["name"] not in ignored_checks
+    }
+    mismatches: list[str] = []
+    for candidate in reports[1:]:
+        candidate_checks = {
+            check["name"]: check["passed"]
+            for check in candidate["checks"]
+            if check["name"] not in ignored_checks
+        }
+        if candidate_checks.keys() != baseline_checks.keys():
+            missing = sorted(baseline_checks.keys() - candidate_checks.keys())
+            extra = sorted(candidate_checks.keys() - baseline_checks.keys())
+            mismatches.append(
+                f"{candidate['mode']} check set differs: missing={missing} extra={extra}"
+            )
+            continue
+        for name, baseline_passed in baseline_checks.items():
+            candidate_passed = candidate_checks[name]
+            if candidate_passed != baseline_passed:
+                mismatches.append(
+                    f"{candidate['mode']} check {name!r}={candidate_passed} "
+                    f"differs from {baseline['mode']}={baseline_passed}"
+                )
+    return {
+        "passed": not mismatches,
+        "compared_modes": [report["mode"] for report in reports],
+        "ignored_profile_specific_checks": sorted(ignored_checks),
+        "mismatches": mismatches,
+    }
+
+
 async def run_conformance(
     invoker: AsyncToolInvoker,
     *,
@@ -278,9 +321,11 @@ async def run_profiles(profiles: Sequence[str]) -> dict[str, Any]:
         await run_conformance(NoMotionProviderStub(profile), expected_mode=profile)
         for profile in profiles
     ]
+    parity = compare_profiles(reports)
     return {
         "conformance_version": CONFORMANCE_VERSION,
-        "passed": all(item["passed"] for item in reports),
+        "passed": all(item["passed"] for item in reports) and parity["passed"],
+        "profile_parity": parity,
         "profiles": reports,
     }
 

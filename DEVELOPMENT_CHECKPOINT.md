@@ -1,6 +1,6 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `94ecef0`
+**Last committed Chromie base:** `1df3159`
 **Pinned Soridormi capability revision:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
 **Verified date:** 2026-06-14
 **Current focus:** Robust simulation and provider readiness development while
@@ -29,7 +29,7 @@ release gate.
 ## Next sequence
 
 1. Run the shared conformance suite against live Soridormi `sim` and
-   `hardware_dry_run` providers when available.
+   `hardware_dry_run` providers when available and retain their parity result.
 2. Run the versioned Chromie fault matrix against Soridormi-owned injected
    faults when that endpoint is available.
 3. Retain live scenario summaries against declared target thresholds and verify
@@ -45,7 +45,7 @@ conformance work. Do not start physical motion ahead of that gate.
 ## Verification baseline
 
 ```text
-192 current unittest cases passed
+193 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```

@@ -210,6 +210,11 @@ device fields. It refuses real `hardware` mode. When a safe live endpoint is
 available, use `--live --profile sim` or `--live --profile hardware_dry_run`
 with `SORIDORMI_MCP_URL` configured.
 
+Multi-profile output includes a parity result. Profile-specific checks such as
+the declared mode and `hardware_dry_run` no-motion proof are compared
+separately; all shared catalog, plan, monitor, execution, abstraction, and
+cancellation checks must have the same names and pass/fail outcomes.
+
 `scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.
