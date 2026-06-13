@@ -136,6 +136,94 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 session_id="sid-1",
             )
 
+    async def test_catalog_failure_becomes_terminal_safe_fallback(self) -> None:
+        class CatalogFailureInvoker(_SoridormiInvoker):
+            async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
+                self.calls.append((tool_name, args, context))
+                if tool_name == "soridormi.skill.list":
+                    return ToolCallOutcome.failed(
+                        "provider restarting",
+                        retryable=True,
+                    )
+                return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
+
+        spoken: list[str] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            soridormi_invoker=CatalogFailureInvoker(),
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "nod-1",
+                        "skill_id": "soridormi.nod_yes",
+                    }
+                ]
+            ),
+            session_id="sid-1",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.results[0].reason_code, "catalog_unavailable")
+        self.assertEqual(
+            spoken,
+            ["I could not complete that movement safely."],
+        )
+
+    async def test_unavailable_catalog_skill_becomes_terminal_safe_fallback(
+        self,
+    ) -> None:
+        class UnavailableSkillInvoker(_SoridormiInvoker):
+            async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
+                self.calls.append((tool_name, args, context))
+                if tool_name == "soridormi.skill.list":
+                    return ToolCallOutcome.success(
+                        {
+                            "mode": "sim",
+                            "skills": [
+                                {
+                                    "skill_id": "nod_yes",
+                                    "available": False,
+                                    "unavailable_reason": "provider not calibrated",
+                                    "parameters_schema": {"type": "object"},
+                                }
+                            ],
+                        }
+                    )
+                return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
+
+        spoken: list[str] = []
+        invoker = UnavailableSkillInvoker()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "nod-1",
+                        "skill_id": "soridormi.nod_yes",
+                    }
+                ]
+            ),
+            session_id="sid-1",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.results[0].reason_code, "skill_unavailable")
+        self.assertEqual(
+            spoken,
+            ["I could not complete that movement safely."],
+        )
+        self.assertEqual(
+            [call[0] for call in invoker.calls],
+            ["soridormi.skill.list"],
+        )
+
     async def test_request_bound_confirmation_authorizes_only_exact_request(self) -> None:
         invoker = _SoridormiInvoker()
         coordinator = InteractionRuntimeCoordinator(

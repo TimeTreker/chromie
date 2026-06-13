@@ -5,6 +5,12 @@ yet published an official release.
 
 ## Unreleased
 
+- Added versioned provider conformance traces, recommendation-only hardware
+  shadow coverage, safe-idle status checks, and a first-reference-robot
+  commissioning checklist.
+- Normalized provider catalog and unavailable-skill failures into stable
+  terminal results and expanded the deterministic fault matrix to 16 scenarios.
+
 ### Implemented in the current development snapshot
 
 - Structured `InteractionResponse` contracts with recursive low-level-field

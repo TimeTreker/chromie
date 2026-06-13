@@ -62,9 +62,11 @@ name. That identifier is retained for compatibility only.
 
 ## Next phase - Robust simulation and provider readiness
 
-Local engineering work is now proceeding here while the alpha target-validation
-gate waits for Linux. Starting this work does not close the alpha, remove its
-release blocker, or make the candidate publishable.
+The Chromie-side implementation and automated verification for this milestone
+are complete. Milestone closure now waits for live Soridormi simulator,
+hardware-shadow, hardware-dry-run, and fault-injection evidence on the reference
+environment. This work does not close the alpha, remove its release blocker, or
+make the candidate publishable.
 
 ### Objective
 

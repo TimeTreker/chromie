@@ -72,6 +72,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Configuration Reference](CONFIGURATION.md)
 - [API Reference](API_REFERENCE.md)
 - [Acceptance and Evidence](ACCEPTANCE.md)
+- [Reference Robot Commissioning Checklist](ROBOT_COMMISSIONING.md)
 - [Release and Packaging](RELEASE.md)
 - [Release Assets](../release/README.md)
 - [Alpha Candidate Notes](../release/v0.1.0-alpha.1.md)

@@ -8,7 +8,11 @@ from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry
 from agent.app.tool_invocation import AsyncToolInvoker, McpStreamableHttpInvoker
-from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
+from shared.chromie_contracts.interaction import (
+    InteractionResponse,
+    SkillRequest,
+    SkillResult,
+)
 
 from .skill_runtime import (
     LocalSpeechSkillProvider,
@@ -63,7 +67,32 @@ class InteractionRuntimeCoordinator:
             if request.skill_id.startswith("soridormi.")
         ]
         if body_requests:
-            await self._ensure_soridormi_catalog()
+            if self.soridormi_invoker is None:
+                await self._ensure_soridormi_catalog()
+            try:
+                await self._ensure_soridormi_catalog()
+            except RuntimeError as exc:
+                return await self._body_setup_failure(
+                    prepared,
+                    body_requests,
+                    session_id=session_id,
+                    reason_code="catalog_unavailable",
+                    message=str(exc),
+                )
+            unavailable = [
+                request
+                for request in body_requests
+                if not self.registry.get(request.skill_id).available
+            ]
+            if unavailable:
+                definition = self.registry.get(unavailable[0].skill_id)
+                return await self._body_setup_failure(
+                    prepared,
+                    body_requests,
+                    session_id=session_id,
+                    reason_code="skill_unavailable",
+                    message=definition.unavailable_reason or "unavailable",
+                )
 
         authorized_request_ids = set(confirmed_request_ids or ())
         if (
@@ -160,6 +189,62 @@ class InteractionRuntimeCoordinator:
                 ),
             )
         return execution
+
+    async def _body_setup_failure(
+        self,
+        response: InteractionResponse,
+        body_requests: list[SkillRequest],
+        *,
+        session_id: str | None,
+        reason_code: str,
+        message: str,
+    ) -> SkillRuntimeResult:
+        body_results = [
+            SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=request.skill_version,
+                status="failed",
+                provider_id="soridormi.mcp",
+                reason_code=reason_code,
+                message=message,
+            )
+            for request in body_requests
+        ]
+        failed = SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="failed",
+            results=body_results,
+        )
+        fallback = InteractionResponse(
+            interaction_id=response.interaction_id,
+            speech=[
+                {
+                    "text": self._body_failure_message(
+                        body_results,
+                        language=str(response.metadata.get("language") or ""),
+                    ),
+                    "timing": "sequential",
+                    "style": "warning",
+                    "priority": "high",
+                    "interruptible": True,
+                    "metadata": {
+                        "source": "host_body_setup_failure_fallback",
+                        "failed_request_ids": [
+                            result.request_id for result in body_results
+                        ],
+                        "session_id": session_id,
+                    },
+                }
+            ],
+            metadata={"source": "host_body_setup_failure_fallback"},
+        )
+        fallback_execution = await self.runtime.execute(fallback)
+        return self._merge_executions(
+            failed,
+            fallback_execution,
+            status="failed",
+        )
 
     def _body_failure_message(
         self,

@@ -24,8 +24,9 @@ from agent.app.tool_invocation import (
 from orchestrator.runtime.interaction_coordinator import build_soridormi_invoker
 from shared.chromie_contracts.interaction import reject_forbidden_low_level_fields
 
-CONFORMANCE_VERSION = "1.0"
-SAFE_MODES = {"sim", "hardware_dry_run"}
+CONFORMANCE_VERSION = "1.1"
+TRACE_VERSION = "1.0"
+SAFE_MODES = {"sim", "hardware_shadow", "hardware_dry_run"}
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,37 @@ class ConformanceCheck:
     name: str
     passed: bool
     detail: str
+
+
+class TracingInvoker:
+    """Retain replayable high-level calls without exposing device controls."""
+
+    def __init__(self, delegate: AsyncToolInvoker) -> None:
+        self.delegate = delegate
+        self.entries: list[dict[str, Any]] = []
+
+    async def invoke(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> ToolCallOutcome:
+        outcome = await self.delegate.invoke(tool_name, args, context=context)
+        self.entries.append(
+            {
+                "sequence": len(self.entries) + 1,
+                "tool_name": tool_name,
+                "args": args,
+                "authorization": (
+                    context.model_dump(mode="json")
+                    if context is not None
+                    else ToolInvocationContext().model_dump(mode="json")
+                ),
+                "outcome": outcome.model_dump(mode="json"),
+            }
+        )
+        return outcome
 
 
 class NoMotionProviderStub:
@@ -97,13 +129,22 @@ class NoMotionProviderStub:
                     "completed": True,
                     "skill_id": "nod_yes",
                     "mode": self.mode,
-                    "no_motion": self.mode == "hardware_dry_run",
+                    "no_motion": self.mode != "sim",
+                    "recommendation_only": self.mode == "hardware_shadow",
                 }
             )
         if tool_name == "soridormi.motion.cancel":
             if not context or not context.allow_safety_controls:
                 return ToolCallOutcome.failed("missing safety-control authorization")
             return ToolCallOutcome.success({"cancelled": True})
+        if tool_name == "soridormi.robot.get_status":
+            return ToolCallOutcome.success(
+                {
+                    "mode": self.mode,
+                    "active_task": None,
+                    "emergency_stop": False,
+                }
+            )
         return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
 
 
@@ -136,14 +177,32 @@ def record_abstraction(
         checks.append(ConformanceCheck(name, True, "no forbidden low-level fields"))
 
 
-def report(mode: str, checks: Sequence[ConformanceCheck]) -> dict[str, Any]:
+def report(
+    mode: str,
+    checks: Sequence[ConformanceCheck],
+    trace: Sequence[dict[str, Any]] = (),
+) -> dict[str, Any]:
     return {
         "conformance_version": CONFORMANCE_VERSION,
+        "trace_version": TRACE_VERSION,
         "mode": mode,
         "passed": all(check.passed for check in checks),
         "check_count": len(checks),
         "checks": [asdict(check) for check in checks],
+        "trace": list(trace),
     }
+
+
+def trace_signature(profile: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "tool_name": entry.get("tool_name"),
+            "args": entry.get("args"),
+            "authorization": entry.get("authorization"),
+            "status": entry.get("outcome", {}).get("status"),
+        }
+        for entry in profile.get("trace", [])
+    ]
 
 
 def compare_profiles(reports: Sequence[dict[str, Any]]) -> dict[str, Any]:
@@ -153,7 +212,11 @@ def compare_profiles(reports: Sequence[dict[str, Any]]) -> dict[str, Any]:
             "compared_modes": [report["mode"] for report in reports],
             "mismatches": [],
         }
-    ignored_checks = {"safe provider mode", "no-motion proof"}
+    ignored_checks = {
+        "safe provider mode",
+        "shadow no-motion proof",
+        "dry-run no-motion proof",
+    }
     baseline = reports[0]
     baseline_checks = {
         check["name"]: check["passed"]
@@ -181,11 +244,55 @@ def compare_profiles(reports: Sequence[dict[str, Any]]) -> dict[str, Any]:
                     f"{candidate['mode']} check {name!r}={candidate_passed} "
                     f"differs from {baseline['mode']}={baseline_passed}"
                 )
+        if trace_signature(candidate) != trace_signature(baseline):
+            mismatches.append(
+                f"{candidate['mode']} high-level trace differs from "
+                f"{baseline['mode']}"
+            )
     return {
         "passed": not mismatches,
         "compared_modes": [report["mode"] for report in reports],
         "ignored_profile_specific_checks": sorted(ignored_checks),
         "mismatches": mismatches,
+    }
+
+
+def compare_evidence(paths: Sequence[Path]) -> dict[str, Any]:
+    profiles: list[dict[str, Any]] = []
+    seen_modes: set[str] = set()
+    for path in paths:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("conformance_version") != CONFORMANCE_VERSION:
+            raise ValueError(
+                f"{path} uses conformance version "
+                f"{payload.get('conformance_version')!r}, expected "
+                f"{CONFORMANCE_VERSION!r}"
+            )
+        if payload.get("trace_version") != TRACE_VERSION:
+            raise ValueError(
+                f"{path} uses trace version {payload.get('trace_version')!r}, "
+                f"expected {TRACE_VERSION!r}"
+            )
+        items = payload.get("profiles")
+        if not isinstance(items, list) or not items:
+            raise ValueError(f"{path} contains no provider profiles")
+        for profile in items:
+            if not isinstance(profile, dict) or profile.get("mode") not in SAFE_MODES:
+                raise ValueError(f"{path} contains an invalid provider profile")
+            mode = str(profile["mode"])
+            if mode in seen_modes:
+                raise ValueError(f"duplicate provider profile mode: {mode}")
+            seen_modes.add(mode)
+            profiles.append(profile)
+    parity = compare_profiles(profiles)
+    return {
+        "conformance_version": CONFORMANCE_VERSION,
+        "trace_version": TRACE_VERSION,
+        "passed": all(profile.get("passed") is True for profile in profiles)
+        and parity["passed"],
+        "profile_parity": parity,
+        "profiles": profiles,
+        "source_files": [str(path) for path in paths],
     }
 
 
@@ -196,13 +303,14 @@ async def run_conformance(
 ) -> dict[str, Any]:
     if expected_mode not in SAFE_MODES:
         raise ValueError(
-            "Provider conformance execution is restricted to sim or "
-            "hardware_dry_run"
+            "Provider conformance execution is restricted to sim, "
+            "hardware_shadow, or hardware_dry_run"
         )
+    traced = TracingInvoker(invoker)
     checks: list[ConformanceCheck] = []
-    catalog = await invoker.invoke("soridormi.skill.list", {})
+    catalog = await traced.invoke("soridormi.skill.list", {})
     if not record_outcome(checks, "catalog call", catalog):
-        return report(expected_mode, checks)
+        return report(expected_mode, checks, traced.entries)
     record_abstraction(checks, "catalog abstraction", catalog.output)
     actual_mode = catalog.output.get("mode")
     checks.append(
@@ -233,14 +341,14 @@ async def run_conformance(
         )
     )
     if not isinstance(nod, dict):
-        return report(expected_mode, checks)
+        return report(expected_mode, checks, traced.entries)
 
-    planned = await invoker.invoke(
+    planned = await traced.invoke(
         "soridormi.skill.create_plan",
         {"skill_id": "nod_yes", "parameters": {"count": 2}},
     )
     if not record_outcome(checks, "plan call", planned):
-        return report(expected_mode, checks)
+        return report(expected_mode, checks, traced.entries)
     record_abstraction(checks, "plan abstraction", planned.output)
     plan_id = planned.output.get("plan_id")
     checks.append(
@@ -253,15 +361,15 @@ async def run_conformance(
         )
     )
     if not isinstance(plan_id, str) or not plan_id:
-        return report(expected_mode, checks)
+        return report(expected_mode, checks, traced.entries)
 
-    monitored = await invoker.invoke(
+    monitored = await traced.invoke(
         "soridormi.safety.monitor_motion",
         {"during_node_id": "conformance-request"},
         context=ToolInvocationContext(allow_safety_controls=True),
     )
     if not record_outcome(checks, "monitor call", monitored):
-        return report(expected_mode, checks)
+        return report(expected_mode, checks, traced.entries)
     record_abstraction(checks, "monitor abstraction", monitored.output)
     checks.append(
         ConformanceCheck(
@@ -271,7 +379,7 @@ async def run_conformance(
         )
     )
 
-    executed = await invoker.invoke(
+    executed = await traced.invoke(
         "soridormi.skill.execute_plan",
         {"plan_id": plan_id},
         context=ToolInvocationContext(
@@ -290,16 +398,25 @@ async def run_conformance(
                 "completed=true and skill_id=nod_yes",
             )
         )
+        if expected_mode == "hardware_shadow":
+            checks.append(
+                ConformanceCheck(
+                    "shadow no-motion proof",
+                    executed.output.get("no_motion") is True
+                    and executed.output.get("recommendation_only") is True,
+                    "hardware_shadow is no-motion and recommendation-only",
+                )
+            )
         if expected_mode == "hardware_dry_run":
             checks.append(
                 ConformanceCheck(
-                    "no-motion proof",
+                    "dry-run no-motion proof",
                     executed.output.get("no_motion") is True,
-                    "hardware_dry_run execution declares no_motion=true",
+                    "hardware_dry_run declares no_motion=true",
                 )
             )
 
-    cancelled = await invoker.invoke(
+    cancelled = await traced.invoke(
         "soridormi.motion.cancel",
         {},
         context=ToolInvocationContext(allow_safety_controls=True),
@@ -313,7 +430,19 @@ async def run_conformance(
                 "cancelled=true",
             )
         )
-    return report(expected_mode, checks)
+    status = await traced.invoke("soridormi.robot.get_status", {})
+    if record_outcome(checks, "status call", status):
+        record_abstraction(checks, "status abstraction", status.output)
+        checks.append(
+            ConformanceCheck(
+                "safe idle",
+                status.output.get("mode") == expected_mode
+                and status.output.get("active_task") is None
+                and status.output.get("emergency_stop") is False,
+                "provider mode matches and status is explicitly safe idle",
+            )
+        )
+    return report(expected_mode, checks, traced.entries)
 
 
 async def run_profiles(profiles: Sequence[str]) -> dict[str, Any]:
@@ -324,6 +453,7 @@ async def run_profiles(profiles: Sequence[str]) -> dict[str, Any]:
     parity = compare_profiles(reports)
     return {
         "conformance_version": CONFORMANCE_VERSION,
+        "trace_version": TRACE_VERSION,
         "passed": all(item["passed"] for item in reports) and parity["passed"],
         "profile_parity": parity,
         "profiles": reports,
@@ -339,6 +469,7 @@ async def run_live(manifest: Path, expected_mode: str) -> dict[str, Any]:
     )
     return {
         "conformance_version": CONFORMANCE_VERSION,
+        "trace_version": TRACE_VERSION,
         "passed": conformance["passed"],
         "profiles": [conformance],
     }
@@ -348,27 +479,40 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--profile",
-        choices=("all", "sim", "hardware_dry_run"),
+        choices=("all", "sim", "hardware_shadow", "hardware_dry_run"),
         default="all",
     )
     parser.add_argument("--live", action="store_true")
+    parser.add_argument(
+        "--compare",
+        nargs="+",
+        type=Path,
+        help="Compare retained conformance JSON files without provider calls.",
+    )
     parser.add_argument("--manifest", default="capabilities/soridormi.json")
     parser.add_argument("--output")
     args = parser.parse_args()
+    if args.compare and args.live:
+        parser.error("--compare cannot be combined with --live")
+    if args.compare and args.profile != "all":
+        parser.error("--compare cannot be combined with --profile")
     if args.live and args.profile == "all":
         parser.error("--live requires one explicit safe --profile")
     profiles = (
-        ["sim", "hardware_dry_run"]
+        ["sim", "hardware_shadow", "hardware_dry_run"]
         if args.profile == "all"
         else [args.profile]
     )
     try:
-        payload = (
-            asyncio.run(run_live(Path(args.manifest), profiles[0]))
-            if args.live
-            else asyncio.run(run_profiles(profiles))
-        )
-    except ValueError as exc:
+        if args.compare:
+            payload = compare_evidence(args.compare)
+        else:
+            payload = (
+                asyncio.run(run_live(Path(args.manifest), profiles[0]))
+                if args.live
+                else asyncio.run(run_profiles(profiles))
+            )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
     rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     if args.output:

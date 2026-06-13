@@ -20,7 +20,7 @@ from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
 
-MATRIX_VERSION = "1.1"
+MATRIX_VERSION = "1.2"
 
 
 @dataclass(frozen=True)
@@ -94,6 +94,30 @@ SCENARIOS = (
         (*STANDARD_CALLS, STATUS_CALL),
     ),
     FaultScenario(
+        "catalog_restart",
+        "failed",
+        "failed",
+        "catalog_unavailable",
+        GENERIC_FAILURE,
+        ("soridormi.skill.list", STATUS_CALL),
+    ),
+    FaultScenario(
+        "skill_unavailable",
+        "failed",
+        "failed",
+        "skill_unavailable",
+        GENERIC_FAILURE,
+        ("soridormi.skill.list", STATUS_CALL),
+    ),
+    FaultScenario(
+        "plan_jitter",
+        "completed",
+        "completed",
+        None,
+        ("Done.",),
+        (*STANDARD_CALLS, STATUS_CALL),
+    ),
+    FaultScenario(
         "plan_timeout",
         "failed",
         "timed_out",
@@ -131,6 +155,14 @@ SCENARIOS = (
         "timed_out",
         "monitor_timeout",
         TIMEOUT_FAILURE,
+        (*STANDARD_CALLS[:3], STATUS_CALL),
+    ),
+    FaultScenario(
+        "monitor_status_drop",
+        "failed",
+        "failed",
+        "monitor_failed_retryable",
+        GENERIC_FAILURE,
         (*STANDARD_CALLS[:3], STATUS_CALL),
     ),
     FaultScenario(
@@ -204,13 +236,24 @@ class ScenarioInvoker:
         self.calls.append(tool_name)
         scenario_id = self.scenario.scenario_id
         if tool_name == "soridormi.skill.list":
+            if scenario_id == "catalog_restart":
+                return ToolCallOutcome.failed(
+                    "injected provider restart during catalog lookup",
+                    retryable=True,
+                )
+            available = scenario_id != "skill_unavailable"
             return ToolCallOutcome.success(
                 {
                     "mode": "sim",
                     "skills": [
                         {
                             "skill_id": "nod_yes",
-                            "available": True,
+                            "available": available,
+                            "unavailable_reason": (
+                                None
+                                if available
+                                else "injected provider not calibrated"
+                            ),
                             "parameters_schema": {
                                 "type": "object",
                                 "properties": {
@@ -228,6 +271,8 @@ class ScenarioInvoker:
                 }
             )
         if tool_name == "soridormi.skill.create_plan":
+            if scenario_id == "plan_jitter":
+                await asyncio.sleep(0.02)
             if scenario_id == "plan_timeout":
                 return ToolCallOutcome(status="timeout", error="injected plan timeout")
             if scenario_id == "plan_disconnect":
@@ -247,6 +292,11 @@ class ScenarioInvoker:
                 return ToolCallOutcome(
                     status="timeout",
                     error="injected monitor timeout",
+                )
+            if scenario_id == "monitor_status_drop":
+                return ToolCallOutcome.failed(
+                    "injected dropped monitor status",
+                    retryable=True,
                 )
             return ToolCallOutcome.success({"ok": True, "event": None})
         if tool_name == "soridormi.skill.execute_plan":

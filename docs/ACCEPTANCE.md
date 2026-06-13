@@ -177,13 +177,14 @@ endpoint, or MuJoCo:
 python scripts/provider_fault_matrix.py
 ```
 
-It executes versioned deterministic scenarios for plan, safety-monitor,
-execution, timeout, disconnect, malformed-result, runtime-cancellation, and
-operator-cancellation behavior. Each result compares the interaction terminal
-state, body-skill terminal state, reason code, user-facing speech, and exact
-tool-call sequence. Use `--scenarios` for a subset and `--output` to retain a
-machine-readable JSON summary. This is automated contract evidence, not live
-simulator or hardware validation.
+It executes 16 versioned deterministic scenarios for provider restart, skill
+unavailability, jitter, plan, safety-monitor status loss, execution, timeout,
+disconnect, malformed-result, runtime-cancellation, and operator-cancellation
+behavior. Each result compares the interaction terminal state, body-skill
+terminal state, reason code, user-facing speech, and exact tool-call sequence.
+Use `--scenarios` for a subset and `--output` to retain a machine-readable JSON
+summary. This is automated contract evidence, not live simulator or hardware
+validation.
 
 The matrix also records total scenario and terminal latency. Defaults require
 each scenario to finish within 1000 ms, timeout terminal handling within 500
@@ -198,22 +199,38 @@ passes only when the status call succeeds, `active_task` is empty, and
 high-level status snapshot and aggregate safe-idle count.
 
 The shared provider conformance suite verifies the same high-level contract for
-`sim` and a no-motion `hardware_dry_run` skeleton:
+`sim`, a recommendation-only `hardware_shadow` skeleton, and a no-motion
+`hardware_dry_run` skeleton:
 
 ```bash
 python scripts/provider_conformance.py
 ```
 
 It checks the versioned catalog, opaque plan identity, safety monitor,
-authorized explicit completion, cancellation, and rejection of low-level
-device fields. It refuses real `hardware` mode. When a safe live endpoint is
-available, use `--live --profile sim` or `--live --profile hardware_dry_run`
-with `SORIDORMI_MCP_URL` configured.
+authorized explicit completion, cancellation, provider status, safe idle, and
+rejection of low-level device fields. It refuses real `hardware` mode. When a
+safe live endpoint is available, use `--live` with one explicit safe
+`--profile` and configure `SORIDORMI_MCP_URL`.
 
 Multi-profile output includes a parity result. Profile-specific checks such as
-the declared mode and `hardware_dry_run` no-motion proof are compared
-separately; all shared catalog, plan, monitor, execution, abstraction, and
-cancellation checks must have the same names and pass/fail outcomes.
+the declared mode, recommendation-only shadow proof, and dry-run no-motion
+proof are compared separately. All shared checks must have the same names and
+pass/fail outcomes. Versioned traces retain each high-level call, arguments,
+authorization context, and normalized outcome; parity also requires the shared
+trace sequence and terminal statuses to match. Use `--output` to retain the
+replayable JSON evidence. Compare separately retained live runs without making
+new provider calls:
+
+```bash
+python scripts/provider_conformance.py --compare \
+  evidence/provider-sim.json \
+  evidence/provider-shadow.json \
+  evidence/provider-dry-run.json \
+  --output evidence/provider-parity.json
+```
+
+The hardware selection requirements and rejection conditions are maintained in
+the [Reference Robot Commissioning Checklist](ROBOT_COMMISSIONING.md).
 
 `scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or

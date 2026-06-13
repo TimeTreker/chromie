@@ -1,11 +1,11 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Verified base revision:** `1df3159` plus the current provider-conformance parity patch;
+**Verified base revision:** `6d42563` plus the current provider-readiness patch;
 release tooling records the exact packaged revision
 **Verified date:** 2026-06-14
-**Current focus:** **Robust simulation and provider readiness development;
-Voice-to-MuJoCo alpha target validation remains open**
+**Current focus:** **Robust simulation and provider readiness target validation;
+Voice-to-MuJoCo alpha target validation also remains open**
 **Version candidate:** `0.1.0-alpha.1` (prepared, not published)
 **Soridormi capability snapshot:** `a092dc704f1ab797fb1d4f542696fe75026eb171`
 
@@ -15,6 +15,11 @@ readiness.
 
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
+
+Chromie-side implementation and automated verification for the current
+milestone are complete. Target validation remains open because no live
+Soridormi simulator, hardware-shadow, hardware-dry-run, or fault-injection
+endpoint was available for retained evidence.
 
 ## Status vocabulary
 
@@ -45,8 +50,8 @@ Target validation or Release readiness.
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean automatic and supervised approval/denial bundles still open | Structured path; simulator exemption configurable |
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; microphone retention still open | Available in structured path |
 | Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Provider flag off |
-| Provider failure normalization | Strict plan/monitor/completion validation, stable timeout/cancellation terminal states, deterministic language-matched speech fallback, and a versioned 12-scenario replayable fault matrix with configurable latency thresholds, status snapshots, and safe-idle enforcement | Matrix, threshold and safe-idle evaluation, malformed completion, mismatched identity, disconnect-during-cancel, timeout, fallback, and completion-suppression tests | Soridormi-owned live fault injection and target threshold retention remain open | Used by Soridormi named skills |
-| Provider conformance | Shared versioned checks and cross-profile semantic parity for simulator and a no-motion hardware-dry-run skeleton, including catalog, plan, monitor, completion, cancellation, and low-level-field isolation | Local `sim` and `hardware_dry_run` profiles, parity drift detection, and unsafe-output rejection tests | Live provider conformance retention remains open | Test tooling; real hardware mode refused |
+| Provider failure normalization | Strict catalog/availability/plan/monitor/completion validation, stable timeout/cancellation terminal states, deterministic language-matched speech fallback, and a versioned 16-scenario replayable fault matrix with configurable latency thresholds, status snapshots, and safe-idle enforcement | Matrix, threshold and safe-idle evaluation, provider restart, unavailable skill, deterministic jitter, dropped monitor status, malformed completion, mismatched identity, disconnect-during-cancel, timeout, fallback, and completion-suppression tests | Soridormi-owned live fault injection and target threshold retention remain open | Used by Soridormi named skills |
+| Provider conformance | Shared versioned checks and replayable high-level traces for simulator, recommendation-only hardware shadow, and no-motion hardware dry-run profiles, including catalog, plan, monitor, completion, cancellation, status, safe idle, and low-level-field isolation | Local three-profile parity, trace-drift detection, profile-specific no-motion proofs, and unsafe-output rejection tests | Live provider conformance retention remains open | Test tooling; real hardware mode refused |
 | Conversation state across VAD utterances | Implemented in host memory | Boundary, follow-up, and limit tests | Available in the host Orchestrator | Enabled by `.env.common` |
 | Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and three explicit modes implemented | Preflight, synthetic/virtual-mic framing, isolation, and bundle-verification tests | Only supervised mode is release-closing; reviewed bundle still open | Acceptance-only |
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
@@ -70,7 +75,7 @@ The repository test command is:
 
 At the current working revision it runs:
 
-- **193** current `unittest` cases under `tests/`;
+- **198** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
