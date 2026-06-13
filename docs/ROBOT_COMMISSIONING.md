@@ -33,7 +33,15 @@ Reject a candidate whose exact hardware or software identity cannot be pinned.
 
 ## Contract gates
 
-Run each gate independently and retain the JSON output:
+Run the manifest preflight before starting target services:
+
+```bash
+python scripts/verify_provider_readiness.py preflight \
+  --manifest capabilities/soridormi.json
+```
+
+Do not continue until it passes. Then run each gate independently and retain
+the JSON output:
 
 ```bash
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
@@ -94,3 +102,10 @@ The candidate can be selected as the first reference robot only when:
 
 Any missing identity, low-level contract leak, unsafe-idle result, trace drift,
 unreviewed stop behavior, or threshold failure rejects the candidate.
+
+The completed directory must pass:
+
+```bash
+python scripts/verify_provider_readiness.py verify \
+  evidence/provider-readiness/<run-id> --require-clean
+```

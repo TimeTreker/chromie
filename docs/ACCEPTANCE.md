@@ -232,6 +232,43 @@ python scripts/provider_conformance.py --compare \
 The hardware selection requirements and rejection conditions are maintained in
 the [Reference Robot Commissioning Checklist](ROBOT_COMMISSIONING.md).
 
+Before starting target services, check whether the pinned Soridormi manifest
+declares every required safe mode and the test-only fault-injection contract:
+
+```bash
+python scripts/verify_provider_readiness.py preflight \
+  --manifest capabilities/soridormi.json
+```
+
+The fault-injection declaration lives under
+`metadata.provider_readiness.fault_injection`. It names test-only
+`configure_tool` and `clear_tool` capabilities, which must be
+`llm_visible=false`, plus the supported versioned scenario IDs. The checked-in
+manifest currently fails this preflight because the pinned upstream revision
+does not yet declare hardware shadow or live fault injection.
+
+Retained target evidence uses one directory containing:
+
+- `metadata.json` with target, endpoint, exact Chromie and Soridormi revisions,
+  clean-worktree state, and `status=passed`;
+- one live conformance JSON file for each safe profile;
+- the offline profile parity result;
+- a live 16-scenario fault-matrix result; and
+- reviewed `operator-notes.md`.
+
+Verify it with:
+
+```bash
+python scripts/verify_provider_readiness.py verify \
+  evidence/provider-readiness/<run-id> \
+  --require-clean \
+  --write-report evidence/provider-readiness/<run-id>/verification.json
+```
+
+The verifier rejects local-stub conformance output, missing profiles or
+scenarios, version drift, threshold violations, unsafe-idle results, dirty
+revisions when required, and missing operator review.
+
 `scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.

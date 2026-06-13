@@ -10,6 +10,8 @@ yet published an official release.
   commissioning checklist.
 - Normalized provider catalog and unavailable-skill failures into stable
   terminal results and expanded the deterministic fault matrix to 16 scenarios.
+- Added provider-readiness manifest preflight, explicit live/stub evidence
+  provenance, and strict target evidence bundle verification.
 
 ### Implemented in the current development snapshot
 

@@ -181,10 +181,13 @@ def report(
     mode: str,
     checks: Sequence[ConformanceCheck],
     trace: Sequence[dict[str, Any]] = (),
+    *,
+    evidence_source: str,
 ) -> dict[str, Any]:
     return {
         "conformance_version": CONFORMANCE_VERSION,
         "trace_version": TRACE_VERSION,
+        "evidence_source": evidence_source,
         "mode": mode,
         "passed": all(check.passed for check in checks),
         "check_count": len(checks),
@@ -300,6 +303,7 @@ async def run_conformance(
     invoker: AsyncToolInvoker,
     *,
     expected_mode: str,
+    evidence_source: str = "local_stub",
 ) -> dict[str, Any]:
     if expected_mode not in SAFE_MODES:
         raise ValueError(
@@ -310,7 +314,12 @@ async def run_conformance(
     checks: list[ConformanceCheck] = []
     catalog = await traced.invoke("soridormi.skill.list", {})
     if not record_outcome(checks, "catalog call", catalog):
-        return report(expected_mode, checks, traced.entries)
+        return report(
+            expected_mode,
+            checks,
+            traced.entries,
+            evidence_source=evidence_source,
+        )
     record_abstraction(checks, "catalog abstraction", catalog.output)
     actual_mode = catalog.output.get("mode")
     checks.append(
@@ -341,14 +350,24 @@ async def run_conformance(
         )
     )
     if not isinstance(nod, dict):
-        return report(expected_mode, checks, traced.entries)
+        return report(
+            expected_mode,
+            checks,
+            traced.entries,
+            evidence_source=evidence_source,
+        )
 
     planned = await traced.invoke(
         "soridormi.skill.create_plan",
         {"skill_id": "nod_yes", "parameters": {"count": 2}},
     )
     if not record_outcome(checks, "plan call", planned):
-        return report(expected_mode, checks, traced.entries)
+        return report(
+            expected_mode,
+            checks,
+            traced.entries,
+            evidence_source=evidence_source,
+        )
     record_abstraction(checks, "plan abstraction", planned.output)
     plan_id = planned.output.get("plan_id")
     checks.append(
@@ -361,7 +380,12 @@ async def run_conformance(
         )
     )
     if not isinstance(plan_id, str) or not plan_id:
-        return report(expected_mode, checks, traced.entries)
+        return report(
+            expected_mode,
+            checks,
+            traced.entries,
+            evidence_source=evidence_source,
+        )
 
     monitored = await traced.invoke(
         "soridormi.safety.monitor_motion",
@@ -369,7 +393,12 @@ async def run_conformance(
         context=ToolInvocationContext(allow_safety_controls=True),
     )
     if not record_outcome(checks, "monitor call", monitored):
-        return report(expected_mode, checks, traced.entries)
+        return report(
+            expected_mode,
+            checks,
+            traced.entries,
+            evidence_source=evidence_source,
+        )
     record_abstraction(checks, "monitor abstraction", monitored.output)
     checks.append(
         ConformanceCheck(
@@ -442,7 +471,12 @@ async def run_conformance(
                 "provider mode matches and status is explicitly safe idle",
             )
         )
-    return report(expected_mode, checks, traced.entries)
+    return report(
+        expected_mode,
+        checks,
+        traced.entries,
+        evidence_source=evidence_source,
+    )
 
 
 async def run_profiles(profiles: Sequence[str]) -> dict[str, Any]:
@@ -466,6 +500,7 @@ async def run_live(manifest: Path, expected_mode: str) -> dict[str, Any]:
     conformance = await run_conformance(
         build_soridormi_invoker(manifest_path=manifest),
         expected_mode=expected_mode,
+        evidence_source="live",
     )
     return {
         "conformance_version": CONFORMANCE_VERSION,
