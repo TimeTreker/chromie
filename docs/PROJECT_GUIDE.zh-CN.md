@@ -54,8 +54,9 @@ Alpha 的代码和自动测试已经完成，包括：
 - synthetic、virtual-mic、supervised 七场景验收；
 - 证据校验与 `0.1.0-alpha.1` 打包工具。
 
-尚未完成的是证据闭环：需要保留自动矩阵，并在参考主机上完成真实麦克风、
-扬声器和 MuJoCo 的 supervised 验收与人工审核。现阶段不能宣称实体机器人支持。
+RTX 5090 参考主机上的 GPU smoke、synthetic 七场景和 PipeWire virtual-mic
+七场景均已通过并保留证据。尚未完成的是使用真实麦克风、扬声器和 MuJoCo 的
+supervised 验收与人工审核。现阶段不能发布 Alpha，也不能宣称实体机器人支持。
 
 ## 开发主线
 

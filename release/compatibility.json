@@ -23,6 +23,6 @@
   ],
   "release_state": "candidate",
   "release_gate_blockers": [
-    "clean automatic and supervised spoken approval/denial evidence is not yet retained"
+    "clean reviewed supervised real-microphone/speaker evidence is not yet retained"
   ]
 }

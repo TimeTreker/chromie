@@ -8,9 +8,10 @@ generation, a release manifest, and checksums. No official GitHub release has
 been published.
 
 Treat `main` as a development branch and the current revision as supervised
-alpha validation material. The release generator intentionally refuses a
-publishable bundle while tracked spoken approval/denial evidence remains open
-or a real alpha evidence bundle does not pass. See
+alpha validation material. Clean synthetic and virtual-microphone evidence is
+retained on the RTX 5090 reference host, but it is deliberately not
+release-closing. The release generator intentionally refuses a publishable
+bundle until a reviewed supervised alpha evidence bundle passes. See
 [Current Implementation Status](STATUS.md).
 
 ## Recommended first release scope

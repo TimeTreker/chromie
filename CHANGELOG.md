@@ -22,6 +22,8 @@ yet published an official release.
   strict full-manifest probing for provider-readiness conformance.
 - Prevented host proxy variables from intercepting Agent-to-Ollama traffic on
   the trusted Compose network.
+- Retained passing RTX 5090 GPU smoke plus complete synthetic and PipeWire
+  virtual-microphone M13 evidence; supervised physical audio remains open.
 
 ### Implemented in the current development snapshot
 
@@ -81,7 +83,7 @@ yet published an official release.
 ### Still open before the first alpha release
 
 - Reviewed reference-host microphone/MuJoCo alpha evidence bundle.
-- Clean automatic and supervised spoken approval/denial evidence.
-- Reference-target GPU/audio evidence and supervised recovery evidence.
+- Clean reviewed supervised spoken approval/denial evidence.
+- Physical microphone/speaker and supervised recovery evidence.
 - Published GitHub prerelease; candidate artifacts and compatibility declaration
   are prepared but intentionally blocked.

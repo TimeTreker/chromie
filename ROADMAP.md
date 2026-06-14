@@ -37,10 +37,11 @@ and evidence references. It should not drive new scope.
 Publish a narrowly scoped alpha proving the complete voice, interaction,
 confirmation, named-skill, cancellation, and recovery loop in MuJoCo.
 
-The implementation is complete. Remaining work is evidence and release closure.
-The Linux/GPU, virtual-microphone, and supervised runs are currently deferred
-until development returns to the reference environment. This milestone remains
-an open release gate; its scope is frozen except for defects.
+The implementation is complete. Linux RTX 5090 GPU smoke and both automatic
+seven-case matrices now pass with retained evidence. Remaining work is the
+supervised real-microphone/speaker matrix, operator review, and release
+publication. This milestone remains an open release gate; its scope is frozen
+except for defects.
 
 ### Exit criteria
 
@@ -69,9 +70,10 @@ injection. All three profiles pass conformance and parity, and the live
 16-scenario fault matrix passes its terminal-state, latency, and safe-idle
 checks.
 
-The retained run used a local macOS ARM64 MCP endpoint and did not command
-MuJoCo actuators or physical hardware. Linux/GPU Voice-to-MuJoCo evidence and
-supervised physical evidence remain separate release tracks.
+The provider-readiness run used a local macOS ARM64 MCP endpoint and did not
+command MuJoCo actuators or physical hardware. Separate Linux RTX 5090
+Voice-to-MuJoCo automated evidence now passes; supervised physical audio and
+real-hardware evidence remain separate release tracks.
 
 ### Objective
 

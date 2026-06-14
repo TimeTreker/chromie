@@ -9,9 +9,10 @@ The long-term goal and ownership boundaries are defined in the
 [Project Charter](docs/PROJECT_CHARTER.md).
 
 > **Current state:** the Voice-to-MuJoCo alpha implementation is complete and
-> automatically verified.
-> Clean automatic and reviewed supervised reference-host evidence are still
-> required before publishing `0.1.0-alpha.1`. See
+> automatically verified. Retained RTX 5090 GPU smoke, synthetic, and
+> virtual-microphone evidence pass on the reference host.
+> A clean reviewed supervised real-microphone/speaker bundle is still required
+> before publishing `0.1.0-alpha.1`. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
@@ -47,8 +48,8 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 - synthetic, virtual-microphone, supervised, GPU, simulator, and release
   acceptance tooling.
 
-Target GPU/audio evidence, the reviewed supervised alpha bundle, verified Jetson
-packaging, and physical robot support remain open.
+Physical microphone/speaker evidence, the reviewed supervised alpha bundle,
+verified Jetson packaging, and physical robot support remain open.
 
 ## Quick start
 

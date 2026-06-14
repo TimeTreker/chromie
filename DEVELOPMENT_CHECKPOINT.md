@@ -1,10 +1,10 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `a12b2e9`
+**Last committed Chromie base:** `f0e22ba`
 **Pinned Soridormi capability revision:** `4afb4bc6411db4a4194e97349d9466a62efd2f24`
 **Verified date:** 2026-06-14
-**Current focus:** Physical pilot preparation while Voice-to-MuJoCo alpha
-target evidence is deferred to Linux
+**Current focus:** Physical pilot preparation while Voice-to-MuJoCo alpha waits
+for supervised real-microphone/speaker closure
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -21,26 +21,28 @@ The alpha implementation is present:
 - seven-case synthetic, virtual-microphone, and supervised acceptance;
 - evidence verification and alpha packaging.
 
-The alpha implementation remains frozen except for defects. Linux/GPU,
-virtual-microphone, and supervised evidence is intentionally deferred. The
-robust-simulation and provider-readiness milestone is complete with live
+The alpha implementation remains frozen except for defects. Linux RTX 5090 GPU
+smoke passed 21/21, and clean seven-case synthetic and PipeWire virtual-mic
+bundles passed at `f0e22ba`. Supervised real-microphone/speaker evidence remains
+open. The robust-simulation and provider-readiness milestone is complete with live
 no-motion MCP conformance, three-profile parity, and 16/16 Soridormi-owned
 fault-injection scenarios. This does not clear any alpha release gate.
 
 ## Next sequence
 
-1. Select one reference-robot candidate and complete the identity,
+1. Run the full seven-case `supervised` alpha matrix on the reference host,
+   review audible output and MuJoCo safe-idle/recovery behavior, and verify the
+   bundle with `--require-clean`.
+2. Clear the compatibility blocker and publish `0.1.0-alpha.1` only after that
+   retained evidence passes.
+3. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
    `commissioning/reference_robot_candidate.schema.json` contract and keep the
    real manifest under ignored `.chromie/commissioning/`.
-2. Keep all physical-motion gates off while validating no-motion health,
+4. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
-3. On Linux, resume the full `synthetic`, `virtual-mic`, and `supervised` alpha
-   matrices.
-4. Clear the compatibility blocker and publish `0.1.0-alpha.1` only after that
-   retained evidence passes.
 
 Do not start physical motion until the robust-simulation and provider-readiness
 target evidence passes and the first reference robot satisfies the commissioning
@@ -54,7 +56,8 @@ checklist.
 documentation checks passed
 ```
 
-This is Level A evidence only.
+The baseline above is Level A evidence. Retained target-host evidence is listed
+in `docs/STATUS.md`.
 
 ## Useful commands
 

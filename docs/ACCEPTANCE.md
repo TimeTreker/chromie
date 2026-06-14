@@ -18,12 +18,23 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Router/Agent contracts | Yes | Smoke tooling | Not required | Target run open |
-| Interaction contracts and Skill Runtime | Yes | Text path | Live MuJoCo path | Full microphone matrix open |
+| Router/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
+| Interaction contracts and Skill Runtime | Yes | Text path | Live MuJoCo path | Automated target-host matrices passed; supervised open |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
-| ASR/TTS GPU use | Limited | GPU smoke tooling | Not applicable | Retained target run open |
-| Audio devices and barge-in | Partial | Manual host run | Can pair with sim | Retained matrix open |
+| ASR/TTS GPU use | Limited | GPU smoke tooling | Not applicable | RTX 5090 smoke passed 21/21 |
+| Audio devices and barge-in | Partial | Manual host run | Can pair with sim | PipeWire virtual-mic 7/7 passed; physical microphone/speaker open |
+
+Retained reference-host evidence from June 14, 2026:
+
+| Evidence ID | Revision | Result | Scope |
+|---|---|---|---|
+| GPU `20260614T130944Z` | `280c36a` | 21 passed, 0 failed | RTX 5090 service/GPU smoke, Ollama GPU placement, ASR/TTS health, generated PCM |
+| M13 `20260614T132934Z` | `f0e22ba` | 7/7 passed | Synthetic framed PCM through VAD, ASR, Router, Agent, Skill Runtime, TTS, and MuJoCo |
+| M13 `20260614T133155Z` | `f0e22ba` | 7/7 passed | PipeWire virtual-microphone capture through the same interaction and MuJoCo path |
+
+The two M13 bundles pass the automated verifier with `--require-clean`, zero
+errors, and zero warnings. They report `release_eligible=false` by design.
 
 ## Level A — automated suite
 
@@ -369,6 +380,9 @@ python scripts/verify_m13_evidence.py --allow-automated \
 The verifier reports the bundle as valid automated evidence but
 `release_eligible=false`.
 
+The retained reference-host synthetic run is `20260614T132934Z`; all seven
+cases passed at Chromie revision `f0e22ba`.
+
 ### Automatic virtual-microphone acceptance
 
 `virtual-mic` mode requires PulseAudio or PipeWire. It uses `pactl`/`paplay`
@@ -391,6 +405,9 @@ with `--virtual-mic-sink` when needed.
 This mode exercises normal `sounddevice` capture, sample-rate conversion, host
 buffering, VAD, and ASR. It still does not prove a physical microphone or
 speaker.
+
+The retained PipeWire run is `20260614T133155Z`; all seven cases passed at
+Chromie revision `f0e22ba`.
 
 ### Final supervised acceptance
 
