@@ -16,6 +16,8 @@ yet published an official release.
   modes, MCP error normalization, and opaque-plan-aware profile parity.
 - Added a versioned reference-robot candidate schema, rejected draft template,
   and fail-closed verifier for Physical pilot preparation.
+- Fixed the Ollama container healthcheck to use a reachable loopback client
+  address while the service continues listening on all interfaces.
 
 ### Implemented in the current development snapshot
 

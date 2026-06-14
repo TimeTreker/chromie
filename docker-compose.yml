@@ -209,7 +209,11 @@ services:
     networks:
       - chromie-net
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test:
+        [
+          "CMD-SHELL",
+          "OLLAMA_HOST=http://127.0.0.1:11434 ollama list >/dev/null",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5

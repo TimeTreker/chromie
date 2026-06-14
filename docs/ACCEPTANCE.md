@@ -31,7 +31,7 @@ A higher level does not replace lower-level regression tests.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 170 current tests and 20 legacy Agent
+At the current working revision this runs 212 current tests and 20 legacy Agent
 tests.
 It also runs the documentation consistency checker.
 
