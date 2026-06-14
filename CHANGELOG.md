@@ -20,6 +20,8 @@ yet published an official release.
   address while the service continues listening on all interfaces.
 - Scoped M13 capability probing to the production surface while retaining
   strict full-manifest probing for provider-readiness conformance.
+- Prevented host proxy variables from intercepting Agent-to-Ollama traffic on
+  the trusted Compose network.
 
 ### Implemented in the current development snapshot
 

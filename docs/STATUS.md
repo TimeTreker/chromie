@@ -77,7 +77,7 @@ The repository test command is:
 
 At the current working revision it runs:
 
-- **213** current `unittest` cases under `tests/`;
+- **214** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 

@@ -92,7 +92,10 @@ class OllamaClient:
         started = time.perf_counter()
 
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                trust_env=False,
+            ) as client:
                 response = await client.post(url, json=payload)
 
             elapsed_ms = (time.perf_counter() - started) * 1000.0
