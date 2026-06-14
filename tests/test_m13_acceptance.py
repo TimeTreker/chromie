@@ -331,7 +331,15 @@ class M13AcceptanceTests(unittest.TestCase):
         self.assertEqual(endpoint, "http://host.docker.internal:8000/mcp")
         self.assertIn("chromie-agent", command)
         self.assertIn("SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp", command)
-        self.assertEqual(command[-2:], ["--manifest", "/app/capabilities/soridormi.json"])
+        self.assertEqual(
+            command[-4:],
+            [
+                "--manifest",
+                "/app/capabilities/soridormi.json",
+                "--exclude-effect",
+                "test_control",
+            ],
+        )
 
     def test_host_probe_remains_an_explicit_development_option(self) -> None:
         command, environment, endpoint = capability_probe_invocation(
@@ -345,6 +353,7 @@ class M13AcceptanceTests(unittest.TestCase):
             environment["SORIDORMI_MCP_URL"],
             "http://127.0.0.1:8000/mcp",
         )
+        self.assertEqual(command[-2:], ["--exclude-effect", "test_control"])
 
     def test_extract_asr_text_handles_repr_rendering(self) -> None:
         self.assertEqual(

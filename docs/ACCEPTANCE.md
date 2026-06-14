@@ -31,7 +31,7 @@ A higher level does not replace lower-level regression tests.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 212 current tests and 20 legacy Agent
+At the current working revision this runs 213 current tests and 20 legacy Agent
 tests.
 It also runs the documentation consistency checker.
 
@@ -76,6 +76,11 @@ docker compose --env-file .env.runtime exec -T \
 `chromie-agent`. When Soridormi runs in the same Docker network, pass its
 service hostname instead. A host-side probe remains available for development
 after installing `agent/requirements.txt`.
+
+The general probe verifies the complete manifest by default. M13 voice
+acceptance adds `--exclude-effect test_control` because its production
+voice-to-simulator path does not depend on hidden fault-injection controls.
+Provider-readiness evidence continues to require those controls separately.
 
 Run safe status and zero-motion planning:
 

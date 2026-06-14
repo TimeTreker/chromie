@@ -7,11 +7,16 @@ from .capabilities.loader import build_configured_registry
 from .capabilities.probe import probe_mcp_capabilities
 
 
-async def _run(manifests: list[str], timeout_s: float) -> int:
+async def _run(
+    manifests: list[str],
+    timeout_s: float,
+    excluded_effects: frozenset[str],
+) -> int:
     configured = build_configured_registry(manifests)
     results = await probe_mcp_capabilities(
         configured.registry,
         timeout_s=timeout_s,
+        excluded_effects=excluded_effects,
     )
 
     failed = False
@@ -46,8 +51,25 @@ def main() -> None:
         help="External capability bundle JSON. May be repeated.",
     )
     parser.add_argument("--timeout-s", type=float, default=10.0)
+    parser.add_argument(
+        "--exclude-effect",
+        action="append",
+        default=[],
+        help=(
+            "Do not require manifest tools with this effect. May be repeated; "
+            "the default probe verifies the full manifest."
+        ),
+    )
     args = parser.parse_args()
-    raise SystemExit(asyncio.run(_run(args.manifest, args.timeout_s)))
+    raise SystemExit(
+        asyncio.run(
+            _run(
+                args.manifest,
+                args.timeout_s,
+                frozenset(args.exclude_effect),
+            )
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -82,6 +82,22 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.missing_tools, frozenset({"remote.plan"}))
 
+    async def test_probe_can_exclude_tools_by_effect(self) -> None:
+        registry = _registry()
+        registry.get_tool("remote.plan").effects = ["test_control"]
+
+        async def list_tools(url: str, timeout_s: float) -> dict[str, dict]:
+            return {"remote.status": {}}
+
+        [result] = await probe_mcp_capabilities(
+            registry,
+            list_tools=list_tools,
+            excluded_effects=frozenset({"test_control"}),
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(set(result.expected_schemas), {"remote.status"})
+
     async def test_probe_reports_server_schema_weaker_than_manifest(self) -> None:
         registry = _registry()
         registry.get_tool("remote.plan").input_schema = {

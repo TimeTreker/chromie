@@ -48,6 +48,7 @@ async def probe_mcp_capabilities(
     *,
     timeout_s: float = 10.0,
     list_tools: McpToolLister | None = None,
+    excluded_effects: frozenset[str] = frozenset(),
 ) -> list[CapabilityProbeResult]:
     endpoints: dict[str, McpToolSchemas] = defaultdict(dict)
     for agent in registry.list_agents():
@@ -56,7 +57,11 @@ async def probe_mcp_capabilities(
         if not agent.transport.url:
             raise ValueError(f"MCP agent {agent.agent_id!r} has no transport URL")
         endpoints[agent.transport.url].update(
-            {tool.name: tool.input_schema for tool in agent.tools}
+            {
+                tool.name: tool.input_schema
+                for tool in agent.tools
+                if excluded_effects.isdisjoint(tool.effects)
+            }
         )
 
     if not endpoints:

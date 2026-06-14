@@ -18,6 +18,8 @@ yet published an official release.
   and fail-closed verifier for Physical pilot preparation.
 - Fixed the Ollama container healthcheck to use a reachable loopback client
   address while the service continues listening on all interfaces.
+- Scoped M13 capability probing to the production surface while retaining
+  strict full-manifest probing for provider-readiness conformance.
 
 ### Implemented in the current development snapshot
 

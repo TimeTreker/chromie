@@ -101,3 +101,6 @@ PYTHONPATH=. python -m app.probe_capabilities \
 
 A successful probe demonstrates live surface compatibility. It is not evidence
 that guarded or physical execution has been accepted on target hardware.
+The probe verifies the full manifest unless an acceptance workflow explicitly
+uses repeatable `--exclude-effect EFFECT` filters. Such filters define scope;
+they do not relax schema validation for included tools.
