@@ -1,5 +1,5 @@
-faster-whisper
-websockets
-numpy
-soundfile
-python-dotenv
+faster-whisper==1.2.1
+websockets==16.0
+numpy==2.3.5
+soundfile==0.13.1
+python-dotenv==1.2.2

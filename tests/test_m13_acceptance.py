@@ -790,6 +790,11 @@ class M13AcceptanceTests(unittest.TestCase):
             manifest = json.loads((bundle / "manifest.json").read_text())
             self.assertFalse(manifest["publishable"])
             self.assertTrue((bundle / "chromie-0.1.0-alpha.1.tar.gz").is_file())
+            self.assertTrue((bundle / "build-provenance.json").is_file())
+            self.assertEqual(
+                manifest["artifacts"]["build_provenance"],
+                "build-provenance.json",
+            )
             self.assertTrue((bundle / "SHA256SUMS").is_file())
 
     def test_dry_run_evidence_cannot_close_m13(self) -> None:

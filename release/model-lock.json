@@ -1,0 +1,38 @@
+{
+  "asr": {
+    "base.en": {
+      "repository": "Systran/faster-whisper-base.en",
+      "revision": "b9aa26eecb911386885c475d79736c5e76dd09bd"
+    },
+    "small.en": {
+      "repository": "Systran/faster-whisper-small.en",
+      "revision": "4138ac1f564d20fb698abba4511811dd53533e47"
+    },
+    "tiny.en": {
+      "repository": "Systran/faster-whisper-tiny.en",
+      "revision": "53b4a348cf5fad713d6322c9120d56326f831b0d"
+    }
+  },
+  "ollama": {
+    "agent_models": [
+      "gemma4:e2b",
+      "gemma4:26b"
+    ],
+    "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json at release time",
+    "router_models": [
+      "qwen3:0.6b"
+    ]
+  },
+  "schema_version": 1,
+  "tts": {
+    "gguf": {
+      "repository": "OuteAI/OuteTTS-1.0-0.6B-GGUF",
+      "revision": "d85d0f1e5242c3fb04c95f55bd99ec3ebd4c2d16"
+    },
+    "model_size": "0.6B",
+    "tokenizer": {
+      "repository": "OuteAI/OuteTTS-1.0-0.6B",
+      "revision": "e7bcd87b0ca47fd8c46317c8f745a5e4e19c7b5c"
+    }
+  }
+}

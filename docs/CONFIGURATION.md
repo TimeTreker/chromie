@@ -26,6 +26,26 @@ Use:
 ./scripts/show_profile.sh
 ```
 
+## Reproducible build and model identity
+
+Release inputs use versioned image references and exact direct dependency pins.
+A publishable release still records the resolved content digests and transitive
+Python environment in `build-provenance.json`; a version tag alone is not treated
+as immutable proof.
+
+| Variable | Purpose |
+|---|---|
+| `CHROMIE_IMAGE_TAG` | Version tag applied to the four repository-built service images. |
+| `PYTHON_IMAGE` | Versioned Python base image for Router and Agent builds. |
+| `OLLAMA_IMAGE` | Versioned Ollama runtime image. |
+| `ASR_CUDA_IMAGE`, `TTS_CUDA_IMAGE` | Versioned CUDA base images selected by the active profile/common configuration. |
+
+Model repository revisions are tracked in
+[`release/model-lock.json`](../release/model-lock.json). Profile-specific ASR
+settings and common TTS settings must be changed together with that lock file.
+The release tool obtains the installed Ollama model digests from `/api/tags`
+because an Ollama model name and tag are not sufficient release provenance.
+
 ## Deployment feature gates
 
 All risky or incomplete execution paths are default-off.
@@ -46,7 +66,6 @@ All risky or incomplete execution paths are default-off.
 | `AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION` | `0` | Enable bounded parallel read/planning and guarded non-physical work. |
 | `AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION` | `0` | Enable bearer-authorized side-effect execution. |
 | `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` | `0` | Permit guarded physical nodes after all other proofs. |
-| `AGENT_ENABLE_HARDWARE_CLIENT` | `0` | Compatibility setting only; new robot work belongs in Soridormi. |
 | `ORCH_ACTION_DRY_RUN` | `true` | Log compatibility actions instead of calling the hardware daemon. |
 
 `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1` requires guarded execution.
@@ -111,6 +130,7 @@ configuration.
 | `ROUTER_USE_LLM` | `0`; selects `rules_only` when `ROUTER_MODE` is absent. |
 | `ROUTER_RULES_FIRST` | `1`. |
 | `ROUTER_MODEL` | `qwen3:0.6b` in common configuration. |
+| `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
 | `ROUTER_TIMEOUT_MS` | `1500` in common configuration. |
 | `ROUTER_LLM_TIMEOUT_MS` | Falls back to `ROUTER_TIMEOUT_MS`. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
@@ -132,10 +152,25 @@ configuration.
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | Default `0`; when enabled, only native contract-validation failures use the compatibility adapter. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
 | `AGENT_TASK_GRAPH_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
+| `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN` | Bearer token for dry-run, trace, and scheduler diagnostics. A blank value falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |
+| `AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES` | Maximum in-memory retained traces; default `128`. Least-recently-used entries are evicted first. |
+| `AGENT_TASK_GRAPH_TRACE_TTL_SEC` | Retained-trace lifetime; default `900` seconds. |
+| `AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES` | Maximum in-memory unconsumed confirmation grants; default `128`. Expired grants are purged before issue/consume. |
 | `AGENT_HOST`, `AGENT_PORT`, `AGENT_LOG_LEVEL` | Service bind/log settings. |
 
 Do not commit a real execution token. Manifest strings may use required
 `${VARIABLE}` substitutions; missing variables fail Agent startup.
+
+## Orchestrator service budgets and response shaping
+
+| Variable | Default or profile behavior |
+|---|---|
+| `ORCH_ROUTER_TIMEOUT_MS` | `2000` in common configuration. It must exceed `ROUTER_TIMEOUT_MS` so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
+| `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
+| `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
+| `TTS_FLUSH_CHARS` | Streaming direct-LLM text threshold before scheduling a sentence for TTS; code default `160`. |
+| `ORCH_VOICE_SYSTEM_PROMPT` | Optional replacement for the direct-LLM voice brevity/style instruction. |
 
 ## Orchestrator audio and VAD
 
@@ -201,12 +236,14 @@ responsible for cross-process resource safety.
 | Variable | Purpose |
 |---|---|
 | `ASR_MODEL` | Faster-Whisper model; profile-specific. |
+| `ASR_MODEL_REVISION` | Immutable Hugging Face revision paired with `ASR_MODEL`; required by maintained profiles. |
 | `ASR_DEVICE` | Common default `cuda`. |
 | `ASR_COMPUTE_TYPE` | Profile-specific, usually `float16` or `int8_float16`. |
 | `ASR_LANGUAGE` | Empty for auto-detection. |
 | `ASR_BEAM_SIZE` | Common default `1`. |
 | `ASR_VAD_FILTER` | Common default `false`; host VAD already segments utterances. |
 | `ASR_CONDITION_ON_PREVIOUS_TEXT` | Common default `false`. |
+| `ASR_MAX_CONCURRENT_TRANSCRIPTIONS` | Bounded inference-worker count; common default `1`. Blocking faster-whisper work runs off the WebSocket event loop. |
 | `ASR_SAMPLE_RATE` | Server default `16000`. |
 | `ASR_HOST`, `ASR_PORT` | Service bind settings. |
 
@@ -214,7 +251,10 @@ responsible for cross-process resource safety.
 
 | Variable | Purpose |
 |---|---|
-| `TTS_MODEL_SIZE` | OuteTTS model size, currently `0.6B` in profiles. |
+| `TTS_MODEL_SIZE` | OuteTTS model size, currently release-locked to `0.6B`. |
+| `TTS_TOKENIZER_REPO`, `TTS_TOKENIZER_REVISION` | Immutable tokenizer/config snapshot used instead of a mutable repository branch. |
+| `TTS_GGUF_REPO`, `TTS_GGUF_REVISION` | Immutable GGUF snapshot; the quantization selects an exact filename inside it. |
+| `TTS_HOST` | Service bind address; default `0.0.0.0`. |
 | `TTS_QUANTIZATION` | Common default `FP16`. |
 | `TTS_N_GPU_LAYERS` | Common default `-1` for full offload. |
 | `TTS_CONTEXT_SIZE` | Profile-specific model context. |
@@ -230,11 +270,17 @@ responsible for cross-process resource safety.
 | `TTS_RESET_LLAMA_STATE` | Common default `1`. |
 | `TTS_AUDIO_CODEC_DEVICE` | Common default `cpu`. |
 | `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY` | Common defaults `0.4`, `1.1`. |
+| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Maximum wait for initial or post-cancellation model-worker startup; default `600`. |
 | `SPEAKER_DIR`, `TTS_SPEAKER_ID` | Speaker-profile storage and host selection. |
 
 Use `TTS_MAX_TEXT_CHARS` to shorten speech. Setting `TTS_MAX_LENGTH` to values
 such as 100 or 120 can produce empty audio; the server clamps unsafe values when
 possible.
+
+OuteTTS/llama.cpp runs in a restartable child process. Cancelling an active
+synthesis terminates that process and starts a clean worker, preventing stale
+native generation from occupying the only model slot. New synthesis waits for
+the replacement model worker to become ready.
 
 ## Ollama
 

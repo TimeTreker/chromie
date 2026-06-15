@@ -14,11 +14,30 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote
 
+try:
+    from release_provenance import (
+        declared_images,
+        exact_requirement_errors,
+        mutable_image_errors,
+        model_lock_errors,
+        source_environment,
+    )
+except ImportError:
+    from scripts.release_provenance import (
+        declared_images,
+        exact_requirement_errors,
+        mutable_image_errors,
+        model_lock_errors,
+        source_environment,
+    )
+
 ROOT = Path(__file__).resolve().parents[1]
 DOC_INDEX = ROOT / "docs" / "README.md"
 API_REFERENCE = ROOT / "docs" / "API_REFERENCE.md"
+CONFIGURATION_REFERENCE = ROOT / "docs" / "CONFIGURATION.md"
 PROJECT_CHARTER = ROOT / "docs" / "PROJECT_CHARTER.md"
 ROADMAP = ROOT / "ROADMAP.md"
+COMMON_ENV = ROOT / ".env.common"
 
 MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(([^)]+)\)")
 STATUS_FILES = [
@@ -32,6 +51,14 @@ ROUTE_SOURCES = [
     ROOT / "router" / "app" / "main.py",
     ROOT / "agent" / "app" / "main.py",
     ROOT / "hardware" / "daemon.py",
+]
+
+RUNTIME_CONFIG_SOURCES = [
+    ROOT / "orchestrator" / "orchestrator.py",
+    ROOT / "agent" / "app" / "main.py",
+    ROOT / "asr" / "server.py",
+    ROOT / "tts" / "server.py",
+    ROOT / "router" / "app" / "main.py",
 ]
 
 # Generated dependency, cache, coverage, and build directories are not project
@@ -252,6 +279,73 @@ def check_api_reference(errors: list[str]) -> None:
                 )
 
 
+def os_getenv_names(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        func = node.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "os"
+            and func.attr == "getenv"
+        ):
+            continue
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            names.add(first.value)
+    return names
+
+
+def common_env_values() -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in COMMON_ENV.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        values[name.strip()] = value.strip()
+    return values
+
+
+def check_configuration_reference(errors: list[str]) -> None:
+    text = CONFIGURATION_REFERENCE.read_text(encoding="utf-8")
+    active_names: set[str] = set()
+    for source in RUNTIME_CONFIG_SOURCES:
+        active_names.update(os_getenv_names(source))
+    for name in sorted(active_names):
+        if f"`{name}`" not in text:
+            errors.append(
+                f"docs/CONFIGURATION.md is missing active runtime variable {name}"
+            )
+
+    values = common_env_values()
+    try:
+        router_internal_ms = int(values["ROUTER_TIMEOUT_MS"])
+        router_host_ms = int(values["ORCH_ROUTER_TIMEOUT_MS"])
+    except (KeyError, ValueError) as exc:
+        errors.append(f".env.common has invalid Router timeout configuration: {exc}")
+    else:
+        if router_host_ms <= router_internal_ms:
+            errors.append(
+                "ORCH_ROUTER_TIMEOUT_MS must exceed ROUTER_TIMEOUT_MS so the "
+                "Router can finish or report its own timeout first"
+            )
+
+
+
+def check_release_reproducibility(errors: list[str]) -> None:
+    errors.extend(exact_requirement_errors(ROOT))
+    images = declared_images(ROOT, source_environment(ROOT))
+    errors.extend(mutable_image_errors(images))
+    errors.extend(model_lock_errors(ROOT, source_environment(ROOT)))
+    release_text = (ROOT / "docs" / "RELEASE.md").read_text(encoding="utf-8")
+    for required in ("build-provenance.json", "model-lock.json"):
+        if required not in release_text:
+            errors.append(f"docs/RELEASE.md does not describe {required}")
+
 def main() -> int:
     errors: list[str] = []
     check_local_links(errors)
@@ -259,6 +353,8 @@ def main() -> int:
     check_current_focus(errors)
     check_project_direction(errors)
     check_api_reference(errors)
+    check_configuration_reference(errors)
+    check_release_reproducibility(errors)
 
     if errors:
         print("Documentation checks failed:", file=sys.stderr)
@@ -269,7 +365,8 @@ def main() -> int:
     print(
         "Documentation checks passed: "
         f"{len(markdown_files())} Markdown files, project direction, "
-        "local links, current focus, and API routes."
+        "local links, current focus, API routes, runtime configuration, "
+        "and reproducible release inputs."
     )
     return 0
 

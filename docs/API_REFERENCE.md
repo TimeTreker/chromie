@@ -61,14 +61,14 @@ metadata includes `interaction_output_mode` (`native`, `legacy-adapter`, or
 | Method | Path | Gate or authorization | Purpose |
 |---|---|---|---|
 | `POST` | `/task-graphs/validate` | Always available | Validate graph structure and active capability policy. |
-| `POST` | `/task-graphs/dry-run` | Always available | Produce a deterministic trace without remote calls. |
+| `POST` | `/task-graphs/dry-run` | Diagnostics bearer token | Produce a deterministic trace without remote calls. |
 | `POST` | `/task-graphs/execute-read-only` | `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION=1` | Execute preflight-approved side-effect-free work. |
 | `POST` | `/task-graphs/execute-planning` | `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1` | Execute safe reads and stateful `planning_only` tools. |
 | `POST` | `/task-graphs/confirmation-grants` | Guarded execution enabled plus bearer token | Issue a short-lived, single-use grant bound to a graph and confirmation nodes. |
 | `POST` | `/task-graphs/execute-guarded` | Guarded execution enabled plus bearer token | Execute authorized side effects; physical motion also requires its separate gate and monitor proofs. |
 | `POST` | `/task-graphs/{graph_id}/cancel` | Guarded execution bearer token | Request cancellation of an active graph. |
-| `GET` | `/task-graphs/{graph_id}/trace` | No bearer check in current implementation | Return the latest in-memory retained trace. |
-| `GET` | `/task-graphs/scheduler/status` | No bearer check in current implementation | Return scheduler mode, active/waiting counters, and active graph IDs. |
+| `GET` | `/task-graphs/{graph_id}/trace` | Diagnostics bearer token | Return the latest non-expired in-memory retained trace. |
+| `GET` | `/task-graphs/scheduler/status` | Diagnostics bearer token | Return scheduler mode, active/waiting counters, and active graph IDs. |
 
 Bearer format:
 
@@ -76,8 +76,15 @@ Bearer format:
 Authorization: Bearer <AGENT_TASK_GRAPH_EXECUTION_TOKEN>
 ```
 
+Dry-run, trace, and scheduler requests use
+`AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN`. When that variable is blank, the Agent
+falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, the
+diagnostic endpoints return 503. Invalid or missing credentials return 401.
+
 Traces and grants are process-memory state; they are not durable across Agent
-restarts.
+restarts. Traces use configurable TTL/LRU retention (defaults: 900 seconds and
+128 entries). Unconsumed grants are capped at 128 entries by default and expired
+entries are purged before issue or consume.
 
 ## Hardware compatibility HTTP API — port 8095
 
@@ -98,7 +105,7 @@ configuration variables do not select a production backend.
 
 ## ASR WebSocket protocol — port 9001
 
-The ASR service accepts one WebSocket connection and two message forms:
+The ASR service accepts WebSocket connections and two message forms:
 
 - JSON text `{"type":"health"}` or `{"type":"ping"}` ->
   `{"type":"pong","service":"asr"}`.
@@ -107,7 +114,9 @@ The ASR service accepts one WebSocket connection and two message forms:
 
 Failures return `{"type":"error","message":"..."}`. The host Orchestrator
 performs VAD and sends complete utterance audio; this service does not stream
-partial transcripts.
+partial transcripts. Blocking faster-whisper inference and segment consumption
+run in a bounded executor, so health/ping handling remains responsive while a
+transcription is active. The pong reports `max_concurrent_transcriptions`.
 
 ## TTS WebSocket protocol — port 5000
 
@@ -124,8 +133,12 @@ A synthesis request includes `text`, optional `speaker_id`, and optional
 `request_id`. The `start` message declares `sample_rate`, `format=pcm_s16le`,
 and `channels=1`.
 
-The process has one mutable OuteTTS/llama.cpp model worker. Generation is
-serialized internally even when multiple WebSocket tasks are present.
+The process has one mutable OuteTTS/llama.cpp model worker in a restartable child
+process. Generation is serialized internally even when multiple WebSocket tasks
+are present. If an active synthesis is cancelled because its client disconnects,
+the child is terminated and re-created; stale native generation cannot continue
+holding the only model slot. Health responses report worker liveness, restart
+count, and cancellation mode.
 
 ## Soridormi contract snapshot
 

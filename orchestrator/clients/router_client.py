@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class RouterClient:
-    def __init__(self, base_url: str, timeout_ms: int = 900):
+    def __init__(self, base_url: str, timeout_ms: int = 2000):
         self.base_url = base_url.rstrip("/")
         self.timeout_ms = max(50, int(timeout_ms))
 

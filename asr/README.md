@@ -45,7 +45,10 @@ Failure response:
 ```
 
 The service converts PCM16 to float32 and calls `faster-whisper` once per binary
-message.
+message. Blocking model inference and consumption of faster-whisper's segment
+generator run in a bounded thread executor rather than on the WebSocket event
+loop. Separate health/ping connections therefore remain responsive while an
+utterance is being transcribed.
 
 ## Configuration
 
@@ -53,6 +56,7 @@ message.
 ASR_HOST=0.0.0.0
 ASR_PORT=9001
 ASR_MODEL=dropbox-dash/faster-whisper-large-v3-turbo
+ASR_MODEL_REVISION=<immutable-hugging-face-commit>
 ASR_DEVICE=cuda
 ASR_COMPUTE_TYPE=float16
 ASR_SAMPLE_RATE=16000
@@ -60,11 +64,21 @@ ASR_LANGUAGE=
 ASR_BEAM_SIZE=1
 ASR_VAD_FILTER=false
 ASR_CONDITION_ON_PREVIOUS_TEXT=false
+ASR_MAX_CONCURRENT_TRANSCRIPTIONS=1
 ```
+
+`ASR_MODEL_REVISION` is passed to Faster-Whisper and must identify the exact
+model snapshot. Maintained hardware profiles provide revisions recorded in
+[`../release/model-lock.json`](../release/model-lock.json). Custom models must
+provide their own immutable revision.
 
 Leaving `ASR_LANGUAGE` empty enables model language detection. Host-side VAD is
 the normal utterance boundary; enabling the model's VAD filter is a separate
 choice.
+
+The host waits up to `ORCH_ASR_TIMEOUT_MS` (common default `30000`) for the final
+response. Increase that budget for slower profiles or unusually long
+utterances; it is independent of the service's bounded inference concurrency.
 
 ## Start and verify
 

@@ -16,8 +16,10 @@ from pathlib import Path
 from typing import Any, Sequence
 
 try:
+    from release_provenance import collect_provenance
     from verify_m13_evidence import verify_bundle
 except ImportError:  # imported as scripts.prepare_alpha_release in tests/tools
+    from scripts.release_provenance import collect_provenance
     from scripts.verify_m13_evidence import verify_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -117,6 +119,10 @@ def prepare_release(args: argparse.Namespace) -> Path:
             + "\nUse --preview only for a non-publishable packaging rehearsal."
         )
 
+    skip_runtime_provenance = bool(getattr(args, "skip_runtime_provenance", False))
+    if skip_runtime_provenance and not args.preview:
+        raise ValueError("--skip-runtime-provenance is allowed only with --preview")
+
     evidence_dir = Path(args.evidence_dir).expanduser().resolve()
     evidence_report = verify_bundle(evidence_dir, require_clean=args.require_clean_evidence)
     if not evidence_report["passed"] and not args.preview:
@@ -145,10 +151,31 @@ def prepare_release(args: argparse.Namespace) -> Path:
     if not args.skip_tests:
         run_logged(["./scripts/run_tests.sh"], output_dir / "tests.log")
 
+    provenance = collect_provenance(
+        ROOT,
+        require_runtime=not args.preview,
+        attempt_runtime=not skip_runtime_provenance,
+    )
+    if not provenance["complete"] and not args.preview:
+        errors = provenance["source_errors"] + provenance["runtime_errors"]
+        raise RuntimeError(
+            "Release build provenance is incomplete:\n- " + "\n- ".join(errors)
+        )
+    provenance_path = output_dir / "build-provenance.json"
+    provenance_path.write_text(
+        json.dumps(provenance, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
     source_archive = output_dir / f"chromie-{version}.tar.gz"
     create_source_archive(revision, version, source_archive)
     shutil.copy2(notes_path, output_dir / "release-notes.md")
     shutil.copy2(ROOT / "release" / "compatibility.json", output_dir / "compatibility.json")
+    model_lock_source = ROOT / "release" / "model-lock.json"
+    model_lock_artifact = None
+    if model_lock_source.is_file():
+        shutil.copy2(model_lock_source, output_dir / "model-lock.json")
+        model_lock_artifact = "model-lock.json"
     shutil.copy2(evidence_dir / "summary.md", output_dir / "m13-acceptance-summary.md")
 
     publishable = (
@@ -156,9 +183,10 @@ def prepare_release(args: argparse.Namespace) -> Path:
         and not dirty
         and not args.preview
         and not blockers
+        and provenance["complete"]
     )
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_utc": utc_now(),
         "version": version,
         "tag": f"v{version}",
@@ -172,10 +200,17 @@ def prepare_release(args: argparse.Namespace) -> Path:
         },
         "compatibility": compatibility,
         "m13_evidence": evidence_report,
+        "build_provenance": {
+            "complete": provenance["complete"],
+            "source_error_count": len(provenance["source_errors"]),
+            "runtime_error_count": len(provenance["runtime_errors"]),
+        },
         "artifacts": {
             "source_archive": source_archive.name,
             "release_notes": "release-notes.md",
             "compatibility": "compatibility.json",
+            "model_lock": model_lock_artifact,
+            "build_provenance": "build-provenance.json",
             "acceptance_summary": "m13-acceptance-summary.md",
             "tests_log": None if args.skip_tests else "tests.log",
         },
@@ -194,9 +229,12 @@ def prepare_release(args: argparse.Namespace) -> Path:
         source_archive,
         output_dir / "release-notes.md",
         output_dir / "compatibility.json",
+        provenance_path,
         output_dir / "m13-acceptance-summary.md",
         output_dir / "manifest.json",
     ]
+    if model_lock_artifact:
+        checksum_targets.append(output_dir / model_lock_artifact)
     if not args.skip_tests:
         checksum_targets.append(output_dir / "tests.log")
     (output_dir / "SHA256SUMS").write_text(
@@ -214,6 +252,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--require-clean-evidence", action="store_true")
     parser.add_argument("--preview", action="store_true")
+    parser.add_argument(
+        "--skip-runtime-provenance",
+        action="store_true",
+        help="Preview only: omit the requirement for live Docker/Ollama provenance",
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser
 

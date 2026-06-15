@@ -35,7 +35,7 @@ RUN python3 -m venv /opt/venv
 
 ENV PATH=/opt/venv/bin:$PATH
 
-RUN pip install --upgrade pip setuptools wheel
+RUN pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1
 
 RUN if [ -f /usr/local/cuda/lib64/stubs/libcuda.so ]; then \
       ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1; \
@@ -58,9 +58,9 @@ RUN pip uninstall -y llama-cpp-python || true && \
     LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs:${LIBRARY_PATH} \
     CMAKE_ARGS="-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=${TTS_CUDA_ARCH}" \
     FORCE_CMAKE=1 \
-    pip install --no-cache-dir --no-deps --force-reinstall --no-binary=llama-cpp-python llama-cpp-python
+    pip install --no-cache-dir --no-deps --force-reinstall --no-binary=llama-cpp-python llama-cpp-python==0.3.9
 
-COPY server.py .
+COPY server.py cancellable_worker.py model_sources.py ./
 COPY create_speaker.py .
 
 RUN mkdir -p /app/speakers

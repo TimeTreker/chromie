@@ -26,7 +26,7 @@ ENV PATH=/opt/venv/bin:$PATH
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
+RUN pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1 && pip install -r requirements.txt
 
-COPY server.py .
+COPY server.py transcription.py ./
 CMD ["python", "server.py"]

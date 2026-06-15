@@ -15,6 +15,8 @@ import torch
 from outetts import Backend, Interface, LlamaCppQuantization, Models
 from scipy import signal
 
+from model_sources import apply_model_sources, resolve_model_sources
+
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("create-oute-speaker")
 
@@ -74,6 +76,16 @@ def build_model_config():
         TTS_THREADS,
     )
     cfg = outetts.ModelConfig.auto_config(model=get_model_version(), backend=Backend.LLAMACPP, quantization=get_quantization())
+    sources = resolve_model_sources(MODEL_SIZE, QUANTIZATION_NAME)
+    apply_model_sources(cfg, sources)
+    logger.info(
+        "Using pinned OuteTTS sources: tokenizer=%s@%s gguf=%s@%s file=%s",
+        sources.tokenizer_repo,
+        sources.tokenizer_revision,
+        sources.gguf_repo,
+        sources.gguf_revision,
+        sources.gguf_filename,
+    )
     cfg.n_gpu_layers = TTS_N_GPU_LAYERS
     cfg.max_seq_length = TTS_CONTEXT_SIZE
     cfg.device = "cuda"

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
+import time
+from collections import OrderedDict
+from collections.abc import Awaitable, Callable
 
 from pydantic import BaseModel, Field
 
@@ -86,7 +88,15 @@ class TaskGraphService:
         allow_physical_motion: bool = False,
         enable_parallel_execution: bool = False,
         max_concurrency: int = 4,
+        trace_max_entries: int = 128,
+        trace_ttl_s: float = 900.0,
+        grant_max_entries: int = 128,
+        clock: Callable[[], float] | None = None,
     ) -> None:
+        if trace_max_entries < 1:
+            raise ValueError("trace_max_entries must be at least 1")
+        if trace_ttl_s <= 0:
+            raise ValueError("trace_ttl_s must be positive")
         self.registry = registry
         self.read_only_invoker = read_only_invoker
         self.planning_invoker = planning_invoker
@@ -94,13 +104,19 @@ class TaskGraphService:
         self.allow_physical_motion = allow_physical_motion
         self.enable_parallel_execution = enable_parallel_execution
         self.max_concurrency = max_concurrency
+        self.trace_max_entries = trace_max_entries
+        self.trace_ttl_s = trace_ttl_s
+        self._clock = clock
         self._resource_arbiter = (
             ResourceArbiter(max_concurrency)
             if enable_parallel_execution
             else None
         )
-        self._traces: dict[str, ExecutionTrace] = {}
-        self._grants = ConfirmationGrantStore()
+        self._traces: OrderedDict[str, tuple[float, ExecutionTrace]] = OrderedDict()
+        self._grants = ConfirmationGrantStore(
+            max_entries=grant_max_entries,
+            clock=clock,
+        )
         self._active_executions: dict[str, asyncio.Task[ExecutionTrace]] = {}
 
     def validate(self, graph: TaskGraph) -> TaskGraphValidationResponse:
@@ -117,7 +133,7 @@ class TaskGraphService:
             raise ValueError("TaskGraph validation failed: " + "; ".join(validation.errors))
 
         trace = DagDryRunExecutor(self.registry, auto_confirm=auto_confirm).run(graph, validate=False)
-        self._traces[graph.graph_id] = trace.model_copy(deep=True)
+        self._store_trace(graph.graph_id, trace)
         return trace
 
     async def execute_guarded(
@@ -147,7 +163,7 @@ class TaskGraphService:
                 resource_arbiter=self._resource_arbiter,
                 max_concurrency=self.max_concurrency,
             ).run(graph, proofs)
-            self._traces[graph.graph_id] = trace.model_copy(deep=True)
+            self._store_trace(graph.graph_id, trace)
             return trace
         finally:
             self._active_executions.pop(graph.graph_id, None)
@@ -238,7 +254,7 @@ class TaskGraphService:
         self._active_executions[graph.graph_id] = task
         try:
             trace = await execution
-            self._traces[graph.graph_id] = trace.model_copy(deep=True)
+            self._store_trace(graph.graph_id, trace)
             return trace
         finally:
             self._active_executions.pop(graph.graph_id, None)
@@ -266,5 +282,32 @@ class TaskGraphService:
         )
 
     def get_trace(self, graph_id: str) -> ExecutionTrace | None:
-        trace = self._traces.get(graph_id)
-        return trace.model_copy(deep=True) if trace is not None else None
+        self._purge_expired_traces()
+        retained = self._traces.get(graph_id)
+        if retained is None:
+            return None
+        self._traces.move_to_end(graph_id)
+        return retained[1].model_copy(deep=True)
+
+    def _store_trace(self, graph_id: str, trace: ExecutionTrace) -> None:
+        self._purge_expired_traces()
+        self._traces.pop(graph_id, None)
+        while len(self._traces) >= self.trace_max_entries:
+            self._traces.popitem(last=False)
+        self._traces[graph_id] = (
+            self._now() + self.trace_ttl_s,
+            trace.model_copy(deep=True),
+        )
+
+    def _purge_expired_traces(self) -> None:
+        now = self._now()
+        expired = [
+            graph_id
+            for graph_id, (expires_at, _) in self._traces.items()
+            if expires_at < now
+        ]
+        for graph_id in expired:
+            self._traces.pop(graph_id, None)
+
+    def _now(self) -> float:
+        return self._clock() if self._clock is not None else time.time()

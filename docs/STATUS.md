@@ -3,7 +3,7 @@
 **Status authority:** this file describes what is present in the repository snapshot.
 **Verified base revision:** `f0e22ba`;
 release tooling records the exact packaged revision
-**Verified date:** 2026-06-14
+**Verified date:** 2026-06-15
 **Current focus:** **Voice-to-MuJoCo alpha supervised release closure; physical
 pilot preparation continues without motion authorization**
 **Version candidate:** `0.1.0-alpha.1` (prepared, not published)
@@ -56,7 +56,7 @@ Target validation or Release readiness.
 | Capability | Implementation | Automated evidence | Target or live evidence | Default deployment state |
 |---|---|---|---|---|
 | Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
-| Realtime microphone/VAD/ASR/TTS/playback loop | Implemented | Component tests plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Synthetic and PipeWire virtual-mic matrices passed 7/7; supervised physical microphone/speaker bundle still open | Enabled after host audio setup |
+| Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR inference runs off the WebSocket event loop and cancelled native TTS generation is terminated through a restartable worker process | Component concurrency/cancellation tests plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Synthetic and PipeWire virtual-mic matrices passed 7/7; supervised physical microphone/speaker bundle still open | Enabled after host audio setup |
 | Deterministic Router operational controls | Implemented | Router rule tests | Exercised by deployed smoke test | Enabled by `.env.common` |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Used by the current voice loop | Enabled by `.env.common` |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo path exists | Host rollout flag off |
@@ -73,7 +73,7 @@ Target validation or Release readiness.
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |
 | Stateful planning-only TaskGraph execution | Implemented | Planning policy and concurrency tests | Safe Soridormi plan creation acceptance exists | Flag off |
-| Guarded side-effect execution | Implemented | Authorization, one-time grant, confirmation, monitor, fallback, and cancellation tests | Soridormi dry-run and runtime-cancellation tooling exists | Flag off; bearer token required |
+| Guarded side-effect execution | Implemented; diagnostics are bearer-protected and trace/grant retention is bounded | Authorization, one-time grant, retention, confirmation, monitor, fallback, and cancellation tests | Soridormi dry-run and runtime-cancellation tooling exists | Flag off; bearer token required |
 | Physical TaskGraph execution | Policy path implemented | Safety and sequential-execution tests | Supervised hardware acceptance remains open | Separate flag off |
 | Reference robot candidate gate | Versioned schema, intentionally incomplete template, and fail-closed semantic verifier implemented | Identity, revision, timestamp, emergency-stop, calibration, exclusion, low-level-field, and no-motion authorization tests | No real candidate has been recorded or selected | Preparation only; cannot authorize motion |
 | Shared bounded scheduling and resource arbitration | Implemented | Agent and Orchestrator concurrency tests | MuJoCo interaction path exercises the policy | Parallel flags off |
@@ -91,7 +91,7 @@ The repository test command is:
 
 At the current working revision it runs:
 
-- **214** current `unittest` cases under `tests/`;
+- **233** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 

@@ -2,7 +2,7 @@
 
 **Last committed Chromie base:** `f0e22ba`
 **Pinned Soridormi capability revision:** `4afb4bc6411db4a4194e97349d9466a62efd2f24`
-**Verified date:** 2026-06-14
+**Verified date:** 2026-06-15
 **Current focus:** Physical pilot preparation while Voice-to-MuJoCo alpha waits
 for supervised real-microphone/speaker closure
 
@@ -51,7 +51,7 @@ checklist.
 ## Verification baseline
 
 ```text
-214 current unittest cases passed
+233 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```

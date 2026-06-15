@@ -81,9 +81,13 @@ class VoiceAssistant:
         self.agent_url = os.getenv("AGENT_URL", "http://127.0.0.1:8092")
         self.action_executor_url = os.getenv("ACTION_EXECUTOR_URL", "http://127.0.0.1:8095")
         self.action_dry_run = env_bool("ORCH_ACTION_DRY_RUN", True)
-        self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "900")))
+        self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "2000")))
         self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "3000")))
         self.action_client = ActionClient(self.action_executor_url, int(os.getenv("ORCH_ACTION_TIMEOUT_MS", "5000")))
+        self.asr_timeout_s = max(
+            0.001,
+            int(os.getenv("ORCH_ASR_TIMEOUT_MS", "30000")) / 1000.0,
+        )
 
         self.min_rms = float(os.getenv("ORCH_MIN_RMS", "120"))
         self.barge_in_min_rms = float(os.getenv("ORCH_BARGE_IN_MIN_RMS", "350"))
@@ -101,6 +105,7 @@ class VoiceAssistant:
         )
         self.tts_ws_retries = int(os.getenv("ORCH_TTS_WS_RETRIES", "2"))
         self.tts_ws_retry_delay_ms = int(os.getenv("ORCH_TTS_WS_RETRY_DELAY_MS", "300"))
+        self.playback_chunk_ms = int(os.getenv("ORCH_PLAYBACK_CHUNK_MS", "80"))
 
         self.asr_ws = None
         self.http_session: aiohttp.ClientSession | None = None
@@ -164,7 +169,7 @@ class VoiceAssistant:
                 "rate": discard_rate,
                 "channels": 1,
                 "blocksize": 0,
-                "block_ms": self.playback_chunk_ms if hasattr(self, "playback_chunk_ms") else 80,
+                "block_ms": self.playback_chunk_ms,
                 "latency": "none",
             }
         self.input_rate = self.input_params["rate"]
@@ -240,7 +245,6 @@ class VoiceAssistant:
         self.output_stream = None
         self.output_stream_lock = asyncio.Lock()
         self.output_write_lock = asyncio.Lock()
-        self.playback_chunk_ms = int(os.getenv("ORCH_PLAYBACK_CHUNK_MS", "80"))
         recordings_dir = Path(os.getenv("RECORDINGS_DIR", "recordings")).expanduser()
         if not recordings_dir.is_absolute():
             recordings_dir = PROJECT_ROOT / recordings_dir
@@ -1317,7 +1321,7 @@ class VoiceAssistant:
             self.session_log(session_id, "asr_send_start: audio_ms=%.1f bytes=%s", duration_ms, len(audio))
             await self.asr_ws.send(audio)
             self.session_log(session_id, "asr_send_done: send_ms=%.1f", now_ms() - asr_start_ms)
-            resp = await asyncio.wait_for(self.asr_ws.recv(), timeout=15.0)
+            resp = await asyncio.wait_for(self.asr_ws.recv(), timeout=self.asr_timeout_s)
             asr_done_ms = now_ms()
             result = json.loads(resp)
             if result.get("type") == "error":

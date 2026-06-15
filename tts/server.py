@@ -1,5 +1,4 @@
 import asyncio
-import concurrent.futures
 import contextlib
 import json
 import logging
@@ -26,6 +25,10 @@ from outetts import (
     SamplerConfig,
 )
 from scipy import signal
+
+from model_sources import apply_model_sources, resolve_model_sources
+
+from cancellable_worker import RestartableProcessWorker
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -113,12 +116,8 @@ SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
 synthesis_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SYNTHESIS)
 
 # One global OuteTTS Interface owns one llama.cpp model/context. Treat it as
-# process-global mutable CUDA state: never call it concurrently.
+# process-global mutable CUDA state inside the generation worker process.
 tts_interface_lock = threading.RLock()
-tts_generate_executor = concurrent.futures.ThreadPoolExecutor(
-    max_workers=1,
-    thread_name_prefix="chromie-tts-generate",
-)
 
 
 def sanitize_speaker_id(speaker_id: str) -> str:
@@ -222,6 +221,16 @@ def build_model_config():
         model=get_model_version(),
         backend=Backend.LLAMACPP,
         quantization=get_quantization(),
+    )
+    sources = resolve_model_sources(MODEL_SIZE, QUANTIZATION_NAME)
+    apply_model_sources(cfg, sources)
+    logger.info(
+        "Using pinned OuteTTS sources: tokenizer=%s@%s gguf=%s@%s file=%s",
+        sources.tokenizer_repo,
+        sources.tokenizer_revision,
+        sources.gguf_repo,
+        sources.gguf_revision,
+        sources.gguf_filename,
     )
     cfg.n_gpu_layers = TTS_N_GPU_LAYERS
     cfg.max_seq_length = TTS_CONTEXT_SIZE
@@ -362,11 +371,10 @@ def create_speaker_profile_from_wav(speaker_id: str, wav_path: Path, save_as_def
     return speaker
 
 
-logger.info("Initializing TTS interface")
-log_llama_cpp_backend()
-interface = Interface(config=build_model_config())
-patch_audio_loader(interface)
-logger.info("TTS model loaded")
+# The model is initialized only in the restartable generation subprocess. This
+# lets websocket cancellation terminate native OuteTTS/llama.cpp work rather
+# than leaving stale generation on the sole worker.
+interface: Interface | None = None
 
 
 def reset_llama_generation_state() -> None:
@@ -374,6 +382,8 @@ def reset_llama_generation_state() -> None:
     if not TTS_RESET_LLAMA_STATE:
         return
     try:
+        if interface is None:
+            return
         llama = getattr(getattr(interface, "model", None), "model", None)
         reset = getattr(llama, "reset", None)
         if callable(reset):
@@ -384,6 +394,8 @@ def reset_llama_generation_state() -> None:
 
 def generate_tts_sync(cfg: GenerationConfig):
     """Run OuteTTS generation under a process-wide interface lock."""
+    if interface is None:
+        raise RuntimeError("TTS interface is not initialized")
     with tts_interface_lock:
         reset_llama_generation_state()
         try:
@@ -391,14 +403,9 @@ def generate_tts_sync(cfg: GenerationConfig):
         finally:
             reset_llama_generation_state()
 
-
-async def generate_tts_serialized(cfg: GenerationConfig):
-    """Serialize access to the global OuteTTS/llama.cpp instance."""
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(tts_generate_executor, generate_tts_sync, cfg)
-
-
 def load_default_speaker():
+    if interface is None:
+        raise RuntimeError("TTS interface is not initialized")
     speaker_json = SPEAKER_DIR / "default.json"
     speaker_wav = SPEAKER_DIR / "default.wav"
 
@@ -433,6 +440,8 @@ def audio_to_pcm16(audio) -> bytes:
 
 
 def get_or_load_speaker(speaker_id: str):
+    if interface is None:
+        raise RuntimeError("TTS interface is not initialized")
     speaker_id = sanitize_speaker_id(speaker_id)
     if speaker_id in speakers_cache:
         return speakers_cache[speaker_id]
@@ -455,7 +464,7 @@ def get_or_load_speaker(speaker_id: str):
 
 
 def list_speaker_ids():
-    ids = set()
+    ids = {"default"}
     for path in SPEAKER_DIR.glob("*.json"):
         ids.add(path.stem)
     for path in SPEAKER_DIR.glob("*.wav"):
@@ -464,19 +473,119 @@ def list_speaker_ids():
     return sorted(ids)
 
 
-# Speaker cache is used by speaker creation and loading helpers.
-speakers_cache = {}
+# Speaker state is populated inside the generation subprocess.
+speakers_cache: dict[str, object] = {}
+default_speaker = None
 
-# Load default after helper functions are available.
-default_speaker = load_default_speaker()
-speakers_cache["default"] = default_speaker
+
+def generation_worker_main(connection) -> None:
+    """Own the mutable model in a process that can be terminated on cancel."""
+    global interface, speakers_cache, default_speaker
+
+    try:
+        logger.info("Initializing TTS interface in generation worker")
+        log_llama_cpp_backend()
+        interface = Interface(config=build_model_config())
+        patch_audio_loader(interface)
+        speakers_cache = {}
+        default_speaker = load_default_speaker()
+        speakers_cache["default"] = default_speaker
+        logger.info("TTS model loaded in generation worker")
+        connection.send({"type": "ready"})
+    except Exception as exc:
+        logger.error("TTS generation worker failed to initialize: %s", exc, exc_info=True)
+        try:
+            connection.send({"type": "startup_error", "message": str(exc)})
+        finally:
+            connection.close()
+        return
+
+    try:
+        while True:
+            command = connection.recv()
+            command_type = command.get("type") if isinstance(command, dict) else None
+            if command_type == "shutdown":
+                connection.send({"type": "stopped"})
+                return
+
+            try:
+                if command_type == "generate":
+                    speaker_id = sanitize_speaker_id(command.get("speaker_id", "default"))
+                    speaker = get_or_load_speaker(speaker_id)
+                    if speaker is None:
+                        raise ValueError(f"Speaker not found: {speaker_id}")
+                    cfg = GenerationConfig(
+                        text=str(command.get("text") or ""),
+                        generation_type=outetts.GenerationType.CHUNKED,
+                        speaker=speaker,
+                        sampler_config=SamplerConfig(
+                            temperature=TTS_TEMPERATURE,
+                            repetition_penalty=TTS_REPETITION_PENALTY,
+                        ),
+                        max_length=EFFECTIVE_TTS_MAX_LENGTH,
+                    )
+                    started = time.time()
+                    output = generate_tts_sync(cfg)
+                    connection.send(
+                        {
+                            "type": "generated",
+                            "pcm": audio_to_pcm16(getattr(output, "audio", None)),
+                            "generate_seconds": time.time() - started,
+                        }
+                    )
+                    continue
+
+                if command_type == "create_speaker":
+                    speaker_id = sanitize_speaker_id(command.get("speaker_id", "default"))
+                    wav_path = speaker_path_inside_dir(Path(command["wav_path"]))
+                    make_default = bool(command.get("make_default", False))
+                    create_speaker_profile_from_wav(
+                        speaker_id,
+                        wav_path,
+                        save_as_default=make_default,
+                    )
+                    connection.send(
+                        {
+                            "type": "speaker_created",
+                            "speaker_id": speaker_id,
+                            "speaker_json": str(SPEAKER_DIR / f"{speaker_id}.json"),
+                            "make_default": make_default,
+                        }
+                    )
+                    continue
+
+                raise ValueError(f"Unknown generation-worker command: {command_type}")
+            except Exception as exc:
+                logger.error(
+                    "TTS generation worker command failed type=%s error=%s",
+                    command_type,
+                    exc,
+                    exc_info=True,
+                )
+                connection.send({"type": "error", "message": str(exc)})
+    except (EOFError, BrokenPipeError, OSError):
+        logger.info("TTS generation worker connection closed")
+    finally:
+        connection.close()
+
+
+generation_worker = RestartableProcessWorker(
+    generation_worker_main,
+    name="chromie-tts-generation",
+    startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "600")),
+)
 
 
 async def send_json(ws, payload):
     await ws.send(json.dumps(payload, ensure_ascii=False))
 
 
-async def synthesize_text(text: str, speaker, ws, request_id: Optional[str] = None):
+async def synthesize_text(
+    text: str,
+    speaker_id: str,
+    ws,
+    request_id: Optional[str] = None,
+):
     async with synthesis_semaphore:
         text = normalize_tts_text(text)
         if not is_valid_tts_text(text):
@@ -505,23 +614,21 @@ async def synthesize_text(text: str, speaker, ws, request_id: Optional[str] = No
 
         for attempt in range(1, TTS_GENERATION_RETRIES + 1):
             try:
-                cfg = GenerationConfig(
-                    text=text,
-                    generation_type=outetts.GenerationType.CHUNKED,
-                    speaker=speaker,
-                    sampler_config=SamplerConfig(
-                        temperature=TTS_TEMPERATURE,
-                        repetition_penalty=TTS_REPETITION_PENALTY,
-                    ),
-                    max_length=EFFECTIVE_TTS_MAX_LENGTH,
+                response = await generation_worker.request(
+                    {
+                        "type": "generate",
+                        "text": text,
+                        "speaker_id": speaker_id,
+                    }
                 )
-
-                generate_start = time.time()
-                output = await generate_tts_serialized(cfg)
-                generate_seconds = time.time() - generate_start
-
-                audio = getattr(output, "audio", None)
-                pcm = audio_to_pcm16(audio)
+                if response.get("type") == "error":
+                    raise RuntimeError(str(response.get("message") or "generation failed"))
+                if response.get("type") != "generated":
+                    raise RuntimeError(
+                        f"Unexpected generation-worker response: {response.get('type')!r}"
+                    )
+                pcm = response.get("pcm") or b""
+                generate_seconds = float(response.get("generate_seconds") or 0.0)
                 if not pcm:
                     raise RuntimeError(
                         "OuteTTS generated empty audio. "
@@ -587,15 +694,20 @@ async def handle_create_speaker(data: dict, ws):
     try:
         speaker_id = sanitize_speaker_id(speaker_id)
         wav_path = speaker_path_inside_dir(Path(wav_path) if wav_path else SPEAKER_DIR / f"{speaker_id}.wav")
-        speaker = await asyncio.to_thread(
-            create_speaker_profile_from_wav,
-            speaker_id,
-            wav_path,
-            make_default,
+        response = await generation_worker.request(
+            {
+                "type": "create_speaker",
+                "speaker_id": speaker_id,
+                "wav_path": str(wav_path),
+                "make_default": make_default,
+            }
         )
-        speakers_cache[speaker_id] = speaker
-        if make_default:
-            speakers_cache["default"] = speaker
+        if response.get("type") == "error":
+            raise RuntimeError(str(response.get("message") or "speaker creation failed"))
+        if response.get("type") != "speaker_created":
+            raise RuntimeError(
+                f"Unexpected generation-worker response: {response.get('type')!r}"
+            )
 
         await send_json(
             ws,
@@ -643,6 +755,9 @@ async def ws_handler(ws):
                         "gpu_layers": TTS_N_GPU_LAYERS,
                         "reset_llama_state": TTS_RESET_LLAMA_STATE,
                         "single_model_worker": True,
+                        "worker_process_alive": generation_worker.is_alive,
+                        "worker_restart_count": generation_worker.restart_count,
+                        "cancellation_mode": "terminate_and_restart_worker",
                         "requested_max_length": REQUESTED_TTS_MAX_LENGTH,
                         "effective_max_length": EFFECTIVE_TTS_MAX_LENGTH,
                         "min_generation_length": MIN_TTS_GENERATION_LENGTH,
@@ -667,7 +782,7 @@ async def ws_handler(ws):
                 continue
 
             try:
-                speaker = get_or_load_speaker(data.get("speaker_id", "default"))
+                speaker_id = sanitize_speaker_id(data.get("speaker_id", "default"))
             except ValueError as exc:
                 await send_json(
                     ws,
@@ -679,7 +794,10 @@ async def ws_handler(ws):
                 )
                 continue
 
-            if speaker is None:
+            if speaker_id != "default" and not (
+                (SPEAKER_DIR / f"{speaker_id}.json").exists()
+                or (SPEAKER_DIR / f"{speaker_id}.wav").exists()
+            ):
                 await send_json(
                     ws,
                     {
@@ -691,7 +809,12 @@ async def ws_handler(ws):
                 continue
 
             task = asyncio.create_task(
-                synthesize_text(data.get("text", ""), speaker, ws, data.get("request_id"))
+                synthesize_text(
+                    data.get("text", ""),
+                    speaker_id,
+                    ws,
+                    data.get("request_id"),
+                )
             )
             active_tasks.add(task)
             task.add_done_callback(active_tasks.discard)
@@ -700,9 +823,12 @@ async def ws_handler(ws):
     finally:
         for task in active_tasks:
             task.cancel()
+        if active_tasks:
+            await asyncio.gather(*active_tasks, return_exceptions=True)
 
 
 async def main():
+    await generation_worker.start()
     logger.info(
         "TTS server ready on ws://%s:%s output=%sHz pcm_s16le chunk_ms=%s "
         "effective_max_length=%s max_text_chars=%s",
@@ -713,15 +839,18 @@ async def main():
         EFFECTIVE_TTS_MAX_LENGTH,
         TTS_MAX_TEXT_CHARS,
     )
-    async with websockets.serve(
-        ws_handler,
-        HOST,
-        PORT,
-        max_size=10**7,
-        ping_interval=20,
-        ping_timeout=20,
-    ):
-        await asyncio.Future()
+    try:
+        async with websockets.serve(
+            ws_handler,
+            HOST,
+            PORT,
+            max_size=10**7,
+            ping_interval=20,
+            ping_timeout=20,
+        ):
+            await asyncio.Future()
+    finally:
+        await generation_worker.stop()
 
 
 if __name__ == "__main__":

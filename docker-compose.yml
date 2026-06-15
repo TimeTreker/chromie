@@ -11,7 +11,7 @@ services:
         https_proxy: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
         no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    image: chromie-asr:latest
+    image: chromie-asr:${CHROMIE_IMAGE_TAG:-0.1.0-alpha.1}
     init: true
     restart: unless-stopped
     gpus: all
@@ -28,12 +28,14 @@ services:
       ASR_HOST: "0.0.0.0"
       ASR_PORT: "9001"
       ASR_MODEL: ${ASR_MODEL}
+      ASR_MODEL_REVISION: ${ASR_MODEL_REVISION}
       ASR_DEVICE: ${ASR_DEVICE}
       ASR_COMPUTE_TYPE: ${ASR_COMPUTE_TYPE}
       ASR_LANGUAGE: ${ASR_LANGUAGE:-}
       ASR_BEAM_SIZE: ${ASR_BEAM_SIZE:-1}
       ASR_VAD_FILTER: ${ASR_VAD_FILTER:-false}
       ASR_CONDITION_ON_PREVIOUS_TEXT: ${ASR_CONDITION_ON_PREVIOUS_TEXT:-false}
+      ASR_MAX_CONCURRENT_TRANSCRIPTIONS: ${ASR_MAX_CONCURRENT_TRANSCRIPTIONS:-1}
 
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
@@ -89,7 +91,7 @@ services:
         https_proxy: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
         no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    image: chromie-tts:latest
+    image: chromie-tts:${CHROMIE_IMAGE_TAG:-0.1.0-alpha.1}
     init: true
     restart: unless-stopped
     gpus: all
@@ -106,6 +108,10 @@ services:
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
       TTS_MODEL_SIZE: ${TTS_MODEL_SIZE}
+      TTS_TOKENIZER_REPO: ${TTS_TOKENIZER_REPO}
+      TTS_TOKENIZER_REVISION: ${TTS_TOKENIZER_REVISION}
+      TTS_GGUF_REPO: ${TTS_GGUF_REPO}
+      TTS_GGUF_REVISION: ${TTS_GGUF_REVISION}
       TTS_QUANTIZATION: ${TTS_QUANTIZATION}
       TTS_N_GPU_LAYERS: ${TTS_N_GPU_LAYERS}
       TTS_CONTEXT_SIZE: ${TTS_CONTEXT_SIZE}
@@ -123,6 +129,7 @@ services:
       TTS_GENERATION_RETRIES: ${TTS_GENERATION_RETRIES:-1}
       TTS_RESET_LLAMA_STATE: ${TTS_RESET_LLAMA_STATE:-1}
       TTS_AUDIO_CODEC_DEVICE: ${TTS_AUDIO_CODEC_DEVICE:-cpu}
+      TTS_WORKER_STARTUP_TIMEOUT_SEC: ${TTS_WORKER_STARTUP_TIMEOUT_SEC:-600}
 
       PYTORCH_CUDA_ALLOC_CONF: ${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
@@ -173,7 +180,7 @@ services:
 
   chromie-llm:
     container_name: chromie-llm
-    image: ollama/ollama:latest
+    image: ${OLLAMA_IMAGE:-ollama/ollama:0.12.10}
     init: true
     restart: unless-stopped
     gpus: all
@@ -224,13 +231,14 @@ services:
     build:
       context: ./router
       args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12.10-slim-bookworm}
         HTTP_PROXY: ${HTTP_PROXY:-}
         HTTPS_PROXY: ${HTTPS_PROXY:-}
         http_proxy: ${HTTP_PROXY:-}
         https_proxy: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
         no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    image: chromie-router:latest
+    image: chromie-router:${CHROMIE_IMAGE_TAG:-0.1.0-alpha.1}
     init: true
     restart: unless-stopped
     ports:
@@ -276,13 +284,14 @@ services:
       context: .
       dockerfile: agent/Dockerfile
       args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12.10-slim-bookworm}
         HTTP_PROXY: ${HTTP_PROXY:-}
         HTTPS_PROXY: ${HTTPS_PROXY:-}
         http_proxy: ${HTTP_PROXY:-}
         https_proxy: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
         no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    image: chromie-agent:latest
+    image: chromie-agent:${CHROMIE_IMAGE_TAG:-0.1.0-alpha.1}
     init: true
     restart: unless-stopped
     ports:
@@ -307,10 +316,12 @@ services:
       AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION: ${AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION:-0}
       AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION: ${AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION:-0}
       AGENT_TASK_GRAPH_EXECUTION_TOKEN: ${AGENT_TASK_GRAPH_EXECUTION_TOKEN:-}
+      AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN: ${AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN:-}
+      AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES: ${AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES:-128}
+      AGENT_TASK_GRAPH_TRACE_TTL_SEC: ${AGENT_TASK_GRAPH_TRACE_TTL_SEC:-900}
+      AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES: ${AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES:-128}
       AGENT_CAPABILITY_MANIFESTS: ${AGENT_CAPABILITY_MANIFESTS:-}
       SORIDORMI_MCP_URL: ${SORIDORMI_MCP_URL:-}
-      AGENT_ENABLE_HARDWARE_CLIENT: ${AGENT_ENABLE_HARDWARE_CLIENT:-0}
-      HARDWARE_DAEMON_URL: ${HARDWARE_DAEMON_URL:-http://host.docker.internal:8095}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
       HTTP_PROXY: ${HTTP_PROXY:-}

@@ -72,9 +72,12 @@ TaskGraph endpoints:
 - `GET /task-graphs/scheduler/status`
 
 Guarded execution, confirmation grants, and cancellation require
-`Authorization: Bearer <AGENT_TASK_GRAPH_EXECUTION_TOKEN>`. Validation, dry-run,
-capability inspection, traces, and scheduler status are currently not protected
-by that token; deploy the service only on a trusted network boundary.
+`Authorization: Bearer <AGENT_TASK_GRAPH_EXECUTION_TOKEN>`. Dry-run, trace, and
+scheduler diagnostics require `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN`; a blank
+diagnostics token falls back to the execution token, and both blank disables
+those diagnostic endpoints with HTTP 503. Validation and capability inspection
+remain available without that bearer token, so deploy the service only on a
+trusted network boundary.
 
 ## Feature gates
 
@@ -89,6 +92,10 @@ Risk-bearing behavior is default-off.
 | `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION` | `0` | Enable stateful `planning_only` execution. |
 | `AGENT_ENABLE_PARALLEL_TASK_GRAPH_EXECUTION` | `0` | Permit eligible independent nodes to use bounded parallel scheduling. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | `4` | Process-local scheduler concurrency bound. |
+| `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN` | blank | Protect dry-run, trace, and scheduler endpoints; falls back to the execution token. |
+| `AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES` | `128` | Bound retained in-memory traces with LRU eviction. |
+| `AGENT_TASK_GRAPH_TRACE_TTL_SEC` | `900` | Expire retained traces after this many seconds. |
+| `AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES` | `128` | Bound unconsumed in-memory confirmation grants. |
 | `AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION` | `0` | Enable authorized guarded side effects. Requires an execution token. |
 | `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` | `0` | Permit physical nodes after confirmation and active-monitor proof. Requires guarded execution. |
 
@@ -125,7 +132,9 @@ TaskGraph planning and execution are separate operations. A graph returned in
   emergency fallback.
 - Parallel execution is bounded and honors `can_run_parallel` and
   `exclusive_group`; physical work remains sequential.
-- Traces and confirmation grants are retained in process memory only.
+- Traces and confirmation grants are retained in process memory only. Traces
+  have configurable TTL/LRU bounds; grants have a configurable capacity and
+  purge expired entries before issue/consume.
 
 Detailed semantics are in
 [`../docs/agent_task_graph.md`](../docs/agent_task_graph.md) and

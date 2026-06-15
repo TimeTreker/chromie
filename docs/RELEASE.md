@@ -66,8 +66,21 @@ python scripts/prepare_alpha_release.py --require-clean-evidence \
 
 Generated files are placed below `.chromie/releases/` and include a Git source
 archive, release notes, compatibility declaration, acceptance summary,
-`manifest.json`, test log, and `SHA256SUMS`. The command does not create or push
-a Git tag.
+`model-lock.json`, `build-provenance.json`, `manifest.json`, test log, and
+`SHA256SUMS`. The command does not create or push a Git tag.
+
+`build-provenance.json` records source-input checksums, declared image
+references, resolved image IDs/repository digests, `pip freeze --all` output for
+the four built Python images, the immutable ASR/TTS model lock, and installed
+Ollama model digests. A publishable preparation fails if any exact dependency
+pin is missing, an image reference uses a mutable tag, Docker images cannot be
+inspected, a built image cannot report its resolved Python environment, or a
+configured Ollama model/digest is absent.
+
+A preview remains useful on a development host without Docker or Ollama. Such a
+bundle is explicitly non-publishable and its provenance file lists the missing
+runtime evidence. To avoid even attempting runtime collection during an
+offline preview, add `--skip-runtime-provenance`.
 
 ## Required release artifacts
 
@@ -79,7 +92,7 @@ a Git tag.
 - installation and upgrade instructions;
 - known limitations and default-off gates;
 - test summary and retained target evidence references;
-- container image identifiers or reproducible build instructions;
+- `model-lock.json` plus complete `build-provenance.json` with image, dependency, and Ollama digests;
 - security and support policy links.
 
 ## Compatibility declaration
@@ -109,7 +122,10 @@ The release process must also probe the live endpoint and retain the result.
 ### Engineering
 
 - `./scripts/run_tests.sh` passes.
-- Docker images build from a clean checkout.
+- Docker images build from a clean checkout using versioned base/runtime references.
+- All direct Python dependencies are exact `==` pins and the release provenance captures resolved transitive dependencies.
+- `release/model-lock.json` matches every maintained ASR profile and the configured TTS snapshot.
+- `build-provenance.json` is complete, including Docker image and Ollama model digests.
 - `START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh` passes on the reference host.
 - The selected Ollama, ASR, and TTS models are documented and obtainable.
 - Structured interaction and Soridormi compatibility are probed against the pinned revision.
@@ -143,6 +159,7 @@ table rather than relying only on repository commit hashes.
 
 - [`VERSION`](../VERSION)
 - [`release/compatibility.json`](../release/compatibility.json)
+- [`release/model-lock.json`](../release/model-lock.json)
 - [`release/v0.1.0-alpha.1.md`](../release/v0.1.0-alpha.1.md)
 - [`release/README.md`](../release/README.md)
 

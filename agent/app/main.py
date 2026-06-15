@@ -100,6 +100,33 @@ class Settings(BaseModel):
     task_graph_execution_token: str = Field(
         default_factory=lambda: os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "")
     )
+    task_graph_diagnostics_token: str = Field(
+        default_factory=lambda: (
+            os.getenv("AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN", "").strip()
+            or os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "").strip()
+        )
+    )
+    task_graph_trace_max_entries: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES", "128")
+        ),
+        ge=1,
+        le=10000,
+    )
+    task_graph_trace_ttl_sec: float = Field(
+        default_factory=lambda: float(
+            os.getenv("AGENT_TASK_GRAPH_TRACE_TTL_SEC", "900")
+        ),
+        gt=0,
+        le=86400,
+    )
+    task_graph_grant_max_entries: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES", "128")
+        ),
+        ge=1,
+        le=10000,
+    )
     capability_manifests: str = Field(default_factory=lambda: os.getenv("AGENT_CAPABILITY_MANIFESTS", ""))
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     mode: Literal["runtime"] = "runtime"
@@ -168,6 +195,9 @@ task_graph_service = TaskGraphService(
     allow_physical_motion=settings.enable_physical_task_graph_execution,
     enable_parallel_execution=settings.enable_parallel_task_graph_execution,
     max_concurrency=settings.task_graph_max_concurrency,
+    trace_max_entries=settings.task_graph_trace_max_entries,
+    trace_ttl_s=settings.task_graph_trace_ttl_sec,
+    grant_max_entries=settings.task_graph_grant_max_entries,
 )
 logger.info(
     "loaded capability registry sources=%s manifests=%s tools=%d",
@@ -187,6 +217,23 @@ def require_task_graph_execution_auth(authorization: str | None) -> None:
     expected = f"Bearer {settings.task_graph_execution_token}"
     if not authorization or not secrets.compare_digest(authorization, expected):
         raise HTTPException(status_code=401, detail="invalid TaskGraph execution authorization")
+
+
+def require_task_graph_diagnostics_auth(authorization: str | None) -> None:
+    if not settings.task_graph_diagnostics_token:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "TaskGraph diagnostics are disabled; configure "
+                "AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN"
+            ),
+        )
+    expected = f"Bearer {settings.task_graph_diagnostics_token}"
+    if not authorization or not secrets.compare_digest(authorization, expected):
+        raise HTTPException(
+            status_code=401,
+            detail="invalid TaskGraph diagnostics authorization",
+        )
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -209,7 +256,6 @@ async def health() -> HealthResponse:
         task_graph_max_concurrency=settings.task_graph_max_concurrency,
         task_graph_active_count=scheduler.active_count,
         task_graph_waiting_count=scheduler.waiting_count,
-        active_task_graph_ids=scheduler.active_graph_ids,
         guarded_task_graph_execution_enabled=guarded_invoker is not None,
         physical_task_graph_execution_enabled=(
             guarded_invoker is not None and settings.enable_physical_task_graph_execution
@@ -251,7 +297,11 @@ async def validate_task_graph(graph: TaskGraph) -> TaskGraphValidationResponse:
 
 
 @app.post("/task-graphs/dry-run", response_model=ExecutionTrace)
-async def dry_run_task_graph(request: TaskGraphDryRunRequest) -> ExecutionTrace:
+async def dry_run_task_graph(
+    request: TaskGraphDryRunRequest,
+    authorization: str | None = Header(default=None),
+) -> ExecutionTrace:
+    require_task_graph_diagnostics_auth(authorization)
     try:
         return task_graph_service.dry_run(request.graph, auto_confirm=request.auto_confirm)
     except ValueError as exc:
@@ -323,7 +373,11 @@ async def cancel_task_graph(
 
 
 @app.get("/task-graphs/{graph_id}/trace", response_model=ExecutionTrace)
-async def get_task_graph_trace(graph_id: str) -> ExecutionTrace:
+async def get_task_graph_trace(
+    graph_id: str,
+    authorization: str | None = Header(default=None),
+) -> ExecutionTrace:
+    require_task_graph_diagnostics_auth(authorization)
     trace = task_graph_service.get_trace(graph_id)
     if trace is None:
         raise HTTPException(status_code=404, detail=f"No TaskGraph trace found for {graph_id!r}")
@@ -331,7 +385,10 @@ async def get_task_graph_trace(graph_id: str) -> ExecutionTrace:
 
 
 @app.get("/task-graphs/scheduler/status", response_model=TaskGraphSchedulerStatus)
-async def get_task_graph_scheduler_status() -> TaskGraphSchedulerStatus:
+async def get_task_graph_scheduler_status(
+    authorization: str | None = Header(default=None),
+) -> TaskGraphSchedulerStatus:
+    require_task_graph_diagnostics_auth(authorization)
     return task_graph_service.scheduler_status()
 
 

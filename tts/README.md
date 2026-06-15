@@ -7,10 +7,16 @@ barge-in.
 
 ## Concurrency model
 
-One process-global OuteTTS/llama.cpp interface owns mutable model and CUDA
-state. Generation is therefore serialized through a single worker and lock,
-even when multiple WebSocket clients are connected. `TTS_MAX_CONCURRENT_SYNTHESIS`
+One OuteTTS/llama.cpp interface owns mutable model and CUDA state in a dedicated
+child process. Generation is therefore serialized through a single worker even
+when multiple WebSocket clients are connected. `TTS_MAX_CONCURRENT_SYNTHESIS`
 limits admitted synthesis work, but it does not make model generation parallel.
+
+Cancelling an active synthesis (normally because the Orchestrator closes the
+WebSocket during barge-in) terminates and restarts the child process. This is
+deliberate: cancelling only the asyncio waiter cannot stop native llama.cpp
+generation. The restart prevents stale speech work from occupying the sole
+model slot, although the next request must wait for the model worker to reload.
 
 ## WebSocket protocol
 
@@ -91,6 +97,10 @@ Common settings:
 TTS_HOST=0.0.0.0
 TTS_PORT=5000
 TTS_MODEL_SIZE=0.6B
+TTS_TOKENIZER_REPO=OuteAI/OuteTTS-1.0-0.6B
+TTS_TOKENIZER_REVISION=<immutable-hugging-face-commit>
+TTS_GGUF_REPO=OuteAI/OuteTTS-1.0-0.6B-GGUF
+TTS_GGUF_REVISION=<immutable-hugging-face-commit>
 TTS_QUANTIZATION=FP16
 TTS_SAMPLE_RATE=44100
 TTS_CHUNK_MS=120
@@ -102,8 +112,14 @@ TTS_MIN_TEXT_CHARS=4
 TTS_MAX_CONCURRENT_SYNTHESIS=1
 TTS_GENERATION_RETRIES=1
 TTS_RESET_LLAMA_STATE=1
+TTS_WORKER_STARTUP_TIMEOUT_SEC=600
 TTS_SPEAKER_ID=default
 ```
+
+The service downloads those exact snapshots and replaces OuteTTS auto-config
+paths with local immutable tokenizer and GGUF paths. The maintained lock is
+[`../release/model-lock.json`](../release/model-lock.json); enabling another
+model size requires updating code, tests, the lock, and these operational docs.
 
 The full settings list is in
 [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md).

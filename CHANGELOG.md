@@ -5,6 +5,10 @@ yet published an official release.
 
 ## Unreleased
 
+- Hardened release reproducibility with versioned container references, exact
+  direct dependency pins, immutable ASR/TTS model revisions, runtime image and
+  Ollama digest capture, resolved dependency provenance, and fail-closed
+  publishable bundle generation.
 - Added versioned provider conformance traces, recommendation-only hardware
   shadow coverage, safe-idle status checks, and a first-reference-robot
   commissioning checklist.

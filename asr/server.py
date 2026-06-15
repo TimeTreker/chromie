@@ -8,6 +8,8 @@ import numpy as np
 import websockets
 from faster_whisper import WhisperModel
 
+from transcription import TranscriptionExecutor
+
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s - %(threadName)s - %(levelname)s - %(message)s",
@@ -17,6 +19,7 @@ logger = logging.getLogger("chromie-asr")
 HOST = os.getenv("ASR_HOST", "0.0.0.0")
 PORT = int(os.getenv("ASR_PORT", "9001"))
 MODEL_NAME = os.getenv("ASR_MODEL", "dropbox-dash/faster-whisper-large-v3-turbo")
+MODEL_REVISION = os.getenv("ASR_MODEL_REVISION") or None
 DEVICE = os.getenv("ASR_DEVICE", "cuda")
 COMPUTE_TYPE = os.getenv("ASR_COMPUTE_TYPE", "float16")
 SAMPLE_RATE = int(os.getenv("ASR_SAMPLE_RATE", "16000"))
@@ -24,18 +27,29 @@ ASR_LANGUAGE = os.getenv("ASR_LANGUAGE") or None
 ASR_BEAM_SIZE = int(os.getenv("ASR_BEAM_SIZE", "1"))
 ASR_VAD_FILTER = os.getenv("ASR_VAD_FILTER", "false").lower() in {"1", "true", "yes", "on"}
 ASR_CONDITION_ON_PREVIOUS_TEXT = os.getenv("ASR_CONDITION_ON_PREVIOUS_TEXT", "false").lower() in {"1", "true", "yes", "on"}
+ASR_MAX_CONCURRENT_TRANSCRIPTIONS = max(
+    1,
+    int(os.getenv("ASR_MAX_CONCURRENT_TRANSCRIPTIONS", "1")),
+)
 
 logger.info(
-    "ASR config: model=%s device=%s compute_type=%s language=%s beam_size=%s vad_filter=%s",
+    "ASR config: model=%s revision=%s device=%s compute_type=%s language=%s beam_size=%s vad_filter=%s",
     MODEL_NAME,
+    MODEL_REVISION or "unpinned",
     DEVICE,
     COMPUTE_TYPE,
     ASR_LANGUAGE or "auto",
     ASR_BEAM_SIZE,
     ASR_VAD_FILTER,
 )
-model = WhisperModel(MODEL_NAME, device=DEVICE, compute_type=COMPUTE_TYPE)
+model = WhisperModel(
+    MODEL_NAME,
+    device=DEVICE,
+    compute_type=COMPUTE_TYPE,
+    revision=MODEL_REVISION,
+)
 logger.info("Model loaded successfully on %s", DEVICE)
+transcription_executor = TranscriptionExecutor(ASR_MAX_CONCURRENT_TRANSCRIPTIONS)
 
 
 def pcm16_to_float32(audio_bytes: bytes) -> np.ndarray:
@@ -52,7 +66,17 @@ async def handle_client(ws):
                 data = {}
 
             if data.get("type") in {"health", "ping"}:
-                await ws.send(json.dumps({"type": "pong", "service": "asr"}))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "pong",
+                            "service": "asr",
+                            "max_concurrent_transcriptions": ASR_MAX_CONCURRENT_TRANSCRIPTIONS,
+                            "model": MODEL_NAME,
+                            "model_revision": MODEL_REVISION,
+                        }
+                    )
+                )
             continue
 
         audio = pcm16_to_float32(message)
@@ -63,7 +87,8 @@ async def handle_client(ws):
 
         start = time.time()
         try:
-            segments, info = model.transcribe(
+            text, info = await transcription_executor.transcribe(
+                model,
                 audio,
                 language=ASR_LANGUAGE,
                 beam_size=ASR_BEAM_SIZE,
@@ -71,7 +96,6 @@ async def handle_client(ws):
                 condition_on_previous_text=ASR_CONDITION_ON_PREVIOUS_TEXT,
                 temperature=0.0,
             )
-            text = " ".join(seg.text.strip() for seg in segments).strip()
             elapsed = time.time() - start
             logger.info("ASR done in %.2fs text=%s", elapsed, text)
             await ws.send(json.dumps({"type": "final", "text": text, "duration": duration}))
@@ -82,9 +106,12 @@ async def handle_client(ws):
 
 async def main():
     logger.info("ASR server starting on ws://%s:%s", HOST, PORT)
-    async with websockets.serve(handle_client, HOST, PORT, max_size=10**7, ping_interval=20, ping_timeout=20):
-        logger.info("ASR server started on ws://%s:%s", HOST, PORT)
-        await asyncio.Future()
+    try:
+        async with websockets.serve(handle_client, HOST, PORT, max_size=10**7, ping_interval=20, ping_timeout=20):
+            logger.info("ASR server started on ws://%s:%s", HOST, PORT)
+            await asyncio.Future()
+    finally:
+        transcription_executor.close()
 
 
 if __name__ == "__main__":

@@ -78,7 +78,7 @@ does not authorize a side effect.
 
 `POST /task-graphs/dry-run`
 
-- always available;
+- requires the TaskGraph diagnostics bearer token;
 - makes no MCP calls;
 - simulates dependency and policy behavior;
 - can auto-confirm simulated confirmation nodes when requested;
@@ -156,6 +156,7 @@ Properties:
 - grants are consumed once;
 - modifying the graph invalidates the grant;
 - storage is process-local;
+- the store is capacity-bounded and purges expired entries;
 - issuance requires the execution bearer token.
 
 The API proves TaskGraph control-plane binding. The separate host Orchestrator
@@ -166,11 +167,16 @@ InteractionResponse and Skill Runtime path.
 
 - `POST /task-graphs/{graph_id}/cancel` requests cancellation of an active graph
   and requires the execution bearer token.
-- `GET /task-graphs/{graph_id}/trace` returns the latest retained trace or 404.
-- `GET /task-graphs/scheduler/status` reports active/waiting counts and graph IDs.
+- `GET /task-graphs/{graph_id}/trace` returns the latest non-expired retained
+  trace or 404 and requires the diagnostics bearer token.
+- `GET /task-graphs/scheduler/status` reports active/waiting counts and graph IDs
+  and requires the diagnostics bearer token.
 
 Active executions, traces, and grants live only in the Agent process. Restarting
-the service removes them.
+the service removes them. Traces default to a 900-second TTL and a 128-entry LRU
+bound. Grants default to a 128-entry capacity. Configure these with
+`AGENT_TASK_GRAPH_TRACE_TTL_SEC`, `AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES`, and
+`AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES`.
 
 ## Concurrency
 
@@ -217,7 +223,10 @@ to an enabled endpoint.
 - Model output is untrusted and revalidated.
 - All remote calls cross `ToolInvoker` authorization policy.
 - Guarded write endpoints require a bearer token.
-- Inspection and trace endpoints are currently unauthenticated; keep the Agent
+- Dry-run, trace, and scheduler diagnostics require
+  `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN`. A blank value falls back to the execution
+  token; if neither token is configured, diagnostics return 503.
+- Validation and capability inspection remain unauthenticated; keep the Agent
   on a trusted network or place it behind an authenticated proxy.
 - No TaskGraph API should expose raw motor, torque, joint, or actuator fields.
 

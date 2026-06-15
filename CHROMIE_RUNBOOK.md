@@ -126,9 +126,23 @@ curl -fsS http://127.0.0.1:8091/health | python -m json.tool
 curl -fsS http://127.0.0.1:8091/routes | python -m json.tool
 curl -fsS http://127.0.0.1:8092/health | python -m json.tool
 curl -fsS http://127.0.0.1:8092/capabilities | python -m json.tool
-curl -fsS http://127.0.0.1:8092/task-graphs/scheduler/status | python -m json.tool
 curl -fsS http://127.0.0.1:11434/api/tags | python -m json.tool
 ```
+
+TaskGraph dry-run, trace, and scheduler diagnostics require a bearer token. Use
+the configured diagnostics token, or the execution token when the diagnostics
+token is blank:
+
+```bash
+TASK_GRAPH_TOKEN="${AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN:-${AGENT_TASK_GRAPH_EXECUTION_TOKEN:-}}"
+test -n "$TASK_GRAPH_TOKEN"
+curl -fsS \
+  -H "Authorization: Bearer $TASK_GRAPH_TOKEN" \
+  http://127.0.0.1:8092/task-graphs/scheduler/status | python -m json.tool
+```
+
+When neither token is configured, diagnostic endpoints intentionally return
+HTTP 503.
 
 ## 7. Automated tests
 
