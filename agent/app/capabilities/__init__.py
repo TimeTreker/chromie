@@ -1,5 +1,12 @@
 """MCP-ready capability registry for Chromie's global agent host."""
 
+from .catalog import (
+    CatalogCapability,
+    CapabilityCatalog,
+    CapabilityMatch,
+    CapabilitySearchRequest,
+    CapabilitySearchResult,
+)
 from .models import (
     AgentManifest,
     AgentStatus,
@@ -24,6 +31,11 @@ from .loader import (
 from .probe import CapabilityProbeResult, probe_mcp_capabilities
 
 __all__ = [
+    "CapabilitySearchResult",
+    "CapabilitySearchRequest",
+    "CapabilityMatch",
+    "CapabilityCatalog",
+    "CatalogCapability",
     "AgentManifest",
     "AgentStatus",
     "CapabilityBundle",

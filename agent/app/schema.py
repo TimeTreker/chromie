@@ -17,7 +17,7 @@ RouteName = Literal[
 ]
 
 Priority = Literal["low", "normal", "high", "urgent"]
-DecisionSource = Literal["rules", "llm", "fallback"]
+DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 AgentStatus = Literal["ok", "clarify", "blocked", "ignored", "error"]
 SpeakStyle = Literal["brief", "normal", "empathetic", "confirm", "warning"]
 ActionTarget = Literal[
@@ -48,6 +48,7 @@ class RouteDecision(BaseModel):
     should_speak: bool = True
     speak_first: str | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
+    candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
     source: DecisionSource = "fallback"
 
@@ -211,6 +212,8 @@ class HealthResponse(BaseModel):
     physical_task_graph_execution_enabled: bool = False
     interaction_output_mode: str = "native"
     native_interaction_fallback_enabled: bool = False
+    capability_catalog_enabled: bool = False
+    capability_catalog_version: int = 0
 
 
 def detect_language(text: str) -> str:

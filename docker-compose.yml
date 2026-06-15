@@ -11,7 +11,7 @@ services:
         https_proxy: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
         no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    image: chromie-asr:${CHROMIE_IMAGE_TAG:-0.1.0-alpha.1}
+    image: chromie-asr:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
     init: true
     restart: unless-stopped
     gpus: all
@@ -91,7 +91,7 @@ services:
         https_proxy: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
         no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    image: chromie-tts:${CHROMIE_IMAGE_TAG:-0.1.0-alpha.1}
+    image: chromie-tts:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
     init: true
     restart: unless-stopped
     gpus: all
@@ -180,7 +180,7 @@ services:
 
   chromie-llm:
     container_name: chromie-llm
-    image: ${OLLAMA_IMAGE:-ollama/ollama:0.12.10}
+    image: ${OLLAMA_IMAGE:?OLLAMA_IMAGE must be set}
     init: true
     restart: unless-stopped
     gpus: all
@@ -238,7 +238,7 @@ services:
         https_proxy: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
         no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    image: chromie-router:${CHROMIE_IMAGE_TAG:-0.1.0-alpha.1}
+    image: chromie-router:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
     init: true
     restart: unless-stopped
     ports:
@@ -250,6 +250,10 @@ services:
       ROUTER_OLLAMA_URL: http://chromie-llm:11434
       ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:0.6b}
       ROUTER_TIMEOUT_MS: ${ROUTER_TIMEOUT_MS:-2000}
+      ROUTER_CAPABILITY_CATALOG_URL: ${ROUTER_CAPABILITY_CATALOG_URL:?Set ROUTER_CAPABILITY_CATALOG_URL}
+      ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS: ${ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS:?Set ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS}
+      ROUTER_CAPABILITY_MATCH_LIMIT: ${ROUTER_CAPABILITY_MATCH_LIMIT:?Set ROUTER_CAPABILITY_MATCH_LIMIT}
+      ROUTER_ALLOW_LEGACY_ROBOT_RULES: ${ROUTER_ALLOW_LEGACY_ROBOT_RULES:?Set ROUTER_ALLOW_LEGACY_ROBOT_RULES}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
       HTTP_PROXY: ${HTTP_PROXY:-}
@@ -291,7 +295,7 @@ services:
         https_proxy: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
         no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    image: chromie-agent:${CHROMIE_IMAGE_TAG:-0.1.0-alpha.1}
+    image: chromie-agent:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
     init: true
     restart: unless-stopped
     ports:
@@ -321,6 +325,9 @@ services:
       AGENT_TASK_GRAPH_TRACE_TTL_SEC: ${AGENT_TASK_GRAPH_TRACE_TTL_SEC:-900}
       AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES: ${AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES:-128}
       AGENT_CAPABILITY_MANIFESTS: ${AGENT_CAPABILITY_MANIFESTS:-}
+      AGENT_CAPABILITY_CATALOG_REFRESH_SEC: ${AGENT_CAPABILITY_CATALOG_REFRESH_SEC:?Set AGENT_CAPABILITY_CATALOG_REFRESH_SEC}
+      AGENT_CAPABILITY_MATCH_MIN_SCORE: ${AGENT_CAPABILITY_MATCH_MIN_SCORE:?Set AGENT_CAPABILITY_MATCH_MIN_SCORE}
+      AGENT_CAPABILITY_MATCH_LIMIT: ${AGENT_CAPABILITY_MATCH_LIMIT:?Set AGENT_CAPABILITY_MATCH_LIMIT}
       SORIDORMI_MCP_URL: ${SORIDORMI_MCP_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 

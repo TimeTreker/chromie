@@ -100,6 +100,49 @@ def _robot_decision(
     )
 
 
+def route_by_priority_rules(request: RouteRequest) -> RouteDecision | None:
+    """Handle only safety-critical interruption and obvious non-speech noise."""
+
+    text = _norm(request.text)
+    lang = request.language or detect_language(request.text)
+    if _matches(text, INTERRUPT_PATTERNS):
+        return finalize_decision(
+            RouteDecision(
+                route="interrupt",
+                agents=[],
+                intent="stop_current_output",
+                confidence=0.99,
+                language=lang,
+                priority="urgent",
+                interrupt_current=True,
+                needs_agent=False,
+                should_speak=False,
+                reason="Matched interrupt safety rule",
+                source="rules",
+            ),
+            request,
+            source="rules",
+        )
+    if _matches(text, IGNORE_PATTERNS):
+        return finalize_decision(
+            RouteDecision(
+                route="ignore",
+                agents=[],
+                intent="noise_or_filler",
+                confidence=0.90,
+                language=lang,
+                priority="low",
+                needs_agent=False,
+                should_speak=False,
+                reason="Matched ignore/noise rule",
+                source="rules",
+            ),
+            request,
+            source="rules",
+        )
+    return None
+
+
 def route_by_rules(request: RouteRequest) -> RouteDecision | None:
     """Return a high-confidence route using cheap deterministic rules.
 

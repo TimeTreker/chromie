@@ -25,7 +25,7 @@ def selected_agents(request: AgentRunRequest) -> list[str]:
 
     # Expand robot_action to include both pose and motion planners. They are
     # cheap deterministic planners and will no-op when not relevant.
-    if request.route_decision.route == "robot_action":
+    if request.route_decision.route == "robot_action" and "capability_agent" not in requested:
         for agent in ["robot_pose_controller_agent", "motion_planner_agent", "safety_agent", "speaker_agent"]:
             if agent not in requested:
                 requested.append(agent)

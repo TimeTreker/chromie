@@ -55,7 +55,9 @@ Core endpoints:
 - `GET /health`
 - `GET /agents`
 - `GET /capabilities`
-- `GET /capabilities/llm-context?language=en`
+- `GET /capabilities/catalog`
+- `POST /capabilities/search`
+- `GET /capabilities/llm-context?language=en&text=...`
 - `POST /run`
 - `POST /interaction`
 
@@ -87,6 +89,9 @@ Risk-bearing behavior is default-off.
 |---|---:|---|
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
+| `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named skills while keeping the last known-good catalog. |
+| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | `0.16` | Minimum score for automatic native route correction. |
+| `AGENT_CAPABILITY_MATCH_LIMIT` | `8` | Bound candidates sent to capability selection. |
 | `AGENT_ENABLE_TASK_GRAPH_PLANNING` | `0` | Allow LLM-authored TaskGraph planning for tool routes. |
 | `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION` | `0` | Enable side-effect-free read-only execution. |
 | `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION` | `0` | Enable stateful `planning_only` execution. |

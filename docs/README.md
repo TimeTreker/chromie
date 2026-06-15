@@ -68,6 +68,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 ## Operations and release
 
+- [Voice-to-MuJoCo Quick Start (Chinese)](VOICE_MUJOCO_QUICKSTART.zh-CN.md)
 - [Operations Runbook](../CHROMIE_RUNBOOK.md)
 - [Configuration Reference](CONFIGURATION.md)
 - [API Reference](API_REFERENCE.md)

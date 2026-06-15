@@ -1,4 +1,5 @@
 from .base import AgentServices, BaseAgent
+from .capability import CapabilityAgent
 from .conversation import ConversationAgent
 from .memory import MemoryAgent
 from .motion_planner import MotionPlannerAgent
@@ -11,6 +12,7 @@ from .vision import VisionAgent
 __all__ = [
     "AgentServices",
     "BaseAgent",
+    "CapabilityAgent",
     "ConversationAgent",
     "MemoryAgent",
     "MotionPlannerAgent",

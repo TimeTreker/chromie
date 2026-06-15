@@ -16,7 +16,7 @@ RouteName = Literal[
 ]
 
 Priority = Literal["low", "normal", "high", "urgent"]
-DecisionSource = Literal["rules", "llm", "fallback"]
+DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 
 
 DEFAULT_AGENTS: dict[str, list[str]] = {
@@ -58,6 +58,7 @@ class RouteDecision(BaseModel):
     should_speak: bool = True
     speak_first: str | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
+    candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
     source: DecisionSource = "fallback"
 

@@ -30,6 +30,10 @@ class ConversationAgent(BaseAgent):
             self._conversation_id(request),
         )
 
+        if getattr(result, "metadata", {}).get("capability_handled"):
+            result.trace.append("conversation_agent: skipped because capability agent handled the request")
+            return result
+
         if request.route_decision.route not in {"chat", "clarify"} and self.name not in request.route_decision.agents:
             logger.info(
                 "conversation_agent_skip sid=%s reason=route_not_handled route=%s agents=%s",
@@ -120,6 +124,7 @@ class ConversationAgent(BaseAgent):
         history_block = self._format_history(request, zh=zh)
         pending_block = self._format_pending_tasks(request, zh=zh)
         conversation_id = self._conversation_id(request)
+        capability_context = self._capability_context(request, zh=zh)
 
         if zh:
             system = (
@@ -128,6 +133,7 @@ class ConversationAgent(BaseAgent):
                 "如果用户说‘那个/它/什么时候/结果呢/继续’这类追问，请根据最近上下文理解。"
                 "如果用户问之前任务什么时候有结果，而待处理任务还在进行中，就说明还在处理。"
                 "不要假装记得上下文里没有的事情，也不要编造工具结果。"
+                "回答能力问题前必须检查提供的能力目录；不要声称机器人断开，除非目录明确不可用。"
                 "回复要适合语音播放，默认一句话，不超过 24 个中文字。"
                 "请只输出要说的话，不要输出 JSON。"
             )
@@ -135,6 +141,7 @@ class ConversationAgent(BaseAgent):
                 f"conversation_id: {conversation_id}\n\n"
                 f"最近对话：\n{history_block}\n\n"
                 f"待处理任务：\n{pending_block}\n\n"
+                f"能力目录：\n{capability_context}\n\n"
                 f"当前用户说：{request.text}\n"
                 f"当前意图：{request.route_decision.intent}\n"
                 "请结合最近上下文自然回复。"
@@ -146,6 +153,7 @@ class ConversationAgent(BaseAgent):
                 "Use short-term context to answer follow-up questions like 'when will you give me the answer?' or 'what about it?'. "
                 "If the user asks about a previous pending task, refer to that task and say it is still in progress unless a result is provided. "
                 "Do not invent tool results. Do not pretend to remember anything outside the provided context. "
+                "Before answering capability questions, inspect the supplied capability catalog. Do not claim the robot is disconnected unless the catalog says it is unavailable. "
                 "The reply will be spoken aloud, so keep it to one short sentence. "
                 "Reply with only the spoken response text. Do not output JSON."
             )
@@ -153,6 +161,7 @@ class ConversationAgent(BaseAgent):
                 f"conversation_id: {conversation_id}\n\n"
                 f"Recent conversation:\n{history_block}\n\n"
                 f"Pending tasks:\n{pending_block}\n\n"
+                f"Capability catalog:\n{capability_context}\n\n"
                 f"Current user said: {request.text}\n"
                 f"Current intent: {request.route_decision.intent}\n"
                 "Reply naturally using the recent context when relevant."
@@ -241,6 +250,23 @@ class ConversationAgent(BaseAgent):
             else:
                 lines.append(f"- {task_type}: {status}; {summary}")
         return "\n".join(lines) if lines else ("无" if zh else "None")
+
+    def _capability_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        candidates = request.route_decision.candidate_capabilities
+        if not candidates:
+            candidates = request.context.get("capability_candidates") or []
+        if not isinstance(candidates, list) or not candidates:
+            return "无匹配能力" if zh else "No matching capabilities were supplied."
+        lines: list[str] = []
+        for item in candidates[:8]:
+            if not isinstance(item, dict):
+                continue
+            capability_id = str(item.get("capability_id") or item.get("skill_id") or "")
+            description = str(item.get("description") or "")
+            executable = bool(item.get("interaction_executable"))
+            label = "可执行" if zh and executable else "仅供规划" if zh else "executable" if executable else "planning only"
+            lines.append(f"- {capability_id}: {description} [{label}]")
+        return "\n".join(lines) if lines else ("无匹配能力" if zh else "No matching capabilities were supplied.")
 
     def _fallback_reply(self, request: AgentRunRequest) -> str:
         text = request.text.strip().lower()

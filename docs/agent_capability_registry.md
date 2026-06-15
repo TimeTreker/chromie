@@ -7,8 +7,9 @@ manifest is a static deployment snapshot; live compatibility and target
 acceptance remain separate evidence.
 
 The registry is used by Agent TaskGraph planning, validation, LLM context,
-policy checks, and MCP invocation. It does not replace the host Orchestrator's
-runtime Skill Registry.
+policy checks, MCP invocation, capability-aware routing, and the normal native
+InteractionRuntime. It does not replace the host Orchestrator's runtime Skill
+Registry.
 
 ## Source of truth
 
@@ -40,7 +41,10 @@ directories. Registry construction is fail-fast for:
 - invalid safety, fallback, or dependency references.
 
 The Agent logs loaded sources, manifest files, and total tool count at startup.
-`GET /health` and `GET /capabilities` expose the active view.
+`GET /health` and `GET /capabilities` expose the static view. The shared catalog
+also refreshes `soridormi.skill.list` through the trusted MCP transport and keeps
+the last known-good named-skill snapshot. `GET /capabilities/catalog` exposes
+that merged routing/execution view.
 
 ## Capability policy represented
 
@@ -57,13 +61,21 @@ Each tool can declare information such as:
 The registry enables validation and policy decisions; it does not itself execute
 a tool. Real calls cross a `ToolInvoker` boundary.
 
-## LLM visibility
+## Shared capability catalog and LLM visibility
+
+The Agent owns one queryable catalog service. Static manifest tools are indexed
+for routing and planning. Live Soridormi named skills are indexed separately as
+`interaction_executable`, because those exact IDs are resolvable by the host
+Skill Registry. Router calls `POST /capabilities/search`; native
+InteractionRuntime performs the same search in-process before execution. This
+second check prevents a Router timeout or stale route from silently turning a
+robot request into generic chat.
 
 `GET /capabilities/llm-context?language=en` returns the filtered context used for
-planning. The model receives only the descriptions intended for planning, not
+planning and capability-aware conversation. Supplying `text=...` returns only
+the most relevant candidates. The model receives descriptions and schemas, not
 deployment secrets or unrestricted low-level controls. Restricted safety and
-control capabilities remain policy-governed even when they are present in the
-registry.
+control capabilities remain policy-governed even when present in the registry.
 
 Model output is never trusted as registry truth. Graph identity is replaced by
 the service, capability references are resolved again, arguments are validated,
@@ -78,16 +90,21 @@ The two registries solve different problems:
 | Agent capability registry | Agent process | Loaded at startup | TaskGraph planning, validation, policy, MCP transport |
 | Skill Registry | Host Orchestrator | Runtime/provider registration | `InteractionResponse` named-skill resolution and execution |
 
-The native structured Agent path generates Skill Runtime requests directly,
-while preserving the host's provider and execution boundary. It must not expose
-raw MCP tool names or motor-level fields as a shortcut; runtime registry
-resolution remains mandatory.
+The native structured Agent path selects only live named skills marked
+`interaction_executable`, then emits normal `SkillRequest` values. The host still
+reloads and validates the provider catalog before execution. Static MCP tools
+remain available for routing/planning but are not treated as directly executable
+named skills. Raw motor-level fields remain forbidden.
 
 ## Inspection and verification
 
 ```bash
 curl -s http://127.0.0.1:8092/capabilities | jq
-curl -s 'http://127.0.0.1:8092/capabilities/llm-context?language=en' | jq -r .context
+curl -s 'http://127.0.0.1:8092/capabilities/catalog?refresh=true' | jq
+curl -s http://127.0.0.1:8092/capabilities/search \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"move forward slowly for one second","language":"en"}' | jq
+curl -s 'http://127.0.0.1:8092/capabilities/llm-context?language=en&text=move%20forward' | jq -r .context
 ```
 
 Probe the live Soridormi server:

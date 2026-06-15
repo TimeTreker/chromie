@@ -56,6 +56,26 @@ verified Jetson packaging, and physical robot support remain open.
 Requirements: Linux, Docker Compose, an NVIDIA runtime for GPU deployment,
 Python 3.11, and host audio dependencies.
 
+For the complete microphone -> Chromie -> Soridormi -> MuJoCo path, keep the
+Chromie and Soridormi repositories next to each other and run:
+
+```bash
+./scripts/start_voice_mujoco.sh --build
+```
+
+After the first build, normal daily startup is:
+
+```bash
+./scripts/start_voice_mujoco.sh
+```
+
+This starts the MuJoCo viewer, runtime-backed Soridormi MCP service, all Chromie
+containers, and the host audio Orchestrator. Press `Ctrl+C` to stop the stack, or
+run `./scripts/stop_voice_mujoco.sh` from another terminal. See the
+[Chinese voice-to-MuJoCo quick start](docs/VOICE_MUJOCO_QUICKSTART.zh-CN.md).
+
+For individual component startup:
+
 ```bash
 cp .env.local.example .env.local
 ./scripts/show_profile.sh

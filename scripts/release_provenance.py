@@ -88,10 +88,17 @@ def exact_requirement_errors(root: Path) -> list[str]:
     return errors
 
 
+def required_env(env: dict[str, str], name: str) -> str:
+    value = env.get(name, "").strip()
+    if not value:
+        raise ValueError(f"required environment variable is missing: {name}")
+    return value
+
+
 def declared_images(root: Path, env: dict[str, str]) -> list[str]:
-    tag = env.get("CHROMIE_IMAGE_TAG", "0.1.0-alpha.1")
+    tag = required_env(env, "CHROMIE_IMAGE_TAG")
     images = [f"{name}:{tag}" for name in PROJECT_IMAGE_NAMES]
-    images.append(env.get("OLLAMA_IMAGE", "ollama/ollama:0.12.10"))
+    images.append(required_env(env, "OLLAMA_IMAGE"))
     images.append(env.get("PYTHON_IMAGE", "python:3.12.10-slim-bookworm"))
     for dockerfile, key in (("asr/Dockerfile", "ASR_CUDA_IMAGE"), ("tts/Dockerfile", "TTS_CUDA_IMAGE")):
         text = (root / dockerfile).read_text(encoding="utf-8") if (root / dockerfile).is_file() else ""
@@ -221,10 +228,18 @@ def collect_provenance(
 ) -> dict[str, Any]:
     root = root.resolve()
     env = source_environment(root)
-    images = declared_images(root, env)
+    image_config_errors: list[str] = []
+    try:
+        images = declared_images(root, env)
+    except ValueError as exc:
+        images = []
+        if require_runtime:
+            image_config_errors.append(str(exc))
+    # Runtime image aliases may be mutable for local development. Publishable
+    # provenance is anchored by the resolved image IDs/digests collected below.
     source_errors = (
         exact_requirement_errors(root)
-        + mutable_image_errors(images)
+        + image_config_errors
         + model_lock_errors(root, env)
     )
     model_lock = root / "release" / "model-lock.json"
@@ -249,7 +264,7 @@ def collect_provenance(
                     inspected_images.append(inspect_image(image))
                 except (subprocess.CalledProcessError, json.JSONDecodeError, IndexError) as exc:
                     runtime_errors.append(f"could not inspect image {image}: {exc}")
-            tag = env.get("CHROMIE_IMAGE_TAG", "0.1.0-alpha.1")
+            tag = required_env(env, "CHROMIE_IMAGE_TAG")
             for name in PROJECT_IMAGE_NAMES:
                 image = f"{name}:{tag}"
                 try:

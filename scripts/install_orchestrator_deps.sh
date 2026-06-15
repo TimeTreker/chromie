@@ -51,6 +51,26 @@ if [ "$FORCE_INSTALL" != "1" ] && [ "$CURRENT_HASH" = "$PREVIOUS_HASH" ]; then
   exit 0
 fi
 
+# A stale or missing hash file must not force a network operation when the
+# active Python environment already satisfies the Orchestrator imports.
+if [ "$FORCE_INSTALL" != "1" ] && python - <<'PYIMPORT' >/dev/null 2>&1
+import aiohttp
+import dotenv
+import httpx
+import mcp
+import numpy
+import pydantic
+import scipy
+import sounddevice
+import webrtcvad
+import websockets
+PYIMPORT
+then
+  echo "$CURRENT_HASH" > "$HASH_FILE"
+  echo "[deps] Host orchestrator dependencies are already importable."
+  exit 0
+fi
+
 echo "[deps] Installing host orchestrator dependencies from $REQ_FILE"
 echo "[deps] Python: $(command -v python)"
 python -m pip install -U pip

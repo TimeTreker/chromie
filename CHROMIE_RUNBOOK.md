@@ -118,6 +118,22 @@ SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 
 Restart the Orchestrator after changing host feature gates.
 
+
+## 5.1 Start the complete voice-to-MuJoCo path
+
+Start Soridormi's simulator and runtime MCP first. Then, from the Chromie
+repository root, run:
+
+```bash
+./scripts/start_chromie_voice.sh
+```
+
+The launcher uses the same `.env.runtime` and Compose image definitions as the
+normal service scripts. It enables structured InteractionResponse, Soridormi
+named skills, physical microphone input, and speaker output without redefining
+image tags. Use `--require-confirmation` to require spoken confirmation for all
+simulator skills, or `--build` to rebuild repository-owned service images.
+
 ## 6. Health checks
 
 ```bash

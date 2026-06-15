@@ -278,6 +278,12 @@ class InteractionDraft:
             self.requires_confirmation = True
         return action
 
+    def add_skill(self, request: SkillRequest) -> SkillRequest:
+        self._skills.append(request)
+        if request.requires_confirmation:
+            self.requires_confirmation = True
+        return request
+
     def add_task_graph(self, graph: dict[str, Any]) -> SkillRequest:
         request = SkillRequest(
             skill_id="chromie.task_graph.execute",

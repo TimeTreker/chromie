@@ -9,21 +9,25 @@ skills, or controls hardware.
 
 ```text
 text + bounded context
-  -> deterministic rules (optional first pass)
-  -> optional Ollama route classifier
+  -> deterministic interrupt/noise safety rules
+  -> shared Agent capability-catalog search
+  -> optional legacy rules / Ollama route classifier
   -> schema finalization
   -> RouteDecision
 ```
 
 Supported modes:
 
-- `rules_only` — deterministic rules followed by a deterministic fallback;
+- `rules_only` — capability-catalog routing, compatible non-robot rules, then a deterministic fallback;
 - `hybrid` — rules first when enabled, then Ollama for unmatched requests;
 - `llm_only` — send routing decisions directly to Ollama.
 
 `ROUTER_USE_LLM=0` selects `rules_only` unless `ROUTER_MODE` is explicitly set.
-Operational commands such as interruption should continue to use deterministic
-routing even when a conversational model is available.
+Operational interruption/noise handling remains deterministic even when a
+conversational model is available. Robot routing is catalog-first; the old
+phrase-based robot rules are an explicit compatibility rollback only. The Agent
+repeats the same catalog search inside native InteractionRuntime, so Router
+unavailability cannot authorize or suppress execution by itself.
 
 ## HTTP API
 
@@ -60,6 +64,10 @@ ROUTER_MODEL=qwen3:0.6b
 ROUTER_TIMEOUT_MS=800
 ROUTER_LLM_TIMEOUT_MS=800
 ROUTER_CONFIDENCE_THRESHOLD=0.55
+ROUTER_CAPABILITY_CATALOG_URL=http://chromie-agent:8092
+ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=600
+ROUTER_CAPABILITY_MATCH_LIMIT=8
+ROUTER_ALLOW_LEGACY_ROBOT_RULES=0
 ROUTER_LOG_LEVEL=INFO
 ```
 

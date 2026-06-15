@@ -18,7 +18,10 @@ here. Current revision and verification status are maintained in
 `clarify`, `interrupt`, and `ignore`.
 
 Interrupt and ignore decisions are normalized deterministically: they do not
-require the Agent and they do not speak.
+require the Agent and they do not speak. For other input, Router queries the
+Agent-owned shared capability catalog before optional legacy rules or LLM
+routing. `RouteDecision.candidate_capabilities` preserves the ranked evidence
+for the native interaction path.
 
 ## Agent HTTP API — port 8092
 
@@ -31,8 +34,10 @@ running.
 |---|---|---|
 | `GET` | `/health` | Return model/runtime state, loaded capability sources, feature gates, and scheduler counters. |
 | `GET` | `/agents` | List specialized agents and ownership notes. |
-| `GET` | `/capabilities` | Return the active merged capability registry and manifest sources. |
-| `GET` | `/capabilities/llm-context?language=en` | Return the concise capability context visible to planning prompts. |
+| `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
+| `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
+| `POST` | `/capabilities/search` | Rank relevant capabilities for Router and normal InteractionRuntime. |
+| `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog or query-specific LLM context. |
 
 ### Conversation and interaction
 

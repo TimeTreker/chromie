@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from .agents import (
     AgentServices,
     BaseAgent,
+    CapabilityAgent,
     ConversationAgent,
     MemoryAgent,
     MotionPlannerAgent,
@@ -33,6 +34,7 @@ class _AgentPipeline:
     def __init__(self, services: AgentServices) -> None:
         self.services = services
         agents: list[BaseAgent] = [
+            CapabilityAgent(services),
             ConversationAgent(services),
             RobotPoseControllerAgent(services),
             MotionPlannerAgent(services),
@@ -98,6 +100,7 @@ class InteractionRuntime(_AgentPipeline):
     """Native InteractionResponse runtime used by `/interaction`."""
 
     async def run(self, request: AgentRunRequest) -> InteractionResponse:
+        await self._prepare_capability_route(request)
         result = await self._run_pipeline(request, InteractionDraft())
         if not isinstance(result, InteractionDraft):  # pragma: no cover - defensive
             raise TypeError("native interaction runtime returned a non-InteractionDraft value")
@@ -107,3 +110,35 @@ class InteractionRuntime(_AgentPipeline):
             raise NativeInteractionOutputError(
                 f"native InteractionResponse validation failed: {exc}"
             ) from exc
+
+    async def _prepare_capability_route(self, request: AgentRunRequest) -> None:
+        catalog = self.services.capability_catalog
+        if catalog is None or request.route_decision.route in {"interrupt", "ignore"}:
+            return
+        search = await catalog.search(
+            request.text,
+            language=request.language or request.route_decision.language,
+            limit=self.services.capability_match_limit,
+        )
+        request.route_decision.candidate_capabilities = [
+            match.model_dump(mode="json") for match in search.matches
+        ]
+        request.context["capability_catalog_version"] = search.catalog_version
+        request.context["capability_candidates"] = list(
+            request.route_decision.candidate_capabilities
+        )
+        if not search.matched:
+            return
+        request.route_decision.route = search.suggested_route
+        request.route_decision.agents = list(search.suggested_agents)
+        request.route_decision.intent = (
+            f"capability:{search.matches[0].capability_id}"
+            if search.matches
+            else "capability_match"
+        )
+        request.route_decision.confidence = max(
+            request.route_decision.confidence,
+            search.matches[0].score if search.matches else 0.0,
+        )
+        request.route_decision.source = "catalog"
+        request.route_decision.reason = "Matched shared capability catalog"

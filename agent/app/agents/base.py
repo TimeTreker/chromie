@@ -8,6 +8,7 @@ from ..clients.ollama_client import OllamaClient
 from ..schema import AgentResult, AgentRunRequest
 
 if TYPE_CHECKING:
+    from ..capabilities.catalog import CapabilityCatalog
     from ..task_graph.planner import TaskGraphPlanner
 
 
@@ -17,6 +18,8 @@ class AgentServices:
     use_llm: bool = True
     max_speak_chars: int = 120
     task_graph_planner: "TaskGraphPlanner | None" = None
+    capability_catalog: "CapabilityCatalog | None" = None
+    capability_match_limit: int = 8
 
 
 class BaseAgent(ABC):

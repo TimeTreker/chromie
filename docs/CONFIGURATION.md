@@ -28,16 +28,18 @@ Use:
 
 ## Reproducible build and model identity
 
-Release inputs use versioned image references and exact direct dependency pins.
-A publishable release still records the resolved content digests and transitive
-Python environment in `build-provenance.json`; a version tag alone is not treated
-as immutable proof.
+Runtime image aliases are defined once in `.env.common` and may be overridden
+locally in `.env.local`. Docker Compose consumes the generated `.env.runtime`;
+startup scripts do not redefine image names or tags. Publishable releases record
+the resolved image IDs/digests and transitive Python environment in
+`build-provenance.json`, so a mutable local alias such as `latest` is never
+treated as immutable proof.
 
 | Variable | Purpose |
 |---|---|
-| `CHROMIE_IMAGE_TAG` | Version tag applied to the four repository-built service images. |
+| `CHROMIE_IMAGE_TAG` | Single tag value applied by Compose to the four repository-built service images. |
 | `PYTHON_IMAGE` | Versioned Python base image for Router and Agent builds. |
-| `OLLAMA_IMAGE` | Versioned Ollama runtime image. |
+| `OLLAMA_IMAGE` | Complete Ollama runtime image reference consumed directly by Compose. |
 | `ASR_CUDA_IMAGE`, `TTS_CUDA_IMAGE` | Versioned CUDA base images selected by the active profile/common configuration. |
 
 Model repository revisions are tracked in
@@ -81,6 +83,7 @@ Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
 | `BUILD=1` | Build service images before startup. |
 | `REBUILD_NO_CACHE=1` | Rebuild service images without cache. |
 | `FOLLOW_LOGS=1` | Follow service logs after startup. |
+| `CHROMIE_PULL_POLICY` | Compose pull policy used by `start_services.sh`; default `never` for local project images. |
 | `WARM_OLLAMA_BEFORE_ORCH` | Warm the selected Agent model before opening the microphone; default `1`. |
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
@@ -134,6 +137,10 @@ configuration.
 | `ROUTER_TIMEOUT_MS` | `1500` in common configuration. |
 | `ROUTER_LLM_TIMEOUT_MS` | Falls back to `ROUTER_TIMEOUT_MS`. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
+| `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
+| `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `600`. Catalog failure falls back safely and the Agent rechecks in-process. |
+| `ROUTER_CAPABILITY_MATCH_LIMIT` | Maximum ranked candidates attached to one route; default `8`. |
+| `ROUTER_ALLOW_LEGACY_ROBOT_RULES` | Default `0`; enables old phrase-based robot routing only as an explicit compatibility rollback. Interrupt/noise safety rules remain deterministic. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
 | `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 
@@ -148,6 +155,9 @@ configuration.
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
 | `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `160`. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories inside the Agent container. |
+| `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
+| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for automatic route correction; default `0.16`. |
+| `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` by default; `legacy-adapter` is the explicit rollback path for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | Default `0`; when enabled, only native contract-validation failures use the compatibility adapter. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |

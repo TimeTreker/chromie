@@ -18,7 +18,6 @@ try:
     from release_provenance import (
         declared_images,
         exact_requirement_errors,
-        mutable_image_errors,
         model_lock_errors,
         source_environment,
     )
@@ -26,7 +25,6 @@ except ImportError:
     from scripts.release_provenance import (
         declared_images,
         exact_requirement_errors,
-        mutable_image_errors,
         model_lock_errors,
         source_environment,
     )
@@ -338,8 +336,7 @@ def check_configuration_reference(errors: list[str]) -> None:
 
 def check_release_reproducibility(errors: list[str]) -> None:
     errors.extend(exact_requirement_errors(ROOT))
-    images = declared_images(ROOT, source_environment(ROOT))
-    errors.extend(mutable_image_errors(images))
+    declared_images(ROOT, source_environment(ROOT))
     errors.extend(model_lock_errors(ROOT, source_environment(ROOT)))
     release_text = (ROOT / "docs" / "RELEASE.md").read_text(encoding="utf-8")
     for required in ("build-provenance.json", "model-lock.json"):

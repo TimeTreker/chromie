@@ -97,8 +97,9 @@ else
   echo "[start] Skipping image build. Use BUILD=1 to rebuild."
 fi
 
-echo "[start] Starting containers without building..."
-docker compose "${COMPOSE_ARGS[@]}" up -d --no-build "${SERVICES[@]}"
+PULL_POLICY="${CHROMIE_PULL_POLICY:-never}"
+echo "[start] Starting containers without building (pull policy: ${PULL_POLICY})..."
+docker compose "${COMPOSE_ARGS[@]}" up -d --no-build --pull "$PULL_POLICY" "${SERVICES[@]}"
 
 echo
 echo "[start] Docker service status:"

@@ -11,6 +11,7 @@ from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field
 
 from .agents import AgentServices
+from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .clients.ollama_client import OllamaClient
 from .interaction import (
@@ -128,6 +129,21 @@ class Settings(BaseModel):
         le=10000,
     )
     capability_manifests: str = Field(default_factory=lambda: os.getenv("AGENT_CAPABILITY_MANIFESTS", ""))
+    capability_catalog_refresh_sec: float = Field(
+        default_factory=lambda: float(os.getenv("AGENT_CAPABILITY_CATALOG_REFRESH_SEC", "30")),
+        ge=1.0,
+        le=3600.0,
+    )
+    capability_match_min_score: float = Field(
+        default_factory=lambda: float(os.getenv("AGENT_CAPABILITY_MATCH_MIN_SCORE", "0.16")),
+        ge=0.0,
+        le=1.0,
+    )
+    capability_match_limit: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_CAPABILITY_MATCH_LIMIT", "8")),
+        ge=1,
+        le=32,
+    )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     mode: Literal["runtime"] = "runtime"
 
@@ -143,6 +159,18 @@ logger = logging.getLogger("chromie.agent")
 ollama_client = OllamaClient(settings.ollama_url, settings.model, timeout_ms=settings.timeout_ms)
 configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
 capability_registry = configured_registry.registry
+try:
+    capability_registry.get_tool("soridormi.skill.list")
+except KeyError:
+    capability_catalog_invoker = None
+else:
+    capability_catalog_invoker = McpStreamableHttpInvoker(capability_registry)
+capability_catalog = CapabilityCatalog(
+    capability_registry,
+    live_invoker=capability_catalog_invoker,
+    refresh_ttl_s=settings.capability_catalog_refresh_sec,
+    min_score=settings.capability_match_min_score,
+)
 task_graph_planner = (
     TaskGraphPlanner(capability_registry, ollama_client)
     if settings.enable_task_graph_planning and settings.use_llm
@@ -153,6 +181,8 @@ services = AgentServices(
     use_llm=settings.use_llm,
     max_speak_chars=settings.max_speak_chars,
     task_graph_planner=task_graph_planner,
+    capability_catalog=capability_catalog,
+    capability_match_limit=settings.capability_match_limit,
 )
 runtime = AgentRuntime(services)
 interaction_runtime = InteractionRuntime(services)
@@ -262,6 +292,8 @@ async def health() -> HealthResponse:
         ),
         interaction_output_mode=settings.interaction_output_mode,
         native_interaction_fallback_enabled=settings.native_interaction_fallback,
+        capability_catalog_enabled=True,
+        capability_catalog_version=capability_catalog.version,
     )
 
 
@@ -286,9 +318,35 @@ async def capabilities() -> dict:
     return payload
 
 
+@app.get("/capabilities/catalog")
+async def capability_catalog_snapshot(refresh: bool = False) -> dict[str, object]:
+    return await capability_catalog.snapshot(refresh=refresh)
+
+
+@app.post("/capabilities/search", response_model=CapabilitySearchResult)
+async def capability_search(request: CapabilitySearchRequest) -> CapabilitySearchResult:
+    return await capability_catalog.search(
+        request.text,
+        language=request.language,
+        limit=request.limit,
+        min_score=request.min_score,
+        refresh=request.refresh,
+    )
+
+
 @app.get("/capabilities/llm-context")
-async def capability_llm_context(language: str = "en") -> dict[str, str]:
-    return {"context": capability_registry.llm_context(language=language)}
+async def capability_llm_context(
+    language: str = "en",
+    text: str | None = None,
+    limit: int = 20,
+) -> dict[str, str]:
+    return {
+        "context": await capability_catalog.llm_context(
+            text=text,
+            language=language,
+            limit=max(1, min(limit, 64)),
+        )
+    }
 
 
 @app.post("/task-graphs/validate", response_model=TaskGraphValidationResponse)
