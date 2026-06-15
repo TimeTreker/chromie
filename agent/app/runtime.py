@@ -119,6 +119,7 @@ class InteractionRuntime(_AgentPipeline):
             request.text,
             language=request.language or request.route_decision.language,
             limit=self.services.capability_match_limit,
+            prefer_interaction_executable=True,
         )
         request.route_decision.candidate_capabilities = [
             match.model_dump(mode="json") for match in search.matches

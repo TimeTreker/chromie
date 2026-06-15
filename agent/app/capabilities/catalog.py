@@ -153,6 +153,7 @@ class CapabilitySearchRequest(BaseModel):
     limit: int = Field(default=8, ge=1, le=32)
     min_score: float | None = Field(default=None, ge=0.0, le=1.0)
     refresh: bool = False
+    prefer_interaction_executable: bool = True
 
 
 class CapabilityInvoker(Protocol):
@@ -212,6 +213,7 @@ class CapabilityCatalog:
         limit: int = 8,
         min_score: float | None = None,
         refresh: bool = False,
+        prefer_interaction_executable: bool = True,
     ) -> CapabilitySearchResult:
         del language  # Reserved for future multilingual embeddings.
         await self.refresh_live_named_skills(force=refresh)
@@ -240,6 +242,28 @@ class CapabilityCatalog:
             ),
             reverse=True,
         )
+        if prefer_interaction_executable:
+            # The normal InteractionRuntime can directly execute live named
+            # skills, while static MCP tools are routing/planning context only.
+            # Once an executable candidate clears the same relevance threshold,
+            # keep it ahead of non-executable entries even when a planning tool
+            # has slightly stronger lexical overlap. Static entries remain in
+            # the result so downstream planners still retain full context.
+            executable_matches = {
+                item.capability_id
+                for item in scored
+                if item.interaction_executable and item.score >= threshold
+            }
+            if executable_matches:
+                scored.sort(
+                    key=lambda item: (
+                        item.capability_id in executable_matches,
+                        item.score,
+                        item.invocation_kind == "named_skill",
+                        item.capability_id,
+                    ),
+                    reverse=True,
+                )
         if not scored:
             scored = [
                 CapabilityMatch(

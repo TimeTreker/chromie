@@ -331,6 +331,7 @@ async def capability_search(request: CapabilitySearchRequest) -> CapabilitySearc
         limit=request.limit,
         min_score=request.min_score,
         refresh=request.refresh,
+        prefer_interaction_executable=request.prefer_interaction_executable,
     )
 
 

@@ -44,6 +44,7 @@ class CapabilityAgent(BaseAgent):
             language=self.language(request),
             limit=self.services.capability_match_limit,
             min_score=0.0,
+            prefer_interaction_executable=True,
         )
         request.route_decision.candidate_capabilities = [
             match.model_dump(mode="json") for match in search.matches

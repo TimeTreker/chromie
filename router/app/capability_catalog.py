@@ -36,6 +36,7 @@ class CapabilityCatalogClient:
                         "text": text,
                         "language": language or "auto",
                         "limit": self.limit,
+                        "prefer_interaction_executable": True,
                     },
                 )
                 response.raise_for_status()

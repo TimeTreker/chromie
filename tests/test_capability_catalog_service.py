@@ -76,6 +76,47 @@ def _registry() -> CapabilityRegistry:
     )
 
 
+def _registry_with_planning_tool() -> CapabilityRegistry:
+    return CapabilityRegistry.from_bundles(
+        [
+            CapabilityBundle(
+                source="soridormi-test",
+                agents=[
+                    AgentManifest(
+                        agent_id="soridormi.skill",
+                        tags=["soridormi", "skill"],
+                        tools=[
+                            ToolCapability(
+                                name="soridormi.skill.list",
+                                agent_id="soridormi.skill",
+                                description="List named robot skills.",
+                                effects=["read_only"],
+                                safety_class="safe_read",
+                            )
+                        ],
+                    ),
+                    AgentManifest(
+                        agent_id="soridormi.motion",
+                        tags=["soridormi", "motion", "robot"],
+                        tools=[
+                            ToolCapability(
+                                name="soridormi.motion.create_plan",
+                                agent_id="soridormi.motion",
+                                description=(
+                                    "Create a motion plan to walk forward at a requested "
+                                    "speed for a requested duration."
+                                ),
+                                effects=["planning_only", "creates_plan"],
+                                safety_class="planning_only",
+                            )
+                        ],
+                    ),
+                ],
+            )
+        ]
+    )
+
+
 class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_refreshes_live_named_skills_and_routes_motion(self) -> None:
         invoker = _Invoker()
@@ -95,6 +136,31 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertEqual(invoker.calls, 1)
+
+
+    async def test_prefers_relevant_executable_skill_over_planning_only_tool(self) -> None:
+        catalog = CapabilityCatalog(
+            _registry_with_planning_tool(),
+            live_invoker=_Invoker(),
+            min_score=0.10,
+        )
+
+        result = await catalog.search(
+            "Walk forward at 0.15 speed for 5 seconds.",
+            language="en",
+            prefer_interaction_executable=True,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(result.matches[0].capability_id, "soridormi.walk_forward")
+        self.assertTrue(result.matches[0].interaction_executable)
+        self.assertTrue(
+            any(
+                match.capability_id == "soridormi.motion.create_plan"
+                and not match.interaction_executable
+                for match in result.matches
+            )
+        )
 
     async def test_inventory_question_still_returns_catalog_context(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
