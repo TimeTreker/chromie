@@ -52,6 +52,25 @@ class CapabilityAgent(BaseAgent):
         executable = [
             match for match in search.matches if match.interaction_executable
         ]
+        selected_id = ""
+        intent = (request.route_decision.intent or "").strip()
+        if intent.startswith("capability:"):
+            selected_id = intent[len("capability:") :].strip()
+        if selected_id:
+            selected = [
+                match for match in executable if match.capability_id == selected_id
+            ]
+            if not selected:
+                result.metadata["capability_handled"] = True
+                result.metadata["capability_decision"] = "blocked"
+                result.metadata["invalid_selected_capability_id"] = selected_id
+                self.trace(
+                    result,
+                    f"router-selected capability is unavailable or non-executable: {selected_id}",
+                )
+                return result
+            executable = selected
+            self.trace(result, f"honoring router-selected capability: {selected_id}")
         if not executable:
             result.metadata["capability_search"] = search.model_dump(mode="json")
             self.trace(result, "no interaction-executable capability matched")

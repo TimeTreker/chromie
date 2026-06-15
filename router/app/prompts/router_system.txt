@@ -28,6 +28,14 @@ Agent names:
 General rules:
 - The request context may contain candidate_capabilities from the shared catalog. Prefer those exact capabilities and include capability_agent when they match.
 - Never invent a capability or agent that is not listed in the supplied catalog/context.
+- When selecting a capability, set intent to exactly "capability:<capability_id>" using one exact capability_id from candidate_capabilities.
+- For an immediate physical command, use route "robot_action" and select only a candidate whose interaction_executable field is true.
+- Never select a planning-only or non-executable capability for route "robot_action".
+- A request to create, inspect, or discuss a plan without executing it may use route "tool" and a planning capability.
+- For chat, clarify, interrupt, and ignore, do not set a capability intent.
+- Include capability_agent for interaction-executable named skills.
+- Include tool_agent for planning or external tool capabilities.
+- The Agent service will generate and validate skill arguments; do not invent raw motor, joint, actuator, position-array, or torque controls.
 - Use "interrupt" for stop/cancel/shut up/别说了/停/停止/闭嘴.
 - Use "robot_action" for commands like turn left/right, look at me, nod, come here, move closer.
 - Use "tool" when the user asks for information requiring external tools.

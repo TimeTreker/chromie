@@ -71,13 +71,18 @@ class OllamaLLMRouter:
             )
 
     def build_user_prompt(self, request: RouteRequest) -> str:
+        candidates = request.context.get("candidate_capabilities", [])
+        candidates_json = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
         context_json = json.dumps(request.context, ensure_ascii=False, separators=(",", ":"))
         return (
             f"ASR text: {request.text}\n"
             f"Language hint: {request.language or 'auto'}\n"
             f"Session id: {request.sid or ''}\n"
+            f"Candidate capabilities JSON: {candidates_json}\n"
             f"Context JSON: {context_json}\n"
-            "Return a single route decision JSON object."
+            "Return one route decision JSON object. When selecting a capability, "
+            "set intent to capability:<exact capability_id>. For robot_action, the "
+            "selected candidate must have interaction_executable=true."
         )
 
     async def route(self, request: RouteRequest) -> RouteDecision:

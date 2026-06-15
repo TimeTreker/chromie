@@ -115,6 +115,123 @@ async def routes() -> dict:
     }
 
 
+def _capability_id(item: dict) -> str:
+    return str(item.get("capability_id") or "").strip()
+
+
+def _intent_capability_id(intent: str) -> str:
+    prefix = "capability:"
+    normalized = (intent or "").strip()
+    if not normalized.startswith(prefix):
+        return ""
+    return normalized[len(prefix) :].strip()
+
+
+def _capability_available(item: dict) -> bool:
+    return item.get("available") is not False
+
+
+def _capability_executable(item: dict) -> bool:
+    return _capability_available(item) and bool(item.get("interaction_executable"))
+
+
+def _looks_like_planning_request(text: str) -> bool:
+    normalized = " ".join((text or "").lower().split())
+    phrases = (
+        "create a plan",
+        "make a plan",
+        "plan a route",
+        "motion plan",
+        "without executing",
+        "do not execute",
+        "don't execute",
+        "simulate only",
+    )
+    return any(phrase in normalized for phrase in phrases)
+
+
+def _clarify_capability_decision(
+    request: RouteRequest,
+    result: CapabilityCatalogResult,
+    *,
+    reason: str,
+) -> RouteDecision:
+    language = request.language or "auto"
+    speak_first = (
+        "你希望我现在执行动作，还是只创建动作计划？"
+        if language.startswith("zh")
+        else "Should I execute the motion now, or only create a motion plan?"
+    )
+    return finalize_decision(
+        RouteDecision(
+            route="clarify",
+            agents=["speaker_agent"],
+            intent="clarify_capability_selection",
+            confidence=0.0,
+            language=language,
+            needs_agent=True,
+            should_speak=True,
+            speak_first=speak_first,
+            candidate_capabilities=list(result.matches),
+            reason=reason,
+            source="llm",
+        ),
+        request,
+        source="llm",
+    )
+
+
+def _validate_llm_capability_decision(
+    request: RouteRequest,
+    decision: RouteDecision,
+    result: CapabilityCatalogResult,
+) -> RouteDecision:
+    candidates = list(result.matches)
+    decision.candidate_capabilities = candidates
+    by_id = {_capability_id(item): item for item in candidates if _capability_id(item)}
+    selected_id = _intent_capability_id(decision.intent)
+
+    if decision.route == "robot_action":
+        selected = by_id.get(selected_id)
+        if selected is None or not _capability_executable(selected):
+            if _looks_like_planning_request(request.text):
+                return _clarify_capability_decision(
+                    request,
+                    result,
+                    reason="planning request cannot be executed as robot_action",
+                )
+            executable = [item for item in candidates if _capability_executable(item)]
+            if not executable:
+                return _clarify_capability_decision(
+                    request,
+                    result,
+                    reason="no interaction-executable capability is available",
+                )
+            selected_id = _capability_id(executable[0])
+            decision.reason = (
+                f"{decision.reason}; " if decision.reason else ""
+            ) + "validator selected the highest-ranked executable capability"
+
+        decision.intent = f"capability:{selected_id}"
+        required_agents = ["capability_agent", "safety_agent"]
+        if decision.should_speak:
+            required_agents.append("speaker_agent")
+        decision.agents = list(dict.fromkeys([*decision.agents, *required_agents]))
+        return finalize_decision(decision, request, source="llm")
+
+    if selected_id:
+        selected = by_id.get(selected_id)
+        if selected is None or not _capability_available(selected):
+            decision.intent = "unknown"
+        elif decision.route in {"tool", "memory"}:
+            required_agent = "capability_agent" if _capability_executable(selected) else "tool_agent"
+            decision.agents = list(dict.fromkeys([*decision.agents, required_agent]))
+        else:
+            decision.intent = "unknown"
+
+    return finalize_decision(decision, request, source="llm")
+
+
 def _catalog_decision(
     request: RouteRequest,
     result: CapabilityCatalogResult,
@@ -125,13 +242,23 @@ def _catalog_decision(
     if route not in {"chat", "robot_action", "tool", "memory"}:
         route = "tool"
     top = result.matches[0]
+    if route == "robot_action":
+        top = next(
+            (item for item in result.matches if _capability_executable(item)),
+            None,
+        )
+        if top is None:
+            return None
+    selected_id = _capability_id(top)
+    if not selected_id:
+        return None
     score = float(top.get("score") or 0.0)
     agents = list(result.suggested_agents or ["capability_agent", "speaker_agent"])
     return finalize_decision(
         RouteDecision(
             route=route,
             agents=agents,
-            intent=f"capability:{top.get('capability_id', 'match')}",
+            intent=f"capability:{selected_id}",
             confidence=max(0.56, min(0.99, score)),
             language=request.language or "auto",
             priority="normal",
@@ -159,7 +286,24 @@ async def route(request: RouteRequest) -> RouteDecision:
             text=request.text,
             language=request.language,
         )
-        decision = _catalog_decision(request, catalog_result)
+        decision: RouteDecision | None = None
+
+        if settings.mode in ("llm_only", "hybrid"):
+            request.context = {
+                **request.context,
+                "candidate_capabilities": catalog_result.matches,
+                "capability_catalog_version": catalog_result.catalog_version,
+            }
+            llm_decision = await llm_router.route(request)
+            if llm_decision.source == "llm":
+                decision = _validate_llm_capability_decision(
+                    request,
+                    llm_decision,
+                    catalog_result,
+                )
+
+        if decision is None and settings.mode == "rules_only":
+            decision = _catalog_decision(request, catalog_result)
 
         legacy_decision: RouteDecision | None = None
         if decision is None and settings.mode in ("rules_only", "hybrid") and settings.rules_first:
@@ -173,17 +317,14 @@ async def route(request: RouteRequest) -> RouteDecision:
             decision = legacy_decision
 
         if decision is None:
-            if settings.mode == "rules_only":
-                decision = fallback_decision(request, reason="catalog_and_rules_no_match")
-            elif settings.mode in ("llm_only", "hybrid"):
-                request.context = {
-                    **request.context,
-                    "candidate_capabilities": catalog_result.matches,
-                    "capability_catalog_version": catalog_result.catalog_version,
-                }
-                decision = await llm_router.route(request)
-            else:
-                decision = fallback_decision(request, reason=f"unknown_router_mode:{settings.mode}")
+            decision = _catalog_decision(request, catalog_result)
+        if decision is None:
+            reason = (
+                "catalog_rules_and_llm_no_match"
+                if settings.mode in ("llm_only", "hybrid")
+                else "catalog_and_rules_no_match"
+            )
+            decision = fallback_decision(request, reason=reason)
 
     decision = finalize_decision(decision, request, source=decision.source)
     elapsed_ms = (time.perf_counter() - start) * 1000.0
