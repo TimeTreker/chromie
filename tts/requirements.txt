@@ -1,5 +1,4 @@
 outetts==0.4.4
-torch==2.10.0
 websockets==16.0
 numpy==2.3.5
 scipy==1.17.0

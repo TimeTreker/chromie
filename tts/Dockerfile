@@ -2,6 +2,7 @@ ARG TTS_CUDA_IMAGE=nvidia/cuda:12.8.1-devel-ubuntu24.04
 FROM ${TTS_CUDA_IMAGE}
 
 ARG TTS_CUDA_ARCH=89
+ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG http_proxy
@@ -48,6 +49,15 @@ ENV LIBRARY_PATH=/usr/local/cuda/lib64:${LIBRARY_PATH}
 ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
 COPY requirements.txt .
+
+# Install a torch/torchaudio pair built for the same CUDA runtime as the
+# base image. Installing these from the default PyPI index can select a
+# newer CUDA build (for example cu130), which then fails at import time
+# because libcudart.so.13 is not present in the CUDA 12.8 container.
+RUN pip install --no-cache-dir \
+    --index-url "${PYTORCH_INDEX_URL}" \
+    torch==2.10.0 \
+    torchaudio==2.10.0
 
 RUN pip install --no-cache-dir -r requirements.txt
 
