@@ -57,6 +57,45 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.source, "fallback")
 
+    async def test_stop_now_is_priority_interrupt(self) -> None:
+        from router.app import main
+
+        decision = await main.route(RouteRequest(text="Stop now."))
+
+        self.assertEqual(decision.route, "interrupt")
+        self.assertTrue(decision.interrupt_current)
+        self.assertFalse(decision.needs_agent)
+        self.assertFalse(decision.should_speak)
+
+    async def test_chat_catalog_match_does_not_select_speech_tool_as_intent(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="tell me a joke",
+            matched=True,
+            suggested_route="chat",
+            suggested_agents=["capability_agent", "conversation_agent", "speaker_agent"],
+            catalog_version=4,
+            matches=[
+                {
+                    "capability_id": "chromie.speak",
+                    "agent_id": "chromie.speech",
+                    "description": "Speak a short message.",
+                    "score": 0.41,
+                    "interaction_executable": False,
+                }
+            ],
+        )
+        with patch.object(main, "capability_catalog", _Catalog(result)), patch.object(
+            main.settings, "mode", "rules_only"
+        ):
+            decision = await main.route(RouteRequest(text="Tell me a joke."))
+
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertNotEqual(decision.intent, "capability:chromie.speak")
+        self.assertIn("conversation_agent", decision.agents)
+
 
 if __name__ == "__main__":
     unittest.main()

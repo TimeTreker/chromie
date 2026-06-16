@@ -10,7 +10,7 @@ def _norm(text: str) -> str:
 
 
 INTERRUPT_PATTERNS = [
-    r"^(stop|cancel|quiet|shut up|be quiet|enough|pause|hold on)[.!?]*$",
+    r"^(stop|cancel|quiet|shut up|be quiet|enough|pause|hold on)(?:\s+(?:now|please))?[.!?]*$",
     r"(stop talking|stop speaking|don't speak|do not speak)",
     r"^(停|停下|停止|闭嘴|别说了|不要说了|安静|暂停|打住)[。！!？?]*$",
 ]

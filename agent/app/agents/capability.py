@@ -52,6 +52,54 @@ class CapabilityAgent(BaseAgent):
         executable = [
             match for match in search.matches if match.interaction_executable
         ]
+        direct_actions = list(request.route_decision.actions or [])
+        if direct_actions:
+            allowed = {match.capability_id: match for match in executable}
+            selected_ids: list[str] = []
+            for action in sorted(
+                direct_actions,
+                key=lambda item: int(item.get("sequence", 0)),
+            ):
+                capability_id = str(action.get("capability_id") or "").strip()
+                match = allowed.get(capability_id)
+                if match is None:
+                    result.metadata["capability_handled"] = True
+                    result.metadata["capability_decision"] = "blocked"
+                    result.metadata["invalid_selected_capability_id"] = capability_id
+                    self.trace(
+                        result,
+                        f"router action capability is unavailable or non-executable: {capability_id}",
+                    )
+                    return result
+                args = action.get("args")
+                if not isinstance(args, dict):
+                    args = {}
+                add_skill(
+                    SkillRequest(
+                        skill_id=capability_id,
+                        args=args,
+                        timing="sequential",
+                        requires_confirmation=match.requires_confirmation,
+                        metadata={
+                            "source": "router_actions",
+                            "catalog_version": search.catalog_version,
+                            "catalog_score": match.score,
+                            "sequence": int(action.get("sequence", len(selected_ids))),
+                        },
+                    )
+                )
+                selected_ids.append(capability_id)
+            if selected_ids:
+                speech = self._direct_plan_speech(selected_ids, direct_actions)
+                if speech:
+                    result.add_speak_immediate(speech, style="brief")
+                result.metadata["capability_handled"] = True
+                result.metadata["capability_decision"] = "execute"
+                result.metadata["capability_catalog_version"] = search.catalog_version
+                result.metadata["capability_selected"] = selected_ids
+                self.trace(result, f"accepted {len(selected_ids)} router capability action(s)")
+                return result
+
         selected_id = ""
         intent = (request.route_decision.intent or "").strip()
         if intent.startswith("capability:"):
@@ -123,6 +171,26 @@ class CapabilityAgent(BaseAgent):
         ]
         self.trace(result, f"selected {selected} catalog capability request(s)")
         return result
+
+    def _direct_plan_speech(
+        self,
+        selected_ids: list[str],
+        actions: list[dict[str, Any]],
+    ) -> str:
+        if len(selected_ids) > 1:
+            return "I will do those actions in order."
+        skill_id = selected_ids[0]
+        args = actions[0].get("args") if actions else {}
+        args = args if isinstance(args, dict) else {}
+        if skill_id == "soridormi.walk_velocity":
+            return "Walking backward." if float(args.get("vx_mps", 0.0)) < 0 else "Walking forward."
+        if skill_id == "soridormi.turn_in_place":
+            return "Turning left." if float(args.get("yaw_radps", 0.0)) < 0 else "Turning right."
+        if skill_id == "soridormi.nod_yes":
+            return "Nodding."
+        if skill_id == "soridormi.shake_no":
+            return "Shaking my head."
+        return "Okay."
 
     async def _plan(self, request: AgentRunRequest, candidates: list[Any]) -> _CapabilityPlan:
         assert self.services.ollama is not None

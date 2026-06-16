@@ -1,0 +1,51 @@
+[
+  {
+    "id": "walk_forward_velocity",
+    "text": "Walk forward at 0.15 speed for 10 seconds.",
+    "expected_route": "robot_action",
+    "expected_capabilities": ["soridormi.walk_velocity"],
+    "required_candidates": ["soridormi.walk_velocity"]
+  },
+  {
+    "id": "turn_left",
+    "text": "Turn left for two seconds.",
+    "expected_route": "robot_action",
+    "expected_capabilities": ["soridormi.turn_in_place"],
+    "required_candidates": ["soridormi.turn_in_place"]
+  },
+  {
+    "id": "nod_twice",
+    "text": "Nod your head twice.",
+    "expected_route": "robot_action",
+    "expected_capabilities": ["soridormi.nod_yes"],
+    "required_candidates": ["soridormi.nod_yes"]
+  },
+  {
+    "id": "compound_walk_turn_nod",
+    "text": "Walk forward for 10 seconds and then turn left and then nod your head twice.",
+    "expected_route": "robot_action",
+    "expected_capabilities": [
+      "soridormi.walk_velocity",
+      "soridormi.turn_in_place",
+      "soridormi.nod_yes"
+    ],
+    "required_candidates": [
+      "soridormi.walk_velocity",
+      "soridormi.turn_in_place",
+      "soridormi.nod_yes"
+    ],
+    "require_ordered_actions": true
+  },
+  {
+    "id": "interrupt_stop",
+    "text": "Stop now.",
+    "expected_route": "interrupt",
+    "expected_capabilities": []
+  },
+  {
+    "id": "ordinary_chat",
+    "text": "Tell me something interesting.",
+    "expected_route": "chat",
+    "expected_capabilities": []
+  }
+]

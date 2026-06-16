@@ -15,6 +15,7 @@ from .config import router_mode_from_env
 from .fallback import fallback_decision
 from .llm_router import OllamaLLMRouter
 from .rules import route_by_priority_rules, route_by_rules
+from .semantic_actions import semantic_robot_decision
 from .schema import HealthResponse, RouteDecision, RouteRequest, finalize_decision
 
 
@@ -241,6 +242,24 @@ def _catalog_decision(
     route = result.suggested_route
     if route not in {"chat", "robot_action", "tool", "memory"}:
         route = "tool"
+    if route == "chat":
+        return finalize_decision(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=max(0.56, min(0.99, float(result.matches[0].get("score") or 0.0))),
+                language=request.language or "auto",
+                priority="normal",
+                needs_agent=True,
+                should_speak=True,
+                candidate_capabilities=result.matches,
+                reason=f"Catalog indicated conversational handling v{result.catalog_version}",
+                source="catalog",
+            ),
+            request,
+            source="catalog",
+        )
     top = result.matches[0]
     if route == "robot_action":
         top = next(
@@ -286,9 +305,9 @@ async def route(request: RouteRequest) -> RouteDecision:
             text=request.text,
             language=request.language,
         )
-        decision: RouteDecision | None = None
+        decision: RouteDecision | None = semantic_robot_decision(request, catalog_result)
 
-        if settings.mode in ("llm_only", "hybrid"):
+        if decision is None and settings.mode in ("llm_only", "hybrid"):
             request.context = {
                 **request.context,
                 "candidate_capabilities": catalog_result.matches,
