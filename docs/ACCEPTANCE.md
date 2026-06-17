@@ -25,16 +25,18 @@ A higher level does not replace lower-level regression tests.
 | ASR/TTS GPU use | Limited | GPU smoke tooling | Not applicable | RTX 5090 smoke passed 21/21 |
 | Audio devices and barge-in | Partial | Manual host run | Can pair with sim | PipeWire virtual-mic 7/7 passed; physical microphone/speaker open |
 
-Retained reference-host evidence from June 14, 2026:
+Retained reference-host evidence from June 14 and June 17, 2026:
 
 | Evidence ID | Revision | Result | Scope |
 |---|---|---|---|
 | GPU `20260614T130944Z` | `280c36a` | 21 passed, 0 failed | RTX 5090 service/GPU smoke, Ollama GPU placement, ASR/TTS health, generated PCM |
 | M13 `20260614T132934Z` | `f0e22ba` | 7/7 passed | Synthetic framed PCM through VAD, ASR, Router, Agent, Skill Runtime, TTS, and MuJoCo |
 | M13 `20260614T133155Z` | `f0e22ba` | 7/7 passed | PipeWire virtual-microphone capture through the same interaction and MuJoCo path |
+| M13 `20260617T075825Z` | `4604a03` | 7/7 passed | Clean synthetic framed PCM through VAD, ASR, Router, Agent live Soridormi catalog, host confirmation, Skill Runtime, TTS, and MuJoCo |
 
-The two M13 bundles pass the automated verifier with `--require-clean`, zero
-errors, and zero warnings. They report `release_eligible=false` by design.
+The retained M13 automated bundles pass the verifier with `--require-clean`
+and `--allow-automated`, zero errors, and zero warnings. They report
+`release_eligible=false` by design.
 
 ## Level A — automated suite
 
@@ -42,7 +44,7 @@ errors, and zero warnings. They report `release_eligible=false` by design.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 273 current tests and 20 legacy Agent
+At the current working revision this runs 278 current tests and 20 legacy Agent
 tests.
 It also runs the documentation consistency checker.
 
