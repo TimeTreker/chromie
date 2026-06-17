@@ -217,8 +217,9 @@ route = post(
     "http://127.0.0.1:8091/route",
     {"sid": "gpu-smoke-control", "text": "turn left", "language": "en-US", "context": {}},
 )
-assert route.get("route") == "robot_action", route
-assert route.get("intent") == "turn_left", route
+assert route.get("route") == "chat", route
+assert route.get("intent") == "general_conversation", route
+assert route.get("actions") == [], route
 
 agent = post(
     "http://127.0.0.1:8092/run",
@@ -231,13 +232,14 @@ agent = post(
         "history": [],
     },
 )
-actions = agent.get("actions") or []
-assert any(action.get("type") == "head.turn" for action in actions), agent
+assert agent.get("status") == "ok", agent
+assert agent.get("actions") == [], agent
+assert agent.get("speak_immediate"), agent
 print(json.dumps({"route": route, "agent": agent}, ensure_ascii=False))
 PY
 }
 
-run_step "Run deployed Router-to-Agent control-plane round trip" check_control_plane_http || true
+run_step "Run deployed Router-to-Agent safe chat control-plane round trip" check_control_plane_http || true
 
 check_asr_websocket() {
   docker exec -i chromie-asr python - <<'PY'

@@ -5,6 +5,17 @@ quote() {
   printf '%q' "$1"
 }
 
+trim() {
+  sed 's/^ *//;s/ *$//'
+}
+
+is_nvidia_smi_failure() {
+  case "$1" in
+    *"NVIDIA-SMI has failed"*|*"couldn't communicate with the NVIDIA driver"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 emit() {
   local key="$1"
   local value="${2:-}"
@@ -37,9 +48,19 @@ gpu_memory_total_mib=""
 detected_cuda_arch=""
 
 if command -v nvidia-smi >/dev/null 2>&1; then
-  gpu_name="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1 | sed 's/^ *//;s/ *$//' || true)"
-  gpu_compute_cap="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -n1 | sed 's/^ *//;s/ *$//' || true)"
-  gpu_memory_total_mib="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -n1 | sed 's/^ *//;s/ *$//' || true)"
+  gpu_line="$(
+    nvidia-smi \
+      --query-gpu=name,driver_version,compute_cap,memory.total,memory.used,temperature.gpu,power.draw \
+      --format=csv,noheader 2>/dev/null | head -n1 || true
+  )"
+  if [ -n "$gpu_line" ] && ! is_nvidia_smi_failure "$gpu_line"; then
+    IFS=, read -r gpu_name _gpu_driver gpu_compute_cap gpu_memory_total_mib _gpu_used _gpu_temp _gpu_power <<EOF
+$gpu_line
+EOF
+    gpu_name="$(printf '%s' "$gpu_name" | trim)"
+    gpu_compute_cap="$(printf '%s' "$gpu_compute_cap" | trim)"
+    gpu_memory_total_mib="$(printf '%s' "$gpu_memory_total_mib" | trim | sed 's/[[:space:]]*MiB$//')"
+  fi
 fi
 
 # Jetson usually does not provide a desktop-style nvidia-smi. Infer common CUDA arch from model.

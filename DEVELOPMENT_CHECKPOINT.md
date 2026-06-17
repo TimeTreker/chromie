@@ -51,7 +51,7 @@ checklist.
 ## Verification baseline
 
 ```text
-233 current unittest cases passed
+260 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -11,6 +12,27 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class HardwareProfileDetectionTests(unittest.TestCase):
+    def _collect_with_fake_nvidia_smi(self, script: str) -> dict[str, str]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_bin = Path(temp_dir) / "bin"
+            fake_bin.mkdir()
+            fake_nvidia_smi = fake_bin / "nvidia-smi"
+            fake_nvidia_smi.write_text(script)
+            fake_nvidia_smi.chmod(0o755)
+            result = subprocess.run(
+                [str(ROOT / "scripts" / "collect_system_info.sh")],
+                cwd=ROOT,
+                env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"},
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        values: dict[str, str] = {}
+        for line in result.stdout.splitlines():
+            key, raw_value = line.split("=", 1)
+            values[key] = shlex.split(raw_value)[0] if raw_value else ""
+        return values
+
     def _detect(self, **values: str) -> str:
         defaults = {
             "CHROMIE_IS_JETSON": "0",
@@ -84,6 +106,27 @@ class HardwareProfileDetectionTests(unittest.TestCase):
             ),
             "jetson_thor",
         )
+
+    def test_collect_system_info_parses_full_gpu_query(self) -> None:
+        values = self._collect_with_fake_nvidia_smi(
+            "#!/usr/bin/env bash\n"
+            "printf '%s\\n' 'NVIDIA GeForce RTX 5090, 595.71.05, 12.0, 32607 MiB, 609 MiB, 33, 39.44 W'\n"
+        )
+        self.assertEqual(values["CHROMIE_NVIDIA_GPU_NAME"], "NVIDIA GeForce RTX 5090")
+        self.assertEqual(values["CHROMIE_NVIDIA_COMPUTE_CAP"], "12.0")
+        self.assertEqual(values["CHROMIE_NVIDIA_MEMORY_TOTAL_MIB"], "32607")
+        self.assertEqual(values["CHROMIE_DETECTED_CUDA_ARCH"], "120")
+
+    def test_collect_system_info_discards_nvidia_smi_failure_text(self) -> None:
+        values = self._collect_with_fake_nvidia_smi(
+            "#!/usr/bin/env bash\n"
+            "printf '%s\\n' \"NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver.\"\n"
+            "exit 9\n"
+        )
+        self.assertEqual(values["CHROMIE_NVIDIA_GPU_NAME"], "")
+        self.assertEqual(values["CHROMIE_NVIDIA_COMPUTE_CAP"], "")
+        self.assertEqual(values["CHROMIE_NVIDIA_MEMORY_TOTAL_MIB"], "")
+        self.assertEqual(values["CHROMIE_DETECTED_CUDA_ARCH"], "")
 
 
 if __name__ == "__main__":

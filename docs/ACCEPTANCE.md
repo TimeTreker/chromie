@@ -42,7 +42,7 @@ errors, and zero warnings. They report `release_eligible=false` by design.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 233 current tests and 20 legacy Agent
+At the current working revision this runs 260 current tests and 20 legacy Agent
 tests.
 It also runs the documentation consistency checker.
 
