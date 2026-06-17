@@ -89,6 +89,11 @@ The repository test command is:
 ./scripts/run_tests.sh
 ```
 
+For focused Level A development checks, `python scripts/test_matrix.py --list`
+shows roadmap-aligned module groups and declared combinations. These checks are
+convenience slices over the existing automated tests and do not replace the
+canonical full-suite gate above.
+
 At the current working revision it runs:
 
 - **233** current `unittest` cases under `tests/`;

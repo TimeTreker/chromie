@@ -39,12 +39,25 @@ class _BlockingModel:
 
 
 class TranscriptionExecutorTests(unittest.IsolatedAsyncioTestCase):
+    async def _wait_for_event(
+        self,
+        event: threading.Event,
+        *,
+        timeout_s: float,
+    ) -> bool:
+        deadline = asyncio.get_running_loop().time() + timeout_s
+        while not event.is_set():
+            if asyncio.get_running_loop().time() >= deadline:
+                return False
+            await asyncio.sleep(0.01)
+        return True
+
     async def test_inference_does_not_block_event_loop_and_is_bounded(self) -> None:
         model = _BlockingModel()
         executor = TranscriptionExecutor(max_concurrency=1)
         try:
             first = asyncio.create_task(executor.transcribe(model, [0.0]))
-            started = await asyncio.to_thread(model.started.wait, 1.0)
+            started = await self._wait_for_event(model.started, timeout_s=1.0)
             self.assertTrue(started)
 
             # This timer still runs while the fake synchronous model is blocked.

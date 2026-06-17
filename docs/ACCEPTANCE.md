@@ -46,6 +46,21 @@ At the current working revision this runs 233 current tests and 20 legacy Agent
 tests.
 It also runs the documentation consistency checker.
 
+For roadmap-aligned module and combination checks, use:
+
+```bash
+python scripts/test_matrix.py --list
+python scripts/test_matrix.py router
+python scripts/test_matrix.py asr tts router
+python scripts/test_matrix.py local-modules
+python scripts/test_matrix.py voice-mujoco-alpha
+```
+
+This runner is a Level A convenience layer over existing tests. It lets modules
+be tested independently or in declared combinations, but it does not replace the
+canonical `./scripts/run_tests.sh` gate and it does not create GPU, microphone,
+MuJoCo, or hardware evidence.
+
 ## Level B — deployed service checks
 
 ```bash
