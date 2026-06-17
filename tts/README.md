@@ -7,10 +7,17 @@ barge-in.
 
 ## Concurrency model
 
-One OuteTTS/llama.cpp interface owns mutable model and CUDA state in a dedicated
-child process. Generation is therefore serialized through a single worker even
-when multiple WebSocket clients are connected. `TTS_MAX_CONCURRENT_SYNTHESIS`
-limits admitted synthesis work, but it does not make model generation parallel.
+Each OuteTTS/llama.cpp interface owns mutable model and CUDA state in a dedicated
+child process. `TTS_WORKER_COUNT` controls how many independent model workers
+are started; the common/default configuration uses one worker, while the RTX
+5090 profile can use two. `TTS_MAX_CONCURRENT_SYNTHESIS` limits admitted
+synthesis work and should not exceed the configured worker count unless queueing
+inside the service is intentional.
+
+For latency, the host Orchestrator can split one logical reply into multiple
+ordered synthesis requests. That allows the first chunk to play while later
+chunks wait for or use the model worker. Audible playback remains serialized by
+the Orchestrator.
 
 Cancelling an active synthesis (normally because the Orchestrator closes the
 WebSocket during barge-in) terminates and restarts the child process. This is
@@ -110,6 +117,7 @@ TTS_MAX_LENGTH=4096
 TTS_MAX_TEXT_CHARS=220
 TTS_MIN_TEXT_CHARS=4
 TTS_MAX_CONCURRENT_SYNTHESIS=1
+TTS_WORKER_COUNT=1
 TTS_GENERATION_RETRIES=1
 TTS_RESET_LLAMA_STATE=1
 TTS_WORKER_STARTUP_TIMEOUT_SEC=600

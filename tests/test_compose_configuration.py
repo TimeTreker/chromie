@@ -20,6 +20,29 @@ class ComposeConfigurationTests(unittest.TestCase):
             llm_block,
         )
 
+    def test_ollama_service_allows_two_loaded_models_without_extra_parallelism(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        llm_block = compose.split("  chromie-llm:", 1)[1].split(
+            "  chromie-router:",
+            1,
+        )[0]
+
+        self.assertIn(
+            "OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-2}",
+            llm_block,
+        )
+        self.assertIn("OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}", llm_block)
+
+    def test_router_service_uses_fast_llm_by_default(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        router_block = compose.split("  chromie-router:", 1)[1].split(
+            "  chromie-agent:",
+            1,
+        )[0]
+
+        self.assertIn("ROUTER_USE_LLM: ${ROUTER_USE_LLM:-1}", router_block)
+        self.assertIn("ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:0.6b}", router_block)
+
 
 if __name__ == "__main__":
     unittest.main()

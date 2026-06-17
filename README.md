@@ -85,7 +85,9 @@ BUILD=1 ./scripts/start_services.sh
 ```
 
 Chromie generates `.env.runtime` from committed defaults, the selected hardware
-profile, and `.env.local`. Do not edit `.env.runtime` directly.
+profile, and `.env.local`. It also writes an ignored root `.env` so plain
+`docker compose ...` commands can interpolate the same values. Do not edit
+either generated file directly.
 
 For complete setup, model warming, audio configuration, health checks, and
 recovery, use the [Operations Runbook](CHROMIE_RUNBOOK.md).

@@ -17,6 +17,7 @@ class AgentServices:
     ollama: OllamaClient | None = None
     use_llm: bool = True
     max_speak_chars: int = 120
+    expressive_body_cues: str = "sim_only"
     task_graph_planner: "TaskGraphPlanner | None" = None
     capability_catalog: "CapabilityCatalog | None" = None
     capability_match_limit: int = 8

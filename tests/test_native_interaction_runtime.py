@@ -4,6 +4,7 @@ import unittest
 from typing import Any
 
 from agent.app.agents import AgentServices
+from agent.app.capabilities.catalog import CapabilityMatch, CapabilitySearchResult
 from agent.app.interaction import (
     InteractionOutputCoordinator,
     NativeInteractionOutputError,
@@ -50,6 +51,164 @@ class _LegacyRuntimeStub:
         return self.result
 
 
+class _AgreementOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> str:
+        del prompt, kwargs
+        return "Yes, you are correct."
+
+
+class _ChatOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> str:
+        del prompt, kwargs
+        return "I am listening."
+
+
+class _WeakAgreementCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del kwargs
+        return CapabilitySearchResult(
+            query=text,
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "conversation_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=7,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.turn_in_place",
+                    agent_id="soridormi.skill",
+                    description="Rotate left or right with near-zero forward velocity.",
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.165,
+                    metadata={"mode": "sim"},
+                ),
+                CapabilityMatch(
+                    capability_id="soridormi.nod_yes",
+                    agent_id="soridormi.skill",
+                    description="Visible repeated bounded head pitch motion for yes/acknowledgement.",
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.03,
+                    metadata={"mode": "sim"},
+                ),
+            ],
+        )
+
+
+class _AttentionCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del kwargs
+        return CapabilitySearchResult(
+            query=text,
+            matched=False,
+            suggested_route="chat",
+            suggested_agents=[],
+            catalog_version=9,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.express_attention",
+                    agent_id="soridormi.skill",
+                    description="Small head-only attention/listening gesture.",
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.0,
+                    metadata={"mode": "sim"},
+                )
+            ],
+        )
+
+
+class _SpeechCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del kwargs
+        return CapabilitySearchResult(
+            query=text,
+            matched=True,
+            suggested_route="chat",
+            suggested_agents=[
+                "capability_agent",
+                "conversation_agent",
+                "speaker_agent",
+            ],
+            catalog_version=10,
+            matches=[
+                CapabilityMatch(
+                    capability_id="chromie.speak",
+                    agent_id="chromie.speech",
+                    description="Speak a short message to the user.",
+                    effects=["user_interaction", "audio_output"],
+                    safety_class="low_risk_action",
+                    interaction_executable=False,
+                    requires_confirmation=False,
+                    route="chat",
+                    score=0.455,
+                ),
+                CapabilityMatch(
+                    capability_id="soridormi.express_attention",
+                    agent_id="soridormi.skill",
+                    description="Small head-only attention/listening gesture.",
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.0,
+                    metadata={"mode": "sim"},
+                ),
+            ],
+        )
+
+
+class _WalkCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del text, kwargs
+        return CapabilitySearchResult(
+            query="walk",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=11,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.walk_velocity",
+                    agent_id="soridormi.skill",
+                    description="Track a bounded body velocity command.",
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.5,
+                    metadata={"mode": "sim"},
+                )
+            ],
+        )
+
+
+class _JokeOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> str:
+        del prompt, kwargs
+        return "Why did the robot bring a ladder? To reach the cloud."
+
+
 def _request(
     *,
     text: str = "nod",
@@ -84,6 +243,183 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args, {"count": 2})
         self.assertEqual(response.speech[0].text, "Okay.")
         self.assertIn("robot_pose_controller_agent", response.metadata["handled_by"])
+
+    async def test_speech_while_body_action_waits_for_playback_start(self) -> None:
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "native-interaction",
+                "text": "sing a song for me while walk forward for 10 seconds",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_velocity",
+                    "confidence": 0.99,
+                    "language": "en-US",
+                    "source": "catalog",
+                    "speak_first": "La la, walking with you.",
+                    "actions": [
+                        {
+                            "capability_id": "soridormi.walk_velocity",
+                            "args": {"vx_mps": 0.18, "duration_s": 10.0},
+                            "sequence": 0,
+                        }
+                    ],
+                },
+            }
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=None,
+                use_llm=False,
+                max_speak_chars=160,
+                capability_catalog=_WalkCatalog(),  # type: ignore[arg-type]
+            )
+        ).run(request)
+
+        self.assertEqual(response.speech[0].timing, "sequential")
+        self.assertEqual(response.speech[0].metadata["alignment"], "body_start")
+        self.assertTrue(response.speech[0].metadata["wait_for_playback_start"])
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_velocity")
+
+    async def test_affirmative_chat_adds_parallel_sim_nod_cue(self) -> None:
+        request = _request(
+            text="I think the sun is hot and round, do you agree with me?",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_AgreementOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_WeakAgreementCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="sim_only",
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(response.speech[0].text, "Yes, you are correct.")
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
+        self.assertEqual(
+            response.skills[0].args,
+            {"count": 2, "amplitude": "small", "duration_s": 1.4},
+        )
+        self.assertEqual(response.skills[0].timing, "parallel")
+        self.assertTrue(response.skills[0].requires_confirmation)
+        self.assertEqual(
+            response.skills[0].metadata["source"],
+            "expressive_body_cue",
+        )
+        self.assertEqual(response.metadata["expressive_body_cue"], "soridormi.nod_yes")
+
+    async def test_chat_only_response_adds_attention_cue(self) -> None:
+        request = _request(
+            text="Tell me something interesting.",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ChatOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="sim_only",
+            )
+        ).run(request)
+
+        self.assertEqual(response.speech[0].text, "I am listening.")
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
+        self.assertEqual(
+            response.skills[0].args,
+            {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
+        )
+        self.assertEqual(response.skills[0].timing, "parallel")
+        self.assertEqual(
+            response.skills[0].metadata["reason"],
+            "chat_attention",
+        )
+        self.assertEqual(
+            response.metadata["expressive_body_cue"],
+            "soridormi.express_attention",
+        )
+
+    async def test_chat_catalog_speech_match_still_uses_conversation_llm(self) -> None:
+        request = _request(
+            text="tell a joke to me",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_JokeOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_SpeechCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="sim_only",
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(request.route_decision.intent, "general_conversation")
+        self.assertNotEqual(
+            response.metadata.get("capability_decision"),
+            "blocked",
+        )
+        self.assertEqual(
+            response.speech[0].text,
+            "Why did the robot bring a ladder? To reach the cloud.",
+        )
+        self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
+
+    async def test_expressive_body_cues_off_keeps_chat_speech_only(self) -> None:
+        request = _request(
+            text="Tell me something interesting.",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ChatOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="off",
+            )
+        ).run(request)
+
+        self.assertEqual(response.speech[0].text, "I am listening.")
+        self.assertEqual(response.skills, [])
+
+    async def test_weak_catalog_motion_match_does_not_override_chat_intent(self) -> None:
+        request = _request(
+            text="I think the sun is hot and round, do you agree with me?",
+            route="robot_action",
+            intent="capability:soridormi.turn_in_place",
+            agents=["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=None,
+                use_llm=False,
+                max_speak_chars=160,
+                capability_catalog=_WeakAgreementCatalog(),  # type: ignore[arg-type]
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(request.route_decision.reason, "weak_catalog_robot_action_match")
+        self.assertEqual(response.skills, [])
+        self.assertEqual(
+            response.speech[0].text,
+            "I heard you, but my language model is not responding.",
+        )
 
     async def test_legacy_run_contract_remains_unchanged(self) -> None:
         result = await AgentRuntime(

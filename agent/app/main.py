@@ -54,6 +54,9 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "160")))
+    expressive_body_cues: Literal["off", "sim_only", "on"] = Field(
+        default_factory=lambda: os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "sim_only")
+    )
     interaction_output_mode: Literal["native", "legacy-adapter"] = Field(
         default_factory=lambda: os.getenv("AGENT_INTERACTION_OUTPUT_MODE", "native")
     )
@@ -180,6 +183,7 @@ services = AgentServices(
     ollama=ollama_client,
     use_llm=settings.use_llm,
     max_speak_chars=settings.max_speak_chars,
+    expressive_body_cues=settings.expressive_body_cues,
     task_graph_planner=task_graph_planner,
     capability_catalog=capability_catalog,
     capability_match_limit=settings.capability_match_limit,

@@ -29,12 +29,31 @@ _NUMBER_WORDS = {
     "fifteen": 15.0,
     "twenty": 20.0,
 }
+_NOD_RE = re.compile(r"\b(?:nod|nodding|noding)\b")
+_HEAD_DIRECTION_PATTERNS = (
+    re.compile(
+        r"\b(?:turn|rotate|move)\s+(?:your|my|the)?\s*head\s+"
+        r"(?:to\s+the\s+|to\s+|toward\s+|towards\s+)?(left|right)\b"
+    ),
+    re.compile(
+        r"\b(?:look|face)\s+(?:to\s+the\s+|to\s+|toward\s+|towards\s+)?"
+        r"(left|right)\b"
+    ),
+)
+NORMAL_FORWARD_VX_MPS = 0.18
+NORMAL_BACKWARD_VX_MPS = -0.03
+WALK_VX_MIN_MPS = -0.03
+WALK_VX_MAX_MPS = 0.20
+SING_WHILE_MOVING_SPEECH = (
+    "La la, tiny steps and circuits bright, I am walking through the light."
+)
 
 
 @dataclass(frozen=True)
 class SemanticAction:
     capability_id: str
     args: dict[str, Any]
+    metadata: dict[str, Any] | None = None
 
 
 def _normalized(text: str) -> str:
@@ -69,6 +88,10 @@ def _duration_s(text: str) -> float | None:
     return _number(match.group(1)) if match else None
 
 
+def _clamp(value: float, *, minimum: float, maximum: float) -> float:
+    return max(minimum, min(maximum, float(value)))
+
+
 def _speed(text: str) -> float | None:
     patterns = (
         r"\bat\s+(-?\d+(?:\.\d+)?)\s*(?:m/?s|meters? per second|speed)?\b",
@@ -92,16 +115,112 @@ def _count(text: str, default: int = 2) -> int:
     return int(value) if value is not None else default
 
 
-def _parse_segment(text: str, available: set[str]) -> SemanticAction | None:
+def _natural_head_gesture_args(text: str, *, use_explicit_duration: bool = True) -> dict[str, Any]:
+    count = max(2, _count(text))
+    duration = _duration_s(text) if use_explicit_duration else None
+    if duration is None:
+        duration = round(max(1.0, min(10.0, count * 0.7)), 1)
+    else:
+        duration = round(_clamp(duration, minimum=1.0, maximum=10.0), 1)
+    return {
+        "count": count,
+        "amplitude": "small",
+        "duration_s": duration,
+    }
+
+
+def _head_direction(text: str) -> str | None:
+    for pattern in _HEAD_DIRECTION_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _walk_action(text: str, available: set[str]) -> SemanticAction | None:
+    walk_match = re.search(
+        r"\b(?:walk|move|go|travel)\b(?:\s+straight)?(?:\s+(forward|ahead|backward|back|reverse))?\b",
+        text,
+    )
+    if not walk_match or "soridormi.walk_velocity" not in available:
+        return None
+
+    direction = walk_match.group(1) or "forward"
+    requested_speed = _speed(text)
+    speed = requested_speed
+    metadata: dict[str, Any] = {}
+    if speed is None:
+        speed = NORMAL_BACKWARD_VX_MPS if direction in {"backward", "back", "reverse"} else NORMAL_FORWARD_VX_MPS
+    if direction in {"backward", "back", "reverse"}:
+        speed = -abs(speed)
+        normal_speed = NORMAL_BACKWARD_VX_MPS
+    else:
+        speed = abs(speed)
+        normal_speed = NORMAL_FORWARD_VX_MPS
+    if speed < WALK_VX_MIN_MPS or speed > WALK_VX_MAX_MPS:
+        metadata["speed_adjustment"] = {
+            "reason": "outside_safe_range",
+            "requested_vx_mps": speed,
+            "normal_vx_mps": normal_speed,
+            "safe_min_vx_mps": WALK_VX_MIN_MPS,
+            "safe_max_vx_mps": WALK_VX_MAX_MPS,
+        }
+        speed = normal_speed
+    args = {"vx_mps": speed, "vy_mps": 0.0, "yaw_radps": 0.0}
+    duration = _duration_s(text)
+    if duration is not None:
+        args["duration_s"] = duration
+    return SemanticAction("soridormi.walk_velocity", args, metadata or None)
+
+
+def _head_gesture_action(
+    text: str,
+    available: set[str],
+    *,
+    use_explicit_duration: bool = True,
+) -> SemanticAction | None:
+    if _NOD_RE.search(text) and "soridormi.nod_yes" in available:
+        return SemanticAction(
+            "soridormi.nod_yes",
+            _natural_head_gesture_args(text, use_explicit_duration=use_explicit_duration),
+        )
+
+    if re.search(r"\bshake\b.*\bhead\b", text) and "soridormi.shake_no" in available:
+        return SemanticAction(
+            "soridormi.shake_no",
+            _natural_head_gesture_args(text, use_explicit_duration=use_explicit_duration),
+        )
+
+    return None
+
+
+def _look_direction_action(text: str, available: set[str]) -> SemanticAction | None:
+    direction = _head_direction(text)
+    if direction is None or "soridormi.look_direction" not in available:
+        return None
+
+    args: dict[str, Any] = {
+        "head_yaw_rad": -0.35 if direction == "left" else 0.35,
+        "head_pitch_rad": 0.0,
+    }
+    duration = _duration_s(text)
+    if duration is not None:
+        args["duration_s"] = round(_clamp(duration, minimum=0.2, maximum=3.0), 1)
+    return SemanticAction("soridormi.look_direction", args)
+
+
+def _parse_atomic_segment(text: str, available: set[str]) -> SemanticAction | None:
     text = _normalized(text).strip(" ,.!?")
     if not text:
         return None
 
-    if re.search(r"\b(nod|nodding)\b", text) and "soridormi.nod_yes" in available:
-        return SemanticAction("soridormi.nod_yes", {"count": max(2, _count(text))})
+    head_gesture = _head_gesture_action(text, available)
+    if head_gesture is not None:
+        return head_gesture
 
-    if re.search(r"\bshake\b.*\bhead\b", text) and "soridormi.shake_no" in available:
-        return SemanticAction("soridormi.shake_no", {"count": max(2, _count(text))})
+    look_direction = _look_direction_action(text, available)
+    if look_direction is not None:
+        return look_direction
 
     turn_match = re.search(r"\b(?:turn|rotate)\s+(left|right)\b", text)
     if turn_match and "soridormi.turn_in_place" in available:
@@ -126,26 +245,50 @@ def _parse_segment(text: str, available: set[str]) -> SemanticAction | None:
             args["yaw_radps"] = -0.1 if turn.group(1) == "left" else 0.1
         return SemanticAction("soridormi.curve_walk", args)
 
-    walk_match = re.search(
-        r"\b(?:walk|move|go|travel)\b(?:\s+straight)?(?:\s+(forward|ahead|backward|back|reverse))?\b",
-        text,
-    )
-    if walk_match and "soridormi.walk_velocity" in available:
-        direction = walk_match.group(1) or "forward"
-        speed = _speed(text)
-        if speed is None:
-            speed = 0.1
-        if direction in {"backward", "back", "reverse"}:
-            speed = -abs(speed)
-        else:
-            speed = abs(speed)
-        args = {"vx_mps": speed, "vy_mps": 0.0, "yaw_radps": 0.0}
-        duration = _duration_s(text)
-        if duration is not None:
-            args["duration_s"] = duration
-        return SemanticAction("soridormi.walk_velocity", args)
+    walk = _walk_action(text, available)
+    if walk is not None:
+        return walk
 
     return None
+
+
+def _parse_segment(text: str, available: set[str]) -> list[SemanticAction] | None:
+    normalized = _normalized(text).strip(" ,.!?")
+    if not normalized:
+        return None
+
+    if re.search(r"\b(?:with|while|whilst)\b", normalized):
+        walk = _walk_action(normalized, available)
+        if walk is not None:
+            gesture = _head_gesture_action(
+                normalized,
+                available,
+                use_explicit_duration=False,
+            )
+            if gesture is not None:
+                return [walk, gesture]
+
+    action = _parse_atomic_segment(normalized, available)
+    return [action] if action is not None else None
+
+
+def _speak_first(text: str, actions: list[SemanticAction]) -> str | None:
+    normalized = _normalized(text)
+    speech_parts: list[str] = []
+    for action in actions:
+        metadata = action.metadata or {}
+        if metadata.get("speed_adjustment"):
+            speech_parts.append(
+                "Too fast. Walking normally."
+            )
+            break
+    if re.search(r"\b(?:sing|song)\b", normalized) and any(
+        action.capability_id == "soridormi.walk_velocity" for action in actions
+    ):
+        speech_parts.append(SING_WHILE_MOVING_SPEECH)
+    if re.search(r"\b(?:say|tell|greet)\s+(?:hello|hi|hey)\b", normalized):
+        speech_parts.append("Hello.")
+    return " ".join(speech_parts) if speech_parts else None
 
 
 def semantic_robot_decision(
@@ -167,10 +310,10 @@ def semantic_robot_decision(
     parts = [part for part in _SEQUENCE_SPLIT.split(request.text) if part.strip()]
     actions: list[SemanticAction] = []
     for part in parts:
-        action = _parse_segment(part, set(candidates))
-        if action is None:
+        segment_actions = _parse_segment(part, set(candidates))
+        if segment_actions is None:
             return None
-        actions.append(action)
+        actions.extend(segment_actions)
 
     if not actions:
         return None
@@ -181,6 +324,7 @@ def semantic_robot_decision(
             "args": item.args,
             "timing": "sequential",
             "sequence": index,
+            **({"metadata": item.metadata} if item.metadata else {}),
         }
         for index, item in enumerate(actions)
     ]
@@ -199,6 +343,7 @@ def semantic_robot_decision(
             priority="normal",
             needs_agent=True,
             should_speak=True,
+            speak_first=_speak_first(request.text, actions),
             actions=payload,
             candidate_capabilities=list(result.matches),
             reason="Deterministic semantic capability plan",

@@ -55,7 +55,9 @@ fi
 echo "[start] Hardware profile: ${CHROMIE_ACTIVE_PROFILE:-unknown}"
 echo "[start] GPU: ${CHROMIE_NVIDIA_GPU_NAME:-unknown} compute=${CHROMIE_NVIDIA_COMPUTE_CAP:-unknown} cuda_arch=${TTS_CUDA_ARCH:-unset}"
 echo "[start] CPU: ${CHROMIE_CPU_MODEL:-unknown} cores=${CHROMIE_CPU_CORES:-unknown} mem=${CHROMIE_MEM_TOTAL_MIB:-unknown}MiB"
+echo "[start] Router model: ${ROUTER_MODEL:-unset} use_llm=${ROUTER_USE_LLM:-unset}"
 echo "[start] Agent model: ${AGENT_MODEL:-unset}"
+echo "[start] Ollama: max_loaded=${OLLAMA_MAX_LOADED_MODELS:-unset} num_parallel=${OLLAMA_NUM_PARALLEL:-unset}"
 echo "[start] ASR model: ${ASR_MODEL:-unset}"
 echo "[start] TTS model size: ${TTS_MODEL_SIZE:-unset}"
 
@@ -119,10 +121,12 @@ docker compose "${COMPOSE_ARGS[@]}" ps
 
 echo
 echo "[start] Useful follow-up commands:"
-echo " docker compose --env-file .env.runtime logs -f chromie-tts"
-echo " docker compose --env-file .env.runtime logs -f chromie-asr"
-echo " docker compose --env-file .env.runtime logs -f chromie-router"
-echo " docker compose --env-file .env.runtime logs -f chromie-agent"
+echo " ./scripts/compose.sh logs -f chromie-llm"
+echo " ./scripts/compose.sh logs -f chromie-tts"
+echo " ./scripts/compose.sh logs -f chromie-asr"
+echo " ./scripts/compose.sh logs -f chromie-router"
+echo " ./scripts/compose.sh logs -f chromie-agent"
+echo " ./scripts/compose.sh ps"
 echo " ./scripts/show_profile.sh"
 echo " ./scripts/warm_ollama.sh"
 echo " ./scripts/start_orchestrator.sh"

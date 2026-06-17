@@ -57,6 +57,40 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.source, "fallback")
 
+    async def test_conversation_does_not_become_robot_action_from_weak_catalog_match(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="i think the sun is hot and round do you agree with me",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "conversation_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=4,
+            matches=[
+                {
+                    "capability_id": "soridormi.turn_in_place",
+                    "agent_id": "soridormi.skill",
+                    "description": "Rotate left or right with near-zero forward velocity.",
+                    "score": 0.165,
+                    "interaction_executable": True,
+                }
+            ],
+        )
+        with patch.object(main, "capability_catalog", _Catalog(result)), patch.object(
+            main.settings, "mode", "rules_only"
+        ):
+            decision = await main.route(
+                RouteRequest(text="I think the sun is hot and round, do you agree with me?")
+            )
+
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.source, "fallback")
+
     async def test_stop_now_is_priority_interrupt(self) -> None:
         from router.app import main
 
@@ -66,6 +100,20 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(decision.interrupt_current)
         self.assertFalse(decision.needs_agent)
         self.assertFalse(decision.should_speak)
+
+    async def test_routes_endpoint_lists_quick_and_deep_lanes(self) -> None:
+        from router.app import main
+
+        payload = await main.routes()
+
+        self.assertIn("chat", payload["routes"])
+        self.assertEqual(payload["mode"], main.settings.mode)
+        lanes = {item["id"]: item for item in payload["lanes"]}
+        self.assertIn("quick_control", lanes)
+        self.assertIn("deep_reasoning", lanes)
+        self.assertFalse(lanes["quick_control"]["llm"])
+        self.assertIn("interrupt", lanes["quick_control"]["routes"])
+        self.assertIn("robot_action", lanes["deep_reasoning"]["routes"])
 
     async def test_chat_catalog_match_does_not_select_speech_tool_as_intent(self) -> None:
         from router.app import main

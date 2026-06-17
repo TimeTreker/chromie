@@ -92,14 +92,22 @@ DEFAULT_CASES: tuple[TextSkillCase, ...] = (
         case_id="nod_yes",
         text="nod your head twice",
         expected_skills=("soridormi.nod_yes",),
-        expected_args=((0, "count", 2),),
+        expected_args=(
+            (0, "count", 2),
+            (0, "amplitude", "small"),
+            (0, "duration_s", 1.4),
+        ),
         description="Scripted yes nod.",
     ),
     TextSkillCase(
         case_id="shake_no",
         text="shake your head twice",
         expected_skills=("soridormi.shake_no",),
-        expected_args=((0, "count", 2),),
+        expected_args=(
+            (0, "count", 2),
+            (0, "amplitude", "small"),
+            (0, "duration_s", 1.4),
+        ),
         description="Scripted no shake.",
     ),
     TextSkillCase(

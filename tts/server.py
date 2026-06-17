@@ -102,6 +102,7 @@ TTS_THREADS = env_int("TTS_THREADS", 4, minimum=1)
 TTS_TEMPERATURE = float(os.getenv("TTS_TEMPERATURE", "0.4"))
 TTS_REPETITION_PENALTY = float(os.getenv("TTS_REPETITION_PENALTY", "1.1"))
 MAX_CONCURRENT_SYNTHESIS = env_int("TTS_MAX_CONCURRENT_SYNTHESIS", 1, minimum=1)
+TTS_WORKER_COUNT = env_int("TTS_WORKER_COUNT", 1, minimum=1)
 TTS_MIN_TEXT_CHARS = env_int("TTS_MIN_TEXT_CHARS", 4, minimum=1)
 TTS_MAX_TEXT_CHARS = env_int("TTS_MAX_TEXT_CHARS", 220, minimum=TTS_MIN_TEXT_CHARS)
 TTS_GENERATION_RETRIES = env_int("TTS_GENERATION_RETRIES", 1, minimum=1)
@@ -571,11 +572,53 @@ def generation_worker_main(connection) -> None:
         connection.close()
 
 
-generation_worker = RestartableProcessWorker(
-    generation_worker_main,
-    name="chromie-tts-generation",
-    startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "600")),
-)
+generation_workers = [
+    RestartableProcessWorker(
+        generation_worker_main,
+        name=f"chromie-tts-generation-{index}",
+        startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "600")),
+    )
+    for index in range(TTS_WORKER_COUNT)
+]
+generation_worker_cursor = 0
+generation_worker_select_lock: asyncio.Lock | None = None
+
+
+def generation_worker_lock() -> asyncio.Lock:
+    global generation_worker_select_lock
+    if generation_worker_select_lock is None:
+        generation_worker_select_lock = asyncio.Lock()
+    return generation_worker_select_lock
+
+
+async def select_generation_worker() -> tuple[int, RestartableProcessWorker]:
+    global generation_worker_cursor
+    async with generation_worker_lock():
+        index = generation_worker_cursor % len(generation_workers)
+        generation_worker_cursor += 1
+        return index, generation_workers[index]
+
+
+def generation_worker_status() -> list[dict[str, object]]:
+    return [
+        {
+            "index": index,
+            "alive": worker.is_alive,
+            "restart_count": worker.restart_count,
+        }
+        for index, worker in enumerate(generation_workers)
+    ]
+
+
+async def start_generation_workers() -> None:
+    await asyncio.gather(*(worker.start() for worker in generation_workers))
+
+
+async def stop_generation_workers() -> None:
+    await asyncio.gather(
+        *(worker.stop() for worker in generation_workers),
+        return_exceptions=True,
+    )
 
 
 async def send_json(ws, payload):
@@ -616,7 +659,8 @@ async def synthesize_text(
 
         for attempt in range(1, TTS_GENERATION_RETRIES + 1):
             try:
-                response = await generation_worker.request(
+                worker_index, worker = await select_generation_worker()
+                response = await worker.request(
                     {
                         "type": "generate",
                         "text": text,
@@ -656,8 +700,9 @@ async def synthesize_text(
                     },
                 )
                 logger.info(
-                    "TTS done request_id=%s attempt=%s audio=%.2fs generate=%.2fs total=%.2fs",
+                    "TTS done request_id=%s worker=%s attempt=%s audio=%.2fs generate=%.2fs total=%.2fs",
                     request_id,
+                    worker_index,
                     attempt,
                     audio_seconds,
                     generate_seconds,
@@ -696,7 +741,7 @@ async def handle_create_speaker(data: dict, ws):
     try:
         speaker_id = sanitize_speaker_id(speaker_id)
         wav_path = speaker_path_inside_dir(Path(wav_path) if wav_path else SPEAKER_DIR / f"{speaker_id}.wav")
-        response = await generation_worker.request(
+        response = await generation_workers[0].request(
             {
                 "type": "create_speaker",
                 "speaker_id": speaker_id,
@@ -756,9 +801,16 @@ async def ws_handler(ws):
                         "sample_rate": TTS_SAMPLE_RATE,
                         "gpu_layers": TTS_N_GPU_LAYERS,
                         "reset_llama_state": TTS_RESET_LLAMA_STATE,
-                        "single_model_worker": True,
-                        "worker_process_alive": generation_worker.is_alive,
-                        "worker_restart_count": generation_worker.restart_count,
+                        "single_model_worker": TTS_WORKER_COUNT == 1,
+                        "worker_count": TTS_WORKER_COUNT,
+                        "max_concurrent_synthesis": MAX_CONCURRENT_SYNTHESIS,
+                        "worker_process_alive": all(
+                            worker.is_alive for worker in generation_workers
+                        ),
+                        "worker_restart_count": sum(
+                            worker.restart_count for worker in generation_workers
+                        ),
+                        "workers": generation_worker_status(),
                         "cancellation_mode": "terminate_and_restart_worker",
                         "requested_max_length": REQUESTED_TTS_MAX_LENGTH,
                         "effective_max_length": EFFECTIVE_TTS_MAX_LENGTH,
@@ -830,16 +882,18 @@ async def ws_handler(ws):
 
 
 async def main():
-    await generation_worker.start()
+    await start_generation_workers()
     logger.info(
         "TTS server ready on ws://%s:%s output=%sHz pcm_s16le chunk_ms=%s "
-        "effective_max_length=%s max_text_chars=%s",
+        "effective_max_length=%s max_text_chars=%s worker_count=%s max_concurrent=%s",
         HOST,
         PORT,
         TTS_SAMPLE_RATE,
         TTS_CHUNK_MS,
         EFFECTIVE_TTS_MAX_LENGTH,
         TTS_MAX_TEXT_CHARS,
+        TTS_WORKER_COUNT,
+        MAX_CONCURRENT_SYNTHESIS,
     )
     try:
         async with websockets.serve(
@@ -852,7 +906,7 @@ async def main():
         ):
             await asyncio.Future()
     finally:
-        await generation_worker.stop()
+        await stop_generation_workers()
 
 
 if __name__ == "__main__":

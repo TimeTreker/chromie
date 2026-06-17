@@ -49,6 +49,16 @@ cd ../chromie
 ./scripts/start_services.sh
 ```
 
+Use Chromie's Compose wrapper for service inspection. Startup generates a root
+`.env` so plain `docker compose` can interpolate required variables, but the
+wrapper is preferred because it always passes the intended runtime env and
+Compose file explicitly.
+
+```bash
+./scripts/compose.sh logs -f chromie-llm
+./scripts/compose.sh ps
+```
+
 ## Text Input To MuJoCo
 
 Use this when you want to skip microphone and ASR while still testing routing,
@@ -130,10 +140,27 @@ M13 text closure does not require the supervised real-microphone run.
 
 ## Expected Robot Semantics
 
-- `walk ahead` means a body velocity skill, not a head gesture.
+- `walk ahead` means a body velocity skill, not a head gesture. If no speed is
+  given, Chromie uses a normal safe forward speed of `0.18 m/s`. Requested
+  forward speeds above the current Soridormi runtime limit of `0.20 m/s` are
+  changed back to normal speed and Chromie tells you.
 - `turn left` or `turn right` means body yaw in place, not only looking with the
   head.
+- `turn your head left/right` and `look left/right` mean the head-only
+  `soridormi.look_direction` skill.
 - `nod` and `shake head` are head gestures.
+- `walk ... with nodding/shaking your head` is accepted by the text route, but
+  the physical skills are serialized for now: body movement first, then the head
+  gesture. This preserves the current physical-work safety boundary.
+- `sing a song while walking` is handled as speech plus the walking skill. The
+  speech uses a short original line and still applies the same walking safety
+  normalization. Chromie waits until that speech is actually audible before
+  starting the body walk, so the song and walk overlap.
+- Chat-only speech can add a small parallel `soridormi.express_attention`
+  gesture while Chromie talks when `AGENT_EXPRESSIVE_BODY_CUES=sim_only` and
+  Soridormi reports simulator mode. Affirmative agreement uses a small, quicker
+  `soridormi.nod_yes` cue instead. Set `AGENT_EXPRESSIVE_BODY_CUES=off` in
+  `.env.local` if you want speech-only conversation.
 - Compound requests should preserve order unless a safety or validation rule
   refuses the request.
 
@@ -142,7 +169,7 @@ M13 text closure does not require the supervised real-microphone run.
 Stop Chromie services:
 
 ```bash
-docker compose --env-file .env.runtime down
+./scripts/compose.sh down
 ```
 
 Stop Soridormi by pressing `Ctrl+C` in the launcher terminal.

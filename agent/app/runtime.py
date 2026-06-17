@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pydantic import ValidationError
 
 from .agents import (
@@ -21,11 +22,132 @@ from .interaction import InteractionDraft, NativeInteractionOutputError
 from .schema import AgentResult, AgentRunRequest
 
 try:
-    from chromie_contracts.interaction import InteractionResponse
+    from chromie_contracts.interaction import InteractionResponse, SkillRequest
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.interaction import InteractionResponse
+    from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
 
 logger = logging.getLogger("chromie.agent.runtime")
+
+
+_ROBOT_ACTION_WORDS = re.compile(
+    r"\b("
+    r"bow|come here|crouch|face|go|look|move|nod|rotate|run|shake|"
+    r"sidestep|sit|smile|stand|step|stop|turn|travel|walk|wave"
+    r")\b",
+    re.IGNORECASE,
+)
+_PLANNING_PHRASES = (
+    "create a plan",
+    "make a plan",
+    "plan a route",
+    "motion plan",
+    "without executing",
+    "do not execute",
+    "don't execute",
+    "simulate only",
+)
+_AGREEMENT_PROMPTS = (
+    "do you agree",
+    "right?",
+    "correct?",
+    "is that right",
+    "is that correct",
+    "isn't it",
+    "is that true",
+)
+_ZH_AGREEMENT_PROMPTS = ("对吗", "是不是", "同意吗", "正确吗")
+_AFFIRMATIVE_SPEECH = (
+    "yes",
+    "correct",
+    "you are right",
+    "you're right",
+    "you are correct",
+    "that's right",
+    "that is right",
+    "i agree",
+    "scientifically speaking",
+)
+_NEGATIVE_SPEECH = (
+    "not correct",
+    "incorrect",
+    "i don't agree",
+    "i do not agree",
+    "not exactly",
+    "can't confirm",
+    "cannot confirm",
+)
+_ZH_AFFIRMATIVE_SPEECH = ("是的", "对", "正确", "同意", "没错")
+_ZH_NEGATIVE_SPEECH = ("不对", "不同意", "不能确认", "不完全")
+_EXPRESSIVE_NOD_ARGS = {
+    "count": 2,
+    "amplitude": "small",
+    "duration_s": 1.4,
+}
+_EXPRESSIVE_ATTENTION_ARGS = {
+    "style": "neutral",
+    "duration_s": 2.4,
+    "hold_fraction": 0.35,
+}
+_EXPRESSIVE_CUE_CAPABILITY_IDS = (
+    "soridormi.nod_yes",
+    "soridormi.express_attention",
+)
+
+
+def _normalized_text(text: str) -> str:
+    return " ".join((text or "").strip().lower().split())
+
+
+def _looks_like_robot_action_request(text: str) -> bool:
+    normalized = _normalized_text(text)
+    return bool(normalized and _ROBOT_ACTION_WORDS.search(normalized))
+
+
+def _looks_like_planning_request(text: str) -> bool:
+    normalized = _normalized_text(text)
+    return any(phrase in normalized for phrase in _PLANNING_PHRASES)
+
+
+def _asks_for_agreement(text: str) -> bool:
+    normalized = _normalized_text(text)
+    return any(phrase in normalized for phrase in _AGREEMENT_PROMPTS) or any(
+        phrase in (text or "") for phrase in _ZH_AGREEMENT_PROMPTS
+    )
+
+
+def _speech_is_affirmative(text: str) -> bool:
+    normalized = _normalized_text(text)
+    if re.search(r"\bno\b", normalized) or any(
+        phrase in normalized for phrase in _NEGATIVE_SPEECH
+    ) or any(
+        phrase in (text or "") for phrase in _ZH_NEGATIVE_SPEECH
+    ):
+        return False
+    return any(phrase in normalized for phrase in _AFFIRMATIVE_SPEECH) or any(
+        phrase in (text or "") for phrase in _ZH_AFFIRMATIVE_SPEECH
+    )
+
+
+def _catalog_item(
+    request: AgentRunRequest,
+    capability_id: str,
+) -> dict | None:
+    candidates = request.route_decision.candidate_capabilities
+    if not candidates:
+        candidates = request.context.get("capability_candidates") or []
+    if not isinstance(candidates, list):
+        return None
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        if item.get("capability_id") != capability_id:
+            continue
+        if item.get("available") is False:
+            return None
+        if item.get("interaction_executable") is not True:
+            return None
+        return item
+    return None
 
 
 class _AgentPipeline:
@@ -70,7 +192,23 @@ class _AgentPipeline:
             return result
 
         if decision.speak_first and decision.should_speak:
-            result.add_speak_immediate(decision.speak_first, style="brief", priority=decision.priority)
+            if isinstance(result, InteractionDraft) and _should_align_speech_with_body_start(request):
+                result.add_speak_immediate(
+                    decision.speak_first,
+                    style="brief",
+                    priority=decision.priority,
+                    timing="sequential",
+                    metadata={
+                        "wait_for_playback_start": True,
+                        "alignment": "body_start",
+                    },
+                )
+            else:
+                result.add_speak_immediate(
+                    decision.speak_first,
+                    style="brief",
+                    priority=decision.priority,
+                )
             result.trace.append("runtime: added router speak_first")
 
         for agent_name in selected_agents(request):
@@ -84,6 +222,21 @@ class _AgentPipeline:
             result = await agent.run(request, result)  # type: ignore[arg-type,assignment]
 
         return result
+
+
+def _should_align_speech_with_body_start(request: AgentRunRequest) -> bool:
+    decision = request.route_decision
+    if decision.route != "robot_action" or not decision.actions:
+        return False
+    text = _normalized_text(request.text)
+    if not any(word in text for word in ("while", "whilst")):
+        return False
+    if not any(word in text for word in ("sing", "song", "say", "tell")):
+        return False
+    return any(
+        str(action.get("capability_id") or "").startswith("soridormi.")
+        for action in decision.actions
+    )
 
 
 class AgentRuntime(_AgentPipeline):
@@ -104,6 +257,7 @@ class InteractionRuntime(_AgentPipeline):
         result = await self._run_pipeline(request, InteractionDraft())
         if not isinstance(result, InteractionDraft):  # pragma: no cover - defensive
             raise TypeError("native interaction runtime returned a non-InteractionDraft value")
+        self._add_expressive_body_cue(request, result)
         try:
             return result.to_response()
         except ValidationError as exc:
@@ -124,11 +278,40 @@ class InteractionRuntime(_AgentPipeline):
         request.route_decision.candidate_capabilities = [
             match.model_dump(mode="json") for match in search.matches
         ]
+        await self._ensure_expressive_body_cue_candidates(request)
         request.context["capability_catalog_version"] = search.catalog_version
         request.context["capability_candidates"] = list(
             request.route_decision.candidate_capabilities
         )
         if not search.matched:
+            return
+        if (
+            search.suggested_route == "robot_action"
+            and not request.route_decision.actions
+            and not _looks_like_robot_action_request(request.text)
+            and not _looks_like_planning_request(request.text)
+        ):
+            if request.route_decision.route == "robot_action":
+                request.route_decision.route = "chat"
+                request.route_decision.agents = ["conversation_agent", "speaker_agent"]
+                request.route_decision.intent = "general_conversation"
+                request.route_decision.confidence = min(
+                    request.route_decision.confidence,
+                    0.45,
+                )
+                request.route_decision.source = "fallback"
+                request.route_decision.reason = "weak_catalog_robot_action_match"
+            return
+        if search.suggested_route == "chat":
+            request.route_decision.route = "chat"
+            request.route_decision.agents = ["conversation_agent", "speaker_agent"]
+            request.route_decision.intent = "general_conversation"
+            request.route_decision.confidence = max(
+                request.route_decision.confidence,
+                search.matches[0].score if search.matches else 0.0,
+            )
+            request.route_decision.source = "catalog"
+            request.route_decision.reason = "Matched shared capability catalog"
             return
         request.route_decision.route = search.suggested_route
         request.route_decision.agents = list(search.suggested_agents)
@@ -143,3 +326,130 @@ class InteractionRuntime(_AgentPipeline):
         )
         request.route_decision.source = "catalog"
         request.route_decision.reason = "Matched shared capability catalog"
+
+    async def _ensure_expressive_body_cue_candidates(
+        self,
+        request: AgentRunRequest,
+    ) -> None:
+        if self.services.expressive_body_cues == "off":
+            return
+        catalog = self.services.capability_catalog
+        if catalog is None:
+            return
+        candidates = request.route_decision.candidate_capabilities
+        existing = {
+            item.get("capability_id")
+            for item in candidates
+            if isinstance(item, dict)
+        }
+        missing = [
+            capability_id
+            for capability_id in _EXPRESSIVE_CUE_CAPABILITY_IDS
+            if capability_id not in existing
+        ]
+        if not missing:
+            return
+        try:
+            cue_search = await catalog.search(
+                "express attention nod yes",
+                language=request.language or request.route_decision.language,
+                limit=max(self.services.capability_match_limit, 16),
+                min_score=0.0,
+                prefer_interaction_executable=True,
+            )
+        except Exception as exc:  # pragma: no cover - defensive service boundary
+            logger.warning("expressive cue catalog lookup failed: %s", exc)
+            return
+        for match in cue_search.matches:
+            payload = match.model_dump(mode="json")
+            capability_id = payload.get("capability_id")
+            if capability_id in missing and capability_id not in existing:
+                candidates.append(payload)
+                existing.add(capability_id)
+
+    def _add_expressive_body_cue(
+        self,
+        request: AgentRunRequest,
+        result: InteractionDraft,
+    ) -> None:
+        if self.services.expressive_body_cues == "off":
+            return
+        if request.route_decision.route != "chat":
+            return
+        if result.status != "ok":
+            return
+        if getattr(result, "_skills", []):
+            return
+
+        speech_text = " ".join(item.text for item in result.speak_immediate)
+        if not speech_text.strip():
+            return
+
+        if _asks_for_agreement(request.text) and _speech_is_affirmative(speech_text):
+            match = self._expressive_cue_catalog_item(request, "soridormi.nod_yes")
+            if match is not None:
+                self._add_expressive_skill(
+                    request,
+                    result,
+                    match,
+                    skill_id="soridormi.nod_yes",
+                    args=dict(_EXPRESSIVE_NOD_ARGS),
+                    reason="affirmative_chat",
+                )
+                return
+
+        match = self._expressive_cue_catalog_item(
+            request,
+            "soridormi.express_attention",
+        )
+        if match is None:
+            return
+        self._add_expressive_skill(
+            request,
+            result,
+            match,
+            skill_id="soridormi.express_attention",
+            args=dict(_EXPRESSIVE_ATTENTION_ARGS),
+            reason="chat_attention",
+        )
+
+    def _expressive_cue_catalog_item(
+        self,
+        request: AgentRunRequest,
+        capability_id: str,
+    ) -> dict | None:
+        match = _catalog_item(request, capability_id)
+        if match is None:
+            return None
+        cue_mode = self.services.expressive_body_cues
+        capability_mode = str((match.get("metadata") or {}).get("mode") or "")
+        if cue_mode == "sim_only" and capability_mode != "sim":
+            return None
+        return match
+
+    def _add_expressive_skill(
+        self,
+        request: AgentRunRequest,
+        result: InteractionDraft,
+        match: dict,
+        *,
+        skill_id: str,
+        args: dict,
+        reason: str,
+    ) -> None:
+        result.add_skill(
+            SkillRequest(
+                skill_id=skill_id,
+                args=args,
+                timing="parallel",
+                requires_confirmation=bool(match.get("requires_confirmation")),
+                metadata={
+                    "source": "expressive_body_cue",
+                    "reason": reason,
+                    "catalog_version": request.context.get("capability_catalog_version"),
+                    "catalog_score": match.get("score"),
+                },
+            )
+        )
+        result.metadata["expressive_body_cue"] = skill_id
+        result.trace.append(f"runtime: added expressive {skill_id} cue")

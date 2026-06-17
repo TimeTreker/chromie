@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Literal
@@ -102,6 +103,21 @@ async def health() -> HealthResponse:
 async def routes() -> dict:
     return {
         "routes": ["chat", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
+        "lanes": [
+            {
+                "id": "quick_control",
+                "description": "Deterministic stop, cancel, silence, emergency, and unusable-audio handling before catalog or LLM routing.",
+                "routes": ["interrupt", "ignore"],
+                "llm": False,
+            },
+            {
+                "id": "deep_reasoning",
+                "description": "Capability-catalog, semantic, and optional LLM routing for chat, body actions, tools, memory, and clarification.",
+                "routes": ["chat", "robot_action", "tool", "memory", "clarify"],
+                "llm": settings.mode in {"hybrid", "llm_only"},
+            },
+        ],
+        "mode": settings.mode,
         "agents": [
             "capability_agent",
             "conversation_agent",
@@ -149,6 +165,21 @@ def _looks_like_planning_request(text: str) -> bool:
         "simulate only",
     )
     return any(phrase in normalized for phrase in phrases)
+
+
+def _looks_like_robot_action_request(text: str) -> bool:
+    normalized = " ".join((text or "").lower().split())
+    if not normalized:
+        return False
+    return bool(
+        re.search(
+            r"\b("
+            r"bow|come here|crouch|face|go|look|move|nod|rotate|run|shake|"
+            r"sidestep|sit|smile|stand|step|stop|turn|travel|walk|wave"
+            r")\b",
+            normalized,
+        )
+    )
 
 
 def _clarify_capability_decision(
@@ -267,6 +298,10 @@ def _catalog_decision(
             None,
         )
         if top is None:
+            return None
+        if not _looks_like_robot_action_request(request.text) and not _looks_like_planning_request(
+            request.text
+        ):
             return None
     selected_id = _capability_id(top)
     if not selected_id:

@@ -134,6 +134,7 @@ class ConversationAgent(BaseAgent):
                 "如果用户问之前任务什么时候有结果，而待处理任务还在进行中，就说明还在处理。"
                 "不要假装记得上下文里没有的事情，也不要编造工具结果。"
                 "回答能力问题前必须检查提供的能力目录；不要声称机器人断开，除非目录明确不可用。"
+                "不要描述身体动作或舞台指令；表情动作会由运行时单独处理。"
                 "回复要适合语音播放，默认一句话，不超过 24 个中文字。"
                 "请只输出要说的话，不要输出 JSON。"
             )
@@ -154,6 +155,7 @@ class ConversationAgent(BaseAgent):
                 "If the user asks about a previous pending task, refer to that task and say it is still in progress unless a result is provided. "
                 "Do not invent tool results. Do not pretend to remember anything outside the provided context. "
                 "Before answering capability questions, inspect the supplied capability catalog. Do not claim the robot is disconnected unless the catalog says it is unavailable. "
+                "Do not describe body gestures or stage directions; expressive motion is handled separately by the runtime. "
                 "The reply will be spoken aloud, so keep it to one short sentence. "
                 "Reply with only the spoken response text. Do not output JSON."
             )

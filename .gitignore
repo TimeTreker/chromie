@@ -8,7 +8,7 @@
 /.env.runtime
 /.env.local
 
-# Legacy/root local env should not be committed.
+# Generated Docker Compose compatibility env should not be committed.
 # Note: if .env is already tracked in git, run: git rm --cached .env
 /.env
 

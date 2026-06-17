@@ -84,7 +84,9 @@ BUILD=1 ./scripts/start_services.sh
 ./scripts/start_orchestrator.sh
 ```
 
-不要直接编辑生成的 `.env.runtime`。
+Chromie 会生成 `.env.runtime`，并写入一个被 Git 忽略的根目录 `.env`，
+方便普通 `docker compose ...` 命令读取同一套变量。不要直接编辑这些
+生成文件。
 
 自动测试：
 

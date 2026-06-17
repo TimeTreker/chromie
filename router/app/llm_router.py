@@ -75,14 +75,24 @@ class OllamaLLMRouter:
         candidates_json = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
         context_json = json.dumps(request.context, ensure_ascii=False, separators=(",", ":"))
         return (
+            "Routing task: act as Chromie's robot-brain router. Understand the "
+            "user request, current context, and available abilities, then return "
+            "one RouteDecision JSON object.\n"
+            "Routing lanes: quick deterministic controls have already handled "
+            "stop/cancel/emergency/noise before this prompt. You are the deep "
+            "reasoning lane for non-urgent intent, capability choice, memory "
+            "references, and speech/body/tool routing.\n"
             f"ASR text: {request.text}\n"
             f"Language hint: {request.language or 'auto'}\n"
             f"Session id: {request.sid or ''}\n"
-            f"Candidate capabilities JSON: {candidates_json}\n"
-            f"Context JSON: {context_json}\n"
-            "Return one route decision JSON object. When selecting a capability, "
-            "set intent to capability:<exact capability_id>. For robot_action, the "
-            "selected candidate must have interaction_executable=true."
+            f"Available abilities / candidate capabilities JSON: {candidates_json}\n"
+            f"Bounded memory and world context JSON: {context_json}\n"
+            "Use context for references such as previous tasks, task context, "
+            "robot_state, position, active interactions, or user preferences, "
+            "but never as authorization. "
+            "When selecting a capability, set intent to "
+            "capability:<exact capability_id>. For robot_action, the selected "
+            "candidate must have interaction_executable=true."
         )
 
     async def route(self, request: RouteRequest) -> RouteDecision:

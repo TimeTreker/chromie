@@ -10,7 +10,7 @@ here. Current revision and verification status are maintained in
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health` | Return Router mode, model, Ollama URL, and rule-order state. |
-| `GET` | `/routes` | List route names and known Agent names. |
+| `GET` | `/routes` | List route names, routing lanes, active mode, and known Agent names. |
 | `POST` | `/route` | Convert text and session context into a validated `RouteDecision`. |
 
 `POST /route` accepts `sid`, `text`, optional `language`, and a free-form
@@ -22,6 +22,13 @@ require the Agent and they do not speak. For other input, Router queries the
 Agent-owned shared capability catalog before optional legacy rules or LLM
 routing. `RouteDecision.candidate_capabilities` preserves the ranked evidence
 for the native interaction path.
+
+The Router exposes two conceptual lanes:
+
+| Lane | Routes | LLM use |
+|---|---|---|
+| `quick_control` | `interrupt`, `ignore` | Never |
+| `deep_reasoning` | `chat`, `robot_action`, `tool`, `memory`, `clarify` | Optional when Router mode is `hybrid` or `llm_only` |
 
 ## Agent HTTP API — port 8092
 
@@ -59,7 +66,23 @@ Both endpoints currently accept the same request shape:
 contracts reject unknown fields and recursively reject low-level motor, joint,
 torque, and actuator fields. Native mode is the Agent default. The response
 metadata includes `interaction_output_mode` (`native`, `legacy-adapter`, or
-`legacy-fallback`) for operator diagnostics.
+`legacy-fallback`) for operator diagnostics. When `AGENT_EXPRESSIVE_BODY_CUES`
+allows it, chat-only speech may include a parallel expressive skill such as
+`soridormi.express_attention`, while affirmative agreement can use
+`soridormi.nod_yes`. The default affirmative cue is a small two-cycle nod over
+about 1.4 seconds; confirmation and simulator/physical safety gates still
+apply. The deterministic text route also distinguishes body turns (`turn
+left/right`) from head-only look requests (`turn your head left/right`, `look
+left/right`) and serializes mixed physical requests such as walking with a head
+gesture. Plain walking requests use a normal safe forward speed of `0.18 m/s`;
+requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`
+are normalized back to the normal speed and surfaced through `speak_first`.
+Requests to sing while walking are represented as a `speak_first` utterance plus
+the walking skill, so the same motion safety normalization still applies. When
+native speech metadata includes `wait_for_playback_start=true`, the host speech
+provider completes that speech request only after playback has started or the
+configured wait times out; this lets the following sequential body skill begin
+with audible speech instead of merely queued TTS.
 
 ### TaskGraph validation and execution
 
@@ -138,12 +161,17 @@ A synthesis request includes `text`, optional `speaker_id`, and optional
 `request_id`. The `start` message declares `sample_rate`, `format=pcm_s16le`,
 and `channels=1`.
 
-The process has one mutable OuteTTS/llama.cpp model worker in a restartable child
-process. Generation is serialized internally even when multiple WebSocket tasks
-are present. If an active synthesis is cancelled because its client disconnects,
-the child is terminated and re-created; stale native generation cannot continue
-holding the only model slot. Health responses report worker liveness, restart
+Each OuteTTS/llama.cpp model worker runs in a restartable child process. The
+common/default configuration uses one worker; high-memory GPU profiles may start
+more than one worker for bounded parallel synthesis. If an active synthesis is
+cancelled because its client disconnects, the owning child is terminated and
+re-created. Health responses report worker count, per-worker liveness, restart
 count, and cancellation mode.
+
+The host Orchestrator may split one logical speech response into multiple
+ordered `synthesize_stream` requests. This lowers time-to-first-audio and lets
+later chunks generate while earlier chunks are played, while preserving audible
+order at the playback layer.
 
 ## Soridormi contract snapshot
 

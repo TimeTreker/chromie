@@ -90,7 +90,11 @@ class CapabilityAgent(BaseAgent):
                 )
                 selected_ids.append(capability_id)
             if selected_ids:
-                speech = self._direct_plan_speech(selected_ids, direct_actions)
+                speech = (
+                    ""
+                    if request.route_decision.speak_first
+                    else self._direct_plan_speech(selected_ids, direct_actions)
+                )
                 if speech:
                     result.add_speak_immediate(speech, style="brief")
                 result.metadata["capability_handled"] = True

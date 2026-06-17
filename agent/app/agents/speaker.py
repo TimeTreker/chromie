@@ -19,8 +19,11 @@ class SpeakerAgent(BaseAgent):
             if default:
                 result.add_speak_immediate(default, style="brief")
 
-        result.speak_immediate = self._dedupe_and_trim(result.speak_immediate)
-        result.speak_after = self._dedupe_and_trim(result.speak_after)
+        if hasattr(result, "normalize_speech"):
+            result.normalize_speech(self.services.max_speak_chars)
+        else:
+            result.speak_immediate = self._dedupe_and_trim(result.speak_immediate)
+            result.speak_after = self._dedupe_and_trim(result.speak_after)
         self.trace(result, "normalized speech")
         return result
 

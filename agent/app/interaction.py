@@ -218,15 +218,18 @@ class InteractionDraft:
         *,
         style: SpeakStyle = "brief",
         priority: Priority = "normal",
+        timing: Literal["immediate", "parallel", "sequential"] = "immediate",
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         normalized = (text or "").strip()
         if normalized:
             self._speech.append(
                 InteractionSpeech(
                     text=normalized,
-                    timing="immediate",
+                    timing=timing,
                     style=style,
                     priority=priority,
+                    metadata=metadata or {},
                 )
             )
 
@@ -252,6 +255,14 @@ class InteractionDraft:
                     metadata=metadata,
                 )
             )
+
+    def normalize_speech(self, max_chars: int) -> None:
+        immediate = [item for item in self._speech if item.timing != "after_skills"]
+        after = [item for item in self._speech if item.timing == "after_skills"]
+        self._speech = [
+            *self._dedupe_and_trim_speech(immediate, max_chars),
+            *self._dedupe_and_trim_speech(after, max_chars),
+        ]
 
     def add_action(
         self,
@@ -347,6 +358,24 @@ class InteractionDraft:
             interruptible=item.interruptible,
             metadata=metadata,
         )
+
+    def _dedupe_and_trim_speech(
+        self,
+        items: list[InteractionSpeech],
+        max_chars: int,
+    ) -> list[InteractionSpeech]:
+        seen: set[str] = set()
+        out: list[InteractionSpeech] = []
+        for item in items:
+            text = " ".join(item.text.strip().split())
+            if not text or text in seen:
+                continue
+            if len(text) > max_chars:
+                text = text[:max_chars].rstrip("，,。.!！?？ ")
+                text += "。" if any("\u4e00" <= ch <= "\u9fff" for ch in text) else "."
+            seen.add(text)
+            out.append(item.model_copy(update={"text": text}))
+        return out
 
 
 class AgentResultInteractionAdapter:

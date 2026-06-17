@@ -94,6 +94,15 @@ class VoiceAssistant:
         self.barge_in_min_rms = float(os.getenv("ORCH_BARGE_IN_MIN_RMS", "350"))
         self.min_audio_ms = int(os.getenv("ORCH_MIN_AUDIO_MS", "1200"))
         self.tts_flush_chars = int(os.getenv("TTS_FLUSH_CHARS", "160"))
+        self.tts_text_chunking_enabled = env_bool("ORCH_TTS_TEXT_CHUNKING", True)
+        self.tts_chunk_chars = max(
+            20,
+            int(os.getenv("ORCH_TTS_CHUNK_CHARS", str(self.tts_flush_chars))),
+        )
+        self.tts_min_chunk_chars = max(
+            1,
+            int(os.getenv("ORCH_TTS_MIN_CHUNK_CHARS", "40")),
+        )
         self.default_tts_rate = int(os.getenv("TTS_SAMPLE_RATE", "44100"))
         self.speaker_id = os.getenv("TTS_SPEAKER_ID", "default")
         self.save_audio_enabled = env_bool("ORCH_SAVE_AUDIO", False)
@@ -242,6 +251,10 @@ class VoiceAssistant:
         self.pending_audio: dict[int, tuple[int, bytes, int, str | None, str | None]] = {}
         self.synthesis_order = 0
         self.playback_generation = 0
+        self.playback_start_waiters: dict[
+            tuple[int, int, str | None],
+            asyncio.Future[bool],
+        ] = {}
         self.order_lock = asyncio.Lock()
         self.output_stream = None
         self.output_stream_lock = asyncio.Lock()
@@ -288,6 +301,79 @@ class VoiceAssistant:
     def maybe_session_done(self, sid: Optional[str]) -> None:
         self.sessions.maybe_done(sid)
 
+    def playback_start_key(
+        self,
+        generation: int,
+        order: int,
+        session_id: Optional[str],
+    ) -> tuple[int, int, str | None]:
+        return (generation, order, session_id)
+
+    def resolve_playback_start_waiter(
+        self,
+        generation: int,
+        order: int,
+        session_id: Optional[str],
+        *,
+        started: bool,
+        reason: str,
+    ) -> None:
+        key = self.playback_start_key(generation, order, session_id)
+        waiter = self.playback_start_waiters.pop(key, None)
+        if waiter is None or waiter.done():
+            return
+        waiter.set_result(started)
+        self.session_log(
+            session_id,
+            "tts_playback_start_waiter_resolved: order=%s started=%s reason=%s",
+            order,
+            started,
+            reason,
+        )
+
+    def resolve_all_playback_start_waiters(
+        self,
+        *,
+        started: bool,
+        reason: str,
+    ) -> None:
+        waiters = list(self.playback_start_waiters.items())
+        self.playback_start_waiters.clear()
+        for (_, order, session_id), waiter in waiters:
+            if not waiter.done():
+                waiter.set_result(started)
+                self.session_log(
+                    session_id,
+                    "tts_playback_start_waiter_resolved: order=%s started=%s reason=%s",
+                    order,
+                    started,
+                    reason,
+                )
+
+    async def wait_for_playback_start(
+        self,
+        *,
+        generation: int,
+        order: int,
+        session_id: Optional[str],
+        timeout_s: float,
+    ) -> bool:
+        key = self.playback_start_key(generation, order, session_id)
+        waiter = self.playback_start_waiters.get(key)
+        if waiter is None:
+            return False
+        try:
+            return await asyncio.wait_for(waiter, timeout=timeout_s)
+        except TimeoutError:
+            self.playback_start_waiters.pop(key, None)
+            self.session_log(
+                session_id,
+                "tts_playback_start_waiter_timeout: order=%s timeout_s=%.3f",
+                order,
+                timeout_s,
+            )
+            return False
+
     def create_session(self) -> str:
         return self.sessions.create()
 
@@ -308,24 +394,73 @@ class VoiceAssistant:
             return False
         return any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in text)
 
-    def pop_tts_chunk(self, buffer: str) -> tuple[str | None, str]:
+    def pop_tts_chunk(
+        self,
+        buffer: str,
+        *,
+        flush_chars: int | None = None,
+    ) -> tuple[str | None, str]:
         candidate = self.normalize_tts_candidate(buffer)
         if not candidate:
             return None, ""
+        limit = max(20, int(flush_chars or self.tts_flush_chars))
         match = re.search(r".+?[.!?。！？](?:\s+|$)", candidate)
-        if match:
+        if match and (match.end() <= limit or len(candidate) <= limit):
             end = match.end()
             return candidate[:end].strip(), candidate[end:].strip()
-        if len(candidate) >= self.tts_flush_chars:
-            cut = candidate[: self.tts_flush_chars]
+        if len(candidate) >= limit:
+            cut = candidate[:limit]
             cut_points = [cut.rfind(sep) for sep in (",", "，", "、", ";", ":", " ")]
             cut_at = max(cut_points)
-            if cut_at < max(40, self.tts_flush_chars // 2):
-                cut_at = self.tts_flush_chars
+            if cut_at < max(20, limit // 2):
+                cut_at = limit
             else:
                 cut_at += 1
             return candidate[:cut_at].strip(), candidate[cut_at:].strip()
         return None, candidate
+
+    def split_tts_text(self, text: str) -> list[str]:
+        candidate = self.normalize_tts_candidate(text)
+        if not self.is_valid_tts_text(candidate):
+            return []
+        if not getattr(self, "tts_text_chunking_enabled", True):
+            return [candidate]
+        limit = max(
+            20,
+            int(getattr(self, "tts_chunk_chars", getattr(self, "tts_flush_chars", 160))),
+        )
+        if len(candidate) <= limit:
+            return [candidate]
+
+        raw_chunks: list[str] = []
+        remaining = candidate
+        while remaining:
+            chunk, remaining = self.pop_tts_chunk(remaining, flush_chars=limit)
+            if chunk is None:
+                chunk, remaining = remaining, ""
+            if self.is_valid_tts_text(chunk):
+                raw_chunks.append(chunk)
+        if not raw_chunks:
+            return [candidate]
+
+        chunks: list[str] = []
+        current = ""
+        min_chars = max(1, int(getattr(self, "tts_min_chunk_chars", 40)))
+        overflow_limit = limit + min(10, max(0, min_chars // 4))
+        for chunk in raw_chunks:
+            merged = f"{current} {chunk}".strip() if current else chunk
+            if not current:
+                current = chunk
+            elif len(merged) <= limit or (
+                len(current) < min_chars and len(merged) <= overflow_limit
+            ):
+                current = merged
+            else:
+                chunks.append(current)
+                current = chunk
+        if current:
+            chunks.append(current)
+        return chunks or [candidate]
 
     def save_audio(self, data: bytes, prefix: str, session_id: Optional[str] = None) -> None:
         if not self.save_audio_enabled or not data:
@@ -511,6 +646,13 @@ class VoiceAssistant:
                 break
             generation, order, audio, source_rate, session_id, skip_reason = item
             if self.is_stale_playback(generation, session_id):
+                self.resolve_playback_start_waiter(
+                    generation,
+                    order,
+                    session_id,
+                    started=False,
+                    reason="stale_before_order",
+                )
                 self.session_log(session_id, "playback_drop_stale_before_order: order=%s", order)
                 continue
             if order != self.next_playback_order:
@@ -522,6 +664,13 @@ class VoiceAssistant:
             while self.next_playback_order in self.pending_audio:
                 ng, na, nsr, nsid, nreason = self.pending_audio.pop(self.next_playback_order)
                 if self.is_stale_playback(ng, nsid):
+                    self.resolve_playback_start_waiter(
+                        ng,
+                        self.next_playback_order,
+                        nsid,
+                        started=False,
+                        reason="stale_pending_order",
+                    )
                     self.next_playback_order += 1
                     continue
                 played = await self.play_one_order(ng, self.next_playback_order, na, nsr, nsid, nreason)
@@ -532,10 +681,24 @@ class VoiceAssistant:
 
     async def play_one_order(self, generation: int, order: int, audio: bytes, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
         if self.is_stale_playback(generation, session_id):
+            self.resolve_playback_start_waiter(
+                generation,
+                order,
+                session_id,
+                started=False,
+                reason="stale_playback",
+            )
             return False
         state = self.sessions.state.get(session_id or "")
         if not audio:
             reason = skip_reason or "empty_audio"
+            self.resolve_playback_start_waiter(
+                generation,
+                order,
+                session_id,
+                started=False,
+                reason=reason,
+            )
             if state is not None:
                 if reason in {"tts_error", "tts_exception", "playback_exception"}:
                     state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
@@ -554,6 +717,13 @@ class VoiceAssistant:
             self.output_rate,
             audio_ms,
             generation,
+        )
+        self.resolve_playback_start_waiter(
+            generation,
+            order,
+            session_id,
+            started=True,
+            reason="playback_start",
         )
         playback_start_ms = now_ms()
         try:
@@ -648,17 +818,23 @@ class VoiceAssistant:
             await self.enqueue_playback_skip(generation, order, session_id, "tts_exception")
             self.maybe_session_done(session_id)
 
-    async def schedule_tts_sentence(self, sentence: str, session_id: Optional[str]):
+    async def schedule_tts_sentence(
+        self,
+        sentence: str,
+        session_id: Optional[str],
+    ) -> dict[str, Any]:
         sentence = self.normalize_tts_candidate(sentence)
         if not self.is_valid_tts_text(sentence):
             self.session_log(session_id, "tts_skip_invalid_sentence_no_order: chars=%s text=%r", len(sentence), sentence)
-            return
+            return {"scheduled": False, "reason": "invalid_tts_text"}
         async with self.order_lock:
             order = self.synthesis_order
             self.synthesis_order += 1
             generation = self.playback_generation
         if self.is_stale_playback(generation, session_id):
-            return
+            return {"scheduled": False, "reason": "stale_playback"}
+        key = self.playback_start_key(generation, order, session_id)
+        self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
         state = self.sessions.state.get(session_id or "")
         if state is not None:
             state["scheduled_tts"] = int(state.get("scheduled_tts", 0)) + 1
@@ -666,6 +842,51 @@ class VoiceAssistant:
         task = asyncio.create_task(self.synthesize_one(sentence, order, session_id, generation))
         self.active_synthesis_tasks.add(task)
         task.add_done_callback(self.active_synthesis_tasks.discard)
+        return {"scheduled": True, "order": order, "generation": generation}
+
+    async def schedule_tts_text(
+        self,
+        text: str,
+        session_id: Optional[str],
+    ) -> dict[str, Any]:
+        chunks = self.split_tts_text(text)
+        if not chunks:
+            normalized = self.normalize_tts_candidate(text)
+            self.session_log(
+                session_id,
+                "tts_skip_invalid_text_no_order: chars=%s text=%r",
+                len(normalized),
+                normalized,
+            )
+            return {"scheduled": False, "reason": "invalid_tts_text"}
+
+        if len(chunks) > 1:
+            self.session_log(
+                session_id,
+                "tts_text_split: chunks=%s chars=%s chunk_chars=%s",
+                len(chunks),
+                len(self.normalize_tts_candidate(text)),
+                getattr(self, "tts_chunk_chars", getattr(self, "tts_flush_chars", 160)),
+            )
+
+        scheduled: list[dict[str, Any]] = []
+        for chunk in chunks:
+            result = await self.schedule_tts_sentence(chunk, session_id)
+            if result.get("scheduled") is True:
+                scheduled.append(result)
+
+        if not scheduled:
+            return {"scheduled": False, "reason": "no_tts_chunks_scheduled"}
+        first = scheduled[0]
+        last = scheduled[-1]
+        return {
+            "scheduled": True,
+            "order": first["order"],
+            "generation": first["generation"],
+            "chunks": len(scheduled),
+            "orders": [item["order"] for item in scheduled],
+            "last_order": last["order"],
+        }
 
     async def _schedule_interaction_speech(
         self,
@@ -677,11 +898,35 @@ class VoiceAssistant:
             if isinstance(metadata, dict)
             else None
         )
-        await self.schedule_tts_sentence(str(args.get("text") or ""), session_id)
-        return {"scheduled": True}
+        scheduled = await self.schedule_tts_text(str(args.get("text") or ""), session_id)
+        if (
+            isinstance(metadata, dict)
+            and metadata.get("wait_for_playback_start") is True
+            and scheduled.get("scheduled") is True
+        ):
+            raw_timeout_ms = metadata.get(
+                "playback_start_timeout_ms",
+                os.getenv("ORCH_TTS_PLAYBACK_START_TIMEOUT_MS", "20000"),
+            )
+            try:
+                timeout_ms = int(raw_timeout_ms)
+            except (TypeError, ValueError):
+                timeout_ms = 20000
+            playback_started = await self.wait_for_playback_start(
+                generation=int(scheduled["generation"]),
+                order=int(scheduled["order"]),
+                session_id=session_id,
+                timeout_s=max(0.001, timeout_ms / 1000.0),
+            )
+            scheduled["playback_started"] = playback_started
+        return scheduled
 
     async def reset_playback_ordering(self):
         async with self.order_lock:
+            self.resolve_all_playback_start_waiters(
+                started=False,
+                reason="reset_playback_ordering",
+            )
             self.synthesis_order = 0
             self.next_playback_order = 0
             self.pending_audio.clear()
@@ -1212,7 +1457,7 @@ class VoiceAssistant:
     async def execute_agent_result(self, result: AgentResult, session_id: str | None) -> None:
         await self.reset_playback_ordering()
         for item in result.speak_immediate:
-            await self.schedule_tts_sentence(item.text, session_id)
+            await self.schedule_tts_text(item.text, session_id)
 
         for graph in result.task_graphs:
             self.session_log(
@@ -1246,7 +1491,7 @@ class VoiceAssistant:
                 logger.error("Action execution failed: %s", exc, exc_info=True)
 
         for item in result.speak_after:
-            await self.schedule_tts_sentence(item.text, session_id)
+            await self.schedule_tts_text(item.text, session_id)
 
         state = self.sessions.state.get(session_id or "")
         if state is not None:
@@ -1256,6 +1501,10 @@ class VoiceAssistant:
 
     async def interrupt(self, new_session_id: Optional[str] = None):
         self.playback_generation += 1
+        self.resolve_all_playback_start_waiters(
+            started=False,
+            reason="interrupt",
+        )
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
         if self.active_interaction_task and not self.active_interaction_task.done():
@@ -1454,6 +1703,10 @@ class VoiceAssistant:
             await self.mic_stream()
 
     async def cleanup(self):
+        self.resolve_all_playback_start_waiters(
+            started=False,
+            reason="cleanup",
+        )
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
         for task in list(self.active_synthesis_tasks):

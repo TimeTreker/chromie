@@ -81,7 +81,11 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
                     "actions": [
                         {"capability_id": "soridormi.walk_velocity", "args": {"vx_mps": 0.15, "duration_s": 10.0}, "sequence": 0},
                         {"capability_id": "soridormi.turn_in_place", "args": {"yaw_radps": -0.12}, "sequence": 1},
-                        {"capability_id": "soridormi.nod_yes", "args": {"count": 2}, "sequence": 2},
+                        {
+                            "capability_id": "soridormi.nod_yes",
+                            "args": {"count": 2, "amplitude": "small", "duration_s": 1.4},
+                            "sequence": 2,
+                        },
                     ],
                 },
             }
@@ -94,7 +98,45 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(item.timing == "sequential" for item in response.skills))
         self.assertEqual(response.skills[0].args["duration_s"], 10.0)
         self.assertEqual(response.skills[2].args["count"], 2)
+        self.assertEqual(response.skills[2].args["amplitude"], "small")
+        self.assertEqual(response.skills[2].args["duration_s"], 1.4)
         self.assertEqual(response.speech[0].text, "I will do those actions in order.")
+
+    async def test_router_speak_first_suppresses_generic_direct_plan_speech(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=None,
+                use_llm=False,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "say-hello",
+                "text": "Walk forward and nod your head to say hello.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "compound_robot_action",
+                    "confidence": 0.99,
+                    "language": "en-US",
+                    "source": "catalog",
+                    "speak_first": "Hello.",
+                    "actions": [
+                        {"capability_id": "soridormi.walk_velocity", "args": {"vx_mps": 0.1}, "sequence": 0},
+                        {"capability_id": "soridormi.nod_yes", "args": {"count": 2}, "sequence": 1},
+                    ],
+                },
+            }
+        )
+        response = await runtime.run(request)
+        self.assertEqual(
+            [item.skill_id for item in response.skills],
+            ["soridormi.walk_velocity", "soridormi.nod_yes"],
+        )
+        self.assertEqual([item.text for item in response.speech], ["Hello."])
 
 
 if __name__ == "__main__":
