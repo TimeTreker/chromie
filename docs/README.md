@@ -31,6 +31,8 @@ When documents disagree, correct the lower-authority document.
 | What does an environment variable mean? | `docs/CONFIGURATION.md` |
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` |
+| How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
+| Where should a new collaborator resume? | `docs/HANDOFF.md` |
 | What can be published and supported? | `docs/RELEASE.md` |
 | What changed? | `CHANGELOG.md` |
 
@@ -45,6 +47,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Current Status](STATUS.md)
 - [Roadmap](../ROADMAP.md)
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
+- [User Manual](USER_MANUAL.md)
+- [Project Handoff](HANDOFF.md)
 
 ## Architecture and runtime
 
@@ -69,6 +73,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 ## Operations and release
 
 - [Voice-to-MuJoCo Quick Start (Chinese)](VOICE_MUJOCO_QUICKSTART.zh-CN.md)
+- [User Manual](USER_MANUAL.md)
+- [Project Handoff](HANDOFF.md)
 - [Operations Runbook](../CHROMIE_RUNBOOK.md)
 - [Configuration Reference](CONFIGURATION.md)
 - [API Reference](API_REFERENCE.md)

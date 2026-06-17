@@ -184,10 +184,10 @@ def check_document_index(errors: list[str]) -> None:
 def check_current_focus(errors: list[str]) -> None:
     for path in STATUS_FILES:
         text = path.read_text(encoding="utf-8")
-        if "Voice-to-MuJoCo alpha" not in text:
+        if "M13" not in text or "text-to-MuJoCo" not in text:
             errors.append(
                 f"{path.relative_to(ROOT)} does not declare the current "
-                "Voice-to-MuJoCo alpha focus"
+                "M13 text-to-MuJoCo focus"
             )
 
     for path in markdown_files():
@@ -214,7 +214,8 @@ def check_project_direction(errors: list[str]) -> None:
     roadmap = ROADMAP.read_text(encoding="utf-8")
     for heading in (
         "## Completed foundations",
-        "## Open release track - Voice-to-MuJoCo alpha",
+        "## Completed phase - Text-to-MuJoCo interaction closure",
+        "## Open evidence track - Physical audio validation",
         "## Completed phase - Robust simulation and provider readiness",
         "## Current phase - Physical pilot preparation",
         "## Later work",

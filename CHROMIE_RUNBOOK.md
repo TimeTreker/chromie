@@ -191,8 +191,9 @@ python scripts/interaction_text_mujoco_check.py \
 Use `--no-speaker` for headless automation. The runner sets a 120s per-skill
 diagnostic timeout for live simulator checks; pass `--skill-timeout-s 0` to use
 catalog/default timeouts unchanged. Evidence is written under
-`.chromie/acceptance/text-mujoco/<id>/`. This is not supervised microphone
-evidence and does not close the alpha release gate.
+`.chromie/acceptance/text-mujoco/<id>/`. This is the current M13 text
+interaction closure path. It is not supervised microphone evidence and does not
+prove physical audio-device quality.
 
 To sweep the maintained text prompts across Soridormi named skills without
 executing robot motion, run:

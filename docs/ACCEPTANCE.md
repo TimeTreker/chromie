@@ -19,7 +19,7 @@ A higher level does not replace lower-level regression tests.
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
 | Router/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
-| Interaction contracts and Skill Runtime | Yes | Text path | Live MuJoCo path | Automated target-host matrices passed; supervised open |
+| Interaction contracts and Skill Runtime | Yes | Text path | Live MuJoCo path | Text-to-MuJoCo closure passed; physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
 | ASR/TTS GPU use | Limited | GPU smoke tooling | Not applicable | RTX 5090 smoke passed 21/21 |
@@ -33,10 +33,13 @@ Retained reference-host evidence from June 14 and June 17, 2026:
 | M13 `20260614T132934Z` | `f0e22ba` | 7/7 passed | Synthetic framed PCM through VAD, ASR, Router, Agent, Skill Runtime, TTS, and MuJoCo |
 | M13 `20260614T133155Z` | `f0e22ba` | 7/7 passed | PipeWire virtual-microphone capture through the same interaction and MuJoCo path |
 | M13 `20260617T075825Z` | `4604a03` | 7/7 passed | Clean synthetic framed PCM through VAD, ASR, Router, Agent live Soridormi catalog, host confirmation, Skill Runtime, TTS, and MuJoCo |
+| Text-MuJoCo `20260617T081411Z` | `857c15f` | passed | Direct text input through Router, Agent `/interaction`, host Skill Runtime, live Soridormi MCP, ordered walk/nod/turn execution, and safe-idle status |
 
 The retained M13 automated bundles pass the verifier with `--require-clean`
 and `--allow-automated`, zero errors, and zero warnings. They report
-`release_eligible=false` by design.
+`release_eligible=false` by design. The retained Text-MuJoCo bundle closes the
+historical M13 text interaction scope. It intentionally skips microphone and
+ASR and therefore does not prove physical audio-device quality.
 
 ## Level A — automated suite
 
@@ -188,6 +191,11 @@ diagnostic timeout by default; pass `--skill-timeout-s 0` to use catalog/default
 timeouts unchanged. The runner refuses non-`sim` Soridormi modes unless
 `--allow-non-sim` is supplied under separate supervision.
 
+The retained `20260617T081411Z` text bundle is the M13 text interaction closure
+evidence. It is the right gate when the goal is to skip microphone and ASR while
+proving the interaction contract, trusted Skill Runtime, live Soridormi
+execution, and safe-idle behavior.
+
 ## Guarded and recovery acceptance
 
 Against a disposable Soridormi dry-run process:
@@ -239,7 +247,7 @@ SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
   ./scripts/m5_target_acceptance.sh
 ```
 
-## Alpha voice acceptance modes
+## Voice audio acceptance modes
 
 The scripts, environment variables, and evidence directory retain the
 historical `m13` identifier for compatibility.
@@ -378,7 +386,7 @@ captured audio, Orchestrator logs, and per-case checks.
 |---|---|---|---|---:|
 | `synthetic` (default) | Chromie TTS WAV -> framed Orchestrator stdin -> VAD -> ASR | None | Reproducible speech/control-plane/Skill Runtime regression | No |
 | `virtual-mic` | Chromie TTS WAV -> Pulse/PipeWire null sink monitor -> normal host capture -> VAD -> ASR | None | Host audio-device capture plus the automated control path | No |
-| `supervised` | Real microphone -> normal host capture -> VAD -> ASR | Audible/visual verdict after machine checks pass | Reference-host microphone, speaker, pronunciation, and observed simulator behavior | Yes |
+| `supervised` | Real microphone -> normal host capture -> VAD -> ASR | Audible/visual verdict after machine checks pass | Reference-host microphone, speaker, pronunciation, and observed simulator behavior | Yes, for physical voice-device release claims |
 
 The automatic modes intentionally use response playback `discard` mode. Audio
 is paced in real time, so `playback_start`, barge-in, cancellation, and stale
@@ -474,7 +482,7 @@ speaker.
 The retained PipeWire run is `20260614T133155Z`; all seven cases passed at
 Chromie revision `f0e22ba`.
 
-### Final supervised acceptance
+### Physical audio supervised acceptance
 
 Commit the candidate revision first, then run:
 
@@ -492,7 +500,8 @@ session's Router, interaction, skill, playback, cancellation, and completion
 events. It asks for an audible/visual operator verdict only after all machine
 checks pass. Missing ASR or required runtime events automatically fail the case.
 
-Only a clean, passing `supervised` bundle can satisfy the release verifier:
+Only a clean, passing `supervised` bundle can satisfy the voice-device release
+verifier:
 
 ```bash
 python scripts/verify_m13_evidence.py --require-clean \
@@ -503,6 +512,10 @@ The host runner uses `ORCH_RUNTIME_OVERRIDE_FILE` and does not edit the
 operator's `.env.local` or generated `.env.runtime`. The Soridormi capability
 probe runs inside `chromie-agent` by default; host-loopback endpoints are
 translated to `host.docker.internal` only for that container command.
+
+This supervised mode is not required for M13 text interaction closure. Use it
+when the claim being tested includes real microphone recognition, real speaker
+playback, and operator-observed behavior.
 
 ### Shared controls
 
@@ -523,7 +536,7 @@ python scripts/m13_voice_acceptance.py --dry-run \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-## Alpha microphone acceptance matrix
+## Physical microphone acceptance matrix
 
 Run from the repository root with the structured path enabled and a live
 MuJoCo-backed Soridormi endpoint. All three modes execute these cases in the

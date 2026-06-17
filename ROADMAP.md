@@ -30,36 +30,48 @@ capability foundations:
 The old M0-M12 numbering remains visible only in historical commits, tool names,
 and evidence references. It should not drive new scope.
 
-## Open release track - Voice-to-MuJoCo alpha
+## Completed phase - Text-to-MuJoCo interaction closure
 
 ### Objective
 
-Publish a narrowly scoped alpha proving the complete voice, interaction,
-confirmation, named-skill, cancellation, and recovery loop in MuJoCo.
+Close the historical M13 interaction milestone by proving the deterministic
+text-input path through Router, native `/interaction`, trusted Skill Runtime,
+Soridormi named skills, MuJoCo execution, and safe-idle recovery.
 
-The implementation is complete. Linux RTX 5090 GPU smoke and both automatic
-seven-case matrices now pass with retained evidence. Remaining work is the
-supervised real-microphone/speaker matrix, operator review, and release
-publication. This milestone remains an open release gate; its scope is frozen
-except for defects.
+This phase is complete. The retained `text-mujoco` evidence proves a compound
+text request is routed into ordered walking, nodding, and turning skills, all
+executed by Soridormi in MuJoCo, with the simulator returning to safe idle. The
+automatic synthetic and virtual-microphone matrices remain retained regression
+evidence for the broader voice pipeline.
+
+Physical microphone recognition and speaker quality are deliberately excluded
+from M13 closure. They remain an audio-device validation track for any future
+release claim that includes real voice input/output support.
 
 ### Exit criteria
 
 - `./scripts/run_tests.sh` passes from the candidate revision;
 - automatic `synthetic` and `virtual-mic` matrices pass all seven cases;
-- `supervised` mode passes all seven cases on the declared reference host;
-- `verify_m13_evidence.py --require-clean` accepts the supervised bundle;
-- operator notes confirm audible output, request-bound approval and denial,
-  simulator safe idle, cancellation, and recovery;
+- the deployed text-to-MuJoCo check passes against live Soridormi MCP and MuJoCo;
+- retained text evidence shows ordered `walk_velocity`, `nod_yes`, and
+  `turn_in_place` execution plus safe idle;
 - exact Chromie and Soridormi revisions are retained;
-- `release/compatibility.json` has no release blocker;
-- a clean `0.1.0-alpha.1` bundle is published as a prerelease.
 
-This alpha does not claim production robot support, verified Jetson packaging, or
-unattended operation.
+This closure does not claim robust human ASR, physical microphone/speaker
+quality, production robot support, verified Jetson packaging, or unattended
+operation.
 
-The acceptance scripts and evidence directories still use the historical `m13`
-name. That identifier is retained for compatibility only.
+The voice acceptance scripts and evidence directories still use the historical
+`m13` name. That identifier is retained for compatibility only.
+
+## Open evidence track - Physical audio validation
+
+Physical voice validation is no longer a blocker for M13 text interaction
+closure. Before publishing a release that claims support for real microphone and
+speaker operation, retain a clean supervised bundle, operator review, and
+release evidence that cover microphone choice, room noise, ASR recognition,
+audible output, barge-in, request-bound approval and denial, cancellation, stop,
+and simulator recovery.
 
 ## Completed phase - Robust simulation and provider readiness
 

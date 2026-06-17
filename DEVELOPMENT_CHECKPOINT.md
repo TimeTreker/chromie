@@ -2,9 +2,9 @@
 
 **Last committed Chromie base:** `f0e22ba`
 **Pinned Soridormi capability revision:** `4afb4bc6411db4a4194e97349d9466a62efd2f24`
-**Verified date:** 2026-06-15
-**Current focus:** Physical pilot preparation while Voice-to-MuJoCo alpha waits
-for supervised real-microphone/speaker closure
+**Verified date:** 2026-06-17
+**Current focus:** Physical pilot preparation after M13 text-to-MuJoCo closure;
+physical audio validation remains separate
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -21,28 +21,29 @@ The alpha implementation is present:
 - seven-case synthetic, virtual-microphone, and supervised acceptance;
 - evidence verification and alpha packaging.
 
-The alpha implementation remains frozen except for defects. Linux RTX 5090 GPU
-smoke passed 21/21, and clean seven-case synthetic and PipeWire virtual-mic
-bundles passed at `f0e22ba`. Supervised real-microphone/speaker evidence remains
-open. The robust-simulation and provider-readiness milestone is complete with live
-no-motion MCP conformance, three-profile parity, and 16/16 Soridormi-owned
-fault-injection scenarios. This does not clear any alpha release gate.
+The M13 text interaction scope is closed. Linux RTX 5090 GPU smoke passed
+21/21; clean seven-case synthetic and PipeWire virtual-mic bundles passed; and
+text-to-MuJoCo evidence `20260617T081411Z` passed at Chromie revision `857c15f`
+with ordered walk, nod, and turn execution in MuJoCo plus safe idle. Physical
+real-microphone/speaker evidence remains open only as a separate voice-device
+release-support track. The robust-simulation and provider-readiness milestone is
+complete with live no-motion MCP conformance, three-profile parity, and 16/16
+Soridormi-owned fault-injection scenarios.
 
 ## Next sequence
 
-1. Run the full seven-case `supervised` alpha matrix on the reference host,
-   review audible output and MuJoCo safe-idle/recovery behavior, and verify the
-   bundle with `--require-clean`.
-2. Clear the compatibility blocker and publish `0.1.0-alpha.1` only after that
-   retained evidence passes.
-3. Select one reference-robot candidate and complete the identity,
+1. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
    `commissioning/reference_robot_candidate.schema.json` contract and keep the
    real manifest under ignored `.chromie/commissioning/`.
-4. Keep all physical-motion gates off while validating no-motion health,
+2. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
+3. If the next supported release claims real microphone/speaker voice-device
+   operation, run the full seven-case `supervised` matrix on the reference host,
+   review audible output and MuJoCo safe-idle/recovery behavior, verify the
+   bundle with `--require-clean`, then clear the compatibility blocker.
 
 Do not start physical motion until the robust-simulation and provider-readiness
 target evidence passes and the first reference robot satisfies the commissioning
@@ -51,7 +52,7 @@ checklist.
 ## Verification baseline
 
 ```text
-273 current unittest cases passed
+278 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```

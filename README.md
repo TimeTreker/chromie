@@ -8,11 +8,11 @@ optional Soridormi-backed simulator or robot skills.
 The long-term goal and ownership boundaries are defined in the
 [Project Charter](docs/PROJECT_CHARTER.md).
 
-> **Current state:** the Voice-to-MuJoCo alpha implementation is complete and
-> automatically verified. Retained RTX 5090 GPU smoke, synthetic, and
-> virtual-microphone evidence pass on the reference host.
-> A clean reviewed supervised real-microphone/speaker bundle is still required
-> before publishing `0.1.0-alpha.1`. See
+> **Current state:** the historical M13 text-to-MuJoCo interaction milestone is
+> closed. Retained RTX 5090 GPU smoke, synthetic, virtual-microphone, and
+> text-to-MuJoCo evidence pass on the reference host.
+> Real microphone/speaker validation remains a separate track before making a
+> physical voice-device release claim. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
@@ -45,10 +45,10 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 - Soridormi named-skill discovery and MuJoCo execution;
 - TaskGraph validation and gated read, planning, guarded, and physical-policy
   paths;
-- synthetic, virtual-microphone, supervised, GPU, simulator, and release
+- text-to-MuJoCo, synthetic, virtual-microphone, supervised, GPU, simulator, and release
   acceptance tooling.
 
-Physical microphone/speaker evidence, the reviewed supervised alpha bundle,
+Physical microphone/speaker evidence, a reviewed voice-device release bundle,
 verified Jetson packaging, and physical robot support remain open.
 
 ## Quick start
@@ -145,5 +145,7 @@ are in the [Runbook](CHROMIE_RUNBOOK.md).
 - [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
 - [Status](docs/STATUS.md): what exists and what is evidenced
 - [Roadmap](ROADMAP.md): milestone order and exit criteria
+- [User Manual](docs/USER_MANUAL.md): current simulator operation
+- [Project Handoff](docs/HANDOFF.md): resume point for the next developer
 - [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point
 - [Documentation Index](docs/README.md): owner for every documentation fact

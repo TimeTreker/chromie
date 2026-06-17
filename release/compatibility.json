@@ -23,6 +23,6 @@
   ],
   "release_state": "candidate",
   "release_gate_blockers": [
-    "clean reviewed supervised real-microphone/speaker evidence is not yet retained"
+    "clean reviewed supervised real-microphone/speaker evidence is not yet retained for a physical voice-device release claim"
   ]
 }

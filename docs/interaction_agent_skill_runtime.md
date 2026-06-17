@@ -19,13 +19,11 @@ Implemented now:
 - simulation-only auto-confirm exemptions;
 - deterministic text-driven live Soridormi acceptance.
 
-Open alpha gates:
+Open release-support gates:
 
-- rerun the automatic matrix with spoken approval and denial evidence;
-- run and review the implemented seven-case microphone/MuJoCo evidence flow on
-  the reference host;
-- close applicable target-evidence tracks and publish the prepared alpha
-  candidate only after all blockers are removed.
+- physical microphone/speaker validation if a release claims real voice-device
+  support;
+- physical pilot commissioning evidence before any real robot motion claim.
 
 ## Design goal
 
@@ -257,6 +255,10 @@ catalog/default timeouts unchanged. Generated TTS-audio injection is covered by
 `scripts/m13_voice_acceptance.py --mode synthetic`; that mode skips the physical
 microphone but intentionally keeps VAD and ASR in the path.
 
+The retained `20260617T081411Z` bundle closes the historical M13 text
+interaction scope. Physical microphone and ASR behavior are intentionally
+separate from that closure.
+
 For broader text-input skill coverage without executing robot motion, use the
 preview sweep:
 
@@ -270,8 +272,9 @@ IDs and arguments, writes `.chromie/acceptance/text-skill-sweep/<id>/`, and
 reports live available skills that do not yet have text cases. Use `--execute`
 only for supervised simulator execution.
 
-The complete alpha microphone matrix and evidence requirements are maintained in
-[`ACCEPTANCE.md`](ACCEPTANCE.md). Run and verify it with:
+The physical voice-device matrix and evidence requirements are maintained in
+[`ACCEPTANCE.md`](ACCEPTANCE.md). Run and verify it only when a release claim
+includes real microphone and speaker operation:
 
 ```bash
 python scripts/m13_voice_acceptance.py \

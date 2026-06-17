@@ -7,12 +7,15 @@ candidate notes, compatibility metadata, an evidence verifier, source-archive
 generation, a release manifest, and checksums. No official GitHub release has
 been published.
 
-Treat `main` as a development branch and the current revision as supervised
-alpha validation material. Clean synthetic and virtual-microphone evidence is
-retained on the RTX 5090 reference host, but it is deliberately not
-release-closing. The release generator intentionally refuses a publishable
-bundle until a reviewed supervised alpha evidence bundle passes. See
-[Current Implementation Status](STATUS.md).
+Treat `main` as a development branch. The historical M13 text-to-MuJoCo
+interaction scope is closed with retained text evidence. Clean synthetic and
+virtual-microphone evidence is also retained on the RTX 5090 reference host.
+Physical microphone/speaker evidence is still required only for a release that
+claims real voice-device support. The checked-in compatibility declaration still
+contains that voice-device blocker, so the release generator refuses a
+publishable bundle until either the supervised evidence passes or the supported
+release scope is deliberately narrowed. See [Current Implementation
+Status](STATUS.md).
 
 ## Recommended first release scope
 
@@ -22,7 +25,7 @@ The prepared first version is:
 v0.1.0-alpha.1
 ```
 
-Recommended supported scope:
+Recommended supported scope for a voice-device alpha:
 
 - one documented Linux x86_64 NVIDIA reference host;
 - speech-only mode;
@@ -37,7 +40,8 @@ matrices are complete.
 
 ## Prepare the candidate bundle
 
-First complete and verify the guided reference-host run:
+For a release that claims real microphone/speaker operation, first complete and
+verify the guided reference-host run:
 
 ```bash
 python scripts/m13_voice_acceptance.py \
@@ -48,7 +52,9 @@ python scripts/verify_m13_evidence.py --require-clean \
   .chromie/acceptance/m13/<acceptance-id>
 ```
 
-A packaging rehearsal can be created before all blockers close:
+The M13 text-to-MuJoCo interaction scope is already evidenced by
+`.chromie/acceptance/text-mujoco/20260617T081411Z`. A packaging rehearsal can be
+created before all blockers close:
 
 ```bash
 python scripts/prepare_alpha_release.py --preview \
