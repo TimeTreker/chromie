@@ -12,6 +12,7 @@ from agent.app.capabilities.models import (
     ToolCapability,
     TransportSpec,
 )
+import agent.app.tool_invocation as tool_invocation
 from agent.app.tool_invocation import McpStreamableHttpInvoker, ToolInvocationContext
 
 
@@ -163,6 +164,28 @@ class McpToolInvokerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(error_outcome.status, "failed_fatal")
         self.assertEqual(error_outcome.error, "robot unavailable")
         self.assertEqual(timeout_outcome.status, "timeout")
+
+    async def test_exception_message_works_without_base_exception_group_builtin(self) -> None:
+        async def broken_call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            raise RuntimeError("provider disconnected")
+
+        original = tool_invocation._BASE_EXCEPTION_GROUP
+        tool_invocation._BASE_EXCEPTION_GROUP = None
+        try:
+            outcome = await McpStreamableHttpInvoker(
+                _registry(),
+                call=broken_call,
+            ).invoke("soridormi.robot.get_status", {})
+        finally:
+            tool_invocation._BASE_EXCEPTION_GROUP = original
+
+        self.assertEqual(outcome.status, "failed_retryable")
+        self.assertEqual(outcome.error, "provider disconnected")
 
     async def test_mcp_provider_faults_preserve_retryable_and_timeout_semantics(self) -> None:
         responses = iter(

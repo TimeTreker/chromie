@@ -117,6 +117,8 @@ GROUPS: dict[str, TestGroup] = {
         (
             _unittest(
                 "tests.test_interaction_text_acceptance",
+                "tests.test_interaction_text_mujoco_check",
+                "tests.test_interaction_text_skill_sweep",
                 "tests.test_m13_acceptance",
                 "tests.test_m5_target_acceptance",
             ),

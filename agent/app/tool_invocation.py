@@ -8,6 +8,11 @@ from pydantic import BaseModel, Field
 
 from .capabilities.models import CapabilityRegistry, ToolCapability
 
+try:
+    _BASE_EXCEPTION_GROUP = BaseExceptionGroup
+except NameError:  # pragma: no cover - exercised on Python < 3.11
+    _BASE_EXCEPTION_GROUP = None
+
 ToolOutcomeStatus = Literal[
     "success",
     "failed_retryable",
@@ -168,7 +173,7 @@ class McpStreamableHttpInvoker:
 
     @classmethod
     def _exception_message(cls, exc: BaseException) -> str:
-        if isinstance(exc, BaseExceptionGroup):
+        if _BASE_EXCEPTION_GROUP is not None and isinstance(exc, _BASE_EXCEPTION_GROUP):
             nested = "; ".join(
                 cls._exception_message(item)
                 for item in exc.exceptions

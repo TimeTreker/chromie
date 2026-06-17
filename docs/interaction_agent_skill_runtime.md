@@ -233,6 +233,43 @@ trusted Skill Runtime scheduling, live Soridormi MCP, and a test speech
 scheduler. It deliberately does not prove microphone capture, real TTS
 playback, or hardware motion.
 
+The deployed text-to-MuJoCo check exercises the Router service, Agent
+`/interaction`, trusted Skill Runtime, live Soridormi MCP, and optional real
+speaker output while skipping microphone and ASR:
+
+```bash
+python scripts/interaction_text_mujoco_check.py \
+  "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --expect-skill soridormi.walk_velocity \
+  --expect-skill soridormi.nod_yes \
+  --expect-skill soridormi.turn_in_place \
+  --expect-arg 0:vx_mps=0.2 \
+  --expect-arg 0:duration_s=10 \
+  --expect-arg 1:count=2 \
+  --expect-arg 2:yaw_radps=-0.12
+```
+
+This command creates a text-MuJoCo evidence directory and fails closed on route,
+interaction, execution, or safe-idle mismatch. It uses a 120s per Soridormi
+skill diagnostic timeout by default; pass `--skill-timeout-s 0` to use
+catalog/default timeouts unchanged. Generated TTS-audio injection is covered by
+`scripts/m13_voice_acceptance.py --mode synthetic`; that mode skips the physical
+microphone but intentionally keeps VAD and ASR in the path.
+
+For broader text-input skill coverage without executing robot motion, use the
+preview sweep:
+
+```bash
+python scripts/interaction_text_skill_sweep.py \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
+The sweep validates maintained text prompts against expected Soridormi skill
+IDs and arguments, writes `.chromie/acceptance/text-skill-sweep/<id>/`, and
+reports live available skills that do not yet have text cases. Use `--execute`
+only for supervised simulator execution.
+
 The complete alpha microphone matrix and evidence requirements are maintained in
 [`ACCEPTANCE.md`](ACCEPTANCE.md). Run and verify it with:
 

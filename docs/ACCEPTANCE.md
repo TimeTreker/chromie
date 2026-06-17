@@ -42,7 +42,7 @@ errors, and zero warnings. They report `release_eligible=false` by design.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 260 current tests and 20 legacy Agent
+At the current working revision this runs 273 current tests and 20 legacy Agent
 tests.
 It also runs the documentation consistency checker.
 
@@ -142,6 +142,49 @@ The text acceptance path uses deterministic routing, the current Agent runtime,
 native Interaction output, the trusted Skill Runtime, and the live
 Soridormi MCP provider. It schedules speech through a test scheduler rather
 than a speaker device.
+
+To sweep maintained text prompts across Soridormi named skills without
+executing motion:
+
+```bash
+python scripts/interaction_text_skill_sweep.py \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
+The sweep defaults to preview-only and no speaker. It writes per-case evidence
+and `summary.json` under `.chromie/acceptance/text-skill-sweep/<id>/`, validates
+expected skill IDs and arguments, and reports live available skills without a
+maintained text case. Use `--execute` only for supervised simulator execution.
+Use `--case-file cases.json` to add project-local text cases.
+
+For a deployed text-to-MuJoCo check that skips microphone and ASR while keeping
+Router, Agent `/interaction`, the host trusted Skill Runtime, live Soridormi
+MCP, and optional real speaker playback, start Chromie with the Soridormi
+manifest loaded and run:
+
+```bash
+python scripts/interaction_text_mujoco_check.py \
+  "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --expect-skill soridormi.walk_velocity \
+  --expect-skill soridormi.nod_yes \
+  --expect-skill soridormi.turn_in_place \
+  --expect-arg 0:vx_mps=0.2 \
+  --expect-arg 0:duration_s=10 \
+  --expect-arg 1:count=2 \
+  --expect-arg 2:yaw_radps=-0.12
+```
+
+This runner writes `route.json`, `interaction_response.json`,
+`execution.json`, status snapshots, session events, recordings when enabled,
+and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. It fails if
+the ordered Soridormi skills or expected arguments do not match, if Skill
+Runtime execution fails, or if the simulator does not return to safe idle. Use
+`--no-speaker` for headless automation; otherwise Chromie schedules TTS through
+the configured output device. The runner uses a 120s per-Soridormi-skill
+diagnostic timeout by default; pass `--skill-timeout-s 0` to use catalog/default
+timeouts unchanged. The runner refuses non-`sim` Soridormi modes unless
+`--allow-non-sim` is supplied under separate supervision.
 
 ## Guarded and recovery acceptance
 
@@ -339,6 +382,11 @@ The automatic modes intentionally use response playback `discard` mode. Audio
 is paced in real time, so `playback_start`, barge-in, cancellation, and stale
 playback checks still execute without requiring a physical speaker or risking
 speaker-to-microphone feedback.
+
+Use `scripts/interaction_text_mujoco_check.py` when the goal is to skip both
+microphone and ASR but still hear Chromie through the speaker. Use
+`synthetic` M13 mode when the goal is to skip only the microphone: generated
+Chromie TTS audio is injected as input and still passes through VAD and ASR.
 
 ### Automatic synthetic acceptance
 

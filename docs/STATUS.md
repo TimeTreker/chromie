@@ -59,7 +59,7 @@ Target validation or Release readiness.
 | Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR inference runs off the WebSocket event loop and cancelled native TTS generation is terminated through a restartable worker process | Component concurrency/cancellation tests plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Synthetic and PipeWire virtual-mic matrices passed 7/7; supervised physical microphone/speaker bundle still open | Enabled after host audio setup |
 | Deterministic Router operational controls | Implemented | Router rule tests | Exercised by deployed smoke test | Enabled by `.env.common` |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Used by the current voice loop | Enabled by `.env.common` |
-| Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo path exists | Host rollout flag off |
+| Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo path plus deployed text/speaker check tooling exists | Host rollout flag off |
 | Native structured Interaction Agent | Implemented with direct `InteractionSpeech`/`SkillRequest` accumulation | Native route, TaskGraph, validation, fail-closed, fallback, and compatibility-mode tests | Microphone retention still open | Agent default |
 | Trusted host Skill Runtime | Implemented | Scheduling, confirmation, timeout, cancellation, and isolation tests | Text-to-live-MuJoCo acceptance exists | Used only by structured path |
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean synthetic and virtual-mic approval/denial evidence passed; supervised approval/denial remains open | Structured path; simulator exemption configurable |
@@ -96,13 +96,23 @@ canonical full-suite gate above.
 
 At the current working revision it runs:
 
-- **260** current `unittest` cases under `tests/`;
+- **273** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
 quality, or real robot safety. The retained RTX evidence above separately
 validates the target GPU and automated host audio paths.
+
+`scripts/interaction_text_mujoco_check.py` is available for text-input,
+speaker-output, live-MuJoCo checks that skip microphone and ASR. It produces
+contract and safe-idle evidence only; it does not replace the supervised
+microphone/speaker alpha bundle.
+
+`scripts/interaction_text_skill_sweep.py` is available for text-input
+preview sweeps across maintained Soridormi skill prompts. It reports live
+available skills without text cases and executes motion only when explicitly
+run with `--execute` against a supervised simulator endpoint.
 
 ## Alpha open gates
 

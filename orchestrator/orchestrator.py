@@ -38,6 +38,7 @@ from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
 )
+from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.interaction import InteractionResponse
@@ -1155,7 +1156,7 @@ class VoiceAssistant:
         session_id: str | None,
         *,
         confirmed_request_ids: set[str] | None = None,
-    ) -> None:
+    ) -> SkillRuntimeResult:
         await self.reset_playback_ordering()
         started_ms = now_ms()
         try:
@@ -1182,6 +1183,7 @@ class VoiceAssistant:
                     result.reason_code,
                     result.message,
                 )
+            return execution
         except asyncio.CancelledError:
             self.session_log(
                 session_id,

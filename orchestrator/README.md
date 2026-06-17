@@ -197,6 +197,8 @@ python orchestrator/list_devices.py
 ./scripts/show_profile.sh
 ./scripts/gpu_smoke_test.sh
 ./scripts/interaction_text_acceptance.py
+python scripts/interaction_text_skill_sweep.py --skip-live-inventory
+python scripts/interaction_text_mujoco_check.py --no-speaker
 ```
 
 Session timing logs can be enabled with `ORCH_SESSION_TIMING_LOGS=1`. Set

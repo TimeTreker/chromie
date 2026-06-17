@@ -134,6 +134,80 @@ named skills, physical microphone input, and speaker output without redefining
 image tags. Use `--require-confirmation` to require spoken confirmation for all
 simulator skills, or `--build` to rebuild repository-owned service images.
 
+## 5.2 Text-to-MuJoCo without microphone or ASR
+
+For route, interaction, Skill Runtime, speaker, and live MuJoCo checks without
+microphone capture or ASR, start Soridormi first:
+
+```bash
+cd ../soridormi
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+```
+
+In another terminal:
+
+```bash
+cd ../soridormi
+docker compose -f compose.sim.yaml --profile mcp-runtime up -d --no-build mcp-runtime
+```
+
+Start the Chromie services with the Soridormi manifest mounted into the Agent:
+
+```bash
+cd ../chromie
+mkdir -p .chromie/text-mujoco
+cat > .chromie/text-mujoco/compose.soridormi.yaml <<'EOF'
+services:
+  chromie-agent:
+    environment:
+      AGENT_CAPABILITY_MANIFESTS: /app/capabilities/soridormi.json
+      SORIDORMI_MCP_URL: http://host.docker.internal:8000/mcp
+      AGENT_INTERACTION_OUTPUT_MODE: native
+      AGENT_NATIVE_INTERACTION_FALLBACK: "0"
+  chromie-router:
+    environment:
+      ROUTER_CAPABILITY_MATCH_LIMIT: "16"
+EOF
+CHROMIE_COMPOSE_OVERRIDE_FILES=.chromie/text-mujoco/compose.soridormi.yaml \
+  ./scripts/start_services.sh
+```
+
+Then run the text check. This commands MuJoCo through Soridormi and speaks
+Chromie's response through the configured speaker:
+
+```bash
+python scripts/interaction_text_mujoco_check.py \
+  "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --expect-skill soridormi.walk_velocity \
+  --expect-skill soridormi.nod_yes \
+  --expect-skill soridormi.turn_in_place \
+  --expect-arg 0:vx_mps=0.2 \
+  --expect-arg 0:duration_s=10 \
+  --expect-arg 1:count=2 \
+  --expect-arg 2:yaw_radps=-0.12
+```
+
+Use `--no-speaker` for headless automation. The runner sets a 120s per-skill
+diagnostic timeout for live simulator checks; pass `--skill-timeout-s 0` to use
+catalog/default timeouts unchanged. Evidence is written under
+`.chromie/acceptance/text-mujoco/<id>/`. This is not supervised microphone
+evidence and does not close the alpha release gate.
+
+To sweep the maintained text prompts across Soridormi named skills without
+executing robot motion, run:
+
+```bash
+python scripts/interaction_text_skill_sweep.py \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
+This checks text-to-Router and Agent `/interaction` contracts in preview mode,
+writes evidence under `.chromie/acceptance/text-skill-sweep/<id>/`, and reports
+live available Soridormi skills that have no maintained text case. Use
+`--list-cases` to inspect the built-in text prompts. Add `--execute` only for a
+supervised simulator run; it remains headless unless `--speaker` is supplied.
+
 ## 6. Health checks
 
 ```bash

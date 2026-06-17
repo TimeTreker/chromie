@@ -264,13 +264,17 @@ def collect_provenance(
                     inspected_images.append(inspect_image(image))
                 except (subprocess.CalledProcessError, json.JSONDecodeError, IndexError) as exc:
                     runtime_errors.append(f"could not inspect image {image}: {exc}")
-            tag = required_env(env, "CHROMIE_IMAGE_TAG")
-            for name in PROJECT_IMAGE_NAMES:
-                image = f"{name}:{tag}"
-                try:
-                    resolved_dependencies[image] = pip_freeze(image)
-                except subprocess.CalledProcessError as exc:
-                    runtime_errors.append(f"could not capture pip freeze for {image}: {exc}")
+            try:
+                tag = required_env(env, "CHROMIE_IMAGE_TAG")
+            except ValueError as exc:
+                runtime_errors.append(str(exc))
+            else:
+                for name in PROJECT_IMAGE_NAMES:
+                    image = f"{name}:{tag}"
+                    try:
+                        resolved_dependencies[image] = pip_freeze(image)
+                    except subprocess.CalledProcessError as exc:
+                        runtime_errors.append(f"could not capture pip freeze for {image}: {exc}")
         else:
             runtime_errors.append("docker executable is unavailable; image digests and resolved dependencies were not captured")
 
