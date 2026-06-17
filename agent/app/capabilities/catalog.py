@@ -50,6 +50,8 @@ _STOP_WORDS = {
 # identifiers. Capability descriptions and schemas remain the source of truth.
 _TOKEN_EQUIVALENTS = (
     {"move", "walk", "go", "travel", "locomotion"},
+    {"nod", "nodd", "yes", "acknowledgement"},
+    {"shake", "shak", "no", "decline"},
     {"turn", "rotate", "yaw"},
     {"stop", "cancel", "halt", "pause"},
     {"status", "state", "health"},
@@ -363,14 +365,24 @@ class CapabilityCatalog:
                     # Match the host SkillRegistry namespace exactly. The
                     # provider contract returns an unprefixed opaque skill_id.
                     capability_id = f"soridormi.{upstream_id}"
+                    effects = list(item.get("effects") or ["physical_motion"])
+                    safety_class = str(item.get("safety_class") or "physical_motion")
+                    provider_requires_confirmation = bool(
+                        item.get("requires_confirmation", False)
+                    )
+                    requires_confirmation = (
+                        provider_requires_confirmation
+                        or safety_class in {"physical_motion", "safety_critical"}
+                        or "physical_motion" in effects
+                    )
                     live[capability_id] = CatalogCapability(
                         capability_id=capability_id,
                         agent_id="soridormi.skill",
                         description=str(item.get("description") or item.get("summary") or ""),
                         input_schema=dict(item.get("parameters_schema") or item.get("input_schema") or {}),
-                        effects=list(item.get("effects") or ["physical_motion"]),
-                        safety_class=str(item.get("safety_class") or "physical_motion"),
-                        requires_confirmation=bool(item.get("requires_confirmation", True)),
+                        effects=effects,
+                        safety_class=safety_class,
+                        requires_confirmation=requires_confirmation,
                         available=bool(item.get("available", True)),
                         route="robot_action",
                         source="soridormi.live_named_skills",

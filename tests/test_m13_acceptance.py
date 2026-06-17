@@ -29,8 +29,10 @@ from scripts.m13_voice_acceptance import (
     prompt_verdict,
     redact_env_file,
     run_acceptance,
+    service_runtime_overrides,
     wait_for_any_event,
     wait_for_case_checks,
+    write_service_override_file,
     write_override_file,
 )
 from orchestrator.audio_injection import encode_audio_packet, read_audio_packet
@@ -340,6 +342,35 @@ class M13AcceptanceTests(unittest.TestCase):
                 "test_control",
             ],
         )
+
+    def test_body_cases_start_agent_with_soridormi_manifest(self) -> None:
+        values = service_runtime_overrides(
+            soridormi_mcp_url="http://127.0.0.1:8000/mcp",
+            enable_soridormi=True,
+        )
+        self.assertEqual(
+            values["AGENT_CAPABILITY_MANIFESTS"],
+            "/app/capabilities/soridormi.json",
+        )
+        self.assertEqual(
+            values["SORIDORMI_MCP_URL"],
+            "http://host.docker.internal:8000/mcp",
+        )
+
+    def test_service_override_file_is_shell_sourceable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "service.env"
+            write_service_override_file(
+                path,
+                {
+                    "AGENT_CAPABILITY_MANIFESTS": "/app/capabilities/soridormi.json",
+                    "SORIDORMI_MCP_URL": "http://host.docker.internal:8000/mcp",
+                },
+            )
+            text = path.read_text()
+
+        self.assertIn("AGENT_CAPABILITY_MANIFESTS=/app/capabilities/soridormi.json", text)
+        self.assertIn("SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp", text)
 
     def test_host_probe_remains_an_explicit_development_option(self) -> None:
         command, environment, endpoint = capability_probe_invocation(

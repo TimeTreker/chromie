@@ -79,6 +79,21 @@ class SkillRegistry:
             upstream_id = str(item.get("skill_id", "")).strip()
             if not upstream_id:
                 raise ValueError("Soridormi skill catalog entry has no skill_id")
+            effects = list(item.get("effects") or ["physical_motion"])
+            safety_class = str(item.get("safety_class") or "physical_motion")
+            provider_requires_confirmation = bool(
+                item.get("requires_confirmation", False)
+            )
+            effective_requires_confirmation = (
+                provider_requires_confirmation
+                or (
+                    requires_confirmation
+                    and (
+                        safety_class in {"physical_motion", "safety_critical"}
+                        or "physical_motion" in effects
+                    )
+                )
+            )
             self.register(
                 SkillDefinition(
                     skill_id=f"soridormi.{upstream_id}",
@@ -88,9 +103,7 @@ class SkillRegistry:
                     input_schema=dict(item.get("parameters_schema") or {}),
                     available=bool(item.get("available", False)),
                     unavailable_reason=item.get("unavailable_reason"),
-                    requires_confirmation=bool(
-                        item.get("requires_confirmation", requires_confirmation)
-                    ),
+                    requires_confirmation=effective_requires_confirmation,
                     interruptible=bool(item.get("interruptible", False)),
                     can_run_parallel=True,
                     exclusive_group="soridormi.robot_motion",

@@ -51,6 +51,44 @@ def _body_definition(
 
 
 class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_soridormi_import_keeps_physical_confirmation_when_host_requires_it(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "nod_yes",
+                    "description": "Visible head nod.",
+                    "parameters_schema": {"type": "object", "properties": {}},
+                    "available": True,
+                    "effects": ["physical_motion"],
+                    "safety_class": "physical_motion",
+                    "requires_confirmation": False,
+                }
+            ],
+            requires_confirmation=True,
+        )
+
+        self.assertTrue(registry.get("soridormi.nod_yes").requires_confirmation)
+
+    async def test_soridormi_import_allows_declared_sim_exemption_when_host_allows_it(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "nod_yes",
+                    "description": "Visible head nod.",
+                    "parameters_schema": {"type": "object", "properties": {}},
+                    "available": True,
+                    "effects": ["physical_motion"],
+                    "safety_class": "physical_motion",
+                    "requires_confirmation": False,
+                }
+            ],
+            requires_confirmation=False,
+        )
+
+        self.assertFalse(registry.get("soridormi.nod_yes").requires_confirmation)
+
     async def test_speech_only_request_completes(self) -> None:
         spoken: list[str] = []
         registry = SkillRegistry()

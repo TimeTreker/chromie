@@ -32,6 +32,22 @@ class _Invoker:
                 "mode": "sim",
                 "skills": [
                     {
+                        "skill_id": "nod_yes",
+                        "version": "1.0.0",
+                        "description": "Visible repeated bounded head pitch motion for yes/acknowledgement.",
+                        "parameters_schema": {
+                            "type": "object",
+                            "properties": {
+                                "count": {"type": "number", "minimum": 2, "maximum": 8},
+                                "duration_s": {"type": "number", "minimum": 1.0, "maximum": 10.0},
+                            },
+                        },
+                        "available": True,
+                        "effects": ["physical_motion"],
+                        "safety_class": "physical_motion",
+                        "requires_confirmation": False,
+                    },
+                    {
                         "skill_id": "walk_forward",
                         "version": "1.0.0",
                         "description": "Walk forward a short distance at a safe speed.",
@@ -136,6 +152,19 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertEqual(invoker.calls, 1)
+
+    async def test_physical_live_skill_requires_confirmation_despite_sim_exemption(self) -> None:
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+
+        result = await catalog.search(
+            "Please perform a nodding gesture two times.",
+            language="en",
+            prefer_interaction_executable=True,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(result.matches[0].capability_id, "soridormi.nod_yes")
+        self.assertTrue(result.matches[0].requires_confirmation)
 
 
     async def test_prefers_relevant_executable_skill_over_planning_only_tool(self) -> None:

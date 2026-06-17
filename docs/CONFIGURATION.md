@@ -84,6 +84,7 @@ Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
 | `REBUILD_NO_CACHE=1` | Rebuild service images without cache. |
 | `FOLLOW_LOGS=1` | Follow service logs after startup. |
 | `CHROMIE_PULL_POLICY` | Compose pull policy used by `start_services.sh`; default `never` for local project images. |
+| `CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced by `start_services.sh` after `.env.runtime`; intended for acceptance/service harnesses that need temporary Compose variables. |
 | `WARM_OLLAMA_BEFORE_ORCH` | Warm the selected Agent model before opening the microphone; default `1`. |
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |

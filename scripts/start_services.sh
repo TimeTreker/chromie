@@ -14,6 +14,18 @@ set -a
 source .env.runtime
 set +a
 
+if [ -n "${CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE:-}" ]; then
+  if [ ! -f "$CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE" ]; then
+    echo "[start][error] Service runtime override file not found: $CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE" >&2
+    exit 1
+  fi
+  echo "[start] Loading service runtime overrides: $CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  source "$CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE"
+  set +a
+fi
+
 ensure_dir() {
   local dir="$1"
 
