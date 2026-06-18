@@ -1,9 +1,9 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Verified base revision:** `857c15f` plus retained evidence listed below;
-release tooling records the exact packaged revision
-**Verified date:** 2026-06-17
+**Current verified repository revision:** `91c60e2`; retained target evidence
+below records the exact revision that produced each bundle
+**Verified date:** 2026-06-18
 **Current focus:** **Physical pilot preparation after M13 text-to-MuJoCo
 closure; physical audio validation remains a separate release-support track**
 **Version candidate:** `0.1.0-alpha.1` (prepared, not published)
@@ -70,11 +70,11 @@ Target validation or Release readiness.
 | Capability | Implementation | Automated evidence | Target or live evidence | Default deployment state |
 |---|---|---|---|---|
 | Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
-| Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR inference runs off the WebSocket event loop and cancelled native TTS generation is terminated through a restartable worker process | Component concurrency/cancellation tests plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Synthetic and PipeWire virtual-mic matrices passed 7/7; physical microphone/speaker validation remains open for voice-device release claims | Enabled after host audio setup |
-| Deterministic Router operational controls | Implemented | Router rule tests | Exercised by deployed smoke test | Enabled by `.env.common` |
+| Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR inference runs off the WebSocket event loop; TTS playback stays ordered while complete speech can be chunked across bounded restartable service workers | Component concurrency/cancellation, TTS worker-pool, TTS alignment, plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Synthetic and PipeWire virtual-mic matrices passed 7/7; physical microphone/speaker validation remains open for voice-device release claims | Enabled after host audio setup |
+| Deterministic Router operational controls plus quick LLM route classifier | Implemented; interrupt/ignore controls remain deterministic while normal requests can use catalog search, semantic parsing, and the small Router model | Router rule, capability-routing, LLM-prompt, and semantic-action tests | Exercised by deployed smoke test | Enabled by `.env.common` |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Used by the current voice loop | Enabled by `.env.common` |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle | Host rollout flag off |
-| Native structured Interaction Agent | Implemented with direct `InteractionSpeech`/`SkillRequest` accumulation and simulator-bounded expressive body cues | Native route, TaskGraph, validation, fail-closed, fallback, expressive chat attention/nod cues, and compatibility-mode tests | Text-input MuJoCo closure evidence retained; physical microphone retention remains separate | Agent default |
+| Native structured Interaction Agent | Implemented with direct `InteractionSpeech`/`SkillRequest` accumulation, simulator-bounded expressive body cues, and safe defaults for underspecified walking requests | Native route, TaskGraph, validation, fail-closed, fallback, expressive chat attention/nod cues, semantic action, and compatibility-mode tests | Text-input MuJoCo closure evidence retained; physical microphone retention remains separate | Agent default |
 | Trusted host Skill Runtime | Implemented | Scheduling, confirmation, timeout, cancellation, and isolation tests | Text-to-live-MuJoCo closure evidence passed | Used only by structured path |
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean synthetic and virtual-mic approval/denial evidence passed; text-to-MuJoCo uses the same trusted runtime authorization boundary | Structured path; simulator exemption configurable |
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; physical speaker validation remains separate | Available in structured path |
@@ -110,9 +110,13 @@ canonical full-suite gate above.
 
 At the current working revision it runs:
 
-- **278** current `unittest` cases under `tests/`;
+- **309** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
+
+This Level A suite was verified in the dependency-complete `chromie-agent`
+container at revision `91c60e2`. A host run is equivalent only when the host
+Python environment has the same service/test dependencies installed.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
 quality, or real robot safety. The retained RTX evidence above separately

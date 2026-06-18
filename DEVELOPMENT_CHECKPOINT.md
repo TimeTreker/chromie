@@ -1,8 +1,8 @@
 # Development Checkpoint
 
-**Last committed Chromie base:** `f0e22ba`
+**Current committed Chromie base:** `91c60e2`
 **Pinned Soridormi capability revision:** `4afb4bc6411db4a4194e97349d9466a62efd2f24`
-**Verified date:** 2026-06-17
+**Verified date:** 2026-06-18
 **Current focus:** Physical pilot preparation after M13 text-to-MuJoCo closure;
 physical audio validation remains separate
 
@@ -18,8 +18,14 @@ The alpha implementation is present:
 - trusted host Skill Runtime and Soridormi named skills;
 - request-bound spoken confirmation;
 - deterministic interruption and cancellation;
-- seven-case synthetic, virtual-microphone, and supervised acceptance;
+- seven-case synthetic, virtual-microphone, and supervised acceptance tooling;
 - evidence verification and alpha packaging.
+- small-model quick Router classification for normal semantic routing while
+  stop/cancel/ignore controls remain deterministic;
+- simulator-bounded expressive body cues and safe defaults for underspecified
+  walking requests;
+- ordered TTS playback with bounded chunked generation through configured
+  service workers.
 
 The M13 text interaction scope is closed. Linux RTX 5090 GPU smoke passed
 21/21; clean seven-case synthetic and PipeWire virtual-mic bundles passed; and
@@ -52,7 +58,7 @@ checklist.
 ## Verification baseline
 
 ```text
-278 current unittest cases passed
+309 current unittest cases passed
 20 legacy Agent tests passed
 documentation checks passed
 ```

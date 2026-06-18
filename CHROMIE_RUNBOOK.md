@@ -45,7 +45,7 @@ REBUILD_NO_CACHE=1 ./scripts/start_services.sh
 Stop services:
 
 ```bash
-docker compose --env-file .env.runtime down
+./scripts/compose.sh down
 ```
 
 ## 3. Prepare Ollama
@@ -55,8 +55,8 @@ set -a
 source .env.runtime
 set +a
 
-docker compose --env-file .env.runtime exec chromie-llm ollama list
-docker compose --env-file .env.runtime exec chromie-llm \
+./scripts/compose.sh exec chromie-llm ollama list
+./scripts/compose.sh exec chromie-llm \
   ollama pull "$AGENT_MODEL"
 ./scripts/warm_ollama.sh
 ```
@@ -212,7 +212,7 @@ supervised simulator run; it remains headless unless `--speaker` is supplied.
 ## 6. Health checks
 
 ```bash
-docker compose --env-file .env.runtime ps
+./scripts/compose.sh ps
 curl -fsS http://127.0.0.1:8091/health | python -m json.tool
 curl -fsS http://127.0.0.1:8091/routes | python -m json.tool
 curl -fsS http://127.0.0.1:8092/health | python -m json.tool
@@ -280,8 +280,8 @@ Probe schema compatibility in the deployed Agent environment:
 
 ```bash
 ./scripts/build_runtime_env.sh
-docker compose --env-file .env.runtime up -d chromie-agent
-docker compose --env-file .env.runtime exec -T \
+./scripts/compose.sh up -d chromie-agent
+./scripts/compose.sh exec -T \
   -e SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp \
   chromie-agent \
   python -m app.probe_capabilities \
@@ -511,11 +511,11 @@ conditions, or operator-observed simulator safety.
 ## 14. Logs
 
 ```bash
-docker compose --env-file .env.runtime logs -f chromie-asr
-docker compose --env-file .env.runtime logs -f chromie-router
-docker compose --env-file .env.runtime logs -f chromie-agent
-docker compose --env-file .env.runtime logs -f chromie-llm
-docker compose --env-file .env.runtime logs -f chromie-tts
+./scripts/compose.sh logs -f chromie-asr
+./scripts/compose.sh logs -f chromie-router
+./scripts/compose.sh logs -f chromie-agent
+./scripts/compose.sh logs -f chromie-llm
+./scripts/compose.sh logs -f chromie-tts
 ```
 
 Useful Agent inspection:

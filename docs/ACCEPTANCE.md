@@ -47,9 +47,17 @@ ASR and therefore does not prove physical audio-device quality.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 278 current tests and 20 legacy Agent
-tests.
-It also runs the documentation consistency checker.
+At the current working revision this runs 309 current tests and 20 legacy Agent
+tests. It also runs the documentation consistency checker.
+
+If the host Python environment is intentionally minimal, run the same gate in
+the service dependency envelope:
+
+```bash
+./scripts/compose.sh run --rm --no-deps \
+  -v "$PWD:/workspace" -w /workspace \
+  chromie-agent ./scripts/run_tests.sh
+```
 
 For roadmap-aligned module and combination checks, use:
 
@@ -70,7 +78,7 @@ MuJoCo, or hardware evidence.
 
 ```bash
 ./scripts/start_services.sh
-docker compose --env-file .env.runtime ps
+./scripts/compose.sh ps
 curl -fsS http://127.0.0.1:8091/health
 curl -fsS http://127.0.0.1:8092/health
 curl -fsS http://127.0.0.1:11434/api/tags
@@ -95,8 +103,8 @@ the probe uses the same MCP SDK and dependency versions as the deployed Agent:
 
 ```bash
 ./scripts/build_runtime_env.sh
-docker compose --env-file .env.runtime up -d chromie-agent
-docker compose --env-file .env.runtime exec -T \
+./scripts/compose.sh up -d chromie-agent
+./scripts/compose.sh exec -T \
   -e SORIDORMI_MCP_URL=http://host.docker.internal:8000/mcp \
   chromie-agent \
   python -m app.probe_capabilities \

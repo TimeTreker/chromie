@@ -1,6 +1,6 @@
 # Project Handoff
 
-Last updated: 2026-06-17
+Last updated: 2026-06-18
 
 This handoff records the current resume point for a developer or operator who
 needs to continue Chromie without replaying the full chat history.
@@ -64,9 +64,13 @@ The current required checks passed in the Docker runtime:
 ```text
 python scripts/check_docs.py
 ./scripts/run_tests.sh
-278 current tests passed
+309 current tests passed
 20 legacy Agent tests passed
 ```
+
+This latest Level A run passed in the `chromie-agent` container at Chromie
+revision `91c60e2`, which supplies the service dependencies used by the Router,
+Agent, and TTS tests.
 
 Focused text/M13 tests also passed:
 
@@ -116,7 +120,7 @@ conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
 Run the full automated suite in the container runtime:
 
 ```bash
-docker compose --env-file .env.runtime run --rm --no-deps \
+./scripts/compose.sh run --rm --no-deps \
   -v "$PWD:/workspace" -w /workspace \
   chromie-agent ./scripts/run_tests.sh
 ```

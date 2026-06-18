@@ -35,7 +35,9 @@ archives, and old milestone prose are context only.
 - Use Docker service names inside containers and loopback ports from the host.
 - Run the Orchestrator from repository root with
   `python -m orchestrator.orchestrator`.
-- Keep TTS generation serialized unless the backend ownership model changes.
+- Keep audible TTS playback ordered. TTS generation may run with bounded
+  concurrency only through independently owned service workers; do not raise
+  concurrency beyond the configured worker/resource contract.
 - Do not fabricate microphone, GPU, simulator, or hardware evidence. Use
   synthetic/virtual-mic modes for automated regression and supervised mode for
   release-closing microphone/speaker evidence with operator notes.
