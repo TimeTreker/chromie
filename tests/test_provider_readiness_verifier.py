@@ -64,7 +64,7 @@ class ProviderReadinessVerifierTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report["errors"], [])
         self.assertEqual(
             report["upstream_commit"],
-            "4afb4bc6411db4a4194e97349d9466a62efd2f24",
+            "2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2",
         )
 
     def test_ready_manifest_passes_preflight(self) -> None:

@@ -43,6 +43,65 @@ user speech
 The execution boundary—not the model—owns validation, availability,
 confirmation, resource policy, timeout, cancellation, and provider calls.
 
+## Multi-Agent Boundary
+
+Chromie and Soridormi are both agent-like systems, but they operate at different
+scopes. Chromie owns the global, human-facing task DAG: understanding the user,
+using memory/search/speech, asking clarifying questions, collecting
+confirmation, and deciding which capability provider should handle each node.
+
+Soridormi owns the embodied robot DAG or state machine: robot state, body
+capability checks, sensing/localization hooks, route or local motion planning,
+gait and skill selection, safety monitoring, stop/cancel behavior, recovery,
+MuJoCo execution, and future hardware execution.
+
+Chromie should send structured embodied goals to Soridormi, not movement
+recipes, for rich requests. For example, "bring me water" should become a
+capability-level request such as `deliver_object` and then fail closed today
+because the current robot has no manipulator/carry/handoff capability.
+"Walk forward to the house" should not become plain `walk_velocity`; it
+requires target resolution, localization, route planning, local obstacle checks,
+and bounded local trajectory planning inside Soridormi.
+
+Soridormi exposes both atomic skill APIs and a contract-first task API:
+
+```text
+soridormi.skill.*  atomic body skills and simple explicit requests
+soridormi.task.*   structured embodied goals, currently no-motion contract,
+                   preview, skill-dry-run, and skill-sequence-dry-run tools
+```
+
+Chromie may orchestrate when to call Soridormi, what to ask the user, and what
+to say next. Soridormi remains authoritative for whether and how the robot body
+acts. If Soridormi returns `plan_steps` or `blocked_subsystems`, Chromie can use
+them for explanation, clarification, and global TaskGraph state, but not as a
+recipe to bypass Soridormi's body-runtime boundary.
+If Soridormi returns `task_graph`, Chromie may use it as a body-runtime progress
+view. It is not Chromie's global TaskGraph and must not be converted into raw
+low-level robot control.
+`soridormi.task.preview` is specifically for this explanatory/pre-confirmation
+path; it uses `preview_id` and does not create a persistent task record.
+When Chromie submits a persistent Soridormi task, it should include a stable
+`client_task_ref` from Chromie's global TaskGraph node. Soridormi uses that
+reference as a retry key: identical duplicate submissions return the original
+`task_id` with `idempotent_replay=true`, while conflicting payloads are
+rejected.
+If Soridormi returns `recommended_next_actions`, Chromie may use them to choose
+the next global graph step, such as reporting a blocked capability or calling a
+dedicated stop tool, but the hints are not user-facing speech and not execution
+receipts.
+`soridormi.task.events` returns the monitor cursor
+`soridormi.task_events.v1`, including `latest_sequence`,
+`next_after_sequence`, `terminal`, `safe_idle`, `deadline_at`, `expired`, and
+`poll_recommendation`. Chromie should poll with the returned cursor until the
+task is terminal or until Soridormi recommends cancellation/reporting.
+`soridormi.task.get_capabilities` is the read-only way to ask Soridormi what
+its embodied task runtime can currently dry-run, hold, redirect, or refuse.
+Chromie should treat that readiness as Soridormi-owned state.
+
+For the staged Chromie-side implementation plan, see
+`docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`.
+
 ## Shared contracts
 
 `InteractionResponse` contains:

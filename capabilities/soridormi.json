@@ -57,6 +57,18 @@
               },
               "emergency_stop": {
                 "type": "boolean"
+              },
+              "active_task": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "safe_idle": {
+                "type": "boolean"
+              },
+              "robot_time": {
+                "type": "number"
               }
             }
           },
@@ -513,6 +525,9 @@
             "properties": {
               "stopped": {
                 "type": "boolean"
+              },
+              "safe_idle": {
+                "type": "boolean"
               }
             }
           },
@@ -580,6 +595,9 @@
             "properties": {
               "cancelled": {
                 "type": "boolean"
+              },
+              "safe_idle": {
+                "type": "boolean"
               }
             }
           },
@@ -634,7 +652,7 @@
     {
       "agent_id": "soridormi.skill",
       "display_name": "Soridormi Named Skill Agent",
-      "description": "Discover, plan, and exercise named body skills through opaque no-motion commissioning plans.",
+      "description": "Discover, plan, and execute named body skills through opaque Soridormi-owned plans.",
       "version": "0.1.0",
       "llm_visible": true,
       "transport": {
@@ -655,7 +673,7 @@
       "tags": [
         "soridormi",
         "skill",
-        "commissioning"
+        "body-skill"
       ],
       "tools": [
         {
@@ -735,7 +753,7 @@
           "name": "soridormi.skill.create_plan",
           "agent_id": "soridormi.skill",
           "display_name": null,
-          "description": "Validate a named skill and create an opaque no-motion commissioning plan.",
+          "description": "Validate a named skill and create an opaque Soridormi-owned plan. Planning does not move the robot.",
           "version": "0.1.0",
           "llm_visible": true,
           "input_schema": {
@@ -828,7 +846,7 @@
           "name": "soridormi.skill.execute_plan",
           "agent_id": "soridormi.skill",
           "display_name": null,
-          "description": "Exercise an opaque named-skill plan without sending robot or simulator actuator commands.",
+          "description": "Execute an opaque named-skill plan. The runtime adapter may move the MuJoCo robot in sim mode; hardware shadow/dry-run profiles remain no-motion until a hardware adapter is implemented.",
           "version": "0.1.0",
           "llm_visible": true,
           "input_schema": {
@@ -872,9 +890,10 @@
             ]
           },
           "effects": [
-            "commissioning_no_motion"
+            "physical_motion",
+            "named_skill_execution"
           ],
-          "safety_class": "low_risk_action",
+          "safety_class": "physical_motion",
           "availability": {
             "available": true,
             "modes": [
@@ -911,6 +930,1323 @@
             "hard_interrupt_events": [
               "emergency_stop"
             ]
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "stop_and_report",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        }
+      ]
+    },
+    {
+      "agent_id": "soridormi.task",
+      "display_name": "Soridormi Embodied Task Agent",
+      "description": "Contract-first embodied task API. It records structured goals and refuses missing, unsafe, or unsupported capability paths; this surface does not execute robot motion yet.",
+      "version": "0.1.0",
+      "llm_visible": true,
+      "transport": {
+        "kind": "mcp_streamable_http",
+        "module": null,
+        "command": null,
+        "args": [],
+        "url": "${SORIDORMI_MCP_URL}",
+        "env": {}
+      },
+      "status": {
+        "available": true,
+        "reason": null,
+        "details": {
+          "mode": "sim",
+          "execution_mode": "contract_only"
+        }
+      },
+      "tags": [
+        "soridormi",
+        "task",
+        "embodied-goal",
+        "contract-only"
+      ],
+      "tools": [
+        {
+          "name": "soridormi.task.get_capabilities",
+          "agent_id": "soridormi.task",
+          "display_name": "Get Soridormi task capabilities",
+          "description": "Read Soridormi-owned embodied task readiness, required subsystems, missing subsystems, and no-motion task API status.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "emergency_stop": {
+                "type": "boolean"
+              },
+              "safe_idle": {
+                "type": "boolean"
+              },
+              "task_api_no_motion": {
+                "type": "boolean"
+              },
+              "physical_execution_note": {
+                "type": "string"
+              },
+              "ready_subsystems": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "unsafe_task_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "executable_skill_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "task_types": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            },
+            "required": [
+              "schema_version",
+              "mode",
+              "backend",
+              "task_api_no_motion",
+              "ready_subsystems",
+              "task_types"
+            ]
+          },
+          "effects": [
+            "read_only",
+            "task_capability_readiness"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use before planning embodied tasks to inspect what Soridormi can dry-run, hold, redirect, or fail closed.",
+            "physical_execution_boundary": "This reports task readiness only. It does not authorize physical motion or raw low-level control."
+          }
+        },
+        {
+          "name": "soridormi.task.preview",
+          "agent_id": "soridormi.task",
+          "display_name": "Preview Soridormi embodied task",
+          "description": "Preview Soridormi's no-motion interpretation of a structured embodied task goal without creating a persistent task record.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "client_task_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "task_type": {
+                "type": "string",
+                "enum": [
+                  "move_velocity",
+                  "turn_to_heading",
+                  "approach_target",
+                  "navigate_to_location",
+                  "look_at_target",
+                  "perform_gesture",
+                  "skill_sequence",
+                  "speak_while_moving",
+                  "stop_now",
+                  "recover_safe_idle",
+                  "deliver_object"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "task_context": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "environment_context": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "safety_constraints": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "timeout_s": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 300
+              },
+              "cancellation_policy": {
+                "type": "string",
+                "enum": [
+                  "best_effort_stop",
+                  "cancel_before_execution",
+                  "emergency_stop_on_timeout"
+                ]
+              }
+            },
+            "required": [
+              "task_type"
+            ],
+            "additionalProperties": false
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "client_task_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "idempotent_replay": {
+                "type": "boolean"
+              },
+              "task_type": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "completed",
+                  "cancelled",
+                  "failed",
+                  "refused"
+                ]
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "resolving",
+                  "planning",
+                  "executing",
+                  "monitoring",
+                  "recovering",
+                  "completed",
+                  "failed",
+                  "cancelled",
+                  "refused"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "allowed_next_phases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "accepted",
+                    "resolving",
+                    "planning",
+                    "executing",
+                    "monitoring",
+                    "recovering",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                    "refused"
+                  ]
+                }
+              },
+              "accepted": {
+                "type": "boolean"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "reason_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "safe_idle": {
+                "type": "boolean"
+              },
+              "no_motion": {
+                "type": "boolean"
+              },
+              "execution_mode": {
+                "type": "string"
+              },
+              "skill_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "skill_summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "skill_sequence": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "plan_steps": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "task_graph": {
+                "type": "object"
+              },
+              "blocked_subsystems": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "recommended_next_actions": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "estimated_duration_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "type": "number"
+              },
+              "updated_at": {
+                "type": "number"
+              },
+              "deadline_at": {
+                "type": "number"
+              },
+              "timeout_s": {
+                "type": "number"
+              },
+              "expired": {
+                "type": "boolean"
+              },
+              "timeout_elapsed_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cancellation_policy": {
+                "type": "string"
+              },
+              "events_count": {
+                "type": "integer"
+              },
+              "preview_id": {
+                "type": "string"
+              },
+              "persistent": {
+                "type": "boolean"
+              },
+              "submit_tool": {
+                "type": "string"
+              },
+              "would_record_task_on_submit": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "preview_id",
+              "task_type",
+              "status",
+              "phase",
+              "terminal",
+              "accepted",
+              "safe_idle",
+              "no_motion",
+              "persistent",
+              "would_record_task_on_submit"
+            ]
+          },
+          "effects": [
+            "planning_only",
+            "embodied_task_preview",
+            "no_motion_contract"
+          ],
+          "safety_class": "planning_only",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 2.0,
+            "idempotent": false,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [
+            "unsupported_task_type",
+            "unsafe_task",
+            "missing_navigation_pipeline",
+            "missing_perception_pipeline",
+            "missing_manipulation_capability",
+            "emergency_stop_active",
+            "low_level_control_rejected"
+          ],
+          "default_failure_policy": {
+            "strategy": "stop_and_report",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use before task submission when Chromie needs to explain, clarify, or verify Soridormi's embodied interpretation.",
+            "when_not_to_use": "Do not treat preview as task execution or as a persistent task id; use soridormi.task.submit to create a task record.",
+            "no_motion_until": "task_execution_state_machine",
+            "forbidden_fields": [
+              "action_14d",
+              "joint_targets",
+              "motor_commands",
+              "torque_commands",
+              "actuator_ctrl"
+            ],
+            "plan_step_boundary": "plan_steps describe Soridormi-owned embodied planning layers and never contain raw low-level robot control.",
+            "next_action_boundary": "recommended_next_actions are routing hints for Chromie; they are not execution receipts or low-level commands."
+          }
+        },
+        {
+          "name": "soridormi.task.submit",
+          "agent_id": "soridormi.task",
+          "display_name": "Submit Soridormi embodied task",
+          "description": "Submit a structured embodied task goal. The M11 contract surface validates and records the request, but returns no_motion=true until task execution is implemented.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "client_task_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "task_type": {
+                "type": "string",
+                "enum": [
+                  "move_velocity",
+                  "turn_to_heading",
+                  "approach_target",
+                  "navigate_to_location",
+                  "look_at_target",
+                  "perform_gesture",
+                  "skill_sequence",
+                  "speak_while_moving",
+                  "stop_now",
+                  "recover_safe_idle",
+                  "deliver_object"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "task_context": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "environment_context": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "safety_constraints": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "timeout_s": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 300
+              },
+              "cancellation_policy": {
+                "type": "string",
+                "enum": [
+                  "best_effort_stop",
+                  "cancel_before_execution",
+                  "emergency_stop_on_timeout"
+                ]
+              }
+            },
+            "required": [
+              "task_type"
+            ],
+            "additionalProperties": false
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string"
+              },
+              "client_task_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "idempotent_replay": {
+                "type": "boolean"
+              },
+              "task_type": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "completed",
+                  "cancelled",
+                  "failed",
+                  "refused"
+                ]
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "resolving",
+                  "planning",
+                  "executing",
+                  "monitoring",
+                  "recovering",
+                  "completed",
+                  "failed",
+                  "cancelled",
+                  "refused"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "allowed_next_phases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "accepted",
+                    "resolving",
+                    "planning",
+                    "executing",
+                    "monitoring",
+                    "recovering",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                    "refused"
+                  ]
+                }
+              },
+              "accepted": {
+                "type": "boolean"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "reason_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "safe_idle": {
+                "type": "boolean"
+              },
+              "no_motion": {
+                "type": "boolean"
+              },
+              "execution_mode": {
+                "type": "string"
+              },
+              "skill_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "skill_summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "skill_sequence": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "plan_steps": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "task_graph": {
+                "type": "object"
+              },
+              "blocked_subsystems": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "recommended_next_actions": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "estimated_duration_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "type": "number"
+              },
+              "updated_at": {
+                "type": "number"
+              },
+              "deadline_at": {
+                "type": "number"
+              },
+              "timeout_s": {
+                "type": "number"
+              },
+              "expired": {
+                "type": "boolean"
+              },
+              "timeout_elapsed_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cancellation_policy": {
+                "type": "string"
+              },
+              "events_count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "task_id",
+              "client_task_ref",
+              "idempotent_replay",
+              "task_type",
+              "status",
+              "phase",
+              "terminal",
+              "accepted",
+              "safe_idle",
+              "no_motion",
+              "deadline_at",
+              "expired"
+            ]
+          },
+          "effects": [
+            "planning_only",
+            "embodied_task_request",
+            "no_motion_contract"
+          ],
+          "safety_class": "planning_only",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 2.0,
+            "idempotent": false,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [
+            "unsupported_task_type",
+            "unsafe_task",
+            "missing_navigation_pipeline",
+            "missing_perception_pipeline",
+            "missing_manipulation_capability",
+            "emergency_stop_active",
+            "low_level_control_rejected"
+          ],
+          "default_failure_policy": {
+            "strategy": "stop_and_report",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use for structured embodied goals that should remain Soridormi-owned instead of becoming velocity recipes.",
+            "when_not_to_use": "Do not use for immediate stop/emergency behavior; call soridormi.motion.stop, soridormi.motion.cancel, or soridormi.safety.emergency_stop.",
+            "no_motion_until": "task_execution_state_machine",
+            "forbidden_fields": [
+              "action_14d",
+              "joint_targets",
+              "motor_commands",
+              "torque_commands",
+              "actuator_ctrl"
+            ],
+            "plan_step_boundary": "plan_steps describe Soridormi-owned embodied planning layers and never contain raw low-level robot control.",
+            "next_action_boundary": "recommended_next_actions are routing hints for Chromie; they are not execution receipts or low-level commands."
+          }
+        },
+        {
+          "name": "soridormi.task.status",
+          "agent_id": "soridormi.task",
+          "display_name": null,
+          "description": "Read a previously submitted Soridormi embodied task status.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "client_task_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string"
+              },
+              "client_task_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "idempotent_replay": {
+                "type": "boolean"
+              },
+              "task_type": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "completed",
+                  "cancelled",
+                  "failed",
+                  "refused"
+                ]
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "resolving",
+                  "planning",
+                  "executing",
+                  "monitoring",
+                  "recovering",
+                  "completed",
+                  "failed",
+                  "cancelled",
+                  "refused"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "allowed_next_phases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "accepted",
+                    "resolving",
+                    "planning",
+                    "executing",
+                    "monitoring",
+                    "recovering",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                    "refused"
+                  ]
+                }
+              },
+              "accepted": {
+                "type": "boolean"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "reason_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "safe_idle": {
+                "type": "boolean"
+              },
+              "no_motion": {
+                "type": "boolean"
+              },
+              "execution_mode": {
+                "type": "string"
+              },
+              "skill_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "skill_summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "skill_sequence": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "plan_steps": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "task_graph": {
+                "type": "object"
+              },
+              "blocked_subsystems": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "recommended_next_actions": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "estimated_duration_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "type": "number"
+              },
+              "updated_at": {
+                "type": "number"
+              },
+              "deadline_at": {
+                "type": "number"
+              },
+              "timeout_s": {
+                "type": "number"
+              },
+              "expired": {
+                "type": "boolean"
+              },
+              "timeout_elapsed_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cancellation_policy": {
+                "type": "string"
+              },
+              "events_count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "task_id",
+              "client_task_ref",
+              "idempotent_replay",
+              "task_type",
+              "status",
+              "phase",
+              "terminal",
+              "accepted",
+              "safe_idle",
+              "no_motion",
+              "deadline_at",
+              "expired"
+            ]
+          },
+          "effects": [
+            "read_only"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.task.events",
+          "agent_id": "soridormi.task",
+          "display_name": null,
+          "description": "Read structured lifecycle events for a Soridormi embodied task.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "after_sequence": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "task_id"
+            ]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "schema_version": {
+                "type": "string"
+              },
+              "task_id": {
+                "type": "string"
+              },
+              "client_task_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string"
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "safe_idle": {
+                "type": "boolean"
+              },
+              "deadline_at": {
+                "type": "number"
+              },
+              "expired": {
+                "type": "boolean"
+              },
+              "timeout_elapsed_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "returned_count": {
+                "type": "integer"
+              },
+              "latest_sequence": {
+                "type": "integer"
+              },
+              "next_after_sequence": {
+                "type": "integer"
+              },
+              "has_more": {
+                "type": "boolean"
+              },
+              "poll_recommendation": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "schema_version",
+              "task_id",
+              "client_task_ref",
+              "status",
+              "phase",
+              "terminal",
+              "safe_idle",
+              "deadline_at",
+              "expired",
+              "events",
+              "returned_count",
+              "latest_sequence",
+              "next_after_sequence",
+              "has_more",
+              "poll_recommendation"
+            ]
+          },
+          "effects": [
+            "read_only"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {}
+        },
+        {
+          "name": "soridormi.task.cancel",
+          "agent_id": "soridormi.task",
+          "display_name": null,
+          "description": "Cancel a non-terminal Soridormi embodied task request.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "client_task_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string"
+              },
+              "client_task_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cancelled": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "accepted",
+                  "resolving",
+                  "planning",
+                  "executing",
+                  "monitoring",
+                  "recovering",
+                  "completed",
+                  "failed",
+                  "cancelled",
+                  "refused"
+                ]
+              },
+              "terminal": {
+                "type": "boolean"
+              },
+              "safe_idle": {
+                "type": "boolean"
+              },
+              "reason_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "task_id",
+              "cancelled",
+              "status",
+              "phase",
+              "terminal",
+              "safe_idle"
+            ]
+          },
+          "effects": [
+            "safety_control",
+            "task_lifecycle"
+          ],
+          "safety_class": "safety_critical",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim",
+              "hardware_shadow",
+              "hardware_dry_run"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": false,
+            "exclusive_group": "soridormi.robot_motion",
+            "timeout_s": 1.0,
+            "idempotent": true,
+            "side_effect_free": false
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
           },
           "failure_modes": [],
           "default_failure_policy": {
@@ -977,6 +2313,9 @@
                 ]
               },
               "ok": {
+                "type": "boolean"
+              },
+              "safe_idle": {
                 "type": "boolean"
               }
             }
@@ -1051,6 +2390,12 @@
             "type": "object",
             "properties": {
               "stopped": {
+                "type": "boolean"
+              },
+              "emergency": {
+                "type": "boolean"
+              },
+              "safe_idle": {
                 "type": "boolean"
               }
             }
@@ -1313,11 +2658,23 @@
     ],
     "planning_tools": [
       "soridormi.motion.create_plan",
-      "soridormi.skill.create_plan"
+      "soridormi.skill.create_plan",
+      "soridormi.task.get_capabilities",
+      "soridormi.task.preview",
+      "soridormi.task.submit"
+    ],
+    "embodied_task_tools": [
+      "soridormi.task.get_capabilities",
+      "soridormi.task.preview",
+      "soridormi.task.submit",
+      "soridormi.task.status",
+      "soridormi.task.events",
+      "soridormi.task.cancel"
     ],
     "safety_tools": [
       "soridormi.safety.monitor_motion",
       "soridormi.motion.stop",
+      "soridormi.task.cancel",
       "soridormi.safety.emergency_stop"
     ],
     "default_short_motion_sequence": [
@@ -1335,6 +2692,10 @@
       "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",
       "Chromie must cover soridormi.skill.execute_plan with soridormi.safety.monitor_motion.",
       "Chromie must use soridormi.skill.create_plan before soridormi.skill.execute_plan.",
+      "Chromie may use soridormi.task.get_capabilities to inspect Soridormi-owned embodied readiness before preview or submission.",
+      "Chromie may use soridormi.task.preview before user confirmation or task submission to inspect Soridormi's no-motion embodied interpretation.",
+      "Chromie may submit structured embodied goals through soridormi.task.submit, but M11 task submission is contract-only and no-motion until Soridormi adds task execution.",
+      "Chromie must use soridormi.task.status or soridormi.task.events to monitor task-level requests.",
       "Do not expose raw motor, joint, or torque controls to LLM-generated graphs.",
       "stop and emergency_stop may preempt any running motion task."
     ],
@@ -1383,6 +2744,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "4afb4bc6411db4a4194e97349d9466a62efd2f24"
+    "upstream_commit": "2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2"
   }
 }

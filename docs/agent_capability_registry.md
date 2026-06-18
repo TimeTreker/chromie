@@ -19,10 +19,14 @@ and records the upstream commit rather than hand-maintaining tool schemas.
 
 Current snapshot:
 
-- four agent records;
-- twelve tool records;
+- six agent records;
+- twenty-one tool records;
+- task status schema includes single-skill dry-run and `skill_sequence`
+  dry-run metadata, plus Soridormi-owned `plan_steps` and
+  `blocked_subsystems`, and Chromie routing hints in
+  `recommended_next_actions`;
 - upstream Soridormi commit
-  `4afb4bc6411db4a4194e97349d9466a62efd2f24`;
+  `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`;
 - MCP endpoint resolved from `${SORIDORMI_MCP_URL}`.
 
 Refresh instructions are in

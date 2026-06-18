@@ -59,6 +59,11 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
             for agent in payload["agents"]
             for tool in agent["tools"]
         }
+        tools = {
+            tool["name"]: tool
+            for agent in payload["agents"]
+            for tool in agent["tools"]
+        }
 
         self.assertEqual(
             payload["metadata"]["upstream_repository"],
@@ -66,7 +71,7 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
         )
         self.assertEqual(
             payload["metadata"]["upstream_commit"],
-            "4afb4bc6411db4a4194e97349d9466a62efd2f24",
+            "2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2",
         )
         self.assertEqual(
             tool_names,
@@ -81,12 +86,40 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
                 "soridormi.skill.list",
                 "soridormi.skill.create_plan",
                 "soridormi.skill.execute_plan",
+                "soridormi.task.get_capabilities",
+                "soridormi.task.preview",
+                "soridormi.task.submit",
+                "soridormi.task.status",
+                "soridormi.task.events",
+                "soridormi.task.cancel",
                 "soridormi.safety.monitor_motion",
                 "soridormi.safety.emergency_stop",
                 "soridormi.testing.configure_fault",
                 "soridormi.testing.clear_faults",
             },
         )
+        task_submit = tools["soridormi.task.submit"]
+        task_status = tools["soridormi.task.status"]
+        task_events = tools["soridormi.task.events"]
+        task_cancel = tools["soridormi.task.cancel"]
+        self.assertIn("client_task_ref", task_submit["input_schema"]["properties"])
+        self.assertIn("client_task_ref", task_status["input_schema"]["properties"])
+        self.assertIn("client_task_ref", task_cancel["input_schema"]["properties"])
+        self.assertEqual(
+            task_submit["output_schema"]["properties"]["idempotent_replay"]["type"],
+            "boolean",
+        )
+        self.assertIn("deadline_at", task_submit["output_schema"]["properties"])
+        self.assertIn("expired", task_submit["output_schema"]["properties"])
+        self.assertIn("timeout_elapsed_s", task_submit["output_schema"]["properties"])
+        self.assertEqual(
+            task_events["output_schema"]["properties"]["schema_version"]["type"],
+            "string",
+        )
+        self.assertIn("client_task_ref", task_events["output_schema"]["properties"])
+        self.assertIn("poll_recommendation", task_events["output_schema"]["properties"])
+        self.assertIn("deadline_at", task_events["output_schema"]["properties"])
+        self.assertIn("expired", task_events["output_schema"]["properties"])
 
 
 if __name__ == "__main__":

@@ -32,6 +32,63 @@ model or caller proposes graph
 
 A graph returned by `POST /run` is never automatically executed.
 
+## Global and Embodied Graphs
+
+Chromie's TaskGraph is the global orchestration graph. It is appropriate for
+user-facing and cross-capability work such as:
+
+```text
+understand request
+  -> search or recall candidates
+  -> ask the user to choose
+  -> wait for confirmation
+  -> inspect Soridormi task capabilities if support is uncertain
+  -> preview Soridormi embodied task if clarification or refusal explanation is useful
+  -> submit a Soridormi embodied task
+  -> monitor Soridormi progress/events
+  -> report completion or failure
+```
+
+Soridormi may run its own internal embodied graph or state machine after a
+Soridormi task node is submitted. That body-facing graph owns sensing,
+localization, target/route validation, local trajectory planning, gait/skill
+selection, safety monitoring, recovery, and safe-idle reporting.
+
+Chromie's graph should not expand rich embodied goals into low-level body
+controls. `walk_velocity(vx_mps=0.2, duration_s=10)` is a concrete body skill
+request and remains useful for explicit tests or simple motion commands, but
+requests such as "go to the grocery", "bring me water", "dance",
+"inspect the door", or "approach that person" should be routed as
+capability-level Soridormi tasks when supported. Unsupported or unsafe tasks
+should fail closed with a reason.
+
+When available, `soridormi.task.preview` is the planning-only way to inspect
+Soridormi's embodied interpretation before submitting a persistent task. Preview
+outputs are useful for clarification and reporting, but they are not execution
+receipts and cannot be monitored with `soridormi.task.status`.
+`soridormi.task.get_capabilities` is even earlier in the flow: it reports
+Soridormi-owned task readiness and missing body subsystems without constructing
+a preview or task record.
+Persistent task submission should use a Chromie-owned `client_task_ref`, usually
+derived from the global TaskGraph node id. Soridormi treats that reference as
+an idempotency key: retrying the same payload returns the original task with
+`idempotent_replay=true`; reusing the key for a different payload fails.
+Soridormi task outputs may also include `recommended_next_actions`. Chromie's
+graph may use those hints to choose a safe next node, but must still validate
+every provider call through the active Capability Registry.
+For monitoring, `soridormi.task.events` returns
+`soridormi.task_events.v1` with `latest_sequence`, `next_after_sequence`,
+`terminal`, `safe_idle`, `deadline_at`, `expired`, and
+`poll_recommendation`. Chromie's graph should keep the cursor with the global
+node state and stop polling once Soridormi reports a terminal state.
+When Soridormi returns `task_graph`, treat it as Soridormi's body-runtime DAG:
+Chromie may display, monitor, or route from it, but must not translate it into
+raw motor, joint, torque, or policy outputs. Chromie's own TaskGraph remains the
+global user/task graph above that body DAG.
+
+For the staged Chromie-side implementation plan, see
+`docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`.
+
 ## Graph contract
 
 `TaskGraph` contains:

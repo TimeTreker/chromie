@@ -53,6 +53,12 @@ def test_checked_in_soridormi_manifest_preserves_safety_contract() -> None:
     named_list = registry.get_tool("soridormi.skill.list")
     named_plan = registry.get_tool("soridormi.skill.create_plan")
     named_execute = registry.get_tool("soridormi.skill.execute_plan")
+    task_capabilities = registry.get_tool("soridormi.task.get_capabilities")
+    task_preview = registry.get_tool("soridormi.task.preview")
+    task_submit = registry.get_tool("soridormi.task.submit")
+    task_status = registry.get_tool("soridormi.task.status")
+    task_events = registry.get_tool("soridormi.task.events")
+    task_cancel = registry.get_tool("soridormi.task.cancel")
     emergency_stop = registry.get_tool("soridormi.safety.emergency_stop")
     assert execute.confirmation.required
     assert execute.monitoring.requires_safety_monitor
@@ -63,6 +69,56 @@ def test_checked_in_soridormi_manifest_preserves_safety_contract() -> None:
     assert named_plan.input_schema["required"] == ["skill_id"]
     assert named_execute.confirmation.required
     assert named_execute.monitoring.requires_safety_monitor
+    assert task_capabilities.safety_class == "safe_read"
+    assert task_capabilities.execution.side_effect_free is True
+    assert "task_types" in task_capabilities.output_schema["properties"]
+    assert "ready_subsystems" in task_capabilities.output_schema["properties"]
+    assert "physical_execution_boundary" in task_capabilities.llm_hints
+    assert task_preview.safety_class == "planning_only"
+    assert task_preview.execution.side_effect_free is True
+    assert "preview_id" in task_preview.output_schema["properties"]
+    assert "task_id" not in task_preview.output_schema["properties"]
+    assert "persistent" in task_preview.output_schema["properties"]
+    assert "plan_steps" in task_preview.output_schema["properties"]
+    assert "task_graph" in task_preview.output_schema["properties"]
+    assert "blocked_subsystems" in task_preview.output_schema["properties"]
+    assert "recommended_next_actions" in task_preview.output_schema["properties"]
+    assert "plan_step_boundary" in task_preview.llm_hints
+    assert "next_action_boundary" in task_preview.llm_hints
+    assert task_submit.safety_class == "planning_only"
+    assert "client_task_ref" in task_submit.input_schema["properties"]
+    assert task_submit.output_schema["properties"]["client_task_ref"]["type"] == [
+        "string",
+        "null",
+    ]
+    assert task_submit.output_schema["properties"]["idempotent_replay"]["type"] == "boolean"
+    assert task_submit.output_schema["properties"]["no_motion"]["type"] == "boolean"
+    assert "phase" in task_submit.output_schema["properties"]
+    assert "terminal" in task_submit.output_schema["properties"]
+    assert "allowed_next_phases" in task_submit.output_schema["properties"]
+    assert "skill_id" in task_submit.output_schema["properties"]
+    assert "skill_summary" in task_submit.output_schema["properties"]
+    assert "skill_sequence" in task_submit.output_schema["properties"]
+    assert "plan_steps" in task_submit.output_schema["properties"]
+    assert "task_graph" in task_submit.output_schema["properties"]
+    assert "blocked_subsystems" in task_submit.output_schema["properties"]
+    assert "recommended_next_actions" in task_submit.output_schema["properties"]
+    assert "estimated_duration_s" in task_submit.output_schema["properties"]
+    assert "deadline_at" in task_submit.output_schema["properties"]
+    assert "expired" in task_submit.output_schema["properties"]
+    assert "timeout_elapsed_s" in task_submit.output_schema["properties"]
+    assert "skill_sequence" in task_submit.input_schema["properties"]["task_type"]["enum"]
+    assert "plan_step_boundary" in task_submit.llm_hints
+    assert "next_action_boundary" in task_submit.llm_hints
+    assert "client_task_ref" in task_status.input_schema["properties"]
+    assert "client_task_ref" in task_events.output_schema["properties"]
+    assert task_events.output_schema["properties"]["schema_version"]["type"] == "string"
+    assert task_events.output_schema["properties"]["poll_recommendation"]["type"] == "object"
+    assert task_events.output_schema["properties"]["deadline_at"]["type"] == "number"
+    assert task_events.output_schema["properties"]["expired"]["type"] == "boolean"
+    assert task_cancel.safety_class == "safety_critical"
+    assert "client_task_ref" in task_cancel.input_schema["properties"]
+    assert "physical_motion" not in task_cancel.effects
 
 
 def test_restricted_tools_are_hidden_from_llm() -> None:

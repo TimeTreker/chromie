@@ -12,15 +12,25 @@ TaskGraph validation and execution.
 
 [`soridormi.json`](soridormi.json) is generated from Soridormi's authoritative
 capability export and then materialized with Chromie's MCP Streamable HTTP
-transport placeholder. The checked-in snapshot contains four agent records and
-twelve tool records and identifies upstream Soridormi commit:
+transport placeholder. The checked-in snapshot contains six agent records and
+twenty-one tool records and identifies upstream Soridormi commit:
 
 ```text
-4afb4bc6411db4a4194e97349d9466a62efd2f24
+2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2
 ```
 
 Do not hand-edit exported tools, schemas, or safety policy. Refresh the source
 export and rematerialize the file instead.
+
+The M11 task surface includes retry and monitoring contracts used by Chromie's
+TaskGraph:
+
+- `client_task_ref` lets Chromie retry `soridormi.task.submit` without creating
+  duplicate Soridormi task records.
+- `idempotent_replay` marks duplicate submits that return the original task.
+- `soridormi.task.events` returns `soridormi.task_events.v1` with
+  `latest_sequence`, `next_after_sequence`, `terminal`, `deadline_at`,
+  `expired`, and `poll_recommendation`.
 
 ## Refresh from a Soridormi checkout
 

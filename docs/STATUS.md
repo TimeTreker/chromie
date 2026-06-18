@@ -7,7 +7,7 @@ below records the exact revision that produced each bundle
 **Current focus:** **Physical pilot preparation after M13 text-to-MuJoCo
 closure; physical audio validation remains a separate release-support track**
 **Version candidate:** `0.1.0-alpha.1` (prepared, not published)
-**Soridormi capability snapshot:** `4afb4bc6411db4a4194e97349d9466a62efd2f24`
+**Soridormi capability snapshot:** `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
 current implementation, automated evidence, target evidence, and release

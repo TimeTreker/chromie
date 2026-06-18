@@ -175,12 +175,18 @@ order at the playback layer.
 
 ## Soridormi contract snapshot
 
-`capabilities/soridormi.json` contains 12 tools grouped under four external
+`capabilities/soridormi.json` contains 21 tools grouped under six external
 agents:
 
 - robot status, mode, and battery reads;
 - motion plan creation, execution, stop, and cancellation;
 - named-skill catalog, plan creation, and execution;
+- read-only Soridormi task capability readiness;
+- no-motion embodied task preview with non-persistent `preview_id`;
+- no-motion embodied task submit, status, events, cancellation, lifecycle phase
+  reporting, skill-dry-run metadata, `skill_sequence` dry-run step metadata,
+  embodied `plan_steps`/`blocked_subsystems`, and
+  `recommended_next_actions`;
 - motion monitoring and emergency stop.
 
 The live endpoint URL is supplied by `${SORIDORMI_MCP_URL}`. Probe the endpoint
