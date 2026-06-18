@@ -54,6 +54,44 @@ def _registry():
     )
 
 
+def _soridormi_task_registry():
+    return build_chromie_registry(
+        [
+            CapabilityBundle(
+                source="soridormi-task-test",
+                agents=[
+                    AgentManifest(
+                        agent_id="soridormi.task",
+                        transport=TransportSpec(
+                            kind="mcp_streamable_http",
+                            url="http://soridormi:8000/mcp",
+                        ),
+                        tools=[
+                            ToolCapability(
+                                name="soridormi.task.submit",
+                                agent_id="soridormi.task",
+                                safety_class="planning_only",
+                                effects=[
+                                    "planning_only",
+                                    "embodied_task_request",
+                                    "no_motion_contract",
+                                ],
+                                execution=ExecutionPolicy(side_effect_free=False),
+                            ),
+                            ToolCapability(
+                                name="soridormi.task.events",
+                                agent_id="soridormi.task",
+                                safety_class="safe_read",
+                                effects=["read_only"],
+                            ),
+                        ],
+                    )
+                ],
+            )
+        ]
+    )
+
+
 class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_allows_stateful_non_physical_plan_creation(self) -> None:
         calls: list[str] = []
@@ -174,6 +212,153 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(trace.status, "success")
         self.assertEqual(peak, 2)
+
+    async def test_soridormi_task_submit_adds_client_ref_and_monitors_events(self) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            calls.append((tool, args))
+            if tool == "soridormi.task.submit":
+                return {
+                    "structuredContent": {
+                        "task_id": "soridormi-task-1",
+                        "client_task_ref": args["client_task_ref"],
+                        "accepted": True,
+                        "status": "accepted",
+                        "phase": "planning",
+                        "terminal": False,
+                        "safe_idle": True,
+                        "no_motion": True,
+                    }
+                }
+            if tool == "soridormi.task.events":
+                return {
+                    "structuredContent": {
+                        "schema_version": "soridormi.task_events.v1",
+                        "task_id": "soridormi-task-1",
+                        "client_task_ref": "chromie:water-run:body-task",
+                        "status": "completed",
+                        "phase": "completed",
+                        "terminal": True,
+                        "safe_idle": True,
+                        "deadline_at": 0.0,
+                        "expired": False,
+                        "events": [],
+                        "returned_count": 0,
+                        "latest_sequence": 4,
+                        "next_after_sequence": 4,
+                        "has_more": False,
+                        "poll_recommendation": {"action": "stop_polling"},
+                    }
+                }
+            raise AssertionError(f"unexpected tool {tool}")
+
+        registry = _soridormi_task_registry()
+        service = TaskGraphService(
+            registry,
+            planning_invoker=McpStreamableHttpInvoker(registry, call=call),
+        )
+        graph = TaskGraph.model_validate(
+            {
+                "graph_id": "water-run",
+                "created_by": "system",
+                "nodes": [
+                    {
+                        "id": "body-task",
+                        "tool": "soridormi.task.submit",
+                        "type": "plan",
+                        "args": {
+                            "task_type": "navigate_to_location",
+                            "parameters": {"destination": "kitchen"},
+                        },
+                    }
+                ],
+            }
+        )
+
+        trace = await service.execute_planning(graph)
+
+        self.assertEqual(trace.status, "success")
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "soridormi.task.submit",
+                    {
+                        "task_type": "navigate_to_location",
+                        "parameters": {"destination": "kitchen"},
+                        "client_task_ref": "chromie:water-run:body-task",
+                    },
+                ),
+                (
+                    "soridormi.task.events",
+                    {"task_id": "soridormi-task-1", "after_sequence": 0},
+                ),
+            ],
+        )
+        result = trace.result_map()["body-task"]
+        self.assertEqual(result.output["status"], "completed")
+        self.assertEqual(
+            result.output["monitoring"]["schema_version"],
+            "soridormi.task_events.v1",
+        )
+
+    async def test_soridormi_task_refusal_fails_the_graph_node(self) -> None:
+        calls: list[str] = []
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            calls.append(tool)
+            return {
+                "structuredContent": {
+                    "task_id": "soridormi-task-1",
+                    "client_task_ref": args["client_task_ref"],
+                    "accepted": False,
+                    "status": "refused",
+                    "phase": "refused",
+                    "terminal": True,
+                    "safe_idle": True,
+                    "reason_code": "missing_navigation_pipeline",
+                    "reason": "navigate_to_location is declared but not executable yet.",
+                }
+            }
+
+        registry = _soridormi_task_registry()
+        service = TaskGraphService(
+            registry,
+            planning_invoker=McpStreamableHttpInvoker(registry, call=call),
+        )
+        graph = TaskGraph.model_validate(
+            {
+                "graph_id": "blocked-nav",
+                "created_by": "system",
+                "nodes": [
+                    {
+                        "id": "go",
+                        "tool": "soridormi.task.submit",
+                        "type": "plan",
+                        "args": {"task_type": "navigate_to_location"},
+                    }
+                ],
+            }
+        )
+
+        trace = await service.execute_planning(graph)
+
+        self.assertEqual(trace.status, "aborted")
+        self.assertEqual(calls, ["soridormi.task.submit"])
+        result = trace.result_map()["go"]
+        self.assertEqual(result.status, "failed_fatal")
+        self.assertIn("missing_navigation_pipeline", result.error or "")
 
 
 if __name__ == "__main__":

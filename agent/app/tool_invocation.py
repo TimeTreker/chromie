@@ -60,6 +60,8 @@ class ToolInvocationContext(BaseModel):
     confirmed: bool = False
     safety_monitor_active: bool = False
     allow_safety_controls: bool = False
+    task_graph_id: str | None = None
+    task_node_id: str | None = None
 
 
 class AsyncToolInvoker(Protocol):

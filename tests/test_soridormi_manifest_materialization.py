@@ -104,7 +104,9 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
         task_cancel = tools["soridormi.task.cancel"]
         self.assertIn("client_task_ref", task_submit["input_schema"]["properties"])
         self.assertIn("client_task_ref", task_status["input_schema"]["properties"])
+        self.assertIn("client_task_ref", task_events["input_schema"]["properties"])
         self.assertIn("client_task_ref", task_cancel["input_schema"]["properties"])
+        self.assertNotIn("task_id", task_events["input_schema"].get("required", []))
         self.assertEqual(
             task_submit["output_schema"]["properties"]["idempotent_replay"]["type"],
             "boolean",

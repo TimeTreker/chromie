@@ -151,12 +151,17 @@ class ReadOnlyTaskGraphExecutor:
                         ordered_ready,
                         state,
                         trace,
+                        graph_id=graph.graph_id,
                     )
                 else:
                     completed = []
                     for node in ordered_ready:
                         state.pending.remove(node.id)
-                        result = await self._execute_node(node, state.results)
+                        result = await self._execute_node(
+                            node,
+                            state.results,
+                            graph_id=graph.graph_id,
+                        )
                         completed.append(result)
                         if self._apply_failure_policy(node, result, state, trace):
                             break
@@ -217,9 +222,13 @@ class ReadOnlyTaskGraphExecutor:
         nodes: list[TaskNode],
         state: TaskGraphRunState,
         trace: ExecutionTrace,
+        *,
+        graph_id: str,
     ) -> list[NodeResult]:
         tasks = {
-            asyncio.create_task(self._execute_node(node, state.results)): node
+            asyncio.create_task(
+                self._execute_node(node, state.results, graph_id=graph_id)
+            ): node
             for node in nodes
         }
         completed: list[NodeResult] = []
@@ -416,6 +425,8 @@ class ReadOnlyTaskGraphExecutor:
         self,
         node: TaskNode,
         results: dict[str, NodeResult],
+        *,
+        graph_id: str,
     ) -> NodeResult:
         started = time.monotonic()
         try:
@@ -446,15 +457,27 @@ class ReadOnlyTaskGraphExecutor:
             if node.retry
             else default_policy.backoff_s or 0.0
         )
+        context = ToolInvocationContext(
+            task_graph_id=graph_id,
+            task_node_id=node.id,
+        )
         for attempt in range(1, max_attempts + 1):
             async def invoke() -> Any:
                 if self.resource_arbiter is None:
-                    return await self.invoker.invoke(node.tool, args)
+                    return await self.invoker.invoke(
+                        node.tool,
+                        args,
+                        context=context,
+                    )
                 async with self.resource_arbiter.claim(
                     can_run_parallel=capability.execution.can_run_parallel,
                     exclusive_group=capability.execution.exclusive_group,
                 ):
-                    return await self.invoker.invoke(node.tool, args)
+                    return await self.invoker.invoke(
+                        node.tool,
+                        args,
+                        context=context,
+                    )
 
             timeout_s = node.timeout_s or capability.execution.timeout_s
             try:

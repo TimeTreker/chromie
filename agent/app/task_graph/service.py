@@ -13,6 +13,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime import ResourceArbiter
 
 from ..capabilities.models import CapabilityRegistry
+from ..soridormi_task_client import SoridormiTaskMonitoringInvoker
 from ..tool_invocation import AsyncToolInvoker
 
 from .async_executor import (
@@ -226,11 +227,12 @@ class TaskGraphService:
     async def execute_planning(self, graph: TaskGraph) -> ExecutionTrace:
         if self.planning_invoker is None:
             raise RuntimeError("planning TaskGraph execution is disabled")
+        planning_invoker = SoridormiTaskMonitoringInvoker(self.planning_invoker)
         return await self._execute_tracked(
             graph,
             PlanningTaskGraphExecutor(
                 self.registry,
-                self.planning_invoker,
+                planning_invoker,
                 parallel_enabled=self.enable_parallel_execution,
                 resource_arbiter=self._resource_arbiter,
                 max_concurrency=self.max_concurrency,

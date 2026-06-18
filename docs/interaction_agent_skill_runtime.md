@@ -95,6 +95,16 @@ receipts.
 `next_after_sequence`, `terminal`, `safe_idle`, `deadline_at`, `expired`, and
 `poll_recommendation`. Chromie should poll with the returned cursor until the
 task is terminal or until Soridormi recommends cancellation/reporting.
+The runtime helper `SoridormiTaskClient` keeps this provider lifecycle out of
+speech-generation code: it attaches the global graph/node `client_task_ref`,
+returns Soridormi's submit/status/event payloads unchanged, advances
+`after_sequence`, and routes cancellation through explicit safety-control
+authorization.
+Chromie's planning TaskGraph executor uses a Soridormi task-monitoring invoker
+for `soridormi.task.submit` nodes. The node is not treated as successful merely
+because submit returned; Chromie waits for terminal task events when needed, and
+Soridormi refusal/failure/cancellation becomes a failed graph node for the
+global orchestrator to report or route from.
 `soridormi.task.get_capabilities` is the read-only way to ask Soridormi what
 its embodied task runtime can currently dry-run, hold, redirect, or refuse.
 Chromie should treat that readiness as Soridormi-owned state.

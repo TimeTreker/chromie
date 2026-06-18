@@ -280,6 +280,22 @@ Chromie integration tests pass against dry-run Soridormi task APIs, and live
 MuJoCo validation is required before claiming executable embodied behavior
 ```
 
+Current state: Chromie has `agent.app.soridormi_task_client.SoridormiTaskClient`
+as the narrow provider helper for this step. It creates bounded
+`client_task_ref` values from global graph/node ids, submits
+`soridormi.task.submit`, polls the `soridormi.task_events.v1` cursor until
+Soridormi reports terminal state or `stop_polling`, preserves the latest events
+on monitor exhaustion, and calls `soridormi.task.cancel` with explicit
+safety-control authorization.
+
+Planning TaskGraph execution now wraps its invoker with
+`SoridormiTaskMonitoringInvoker`. A `soridormi.task.submit` node receives a
+graph/node-derived `client_task_ref` when one is absent, terminal event state is
+merged into the node output under `monitoring`, and Soridormi refused, failed,
+or cancelled task states fail the graph node instead of becoming false success.
+This still does not claim physical execution; it only ensures Chromie's global
+planning graph treats Soridormi's task contract as the source of truth.
+
 ## Not now
 
 Do not add these to Chromie while building this plan:

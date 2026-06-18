@@ -81,6 +81,17 @@ For monitoring, `soridormi.task.events` returns
 `terminal`, `safe_idle`, `deadline_at`, `expired`, and
 `poll_recommendation`. Chromie's graph should keep the cursor with the global
 node state and stop polling once Soridormi reports a terminal state.
+Chromie's `agent.app.soridormi_task_client.SoridormiTaskClient` is the current
+provider-facing helper for that lifecycle. It derives bounded
+`client_task_ref` values from global graph/node ids, submits
+`soridormi.task.submit`, polls `soridormi.task.events` by cursor until terminal
+state, and invokes `soridormi.task.cancel` only with safety-control
+authorization.
+`execute-planning` wraps its invoker with the Soridormi task monitor. A
+`soridormi.task.submit` node without an explicit `client_task_ref` receives one
+from the graph/node id, terminal event state is merged back into the node output
+under `monitoring`, and Soridormi refused/failed/cancelled tasks become failed
+TaskGraph nodes instead of successful planning nodes.
 When Soridormi returns `task_graph`, treat it as Soridormi's body-runtime DAG:
 Chromie may display, monitor, or route from it, but must not translate it into
 raw motor, joint, torque, or policy outputs. Chromie's own TaskGraph remains the
