@@ -1,11 +1,12 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Current verified repository revision:** `91c60e2`; retained target evidence
-below records the exact revision that produced each bundle
-**Verified date:** 2026-06-18
-**Current focus:** **Physical pilot preparation after M13 text-to-MuJoCo
-closure; physical audio validation remains a separate release-support track**
+**Current repository revision:** `5204ea1`; retained target evidence below
+records the exact revision that produced each bundle
+**Status refresh date:** 2026-06-19
+**Current focus:** **Physical pilot preparation through the Chromie/Soridormi
+task-agent boundary; physical audio validation remains a separate
+release-support track**
 **Version candidate:** `0.1.0-alpha.1` (prepared, not published)
 **Soridormi capability snapshot:** `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`
 
@@ -21,6 +22,17 @@ endpoint passed the `sim`, recommendation-only `hardware_shadow`, and no-motion
 `hardware_dry_run` conformance profiles, profile parity, and all 16 injected
 fault scenarios. This is no-motion provider-contract evidence from macOS ARM64;
 it is not Linux/GPU MuJoCo, audio-device, or physical-robot evidence.
+
+The current top-level development layer is the Chromie/Soridormi task-agent
+boundary. Chromie now consumes a richer Soridormi task API snapshot with
+`soridormi.task.get_capabilities`, `preview`, `submit`, `status`, `events`, and
+`cancel`. Chromie's global TaskGraph can submit a structured embodied goal with
+a stable `client_task_ref`, monitor Soridormi task events to terminal state,
+and treat refused, failed, cancelled, or timed-out task states as failed graph
+nodes. This prepares richer user-facing goals such as navigation, approach, and
+object-delivery requests without lowering them into velocity recipes. The task
+surface remains a no-motion contract unless later Soridormi evidence proves
+execution.
 
 On June 14, 2026, the Linux x86_64 reference host with an NVIDIA GeForce RTX
 5090 retained:
@@ -86,7 +98,8 @@ Target validation or Release readiness.
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |
-| Stateful planning-only TaskGraph execution | Implemented | Planning policy and concurrency tests | Safe Soridormi plan creation acceptance exists | Flag off |
+| Stateful planning-only TaskGraph execution | Implemented; `soridormi.task.submit` nodes get stable `client_task_ref` values and are monitored through `soridormi.task.events` before graph success is reported | Planning policy, concurrency, task-submit monitoring, idempotency-key, terminal-event, refusal, and timeout tests | Safe Soridormi plan creation acceptance exists; task API live execution evidence remains future work | Flag off |
+| Soridormi task-agent bridge | Implemented for contract/no-motion task goals, including capability inspection, preview/submit/status/events/cancel schemas, event-cursor monitoring, and safety-control authorization for task cancellation | Manifest materialization, capability registry, task client, and planning TaskGraph tests | Checked-in manifest is pinned to Soridormi `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`; no physical task execution claim | Planning/tooling only; physical motion gates off |
 | Guarded side-effect execution | Implemented; diagnostics are bearer-protected and trace/grant retention is bounded | Authorization, one-time grant, retention, confirmation, monitor, fallback, and cancellation tests | Soridormi dry-run and runtime-cancellation tooling exists | Flag off; bearer token required |
 | Physical TaskGraph execution | Policy path implemented | Safety and sequential-execution tests | Supervised hardware acceptance remains open | Separate flag off |
 | Reference robot candidate gate | Versioned schema, intentionally incomplete template, and fail-closed semantic verifier implemented | Identity, revision, timestamp, emergency-stop, calibration, exclusion, low-level-field, and no-motion authorization tests | No real candidate has been recorded or selected | Preparation only; cannot authorize motion |
@@ -108,15 +121,17 @@ shows roadmap-aligned module groups and declared combinations. These checks are
 convenience slices over the existing automated tests and do not replace the
 canonical full-suite gate above.
 
-At the current working revision it runs:
+At the current working revision the Level A suite is expected to run:
 
 - **309** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
-This Level A suite was verified in the dependency-complete `chromie-agent`
-container at revision `91c60e2`. A host run is equivalent only when the host
-Python environment has the same service/test dependencies installed.
+The current documentation refresh at `5204ea1` passed
+`python scripts/check_docs.py` plus focused task-agent/provider tests covering
+Soridormi task monitoring, manifest materialization, and provider readiness. A
+full host run is equivalent only when the host Python environment has the same
+service/test dependencies installed.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
 quality, or real robot safety. The retained RTX evidence above separately
@@ -173,6 +188,10 @@ These legacy evidence tracks do not define the current delivery:
 - Provider-readiness preflight passes for the pinned Soridormi snapshot.
   Physical motion still requires an exact robot selection and supervised
   commissioning evidence.
+- The Soridormi task API is currently a contract/no-motion surface. Chromie may
+  submit and monitor structured embodied goals, but must not report physical
+  completion unless Soridormi later returns retained execution evidence from a
+  validated simulator or commissioned robot path.
 - Jetson profiles select model/runtime values, but this repository does not yet
   include verified Jetson-specific Dockerfiles or Compose overrides.
 - The host hardware daemon currently constructs `MockRobotDriver` regardless of

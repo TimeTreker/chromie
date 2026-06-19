@@ -54,6 +54,25 @@ Both systems may use an orchestrator or DAG engine. Chromie's graph is global
 and user-facing. Soridormi's graph or state machine is body-facing and
 safety-critical.
 
+## Top-view direction
+
+This plan exists to keep Chromie on its main target: a local-first realtime
+voice and decision control plane that can request embodied capability safely.
+The task-agent work is not a new low-level robot controller and not a general
+autonomy expansion. It is the high-level brain/body contract needed before a
+physical pilot:
+
+- Chromie may plan, clarify, confirm, submit, monitor, cancel, and explain a
+  structured embodied goal.
+- Soridormi decides whether that goal is executable, unsupported, unsafe,
+  blocked, cancelled, or complete.
+- Physical motion remains Soridormi-owned and default-off until retained
+  simulator and commissioning evidence exists for the exact path.
+
+The practical rule is simple: Chromie can say "submit and monitor a navigation
+goal"; it must not invent "drive these joints or velocities until you arrive"
+when Soridormi has not declared that body capability.
+
 ## Build order
 
 ### Step 1 - Freeze the boundary contract
@@ -295,6 +314,31 @@ merged into the node output under `monitoring`, and Soridormi refused, failed,
 or cancelled task states fail the graph node instead of becoming false success.
 This still does not claim physical execution; it only ensures Chromie's global
 planning graph treats Soridormi's task contract as the source of truth.
+
+### Step 8 - Next implementation focus
+
+Goal: turn the task-agent bridge into user-facing planning behavior without
+leaving the project target.
+
+Next Chromie-side work should stay in this order:
+
+1. add route/planner tests that choose concrete named skills only for explicit
+   bounded commands, and choose `soridormi.task.*` for rich goals such as
+   navigation, approach, inspection, recovery, or object delivery;
+2. make refusal and blocked-subsystem reporting deterministic and concise, so
+   unsupported Soridormi goals do not sound like completed motion;
+3. add acceptance-style dry-run cases for task capability inspection, preview,
+   submit, terminal event monitoring, cancellation, and timeout;
+4. only after that, connect the same flow to retained live Soridormi task API
+   evidence; physical execution still waits for the reference robot gate.
+
+Gate:
+
+```text
+Chromie can explain why a rich embodied request was submitted, refused,
+blocked, cancelled, or completed by Soridormi without lowering it into raw
+robot controls or claiming physical execution from no-motion evidence
+```
 
 ## Not now
 

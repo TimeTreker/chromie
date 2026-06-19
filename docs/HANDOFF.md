@@ -1,6 +1,6 @@
 # Project Handoff
 
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 This handoff records the current resume point for a developer or operator who
 needs to continue Chromie without replaying the full chat history.
@@ -10,6 +10,13 @@ needs to continue Chromie without replaying the full chat history.
 M13 text-to-MuJoCo interaction closure is complete. The retained text evidence
 shows direct text input flowing through Router, Agent `/interaction`, the trusted
 host Skill Runtime, live Soridormi MCP, and MuJoCo `sim` execution.
+
+The current development focus is physical pilot preparation through the
+Chromie/Soridormi task-agent boundary. Chromie can now represent richer
+embodied requests as structured Soridormi task goals, attach stable
+`client_task_ref` values, submit them through the planning TaskGraph executor,
+and monitor `soridormi.task.events` until Soridormi reports a terminal state.
+This is contract/no-motion preparation; it is not physical execution evidence.
 
 Retained closure evidence:
 
@@ -59,20 +66,24 @@ claim includes real audio devices.
 
 ## Latest Validation
 
-The current required checks passed in the Docker runtime:
+The current docs-and-task-agent refresh at `5204ea1` passed:
 
 ```text
 python scripts/check_docs.py
-./scripts/run_tests.sh
-309 current tests passed
-20 legacy Agent tests passed
+python -m unittest tests.test_soridormi_task_client \
+  tests.test_planning_task_graph_execution \
+  tests.test_soridormi_manifest_materialization \
+  tests.test_provider_readiness_verifier
+19 focused tests passed
 ```
 
-This latest Level A run passed in the `chromie-agent` container at Chromie
-revision `91c60e2`, which supplies the service dependencies used by the Router,
-Agent, and TTS tests.
+The full host `./scripts/run_tests.sh` attempt did not complete in this minimal
+host environment because service dependencies such as `fastapi` were absent and
+one multiprocessing test could not create its forkserver socket under the
+current sandbox. Run the full Level A suite in the dependency-complete
+`chromie-agent` service environment before making new release claims.
 
-Focused text/M13 tests also passed:
+Previously focused text/M13 tests also passed:
 
 ```text
 python -m unittest \
@@ -84,12 +95,16 @@ python -m unittest \
 ## Resume Sequence
 
 1. Keep physical-motion gates off.
-2. Select one reference robot candidate.
-3. Fill the ignored real candidate record under `.chromie/commissioning/` using
+2. Keep the Soridormi task-agent snapshot aligned with Soridormi's
+   authoritative manifest.
+3. Continue acceptance tests for task capability inspection, preview, submit,
+   event monitoring, refusal, timeout, and cancellation semantics.
+4. Select one reference robot candidate.
+5. Fill the ignored real candidate record under `.chromie/commissioning/` using
    `commissioning/reference_robot_candidate.schema.json`.
-4. Verify candidate identity, independent emergency stop, network, workspace,
+6. Verify candidate identity, independent emergency stop, network, workspace,
    software revisions, calibration ownership, and no-motion procedures.
-5. Continue with no-motion health and shadow/dry-run checks before any bounded
+7. Continue with no-motion health and shadow/dry-run checks before any bounded
    physical skill execution.
 
 ## Useful Commands

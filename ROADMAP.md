@@ -133,23 +133,44 @@ progressive, supervised rollout. Until the candidate identity, independent
 emergency stop, and no-motion prerequisites are reviewed, development remains
 in preparation and does not authorize physical motion.
 
-The first preparation gate is a versioned, machine-readable candidate manifest.
-It must pin hardware and software identity, define one bounded low-risk skill,
-record exclusions, and fail closed on missing safety or calibration evidence.
+This phase has two coordinated tracks:
+
+1. **Brain/body task boundary.** Chromie prepares global, user-facing
+   TaskGraphs that submit structured embodied goals to Soridormi and monitor
+   Soridormi's task events. This keeps navigation, approach, gesture,
+   recovery, and future manipulation goals above the low-level robot boundary.
+   It does not authorize physical motion.
+2. **Reference robot candidate gate.** The versioned, machine-readable
+   candidate manifest pins hardware and software identity, defines one bounded
+   low-risk skill, records exclusions, and fails closed on missing safety or
+   calibration evidence.
+
+The task-agent boundary exists to keep the project on target: Chromie remains
+the local-first voice and decision control plane, while Soridormi remains the
+embodied planner/executor. Rich embodied requests should be represented as
+structured Soridormi goals, not translated by Chromie into raw or low-level
+body controls.
 
 ### Sequence
 
-1. no-motion health and state inspection;
-2. shadow recommendations;
-3. dry-run with operator approval;
-4. one low-risk skill at limited speed and workspace;
-5. supervised cancellation, stop, emergency stop, and recovery;
-6. bounded multi-skill TaskGraphs;
-7. narrowly scoped physical prerelease.
+1. keep the Chromie/Soridormi task contract aligned with Soridormi's
+   authoritative manifest;
+2. validate task-capability inspection, preview, submit, event monitoring,
+   refusal, timeout, and cancellation semantics without claiming motion;
+3. no-motion health and state inspection for the selected candidate;
+4. shadow recommendations;
+5. dry-run with operator approval;
+6. one low-risk skill at limited speed and workspace;
+7. supervised cancellation, stop, emergency stop, and recovery;
+8. bounded multi-skill TaskGraphs;
+9. narrowly scoped physical prerelease.
 
 ### Exit criteria
 
 - exact hardware, firmware, sensors, drivers, and Soridormi revision are pinned;
+- Chromie can submit structured Soridormi task goals with stable idempotency
+  keys, monitor terminal task events, and fail closed on Soridormi refusal,
+  failure, timeout, cancellation, or unsafe recommendations;
 - the candidate verifier reports `selected_for_pilot=true` while continuing to
   report `physical_motion_authorized=false`;
 - calibration and latency measurements are retained;

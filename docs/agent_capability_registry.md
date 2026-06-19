@@ -29,6 +29,12 @@ Current snapshot:
   `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`;
 - MCP endpoint resolved from `${SORIDORMI_MCP_URL}`.
 
+The task-level tools are planning/contract inputs for Chromie's global
+TaskGraph. They let Chromie inspect Soridormi readiness, preview structured
+embodied goals, submit persistent task records, monitor event cursors, and
+request cancellation with explicit safety-control authorization. They do not
+authorize physical motion by themselves.
+
 Refresh instructions are in
 [`../capabilities/README.md`](../capabilities/README.md).
 

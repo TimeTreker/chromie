@@ -22,7 +22,7 @@ twenty-one tool records and identifies upstream Soridormi commit:
 Do not hand-edit exported tools, schemas, or safety policy. Refresh the source
 export and rematerialize the file instead.
 
-The M11 task surface includes retry and monitoring contracts used by Chromie's
+The Soridormi task surface includes retry and monitoring contracts used by Chromie's
 TaskGraph:
 
 - `client_task_ref` lets Chromie retry `soridormi.task.submit` without creating
