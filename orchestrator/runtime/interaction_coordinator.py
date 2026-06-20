@@ -22,9 +22,11 @@ from .skill_runtime import (
     SkillRuntimeResult,
     local_speech_definition,
 )
+from .skill_adapters import TaskGraphHandler, TaskGraphSkillProvider, task_graph_skill_definition
 from .soridormi_skill_provider import SoridormiMcpSkillProvider
 
 SpeechScheduler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
+_TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
 
 
 class InteractionRuntimeCoordinator:
@@ -35,10 +37,12 @@ class InteractionRuntimeCoordinator:
         speech_scheduler: SpeechScheduler,
         *,
         soridormi_invoker: AsyncToolInvoker | None = None,
+        task_graph_handler: TaskGraphHandler | None = None,
         auto_confirm_sim: bool = True,
     ) -> None:
         self.registry = SkillRegistry()
         self.registry.register(local_speech_definition())
+        self.registry.register(task_graph_skill_definition())
         self.runtime = SkillRuntime(
             self.registry,
             max_concurrency=max(
@@ -47,6 +51,9 @@ class InteractionRuntimeCoordinator:
             ),
         )
         self.runtime.register_provider(LocalSpeechSkillProvider(speech_scheduler))
+        self._task_graph_enabled = task_graph_handler is not None
+        if task_graph_handler is not None:
+            self.runtime.register_provider(TaskGraphSkillProvider(task_graph_handler))
         self.soridormi_invoker = soridormi_invoker
         self.auto_confirm_sim = auto_confirm_sim
         self.soridormi_mode: str | None = None
@@ -66,6 +73,23 @@ class InteractionRuntimeCoordinator:
             for request in prepared.skills
             if request.skill_id.startswith("soridormi.")
         ]
+        task_graph_requests = [
+            request
+            for request in prepared.skills
+            if request.skill_id == _TASK_GRAPH_SKILL_ID
+        ]
+        gated_requests = [*body_requests, *task_graph_requests]
+        if task_graph_requests and not self._task_graph_enabled:
+            return await self._body_setup_failure(
+                prepared,
+                task_graph_requests,
+                session_id=session_id,
+                reason_code="task_graph_execution_disabled",
+                message=(
+                    "InteractionResponse requested a TaskGraph, but host "
+                    "TaskGraph execution is disabled"
+                ),
+            )
         if body_requests:
             if self.soridormi_invoker is None:
                 await self._ensure_soridormi_catalog()
@@ -117,7 +141,7 @@ class InteractionRuntimeCoordinator:
                     ]
                 },
             )
-            if body_requests and after_skills_speech
+            if gated_requests and after_skills_speech
             else prepared
         )
         execution = await self.runtime.execute(
@@ -126,18 +150,19 @@ class InteractionRuntimeCoordinator:
                 confirmed_request_ids=authorized_request_ids,
             ),
         )
-        if not body_requests:
+        if not gated_requests:
             return execution
 
+        gated_request_ids = {request.request_id for request in gated_requests}
         body_results = [
             result
             for result in execution.results
-            if result.skill_id.startswith("soridormi.")
+            if result.request_id in gated_request_ids
         ]
         failed_body_results = [
             result
             for result in body_results
-            if result.status in {"failed", "refused", "timed_out"}
+            if result.status in {"failed", "refused", "timed_out", "cancelled"}
         ]
         if execution.status == "cancelled":
             return execution
@@ -253,6 +278,24 @@ class InteractionRuntimeCoordinator:
         language: str,
     ) -> str:
         zh = language.lower().startswith("zh")
+        if any(result.skill_id == _TASK_GRAPH_SKILL_ID for result in results):
+            if any(result.status == "cancelled" for result in results):
+                return (
+                    "任务已取消，我没有继续执行。"
+                    if zh
+                    else "The task was cancelled, so I did not continue."
+                )
+            if any(result.status == "timed_out" for result in results):
+                return (
+                    "任务执行超时，我无法确认它已安全完成。"
+                    if zh
+                    else "The task timed out, and I could not confirm it completed safely."
+                )
+            return (
+                "我无法安全完成这个任务。"
+                if zh
+                else "I could not complete that task safely."
+            )
         if any(result.status == "refused" for result in results):
             return (
                 "安全检查未通过，我没有执行这个动作。"

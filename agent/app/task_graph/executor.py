@@ -8,6 +8,7 @@ from ..tool_invocation import ToolCallOutcome, ToolInvoker
 
 from .models import ExecutionEvent, ExecutionTrace, NodeResult, TaskGraph, TaskNode
 from .refs import resolve_refs
+from .reporting import build_trace_outcome_summary
 from .validator import GraphValidator
 
 _TERMINAL_FAILURES = {"failed_retryable", "failed_fatal", "timeout", "cancelled", "safety_interrupted"}
@@ -86,6 +87,7 @@ class DagDryRunExecutor:
             trace.status = "failed"
         else:
             trace.status = "success"
+        trace.outcome_summary = build_trace_outcome_summary(trace)
         return trace
 
     def _ready_nodes(

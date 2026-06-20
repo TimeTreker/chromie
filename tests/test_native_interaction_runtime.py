@@ -31,6 +31,24 @@ class _FakePlanner:
         )
 
 
+class _ConfirmingPlanner:
+    async def plan(self, **_: Any) -> TaskGraph:
+        return TaskGraph(
+            graph_id="graph_confirm",
+            user_request="walk to the kitchen",
+            created_by="llm",
+            requires_confirmation=True,
+            nodes=[
+                TaskNode(
+                    id="submit",
+                    tool="soridormi.task.submit",
+                    type="action",
+                    args={"task_type": "navigate_to_location"},
+                )
+            ],
+        )
+
+
 class _NativeRuntimeStub:
     def __init__(self, response: Any) -> None:
         self.response = response
@@ -453,6 +471,26 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             response.skills[0].args["graph"]["graph_id"],
             "graph_native",
         )
+
+    async def test_native_task_graph_propagates_graph_confirmation(self) -> None:
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=None,
+                use_llm=True,
+                max_speak_chars=160,
+                task_graph_planner=_ConfirmingPlanner(),  # type: ignore[arg-type]
+            )
+        ).run(
+            _request(
+                text="walk to the kitchen",
+                route="tool",
+                intent="soridormi_task_planning",
+                agents=["tool_agent", "speaker_agent"],
+            )
+        )
+
+        self.assertTrue(response.requires_confirmation)
+        self.assertTrue(response.skills[0].requires_confirmation)
 
     async def test_native_validation_failure_is_fail_closed_by_default(self) -> None:
         native = _NativeRuntimeStub(

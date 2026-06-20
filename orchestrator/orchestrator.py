@@ -281,6 +281,7 @@ class VoiceAssistant:
         self.interaction_runtime = InteractionRuntimeCoordinator(
             self._schedule_interaction_speech,
             soridormi_invoker=soridormi_invoker,
+            task_graph_handler=self._execute_planning_task_graph,
             auto_confirm_sim=self.auto_confirm_sim_skills,
         )
         logger.info(
@@ -1364,6 +1365,10 @@ class VoiceAssistant:
             ],
             metadata={"source": "host_confirmation_dialogue"},
         )
+
+    async def _execute_planning_task_graph(self, graph: dict[str, Any]) -> dict[str, Any]:
+        session = await self.get_http_session()
+        return await self.agent_client.execute_planning_task_graph(session, graph)
 
     def _launch_interaction(
         self,

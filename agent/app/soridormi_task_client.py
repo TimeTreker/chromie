@@ -15,6 +15,52 @@ Sleep = Callable[[float], Awaitable[None]]
 _UNSUCCESSFUL_TASK_STATUSES = {"cancelled", "failed", "refused"}
 
 
+def _clean_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _clean_text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list | tuple):
+        return [text for item in value if (text := _clean_text(item))]
+    text = _clean_text(value)
+    return [text] if text else []
+
+
+def _format_recommended_actions(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list | tuple):
+        return _clean_text_list(value)
+
+    formatted: list[str] = []
+    for item in value:
+        if not isinstance(item, dict):
+            text = _clean_text(item)
+            if text:
+                formatted.append(text)
+            continue
+
+        action = _clean_text(item.get("action"))
+        reason_code = _clean_text(item.get("reason_code"))
+        detail = _clean_text(item.get("message") or item.get("reason"))
+        if action and reason_code:
+            text = f"{action}({reason_code})"
+        else:
+            text = action or reason_code
+        if text and detail:
+            text = f"{text}: {detail}"
+        elif detail:
+            text = detail
+        if text:
+            formatted.append(text)
+    return formatted
+
+
 class SoridormiTaskClientError(RuntimeError):
     def __init__(
         self,
@@ -322,6 +368,9 @@ class SoridormiTaskMonitoringInvoker:
             "expired",
             "timeout_elapsed_s",
             "reason_code",
+            "reason",
+            "blocked_subsystems",
+            "recommended_next_actions",
         ):
             if key in events:
                 merged[key] = events[key]
@@ -330,10 +379,26 @@ class SoridormiTaskMonitoringInvoker:
     @staticmethod
     def _task_failure_message(output: dict[str, Any]) -> str | None:
         status = str(output.get("status") or "")
-        if output.get("accepted") is False or status in _UNSUCCESSFUL_TASK_STATUSES:
+        expired = output.get("expired") is True
+        if output.get("accepted") is False or status in _UNSUCCESSFUL_TASK_STATUSES or expired:
             reason_code = output.get("reason_code")
             reason = output.get("reason")
-            parts = [part for part in (status or "task_failed", reason_code, reason) if part]
+            status_part = "expired" if expired and status not in _UNSUCCESSFUL_TASK_STATUSES else status
+            parts = [
+                part
+                for part in (
+                    status_part or "task_failed",
+                    reason_code,
+                    reason,
+                )
+                if part
+            ]
+            blocked = _clean_text_list(output.get("blocked_subsystems"))
+            if blocked:
+                parts.append("blocked_subsystems=" + ",".join(blocked))
+            recommended = _format_recommended_actions(output.get("recommended_next_actions"))
+            if recommended:
+                parts.append("recommended_next_actions=" + ";".join(recommended))
             return "Soridormi task did not complete successfully: " + " / ".join(
                 str(part) for part in parts
             )

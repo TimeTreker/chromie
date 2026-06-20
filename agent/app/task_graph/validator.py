@@ -169,11 +169,18 @@ class GraphValidator:
             for ref in iter_refs(node.args):
                 source = ref_node_id(ref)
                 if source is None:
-                    report.errors.append(f"node {node.id!r} has malformed ref {ref!r}; expected <node>.output.<field>")
+                    report.errors.append(
+                        f"node {node.id!r} has malformed ref {ref!r}; expected "
+                        "<node>.output[.<field>], <node>.error, or <node>.status"
+                    )
                     continue
                 if source not in nodes:
                     report.errors.append(f"node {node.id!r} refs unknown node {source!r}")
-                elif source not in node.depends_on and node.id not in nodes[source].during:
+                elif (
+                    source not in node.depends_on
+                    and node.id not in nodes[source].during
+                    and not self._is_fallback_target(source, node.id, nodes)
+                ):
                     report.warnings.append(f"node {node.id!r} refs {source!r} without an explicit dependency")
 
     def _validate_cycles(self, graph: TaskGraph, nodes: dict[str, TaskNode], report: GraphValidationReport) -> None:
@@ -241,3 +248,15 @@ class GraphValidator:
             return False
 
         return walk(node_id)
+
+    def _is_fallback_target(
+        self,
+        source_id: str,
+        target_id: str,
+        nodes: dict[str, TaskNode],
+    ) -> bool:
+        source = nodes[source_id]
+        for policy in (source.on_failure, source.on_timeout, *source.on_event.values()):
+            if policy and policy.target == target_id:
+                return True
+        return False

@@ -36,8 +36,19 @@ Before marking a candidate selected, the default verifier command must pass:
 ```bash
 python scripts/verify_robot_candidate.py \
   .chromie/commissioning/reference_robot_candidate.json \
+  --evidence-root .chromie/commissioning \
+  --verify-evidence-files \
   --write-report .chromie/commissioning/candidate-verification.json
 ```
+
+The final-review verifier resolves relative evidence paths from the evidence
+root and rejects references that escape that package. It checks the referenced
+provider manifest, emergency-stop procedure and evidence,
+stop/recovery/communication-loss procedures, and calibration artifact files.
+The provider manifest's `metadata.upstream_commit` must match
+`revisions.soridormi`, and calibration artifact hashes must match their
+declared SHA-256 values. Use `--allow-draft` without file verification only
+while collecting the local candidate package.
 
 ## No-motion prerequisites
 
@@ -115,6 +126,8 @@ python scripts/provider_conformance.py --compare \
 The candidate can be selected as the first reference robot only when:
 
 - `verify_robot_candidate.py` reports `selected_for_pilot=true`;
+- the referenced evidence files stay inside the evidence root;
+- the provider manifest revision and calibration hashes match the candidate;
 - every no-motion prerequisite and contract gate passes;
 - the retained evidence identifies exact revisions and configuration;
 - measured latencies satisfy the declared thresholds;

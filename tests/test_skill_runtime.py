@@ -605,7 +605,13 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     )
                 ],
                 speak_after=[SpeechItem(text="Done.")],
-                task_graphs=[{"graph_id": "legacy-1", "nodes": []}],
+                task_graphs=[
+                    {
+                        "graph_id": "legacy-1",
+                        "nodes": [],
+                        "requires_confirmation": True,
+                    }
+                ],
             )
         )
 
@@ -613,6 +619,8 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.speech[1].timing, "after_skills")
         self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
         self.assertEqual(response.skills[1].skill_id, "chromie.task_graph.execute")
+        self.assertTrue(response.skills[1].requires_confirmation)
+        self.assertTrue(response.requires_confirmation)
 
 
 if __name__ == "__main__":

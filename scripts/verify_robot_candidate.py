@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from datetime import datetime
@@ -87,10 +88,84 @@ def _string_list(
     return value
 
 
-def verify_candidate(payload: dict[str, Any]) -> dict[str, Any]:
+def _resolve_file_reference(
+    path_value: Any,
+    label: str,
+    evidence_root: Path,
+    blockers: list[str],
+) -> Path | None:
+    if not _nonempty(path_value):
+        return None
+    path = Path(str(path_value))
+    if path.is_absolute():
+        blockers.append(f"{label} must be relative to the evidence root")
+        return None
+    evidence_root_resolved = evidence_root.resolve()
+    resolved = (evidence_root / path).resolve()
+    if not resolved.is_relative_to(evidence_root_resolved):
+        blockers.append(f"{label} must stay within the evidence root: {path}")
+        return None
+    return resolved
+
+
+def _check_file_reference(
+    path_value: Any,
+    label: str,
+    evidence_root: Path,
+    blockers: list[str],
+) -> Path | None:
+    path = _resolve_file_reference(path_value, label, evidence_root, blockers)
+    if path is None:
+        return None
+    if not path.is_file():
+        blockers.append(f"{label} file does not exist: {path}")
+        return None
+    return path
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _check_provider_manifest(
+    path: Path,
+    expected_soridormi_revision: Any,
+    blockers: list[str],
+) -> None:
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        blockers.append(f"revisions.provider_manifest is not valid JSON: {exc}")
+        return
+    if not isinstance(manifest, dict):
+        blockers.append("revisions.provider_manifest must contain a JSON object")
+        return
+    metadata = manifest.get("metadata")
+    if not isinstance(metadata, dict):
+        blockers.append("revisions.provider_manifest metadata is required")
+        return
+    upstream_commit = metadata.get("upstream_commit")
+    if upstream_commit != expected_soridormi_revision:
+        blockers.append(
+            "revisions.provider_manifest metadata.upstream_commit must match "
+            "revisions.soridormi"
+        )
+
+
+def verify_candidate(
+    payload: dict[str, Any],
+    *,
+    evidence_root: Path | None = None,
+    verify_evidence_files: bool = False,
+) -> dict[str, Any]:
     errors: list[str] = []
     blockers: list[str] = []
     warnings: list[str] = []
+    evidence_root = evidence_root or Path.cwd()
 
     _check_keys(payload, "manifest", TOP_LEVEL_KEYS, errors)
     if payload.get("schema_version") != 1:
@@ -158,6 +233,19 @@ def verify_candidate(payload: dict[str, Any]) -> dict[str, Any]:
             blockers.append(f"revisions.{field} must be a full 40-character SHA")
     if not _nonempty(revisions.get("provider_manifest")):
         blockers.append("revisions.provider_manifest is required")
+    elif verify_evidence_files:
+        provider_manifest_path = _check_file_reference(
+            revisions.get("provider_manifest"),
+            "revisions.provider_manifest",
+            evidence_root,
+            blockers,
+        )
+        if provider_manifest_path is not None:
+            _check_provider_manifest(
+                provider_manifest_path,
+                revisions.get("soridormi"),
+                blockers,
+            )
     provider_sha = revisions.get("provider_configuration_sha256")
     if not isinstance(provider_sha, str) or not SHA256.fullmatch(provider_sha):
         blockers.append(
@@ -239,6 +327,14 @@ def verify_candidate(payload: dict[str, Any]) -> dict[str, Any]:
     ):
         if not _nonempty(safety.get(field)):
             blockers.append(f"safety.{field} is required")
+    if verify_evidence_files:
+        for field in ("emergency_stop_procedure", "emergency_stop_evidence"):
+            _check_file_reference(
+                safety.get(field),
+                f"safety.{field}",
+                evidence_root,
+                blockers,
+            )
     if not _timestamp(safety.get("emergency_stop_tested_at")):
         blockers.append(
             "safety.emergency_stop_tested_at must be an ISO-8601 timestamp"
@@ -271,6 +367,20 @@ def verify_candidate(payload: dict[str, Any]) -> dict[str, Any]:
             blockers.append(
                 f"calibration_artifacts[{index}].sha256 must be a SHA-256"
             )
+        elif verify_evidence_files:
+            artifact_path = _check_file_reference(
+                artifact.get("path"),
+                f"calibration_artifacts[{index}].path",
+                evidence_root,
+                blockers,
+            )
+            if artifact_path is not None:
+                observed_sha256 = _sha256(artifact_path)
+                if observed_sha256 != artifact["sha256"]:
+                    blockers.append(
+                        f"calibration_artifacts[{index}].sha256 does not match "
+                        f"{artifact_path}"
+                    )
         if not _timestamp(artifact.get("captured_at")):
             blockers.append(
                 f"calibration_artifacts[{index}].captured_at must be ISO-8601"
@@ -286,6 +396,14 @@ def verify_candidate(payload: dict[str, Any]) -> dict[str, Any]:
     for field in ("stop", "recovery", "communication_loss", "observable_safe_idle"):
         if not _nonempty(procedures.get(field)):
             blockers.append(f"procedures.{field} is required")
+    if verify_evidence_files:
+        for field in ("stop", "recovery", "communication_loss"):
+            _check_file_reference(
+                procedures.get(field),
+                f"procedures.{field}",
+                evidence_root,
+                blockers,
+            )
 
     approvals = _mapping(payload, "approvals", errors)
     _check_keys(
@@ -336,6 +454,8 @@ def verify_candidate(payload: dict[str, Any]) -> dict[str, Any]:
         "physical_motion_authorized": False,
         "candidate_id": candidate_id,
         "candidate_state": state,
+        "evidence_files_verified": verify_evidence_files,
+        "evidence_root": str(evidence_root) if verify_evidence_files else None,
         "errors": errors,
         "blockers": blockers,
         "warnings": warnings,
@@ -357,10 +477,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Exit zero for a structurally valid draft even when blockers remain.",
     )
+    parser.add_argument(
+        "--evidence-root",
+        type=Path,
+        help=(
+            "Resolve relative evidence paths from this directory when "
+            "--verify-evidence-files is set. Defaults to the manifest directory."
+        ),
+    )
+    parser.add_argument(
+        "--verify-evidence-files",
+        action="store_true",
+        help=(
+            "Require referenced provider, safety, procedure, and calibration "
+            "files to exist and require calibration SHA-256 values to match."
+        ),
+    )
     parser.add_argument("--write-report", type=Path)
     args = parser.parse_args(argv)
     try:
-        report = verify_candidate(load_candidate(args.manifest))
+        evidence_root = args.evidence_root or args.manifest.parent
+        report = verify_candidate(
+            load_candidate(args.manifest),
+            evidence_root=evidence_root,
+            verify_evidence_files=args.verify_evidence_files,
+        )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         report = {
             "schema_version": 1,

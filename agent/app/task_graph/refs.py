@@ -23,17 +23,30 @@ def iter_refs(value: Any) -> list[str]:
 
 def ref_node_id(ref: str) -> str | None:
     parts = ref.split(".")
-    if len(parts) < 3 or parts[1] != "output":
+    if len(parts) < 2:
         return None
-    return parts[0]
+    if parts[1] in {"error", "status"} and len(parts) == 2:
+        return parts[0]
+    if parts[1] == "output" and len(parts) >= 2:
+        return parts[0]
+    return None
 
 
 def resolve_ref(ref: str, results: dict[str, NodeResult]) -> Any:
     node_id = ref_node_id(ref)
     if not node_id or node_id not in results:
         raise KeyError(f"unresolved ref: {ref}")
-    value: Any = results[node_id].output
-    for part in ref.split(".")[2:]:
+    parts = ref.split(".")
+    if parts[1] == "error":
+        value: Any = results[node_id].error or ""
+        return value
+    if parts[1] == "status":
+        value = results[node_id].status
+        return value
+    if parts[1] != "output":
+        raise KeyError(f"unresolved ref: {ref}")
+    value = results[node_id].output
+    for part in parts[2:]:
         if not isinstance(value, dict) or part not in value:
             raise KeyError(f"unresolved ref field: {ref}")
         value = value[part]

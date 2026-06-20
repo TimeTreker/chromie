@@ -62,6 +62,14 @@ requests such as "go to the grocery", "bring me water", "dance",
 capability-level Soridormi tasks when supported. Unsupported or unsafe tasks
 should fail closed with a reason.
 
+When the shared capability catalog finds only Soridormi task-level planning
+tools for a rich embodied request and a TaskGraph planner is enabled, Chromie
+routes the request to the tool-planning lane rather than the direct named-skill
+lane. Explicit bounded commands still prefer interaction-executable named
+skills such as `soridormi.walk_velocity` when the live catalog exposes them.
+This keeps "walk forward for one second" concrete, while "bring me water" stays
+a structured Soridormi task goal.
+
 When available, `soridormi.task.preview` is the planning-only way to inspect
 Soridormi's embodied interpretation before submitting a persistent task. Preview
 outputs are useful for clarification and reporting, but they are not execution
@@ -90,8 +98,32 @@ authorization.
 `execute-planning` wraps its invoker with the Soridormi task monitor. A
 `soridormi.task.submit` node without an explicit `client_task_ref` receives one
 from the graph/node id, terminal event state is merged back into the node output
-under `monitoring`, and Soridormi refused/failed/cancelled tasks become failed
-TaskGraph nodes instead of successful planning nodes.
+under `monitoring`, and terminal `reason`, `reason_code`,
+`blocked_subsystems`, and `recommended_next_actions` fields are promoted to the
+node output for deterministic reporting. Soridormi refused/failed/cancelled or
+expired tasks become failed TaskGraph nodes instead of successful planning
+nodes; their node error preserves the refusal code, blocked subsystems, and
+machine-readable next-action hints without inventing a motion workaround.
+Every execution trace also carries `outcome_summary`, a deterministic one-line
+result summary derived from node results. It is the source that future report
+or speech nodes should use when explaining completion, refusal, timeout,
+cancellation, or blocked Soridormi subsystems without asking an LLM to infer the
+failure.
+Planning execution may run `chromie.report` nodes through a local trace-only
+adapter, primarily as failure-policy fallback nodes. This records a report in
+the execution trace without invoking TTS or audio playback. `chromie.speak`
+remains outside planning execution; audible speech still belongs to the native
+InteractionResponse and host Skill Runtime path.
+Native `POST /interaction` emits planned graphs as
+`chromie.task_graph.execute` Skill Runtime requests. The host Orchestrator wires
+that skill to the Agent's planning executor, which still requires
+`AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1`; if the planning executor is
+disabled or returns a failed trace, the skill result is failed and completion
+speech is suppressed.
+The LLM TaskGraph planner normalizes Soridormi `soridormi.task.submit` nodes
+that lack an explicit failure fallback by adding a `chromie.report` trace-only
+fallback that reports the submit node's `error` field. Existing explicit
+fallbacks are preserved.
 When Soridormi returns `task_graph`, treat it as Soridormi's body-runtime DAG:
 Chromie may display, monitor, or route from it, but must not translate it into
 raw motor, joint, torque, or policy outputs. Chromie's own TaskGraph remains the
@@ -121,8 +153,11 @@ A node includes:
 - failure, timeout, and event policy;
 - an optional condition.
 
-References to prior outputs are resolved by the executor's reference mechanism;
-they do not allow arbitrary code execution.
+References are resolved by the executor's reference mechanism; they do not
+allow arbitrary code execution. Supported forms are
+`<node>.output[.<field>]`, `<node>.error`, and `<node>.status`. Fallback report
+nodes may reference the failed node named by the source node's failure policy
+without adding a normal dependency edge.
 
 ## Validation
 
@@ -239,6 +274,12 @@ InteractionResponse and Skill Runtime path.
   trace or 404 and requires the diagnostics bearer token.
 - `GET /task-graphs/scheduler/status` reports active/waiting counts and graph IDs
   and requires the diagnostics bearer token.
+
+TaskGraph traces keep the planner-provided `summary` and add an
+`outcome_summary` after execution. `outcome_summary` is deterministic and
+reports the first non-success node with any available `reason_code`,
+`blocked_subsystems`, and `recommended_next_actions`; successful traces report a
+plain completion result.
 
 Active executions, traces, and grants live only in the Agent process. Restarting
 the service removes them. Traces default to a 900-second TTL and a 128-entry LRU

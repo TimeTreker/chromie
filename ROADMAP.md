@@ -156,7 +156,9 @@ body controls.
 1. keep the Chromie/Soridormi task contract aligned with Soridormi's
    authoritative manifest;
 2. validate task-capability inspection, preview, submit, event monitoring,
-   refusal, timeout, and cancellation semantics without claiming motion;
+   refusal, blocked-subsystem reporting, timeout, and cancellation semantics
+   without claiming motion, including a no-motion bridge acceptance gate that
+   checks capabilities before preview or submit;
 3. no-motion health and state inspection for the selected candidate;
 4. shadow recommendations;
 5. dry-run with operator approval;
@@ -170,9 +172,13 @@ body controls.
 - exact hardware, firmware, sensors, drivers, and Soridormi revision are pinned;
 - Chromie can submit structured Soridormi task goals with stable idempotency
   keys, monitor terminal task events, and fail closed on Soridormi refusal,
-  failure, timeout, cancellation, or unsafe recommendations;
+  failure, timeout, cancellation, blocked subsystems, or unsafe
+  recommendations;
 - the candidate verifier reports `selected_for_pilot=true` while continuing to
   report `physical_motion_authorized=false`;
+- referenced safety, procedure, provider-manifest, and calibration evidence
+  files stay inside the evidence root, the provider manifest revision matches
+  the candidate, and calibration hashes match;
 - calibration and latency measurements are retained;
 - physical stop and recovery evidence is reviewed;
 - communication loss and stale-command cases fail closed;

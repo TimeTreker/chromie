@@ -47,7 +47,8 @@ class AgentResultInteractionAdapter:
                 skill_id="chromie.task_graph.execute",
                 args={"graph": graph},
                 timing="sequential",
-                requires_confirmation=result.requires_confirmation,
+                requires_confirmation=result.requires_confirmation
+                or bool(graph.get("requires_confirmation")),
             )
             for graph in result.task_graphs
         )
@@ -128,13 +129,17 @@ class TaskGraphSkillProvider:
     ) -> SkillResult:
         raw = self._handler(request.args["graph"])
         output = await raw if inspect.isawaitable(raw) else raw
+        status = _task_graph_skill_status(output)
+        message = _task_graph_skill_message(output, status)
         return SkillResult(
             request_id=request.request_id,
             skill_id=request.skill_id,
             skill_version=definition.version,
-            status="completed",
+            status=status,
             provider_id=self.provider_id,
             output=output,
+            reason_code=_task_graph_reason_code(status),
+            message=message,
         )
 
     async def cancel(
@@ -144,6 +149,35 @@ class TaskGraphSkillProvider:
         context: SkillExecutionContext,
     ) -> None:
         self.cancelled_request_ids.add(request.request_id)
+
+
+def _task_graph_skill_status(output: dict[str, Any]) -> str:
+    graph_status = str(output.get("status") or "").strip().lower()
+    if graph_status == "success":
+        return "completed"
+    if graph_status == "cancelled":
+        return "cancelled"
+    if graph_status in {"failed", "aborted"}:
+        return "failed"
+    return "completed"
+
+
+def _task_graph_skill_message(output: dict[str, Any], status: str) -> str:
+    if status == "completed":
+        return ""
+    summary = str(output.get("outcome_summary") or "").strip()
+    if summary:
+        return summary
+    graph_status = str(output.get("status") or "unknown").strip() or "unknown"
+    return f"TaskGraph ended with status={graph_status}"
+
+
+def _task_graph_reason_code(status: str) -> str | None:
+    if status == "completed":
+        return None
+    if status == "cancelled":
+        return "task_graph_cancelled"
+    return "task_graph_failed"
 
 
 def task_graph_skill_definition() -> SkillDefinition:

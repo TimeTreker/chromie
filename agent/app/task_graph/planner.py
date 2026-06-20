@@ -4,11 +4,14 @@ import json
 from typing import Any, cast
 from uuid import uuid4
 
-from ..capabilities.models import CapabilityRegistry
+from ..capabilities.models import CapabilityRegistry, FailurePolicy
 from ..clients.ollama_client import OllamaClient
 
-from .models import TaskGraph
+from .models import TaskGraph, TaskNode
 from .validator import GraphValidator
+
+_SORIDORMI_TASK_SUBMIT_TOOL = "soridormi.task.submit"
+_TRACE_REPORT_TOOL = "chromie.report"
 
 
 class TaskGraphPlanner:
@@ -40,6 +43,7 @@ class TaskGraphPlanner:
         )
         if not graph.nodes:
             raise ValueError("TaskGraph planner returned an empty graph")
+        graph = self._with_soridormi_trace_report_fallbacks(graph)
 
         report = GraphValidator(self.registry).validate(graph)
         report.raise_for_errors()
@@ -50,7 +54,14 @@ class TaskGraphPlanner:
             "You are Chromie's TaskGraph planner. Return one JSON object matching the requested schema. "
             "Use only tools listed in the capability registry. Never invent tool names. "
             "Do not call restricted or unavailable tools. Physical motion must depend on a confirmation node "
-            "and be covered by a safety monitor. Return a plan only; never claim that tools already ran."
+            "and be covered by a safety monitor. Use concrete Soridormi named skills only when the "
+            "request is explicit and bounded by the user. For richer embodied goals such as navigation, "
+            "approach, inspection, recovery, or object delivery, use soridormi.task.get_capabilities, "
+            "soridormi.task.preview, soridormi.task.submit, and task monitoring instead of lowering the "
+            "request into velocity or low-level body controls. Use chromie.report only as a trace-only "
+            "fallback report node for refusal, timeout, cancellation, or blocked-subsystem outcomes; do "
+            "not use chromie.speak in planning graphs. Return a plan only; never claim that tools already "
+            "ran."
         )
 
     def _prompt(self, *, user_request: str, language: str, context: dict[str, Any]) -> str:
@@ -84,6 +95,10 @@ class TaskGraphPlanner:
                     "args": {},
                     "depends_on": [],
                     "during": [],
+                    "on_failure": {
+                        "strategy": "goto",
+                        "target": "report_node_id",
+                    },
                 }
             ],
         }
@@ -94,3 +109,59 @@ class TaskGraphPlanner:
             f"Capability registry: {json.dumps(tools, ensure_ascii=False)}\n"
             f"Return this TaskGraph shape: {json.dumps(schema_hint, ensure_ascii=False)}"
         )
+
+    def _with_soridormi_trace_report_fallbacks(self, graph: TaskGraph) -> TaskGraph:
+        if not self._can_add_trace_report():
+            return graph
+
+        nodes = list(graph.nodes)
+        existing_ids = {node.id for node in nodes}
+        updated = False
+        for index, node in enumerate(list(nodes)):
+            if node.tool != _SORIDORMI_TASK_SUBMIT_TOOL:
+                continue
+            if node.on_failure and node.on_failure.target:
+                continue
+            report_id = self._unique_node_id(
+                f"{node.id}_report",
+                existing_ids,
+            )
+            existing_ids.add(report_id)
+            nodes[index] = node.model_copy(
+                update={
+                    "on_failure": FailurePolicy(
+                        strategy="goto",
+                        target=report_id,
+                    )
+                },
+                deep=True,
+            )
+            nodes.append(
+                TaskNode(
+                    id=report_id,
+                    tool=_TRACE_REPORT_TOOL,
+                    type="report",
+                    args={"message": {"$ref": f"{node.id}.error"}},
+                )
+            )
+            updated = True
+
+        if not updated:
+            return graph
+        return graph.model_copy(update={"nodes": nodes}, deep=True)
+
+    def _can_add_trace_report(self) -> bool:
+        try:
+            report_tool = self.registry.get_tool(_TRACE_REPORT_TOOL)
+        except KeyError:
+            return False
+        return report_tool.availability.available
+
+    @staticmethod
+    def _unique_node_id(base: str, existing_ids: set[str]) -> str:
+        candidate = base
+        suffix = 2
+        while candidate in existing_ids:
+            candidate = f"{base}_{suffix}"
+            suffix += 1
+        return candidate

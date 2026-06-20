@@ -13,6 +13,8 @@ Implemented now:
 - trusted Skill Registry and providers;
 - local speech as a named runtime skill;
 - Soridormi named-skill discovery and execution;
+- host dispatch for native `chromie.task_graph.execute` requests into the
+  Agent planning TaskGraph executor;
 - bounded scheduling and exclusive groups;
 - timeouts, traces, cancellation, and barge-in propagation;
 - host-owned spoken request-bound confirmation with expiry and denial;
@@ -38,6 +40,7 @@ user speech
   -> trusted host Skill Runtime
       -> speech provider
       -> Soridormi named-skill provider
+      -> planning TaskGraph provider
 ```
 
 The execution boundary—not the model—owns validation, availability,
@@ -105,6 +108,12 @@ for `soridormi.task.submit` nodes. The node is not treated as successful merely
 because submit returned; Chromie waits for terminal task events when needed, and
 Soridormi refusal/failure/cancellation becomes a failed graph node for the
 global orchestrator to report or route from.
+When the native Agent returns a planned graph, it is emitted as a
+`chromie.task_graph.execute` skill request. The host Skill Runtime can dispatch
+that request back to the Agent's planning executor. The Agent-side planning
+execution flag remains the gate, and failed graph traces become failed skill
+results so completion speech is not played after a blocked or refused embodied
+task.
 `soridormi.task.get_capabilities` is the read-only way to ask Soridormi what
 its embodied task runtime can currently dry-run, hold, redirect, or refuse.
 Chromie should treat that readiness as Soridormi-owned state.

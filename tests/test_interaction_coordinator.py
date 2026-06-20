@@ -371,6 +371,159 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(spoken, ["Done."])
 
+    async def test_task_graph_skill_executes_planning_handler_and_keeps_success_speech(
+        self,
+    ) -> None:
+        spoken: list[str] = []
+        graphs: list[dict[str, Any]] = []
+
+        async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
+            graphs.append(graph)
+            return {
+                "graph_id": graph["graph_id"],
+                "status": "success",
+                "outcome_summary": "TaskGraph completed successfully.",
+                "node_results": [],
+                "events": [],
+            }
+
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            task_graph_handler=execute_graph,
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                speech=[{"text": "Done.", "timing": "after_skills"}],
+                skills=[
+                    {
+                        "request_id": "graph-1",
+                        "skill_id": "chromie.task_graph.execute",
+                        "args": {"graph": {"graph_id": "nav", "nodes": []}},
+                        "timing": "sequential",
+                    }
+                ],
+            ),
+            session_id="sid-graph-success",
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(graphs, [{"graph_id": "nav", "nodes": []}])
+        self.assertEqual(spoken, ["Done."])
+        self.assertEqual(result.results[0].skill_id, "chromie.task_graph.execute")
+        self.assertEqual(result.results[0].status, "completed")
+
+    async def test_failed_task_graph_suppresses_completion_speech_and_falls_back(
+        self,
+    ) -> None:
+        spoken: list[str] = []
+
+        async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "graph_id": graph["graph_id"],
+                "status": "failed",
+                "outcome_summary": (
+                    "TaskGraph failed at node go: "
+                    "reason_code=missing_navigation_pipeline"
+                ),
+                "node_results": [],
+                "events": [],
+            }
+
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            task_graph_handler=execute_graph,
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                speech=[{"text": "Done.", "timing": "after_skills"}],
+                skills=[
+                    {
+                        "request_id": "graph-1",
+                        "skill_id": "chromie.task_graph.execute",
+                        "args": {"graph": {"graph_id": "nav", "nodes": []}},
+                        "timing": "sequential",
+                    }
+                ],
+                metadata={"language": "en-US"},
+            ),
+            session_id="sid-graph-failure",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.results[0].status, "failed")
+        self.assertEqual(result.results[0].reason_code, "task_graph_failed")
+        self.assertIn("missing_navigation_pipeline", result.results[0].message)
+        self.assertEqual(spoken, ["I could not complete that task safely."])
+
+    async def test_cancelled_task_graph_suppresses_completion_speech_and_falls_back(
+        self,
+    ) -> None:
+        spoken: list[str] = []
+
+        async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "graph_id": graph["graph_id"],
+                "status": "cancelled",
+                "outcome_summary": "TaskGraph was cancelled at node monitor.",
+                "node_results": [],
+                "events": [],
+            }
+
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            task_graph_handler=execute_graph,
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                speech=[{"text": "Done.", "timing": "after_skills"}],
+                skills=[
+                    {
+                        "request_id": "graph-1",
+                        "skill_id": "chromie.task_graph.execute",
+                        "args": {"graph": {"graph_id": "nav", "nodes": []}},
+                        "timing": "sequential",
+                    }
+                ],
+                metadata={"language": "en-US"},
+            ),
+            session_id="sid-graph-cancelled",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.results[0].status, "cancelled")
+        self.assertEqual(result.results[0].reason_code, "task_graph_cancelled")
+        self.assertEqual(spoken, ["The task was cancelled, so I did not continue."])
+
+    async def test_task_graph_skill_fails_closed_when_handler_is_disabled(
+        self,
+    ) -> None:
+        spoken: list[str] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "graph-1",
+                        "skill_id": "chromie.task_graph.execute",
+                        "args": {"graph": {"graph_id": "nav", "nodes": []}},
+                        "timing": "sequential",
+                    }
+                ],
+                metadata={"language": "en-US"},
+            ),
+            session_id="sid-graph-disabled",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.results[0].reason_code, "task_graph_execution_disabled")
+        self.assertEqual(spoken, ["I could not complete that task safely."])
+
     async def test_cancelled_body_skill_suppresses_all_terminal_speech(self) -> None:
         spoken: list[str] = []
         invoker = _SoridormiInvoker(execute_delay_s=5)

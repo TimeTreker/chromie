@@ -31,11 +31,17 @@ logger = logging.getLogger("chromie.agent.runtime")
 
 _ROBOT_ACTION_WORDS = re.compile(
     r"\b("
-    r"bow|come here|crouch|face|go|look|move|nod|rotate|run|shake|"
-    r"sidestep|sit|smile|stand|step|stop|turn|travel|walk|wave"
+    r"approach|bow|bring|carry|come here|crouch|deliver|face|fetch|go|"
+    r"inspect|look|move|nod|recover|rotate|run|shake|sidestep|sit|smile|"
+    r"stand|step|stop|turn|travel|walk|wave"
     r")\b",
     re.IGNORECASE,
 )
+_SORIDORMI_TASK_PLANNING_TOOLS = {
+    "soridormi.task.get_capabilities",
+    "soridormi.task.preview",
+    "soridormi.task.submit",
+}
 _PLANNING_PHRASES = (
     "create a plan",
     "make a plan",
@@ -148,6 +154,24 @@ def _catalog_item(
             return None
         return item
     return None
+
+
+def _has_interaction_executable_match(candidates: list[dict]) -> bool:
+    return any(
+        isinstance(item, dict)
+        and item.get("interaction_executable") is True
+        and item.get("available") is not False
+        for item in candidates
+    )
+
+
+def _has_soridormi_task_planning_match(candidates: list[dict]) -> bool:
+    return any(
+        isinstance(item, dict)
+        and item.get("capability_id") in _SORIDORMI_TASK_PLANNING_TOOLS
+        and item.get("available") is not False
+        for item in candidates
+    )
 
 
 class _AgentPipeline:
@@ -284,6 +308,33 @@ class InteractionRuntime(_AgentPipeline):
             request.route_decision.candidate_capabilities
         )
         if not search.matched:
+            return
+        if (
+            search.suggested_route == "robot_action"
+            and not request.route_decision.actions
+            and self.services.task_graph_planner is not None
+            and not _has_interaction_executable_match(
+                request.route_decision.candidate_capabilities
+            )
+            and _has_soridormi_task_planning_match(
+                request.route_decision.candidate_capabilities
+            )
+            and (
+                _looks_like_robot_action_request(request.text)
+                or _looks_like_planning_request(request.text)
+            )
+        ):
+            request.route_decision.route = "tool"
+            request.route_decision.agents = ["tool_agent", "speaker_agent"]
+            request.route_decision.intent = "soridormi_task_planning"
+            request.route_decision.confidence = max(
+                request.route_decision.confidence,
+                search.matches[0].score if search.matches else 0.0,
+            )
+            request.route_decision.source = "catalog"
+            request.route_decision.reason = (
+                "Matched Soridormi task-agent planning capability"
+            )
             return
         if (
             search.suggested_route == "robot_action"

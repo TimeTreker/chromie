@@ -124,8 +124,13 @@ export and pinned to upstream commit
 
 ## TaskGraph behavior
 
-TaskGraph planning and execution are separate operations. A graph returned in
-`AgentResult.task_graphs` is never automatically dispatched.
+TaskGraph planning and execution are separate operations. A graph returned from
+the legacy `/run` path in `AgentResult.task_graphs` is not automatically
+dispatched by the Agent service. The native `/interaction` path emits planned
+graphs as `chromie.task_graph.execute` Skill Runtime requests; the host
+Orchestrator can dispatch those to the Agent's planning executor when
+`AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1`, and otherwise the request fails
+closed.
 
 - Validation resolves every node against the active registry.
 - Dry-run simulates policy and dependency behavior without remote MCP calls.
@@ -137,6 +142,15 @@ TaskGraph planning and execution are separate operations. A graph returned in
   emergency fallback.
 - Parallel execution is bounded and honors `can_run_parallel` and
   `exclusive_group`; physical work remains sequential.
+- Execution traces keep the planner `summary` and add a deterministic
+  `outcome_summary` from node results for report/speech use.
+- Planning execution can run `chromie.report` as a trace-only local fallback;
+  audible `chromie.speak` stays outside the planning lane.
+- LLM-planned Soridormi task-submit nodes receive a default trace-only report
+  fallback when the model omits an explicit failure fallback.
+- The host Skill Runtime maps failed or cancelled TaskGraph traces back to
+  failed/cancelled `chromie.task_graph.execute` results and suppresses
+  completion speech after graph failure.
 - Traces and confirmation grants are retained in process memory only. Traces
   have configurable TTL/LRU bounds; grants have a configurable capacity and
   purge expired entries before issue/consume.
@@ -157,6 +171,11 @@ PYTHONPATH=. python -m app.probe_capabilities \
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
 PYTHONPATH=. python -m app.soridormi_acceptance \
   --manifest ../capabilities/soridormi.json
+
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
+PYTHONPATH=. python -m app.soridormi_acceptance \
+  --manifest ../capabilities/soridormi.json \
+  --task-agent-bridge
 ```
 
 The probe checks the complete manifest by default. Acceptance workflows that
@@ -167,8 +186,11 @@ The Agent's direct Ollama client ignores ambient host proxy variables so
 Compose-local model traffic cannot be redirected through an unreachable proxy.
 
 The default acceptance uses safe status/planning behavior and does not authorize
-physical motion. Additional guarded dry-run and runtime-cancellation modes are
-documented in [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md).
+physical motion. `--task-agent-bridge` exercises the no-motion
+`soridormi.task.*` contract and requires declared no-motion task capability
+before preview/submit. Additional guarded dry-run and
+runtime-cancellation modes are documented in
+[`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md).
 
 ## Run locally
 

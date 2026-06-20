@@ -109,6 +109,27 @@ Dry-run, trace, and scheduler requests use
 falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, the
 diagnostic endpoints return 503. Invalid or missing credentials return 401.
 
+TaskGraph execution responses return an `ExecutionTrace`. Its `summary` remains
+the planner-provided task summary, while `outcome_summary` is generated
+deterministically from node results. Failed Soridormi task nodes preserve
+`reason_code`, `blocked_subsystems`, and `recommended_next_actions` in that
+summary so user-facing report/speech code does not need to infer the refusal.
+Planning execution can run `chromie.report` as a trace-only local report node;
+it does not play audio. `chromie.speak` remains rejected from planning
+execution and should be emitted through `InteractionResponse`/Skill Runtime when
+audible playback is required.
+When native `POST /interaction` emits `chromie.task_graph.execute`, the host
+Skill Runtime can route that request to `POST /task-graphs/execute-planning`.
+The Agent-side planning execution flag still controls whether the graph runs;
+disabled planning execution returns a safe failure instead of falling back to
+raw control or guarded execution. Failed, aborted, or cancelled graph traces are
+reported back as non-completed skill results so `after_skills` speech is not
+played as if the task succeeded.
+TaskGraph `$ref` arguments may read `<node>.output[.<field>]`, `<node>.error`,
+or `<node>.status`; LLM-planned Soridormi task-submit nodes that omit a failure
+fallback are normalized with a trace-only report fallback that reads
+`<submit_node>.error`.
+
 Traces and grants are process-memory state; they are not durable across Agent
 restarts. Traces use configurable TTL/LRU retention (defaults: 900 seconds and
 128 entries). Unconsumed grants are capped at 128 entries by default and expired

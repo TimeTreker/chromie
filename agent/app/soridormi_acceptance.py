@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -27,6 +28,10 @@ CapabilityProbe = Callable[
     [CapabilityRegistry],
     Awaitable[list[CapabilityProbeResult]],
 ]
+_TASK_AGENT_SUBMIT_TOOLS = {
+    "soridormi.task.preview",
+    "soridormi.task.submit",
+}
 
 
 class SoridormiDryRunAcceptanceReport(BaseModel):
@@ -42,6 +47,11 @@ class SoridormiRuntimeCancellationAcceptanceReport(BaseModel):
     planning: ExecutionTrace
     cancellation: ExecutionTrace
     status_after_cancellation: dict[str, Any]
+    notes: list[str] = Field(default_factory=list)
+
+
+class SoridormiTaskAgentAcceptanceReport(BaseModel):
+    task_agent: ExecutionTrace
     notes: list[str] = Field(default_factory=list)
 
 
@@ -68,6 +78,44 @@ class _ExecutePlanObserver:
         if tool_name == "soridormi.motion.execute_plan":
             self._started.set()
         return await self._invoker.invoke(tool_name, args, context=context)
+
+
+class _NoMotionTaskAgentGate:
+    def __init__(self, invoker: AsyncToolInvoker) -> None:
+        self._invoker = invoker
+        self.capabilities: dict[str, Any] | None = None
+
+    async def invoke(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        context: ToolInvocationContext | None = None,
+    ) -> ToolCallOutcome:
+        if tool_name == "soridormi.task.get_capabilities":
+            outcome = await self._invoker.invoke(tool_name, args, context=context)
+            if outcome.status == "success":
+                self.capabilities = dict(outcome.output)
+            return outcome
+
+        if tool_name in _TASK_AGENT_SUBMIT_TOOLS:
+            error = _task_agent_capability_error(self.capabilities)
+            if error is not None:
+                return ToolCallOutcome.failed(error, output=self.capabilities)
+
+        return await self._invoker.invoke(tool_name, args, context=context)
+
+
+def _task_agent_capability_error(
+    capabilities: dict[str, Any] | None,
+) -> str | None:
+    if capabilities is None:
+        return "Soridormi task-agent acceptance requires capability preflight"
+    if capabilities.get("task_api_no_motion") is not True:
+        return "Soridormi task-agent acceptance requires task_api_no_motion=true"
+    if not capabilities.get("task_types"):
+        return "Soridormi task-agent capability output is missing task_types"
+    return None
 
 
 def require_soridormi_runtime_status(
@@ -114,6 +162,72 @@ def build_soridormi_planning_graph(
                     "type": "plan",
                     "depends_on": ["status"],
                     "args": {"commands": commands},
+                },
+            ],
+        }
+    )
+
+
+def default_soridormi_task_goal() -> dict[str, Any]:
+    return {
+        "task_type": "perform_gesture",
+        "summary": "Perform a no-motion contract preview of a small nod gesture.",
+        "parameters": {"gesture": "nod_yes", "count": 2},
+        "safety_constraints": {"no_motion": True},
+        "timeout_s": 15.0,
+        "cancellation_policy": "cancel_before_execution",
+    }
+
+
+def soridormi_task_agent_graph_id(goal: dict[str, Any]) -> str:
+    serialized = json.dumps(
+        goal,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        default=str,
+    )
+    digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:12]
+    return f"soridormi-task-agent-acceptance-{digest}"
+
+
+def build_soridormi_task_agent_graph(
+    goal: dict[str, Any],
+) -> TaskGraph:
+    return TaskGraph.model_validate(
+        {
+            "graph_id": soridormi_task_agent_graph_id(goal),
+            "created_by": "system",
+            "summary": (
+                "Inspect, preview, submit, and monitor a no-motion Soridormi "
+                "task-agent goal."
+            ),
+            "nodes": [
+                {
+                    "id": "capabilities",
+                    "tool": "soridormi.task.get_capabilities",
+                    "type": "query",
+                },
+                {
+                    "id": "preview",
+                    "tool": "soridormi.task.preview",
+                    "type": "plan",
+                    "depends_on": ["capabilities"],
+                    "args": goal,
+                },
+                {
+                    "id": "submit",
+                    "tool": "soridormi.task.submit",
+                    "type": "plan",
+                    "depends_on": ["preview"],
+                    "args": goal,
+                },
+                {
+                    "id": "events",
+                    "tool": "soridormi.task.events",
+                    "type": "query",
+                    "depends_on": ["submit"],
+                    "args": {"task_id": {"$ref": "submit.output.task_id"}},
                 },
             ],
         }
@@ -253,6 +367,75 @@ async def run_soridormi_planning_acceptance(
         raise RuntimeError(
             f"Soridormi planning output is missing required fields: {sorted(missing)}"
         )
+    return trace
+
+
+async def run_soridormi_task_agent_acceptance(
+    registry: CapabilityRegistry,
+    *,
+    goal: dict[str, Any],
+    invoker: AsyncToolInvoker,
+    probe: CapabilityProbe | None = None,
+) -> ExecutionTrace:
+    probe_results = await (
+        probe(registry)
+        if probe is not None
+        else probe_mcp_capabilities(registry)
+    )
+    failed_endpoints = [result.url for result in probe_results if not result.ok]
+    if failed_endpoints:
+        raise ValueError(
+            "Soridormi MCP capability probe failed for: "
+            + ", ".join(failed_endpoints)
+        )
+
+    graph = build_soridormi_task_agent_graph(goal)
+    gated_invoker = _NoMotionTaskAgentGate(invoker)
+    trace = await TaskGraphService(
+        registry,
+        planning_invoker=gated_invoker,
+    ).execute_planning(graph)
+
+    results = trace.result_map()
+    capabilities = results["capabilities"].output
+    if error := _task_agent_capability_error(capabilities):
+        raise RuntimeError(error)
+    if trace.status != "success":
+        detail = trace.outcome_summary or "Soridormi task-agent acceptance graph failed"
+        raise RuntimeError(detail)
+
+    preview = results["preview"].output
+    if not preview.get("preview_id"):
+        raise RuntimeError("Soridormi task preview did not return preview_id")
+    if preview.get("persistent") is not False:
+        raise RuntimeError("Soridormi task preview must be non-persistent")
+    if preview.get("would_record_task_on_submit") is not True:
+        raise RuntimeError(
+            "Soridormi task preview did not declare submit persistence"
+        )
+    if preview.get("no_motion") is not True:
+        raise RuntimeError("Soridormi task preview must be no_motion=true")
+
+    submit = results["submit"].output
+    if not submit.get("task_id"):
+        raise RuntimeError("Soridormi task submit did not return task_id")
+    if submit.get("no_motion") is not True:
+        raise RuntimeError("Soridormi task submit must be no_motion=true")
+    if submit.get("terminal") is not True:
+        raise RuntimeError("Soridormi task monitor did not reach terminal state")
+    if submit.get("safe_idle") is not True:
+        raise RuntimeError("Soridormi task monitor did not end safe_idle=true")
+    if submit.get("status") != "completed":
+        raise RuntimeError(
+            "Soridormi task-agent acceptance expected completed terminal status"
+        )
+    events = results["events"].output
+    if events.get("task_id") != submit["task_id"]:
+        raise RuntimeError("Soridormi task events did not match submitted task_id")
+    if events.get("terminal") is not True:
+        raise RuntimeError("Soridormi task events did not report terminal=true")
+    if events.get("safe_idle") is not True:
+        raise RuntimeError("Soridormi task events did not report safe_idle=true")
     return trace
 
 
@@ -428,9 +611,11 @@ async def _run(
     manifest: str,
     commands: list[dict[str, Any]],
     *,
+    task_goal: dict[str, Any],
     runtime_preflight: bool,
     expected_backend: str,
     expected_mode: str,
+    task_agent_bridge: bool,
     guarded_dry_run: bool,
     exercise_emergency_stop: bool,
     exercise_runtime_cancellation: bool,
@@ -444,6 +629,22 @@ async def _run(
             invoker=invoker,
             expected_backend=expected_backend,
             expected_mode=expected_mode,
+        )
+        print(json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        return 0
+
+    if task_agent_bridge:
+        task_trace = await run_soridormi_task_agent_acceptance(
+            configured.registry,
+            goal=task_goal,
+            invoker=invoker,
+        )
+        report = SoridormiTaskAgentAcceptanceReport(
+            task_agent=task_trace,
+            notes=[
+                "Task-agent bridge acceptance is no-motion only.",
+                "Chromie inspected task capabilities, previewed a task goal, submitted it, and monitored terminal events.",
+            ],
         )
         print(json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2))
         return 0
@@ -533,6 +734,13 @@ def main() -> None:
             "or a 5-second zero-motion plan for runtime cancellation."
         ),
     )
+    parser.add_argument(
+        "--task-goal-json",
+        help=(
+            "Structured soridormi.task.* goal for --task-agent-bridge. "
+            "Defaults to a no-motion perform_gesture goal."
+        ),
+    )
     execution_group = parser.add_mutually_exclusive_group()
     execution_group.add_argument(
         "--runtime-preflight",
@@ -540,6 +748,14 @@ def main() -> None:
         help=(
             "Probe the MCP contract and require a ready runtime-backed endpoint "
             "without creating or executing a plan."
+        ),
+    )
+    execution_group.add_argument(
+        "--task-agent-bridge",
+        action="store_true",
+        help=(
+            "Run no-motion soridormi.task.get_capabilities, preview, submit, "
+            "and event-monitor acceptance through Chromie's planning TaskGraph."
         ),
     )
     execution_group.add_argument(
@@ -590,14 +806,23 @@ def main() -> None:
         raise SystemExit("--exercise-emergency-stop requires --guarded-dry-run")
     if args.cancel_after_s < 0:
         raise SystemExit("--cancel-after-s must be non-negative")
+    task_goal = (
+        default_soridormi_task_goal()
+        if args.task_goal_json is None
+        else json.loads(args.task_goal_json)
+    )
+    if not isinstance(task_goal, dict):
+        raise SystemExit("--task-goal-json must decode to a JSON object")
     raise SystemExit(
         asyncio.run(
             _run(
                 args.manifest,
                 commands,
+                task_goal=task_goal,
                 runtime_preflight=args.runtime_preflight,
                 expected_backend=args.expected_backend,
                 expected_mode=args.expected_mode,
+                task_agent_bridge=args.task_agent_bridge,
                 guarded_dry_run=args.guarded_dry_run,
                 exercise_emergency_stop=args.exercise_emergency_stop,
                 exercise_runtime_cancellation=args.exercise_runtime_cancellation,

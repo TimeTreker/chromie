@@ -6,12 +6,14 @@ from typing import Any
 from agent.app.agents import AgentServices
 from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentRunRequest
+from agent.app.task_graph.models import TaskGraph, TaskNode
 from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
 from router.app.rules import route_by_rules
 from router.app.schema import RouteRequest
+from shared.chromie_contracts.interaction import InteractionSpeech
 
 
 class _NamedSkillInvoker:
@@ -67,6 +69,27 @@ class _NamedSkillInvoker:
             raise AssertionError(f"{left!r} != {right!r}")
 
 
+class _RichTaskPlanner:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    async def plan(self, **kwargs: Any) -> TaskGraph:
+        self.calls.append(dict(kwargs))
+        return TaskGraph(
+            graph_id="rich-body-task",
+            user_request=str(kwargs.get("user_request") or ""),
+            created_by="llm",
+            nodes=[
+                TaskNode(
+                    id="submit",
+                    tool="soridormi.task.submit",
+                    type="action",
+                    args={"task_type": "navigate_to_location"},
+                )
+            ],
+        )
+
+
 class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
     async def test_text_nod_reaches_named_skill_runtime(self) -> None:
         route_request = RouteRequest(sid="interaction-nod", text="nod")
@@ -101,6 +124,67 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
                 "soridormi.safety.monitor_motion",
                 "soridormi.skill.execute_plan",
             ],
+        )
+
+    async def test_rich_task_graph_reaches_host_planning_handler(self) -> None:
+        planner = _RichTaskPlanner()
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=None,
+                use_llm=True,
+                task_graph_planner=planner,  # type: ignore[arg-type]
+            )
+        ).run(
+            AgentRunRequest(
+                sid="rich-task",
+                text="Walk to the kitchen and tell me when you arrive.",
+                route_decision={
+                    "route": "tool",
+                    "intent": "soridormi_task_planning",
+                    "agents": ["tool_agent", "speaker_agent"],
+                    "confidence": 0.92,
+                    "source": "catalog",
+                },
+            )
+        )
+        response = response.model_copy(
+            deep=True,
+            update={
+                "speech": [
+                    *response.speech,
+                    InteractionSpeech(text="Arrived.", timing="after_skills"),
+                ]
+            },
+        )
+        graphs: list[dict[str, Any]] = []
+
+        async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
+            graphs.append(graph)
+            return {
+                "graph_id": graph["graph_id"],
+                "status": "failed",
+                "outcome_summary": (
+                    "TaskGraph failed at node submit: "
+                    "reason_code=missing_navigation_pipeline"
+                ),
+                "node_results": [],
+                "events": [],
+            }
+
+        spoken: list[str] = []
+        execution = await InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            task_graph_handler=execute_graph,
+        ).execute(response, session_id="rich-task")
+
+        self.assertEqual(response.skills[0].skill_id, "chromie.task_graph.execute")
+        self.assertEqual(graphs[0]["graph_id"], "rich-body-task")
+        self.assertEqual(execution.status, "failed")
+        self.assertEqual(execution.results[1].skill_id, "chromie.task_graph.execute")
+        self.assertNotIn("Arrived.", spoken)
+        self.assertEqual(
+            spoken,
+            ["I prepared a task plan.", "I could not complete that task safely."],
         )
 
 

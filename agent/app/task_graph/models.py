@@ -112,6 +112,7 @@ class ExecutionTrace(BaseModel):
     graph_id: str
     status: GraphStatus = "pending"
     summary: str = ""
+    outcome_summary: str = ""
     node_results: list[NodeResult] = Field(default_factory=list)
     events: list[ExecutionEvent] = Field(default_factory=list)
 

@@ -1,6 +1,6 @@
 # Project Handoff
 
-Last updated: 2026-06-19
+Last updated: 2026-06-20
 
 This handoff records the current resume point for a developer or operator who
 needs to continue Chromie without replaying the full chat history.
@@ -66,22 +66,47 @@ claim includes real audio devices.
 
 ## Latest Validation
 
-The current docs-and-task-agent refresh at `5204ea1` passed:
+The current task-agent routing, refusal-reporting, and host graph-dispatch
+refresh after committed base `cf83c72` passed:
 
 ```text
 python scripts/check_docs.py
-python -m unittest tests.test_soridormi_task_client \
+python scripts/test_matrix.py taskgraph
+python scripts/test_matrix.py soridormi
+python -m unittest tests.test_agent_client
+python -m unittest tests.test_soridormi_acceptance
+python -m unittest tests.test_robot_candidate_verifier
+python -m unittest tests.test_interaction_control_plane
+python -m unittest tests.test_interaction_coordinator \
+  tests.test_skill_runtime \
+  tests.test_native_interaction_runtime \
+  tests.test_task_graph_planning \
+  tests.test_planning_task_graph_execution
+python -m unittest tests.test_task_graph_planning \
   tests.test_planning_task_graph_execution \
-  tests.test_soridormi_manifest_materialization \
-  tests.test_provider_readiness_verifier
-19 focused tests passed
+  tests.test_soridormi_task_client \
+  tests.test_soridormi_acceptance \
+  tests.test_capability_catalog_service \
+  tests.test_capability_aware_interaction
+SORIDORMI_MCP_URL=http://127.0.0.1:8011/mcp \
+  PYTHONPATH=/Users/chromie/github/chromie/agent:/Users/chromie/github/chromie \
+  /tmp/soridormi-m5-py313/bin/python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json --task-agent-bridge
 ```
 
-The full host `./scripts/run_tests.sh` attempt did not complete in this minimal
-host environment because service dependencies such as `fastapi` were absent and
-one multiprocessing test could not create its forkserver socket under the
-current sandbox. Run the full Level A suite in the dependency-complete
-`chromie-agent` service environment before making new release claims.
+The task-agent bridge acceptance passed against a local Soridormi dry-run MCP
+server with graph `soridormi-task-agent-acceptance-115cc864fd04`, backend
+`local_tool_dry_run`, `no_motion=true`, `safe_idle=true`, and explicit
+`capabilities`, `preview`, `submit`, and `events` nodes. This is no-motion
+contract evidence only; it does not prove physical execution.
+
+The full host `./scripts/run_tests.sh` attempt reached 326 tests and ended
+`FAILED (failures=1, errors=9, skipped=2)`: service dependencies such as
+`fastapi` were absent, one multiprocessing test could not create its forkserver
+socket under the current sandbox, and one temp-path assertion saw
+`/private/var` instead of `/var`. Run the full Level A suite in the
+dependency-complete `chromie-agent` service environment before making new
+release claims.
 
 Previously focused text/M13 tests also passed:
 
@@ -98,13 +123,19 @@ python -m unittest \
 2. Keep the Soridormi task-agent snapshot aligned with Soridormi's
    authoritative manifest.
 3. Continue acceptance tests for task capability inspection, preview, submit,
-   event monitoring, refusal, timeout, and cancellation semantics.
-4. Select one reference robot candidate.
-5. Fill the ignored real candidate record under `.chromie/commissioning/` using
+   event monitoring, refusal, blocked-subsystem reporting, timeout, and
+   cancellation semantics. Use trace `outcome_summary` as the deterministic
+   result source when adding report/speech nodes.
+4. Preserve the no-motion `--task-agent-bridge` acceptance as the bridge
+   contract gate; rerun it when Soridormi's task API snapshot changes.
+5. Select one reference robot candidate.
+6. Fill the ignored real candidate record under `.chromie/commissioning/` using
    `commissioning/reference_robot_candidate.schema.json`.
-6. Verify candidate identity, independent emergency stop, network, workspace,
-   software revisions, calibration ownership, and no-motion procedures.
-7. Continue with no-motion health and shadow/dry-run checks before any bounded
+7. Verify candidate identity, independent emergency stop, network, workspace,
+   software revisions, calibration ownership, referenced evidence files,
+   evidence-root containment, provider-manifest revision matching, calibration
+   hashes, and no-motion procedures.
+8. Continue with no-motion health and shadow/dry-run checks before any bounded
    physical skill execution.
 
 ## Useful Commands

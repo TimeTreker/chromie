@@ -296,14 +296,19 @@ class InteractionDraft:
         return request
 
     def add_task_graph(self, graph: dict[str, Any]) -> SkillRequest:
+        requires_confirmation = self.requires_confirmation or bool(
+            graph.get("requires_confirmation")
+        )
         request = SkillRequest(
             skill_id="chromie.task_graph.execute",
             args={"graph": graph},
             timing="sequential",
-            requires_confirmation=self.requires_confirmation,
+            requires_confirmation=requires_confirmation,
             metadata={"source": "task_graph_planner"},
         )
         self._skills.append(request)
+        if requires_confirmation:
+            self.requires_confirmation = True
         return request
 
     def to_response(self) -> InteractionResponse:
@@ -417,7 +422,8 @@ class AgentResultInteractionAdapter:
                 skill_id="chromie.task_graph.execute",
                 args={"graph": graph},
                 timing="sequential",
-                requires_confirmation=result.requires_confirmation,
+                requires_confirmation=result.requires_confirmation
+                or bool(graph.get("requires_confirmation")),
             )
             for graph in result.task_graphs
         )

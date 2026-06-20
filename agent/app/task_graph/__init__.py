@@ -16,6 +16,7 @@ from .models import (
     TaskNode,
 )
 from .planner import TaskGraphPlanner
+from .reporting import build_trace_outcome_summary
 from .service import (
     TaskGraphDryRunRequest,
     TaskGraphExecuteRequest,
@@ -54,4 +55,5 @@ __all__ = [
     "TaskGraphService",
     "TaskGraphValidationResponse",
     "TaskNode",
+    "build_trace_outcome_summary",
 ]

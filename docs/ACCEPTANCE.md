@@ -47,7 +47,7 @@ ASR and therefore does not prove physical audio-device quality.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 309 current tests and 20 legacy Agent
+At the current working revision this runs 326 current tests and 20 legacy Agent
 tests. It also runs the documentation consistency checker.
 
 If the host Python environment is intentionally minimal, run the same gate in
@@ -203,6 +203,28 @@ The retained `20260617T081411Z` text bundle is the M13 text interaction closure
 evidence. It is the right gate when the goal is to skip microphone and ASR while
 proving the interaction contract, trusted Skill Runtime, live Soridormi
 execution, and safe-idle behavior.
+
+## Task-agent bridge acceptance
+
+Against a live Soridormi endpoint that exposes the no-motion task API, run:
+
+```bash
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json \
+  --task-agent-bridge
+```
+
+This probes the manifest endpoint, calls `soridormi.task.get_capabilities`,
+requires `task_api_no_motion=true` and at least one declared task type before
+any preview or submit call, previews a structured task goal, submits it with a
+Chromie-owned `client_task_ref`, and monitors `soridormi.task.events` until a
+terminal no-motion completion. It fails if Soridormi does not declare the
+no-motion task contract, if preview would create a persistent task, if submit
+does not return a `task_id`, or if terminal monitoring does not end
+`safe_idle=true`.
+
+Use `--task-goal-json` to supply another structured task goal. This acceptance
+mode is contract evidence only; it does not authorize or prove physical motion.
 
 ## Guarded and recovery acceptance
 
@@ -377,14 +399,21 @@ Physical pilot preparation uses a separate machine-readable candidate record:
 
 ```bash
 python scripts/verify_robot_candidate.py \
-  .chromie/commissioning/reference_robot_candidate.json
+  .chromie/commissioning/reference_robot_candidate.json \
+  --evidence-root .chromie/commissioning \
+  --verify-evidence-files \
+  --write-report .chromie/commissioning/candidate-verification.json
 ```
 
 The report separates structural validity, readiness for no-motion review, and
 selection for the pilot. Missing identity, unpinned revisions, absent
 emergency-stop evidence, missing calibration hashes, unspecified limits or
 exclusions, invalid timestamps, and unknown fields all fail closed. Candidate
-selection never authorizes physical motion.
+selection never authorizes physical motion. With `--verify-evidence-files`, the
+verifier also requires referenced procedure and safety files to exist and
+remain inside the evidence root, requires the provider manifest's
+`metadata.upstream_commit` to match `revisions.soridormi`, and requires
+calibration artifact SHA-256 values to match.
 
 `scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or

@@ -8,6 +8,7 @@ from agent.app.soridormi_task_client import (
     SoridormiTaskClient,
     SoridormiTaskClientError,
     SoridormiTaskMonitorTimeout,
+    SoridormiTaskMonitoringInvoker,
     soridormi_client_task_ref,
     with_client_task_ref,
 )
@@ -206,6 +207,122 @@ class SoridormiTaskClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(caught.exception.tool_name, "soridormi.task.status")
         self.assertIn("provider disconnected", str(caught.exception))
+
+    async def test_monitoring_invoker_reports_blocked_submit_refusal(self) -> None:
+        def handler(
+            tool_name: str,
+            args: dict[str, Any],
+            context: ToolInvocationContext | None,
+        ) -> ToolCallOutcome:
+            self.assertEqual(tool_name, "soridormi.task.submit")
+            self.assertEqual(args["client_task_ref"], "chromie:delivery:submit")
+            return ToolCallOutcome.success(
+                {
+                    "task_id": "soridormi-task-1",
+                    "client_task_ref": args["client_task_ref"],
+                    "accepted": False,
+                    "status": "refused",
+                    "phase": "refused",
+                    "terminal": True,
+                    "safe_idle": True,
+                    "reason_code": "missing_manipulation_pipeline",
+                    "reason": "Object delivery is not executable yet.",
+                    "blocked_subsystems": ["manipulation", "handoff"],
+                    "recommended_next_actions": [
+                        {
+                            "action": "report_blocked_capability",
+                            "reason_code": "missing_manipulation_pipeline",
+                        }
+                    ],
+                }
+            )
+
+        invoker = SoridormiTaskMonitoringInvoker(RecordingInvoker(handler), sleep=_no_sleep)
+
+        outcome = await invoker.invoke(
+            "soridormi.task.submit",
+            {"task_type": "deliver_object"},
+            context=ToolInvocationContext(
+                task_graph_id="delivery",
+                task_node_id="submit",
+            ),
+        )
+
+        self.assertEqual(outcome.status, "failed_fatal")
+        error = outcome.error or ""
+        self.assertIn("missing_manipulation_pipeline", error)
+        self.assertIn("blocked_subsystems=manipulation,handoff", error)
+        self.assertIn(
+            "recommended_next_actions=report_blocked_capability(missing_manipulation_pipeline)",
+            error,
+        )
+
+    async def test_monitoring_invoker_reports_blocked_terminal_event_failure(self) -> None:
+        calls: list[str] = []
+
+        def handler(
+            tool_name: str,
+            args: dict[str, Any],
+            context: ToolInvocationContext | None,
+        ) -> ToolCallOutcome:
+            calls.append(tool_name)
+            if tool_name == "soridormi.task.submit":
+                return ToolCallOutcome.success(
+                    {
+                        "task_id": "soridormi-task-2",
+                        "client_task_ref": args["client_task_ref"],
+                        "accepted": True,
+                        "status": "accepted",
+                        "phase": "planning",
+                        "terminal": False,
+                        "safe_idle": True,
+                    }
+                )
+            if tool_name == "soridormi.task.events":
+                return ToolCallOutcome.success(
+                    {
+                        "task_id": "soridormi-task-2",
+                        "terminal": True,
+                        "status": "failed",
+                        "phase": "failed",
+                        "safe_idle": True,
+                        "reason_code": "missing_navigation_pipeline",
+                        "reason": "Navigation planner is unavailable.",
+                        "blocked_subsystems": ["navigation", "localization"],
+                        "recommended_next_actions": [
+                            {
+                                "action": "ask_user_for_static_alternative",
+                                "reason_code": "missing_navigation_pipeline",
+                            }
+                        ],
+                        "next_after_sequence": 8,
+                        "poll_recommendation": {"action": "stop_polling"},
+                    }
+                )
+            raise AssertionError(f"unexpected tool {tool_name}")
+
+        invoker = SoridormiTaskMonitoringInvoker(RecordingInvoker(handler), sleep=_no_sleep)
+
+        outcome = await invoker.invoke(
+            "soridormi.task.submit",
+            {"task_type": "navigate_to_location"},
+            context=ToolInvocationContext(task_graph_id="nav", task_node_id="go"),
+        )
+
+        self.assertEqual(calls, ["soridormi.task.submit", "soridormi.task.events"])
+        self.assertEqual(outcome.status, "failed_fatal")
+        self.assertEqual(outcome.output["blocked_subsystems"], ["navigation", "localization"])
+        self.assertEqual(
+            outcome.output["monitoring"]["blocked_subsystems"],
+            ["navigation", "localization"],
+        )
+        error = outcome.error or ""
+        self.assertIn("missing_navigation_pipeline", error)
+        self.assertIn("blocked_subsystems=navigation,localization", error)
+        self.assertIn(
+            "recommended_next_actions=ask_user_for_static_alternative(missing_navigation_pipeline)",
+            error,
+        )
 
 
 if __name__ == "__main__":

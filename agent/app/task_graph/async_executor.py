@@ -16,9 +16,11 @@ from ..capabilities.models import CapabilityRegistry, FailurePolicy
 from ..tool_invocation import AsyncToolInvoker, ToolInvocationContext
 from .models import ExecutionEvent, ExecutionTrace, NodeResult, TaskGraph, TaskNode
 from .refs import resolve_refs
+from .reporting import build_trace_outcome_summary
 from .validator import GraphValidator
 
 _READ_ONLY_CLASSES = {"safe_read", "planning_only"}
+_LOCAL_PLANNING_REPORT_TOOLS = {"chromie.report"}
 
 
 def _finalize_trace(
@@ -26,6 +28,7 @@ def _finalize_trace(
     *,
     sort_node_events: bool,
 ) -> ExecutionTrace:
+    trace.outcome_summary = build_trace_outcome_summary(trace)
     node_order = {
         node_id: index
         for index, node_id in enumerate(
@@ -539,6 +542,8 @@ class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
         unsafe: list[str] = []
         for node in graph.nodes:
             capability = self.registry.get_tool(node.tool)
+            if node.tool in _LOCAL_PLANNING_REPORT_TOOLS and node.type == "report":
+                continue
             if capability.safety_class == "safe_read":
                 if not capability.execution.side_effect_free:
                     unsafe.append(f"{node.id}:{node.tool}[side_effect_free=false]")
@@ -559,6 +564,59 @@ class PlanningTaskGraphExecutor(ReadOnlyTaskGraphExecutor):
                 "planning TaskGraph execution rejected unsafe nodes: "
                 + ", ".join(unsafe)
             )
+
+    async def _execute_node(
+        self,
+        node: TaskNode,
+        results: dict[str, NodeResult],
+        *,
+        graph_id: str,
+    ) -> NodeResult:
+        if node.tool == "chromie.report":
+            return self._execute_local_report_node(node, results)
+        return await super()._execute_node(node, results, graph_id=graph_id)
+
+    def _execute_local_report_node(
+        self,
+        node: TaskNode,
+        results: dict[str, NodeResult],
+    ) -> NodeResult:
+        started = time.monotonic()
+        try:
+            args = resolve_refs(node.args, results)
+        except KeyError as exc:
+            return NodeResult(
+                node_id=node.id,
+                tool=node.tool,
+                status="failed_fatal",
+                error=str(exc),
+                started_at=started,
+                finished_at=time.monotonic(),
+            )
+
+        message = " ".join(str(args.get("message", "")).strip().split())
+        if not message:
+            return NodeResult(
+                node_id=node.id,
+                tool=node.tool,
+                status="failed_fatal",
+                error="chromie.report requires a non-empty message",
+                started_at=started,
+                finished_at=time.monotonic(),
+            )
+
+        return NodeResult(
+            node_id=node.id,
+            tool=node.tool,
+            status="success",
+            output={
+                "reported": True,
+                "message": message,
+                "delivery": "trace_only",
+            },
+            started_at=started,
+            finished_at=time.monotonic(),
+        )
 
 
 class GuardedTaskGraphExecutor:

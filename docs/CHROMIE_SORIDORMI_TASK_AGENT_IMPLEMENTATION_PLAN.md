@@ -287,6 +287,9 @@ Integration expectations:
 
 - load task-level capabilities from Soridormi's manifest;
 - submit structured goals through trusted runtime/provider code;
+- dispatch native `chromie.task_graph.execute` requests through the host Skill
+  Runtime into the Agent planning executor when the planning execution gate is
+  enabled;
 - monitor task events and final status;
 - propagate cancel, stop, timeout, and emergency paths;
 - suppress success speech after failed, refused, or partial execution;
@@ -310,10 +313,21 @@ safety-control authorization.
 Planning TaskGraph execution now wraps its invoker with
 `SoridormiTaskMonitoringInvoker`. A `soridormi.task.submit` node receives a
 graph/node-derived `client_task_ref` when one is absent, terminal event state is
-merged into the node output under `monitoring`, and Soridormi refused, failed,
-or cancelled task states fail the graph node instead of becoming false success.
-This still does not claim physical execution; it only ensures Chromie's global
-planning graph treats Soridormi's task contract as the source of truth.
+merged into the node output under `monitoring`, and terminal `reason`,
+`reason_code`, `blocked_subsystems`, and `recommended_next_actions` values are
+promoted to the node output for deterministic reporting. Soridormi refused,
+failed, cancelled, or expired task states fail the graph node instead of
+becoming false success, and the node error preserves the refusal code, blocked
+subsystems, and routing hints. Execution traces also populate deterministic
+`outcome_summary` values from node results, giving future report/speech nodes a
+stable source for completion, refusal, timeout, cancellation, and blocked-state
+messages. Planning execution can activate `chromie.report` fallbacks through a
+trace-only local adapter, but audible `chromie.speak` remains outside the
+planning lane. The planner normalizes Soridormi task-submit nodes by adding a
+trace-only report fallback when the model omits one, using the submit node's
+`error` reference as the report message. This still does not claim physical
+execution; it only ensures Chromie's global planning graph treats Soridormi's
+task contract as the source of truth.
 
 ### Step 8 - Next implementation focus
 
@@ -322,14 +336,19 @@ leaving the project target.
 
 Next Chromie-side work should stay in this order:
 
-1. add route/planner tests that choose concrete named skills only for explicit
-   bounded commands, and choose `soridormi.task.*` for rich goals such as
+1. keep route/planner tests green for concrete named skills on explicit
+   bounded commands, and `soridormi.task.*` planning for rich goals such as
    navigation, approach, inspection, recovery, or object delivery;
-2. make refusal and blocked-subsystem reporting deterministic and concise, so
-   unsupported Soridormi goals do not sound like completed motion;
-3. add acceptance-style dry-run cases for task capability inspection, preview,
-   submit, terminal event monitoring, cancellation, and timeout;
-4. only after that, connect the same flow to retained live Soridormi task API
+2. keep dry-run graph tests green for task capability inspection, preview,
+   submit, terminal event monitoring, refusal, timeout, and cancellation;
+3. keep the no-motion task-agent bridge acceptance gate green, including the
+   rule that `task_api_no_motion=true` and declared task types are required
+   before preview or submit is allowed;
+4. keep refusal and blocked-subsystem graph reporting deterministic and concise,
+   keep trace-only report fallbacks available for planning graphs, and connect
+   audible speech only through the host Skill Runtime path without making
+   unsupported Soridormi goals sound like completed motion;
+5. only after that, connect the same flow to retained live Soridormi task API
    evidence; physical execution still waits for the reference robot gate.
 
 Gate:

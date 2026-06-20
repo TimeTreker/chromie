@@ -83,3 +83,23 @@ class AgentClient:
                     f"Agent interaction endpoint returned HTTP {resp.status}: {body[:500]}"
                 )
             return InteractionResponse.model_validate_json(body)
+
+    async def execute_planning_task_graph(
+        self,
+        session: aiohttp.ClientSession,
+        graph: dict[str, Any],
+        *,
+        timeout_ms: int = 120000,
+    ) -> dict[str, Any]:
+        timeout = aiohttp.ClientTimeout(total=max(100, int(timeout_ms)) / 1000.0)
+        async with session.post(
+            f"{self.base_url}/task-graphs/execute-planning",
+            json={"graph": graph},
+            timeout=timeout,
+        ) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                raise RuntimeError(
+                    f"Agent TaskGraph execution returned HTTP {resp.status}: {body[:500]}"
+                )
+            return dict(await resp.json())

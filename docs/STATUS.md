@@ -1,9 +1,9 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Current repository revision:** `5204ea1`; retained target evidence below
+**Current committed base revision:** `cf83c72`; retained target evidence below
 records the exact revision that produced each bundle
-**Status refresh date:** 2026-06-19
+**Status refresh date:** 2026-06-20
 **Current focus:** **Physical pilot preparation through the Chromie/Soridormi
 task-agent boundary; physical audio validation remains a separate
 release-support track**
@@ -29,7 +29,23 @@ boundary. Chromie now consumes a richer Soridormi task API snapshot with
 `cancel`. Chromie's global TaskGraph can submit a structured embodied goal with
 a stable `client_task_ref`, monitor Soridormi task events to terminal state,
 and treat refused, failed, cancelled, or timed-out task states as failed graph
-nodes. This prepares richer user-facing goals such as navigation, approach, and
+nodes with deterministic `reason_code`, `blocked_subsystems`, and
+`recommended_next_actions` reporting plus a trace-level `outcome_summary` for
+future report/speech nodes. Planning execution can also run `chromie.report`
+as a trace-only local fallback while leaving audible `chromie.speak` in the
+host Skill Runtime path; LLM-planned Soridormi task-submit nodes get that
+fallback automatically when no explicit failure fallback is present. Native
+`/interaction` graph requests are now wired through the host Skill Runtime as
+`chromie.task_graph.execute` and can dispatch to the Agent planning executor
+when its feature gate is enabled; failed graph traces suppress completion
+speech. A no-motion task-agent bridge acceptance mode now probes Soridormi,
+requires `task_api_no_motion=true` before preview or submit, submits with a
+Chromie-owned `client_task_ref`, and monitors terminal task events. A local
+Soridormi dry-run MCP endpoint passed this bridge acceptance on June 20, 2026
+with graph `soridormi-task-agent-acceptance-115cc864fd04`, backend
+`local_tool_dry_run`, `no_motion=true`, `safe_idle=true`, and explicit
+`capabilities`, `preview`, `submit`, and `events` nodes. This
+prepares richer user-facing goals such as navigation, approach, and
 object-delivery requests without lowering them into velocity recipes. The task
 surface remains a no-motion contract unless later Soridormi evidence proves
 execution.
@@ -98,11 +114,11 @@ Target validation or Release readiness.
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |
-| Stateful planning-only TaskGraph execution | Implemented; `soridormi.task.submit` nodes get stable `client_task_ref` values and are monitored through `soridormi.task.events` before graph success is reported | Planning policy, concurrency, task-submit monitoring, idempotency-key, terminal-event, refusal, and timeout tests | Safe Soridormi plan creation acceptance exists; task API live execution evidence remains future work | Flag off |
-| Soridormi task-agent bridge | Implemented for contract/no-motion task goals, including capability inspection, preview/submit/status/events/cancel schemas, event-cursor monitoring, and safety-control authorization for task cancellation | Manifest materialization, capability registry, task client, and planning TaskGraph tests | Checked-in manifest is pinned to Soridormi `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`; no physical task execution claim | Planning/tooling only; physical motion gates off |
+| Stateful planning-only TaskGraph execution | Implemented; `soridormi.task.submit` nodes get stable `client_task_ref` values, are monitored through `soridormi.task.events`, preserve refused/blocked metadata, populate deterministic trace outcome summaries, can activate trace-only `chromie.report` fallbacks before graph success is reported, and can be invoked from native `chromie.task_graph.execute` Skill Runtime requests | Planning policy, concurrency, task-submit monitoring, idempotency-key, terminal-event, refusal, timeout, blocked-subsystem reporting, outcome-summary, trace-only report, error/status refs, rich-goal routing, host Skill Runtime dispatch, and completion-speech suppression tests | Safe Soridormi plan creation acceptance exists; task API dry-run bridge acceptance passed locally; physical task execution evidence remains future work | Flag off |
+| Soridormi task-agent bridge | Implemented for contract/no-motion task goals, including capability inspection, preview/submit/status/events/cancel schemas, event-cursor monitoring, deterministic refusal/blocked-subsystem reporting and trace summaries, trace-only report fallbacks, safety-control authorization for task cancellation, routing from rich embodied requests to task planning, and a fail-closed no-motion bridge acceptance mode | Manifest materialization, capability registry, task client, planning TaskGraph, dry-run task contract tests, and no-motion bridge acceptance tests | Local Soridormi dry-run MCP bridge acceptance passed against pinned Soridormi `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2` with `local_tool_dry_run`, explicit task events, `no_motion=true`, and `safe_idle=true`; no physical task execution claim | Planning/tooling only; physical motion gates off |
 | Guarded side-effect execution | Implemented; diagnostics are bearer-protected and trace/grant retention is bounded | Authorization, one-time grant, retention, confirmation, monitor, fallback, and cancellation tests | Soridormi dry-run and runtime-cancellation tooling exists | Flag off; bearer token required |
 | Physical TaskGraph execution | Policy path implemented | Safety and sequential-execution tests | Supervised hardware acceptance remains open | Separate flag off |
-| Reference robot candidate gate | Versioned schema, intentionally incomplete template, and fail-closed semantic verifier implemented | Identity, revision, timestamp, emergency-stop, calibration, exclusion, low-level-field, and no-motion authorization tests | No real candidate has been recorded or selected | Preparation only; cannot authorize motion |
+| Reference robot candidate gate | Versioned schema, intentionally incomplete template, fail-closed semantic verifier, and optional self-contained evidence-package verification implemented | Identity, revision, timestamp, emergency-stop, calibration, referenced evidence file, evidence-root containment, provider-manifest revision match, calibration hash, exclusion, low-level-field, and no-motion authorization tests | No real candidate has been recorded or selected | Preparation only; cannot authorize motion |
 | Shared bounded scheduling and resource arbitration | Implemented | Agent and Orchestrator concurrency tests | MuJoCo interaction path exercises the policy | Parallel flags off |
 | Hardware profile detection and generated `.env.runtime` | Implemented | Profile-detection tests | RTX 5090 profile and CUDA arch 120 validated; Jetson packaging evidence is incomplete | Automatic |
 | Host hardware daemon | Legacy mock compatibility implementation | Hardware/control-plane tests | No production hardware claim | Optional; mock driver only |
@@ -123,15 +139,26 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **309** current `unittest` cases under `tests/`;
+- **326** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
-The current documentation refresh at `5204ea1` passed
-`python scripts/check_docs.py` plus focused task-agent/provider tests covering
-Soridormi task monitoring, manifest materialization, and provider readiness. A
-full host run is equivalent only when the host Python environment has the same
-service/test dependencies installed.
+The current task-agent routing, refusal-reporting, host graph-dispatch,
+no-motion bridge-acceptance, and reference-candidate verifier refresh after
+committed base `cf83c72` passed `python scripts/check_docs.py`,
+`python scripts/test_matrix.py taskgraph soridormi`, local dry-run
+`--task-agent-bridge` acceptance against Soridormi MCP on `127.0.0.1:8011`,
+focused
+interaction/catalog task-agent tests, focused host Skill Runtime graph dispatch
+tests, focused Soridormi acceptance tests, focused robot-candidate verifier
+tests, and dependency-complete Orchestrator
+AgentClient coverage that skips locally when `aiohttp` is unavailable. A full
+host run is equivalent only when the host Python environment has the same
+service/test dependencies installed. The latest local `./scripts/run_tests.sh`
+attempt reached 326 current tests and ended `FAILED (failures=1, errors=9,
+skipped=2)`: `fastapi` was unavailable, the multiprocessing forkserver socket
+was blocked by the sandbox, and one temp-path assertion resolved `/private/var`
+instead of `/var`.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
 quality, or real robot safety. The retained RTX evidence above separately

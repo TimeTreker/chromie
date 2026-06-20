@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from scripts.verify_robot_candidate import verify_candidate
 
@@ -78,6 +82,42 @@ def selected_candidate() -> dict[str, object]:
             "reviewed_at": "2026-06-14T11:00:00Z",
         },
     }
+
+
+def _write(path: Path, content: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_evidence_bundle(
+    root: Path,
+    payload: dict[str, object],
+    *,
+    calibration_content: str = '{"joint_zero": true}\n',
+    provider_revision: str | None = None,
+) -> Path:
+    revisions = payload["revisions"]  # type: ignore[index]
+    upstream_commit = provider_revision or revisions["soridormi"]  # type: ignore[index]
+    provider_manifest = {
+        "schema_version": 1,
+        "metadata": {"upstream_commit": upstream_commit},
+    }
+    _write(
+        root / "capabilities" / "soridormi.json",
+        json.dumps(provider_manifest, sort_keys=True) + "\n",
+    )
+    _write(root / "evidence" / "estop-procedure.md", "press e-stop\n")
+    _write(root / "evidence" / "estop-test.json", '{"stopped": true}\n')
+    calibration = _write(root / "evidence" / "calibration.json", calibration_content)
+    _write(root / "evidence" / "stop.md", "stop\n")
+    _write(root / "evidence" / "recovery.md", "recover\n")
+    _write(root / "evidence" / "comms-loss.md", "fail closed\n")
+    return calibration
 
 
 class RobotCandidateVerifierTests(unittest.TestCase):
@@ -159,6 +199,92 @@ class RobotCandidateVerifierTests(unittest.TestCase):
         self.assertTrue(
             any("joint_targets" in item for item in report["errors"])
         )
+
+    def test_selected_candidate_evidence_files_can_be_verified(self) -> None:
+        payload = selected_candidate()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            calibration = _write_evidence_bundle(root, payload)
+            payload["calibration_artifacts"][0]["sha256"] = _sha256(calibration)  # type: ignore[index]
+
+            report = verify_candidate(
+                payload,
+                evidence_root=root,
+                verify_evidence_files=True,
+            )
+
+        self.assertTrue(report["valid"])
+        self.assertTrue(report["selected_for_pilot"])
+        self.assertTrue(report["evidence_files_verified"])
+        self.assertFalse(report["physical_motion_authorized"])
+
+    def test_evidence_file_verification_rejects_missing_files(self) -> None:
+        payload = selected_candidate()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = verify_candidate(
+                payload,
+                evidence_root=Path(temp_dir),
+                verify_evidence_files=True,
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["selected_for_pilot"])
+        self.assertTrue(any("file does not exist" in item for item in report["blockers"]))
+
+    def test_evidence_file_verification_rejects_calibration_hash_mismatch(self) -> None:
+        payload = selected_candidate()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _write_evidence_bundle(
+                root,
+                payload,
+                calibration_content='{"joint_zero": false}\n',
+            )
+
+            report = verify_candidate(
+                payload,
+                evidence_root=root,
+                verify_evidence_files=True,
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["selected_for_pilot"])
+        self.assertTrue(any("sha256 does not match" in item for item in report["blockers"]))
+
+    def test_evidence_file_verification_rejects_provider_revision_mismatch(self) -> None:
+        payload = selected_candidate()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            calibration = _write_evidence_bundle(root, payload, provider_revision="c" * 40)
+            payload["calibration_artifacts"][0]["sha256"] = _sha256(calibration)  # type: ignore[index]
+
+            report = verify_candidate(
+                payload,
+                evidence_root=root,
+                verify_evidence_files=True,
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["selected_for_pilot"])
+        self.assertTrue(any("upstream_commit" in item for item in report["blockers"]))
+
+    def test_evidence_file_verification_rejects_paths_outside_root(self) -> None:
+        payload = selected_candidate()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            calibration = _write_evidence_bundle(root, payload)
+            payload["calibration_artifacts"][0]["sha256"] = _sha256(calibration)  # type: ignore[index]
+            payload["procedures"]["stop"] = "../stop.md"  # type: ignore[index]
+
+            report = verify_candidate(
+                payload,
+                evidence_root=root,
+                verify_evidence_files=True,
+            )
+
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["selected_for_pilot"])
+        self.assertTrue(any("evidence root" in item for item in report["blockers"]))
 
 
 if __name__ == "__main__":

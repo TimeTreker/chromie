@@ -1,8 +1,8 @@
 # Development Checkpoint
 
-**Current committed Chromie base:** `5204ea1`
+**Current committed Chromie base:** `cf83c72`
 **Pinned Soridormi capability revision:** `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`
-**Status refresh date:** 2026-06-19
+**Status refresh date:** 2026-06-20
 **Current focus:** Physical pilot preparation through the Chromie/Soridormi
 task-agent boundary; physical audio validation remains separate
 
@@ -28,7 +28,15 @@ The alpha implementation is present:
   service workers;
 - Soridormi task-agent contract loading, structured task submission,
   idempotent `client_task_ref` generation, task-event monitoring, and
-  fail-closed handling for task refusal, failure, timeout, and cancellation.
+  fail-closed handling for task refusal, failure, timeout, and cancellation
+  with deterministic blocked-subsystem reporting, trace outcome summaries, and
+  trace-only report fallbacks;
+- native `chromie.task_graph.execute` Skill Runtime dispatch to the Agent
+  planning executor, gated by `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION`, with
+  failed graph traces suppressing completion speech.
+- no-motion task-agent bridge acceptance that requires
+  `task_api_no_motion=true` before preview/submit and monitors terminal
+  `soridormi.task.events`.
 
 The M13 text interaction scope is closed. Linux RTX 5090 GPU smoke passed
 21/21; clean seven-case synthetic and PipeWire virtual-mic bundles passed; and
@@ -43,7 +51,8 @@ Soridormi-owned fault-injection scenarios.
 
 1. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
    authoritative manifest. Use structured task goals for rich embodied requests
-   and keep concrete named skills for explicit bounded body commands.
+   and keep concrete named skills for explicit bounded body commands. Preserve
+   Soridormi refusal metadata when reporting unsupported embodied tasks.
 2. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
@@ -64,12 +73,23 @@ for the exact bounded motion path.
 ## Verification baseline
 
 ```text
-Focused refresh at 5204ea1:
+Focused refresh after cf83c72:
 python scripts/check_docs.py passed
-19 Soridormi task-agent/provider tests passed
+python -m unittest tests.test_robot_candidate_verifier passed: 12 tests
+python scripts/test_matrix.py taskgraph passed: 48 tests
+python scripts/test_matrix.py soridormi passed: 56 tests
+python -m unittest tests.test_soridormi_acceptance passed: 16 tests
+Local Soridormi dry-run MCP --task-agent-bridge acceptance passed:
+  graph=soridormi-task-agent-acceptance-115cc864fd04
+  backend=local_tool_dry_run, no_motion=true, safe_idle=true
+  nodes=capabilities, preview, submit, events
+Focused interaction/catalog task-agent tests passed: 29 tests
+Focused host Skill Runtime graph dispatch tests passed: 59 tests
+Widened host/task-agent focused bundle passed: 95 tests, with 2
+dependency-light local skips for `aiohttp` client coverage
 
 Full Level A baseline:
-309 current unittest cases and 20 legacy Agent tests are expected in the
+326 current unittest cases and 20 legacy Agent tests are expected in the
 dependency-complete service environment
 ```
 
@@ -91,8 +111,15 @@ python scripts/m13_voice_acceptance.py --preflight-only \
 python scripts/provider_fault_matrix.py
 python scripts/provider_conformance.py
 python scripts/verify_provider_readiness.py preflight
+PYTHONPATH=agent python -m app.soridormi_acceptance \
+  --manifest capabilities/soridormi.json --task-agent-bridge
 python scripts/verify_robot_candidate.py \
   commissioning/reference_robot_candidate.example.json --allow-draft
+python scripts/verify_robot_candidate.py \
+  .chromie/commissioning/reference_robot_candidate.json \
+  --evidence-root .chromie/commissioning \
+  --verify-evidence-files \
+  --write-report .chromie/commissioning/candidate-verification.json
 ```
 
 Live commands and recovery procedures are maintained in

@@ -9,12 +9,16 @@ from unittest.mock import patch
 from agent.app.capabilities.loader import build_configured_registry
 from agent.app.capabilities.probe import CapabilityProbeResult
 from agent.app.soridormi_acceptance import (
+    build_soridormi_task_agent_graph,
+    default_soridormi_task_goal,
     build_soridormi_guarded_graph,
     require_soridormi_runtime_status,
     run_soridormi_guarded_dry_run_acceptance,
     run_soridormi_planning_acceptance,
     run_soridormi_runtime_cancellation_acceptance,
     run_soridormi_runtime_preflight,
+    run_soridormi_task_agent_acceptance,
+    soridormi_task_agent_graph_id,
 )
 from agent.app.tool_invocation import McpStreamableHttpInvoker
 
@@ -132,6 +136,245 @@ class SoridormiAcceptanceTests(unittest.IsolatedAsyncioTestCase):
                 invoker=McpStreamableHttpInvoker(registry, call=call),
                 probe=probe,
             )
+
+    async def test_task_agent_bridge_acceptance_previews_submits_and_monitors(
+        self,
+    ) -> None:
+        registry = self._registry()
+        calls: list[tuple[str, dict[str, Any]]] = []
+        expected_ref = (
+            f"chromie:{soridormi_task_agent_graph_id(default_soridormi_task_goal())}:submit"
+        )
+
+        async def probe(_registry):
+            return [
+                CapabilityProbeResult(
+                    url="http://soridormi:8000/mcp",
+                    expected_schemas={},
+                    advertised_schemas={},
+                )
+            ]
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            calls.append((tool, args))
+            if tool == "soridormi.task.get_capabilities":
+                return {
+                    "structuredContent": {
+                        "schema_version": "soridormi.task_capabilities.v1",
+                        "mode": "sim",
+                        "backend": "runtime",
+                        "safe_idle": True,
+                        "task_api_no_motion": True,
+                        "ready_subsystems": ["task_registry"],
+                        "task_types": [
+                            {
+                                "task_type": "perform_gesture",
+                                "status": "dry_run_ready",
+                            }
+                        ],
+                    }
+                }
+            if tool == "soridormi.task.preview":
+                return {
+                    "structuredContent": {
+                        "preview_id": "preview-1",
+                        "task_type": args["task_type"],
+                        "accepted": True,
+                        "status": "accepted",
+                        "phase": "accepted",
+                        "terminal": True,
+                        "safe_idle": True,
+                        "no_motion": True,
+                        "persistent": False,
+                        "would_record_task_on_submit": True,
+                    }
+                }
+            if tool == "soridormi.task.submit":
+                return {
+                    "structuredContent": {
+                        "task_id": "soridormi-task-1",
+                        "client_task_ref": args["client_task_ref"],
+                        "task_type": args["task_type"],
+                        "accepted": True,
+                        "status": "completed",
+                        "phase": "completed",
+                        "terminal": True,
+                        "safe_idle": True,
+                        "no_motion": True,
+                        "deadline_at": 100.0,
+                        "expired": False,
+                    }
+                }
+            if tool == "soridormi.task.events":
+                return {
+                    "structuredContent": {
+                        "schema_version": "soridormi.task_events.v1",
+                        "task_id": "soridormi-task-1",
+                        "client_task_ref": expected_ref,
+                        "status": "completed",
+                        "phase": "completed",
+                        "terminal": True,
+                        "safe_idle": True,
+                        "deadline_at": 100.0,
+                        "expired": False,
+                        "events": [
+                            {
+                                "sequence": 1,
+                                "kind": "task_completed",
+                                "message": "No-motion task contract completed.",
+                            }
+                        ],
+                        "returned_count": 1,
+                        "latest_sequence": 1,
+                        "next_after_sequence": 1,
+                        "has_more": False,
+                        "poll_recommendation": {"action": "stop_polling"},
+                    }
+                }
+            raise AssertionError(f"unexpected tool call: {tool}")
+
+        trace = await run_soridormi_task_agent_acceptance(
+            registry,
+            goal=default_soridormi_task_goal(),
+            invoker=McpStreamableHttpInvoker(registry, call=call),
+            probe=probe,
+        )
+
+        self.assertEqual(trace.status, "success")
+        self.assertEqual(
+            [tool for tool, _ in calls],
+            [
+                "soridormi.task.get_capabilities",
+                "soridormi.task.preview",
+                "soridormi.task.submit",
+                "soridormi.task.events",
+            ],
+        )
+        self.assertEqual(
+            calls[2][1]["client_task_ref"],
+            expected_ref,
+        )
+        self.assertEqual(trace.result_map()["submit"].output["status"], "completed")
+
+    async def test_task_agent_bridge_acceptance_requires_no_motion_api(
+        self,
+    ) -> None:
+        registry = self._registry()
+        calls: list[str] = []
+
+        async def probe(_registry):
+            return [
+                CapabilityProbeResult(
+                    url="http://soridormi:8000/mcp",
+                    expected_schemas={},
+                    advertised_schemas={},
+                )
+            ]
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            calls.append(tool)
+            if tool == "soridormi.task.get_capabilities":
+                return {
+                    "structuredContent": {
+                        "schema_version": "soridormi.task_capabilities.v1",
+                        "task_api_no_motion": False,
+                        "task_types": [{"task_type": "perform_gesture"}],
+                    }
+                }
+            if tool == "soridormi.task.preview":
+                return {
+                    "structuredContent": {
+                        "preview_id": "preview-1",
+                        "task_type": args["task_type"],
+                        "accepted": True,
+                        "status": "accepted",
+                        "phase": "accepted",
+                        "terminal": True,
+                        "safe_idle": True,
+                        "no_motion": True,
+                        "persistent": False,
+                        "would_record_task_on_submit": True,
+                    }
+                }
+            if tool == "soridormi.task.submit":
+                return {
+                    "structuredContent": {
+                        "task_id": "soridormi-task-1",
+                        "client_task_ref": args["client_task_ref"],
+                        "task_type": args["task_type"],
+                        "accepted": True,
+                        "status": "completed",
+                        "phase": "completed",
+                        "terminal": True,
+                        "safe_idle": True,
+                        "no_motion": True,
+                        "deadline_at": 100.0,
+                        "expired": False,
+                    }
+                }
+            raise AssertionError(f"unexpected tool call: {tool}")
+
+        with self.assertRaisesRegex(RuntimeError, "task_api_no_motion=true"):
+            await run_soridormi_task_agent_acceptance(
+                registry,
+                goal=default_soridormi_task_goal(),
+                invoker=McpStreamableHttpInvoker(registry, call=call),
+                probe=probe,
+            )
+        self.assertEqual(calls, ["soridormi.task.get_capabilities"])
+
+    async def test_task_agent_bridge_acceptance_requires_task_types_before_submit(
+        self,
+    ) -> None:
+        registry = self._registry()
+        calls: list[str] = []
+
+        async def probe(_registry):
+            return [
+                CapabilityProbeResult(
+                    url="http://soridormi:8000/mcp",
+                    expected_schemas={},
+                    advertised_schemas={},
+                )
+            ]
+
+        async def call(url: str, tool: str, args: dict[str, Any], timeout_s: float):
+            calls.append(tool)
+            if tool == "soridormi.task.get_capabilities":
+                return {
+                    "structuredContent": {
+                        "schema_version": "soridormi.task_capabilities.v1",
+                        "task_api_no_motion": True,
+                        "task_types": [],
+                    }
+                }
+            raise AssertionError(f"unexpected tool call: {tool}")
+
+        with self.assertRaisesRegex(RuntimeError, "missing task_types"):
+            await run_soridormi_task_agent_acceptance(
+                registry,
+                goal=default_soridormi_task_goal(),
+                invoker=McpStreamableHttpInvoker(registry, call=call),
+                probe=probe,
+            )
+        self.assertEqual(calls, ["soridormi.task.get_capabilities"])
+
+    def test_task_agent_bridge_graph_uses_task_contract_tools(self) -> None:
+        graph = build_soridormi_task_agent_graph(default_soridormi_task_goal())
+
+        self.assertEqual(
+            [node.tool for node in graph.nodes],
+            [
+                "soridormi.task.get_capabilities",
+                "soridormi.task.preview",
+                "soridormi.task.submit",
+                "soridormi.task.events",
+            ],
+        )
+        self.assertEqual(
+            graph.graph_id,
+            soridormi_task_agent_graph_id(default_soridormi_task_goal()),
+        )
 
     async def test_runtime_preflight_requires_runtime_backend_and_ready_state(
         self,
