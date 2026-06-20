@@ -140,7 +140,14 @@ This phase has two coordinated tracks:
    Soridormi's task events. This keeps navigation, approach, gesture,
    recovery, and future manipulation goals above the low-level robot boundary.
    It does not authorize physical motion.
-2. **Reference robot candidate gate.** The versioned, machine-readable
+2. **Soridormi high-level task and skill enrichment.** Soridormi should declare
+   and implement the next safe body-side task types first, in no-motion or
+   simulator-backed form, before Chromie broadens routing or any motion-control
+   model training begins. Near-term task types are `navigate_to_location`,
+   `approach_target`, `look_at_target`, `perform_gesture`, and
+   `recover_safe_idle`, with preview, submit, event, cancellation, refusal, and
+   safe-idle semantics.
+3. **Reference robot candidate gate.** The versioned, machine-readable
    candidate manifest pins hardware and software identity, defines one bounded
    low-risk skill, records exclusions, and fails closed on missing safety or
    calibration evidence.
@@ -151,21 +158,32 @@ embodied planner/executor. Rich embodied requests should be represented as
 structured Soridormi goals, not translated by Chromie into raw or low-level
 body controls.
 
+Model-assisted routing supports this boundary but does not own it. The small
+Router model may propose routes for normal requests, but deterministic controls,
+catalog constraints, schema validation, runtime authorization, and Soridormi
+provider checks remain the authority.
+
 ### Sequence
 
 1. keep the Chromie/Soridormi task contract aligned with Soridormi's
    authoritative manifest;
-2. validate task-capability inspection, preview, submit, event monitoring,
+2. enrich Soridormi's high-level task and skill surface in no-motion or
+   simulator-backed mode before training motion-control models or adding real
+   physical execution;
+3. validate task-capability inspection, preview, submit, event monitoring,
    refusal, blocked-subsystem reporting, timeout, and cancellation semantics
    without claiming motion, including a no-motion bridge acceptance gate that
    checks capabilities before preview or submit;
-3. no-motion health and state inspection for the selected candidate;
-4. shadow recommendations;
-5. dry-run with operator approval;
-6. one low-risk skill at limited speed and workspace;
-7. supervised cancellation, stop, emergency stop, and recovery;
-8. bounded multi-skill TaskGraphs;
-9. narrowly scoped physical prerelease.
+4. add Chromie routing and TaskGraph tests for the enriched Soridormi task
+   types while preserving explicit named-skill routing for simple bounded
+   commands;
+5. no-motion health and state inspection for the selected candidate;
+6. shadow recommendations;
+7. dry-run with operator approval;
+8. one low-risk skill at limited speed and workspace;
+9. supervised cancellation, stop, emergency stop, and recovery;
+10. bounded multi-skill TaskGraphs;
+11. narrowly scoped physical prerelease.
 
 ### Exit criteria
 
@@ -174,6 +192,11 @@ body controls.
   keys, monitor terminal task events, and fail closed on Soridormi refusal,
   failure, timeout, cancellation, blocked subsystems, or unsafe
   recommendations;
+- model-assisted routing remains advisory and cannot bypass deterministic
+  controls, capability availability, confirmation, runtime policy, provider
+  refusal, or physical-motion gates;
+- the enriched Soridormi task surface has retained no-motion or simulator
+  evidence before Chromie treats it as routable for rich embodied requests;
 - the candidate verifier reports `selected_for_pilot=true` while continuing to
   report `physical_motion_authorized=false`;
 - referenced safety, procedure, provider-manifest, and calibration evidence
@@ -183,6 +206,10 @@ body controls.
 - physical stop and recovery evidence is reviewed;
 - communication loss and stale-command cases fail closed;
 - the release names one supported configuration and all exclusions.
+
+Motion-control model training is explicitly later work. It requires a selected
+target body or simulator, retained calibration and telemetry, task-level
+acceptance metrics, and Soridormi-owned safety envelopes.
 
 ## Later work
 

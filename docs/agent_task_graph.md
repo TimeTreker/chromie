@@ -132,6 +132,30 @@ global user/task graph above that body DAG.
 For the staged Chromie-side implementation plan, see
 `docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`.
 
+## Next Routing Targets
+
+The next implementation work should start in Soridormi by enriching the
+high-level no-motion or simulator-backed task surface. Chromie should add
+routing only after those task types appear in the authoritative manifest.
+
+Near-term task targets:
+
+- `navigate_to_location`;
+- `approach_target`;
+- `look_at_target`;
+- `perform_gesture`;
+- `recover_safe_idle`.
+
+For each target, Chromie tests should assert the global graph shape,
+confirmation behavior, provider-call arguments, refusal handling,
+`blocked_subsystems`, `recommended_next_actions`, terminal events, and
+`outcome_summary`. Missing or unsupported task types should remain structured
+refusals or clarifications, not fallback velocity recipes.
+
+Motion-control model training is intentionally outside this graph layer until
+Soridormi has retained task metrics, calibration, telemetry, and safety
+envelopes for a selected target.
+
 ## Graph contract
 
 `TaskGraph` contains:

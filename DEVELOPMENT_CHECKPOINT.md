@@ -1,6 +1,6 @@
 # Development Checkpoint
 
-**Current committed Chromie base:** `cf83c72`
+**Current committed Chromie base:** `f4bbb2f`
 **Pinned Soridormi capability revision:** `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`
 **Status refresh date:** 2026-06-20
 **Current focus:** Physical pilot preparation through the Chromie/Soridormi
@@ -22,6 +22,8 @@ The alpha implementation is present:
 - evidence verification and alpha packaging;
 - small-model quick Router classification for normal semantic routing while
   stop/cancel/ignore controls remain deterministic;
+- model-assisted routing guardrails that treat `qwen3:0.6b` as a proposer, not
+  the authority for capabilities, safety, or physical execution;
 - simulator-bounded expressive body cues and safe defaults for underspecified
   walking requests;
 - ordered TTS playback with bounded chunked generation through configured
@@ -49,31 +51,45 @@ Soridormi-owned fault-injection scenarios.
 
 ## Next sequence
 
-1. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
+1. Enrich Soridormi's high-level task and skill surface first. Start with
+   no-motion or simulator-backed task types such as `navigate_to_location`,
+   `approach_target`, `look_at_target`, `perform_gesture`, and
+   `recover_safe_idle`, including preview, submit, events, cancellation,
+   refusal, blocked-subsystem, and safe-idle semantics.
+2. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
    authoritative manifest. Use structured task goals for rich embodied requests
    and keep concrete named skills for explicit bounded body commands. Preserve
    Soridormi refusal metadata when reporting unsupported embodied tasks.
-2. Select one reference-robot candidate and complete the identity,
+3. Keep Qwen/small-model routing advisory. Add or revise routing only with
+   deterministic-control bypass, catalog constraints, confidence fallback,
+   schema validation, Skill Runtime authorization, and Soridormi provider
+   refusal/event checks.
+4. Add Chromie routing and TaskGraph acceptance only after Soridormi declares
+   the corresponding task type. Do not lower missing navigation, approach, gaze,
+   gesture, recovery, or manipulation goals into velocity recipes.
+5. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
    `commissioning/reference_robot_candidate.schema.json` contract and keep the
    real manifest under ignored `.chromie/commissioning/`.
-3. Keep all physical-motion gates off while validating no-motion health,
+6. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
-4. If the next supported release claims real microphone/speaker voice-device
+7. If the next supported release claims real microphone/speaker voice-device
    operation, run the full seven-case `supervised` matrix on the reference host,
    review audible output and MuJoCo safe-idle/recovery behavior, verify the
    bundle with `--require-clean`, then clear the compatibility blocker.
 
 Do not start physical motion until the first reference robot satisfies the
 commissioning checklist and Soridormi has retained simulator/physical evidence
-for the exact bounded motion path.
+for the exact bounded motion path. Do not train a Soridormi motion-control
+model until the task semantics, target body or simulator, calibration,
+telemetry, safety envelopes, and task-level acceptance metrics exist.
 
 ## Verification baseline
 
 ```text
-Focused refresh after cf83c72:
+Focused refresh after f4bbb2f:
 python scripts/check_docs.py passed
 python -m unittest tests.test_robot_candidate_verifier passed: 12 tests
 python scripts/test_matrix.py taskgraph passed: 48 tests
@@ -132,6 +148,8 @@ First-reference-robot selection requirements are maintained in
 - Keep realtime audio and trusted Skill Runtime coordination in the Orchestrator.
 - Keep embodied execution and hardware safety in Soridormi.
 - Keep operational controls deterministic.
+- Keep small-model routing advisory; never let Qwen or any model become the
+  only authority for route, skill, task, safety, or physical execution.
 - Keep physical work default-off and sequential.
 - Do not expose low-level robot controls to model-facing contracts.
 - Do not report automated or dry-run output as target evidence.

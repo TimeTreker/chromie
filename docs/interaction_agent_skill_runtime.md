@@ -118,6 +118,15 @@ task.
 its embodied task runtime can currently dry-run, hold, redirect, or refuse.
 Chromie should treat that readiness as Soridormi-owned state.
 
+Near-term enrichment should happen on the Soridormi side first. Add or harden
+no-motion/simulator task types for `navigate_to_location`, `approach_target`,
+`look_at_target`, `perform_gesture`, and `recover_safe_idle`; then add Chromie
+routing and Skill Runtime tests for the declared contracts. Until a task type
+is declared, Chromie should clarify or refuse rich embodied requests instead of
+falling back to raw motion or low-level named skills. Motion-control model
+training waits for Soridormi-owned task metrics, calibration, telemetry, and
+safety envelopes.
+
 For the staged Chromie-side implementation plan, see
 `docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`.
 

@@ -66,6 +66,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 - [Interaction Agent and Skill Runtime](interaction_agent_skill_runtime.md)
 - [Agent Capability Registry](agent_capability_registry.md)
+- [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md)
 - [TaskGraph](agent_task_graph.md)
 - [Chromie/Soridormi Task-Agent Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)
 - [TaskGraph Concurrency Decision](task_graph_concurrency_decision.md)

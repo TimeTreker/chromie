@@ -1,7 +1,7 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Current committed base revision:** `cf83c72`; retained target evidence below
+**Current committed base revision:** `f4bbb2f`; retained target evidence below
 records the exact revision that produced each bundle
 **Status refresh date:** 2026-06-20
 **Current focus:** **Physical pilot preparation through the Chromie/Soridormi
@@ -49,6 +49,24 @@ prepares richer user-facing goals such as navigation, approach, and
 object-delivery requests without lowering them into velocity recipes. The task
 surface remains a no-motion contract unless later Soridormi evidence proves
 execution.
+
+The next implementation section is Soridormi high-level task and skill
+enrichment, not motion-control model training. Soridormi should first declare
+and implement no-motion or simulator-backed task types such as
+`navigate_to_location`, `approach_target`, `look_at_target`,
+`perform_gesture`, and `recover_safe_idle`, including preview, submit, events,
+cancellation, refusal, blocked-subsystem, and safe-idle behavior. Chromie's
+next work is then to route rich user requests into those declared task types
+and preserve Soridormi's refusal metadata. Training or tuning motion-control
+models waits until a selected target body or simulator, calibration artifacts,
+telemetry, safety envelopes, and task-level acceptance metrics exist.
+
+The current small Router model is not a single source of truth for routing or
+safety. `qwen3:0.6b` may propose routes for normal requests, but deterministic
+operational controls, capability-catalog constraints, confidence fallback,
+schema validation, host Skill Runtime authorization, and Soridormi provider
+checks remain authoritative. See
+[Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
 
 On June 14, 2026, the Linux x86_64 reference host with an NVIDIA GeForce RTX
 5090 retained:
@@ -145,7 +163,7 @@ At the current working revision the Level A suite is expected to run:
 
 The current task-agent routing, refusal-reporting, host graph-dispatch,
 no-motion bridge-acceptance, and reference-candidate verifier refresh after
-committed base `cf83c72` passed `python scripts/check_docs.py`,
+committed base `f4bbb2f` passed `python scripts/check_docs.py`,
 `python scripts/test_matrix.py taskgraph soridormi`, local dry-run
 `--task-agent-bridge` acceptance against Soridormi MCP on `127.0.0.1:8011`,
 focused
@@ -219,6 +237,9 @@ These legacy evidence tracks do not define the current delivery:
   submit and monitor structured embodied goals, but must not report physical
   completion unless Soridormi later returns retained execution evidence from a
   validated simulator or commissioned robot path.
+- Motion-control model training is deferred until Soridormi has stable
+  high-level task semantics, retained simulator or robot telemetry, calibration
+  evidence, and safety envelopes for the selected target body.
 - Jetson profiles select model/runtime values, but this repository does not yet
   include verified Jetson-specific Dockerfiles or Compose overrides.
 - The host hardware daemon currently constructs `MockRobotDriver` regardless of

@@ -73,6 +73,31 @@ The practical rule is simple: Chromie can say "submit and monitor a navigation
 goal"; it must not invent "drive these joints or velocities until you arrive"
 when Soridormi has not declared that body capability.
 
+## Next implementation section
+
+The next section is Soridormi high-level task and skill enrichment. Do this
+before motion-control model training and before Chromie broadens rich embodied
+routing.
+
+Priority Soridormi task types:
+
+- `navigate_to_location` for resolved destination goals;
+- `approach_target` for locally bounded approach behavior;
+- `look_at_target` for attention, gaze, or facing behavior;
+- `perform_gesture` for nod, shake, and expressive body gestures;
+- `recover_safe_idle` for explicit recovery requests.
+
+Each task type should first expose no-motion or simulator-backed preview,
+submit, status/events, cancellation, refusal, blocked-subsystem, timeout, and
+safe-idle behavior. Chromie should then consume those declared contracts through
+the capability manifest and route user requests into them. If Soridormi does
+not declare the task type, Chromie should clarify or refuse instead of lowering
+the request into a velocity or pose workaround.
+
+Motion-control model training is later work. It needs a selected simulator or
+robot target, retained calibration and telemetry, task-level success metrics,
+and Soridormi-owned safety envelopes.
+
 ## Build order
 
 ### Step 1 - Freeze the boundary contract
@@ -159,18 +184,19 @@ recipe.
 Goal: define the shape of body goals Chromie may submit after user-facing
 planning.
 
-Candidate goal types from Chromie's point of view:
+Candidate goal types from Chromie's point of view. The first five are the next
+priority for Soridormi-side enrichment:
 
-- `move_velocity` for explicit concrete motion requests;
-- `turn_to_heading` for bounded heading changes;
 - `approach_target` for locally bounded approach behavior;
 - `navigate_to_location` for resolved destination goals;
 - `look_at_target` for attention and gaze behavior;
 - `perform_gesture` for nod, shake, and expressive body gestures;
+- `recover_safe_idle` for recovery requests;
+- `move_velocity` for explicit concrete motion requests;
+- `turn_to_heading` for bounded heading changes;
 - `skill_sequence` for bounded ordered body-skill sequences;
 - `speak_while_moving` for coordinated interaction;
 - `stop_now` for deterministic interruption;
-- `recover_safe_idle` for recovery requests;
 - future `deliver_object` only after Soridormi declares manipulation support.
 
 The Agent may keep the original user wording for traceability, but the

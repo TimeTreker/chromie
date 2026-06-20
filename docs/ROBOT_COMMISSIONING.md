@@ -7,6 +7,11 @@ recovery, and the final hardware commissioning decision. Chromie owns the
 high-level contract, authorization evidence, trace comparison, and user-facing
 terminal behavior.
 
+Motion-control model training is not part of candidate selection. Train or tune
+motion-control models only after Soridormi has a selected simulator or robot
+target, retained calibration and telemetry, task-level acceptance metrics, and
+reviewed safety envelopes for the exact body path.
+
 ## Candidate identity
 
 Start from the versioned candidate contract:

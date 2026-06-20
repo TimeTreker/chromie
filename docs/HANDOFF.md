@@ -18,6 +18,19 @@ embodied requests as structured Soridormi task goals, attach stable
 and monitor `soridormi.task.events` until Soridormi reports a terminal state.
 This is contract/no-motion preparation; it is not physical execution evidence.
 
+The next implementation section is Soridormi high-level task and skill
+enrichment. Soridormi should first add no-motion or simulator-backed task types
+such as `navigate_to_location`, `approach_target`, `look_at_target`,
+`perform_gesture`, and `recover_safe_idle`; Chromie should then route rich user
+requests into those declared task types. Motion-control model training is
+deferred until task semantics, target-body evidence, calibration, telemetry,
+and safety envelopes exist.
+
+The small Router model is also not an execution authority. Treat
+`qwen3:0.6b` as an advisory classifier only: deterministic controls,
+capability-catalog constraints, confidence fallback, schemas, Skill Runtime
+authorization, and Soridormi provider checks must catch wrong model routes.
+
 Retained closure evidence:
 
 ```text
@@ -67,7 +80,7 @@ claim includes real audio devices.
 ## Latest Validation
 
 The current task-agent routing, refusal-reporting, and host graph-dispatch
-refresh after committed base `cf83c72` passed:
+refresh after committed base `f4bbb2f` passed:
 
 ```text
 python scripts/check_docs.py
@@ -120,22 +133,31 @@ python -m unittest \
 ## Resume Sequence
 
 1. Keep physical-motion gates off.
-2. Keep the Soridormi task-agent snapshot aligned with Soridormi's
+2. Enrich Soridormi's high-level no-motion or simulator-backed task/skill
+   surface before training motion-control models.
+3. Preserve model-assisted routing guardrails. Qwen may propose normal routes,
+   but stop/cancel/ignore stay deterministic, unknown or low-confidence routes
+   clarify/refuse, and execution still requires registry/runtime/provider
+   validation.
+4. Keep the Soridormi task-agent snapshot aligned with Soridormi's
    authoritative manifest.
-3. Continue acceptance tests for task capability inspection, preview, submit,
+5. Continue acceptance tests for task capability inspection, preview, submit,
    event monitoring, refusal, blocked-subsystem reporting, timeout, and
    cancellation semantics. Use trace `outcome_summary` as the deterministic
    result source when adding report/speech nodes.
-4. Preserve the no-motion `--task-agent-bridge` acceptance as the bridge
+6. Preserve the no-motion `--task-agent-bridge` acceptance as the bridge
    contract gate; rerun it when Soridormi's task API snapshot changes.
-5. Select one reference robot candidate.
-6. Fill the ignored real candidate record under `.chromie/commissioning/` using
+7. Add Chromie routing only for Soridormi-declared task types; keep missing
+   navigation, approach, gaze, gesture, recovery, and manipulation goals as
+   structured refusals or clarifications rather than velocity recipes.
+8. Select one reference robot candidate.
+9. Fill the ignored real candidate record under `.chromie/commissioning/` using
    `commissioning/reference_robot_candidate.schema.json`.
-7. Verify candidate identity, independent emergency stop, network, workspace,
+10. Verify candidate identity, independent emergency stop, network, workspace,
    software revisions, calibration ownership, referenced evidence files,
    evidence-root containment, provider-manifest revision matching, calibration
    hashes, and no-motion procedures.
-8. Continue with no-motion health and shadow/dry-run checks before any bounded
+11. Continue with no-motion health and shadow/dry-run checks before any bounded
    physical skill execution.
 
 ## Useful Commands

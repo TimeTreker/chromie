@@ -32,6 +32,12 @@ phrase-based robot rules are an explicit compatibility rollback only. The Agent
 repeats the same catalog search inside native InteractionRuntime, so Router
 unavailability cannot authorize or suppress execution by itself.
 
+The Router model is a proposer, not the authority. A model route must still pass
+catalog constraints, confidence policy, schema finalization, Agent validation,
+host Skill Runtime authorization, and Soridormi provider checks before anything
+meaningful can execute. See
+[`../docs/MODEL_ASSISTED_ROUTING_GUARDRAILS.md`](../docs/MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
+
 The two routing lanes are intentionally different:
 
 | Lane | What handles it | Purpose |

@@ -70,6 +70,8 @@ A successful Chromie release lets an operator:
 
 - authorize its own side effects;
 - bypass confirmation or safety policy;
+- act as the sole authority for route, capability, or physical execution
+  decisions;
 - send raw motor, joint, actuator, torque, controller-array, or bus commands;
 - decide deterministic operational controls;
 - claim execution succeeded without provider evidence.

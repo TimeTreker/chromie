@@ -192,6 +192,17 @@ before preview/submit. Additional guarded dry-run and
 runtime-cancellation modes are documented in
 [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md).
 
+## Next task-agent direction
+
+The next implementation work should begin in Soridormi, not in Chromie's
+low-level motion code. Soridormi should enrich no-motion or simulator-backed
+task types such as `navigate_to_location`, `approach_target`,
+`look_at_target`, `perform_gesture`, and `recover_safe_idle`. After those task
+types are declared in the authoritative manifest, Chromie can add routing,
+TaskGraph, and Skill Runtime tests that submit and monitor them. Motion-control
+model training is deferred until Soridormi has a selected target body or
+simulator, calibration and telemetry, task-level metrics, and safety envelopes.
+
 ## Run locally
 
 From the repository root:

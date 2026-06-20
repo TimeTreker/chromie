@@ -74,6 +74,25 @@ be tested independently or in declared combinations, but it does not replace the
 canonical `./scripts/run_tests.sh` gate and it does not create GPU, microphone,
 MuJoCo, or hardware evidence.
 
+## Model-assisted routing guardrails
+
+The small Router model is accepted only as an advisory semantic classifier.
+Level A routing evidence must continue to prove:
+
+- deterministic stop, cancel, emergency, ignore, silence, and unusable-audio
+  paths do not depend on model output;
+- model routes are bounded by capability-catalog candidates and schema
+  finalization;
+- low-confidence, ambiguous, unsupported, or unavailable routes clarify, refuse,
+  ignore, or fall back safely;
+- native InteractionRuntime and the host Skill Runtime re-resolve capabilities
+  before execution;
+- Soridormi task preview, refusal, events, cancellation, and safe-idle status
+  remain authoritative for embodied goals.
+
+See
+[Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
+
 ## Level B — deployed service checks
 
 ```bash
@@ -225,6 +244,31 @@ does not return a `task_id`, or if terminal monitoring does not end
 
 Use `--task-goal-json` to supply another structured task goal. This acceptance
 mode is contract evidence only; it does not authorize or prove physical motion.
+
+## High-level task enrichment acceptance
+
+When Soridormi adds a high-level task type, Chromie acceptance should treat it
+as routable only after the authoritative manifest and live endpoint expose the
+contract and the no-motion or simulator evidence passes. Near-term task types
+are:
+
+- `navigate_to_location`;
+- `approach_target`;
+- `look_at_target`;
+- `perform_gesture`;
+- `recover_safe_idle`.
+
+For each task type, retain evidence for manifest probing, task capability
+inspection, preview, submit, event monitoring, terminal state, safe idle,
+cancellation where applicable, refusal or blocked-subsystem behavior, and
+Chromie user-facing routing/reporting. Unsupported task types must remain
+structured refusals or clarifications. Do not treat a task as physical
+completion unless Soridormi returns retained simulator or commissioned hardware
+execution evidence for that exact path.
+
+Motion-control model training is not an acceptance shortcut. It requires a
+selected simulator or robot target, calibration and telemetry, task-level
+metrics, and Soridormi-owned safety envelopes.
 
 ## Guarded and recovery acceptance
 
