@@ -27,6 +27,46 @@ cp -n .env.local.example .env.local
 ./scripts/build_runtime_env.sh
 ```
 
+For the normal microphone, speaker, and MuJoCo viewer operator loop, use the
+paired launcher from the Chromie repository:
+
+```bash
+./scripts/start_voice_mujoco.sh --soridormi-repo ../soridormi
+```
+
+This starts Soridormi MuJoCo, Soridormi runtime MCP, Chromie ASR/TTS/Router/Agent,
+and the host Orchestrator. After it prints `Chromie voice-to-MuJoCo is ready`,
+say a supervised request such as:
+
+```text
+Please nod twice.
+Look at me for three seconds.
+What is the robot status?
+Stop.
+```
+
+Use a headless simulator when no graphical desktop is available:
+
+```bash
+./scripts/start_voice_mujoco.sh --soridormi-repo ../soridormi --no-viewer
+```
+
+From another terminal, check readiness and recent logs:
+
+```bash
+./scripts/status_voice_mujoco.sh
+./scripts/check_voice_mujoco_logs.sh
+```
+
+Stop the paired stack with `Ctrl+C` in the launcher terminal or:
+
+```bash
+./scripts/stop_voice_mujoco.sh
+```
+
+The lower-level manual startup remains available when you want separate
+Soridormi and Chromie terminals.
+
 Start Soridormi with the MuJoCo viewer from the sibling Soridormi repository:
 
 ```bash
@@ -64,6 +104,16 @@ Compose file explicitly.
 Use this when you want to skip microphone and ASR while still testing routing,
 Agent `/interaction`, the trusted Skill Runtime, live Soridormi MCP, and MuJoCo
 execution.
+
+If the paired stack is already running, the compact no-microphone wrapper is:
+
+```bash
+./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --speaker
+./scripts/run_voice_mujoco_text_case.sh "Look at me for three seconds." --no-speaker
+```
+
+The first command also checks speaker playback; the second is better for
+headless automation.
 
 ```bash
 conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
@@ -152,6 +202,9 @@ M13 text closure does not require the supervised real-microphone run.
 - `walk ... with nodding/shaking your head` is accepted by the text route, but
   the physical skills are serialized for now: body movement first, then the head
   gesture. This preserves the current physical-work safety boundary.
+- `sing a song` is speech-only chat unless the request also asks for body
+  motion. Phrases such as `go ahead and sing` are treated as permission to
+  speak, not as a walking command.
 - `sing a song while walking` is handled as speech plus the walking skill. The
   speech uses a short original line and still applies the same walking safety
   normalization. Chromie waits until that speech is actually audible before

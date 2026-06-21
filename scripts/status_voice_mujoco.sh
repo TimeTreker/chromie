@@ -4,6 +4,14 @@ set -u
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+STATE_DIR="${CHROMIE_VOICE_MUJOCO_STATE_DIR:-$ROOT_DIR/.chromie/voice-mujoco}"
+if [ -f "$STATE_DIR/run.env" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$STATE_DIR/run.env"
+  set +a
+fi
+
 SIM_PORT="${SIM_PORT:-5555}"
 MCP_PORT="${SORIDORMI_MCP_PORT:-8000}"
 FAILED=0

@@ -77,11 +77,13 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         errors = validate_contract(
             route=route,
             response=response,
+            expected_route=None,
             expected_skills=[
                 "soridormi.walk_velocity",
                 "soridormi.nod_yes",
                 "soridormi.turn_in_place",
             ],
+            expect_no_skills=False,
             expected_args=[
                 (0, "vx_mps", 0.2),
                 (0, "duration_s", 10.0),
@@ -108,7 +110,9 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         errors = validate_contract(
             route=route,
             response=response,
+            expected_route=None,
             expected_skills=["soridormi.walk_velocity"],
+            expect_no_skills=False,
             expected_args=[(0, "vx_mps", 0.2)],
             arg_tolerance=1e-6,
         )
@@ -116,6 +120,32 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertGreaterEqual(len(errors), 3)
         self.assertTrue(any("route=" in item for item in errors))
         self.assertTrue(any("interaction skills mismatch" in item for item in errors))
+
+    def test_validate_contract_accepts_chat_without_soridormi_skills(self) -> None:
+        route = RouteDecision.model_validate(
+            {
+                "route": "chat",
+                "intent": "general_conversation",
+                "confidence": 0.91,
+                "language": "en-US",
+                "source": "llm",
+            }
+        )
+        response = InteractionResponse.model_validate(
+            {"speech": [{"text": "Here is a short song.", "timing": "immediate"}]}
+        )
+
+        errors = validate_contract(
+            route=route,
+            response=response,
+            expected_route="chat",
+            expected_skills=[],
+            expect_no_skills=True,
+            expected_args=[],
+            arg_tolerance=1e-6,
+        )
+
+        self.assertEqual(errors, [])
 
     def test_safe_idle_errors_require_idle_non_emergency_status(self) -> None:
         self.assertEqual(

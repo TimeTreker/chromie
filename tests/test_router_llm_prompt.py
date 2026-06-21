@@ -26,6 +26,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Memory and context are hints, not authorization", prompt)
         self.assertIn("voice and/or", prompt)
         self.assertIn("body action", prompt)
+        self.assertIn("creative speech-only requests as chat", prompt)
+        self.assertIn("go ahead", prompt)
+        self.assertIn("not physical movement", prompt)
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
         router = OllamaLLMRouter(
@@ -56,6 +59,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Routing lanes", prompt)
         self.assertIn("quick deterministic controls", prompt)
         self.assertIn("deep reasoning lane", prompt)
+        self.assertIn("before non-urgent semantic fallback", prompt)
         self.assertIn("Available abilities / candidate capabilities JSON", prompt)
         self.assertIn("Bounded memory and world context JSON", prompt)
         self.assertIn("soridormi.walk_velocity", prompt)
@@ -63,6 +67,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("position", prompt)
         self.assertIn("last_task", prompt)
         self.assertIn("never as authorization", prompt)
+        self.assertIn("creative speech-only requests", prompt)
+        self.assertIn("'go ahead'", prompt)
 
 
 if __name__ == "__main__":

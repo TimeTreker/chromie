@@ -76,7 +76,9 @@ def validate_contract(
     *,
     route: Any,
     response: Any,
+    expected_route: str | None,
     expected_skills: list[str],
+    expect_no_skills: bool,
     expected_args: list[tuple[int, str, Any]],
     arg_tolerance: float,
 ) -> list[str]:
@@ -92,6 +94,9 @@ def validate_contract(
     ]
     skill_ids = [item.skill_id for item in skills]
 
+    if expected_route and route.route != expected_route:
+        errors.append(f"route={route.route!r}, expected {expected_route!r}")
+
     if expected_skills:
         if route.route != "robot_action":
             errors.append(f"route={route.route!r}, expected 'robot_action'")
@@ -105,6 +110,12 @@ def validate_contract(
                 "interaction skills mismatch: "
                 f"expected {expected_skills!r}, got {skill_ids!r}"
             )
+
+    if expect_no_skills:
+        if route_actions:
+            errors.append(f"router emitted Soridormi actions, expected none: {route_actions!r}")
+        if skill_ids:
+            errors.append(f"interaction emitted Soridormi skills, expected none: {skill_ids!r}")
 
     for index, key, expected in expected_args:
         if index >= len(skills):
@@ -308,7 +319,9 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             validate_contract(
                 route=route,
                 response=response,
+                expected_route=args.expect_route,
                 expected_skills=args.expect_skill,
+                expect_no_skills=args.expect_no_skills,
                 expected_args=args.expect_arg,
                 arg_tolerance=args.arg_tolerance,
             )
@@ -411,6 +424,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi modes. Use only under separate supervision.")
     parser.add_argument("--auto-confirm-sim", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--require-speech", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--expect-route", choices=["chat", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"])
+    parser.add_argument("--expect-no-skills", action="store_true", help="Require no Soridormi actions or skills.")
     parser.add_argument("--expect-skill", action="append", default=[])
     parser.add_argument(
         "--expect-arg",
@@ -434,7 +449,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
+    if args.expect_no_skills and args.expect_skill:
+        parser.error("--expect-no-skills cannot be combined with --expect-skill")
     try:
         summary = asyncio.run(run_check(args))
     except Exception as exc:

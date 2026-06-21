@@ -53,7 +53,7 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "160")))
+    max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "220")))
     expressive_body_cues: Literal["off", "sim_only", "on"] = Field(
         default_factory=lambda: os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "sim_only")
     )

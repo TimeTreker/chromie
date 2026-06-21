@@ -135,7 +135,10 @@ class ConversationAgent(BaseAgent):
                 "不要假装记得上下文里没有的事情，也不要编造工具结果。"
                 "回答能力问题前必须检查提供的能力目录；不要声称机器人断开，除非目录明确不可用。"
                 "不要描述身体动作或舞台指令；表情动作会由运行时单独处理。"
-                "回复要适合语音播放，默认一句话，不超过 24 个中文字。"
+                "回复要适合语音播放，默认一句话。"
+                "如果用户要你唱歌或创作歌曲，可以唱一小段原创歌词；如果用户要很长的歌，"
+                "先给一段原创歌词，并自然说明可以继续分段唱。不要引用受版权保护的歌词，"
+                "也不要说自己没有被编程成会唱歌。"
                 "请只输出要说的话，不要输出 JSON。"
             )
             prompt = (
@@ -156,7 +159,9 @@ class ConversationAgent(BaseAgent):
                 "Do not invent tool results. Do not pretend to remember anything outside the provided context. "
                 "Before answering capability questions, inspect the supplied capability catalog. Do not claim the robot is disconnected unless the catalog says it is unavailable. "
                 "Do not describe body gestures or stage directions; expressive motion is handled separately by the runtime. "
-                "The reply will be spoken aloud, so keep it to one short sentence. "
+                "The reply will be spoken aloud, so use one short sentence by default. "
+                "For singing or songwriting requests, you may sing a brief original verse; for a long song, start with one compact original verse and offer to continue in sections. "
+                "Do not quote copyrighted lyrics, and do not say you are not programmed to sing. "
                 "Reply with only the spoken response text. Do not output JSON."
             )
             prompt = (

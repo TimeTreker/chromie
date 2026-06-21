@@ -112,7 +112,7 @@ async def routes() -> dict:
             },
             {
                 "id": "deep_reasoning",
-                "description": "Capability-catalog, semantic, and optional LLM routing for chat, body actions, tools, memory, and clarification.",
+                "description": "Capability-catalog plus LLM-first semantic routing for chat, body actions, tools, memory, and clarification.",
                 "routes": ["chat", "robot_action", "tool", "memory", "clarify"],
                 "llm": settings.mode in {"hybrid", "llm_only"},
             },
@@ -340,9 +340,9 @@ async def route(request: RouteRequest) -> RouteDecision:
             text=request.text,
             language=request.language,
         )
-        decision: RouteDecision | None = semantic_robot_decision(request, catalog_result)
+        decision: RouteDecision | None = None
 
-        if decision is None and settings.mode in ("llm_only", "hybrid"):
+        if settings.mode in ("llm_only", "hybrid"):
             request.context = {
                 **request.context,
                 "candidate_capabilities": catalog_result.matches,
@@ -355,6 +355,9 @@ async def route(request: RouteRequest) -> RouteDecision:
                     llm_decision,
                     catalog_result,
                 )
+
+        if decision is None and settings.mode in ("rules_only", "hybrid"):
+            decision = semantic_robot_decision(request, catalog_result)
 
         if decision is None and settings.mode == "rules_only":
             decision = _catalog_decision(request, catalog_result)

@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from router.app.capability_catalog import CapabilityCatalogResult
-from router.app.schema import RouteRequest
+from router.app.schema import RouteDecision, RouteRequest
 
 
 class _Catalog:
@@ -14,6 +14,18 @@ class _Catalog:
     async def search(self, **kwargs):
         del kwargs
         return self.result
+
+
+class _LlmRouter:
+    def __init__(self, decision: RouteDecision) -> None:
+        self.decision = decision
+        self.calls = 0
+        self.request: RouteRequest | None = None
+
+    async def route(self, request: RouteRequest) -> RouteDecision:
+        self.calls += 1
+        self.request = request
+        return self.decision
 
 
 class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
@@ -143,6 +155,59 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "general_conversation")
         self.assertNotEqual(decision.intent, "capability:chromie.speak")
         self.assertIn("conversation_agent", decision.agents)
+
+    async def test_hybrid_router_lets_llm_handle_speech_before_semantic_fallback(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="go ahead and sing a song for me",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=8,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_velocity",
+                    "agent_id": "soridormi.skill",
+                    "description": "Track a bounded body velocity command.",
+                    "score": 0.62,
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=0.91,
+                language="en-US",
+                source="llm",
+                reason="creative speech request",
+            )
+        )
+
+        def fail_semantic(*_args, **_kwargs):
+            raise AssertionError("semantic fallback should not run after a valid LLM decision")
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router), patch.object(
+            main, "semantic_robot_decision", fail_semantic
+        ):
+            decision = await main.route(RouteRequest(text="Go ahead and sing a song for me."))
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertIn("conversation_agent", decision.agents)
+        assert llm_router.request is not None
+        self.assertEqual(
+            llm_router.request.context["candidate_capabilities"][0]["capability_id"],
+            "soridormi.walk_velocity",
+        )
 
 
 if __name__ == "__main__":

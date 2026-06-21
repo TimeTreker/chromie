@@ -176,7 +176,7 @@ search, semantic action parsing, and optionally the LLM when `ROUTER_MODE` is
 | `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
-| `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `160`. |
+| `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `220`, matching `TTS_MAX_TEXT_CHARS`. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `sim_only`; appends simulator-bounded cues such as `soridormi.express_attention` for chat-only speech and `soridormi.nod_yes` for affirmative agreement when the live catalog exposes those skills. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories inside the Agent container. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
