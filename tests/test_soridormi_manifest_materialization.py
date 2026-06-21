@@ -69,10 +69,7 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
             payload["metadata"]["upstream_repository"],
             "https://github.com/TimeTreker/soridormi.git",
         )
-        self.assertEqual(
-            payload["metadata"]["upstream_commit"],
-            "2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2",
-        )
+        self.assertRegex(str(payload["metadata"]["upstream_commit"]), r"^[0-9a-f]{40}$")
         self.assertEqual(
             tool_names,
             {

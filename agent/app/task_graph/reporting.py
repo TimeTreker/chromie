@@ -42,23 +42,25 @@ def _problem_prefix(trace: ExecutionTrace, result: NodeResult) -> str:
 def _problem_details(result: NodeResult) -> list[str]:
     output = result.output
     details: list[str] = []
-    for key in ("reason_code", "reason"):
-        text = _clean_text(output.get(key))
-        if text:
-            details.append(f"{key}={text}")
+    reason_code = _clean_text(output.get("reason_code"))
+    if reason_code:
+        details.append(f"reason code: {reason_code}")
+    reason = _clean_text(output.get("reason"))
+    if reason:
+        details.append(f"reason: {reason}")
 
     blocked = _clean_text_list(output.get("blocked_subsystems"))
     if blocked:
-        details.append("blocked_subsystems=" + ",".join(blocked))
+        details.append("blocked subsystems: " + ", ".join(blocked))
 
     recommended = _format_recommended_actions(output.get("recommended_next_actions"))
     if recommended:
-        details.append("recommended_next_actions=" + ";".join(recommended))
+        details.append("recommended next actions: " + "; ".join(recommended))
 
     if not details:
         error = _clean_text(result.error)
         if error:
-            details.append(f"error={error}")
+            details.append(f"error: {error}")
     return details
 
 
@@ -96,7 +98,7 @@ def _format_recommended_actions(value: Any) -> list[str]:
         reason_code = _clean_text(item.get("reason_code"))
         detail = _clean_text(item.get("message") or item.get("reason"))
         if action and reason_code:
-            text = f"{action}({reason_code})"
+            text = f"{action} ({reason_code})"
         else:
             text = action or reason_code
         if text and detail:

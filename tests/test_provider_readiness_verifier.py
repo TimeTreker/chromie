@@ -62,10 +62,7 @@ class ProviderReadinessVerifierTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(report["passed"])
         self.assertEqual(report["errors"], [])
-        self.assertEqual(
-            report["upstream_commit"],
-            "2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2",
-        )
+        self.assertRegex(str(report["upstream_commit"]), r"^[0-9a-f]{40}$")
 
     def test_ready_manifest_passes_preflight(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

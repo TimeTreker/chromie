@@ -532,13 +532,13 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             "TaskGraph aborted: node go (soridormi.task.submit) failed",
             trace.outcome_summary,
         )
-        self.assertIn("reason_code=missing_navigation_pipeline", trace.outcome_summary)
+        self.assertIn("reason code: missing_navigation_pipeline", trace.outcome_summary)
         self.assertIn(
-            "blocked_subsystems=navigation,localization",
+            "blocked subsystems: navigation, localization",
             trace.outcome_summary,
         )
         self.assertIn(
-            "recommended_next_actions=report_blocked_capability(missing_navigation_pipeline)",
+            "recommended next actions: report_blocked_capability (missing_navigation_pipeline)",
             trace.outcome_summary,
         )
         self.assertEqual(calls, ["soridormi.task.submit"])
@@ -546,9 +546,9 @@ class PlanningTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "failed_fatal")
         error = result.error or ""
         self.assertIn("missing_navigation_pipeline", error)
-        self.assertIn("blocked_subsystems=navigation,localization", error)
+        self.assertIn("blocked subsystems: navigation, localization", error)
         self.assertIn(
-            "recommended_next_actions=report_blocked_capability(missing_navigation_pipeline)",
+            "recommended next actions: report_blocked_capability (missing_navigation_pipeline)",
             error,
         )
 

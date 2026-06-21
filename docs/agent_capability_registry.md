@@ -25,8 +25,7 @@ Current snapshot:
   dry-run metadata, plus Soridormi-owned `plan_steps` and
   `blocked_subsystems`, and Chromie routing hints in
   `recommended_next_actions`;
-- upstream Soridormi commit
-  `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`;
+- upstream Soridormi provenance recorded in `metadata.upstream_commit`;
 - MCP endpoint resolved from `${SORIDORMI_MCP_URL}`.
 
 The task-level tools are planning/contract inputs for Chromie's global

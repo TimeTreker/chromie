@@ -356,6 +356,102 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("chromie.speak", ollama.calls[0]["system"])
         self.assertIn("on_failure", ollama.calls[0]["prompt"])
 
+    async def test_rich_body_goals_use_task_types_not_velocity_recipes(self) -> None:
+        cases = [
+            (
+                "walk-house",
+                "Walk forward to the house.",
+                "navigate_to_location",
+                {"target": "house"},
+            ),
+            (
+                "come-closer",
+                "Come closer slowly.",
+                "approach_target",
+                {"target": "speaker", "speed": "slow"},
+            ),
+        ]
+
+        for sid, text, task_type, parameters in cases:
+            with self.subTest(task_type=task_type):
+                registry = _soridormi_task_registry()
+                ollama = FakeOllama(
+                    {
+                        "graph_id": "model-controlled-id",
+                        "summary": f"Ask Soridormi to evaluate {task_type}.",
+                        "nodes": [
+                            {
+                                "id": "capabilities",
+                                "tool": "soridormi.task.get_capabilities",
+                                "type": "query",
+                            },
+                            {
+                                "id": "preview",
+                                "tool": "soridormi.task.preview",
+                                "type": "plan",
+                                "depends_on": ["capabilities"],
+                                "args": {
+                                    "task_type": task_type,
+                                    "summary": text,
+                                    "parameters": parameters,
+                                },
+                            },
+                            {
+                                "id": "submit",
+                                "tool": "soridormi.task.submit",
+                                "type": "plan",
+                                "depends_on": ["preview"],
+                                "args": {
+                                    "task_type": task_type,
+                                    "summary": text,
+                                    "parameters": parameters,
+                                },
+                            },
+                        ],
+                    }
+                )
+                runtime = InteractionRuntime(
+                    AgentServices(
+                        ollama=None,
+                        use_llm=True,
+                        expressive_body_cues="off",
+                        capability_catalog=CapabilityCatalog(
+                            registry,
+                            live_invoker=None,
+                            min_score=0.10,
+                        ),
+                        task_graph_planner=TaskGraphPlanner(
+                            registry, ollama
+                        ),  # type: ignore[arg-type]
+                    )
+                )
+                request = AgentRunRequest.model_validate(
+                    {
+                        "sid": sid,
+                        "text": text,
+                        "route_decision": {
+                            "route": "chat",
+                            "agents": ["conversation_agent", "speaker_agent"],
+                            "intent": "general_conversation",
+                            "confidence": 0.3,
+                            "language": "en-US",
+                            "source": "fallback",
+                        },
+                    }
+                )
+
+                response = await runtime.run(request)
+
+                self.assertEqual(request.route_decision.route, "tool")
+                self.assertEqual(request.route_decision.intent, "soridormi_task_planning")
+                self.assertEqual(response.skills[0].skill_id, "chromie.task_graph.execute")
+                graph = response.skills[0].args["graph"]
+                self.assertEqual(graph["nodes"][1]["args"]["task_type"], task_type)
+                self.assertEqual(graph["nodes"][2]["args"]["task_type"], task_type)
+                graph_tools = {node["tool"] for node in graph["nodes"]}
+                self.assertNotIn("soridormi.walk_velocity", graph_tools)
+                self.assertIn("instead of lowering", ollama.calls[0]["system"])
+
     async def test_explicit_bounded_motion_stays_named_skill_not_task_graph(self) -> None:
         registry = _soridormi_task_registry()
         capability_ollama = CapabilityOllama()

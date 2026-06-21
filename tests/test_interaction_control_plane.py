@@ -165,7 +165,7 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
                 "status": "failed",
                 "outcome_summary": (
                     "TaskGraph failed at node submit: "
-                    "reason_code=missing_navigation_pipeline"
+                    "reason code: missing_navigation_pipeline"
                 ),
                 "node_results": [],
                 "events": [],

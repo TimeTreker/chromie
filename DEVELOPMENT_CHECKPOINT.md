@@ -1,7 +1,7 @@
 # Development Checkpoint
 
 **Current committed Chromie base:** `f4bbb2f`
-**Pinned Soridormi capability revision:** `2fa137ffd59ca7f5be347b09a1664ace0cbbf9c2`
+**Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 **Status refresh date:** 2026-06-20
 **Current focus:** Physical pilot preparation through the Chromie/Soridormi
 task-agent boundary; physical audio validation remains separate

@@ -251,9 +251,9 @@ class SoridormiTaskClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.status, "failed_fatal")
         error = outcome.error or ""
         self.assertIn("missing_manipulation_pipeline", error)
-        self.assertIn("blocked_subsystems=manipulation,handoff", error)
+        self.assertIn("blocked subsystems: manipulation, handoff", error)
         self.assertIn(
-            "recommended_next_actions=report_blocked_capability(missing_manipulation_pipeline)",
+            "recommended next actions: report_blocked_capability (missing_manipulation_pipeline)",
             error,
         )
 
@@ -318,9 +318,9 @@ class SoridormiTaskClientTests(unittest.IsolatedAsyncioTestCase):
         )
         error = outcome.error or ""
         self.assertIn("missing_navigation_pipeline", error)
-        self.assertIn("blocked_subsystems=navigation,localization", error)
+        self.assertIn("blocked subsystems: navigation, localization", error)
         self.assertIn(
-            "recommended_next_actions=ask_user_for_static_alternative(missing_navigation_pipeline)",
+            "recommended next actions: ask_user_for_static_alternative (missing_navigation_pipeline)",
             error,
         )
 

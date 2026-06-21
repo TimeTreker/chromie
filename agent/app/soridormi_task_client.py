@@ -49,7 +49,7 @@ def _format_recommended_actions(value: Any) -> list[str]:
         reason_code = _clean_text(item.get("reason_code"))
         detail = _clean_text(item.get("message") or item.get("reason"))
         if action and reason_code:
-            text = f"{action}({reason_code})"
+            text = f"{action} ({reason_code})"
         else:
             text = action or reason_code
         if text and detail:
@@ -384,21 +384,17 @@ class SoridormiTaskMonitoringInvoker:
             reason_code = output.get("reason_code")
             reason = output.get("reason")
             status_part = "expired" if expired and status not in _UNSUCCESSFUL_TASK_STATUSES else status
-            parts = [
-                part
-                for part in (
-                    status_part or "task_failed",
-                    reason_code,
-                    reason,
-                )
-                if part
-            ]
+            parts = [status_part or "task_failed"]
+            if reason_code:
+                parts.append(f"reason code: {reason_code}")
+            if reason:
+                parts.append(f"reason: {reason}")
             blocked = _clean_text_list(output.get("blocked_subsystems"))
             if blocked:
-                parts.append("blocked_subsystems=" + ",".join(blocked))
+                parts.append("blocked subsystems: " + ", ".join(blocked))
             recommended = _format_recommended_actions(output.get("recommended_next_actions"))
             if recommended:
-                parts.append("recommended_next_actions=" + ";".join(recommended))
+                parts.append("recommended next actions: " + "; ".join(recommended))
             return "Soridormi task did not complete successfully: " + " / ".join(
                 str(part) for part in parts
             )

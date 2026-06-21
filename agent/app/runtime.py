@@ -31,7 +31,7 @@ logger = logging.getLogger("chromie.agent.runtime")
 
 _ROBOT_ACTION_WORDS = re.compile(
     r"\b("
-    r"approach|bow|bring|carry|come here|crouch|deliver|face|fetch|go|"
+    r"approach|bow|bring|carry|come here|come closer|crouch|deliver|face|fetch|go|"
     r"inspect|look|move|nod|recover|rotate|run|shake|sidestep|sit|smile|"
     r"stand|step|stop|turn|travel|walk|wave"
     r")\b",
@@ -106,7 +106,16 @@ def _normalized_text(text: str) -> str:
 
 def _looks_like_robot_action_request(text: str) -> bool:
     normalized = _normalized_text(text)
-    return bool(normalized and _ROBOT_ACTION_WORDS.search(normalized))
+    if not normalized:
+        return False
+    if _ROBOT_ACTION_WORDS.search(normalized):
+        return True
+    return bool(
+        re.search(
+            r"\b(walk|go|move|travel|navigate)\s+(to|toward|towards|near|into|inside)\b",
+            normalized,
+        )
+    )
 
 
 def _looks_like_planning_request(text: str) -> bool:
@@ -307,12 +316,9 @@ class InteractionRuntime(_AgentPipeline):
         request.context["capability_candidates"] = list(
             request.route_decision.candidate_capabilities
         )
-        if not search.matched:
-            return
-        if (
-            search.suggested_route == "robot_action"
+        embodied_task_candidate = (
+            self.services.task_graph_planner is not None
             and not request.route_decision.actions
-            and self.services.task_graph_planner is not None
             and not _has_interaction_executable_match(
                 request.route_decision.candidate_capabilities
             )
@@ -323,6 +329,12 @@ class InteractionRuntime(_AgentPipeline):
                 _looks_like_robot_action_request(request.text)
                 or _looks_like_planning_request(request.text)
             )
+        )
+        if not search.matched and not embodied_task_candidate:
+            return
+        if (
+            embodied_task_candidate
+            and (search.suggested_route == "robot_action" or not search.matched)
         ):
             request.route_decision.route = "tool"
             request.route_decision.agents = ["tool_agent", "speaker_agent"]
