@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the structure and pass state of an M13 acceptance evidence bundle."""
+"""Verify the structure and pass state of a voice acceptance evidence bundle."""
 
 from __future__ import annotations
 

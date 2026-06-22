@@ -119,9 +119,9 @@ Level A gate. Retained target-host evidence is listed in `docs/STATUS.md`.
 ./scripts/show_profile.sh
 ./scripts/start_services.sh
 ./scripts/start_orchestrator.sh
-python scripts/m13_voice_acceptance.py --dry-run \
+python scripts/voice_acceptance.py --dry-run \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
-python scripts/m13_voice_acceptance.py --preflight-only \
+python scripts/voice_acceptance.py --preflight-only \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi --start-services
 python scripts/provider_fault_matrix.py

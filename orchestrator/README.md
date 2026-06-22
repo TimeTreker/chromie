@@ -209,7 +209,7 @@ is best-effort and never authorizes or changes execution.
 Run the complete guided matrix with:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 

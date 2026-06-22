@@ -78,7 +78,7 @@ On June 14, 2026, the Linux x86_64 reference host with an NVIDIA GeForce RTX
 - virtual-microphone M13 `20260614T133155Z`: all seven cases passed through
   PipeWire at the same revision.
 
-Both M13 bundles pass `verify_m13_evidence.py --allow-automated --require-clean`
+Both M13 bundles pass `verify_voice_evidence.py --allow-automated --require-clean`
 with no errors or warnings. They are retained automated target-host evidence,
 not release-closing physical microphone/speaker evidence.
 
@@ -197,9 +197,9 @@ run with `--execute` against a supervised simulator endpoint.
 M13 text interaction is closed. A release that continues to claim physical
 voice-device support is not publishable until all of the following are complete:
 
-1. Run `scripts/m13_voice_acceptance.py --mode supervised` on the reference
+1. Run `scripts/voice_acceptance.py --mode supervised` on the reference
    host for all seven cases and ensure
-   `scripts/verify_m13_evidence.py --require-clean` passes.
+   `scripts/verify_voice_evidence.py --require-clean` passes.
 2. The retained bundle is reviewed for audible quality, simulator safe idle,
    cancellation/recovery behavior, correlated IDs, and absence of secrets.
 3. The candidate compatibility file has no remaining release blockers and
@@ -211,8 +211,8 @@ These legacy evidence tracks do not define the current delivery:
 
 - **Target GPU:** complete on the RTX 5090 reference host with a retained 21/21
   smoke pass; repeat on any hardware claimed by a release.
-- **Combined target runner:** run the legacy-named
-  `scripts/m5_target_acceptance.sh` with a supervised, runtime-backed Soridormi
+- **Combined target runner:** run
+  `scripts/run_supervised_target_acceptance.sh` with a supervised, runtime-backed Soridormi
   endpoint and complete the documented recovery step.
 - **Audio:** automatic synthetic and virtual-microphone modes passed; real
   microphone/speaker device information, timing logs, and pass/fail notes are

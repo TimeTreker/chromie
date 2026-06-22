@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a reproducible Chromie alpha release bundle after M13 acceptance."""
+"""Prepare a reproducible Chromie alpha release bundle after voice acceptance."""
 
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ from typing import Any, Sequence
 
 try:
     from release_provenance import collect_provenance
-    from verify_m13_evidence import verify_bundle
+    from verify_voice_evidence import verify_bundle
 except ImportError:  # imported as scripts.prepare_alpha_release in tests/tools
     from scripts.release_provenance import collect_provenance
-    from scripts.verify_m13_evidence import verify_bundle
+    from scripts.verify_voice_evidence import verify_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "releases"
@@ -109,9 +109,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
         raise ValueError(
             f"Compatibility version {declared_version!r} does not match VERSION {version!r}"
         )
-    blockers = compatibility.get("release_gate_blockers")
-    if blockers is None:
-        blockers = compatibility.get("m13_closure_blockers") or []
+    blockers = compatibility.get("release_gate_blockers") or []
     if blockers and not args.preview:
         raise RuntimeError(
             "Release candidate still has tracked blockers:\n- "
@@ -176,7 +174,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
     if model_lock_source.is_file():
         shutil.copy2(model_lock_source, output_dir / "model-lock.json")
         model_lock_artifact = "model-lock.json"
-    shutil.copy2(evidence_dir / "summary.md", output_dir / "m13-acceptance-summary.md")
+    shutil.copy2(evidence_dir / "summary.md", output_dir / "voice-acceptance-summary.md")
 
     publishable = (
         evidence_report["passed"]
@@ -199,7 +197,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
             "branch": git_output("branch", "--show-current"),
         },
         "compatibility": compatibility,
-        "m13_evidence": evidence_report,
+        "voice_evidence": evidence_report,
         "build_provenance": {
             "complete": provenance["complete"],
             "source_error_count": len(provenance["source_errors"]),
@@ -211,7 +209,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
             "compatibility": "compatibility.json",
             "model_lock": model_lock_artifact,
             "build_provenance": "build-provenance.json",
-            "acceptance_summary": "m13-acceptance-summary.md",
+            "acceptance_summary": "voice-acceptance-summary.md",
             "tests_log": None if args.skip_tests else "tests.log",
         },
         "publication_steps": [
@@ -230,7 +228,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
         output_dir / "release-notes.md",
         output_dir / "compatibility.json",
         provenance_path,
-        output_dir / "m13-acceptance-summary.md",
+        output_dir / "voice-acceptance-summary.md",
         output_dir / "manifest.json",
     ]
     if model_lock_artifact:

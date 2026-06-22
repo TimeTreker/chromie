@@ -12,7 +12,7 @@ Prepare a release bundle only after a complete alpha evidence bundle passes:
 
 ```bash
 python scripts/prepare_alpha_release.py \
-  --evidence-dir .chromie/acceptance/m13/<acceptance-id>
+  --evidence-dir .chromie/acceptance/voice/<acceptance-id>
 ```
 
 The command validates evidence and repository cleanliness, runs the full test

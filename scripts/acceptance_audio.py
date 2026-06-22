@@ -60,7 +60,7 @@ async def _generate_fixtures_async(
             client.synthesize(
                 text=text,
                 speaker_id=speaker_id,
-                request_id=f"m13-input-{uuid.uuid4().hex}",
+                request_id=f"voice-input-{uuid.uuid4().hex}",
             ),
             timeout=timeout_s,
         )
@@ -107,7 +107,7 @@ def generate_tts_fixtures(
 class PulseVirtualMicrophone:
     """Temporary PulseAudio/PipeWire-Pulse null sink and monitor source."""
 
-    def __init__(self, sink_name: str = "chromie_m13_test") -> None:
+    def __init__(self, sink_name: str = "chromie_voice_test") -> None:
         self.sink_name = sink_name
         self.source_name = f"{sink_name}.monitor"
         self.module_id: str | None = None
@@ -144,7 +144,7 @@ class PulseVirtualMicrophone:
                 "load-module",
                 "module-null-sink",
                 f"sink_name={self.sink_name}",
-                "sink_properties=device.description=Chromie_M13_Test_Input",
+                "sink_properties=device.description=Chromie_Voice_Test_Input",
             ],
             text=True,
             stdout=subprocess.PIPE,
@@ -216,7 +216,7 @@ class PulseVirtualMicrophone:
                 (
                     "{ factory.name=support.null-audio-sink "
                     f"node.name={self.sink_name} "
-                    "node.description=\"Chromie M13 Test Input\" "
+                    "node.description=\"Chromie Voice Test Input\" "
                     "media.class=Audio/Sink object.linger=true "
                     "audio.position=[ FL FR ] }"
                 ),

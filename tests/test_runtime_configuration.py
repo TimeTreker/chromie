@@ -89,12 +89,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('Skipping host Orchestrator (--no-orchestrator)', source)
         self.assertIn('ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE"', source)
 
-    def test_deprecated_voice_launcher_forwards_to_start_chromie(self) -> None:
-        source = (ROOT / "scripts" / "start_chromie_voice.sh").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("deprecated", source)
-        self.assertIn('exec "$ROOT_DIR/scripts/start_chromie.sh" "$@"', source)
+    def test_deprecated_voice_launcher_is_not_advertised(self) -> None:
+        self.assertFalse((ROOT / "scripts" / "start_chromie_voice.sh").exists())
 
     def test_removed_dead_controls_are_not_deployed(self) -> None:
         common = (ROOT / ".env.common").read_text(encoding="utf-8")

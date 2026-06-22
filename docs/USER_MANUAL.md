@@ -173,7 +173,7 @@ python scripts/interaction_text_skill_sweep.py \
 Use voice modes when you need audio pipeline evidence:
 
 ```bash
-python scripts/m13_voice_acceptance.py --mode synthetic \
+python scripts/voice_acceptance.py --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --start-services

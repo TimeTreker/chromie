@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "scripts" / "m5_target_acceptance.sh"
+SCRIPT = ROOT / "scripts" / "run_supervised_target_acceptance.sh"
 
 
 class M5TargetAcceptanceTests(unittest.TestCase):
@@ -18,7 +18,7 @@ class M5TargetAcceptanceTests(unittest.TestCase):
             cwd=ROOT,
             env={
                 **os.environ,
-                "M5_DRY_RUN": "1",
+                "TARGET_ACCEPTANCE_DRY_RUN": "1",
                 "SORIDORMI_MCP_URL": "http://soridormi.example/mcp",
             },
             capture_output=True,
@@ -37,9 +37,9 @@ class M5TargetAcceptanceTests(unittest.TestCase):
                 env={
                     **os.environ,
                     "SUPERVISED_ACCEPTANCE": "1",
-                    "M5_DRY_RUN": "1",
-                    "M5_ACCEPTANCE_ID": "test-acceptance",
-                    "M5_EVIDENCE_DIR": str(evidence),
+                    "TARGET_ACCEPTANCE_DRY_RUN": "1",
+                    "TARGET_ACCEPTANCE_ID": "test-acceptance",
+                    "TARGET_ACCEPTANCE_EVIDENCE_DIR": str(evidence),
                     "SORIDORMI_MCP_URL": "http://soridormi.example/mcp",
                     "CHROMIE_ACTIVE_PROFILE": "rtx4090",
                     "CHROMIE_NVIDIA_GPU_NAME": "Test GPU",
@@ -51,14 +51,14 @@ class M5TargetAcceptanceTests(unittest.TestCase):
             )
 
             summary = (evidence / "summary.env").read_text()
-            self.assertIn("M5_ACCEPTANCE_STATUS=dry_run", summary)
+            self.assertIn("TARGET_ACCEPTANCE_STATUS=dry_run", summary)
             self.assertIn(
-                "M5_ACCEPTANCE_ENDPOINT=http://soridormi.example/mcp",
+                "TARGET_ACCEPTANCE_ENDPOINT=http://soridormi.example/mcp",
                 summary,
             )
-            self.assertIn("M5_ACCEPTANCE_PROFILE=rtx4090", summary)
-            self.assertIn("M5_ACCEPTANCE_GPU=Test\\ GPU", summary)
-            self.assertIn("M5_ACCEPTANCE_RECOVERY_STATE=not_exercised", summary)
+            self.assertIn("TARGET_ACCEPTANCE_PROFILE=rtx4090", summary)
+            self.assertIn("TARGET_ACCEPTANCE_GPU=Test\\ GPU", summary)
+            self.assertIn("TARGET_ACCEPTANCE_RECOVERY_STATE=not_exercised", summary)
             self.assertTrue((evidence / "gpu-smoke.log").is_file())
             self.assertTrue((evidence / "runtime-preflight.json").is_file())
             self.assertTrue(
@@ -78,8 +78,8 @@ class M5TargetAcceptanceTests(unittest.TestCase):
             env = {
                 **os.environ,
                 "SUPERVISED_ACCEPTANCE": "1",
-                "M5_DRY_RUN": "1",
-                "M5_EVIDENCE_DIR": str(evidence),
+                "TARGET_ACCEPTANCE_DRY_RUN": "1",
+                "TARGET_ACCEPTANCE_EVIDENCE_DIR": str(evidence),
                 "SORIDORMI_MCP_URL": "",
             }
             result = subprocess.run(
@@ -92,9 +92,9 @@ class M5TargetAcceptanceTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 2)
             summary = (evidence / "summary.env").read_text()
-            self.assertIn("M5_ACCEPTANCE_STATUS=failed", summary)
-            self.assertIn("M5_ACCEPTANCE_FAILED_PHASE=initialization", summary)
-            self.assertIn("M5_ACCEPTANCE_RECOVERY_STATE=not_exercised", summary)
+            self.assertIn("TARGET_ACCEPTANCE_STATUS=failed", summary)
+            self.assertIn("TARGET_ACCEPTANCE_FAILED_PHASE=initialization", summary)
+            self.assertIn("TARGET_ACCEPTANCE_RECOVERY_STATE=not_exercised", summary)
 
 
 if __name__ == "__main__":

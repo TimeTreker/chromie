@@ -339,7 +339,7 @@ This command creates a text-MuJoCo evidence directory and fails closed on route,
 interaction, execution, or safe-idle mismatch. It uses a 120s per Soridormi
 skill diagnostic timeout by default; pass `--skill-timeout-s 0` to use
 catalog/default timeouts unchanged. Generated TTS-audio injection is covered by
-`scripts/m13_voice_acceptance.py --mode synthetic`; that mode skips the physical
+`scripts/voice_acceptance.py --mode synthetic`; that mode skips the physical
 microphone but intentionally keeps VAD and ASR in the path.
 
 The retained `20260617T081411Z` bundle closes the historical M13 text
@@ -364,10 +364,10 @@ The physical voice-device matrix and evidence requirements are maintained in
 includes real microphone and speaker operation:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
-python scripts/verify_m13_evidence.py --require-clean \
-  .chromie/acceptance/m13/<acceptance-id>
+python scripts/verify_voice_evidence.py --require-clean \
+  .chromie/acceptance/voice/<acceptance-id>
 ```
 
 The runner records correlated JSONL session events through

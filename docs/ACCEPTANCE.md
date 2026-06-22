@@ -299,7 +299,7 @@ procedure before further motion.
 
 ```bash
 SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
-  ./scripts/m5_target_acceptance.sh
+  ./scripts/run_supervised_target_acceptance.sh
 ```
 
 Evidence is written under:
@@ -316,15 +316,16 @@ and safe-idle confirmation.
 A command-only rehearsal is available:
 
 ```bash
-SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
+SUPERVISED_ACCEPTANCE=1 TARGET_ACCEPTANCE_DRY_RUN=1 \
   SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-  ./scripts/m5_target_acceptance.sh
+  ./scripts/run_supervised_target_acceptance.sh
 ```
 
 ## Voice audio acceptance modes
 
-The scripts, environment variables, and evidence directory retain the
-historical `m13` identifier for compatibility.
+New voice evidence uses functional script names and the
+`.chromie/acceptance/voice/` directory. Historical M13 text evidence remains
+documented separately.
 
 ## Provider fault matrix
 
@@ -459,7 +460,7 @@ remain inside the evidence root, requires the provider manifest's
 `metadata.upstream_commit` to match `revisions.soridormi`, and requires
 calibration artifact SHA-256 values to match.
 
-`scripts/m13_voice_acceptance.py` has three explicit modes. All three retain
+`scripts/voice_acceptance.py` has three explicit modes. All three retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.
 
@@ -485,7 +486,7 @@ Start the five Chromie services and a supervised MuJoCo-backed Soridormi MCP
 endpoint. Check all prerequisites before creating an evidence bundle:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --preflight-only \
   --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
@@ -499,7 +500,7 @@ and repository. It does not start services or create evidence. Once it reports
 `Overall: ready`, run:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
@@ -510,7 +511,7 @@ The runner generates each unique test utterance once through the existing TTS
 WebSocket service and stores it under:
 
 ```text
-.chromie/acceptance/m13/<id>/generated-input/
+.chromie/acceptance/voice/<id>/generated-input/
 ```
 
 It then injects a private framed PCM16 stream through the Orchestrator process's
@@ -527,8 +528,8 @@ ASR to recognize than arbitrary human speech.
 Verify automatic evidence with:
 
 ```bash
-python scripts/verify_m13_evidence.py --allow-automated \
-  .chromie/acceptance/m13/<id>
+python scripts/verify_voice_evidence.py --allow-automated \
+  .chromie/acceptance/voice/<id>
 ```
 
 The verifier reports the bundle as valid automated evidence but
@@ -544,14 +545,14 @@ when available and otherwise falls back to native
 `pw-cli`/`pw-cat`/`pw-dump` tools:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --mode virtual-mic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --start-services
 ```
 
-The runner creates a temporary null sink named `chromie_m13_test` by default,
+The runner creates a temporary null sink named `chromie_voice_test` by default,
 sets its monitor as `PULSE_SOURCE` for the Orchestrator, plays each generated WAV
 into that sink, and unloads the module during cleanup. Override the sink name
 with `--virtual-mic-sink` when needed.
@@ -568,7 +569,7 @@ Chromie revision `f0e22ba`.
 Commit the candidate revision first, then run:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --mode supervised \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
@@ -585,8 +586,8 @@ Only a clean, passing `supervised` bundle can satisfy the voice-device release
 verifier:
 
 ```bash
-python scripts/verify_m13_evidence.py --require-clean \
-  .chromie/acceptance/m13/<id>
+python scripts/verify_voice_evidence.py --require-clean \
+  .chromie/acceptance/voice/<id>
 ```
 
 The host runner uses `ORCH_RUNTIME_OVERRIDE_FILE` and does not edit the
@@ -613,7 +614,7 @@ playback, and operator-observed behavior.
 A command-only rehearsal remains non-evidence:
 
 ```bash
-python scripts/m13_voice_acceptance.py --dry-run \
+python scripts/voice_acceptance.py --dry-run \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 

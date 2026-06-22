@@ -9,7 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from scripts.m13_voice_acceptance import (
+from scripts.voice_acceptance import (
     AcceptanceAudioDriver,
     CASES,
     CheckResult,
@@ -37,7 +37,7 @@ from scripts.m13_voice_acceptance import (
 )
 from orchestrator.audio_injection import encode_audio_packet, read_audio_packet
 from scripts.acceptance_audio import AudioFixture, PulseVirtualMicrophone
-from scripts.verify_m13_evidence import REQUIRED_FILES, verify_bundle
+from scripts.verify_voice_evidence import REQUIRED_FILES, verify_bundle
 import scripts.prepare_alpha_release as release_module
 
 
@@ -56,15 +56,15 @@ class M13AcceptanceTests(unittest.TestCase):
     def test_automatic_mode_reexecs_in_managed_runtime_when_needed(self) -> None:
         with (
             mock.patch(
-                "scripts.m13_voice_acceptance.importlib.util.find_spec",
+                "scripts.voice_acceptance.importlib.util.find_spec",
                 return_value=None,
             ),
             mock.patch(
-                "scripts.m13_voice_acceptance.shutil.which",
+                "scripts.voice_acceptance.shutil.which",
                 return_value="/usr/bin/conda",
             ),
             mock.patch(
-                "scripts.m13_voice_acceptance.os.execvpe",
+                "scripts.voice_acceptance.os.execvpe",
             ) as execvpe,
             mock.patch.dict("os.environ", {}, clear=True),
         ):
@@ -81,15 +81,15 @@ class M13AcceptanceTests(unittest.TestCase):
             "python",
         ])
         self.assertEqual(command[-3:], ["--mode", "synthetic", "--allow-dirty"])
-        self.assertEqual(environment["CHROMIE_M13_RUNTIME_REEXEC"], "1")
+        self.assertEqual(environment["CHROMIE_VOICE_ACCEPTANCE_RUNTIME_REEXEC"], "1")
 
     def test_preflight_does_not_reexec_managed_runtime(self) -> None:
         with (
             mock.patch(
-                "scripts.m13_voice_acceptance.importlib.util.find_spec",
+                "scripts.voice_acceptance.importlib.util.find_spec",
                 return_value=None,
             ),
-            mock.patch("scripts.m13_voice_acceptance.os.execvpe") as execvpe,
+            mock.patch("scripts.voice_acceptance.os.execvpe") as execvpe,
         ):
             ensure_acceptance_runtime(["--preflight-only"])
 
@@ -110,15 +110,15 @@ class M13AcceptanceTests(unittest.TestCase):
         )
         with (
             mock.patch(
-                "scripts.m13_voice_acceptance.shutil.which",
+                "scripts.voice_acceptance.shutil.which",
                 side_effect=lambda command: None,
             ),
             mock.patch(
-                "scripts.m13_voice_acceptance.importlib.util.find_spec",
+                "scripts.voice_acceptance.importlib.util.find_spec",
                 return_value=object(),
             ),
             mock.patch(
-                "scripts.m13_voice_acceptance.socket.create_connection",
+                "scripts.voice_acceptance.socket.create_connection",
                 side_effect=ConnectionRefusedError("refused"),
             ),
         ):
@@ -146,17 +146,17 @@ class M13AcceptanceTests(unittest.TestCase):
         )
         with (
             mock.patch(
-                "scripts.m13_voice_acceptance.shutil.which",
+                "scripts.voice_acceptance.shutil.which",
                 side_effect=lambda command: (
                     "/usr/bin/docker" if command == "docker" else None
                 ),
             ),
             mock.patch(
-                "scripts.m13_voice_acceptance.subprocess.run",
+                "scripts.voice_acceptance.subprocess.run",
                 return_value=daemon,
             ),
             mock.patch(
-                "scripts.m13_voice_acceptance.importlib.util.find_spec",
+                "scripts.voice_acceptance.importlib.util.find_spec",
                 return_value=object(),
             ),
         ):
@@ -182,7 +182,7 @@ class M13AcceptanceTests(unittest.TestCase):
             )
             with (
                 mock.patch(
-                    "scripts.m13_voice_acceptance.acceptance_readiness",
+                    "scripts.voice_acceptance.acceptance_readiness",
                     return_value=[CheckResult("test", True, "ready")],
                 ),
                 mock.patch("builtins.print"),
@@ -418,9 +418,9 @@ class M13AcceptanceTests(unittest.TestCase):
             "asr_final: asr_ms=12.0 text_chars=10 text='hello moon'",
         )
         with mock.patch(
-            "scripts.m13_voice_acceptance.wait_for_any_event",
+            "scripts.voice_acceptance.wait_for_any_event",
             return_value=detected,
-        ), mock.patch("scripts.m13_voice_acceptance.print_countdown"), mock.patch(
+        ), mock.patch("scripts.voice_acceptance.print_countdown"), mock.patch(
             "builtins.print"
         ):
             result = guide_spoken_step(

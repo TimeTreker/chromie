@@ -380,7 +380,7 @@ recovery procedure and verify ready/safe-idle state before further motion.
 
 ```bash
 SUPERVISED_ACCEPTANCE=1 START_SERVICES=1 \
-  ./scripts/m5_target_acceptance.sh
+  ./scripts/run_supervised_target_acceptance.sh
 ```
 
 Evidence appears under `.chromie/acceptance/<id>/`. The runner combines runtime
@@ -390,14 +390,15 @@ record the recovery result; the script itself leaves e-stop active.
 Command rehearsal:
 
 ```bash
-SUPERVISED_ACCEPTANCE=1 M5_DRY_RUN=1 \
+SUPERVISED_ACCEPTANCE=1 TARGET_ACCEPTANCE_DRY_RUN=1 \
   SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp \
-  ./scripts/m5_target_acceptance.sh
+  ./scripts/run_supervised_target_acceptance.sh
 ```
 
 ## 13. Alpha voice acceptance
 
-The command names and evidence paths retain the historical `m13` identifier.
+Use the functional voice acceptance commands for new evidence. Historical
+M13 text evidence remains documented separately.
 
 Before live simulator work, run the dependency-free provider fault matrix:
 
@@ -452,7 +453,7 @@ audio path, so the test still crosses VAD, ASR, Router, native Agent output,
 Skill Runtime, response TTS, and Soridormi without relying on a person speaking:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --preflight-only \
   --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
@@ -464,7 +465,7 @@ This reports all local blockers without starting services or creating an
 evidence directory. After it reports `Overall: ready`, run:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --mode synthetic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
@@ -476,15 +477,15 @@ transcripts, Router results, proposed skill IDs, skill results, and final case
 verdicts. Validate this regression evidence with:
 
 ```bash
-python scripts/verify_m13_evidence.py --allow-automated \
-  .chromie/acceptance/m13/<id>
+python scripts/verify_voice_evidence.py --allow-automated \
+  .chromie/acceptance/voice/<id>
 ```
 
 To include the host audio-device capture path without using a physical
 microphone, run:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --mode virtual-mic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
@@ -500,7 +501,7 @@ run was killed before cleanup, unload the stale module with
 Finally, commit the candidate revision and run the real reference-host matrix:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --mode supervised \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
@@ -513,8 +514,8 @@ pipeline trace. It asks for an audible/visual verdict only after all automated
 checks pass. Verify release-closing evidence without `--allow-automated`:
 
 ```bash
-python scripts/verify_m13_evidence.py --require-clean \
-  .chromie/acceptance/m13/<id>
+python scripts/verify_voice_evidence.py --require-clean \
+  .chromie/acceptance/voice/<id>
 ```
 
 Automatic bundles are useful regression evidence but cannot close the alpha

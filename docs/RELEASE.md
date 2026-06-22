@@ -44,12 +44,12 @@ For a release that claims real microphone/speaker operation, first complete and
 verify the guided reference-host run:
 
 ```bash
-python scripts/m13_voice_acceptance.py \
+python scripts/voice_acceptance.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi
 
-python scripts/verify_m13_evidence.py --require-clean \
-  .chromie/acceptance/m13/<acceptance-id>
+python scripts/verify_voice_evidence.py --require-clean \
+  .chromie/acceptance/voice/<acceptance-id>
 ```
 
 The M13 text-to-MuJoCo interaction scope is already evidenced by
@@ -58,7 +58,7 @@ created before all blockers close:
 
 ```bash
 python scripts/prepare_alpha_release.py --preview \
-  --evidence-dir .chromie/acceptance/m13/<acceptance-id>
+  --evidence-dir .chromie/acceptance/voice/<acceptance-id>
 ```
 
 A publishable preparation omits `--preview`. It requires a clean committed
@@ -67,7 +67,7 @@ revision, passing evidence, no tracked closure blockers in
 
 ```bash
 python scripts/prepare_alpha_release.py --require-clean-evidence \
-  --evidence-dir .chromie/acceptance/m13/<acceptance-id>
+  --evidence-dir .chromie/acceptance/voice/<acceptance-id>
 ```
 
 Generated files are placed below `.chromie/releases/` and include a Git source
@@ -141,7 +141,7 @@ The release process must also probe the live endpoint and retain the result.
 - Native `InteractionResponse` generation is enabled and validated; compatibility rollback is documented.
 - Non-skippable spoken confirmation dialogue is verified and request-bound.
 - All seven guided cases in `ACCEPTANCE.md` are retained with correlated JSONL events.
-- `scripts/verify_m13_evidence.py --require-clean` passes.
+- `scripts/verify_voice_evidence.py --require-clean` passes.
 - Barge-in and body cancellation leave no stale speech or orphaned motion.
 - Stop/emergency exercises include operator recovery confirmation.
 - Evidence is reviewed for private speech, secrets, and unsafe state before publication.

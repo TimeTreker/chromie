@@ -5,19 +5,19 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 SUPERVISED_ACCEPTANCE="${SUPERVISED_ACCEPTANCE:-0}"
-M5_DRY_RUN="${M5_DRY_RUN:-0}"
+TARGET_ACCEPTANCE_DRY_RUN="${TARGET_ACCEPTANCE_DRY_RUN:-0}"
 START_SERVICES="${START_SERVICES:-0}"
 RUN_TTS_SYNTHESIS="${RUN_TTS_SYNTHESIS:-1}"
-M5_EVIDENCE_ROOT="${M5_EVIDENCE_ROOT:-.chromie/acceptance}"
-M5_ACCEPTANCE_ID="${M5_ACCEPTANCE_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
-EVIDENCE_DIR="${M5_EVIDENCE_DIR:-${M5_EVIDENCE_ROOT}/${M5_ACCEPTANCE_ID}}"
+TARGET_ACCEPTANCE_EVIDENCE_ROOT="${TARGET_ACCEPTANCE_EVIDENCE_ROOT:-.chromie/acceptance}"
+TARGET_ACCEPTANCE_ID="${TARGET_ACCEPTANCE_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
+EVIDENCE_DIR="${TARGET_ACCEPTANCE_EVIDENCE_DIR:-${TARGET_ACCEPTANCE_EVIDENCE_ROOT}/${TARGET_ACCEPTANCE_ID}}"
 SUMMARY_FILE="${EVIDENCE_DIR}/summary.env"
 STATUS="failed"
 FAILED_PHASE="initialization"
 RECOVERY_STATE="not_exercised"
 
 if [ "$SUPERVISED_ACCEPTANCE" != "1" ]; then
-  echo "[m5-acceptance][error] Set SUPERVISED_ACCEPTANCE=1 with a safety operator present." >&2
+  echo "[target-acceptance][error] Set SUPERVISED_ACCEPTANCE=1 with a safety operator present." >&2
   exit 2
 fi
 
@@ -28,16 +28,16 @@ write_summary() {
   local commit
   commit="$(git rev-parse HEAD 2>/dev/null || printf unknown)"
   {
-    printf 'M5_ACCEPTANCE_STATUS=%q\n' "$STATUS"
-    printf 'M5_ACCEPTANCE_FAILED_PHASE=%q\n' "$FAILED_PHASE"
-    printf 'M5_ACCEPTANCE_EXIT_CODE=%q\n' "$exit_code"
-    printf 'M5_ACCEPTANCE_ID=%q\n' "$M5_ACCEPTANCE_ID"
-    printf 'M5_ACCEPTANCE_COMMIT=%q\n' "$commit"
-    printf 'M5_ACCEPTANCE_ENDPOINT=%q\n' "${SORIDORMI_MCP_URL:-}"
-    printf 'M5_ACCEPTANCE_PROFILE=%q\n' "${CHROMIE_ACTIVE_PROFILE:-unknown}"
-    printf 'M5_ACCEPTANCE_GPU=%q\n' "${CHROMIE_NVIDIA_GPU_NAME:-unknown}"
-    printf 'M5_ACCEPTANCE_COMPUTE_CAP=%q\n' "${CHROMIE_NVIDIA_COMPUTE_CAP:-unknown}"
-    printf 'M5_ACCEPTANCE_RECOVERY_STATE=%q\n' "$RECOVERY_STATE"
+    printf 'TARGET_ACCEPTANCE_STATUS=%q\n' "$STATUS"
+    printf 'TARGET_ACCEPTANCE_FAILED_PHASE=%q\n' "$FAILED_PHASE"
+    printf 'TARGET_ACCEPTANCE_EXIT_CODE=%q\n' "$exit_code"
+    printf 'TARGET_ACCEPTANCE_ID=%q\n' "$TARGET_ACCEPTANCE_ID"
+    printf 'TARGET_ACCEPTANCE_COMMIT=%q\n' "$commit"
+    printf 'TARGET_ACCEPTANCE_ENDPOINT=%q\n' "${SORIDORMI_MCP_URL:-}"
+    printf 'TARGET_ACCEPTANCE_PROFILE=%q\n' "${CHROMIE_ACTIVE_PROFILE:-unknown}"
+    printf 'TARGET_ACCEPTANCE_GPU=%q\n' "${CHROMIE_NVIDIA_GPU_NAME:-unknown}"
+    printf 'TARGET_ACCEPTANCE_COMPUTE_CAP=%q\n' "${CHROMIE_NVIDIA_COMPUTE_CAP:-unknown}"
+    printf 'TARGET_ACCEPTANCE_RECOVERY_STATE=%q\n' "$RECOVERY_STATE"
   } > "$SUMMARY_FILE"
 }
 trap write_summary EXIT
@@ -48,9 +48,9 @@ run_logged() {
   shift 2
 
   FAILED_PHASE="$phase"
-  printf '\n[m5-acceptance] %s\n' "$phase"
-  if [ "$M5_DRY_RUN" = "1" ]; then
-    printf '[m5-acceptance][DRY-RUN] '
+  printf '\n[target-acceptance] %s\n' "$phase"
+  if [ "$TARGET_ACCEPTANCE_DRY_RUN" = "1" ]; then
+    printf '[target-acceptance][DRY-RUN] '
     printf '%q ' "$@"
     printf '\n'
     printf 'DRY-RUN: ' > "$log_file"
@@ -69,9 +69,9 @@ run_json_logged() {
   shift 3
 
   FAILED_PHASE="$phase"
-  printf '\n[m5-acceptance] %s\n' "$phase"
-  if [ "$M5_DRY_RUN" = "1" ]; then
-    printf '[m5-acceptance][DRY-RUN] '
+  printf '\n[target-acceptance] %s\n' "$phase"
+  if [ "$TARGET_ACCEPTANCE_DRY_RUN" = "1" ]; then
+    printf '[target-acceptance][DRY-RUN] '
     printf '%q ' "$@"
     printf '\n'
     printf '{"dry_run":true}\n' > "$json_file"
@@ -92,7 +92,7 @@ run_json_logged() {
     "$json_file"
 }
 
-if [ "$M5_DRY_RUN" != "1" ]; then
+if [ "$TARGET_ACCEPTANCE_DRY_RUN" != "1" ]; then
   run_logged \
     "Generate runtime configuration" \
     "$EVIDENCE_DIR/runtime-env.log" \
@@ -104,7 +104,7 @@ if [ "$M5_DRY_RUN" != "1" ]; then
 fi
 
 if [ -z "${SORIDORMI_MCP_URL:-}" ]; then
-  echo "[m5-acceptance][error] SORIDORMI_MCP_URL is required." >&2
+  echo "[target-acceptance][error] SORIDORMI_MCP_URL is required." >&2
   exit 2
 fi
 
@@ -145,11 +145,11 @@ run_logged \
 RECOVERY_STATE="emergency_stop_active_requires_recovery"
 STATUS="passed"
 FAILED_PHASE=""
-if [ "$M5_DRY_RUN" = "1" ]; then
+if [ "$TARGET_ACCEPTANCE_DRY_RUN" = "1" ]; then
   STATUS="dry_run"
   RECOVERY_STATE="not_exercised"
 fi
 
 echo
-echo "[m5-acceptance] Evidence: $EVIDENCE_DIR"
-echo "[m5-acceptance] Soridormi remains emergency-stopped. Complete its recovery procedure before more motion."
+echo "[target-acceptance] Evidence: $EVIDENCE_DIR"
+echo "[target-acceptance] Soridormi remains emergency-stopped. Complete its recovery procedure before more motion."

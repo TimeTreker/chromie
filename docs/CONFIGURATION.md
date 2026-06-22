@@ -351,16 +351,15 @@ variables are not a supported production-selection mechanism in this revision.
 - GPU smoke: `DRY_RUN`, `START_SERVICES`, `RUN_TTS_SYNTHESIS`,
   `RUN_OLLAMA_GENERATE`, `SMOKE_TIMEOUT_SECONDS`, `TTS_SMOKE_TEXT`,
   `TTS_SMOKE_SPEAKER`.
-- Supervised target acceptance: `SUPERVISED_ACCEPTANCE=1`, `M5_DRY_RUN`,
-  `M5_EVIDENCE_ROOT`, `M5_ACCEPTANCE_ID`, `M5_EVIDENCE_DIR`.
-- Alpha voice acceptance uses CLI flags on the legacy-named
-  `scripts/m13_voice_acceptance.py`.
+- Supervised target acceptance: `SUPERVISED_ACCEPTANCE=1`, `TARGET_ACCEPTANCE_DRY_RUN`,
+  `TARGET_ACCEPTANCE_EVIDENCE_ROOT`, `TARGET_ACCEPTANCE_ID`, `TARGET_ACCEPTANCE_EVIDENCE_DIR`.
+- Alpha voice acceptance uses CLI flags on `scripts/voice_acceptance.py`.
   `--mode synthetic` is the fully automatic default; `--mode virtual-mic`
   exercises a PulseAudio/PipeWire monitor source; `--mode supervised` uses the
   real microphone and speaker. Automated modes also accept `--tts-url`,
   `--tts-speaker-id`, and `--virtual-mic-sink`. The runner generates a temporary
   `ORCH_RUNTIME_OVERRIDE_FILE`, enables `ORCH_EVENT_LOG_PATH`, and writes below
-  `.chromie/acceptance/m13/`. Use `--preflight-only` to check Docker, the
+  `.chromie/acceptance/voice/`. Use `--preflight-only` to check Docker, the
   automatic runtime, audio backend, and required endpoints without starting
   services or creating evidence. Its capability probe defaults to
   `--probe-runtime container`, executing inside `chromie-agent`. Host-loopback
