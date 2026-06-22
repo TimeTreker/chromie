@@ -70,6 +70,75 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("creative speech-only requests", prompt)
         self.assertIn("'go ahead'", prompt)
 
+    def test_payload_disables_qwen_thinking_and_supports_relaxed_json_retry(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(text="Go ahead and sing a song for me.")
+
+        payload = router.build_payload(request)
+        relaxed = router.build_payload(request, relaxed_json=True)
+
+        self.assertIs(payload["think"], False)
+        self.assertIs(relaxed["think"], False)
+        self.assertIsInstance(payload["format"], dict)
+        self.assertEqual(relaxed["format"], "json")
+        self.assertIn("Go ahead and sing a song for me.", payload["messages"][1]["content"])
+
+    def test_route_only_json_response_gets_default_llm_confidence(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(text="Go ahead and sing a song for me.")
+
+        decision = router._decision_from_response(
+            request,
+            {"message": {"content": '{"route":"chat"}'}},
+        )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "chat")
+        self.assertGreaterEqual(decision.confidence, 0.72)
+        self.assertIn("default confidence", decision.reason or "")
+
+
+class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_review_model_overrides_underspecified_robot_action(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {"message": {"content": '{"intent":"chat"}'}}
+                return {"message": {"content": '{"route":"robot_action"}'}}
+
+        router = ReviewRouter()
+        request = RouteRequest(text="Go ahead and sing a song for me.")
+
+        decision = await router.route(request)
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "chat")
+        self.assertIn("intent-only route JSON", decision.reason or "")
+        self.assertIn("review_model:review-model", decision.reason or "")
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+        self.assertTrue(all(payload["think"] is False for payload in router.payloads))
+
 
 if __name__ == "__main__":
     unittest.main()

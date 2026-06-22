@@ -76,6 +76,25 @@ fi
 
 mkdir -p "$EVIDENCE_ROOT"
 
+PYTHON_BIN="${CHROMIE_PYTHON:-}"
+if [ -z "$PYTHON_BIN" ]; then
+  CONDA_ENV_NAME="${CONDA_ENV_NAME:-${CHROMIE_CONDA_ENV:-Chromie}}"
+  if command -v conda >/dev/null 2>&1; then
+    CONDA_BASE="$(conda info --base)"
+  elif [ -x "$HOME/miniconda3/bin/conda" ]; then
+    CONDA_BASE="$HOME/miniconda3"
+  elif [ -x "$HOME/anaconda3/bin/conda" ]; then
+    CONDA_BASE="$HOME/anaconda3"
+  else
+    echo "[voice-mujoco-text][error] conda not found; set CHROMIE_PYTHON to a Python with orchestrator dependencies." >&2
+    exit 1
+  fi
+  # shellcheck disable=SC1091
+  source "$CONDA_BASE/etc/profile.d/conda.sh"
+  conda activate "$CONDA_ENV_NAME"
+  PYTHON_BIN="$(command -v python)"
+fi
+
 args=(
   --soridormi-mcp-url "$MCP_URL"
   --manifest capabilities/soridormi.json
@@ -91,4 +110,4 @@ else
 fi
 args+=("${EXPECT_ROUTE[@]}" "${EXPECT_NO_SKILLS[@]}" "${EXPECT_SKILL[@]}" "${EXPECT_ARGS[@]}" "$TEXT")
 
-python scripts/interaction_text_mujoco_check.py "${args[@]}"
+"$PYTHON_BIN" scripts/interaction_text_mujoco_check.py "${args[@]}"

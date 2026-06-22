@@ -151,6 +151,7 @@ configuration.
 | `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the small Router model for fast semantic routing while quick-control rules remain deterministic. |
 | `ROUTER_RULES_FIRST` | `1`. |
 | `ROUTER_MODEL` | `qwen3:0.6b` in common configuration. |
+| `ROUTER_REVIEW_MODEL` | `gemma4:26b` in common configuration; reviews underspecified LLM `robot_action` choices before any robot skill is selected. |
 | `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
 | `ROUTER_TIMEOUT_MS` | `1500` in common configuration. |
 | `ROUTER_LLM_TIMEOUT_MS` | Falls back to `ROUTER_TIMEOUT_MS`. |

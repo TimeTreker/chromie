@@ -316,6 +316,13 @@ class InteractionRuntime(_AgentPipeline):
         request.context["capability_candidates"] = list(
             request.route_decision.candidate_capabilities
         )
+        if (
+            request.route_decision.route == "chat"
+            and request.route_decision.source == "llm"
+            and request.route_decision.confidence >= 0.55
+        ):
+            request.route_decision.agents = ["conversation_agent", "speaker_agent"]
+            return
         embodied_task_candidate = (
             self.services.task_graph_planner is not None
             and not request.route_decision.actions

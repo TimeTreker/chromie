@@ -8,12 +8,13 @@ from agent.app.schema import AgentResult, AgentRunRequest
 
 
 class _CapturingOllama:
-    def __init__(self) -> None:
+    def __init__(self, response: str = "Here is a little song I made for you.") -> None:
+        self.response = response
         self.calls: list[dict[str, Any]] = []
 
     async def generate(self, prompt: str, **kwargs: Any) -> str:
         self.calls.append({"prompt": prompt, **kwargs})
-        return "Here is a little song I made for you."
+        return self.response
 
 
 class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
@@ -46,10 +47,45 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.speak_immediate[0].text, "Here is a little song I made for you.")
         self.assertEqual(len(ollama.calls), 1)
         system = ollama.calls[0]["system"]
-        self.assertIn("brief original verse", system)
-        self.assertIn("continue in sections", system)
+        self.assertIn("sing original lyrics", system)
+        self.assertIn("split them into spoken sections", system)
         self.assertIn("Do not quote copyrighted lyrics", system)
         self.assertIn("do not say you are not programmed to sing", system)
+
+    async def test_long_song_response_is_split_into_tts_sized_sections(self) -> None:
+        response = (
+            "Verse one glows softly under a friendly moon. "
+            "Verse two keeps walking through a field of tiny lights. "
+            "Verse three comes home with a bright little chorus for you."
+        )
+        ollama = _CapturingOllama(response)
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=70,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "long-song-test",
+                "text": "Please sing a long song for me.",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.91,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertGreater(len(result.speak_immediate), 1)
+        self.assertTrue(all(len(item.text) <= 70 for item in result.speak_immediate))
+        self.assertIn("Verse three", " ".join(item.text for item in result.speak_immediate))
 
 
 if __name__ == "__main__":

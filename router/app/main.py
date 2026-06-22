@@ -32,6 +32,7 @@ class Settings(BaseModel):
     )
     ollama_url: str = Field(default_factory=lambda: os.getenv("ROUTER_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("ROUTER_MODEL", "qwen3:0.6b"))
+    review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:26b"))
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "800")))
     llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "800"))))
     confidence_threshold: float = Field(
@@ -82,6 +83,7 @@ capability_catalog = CapabilityCatalogClient(
 llm_router = OllamaLLMRouter(
     ollama_url=settings.ollama_url,
     model=settings.model,
+    review_model=settings.review_model,
     timeout_ms=settings.llm_timeout_ms,
     confidence_threshold=settings.confidence_threshold,
     prompt_path=Path(__file__).parent / "prompts" / "router_system.txt",

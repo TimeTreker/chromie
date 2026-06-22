@@ -90,7 +90,7 @@ class ConversationAgent(BaseAgent):
                     response,
                     (time.perf_counter() - started) * 1000.0,
                 )
-                result.add_speak_immediate(response, style="brief")
+                self._add_spoken_response(result, response)
                 self.trace(result, "generated llm reply with short-term context")
                 return result
             except Exception as exc:
@@ -136,8 +136,8 @@ class ConversationAgent(BaseAgent):
                 "回答能力问题前必须检查提供的能力目录；不要声称机器人断开，除非目录明确不可用。"
                 "不要描述身体动作或舞台指令；表情动作会由运行时单独处理。"
                 "回复要适合语音播放，默认一句话。"
-                "如果用户要你唱歌或创作歌曲，可以唱一小段原创歌词；如果用户要很长的歌，"
-                "先给一段原创歌词，并自然说明可以继续分段唱。不要引用受版权保护的歌词，"
+                "如果用户要你唱歌或创作歌曲，可以创作并唱原创歌词；如果用户要很长的歌，"
+                "写几段紧凑的原创歌词，系统会分段播放。不要引用受版权保护的歌词，"
                 "也不要说自己没有被编程成会唱歌。"
                 "请只输出要说的话，不要输出 JSON。"
             )
@@ -160,7 +160,7 @@ class ConversationAgent(BaseAgent):
                 "Before answering capability questions, inspect the supplied capability catalog. Do not claim the robot is disconnected unless the catalog says it is unavailable. "
                 "Do not describe body gestures or stage directions; expressive motion is handled separately by the runtime. "
                 "The reply will be spoken aloud, so use one short sentence by default. "
-                "For singing or songwriting requests, you may sing a brief original verse; for a long song, start with one compact original verse and offer to continue in sections. "
+                "For singing or songwriting requests, you may sing original lyrics; for a long song, write several compact original lines or verses and the runtime will split them into spoken sections. "
                 "Do not quote copyrighted lyrics, and do not say you are not programmed to sing. "
                 "Reply with only the spoken response text. Do not output JSON."
             )
@@ -186,6 +186,44 @@ class ConversationAgent(BaseAgent):
         )
         response = cast(str, raw)
         return self._clean_response(response, zh=zh)
+
+    def _add_spoken_response(self, result: AgentResult, response: str) -> None:
+        for chunk in self._split_spoken_response(response):
+            result.add_speak_immediate(chunk, style="brief")
+
+    def _split_spoken_response(self, response: str) -> list[str]:
+        text = " ".join((response or "").strip().split())
+        if not text:
+            return []
+        max_chars = max(1, self.services.max_speak_chars)
+        max_total = max_chars * 4
+        if len(text) > max_total:
+            text = text[:max_total].rstrip("，,。.!！?？ ")
+            text += "。" if any("\u4e00" <= ch <= "\u9fff" for ch in text) else "."
+        if len(text) <= max_chars:
+            return [text]
+
+        chunks: list[str] = []
+        current = ""
+        for word in text.split(" "):
+            candidate = f"{current} {word}".strip() if current else word
+            if len(candidate) <= max_chars:
+                current = candidate
+                continue
+            if current:
+                chunks.append(current.rstrip("，,。.!！?？ "))
+            if len(word) <= max_chars:
+                current = word
+                continue
+            for offset in range(0, len(word), max_chars):
+                piece = word[offset : offset + max_chars]
+                if len(piece) == max_chars:
+                    chunks.append(piece)
+                else:
+                    current = piece
+        if current:
+            chunks.append(current.rstrip("，,。.!！?？ "))
+        return [chunk for chunk in chunks if chunk]
 
     def _conversation_id(self, request: AgentRunRequest) -> str | None:
         context = request.context or {}
@@ -325,8 +363,4 @@ class ConversationAgent(BaseAgent):
                 response = response[len(prefix) :].strip()
                 break
 
-        max_chars = self.services.max_speak_chars
-        if len(response) > max_chars:
-            response = response[:max_chars].rstrip("，,。.!！?？ ")
-            response += "。" if zh else "."
         return response

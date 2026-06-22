@@ -227,6 +227,42 @@ class _JokeOllama:
         return "Why did the robot bring a ladder? To reach the cloud."
 
 
+class _SongOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> str:
+        del prompt, kwargs
+        return "La la, here is a small song just for you."
+
+
+class _SongMotionCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del kwargs
+        return CapabilitySearchResult(
+            query=text,
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=12,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.curve_walk",
+                    agent_id="soridormi.skill",
+                    description="Walk forward while tracking a yaw command.",
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.5,
+                    metadata={"mode": "sim"},
+                )
+            ],
+        )
+
+
 def _request(
     *,
     text: str = "nod",
@@ -394,6 +430,31 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "Why did the robot bring a ladder? To reach the cloud.",
         )
         self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
+
+    async def test_confident_llm_chat_is_not_overwritten_by_motion_catalog(self) -> None:
+        request = _request(
+            text="Go ahead and sing a song for me.",
+            route="chat",
+            intent="chat",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        request.route_decision.source = "llm"
+        request.route_decision.confidence = 0.72
+
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_SongOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_SongMotionCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="off",
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(response.speech[0].text, "La la, here is a small song just for you.")
+        self.assertNotIn("capability_decision", response.metadata)
+        self.assertEqual(response.skills, [])
 
     async def test_expressive_body_cues_off_keeps_chat_speech_only(self) -> None:
         request = _request(
