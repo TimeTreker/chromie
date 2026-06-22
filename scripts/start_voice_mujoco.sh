@@ -72,7 +72,7 @@ fi
 
 for path in \
   "$SORIDORMI_REPO/scripts/start_soridormi_mujoco.sh" \
-  "$ROOT_DIR/scripts/start_chromie_voice.sh" \
+  "$ROOT_DIR/scripts/start_chromie.sh" \
   "$ROOT_DIR/scripts/status_voice_mujoco.sh" \
   "$ROOT_DIR/scripts/check_voice_mujoco_logs.sh"; do
   [ -e "$path" ] || {
@@ -176,7 +176,7 @@ fi
 
 ORCH_EVENT_LOG_PATH="$EVENT_LOG" \
   ORCH_SESSION_TIMING_LOGS=1 \
-  ./scripts/start_chromie_voice.sh "${chromie_args[@]}" 2>&1 | tee "$CHROMIE_LOG" &
+  ./scripts/start_chromie.sh "${chromie_args[@]}" 2>&1 | tee "$CHROMIE_LOG" &
 CHROMIE_PID=$!
 echo "$CHROMIE_PID" > "$CHROMIE_PID_FILE"
 

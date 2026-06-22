@@ -22,6 +22,18 @@ Generated files:
 
 Do not hand-edit `.env.runtime`.
 
+## 1.1 Launcher layers
+
+`./scripts/start_services.sh` is the low-level Docker service launcher. It
+builds or starts ASR, TTS, Ollama, Router, and Agent using `.env.runtime` and
+Compose overrides. It does not start the host Orchestrator and does not assume
+Soridormi is running.
+
+`./scripts/start_chromie.sh` is the operator launcher. It expects Soridormi MCP
+to already be reachable, writes the Chromie/Soridormi runtime overrides, starts
+the Docker services through `start_services.sh`, probes Soridormi capabilities,
+and then starts the host Orchestrator.
+
 ## 2. Start Docker services
 
 First build:
@@ -125,7 +137,7 @@ Start Soridormi's simulator and runtime MCP first. Then, from the Chromie
 repository root, run:
 
 ```bash
-./scripts/start_chromie_voice.sh
+./scripts/start_chromie.sh
 ```
 
 The launcher uses the same `.env.runtime` and Compose image definitions as the
