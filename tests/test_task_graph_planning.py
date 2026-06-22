@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 from typing import Any
 
 from agent.app.agents import AgentServices
@@ -14,9 +16,27 @@ from agent.app.capabilities.models import (
 )
 from agent.app.runtime import AgentRuntime, InteractionRuntime
 from agent.app.schema import AgentRunRequest
+from agent.app.task_graph.models import TaskGraph
 from agent.app.task_graph.planner import TaskGraphPlanner
+from agent.app.task_graph.validator import GraphValidator
 from orchestrator.schemas.agent import AgentResult as OrchestratorAgentResult
 from shared.chromie_contracts.agent import AgentResult as SharedAgentResult
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DECLARED_SORIDORMI_TASK_TYPES = {
+    "move_velocity",
+    "turn_to_heading",
+    "approach_target",
+    "navigate_to_location",
+    "look_at_target",
+    "perform_gesture",
+    "skill_sequence",
+    "speak_while_moving",
+    "stop_now",
+    "recover_safe_idle",
+    "deliver_object",
+}
 
 
 class FakeOllama:
@@ -180,6 +200,42 @@ def _soridormi_task_registry() -> CapabilityRegistry:
     )
 
 
+def _checked_in_soridormi_registry() -> CapabilityRegistry:
+    return build_chromie_registry(
+        [CapabilityBundle.load_file(ROOT / "capabilities" / "soridormi.json")]
+    )
+
+
+def _declared_soridormi_task_types() -> list[str]:
+    payload = json.loads((ROOT / "capabilities" / "soridormi.json").read_text(encoding="utf-8"))
+    for agent in payload["agents"]:
+        for tool in agent["tools"]:
+            if tool["name"] == "soridormi.task.submit":
+                return list(tool["input_schema"]["properties"]["task_type"]["enum"])
+    raise AssertionError("soridormi.task.submit not found in checked-in manifest")
+
+
+def _task_args(task_type: str) -> dict[str, Any]:
+    parameters_by_type = {
+        "move_velocity": {"vx_mps": 0.1, "duration_s": 1.0},
+        "turn_to_heading": {"heading_rad": 0.5},
+        "approach_target": {"target": "speaker", "speed": "slow"},
+        "navigate_to_location": {"target": "kitchen"},
+        "look_at_target": {"target": "speaker"},
+        "perform_gesture": {"gesture": "nod_yes"},
+        "skill_sequence": {"skills": [{"skill_id": "nod_yes", "args": {}}]},
+        "speak_while_moving": {"text": "I am moving carefully.", "vx_mps": 0.05},
+        "stop_now": {"reason": "user_requested_stop"},
+        "recover_safe_idle": {"reason": "operator_request"},
+        "deliver_object": {"object": "water", "source": "kitchen", "target": "user"},
+    }
+    return {
+        "task_type": task_type,
+        "summary": f"Route declared Soridormi task type {task_type}.",
+        "parameters": parameters_by_type[task_type],
+    }
+
+
 def _request() -> AgentRunRequest:
     return AgentRunRequest.model_validate(
         {
@@ -199,6 +255,90 @@ def _request() -> AgentRunRequest:
 
 
 class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
+    def test_checked_in_soridormi_manifest_declares_expected_task_types(self) -> None:
+        self.assertEqual(
+            set(_declared_soridormi_task_types()),
+            DECLARED_SORIDORMI_TASK_TYPES,
+        )
+
+    def test_undeclared_soridormi_task_type_is_rejected_by_graph_validator(self) -> None:
+        graph = TaskGraph.model_validate(
+            {
+                "graph_id": "raw-body",
+                "summary": "Invalid raw body request.",
+                "created_by": "llm",
+                "nodes": [
+                    {
+                        "id": "submit",
+                        "tool": "soridormi.task.submit",
+                        "type": "plan",
+                        "args": {
+                            "task_type": "raw_joint_action",
+                            "parameters": {"action_14d": [0.0] * 14},
+                        },
+                    }
+                ],
+            }
+        )
+
+        report = GraphValidator(_checked_in_soridormi_registry()).validate(graph)
+
+        self.assertFalse(report.valid)
+        self.assertTrue(
+            any("args.task_type must be one of" in error for error in report.errors),
+            report.errors,
+        )
+
+    async def test_planner_accepts_every_declared_soridormi_task_type(self) -> None:
+        registry = _checked_in_soridormi_registry()
+
+        for task_type in _declared_soridormi_task_types():
+            with self.subTest(task_type=task_type):
+                task_args = _task_args(task_type)
+                ollama = FakeOllama(
+                    {
+                        "graph_id": "model-controlled-id",
+                        "summary": f"Route {task_type} through Soridormi task API.",
+                        "nodes": [
+                            {
+                                "id": "capabilities",
+                                "tool": "soridormi.task.get_capabilities",
+                                "type": "query",
+                            },
+                            {
+                                "id": "preview",
+                                "tool": "soridormi.task.preview",
+                                "type": "plan",
+                                "depends_on": ["capabilities"],
+                                "args": task_args,
+                            },
+                            {
+                                "id": "submit",
+                                "tool": "soridormi.task.submit",
+                                "type": "plan",
+                                "depends_on": ["preview"],
+                                "args": task_args,
+                            },
+                        ],
+                    }
+                )
+                planner = TaskGraphPlanner(registry, ollama)  # type: ignore[arg-type]
+
+                graph = await planner.plan(
+                    user_request=f"Please handle {task_type}.",
+                    language="en-US",
+                    context={"private_token": "must-not-enter-prompt"},
+                )
+
+                submit = next(node for node in graph.nodes if node.id == "submit")
+                self.assertEqual(submit.args["task_type"], task_type)
+                self.assertEqual(submit.on_failure.target, "submit_report")
+                report = next(node for node in graph.nodes if node.id == "submit_report")
+                self.assertEqual(report.tool, "chromie.report")
+                self.assertEqual(report.args["message"], {"$ref": "submit.error"})
+                self.assertIn(task_type, ollama.calls[0]["prompt"])
+                self.assertNotIn("private_token", ollama.calls[0]["prompt"])
+
     async def test_tool_route_returns_validated_task_graph_without_executable_action(self) -> None:
         ollama = FakeOllama(
             {
