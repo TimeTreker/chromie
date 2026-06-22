@@ -75,24 +75,26 @@ when Soridormi has not declared that body capability.
 
 ## Next implementation section
 
-The next section is Soridormi high-level task and skill enrichment. Do this
-before motion-control model training and before Chromie broadens rich embodied
-routing.
+Soridormi's high-level no-motion task and skill surface is now declared in the
+authoritative capability manifest. The next section is Chromie routing into
+that declared surface, before motion-control model training and before any
+physical execution claims.
 
-Priority Soridormi task types:
+Current priority task types:
 
-- `navigate_to_location` for resolved destination goals;
-- `approach_target` for locally bounded approach behavior;
+- `move_velocity` and `turn_to_heading` for bounded explicit locomotion;
 - `look_at_target` for attention, gaze, or facing behavior;
 - `perform_gesture` for nod, shake, and expressive body gestures;
-- `recover_safe_idle` for explicit recovery requests.
+- `skill_sequence` for ordered Soridormi named-skill requests;
+- `recover_safe_idle` and `stop_now` for recovery and stop semantics;
+- `navigate_to_location`, `approach_target`, and `deliver_object` as
+  future-blocked structured refusals until Soridormi proves the required
+  simulator pipelines.
 
-Each task type should first expose no-motion or simulator-backed preview,
-submit, status/events, cancellation, refusal, blocked-subsystem, timeout, and
-safe-idle behavior. Chromie should then consume those declared contracts through
-the capability manifest and route user requests into them. If Soridormi does
-not declare the task type, Chromie should clarify or refuse instead of lowering
-the request into a velocity or pose workaround.
+Chromie should consume these declared contracts through the capability manifest
+and route user requests into them. If Soridormi does not declare or enable the
+task type, Chromie should clarify or refuse instead of lowering the request
+into a velocity or pose workaround.
 
 Motion-control model training is later work. It needs a selected simulator or
 robot target, retained calibration and telemetry, task-level success metrics,

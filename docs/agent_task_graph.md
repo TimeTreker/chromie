@@ -134,17 +134,18 @@ For the staged Chromie-side implementation plan, see
 
 ## Next Routing Targets
 
-The next implementation work should start in Soridormi by enriching the
-high-level no-motion or simulator-backed task surface. Chromie should add
-routing only after those task types appear in the authoritative manifest.
+Soridormi's current no-motion task surface is declared in the authoritative
+manifest. Chromie should add routing only for those declared task types and
+preserve Soridormi refusal metadata for future-blocked goals.
 
 Near-term task targets:
 
-- `navigate_to_location`;
-- `approach_target`;
-- `look_at_target`;
-- `perform_gesture`;
-- `recover_safe_idle`.
+- `move_velocity` and `turn_to_heading` for bounded explicit locomotion;
+- `look_at_target` and `perform_gesture` for attention and social cues;
+- `skill_sequence` for ordered named-skill requests;
+- `recover_safe_idle` and `stop_now` for safe-idle and stop semantics;
+- `navigate_to_location`, `approach_target`, and `deliver_object` only as
+  structured refusals until Soridormi proves the required simulator pipelines.
 
 For each target, Chromie tests should assert the global graph shape,
 confirmation behavior, provider-call arguments, refusal handling,

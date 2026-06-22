@@ -1,9 +1,9 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Current committed base revision:** `f4bbb2f`; retained target evidence below
+**Current committed base revision:** `20ec9b4`; retained target evidence below
 records the exact revision that produced each bundle
-**Status refresh date:** 2026-06-20
+**Status refresh date:** 2026-06-22
 **Current focus:** **Physical pilot preparation through the Chromie/Soridormi
 task-agent boundary; physical audio validation remains a separate
 release-support track**
@@ -50,16 +50,15 @@ object-delivery requests without lowering them into velocity recipes. The task
 surface remains a no-motion contract unless later Soridormi evidence proves
 execution.
 
-The next implementation section is Soridormi high-level task and skill
-enrichment, not motion-control model training. Soridormi should first declare
-and implement no-motion or simulator-backed task types such as
-`navigate_to_location`, `approach_target`, `look_at_target`,
-`perform_gesture`, and `recover_safe_idle`, including preview, submit, events,
-cancellation, refusal, blocked-subsystem, and safe-idle behavior. Chromie's
-next work is then to route rich user requests into those declared task types
-and preserve Soridormi's refusal metadata. Training or tuning motion-control
-models waits until a selected target body or simulator, calibration artifacts,
-telemetry, safety envelopes, and task-level acceptance metrics exist.
+Soridormi's no-motion task and skill surface is now declared in the
+authoritative capability snapshot. The current non-hardware implementation
+section is Chromie routing into those declared task types: bounded locomotion,
+attention, gesture, sequence, stop, safe-idle, and planning-hold tasks may be
+represented as structured goals, while navigation, approach, and delivery must
+remain structured refusals until Soridormi proves the required simulator
+pipelines. Training or tuning motion-control models waits until a selected
+target body or simulator, calibration artifacts, telemetry, safety envelopes,
+and task-level acceptance metrics exist.
 
 The current small Router model is not a single source of truth for routing or
 safety. `qwen3:0.6b` may propose routes for normal requests, but deterministic

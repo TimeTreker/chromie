@@ -1,6 +1,6 @@
 # Project Handoff
 
-Last updated: 2026-06-20
+Last updated: 2026-06-22
 
 This handoff records the current resume point for a developer or operator who
 needs to continue Chromie without replaying the full chat history.
@@ -18,13 +18,13 @@ embodied requests as structured Soridormi task goals, attach stable
 and monitor `soridormi.task.events` until Soridormi reports a terminal state.
 This is contract/no-motion preparation; it is not physical execution evidence.
 
-The next implementation section is Soridormi high-level task and skill
-enrichment. Soridormi should first add no-motion or simulator-backed task types
-such as `navigate_to_location`, `approach_target`, `look_at_target`,
-`perform_gesture`, and `recover_safe_idle`; Chromie should then route rich user
-requests into those declared task types. Motion-control model training is
-deferred until task semantics, target-body evidence, calibration, telemetry,
-and safety envelopes exist.
+Soridormi's no-motion task and skill surface is now declared in the paired
+capability snapshot. The next non-hardware implementation section is Chromie
+routing into those declared task types while preserving Soridormi refusal
+metadata. Navigation, approach, and delivery remain structured refusals until
+Soridormi proves the required simulator pipelines. Motion-control model
+training is deferred until task semantics, target-body evidence, calibration,
+telemetry, and safety envelopes exist.
 
 The small Router model is also not an execution authority. Treat
 `qwen3:0.6b` as an advisory classifier only: deterministic controls,
@@ -133,8 +133,8 @@ python -m unittest \
 ## Resume Sequence
 
 1. Keep physical-motion gates off.
-2. Enrich Soridormi's high-level no-motion or simulator-backed task/skill
-   surface before training motion-control models.
+2. Route rich user requests into Soridormi-declared no-motion task types before
+   training motion-control models.
 3. Preserve model-assisted routing guardrails. Qwen may propose normal routes,
    but stop/cancel/ignore stay deterministic, unknown or low-confidence routes
    clarify/refuse, and execution still requires registry/runtime/provider
@@ -148,8 +148,8 @@ python -m unittest \
 6. Preserve the no-motion `--task-agent-bridge` acceptance as the bridge
    contract gate; rerun it when Soridormi's task API snapshot changes.
 7. Add Chromie routing only for Soridormi-declared task types; keep missing
-   navigation, approach, gaze, gesture, recovery, and manipulation goals as
-   structured refusals or clarifications rather than velocity recipes.
+   navigation, approach, and manipulation goals as structured refusals or
+   clarifications rather than velocity recipes.
 8. Select one reference robot candidate.
 9. Fill the ignored real candidate record under `.chromie/commissioning/` using
    `commissioning/reference_robot_candidate.schema.json`.

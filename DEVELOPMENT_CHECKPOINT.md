@@ -1,8 +1,8 @@
 # Development Checkpoint
 
-**Current committed Chromie base:** `f4bbb2f`
+**Current committed Chromie base:** `20ec9b4`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-06-20
+**Status refresh date:** 2026-06-22
 **Current focus:** Physical pilot preparation through the Chromie/Soridormi
 task-agent boundary; physical audio validation remains separate
 
@@ -51,22 +51,23 @@ Soridormi-owned fault-injection scenarios.
 
 ## Next sequence
 
-1. Enrich Soridormi's high-level task and skill surface first. Start with
-   no-motion or simulator-backed task types such as `navigate_to_location`,
-   `approach_target`, `look_at_target`, `perform_gesture`, and
-   `recover_safe_idle`, including preview, submit, events, cancellation,
-   refusal, blocked-subsystem, and safe-idle semantics.
+1. Treat Soridormi's high-level task and skill surface as declared for the
+   current no-motion contract: bounded locomotion, attention, gesture,
+   sequence, stop, safe-idle, and planning-hold task types are present in the
+   authoritative manifest; navigation, approach, and delivery remain
+   future-blocked structured refusals.
 2. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
    authoritative manifest. Use structured task goals for rich embodied requests
    and keep concrete named skills for explicit bounded body commands. Preserve
    Soridormi refusal metadata when reporting unsupported embodied tasks.
-3. Keep Qwen/small-model routing advisory. Add or revise routing only with
+3. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
+   types only. Missing navigation, approach, gaze, gesture, recovery, or
+   manipulation goals must remain structured refusals or clarifications rather
+   than velocity recipes.
+4. Keep Qwen/small-model routing advisory. Add or revise routing only with
    deterministic-control bypass, catalog constraints, confidence fallback,
    schema validation, Skill Runtime authorization, and Soridormi provider
    refusal/event checks.
-4. Add Chromie routing and TaskGraph acceptance only after Soridormi declares
-   the corresponding task type. Do not lower missing navigation, approach, gaze,
-   gesture, recovery, or manipulation goals into velocity recipes.
 5. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
