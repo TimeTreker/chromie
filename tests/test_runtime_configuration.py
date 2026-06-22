@@ -80,6 +80,22 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("./scripts/compose.sh logs -f chromie-llm", source)
         self.assertNotIn("docker compose --env-file .env.runtime logs -f chromie-llm", source)
 
+    def test_start_chromie_supports_service_only_attachment(self) -> None:
+        source = (ROOT / "scripts" / "start_chromie.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("--no-orchestrator", source)
+        self.assertIn('START_ORCHESTRATOR=0', source)
+        self.assertIn('Skipping host Orchestrator (--no-orchestrator)', source)
+        self.assertIn('ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE"', source)
+
+    def test_deprecated_voice_launcher_forwards_to_start_chromie(self) -> None:
+        source = (ROOT / "scripts" / "start_chromie_voice.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("deprecated", source)
+        self.assertIn('exec "$ROOT_DIR/scripts/start_chromie.sh" "$@"', source)
+
     def test_removed_dead_controls_are_not_deployed(self) -> None:
         common = (ROOT / ".env.common").read_text(encoding="utf-8")
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")

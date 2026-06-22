@@ -82,11 +82,12 @@ MCP:     http://127.0.0.1:8000/mcp
 Viewer:  enabled
 ```
 
-Start Chromie services from the Chromie repository:
+Start Chromie from the Chromie repository. For text diagnostics, attach the
+services to Soridormi MCP and skip the host microphone/speaker Orchestrator:
 
 ```bash
 cd ../chromie
-./scripts/start_services.sh
+./scripts/start_chromie.sh --mcp-url http://127.0.0.1:8000/mcp --keep-services --no-orchestrator
 ```
 
 Use Chromie's Compose wrapper for service inspection. Startup generates a root
