@@ -32,7 +32,9 @@ Soridormi is running.
 `./scripts/start_chromie.sh` is the operator launcher. It expects Soridormi MCP
 to already be reachable, writes the Chromie/Soridormi runtime overrides, starts
 the Docker services through `start_services.sh`, probes Soridormi capabilities,
-and then starts the host Orchestrator.
+and then starts the host Orchestrator. Use `--no-orchestrator --keep-services`
+when you only want the service/MCP attachment for text diagnostics or another
+already-running Orchestrator.
 
 ## 2. Start Docker services
 

@@ -9,6 +9,7 @@ AUTO_CONFIRM=1
 BUILD_IMAGES=0
 REBUILD_NO_CACHE=0
 KEEP_SERVICES=0
+START_ORCHESTRATOR=1
 
 usage() {
   cat <<'USAGE'
@@ -25,6 +26,7 @@ Options:
   --require-confirmation  Require spoken confirmation for simulator skills
   --auto-confirm          Use declared simulator confirmation exemptions (default)
   --keep-services         Leave Chromie containers running after exit
+  --no-orchestrator       Start/probe services, then skip the host Orchestrator
   -h, --help              Show this help
 USAGE
 }
@@ -37,6 +39,7 @@ while [ "$#" -gt 0 ]; do
     --require-confirmation) AUTO_CONFIRM=0; shift ;;
     --auto-confirm) AUTO_CONFIRM=1; shift ;;
     --keep-services) KEEP_SERVICES=1; shift ;;
+    --no-orchestrator) START_ORCHESTRATOR=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[chromie][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -220,6 +223,11 @@ Speak normally, for example:
 Press Ctrl+C to stop Chromie.
 ======================================================================
 EOF_READY
+
+if [ "$START_ORCHESTRATOR" = "0" ]; then
+  echo "[chromie] Skipping host Orchestrator (--no-orchestrator)."
+  exit 0
+fi
 
 ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE" \
   ./scripts/start_orchestrator.sh
