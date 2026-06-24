@@ -30,17 +30,27 @@ def _split_phrases(value: str | None, defaults: tuple[str, ...]) -> tuple[str, .
 
 DEFAULT_RESET_PHRASES = (
     "new topic",
+    "new session",
     "start over",
+    "start a new session",
     "reset conversation",
+    "reset session",
     "forget that",
     "forget it",
+    "forget this task",
+    "clear session",
     "never mind",
     "nevermind",
     "change topic",
     "let's talk about something else",
     "重新开始",
+    "新的会话",
+    "新会话",
+    "开始新的会话",
     "重来",
     "换个话题",
+    "清空会话",
+    "忘记这个任务",
     "别管刚才",
     "不用了",
     "算了",
@@ -134,6 +144,7 @@ class ConversationStateManager:
         turn_max_text_chars: int = 260,
         max_context_chars: int = 2200,
         max_pending_tasks: int = 8,
+        completed_task_retention_sec: int = 180,
         reset_phrases: tuple[str, ...] = DEFAULT_RESET_PHRASES,
         followup_phrases: tuple[str, ...] = DEFAULT_FOLLOWUP_PHRASES,
         new_topic_starters: tuple[str, ...] = DEFAULT_NEW_TOPIC_STARTERS,
@@ -146,6 +157,7 @@ class ConversationStateManager:
         self.turn_max_text_chars = max(20, int(turn_max_text_chars))
         self.max_context_chars = max(200, int(max_context_chars))
         self.max_pending_tasks = max(0, int(max_pending_tasks))
+        self.completed_task_retention_sec = max(0, int(completed_task_retention_sec))
         self.reset_phrases = tuple(p.lower() for p in reset_phrases)
         self.followup_phrases = tuple(p.lower() for p in followup_phrases)
         self.new_topic_starters = tuple(p.lower() for p in new_topic_starters)
@@ -177,6 +189,7 @@ class ConversationStateManager:
             max_pending_tasks=int(
                 os.getenv("ORCH_CONVERSATION_MAX_PENDING_TASKS", os.getenv("ORCH_CONTEXT_MAX_PENDING_TASKS", "8"))
             ),
+            completed_task_retention_sec=int(os.getenv("ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC", "180")),
             reset_phrases=_split_phrases(os.getenv("ORCH_CONVERSATION_RESET_PHRASES"), DEFAULT_RESET_PHRASES),
             followup_phrases=_split_phrases(os.getenv("ORCH_CONVERSATION_FOLLOWUP_PHRASES"), DEFAULT_FOLLOWUP_PHRASES),
             new_topic_starters=_split_phrases(os.getenv("ORCH_CONVERSATION_NEW_TOPIC_STARTERS"), DEFAULT_NEW_TOPIC_STARTERS),
@@ -198,12 +211,34 @@ class ConversationStateManager:
         return bool(self._turns or self._pending_tasks)
 
     def _active_pending_tasks(self) -> list[dict[str, Any]]:
+        self._prune_completed_tasks()
         tasks: list[dict[str, Any]] = []
         for task in self._pending_tasks:
             status = str(task.get("status") or "pending").lower()
             if status not in _DONE_TASK_STATUSES:
                 tasks.append(task)
         return tasks
+
+    def _prune_completed_tasks(self, now_ms: float | None = None) -> None:
+        if not self._pending_tasks:
+            return
+        now = now_ms if now_ms is not None else _now_ms()
+        retained: list[dict[str, Any]] = []
+        changed = False
+        for task in self._pending_tasks:
+            status = str(task.get("status") or "pending").lower()
+            if status in _DONE_TASK_STATUSES:
+                updated_ms = task.get("updated_ms") or task.get("ts_ms") or now
+                try:
+                    age_sec = (now - float(updated_ms)) / 1000.0
+                except (TypeError, ValueError):
+                    age_sec = 0.0
+                if age_sec >= self.completed_task_retention_sec:
+                    changed = True
+                    continue
+            retained.append(task)
+        if changed:
+            self._pending_tasks = deque(retained, maxlen=max(1, self.max_pending_tasks))
 
     def _contains_phrase(self, text: str, phrases: tuple[str, ...]) -> bool:
         if not text:
@@ -265,6 +300,7 @@ class ConversationStateManager:
             return {"started_new": False, "reason": "disabled", "conversation_id": self.conversation_id, "sid": sid}
 
         now = _now_ms()
+        self._prune_completed_tasks(now)
         idle_sec = (now - self.last_activity_ms) / 1000.0
         normalized = self._normalized(text)
 
@@ -306,7 +342,45 @@ class ConversationStateManager:
     def get_pending_tasks(self) -> list[dict[str, Any]]:
         if not self.enabled or self.max_pending_tasks <= 0:
             return []
+        self._prune_completed_tasks()
         return list(self._pending_tasks)[-self.max_pending_tasks :]
+
+    def _latest_turn(self, role: str) -> dict[str, Any] | None:
+        for turn in reversed(self._turns):
+            if str(turn.get("role") or "").lower() == role:
+                return turn
+        return None
+
+    def session_memory(self) -> dict[str, Any]:
+        active_tasks = self._active_pending_tasks()
+        latest_user = self._latest_turn("user")
+        latest_assistant = self._latest_turn("assistant")
+        summaries = [
+            str(task.get("summary") or task.get("type") or "task")
+            for task in active_tasks[-4:]
+        ]
+        current_task = None
+        if summaries:
+            current_task = {
+                "status": "active",
+                "summary": "; ".join(summaries),
+                "tasks": active_tasks[-4:],
+            }
+        return {
+            "kind": "short_term_session_memory",
+            "conversation_id": self.conversation_id,
+            "recent_user_request": latest_user.get("text") if latest_user else None,
+            "recent_assistant_response": latest_assistant.get("text") if latest_assistant else None,
+            "current_task": current_task,
+            "active_pending_tasks": active_tasks[-4:],
+            "forgetting_policy": {
+                "explicit_reset_clears_history_and_tasks": True,
+                "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
+                "soft_idle_new_topic_timeout_sec": self.soft_idle_timeout_sec,
+                "completed_task_retention_sec": self.completed_task_retention_sec,
+                "last_split_reason": self.last_split_reason,
+            },
+        }
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -319,11 +393,13 @@ class ConversationStateManager:
             "history": self.get_history(),
             "pending_tasks": self.get_pending_tasks(),
             "active_pending_tasks": self._active_pending_tasks(),
+            "session_memory": self.session_memory(),
             "limits": {
                 "max_turns": self.max_turns,
                 "max_context_chars": self.max_context_chars,
                 "soft_idle_timeout_sec": self.soft_idle_timeout_sec,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
+                "completed_task_retention_sec": self.completed_task_retention_sec,
             },
         }
 
@@ -394,13 +470,15 @@ class ConversationStateManager:
         if not self.enabled or self.max_pending_tasks <= 0:
             return
         task_type = (task_type or "unknown").strip() or "unknown"
+        timestamp_ms = _now_ms()
         self._pending_tasks.append(
             {
                 "sid": sid,
                 "type": task_type,
                 "status": status or "pending",
                 "summary": self._compact_text(summary or task_type),
-                "ts_ms": _now_ms(),
+                "ts_ms": timestamp_ms,
+                "updated_ms": timestamp_ms,
                 "conversation_id": self.conversation_id,
                 "metadata": metadata or {},
             }
@@ -423,6 +501,65 @@ class ConversationStateManager:
             if metadata.get(metadata_key) != metadata_value:
                 continue
             task["status"] = status
+            task["updated_ms"] = _now_ms()
+            self.last_activity_ms = _now_ms()
+            return True
+        return False
+
+    def update_pending_task_status_for_request_id(
+        self,
+        *,
+        request_id: str | None,
+        status: str,
+    ) -> bool:
+        if not self.enabled or not request_id:
+            return False
+        normalized_status = str(status or "done").lower()
+        final_status = {
+            "completed": "done",
+            "success": "done",
+            "ok": "done",
+            "cancelled": "cancelled",
+            "canceled": "cancelled",
+            "expired": "expired",
+            "timed_out": "expired",
+            "refused": "cancelled",
+            "failed": "failed",
+            "error": "failed",
+        }.get(normalized_status, normalized_status)
+        for task in reversed(self._pending_tasks):
+            metadata = task.get("metadata")
+            if not isinstance(metadata, dict):
+                continue
+            request_ids = metadata.get("request_ids")
+            if isinstance(request_ids, str):
+                request_ids = [request_ids]
+            if not isinstance(request_ids, list) or request_id not in request_ids:
+                continue
+            statuses = metadata.setdefault("request_statuses", {})
+            if isinstance(statuses, dict):
+                statuses[request_id] = final_status
+            remaining = metadata.get("remaining_request_ids")
+            if isinstance(remaining, str):
+                remaining = [remaining]
+            if isinstance(remaining, list):
+                metadata["remaining_request_ids"] = [
+                    item for item in remaining if item != request_id
+                ]
+                if metadata["remaining_request_ids"]:
+                    task["status"] = "running"
+                else:
+                    values = list(statuses.values()) if isinstance(statuses, dict) else [final_status]
+                    if "failed" in values:
+                        task["status"] = "failed"
+                    elif "cancelled" in values:
+                        task["status"] = "cancelled"
+                    elif "expired" in values:
+                        task["status"] = "expired"
+                    else:
+                        task["status"] = "done"
+            else:
+                task["status"] = final_status
             task["updated_ms"] = _now_ms()
             self.last_activity_ms = _now_ms()
             return True
@@ -453,8 +590,14 @@ class ConversationStateManager:
         actions = data.get("actions", []) or data.get("skills", []) or []
         if actions:
             action_summaries: list[str] = []
-            for action in actions[:3]:
+            request_ids: list[str] = []
+            for index, action in enumerate(actions):
                 if isinstance(action, dict):
+                    request_id = action.get("request_id")
+                    if request_id:
+                        request_ids.append(str(request_id))
+                    if index >= 3:
+                        continue
                     action_summaries.append(
                         str(
                             action.get("skill_id")
@@ -464,6 +607,11 @@ class ConversationStateManager:
                         )
                     )
                 else:
+                    request_id = getattr(action, "request_id", None)
+                    if request_id:
+                        request_ids.append(str(request_id))
+                    if index >= 3:
+                        continue
                     action_summaries.append(
                         str(
                             getattr(action, "skill_id", None)
@@ -477,7 +625,11 @@ class ConversationStateManager:
                 task_type="robot_action",
                 status="scheduled",
                 summary=", ".join(action_summaries),
-                metadata={"action_count": len(actions)},
+                metadata={
+                    "action_count": len(actions),
+                    "request_ids": request_ids,
+                    "remaining_request_ids": list(request_ids),
+                },
             )
 
         # AgentResult exposes memory_updates at the top level. Native

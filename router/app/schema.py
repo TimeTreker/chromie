@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 RouteName = Literal[
     "chat",
+    "deep_thought",
     "robot_action",
     "tool",
     "memory",
@@ -21,6 +22,7 @@ DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 
 DEFAULT_AGENTS: dict[str, list[str]] = {
     "chat": ["conversation_agent", "speaker_agent"],
+    "deep_thought": ["deepthinking_agent", "speaker_agent"],
     "robot_action": ["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
     "tool": ["tool_agent", "speaker_agent"],
     "memory": ["memory_agent", "speaker_agent"],
@@ -123,6 +125,15 @@ def finalize_decision(
         decision.should_speak = True
         if not decision.speak_first:
             decision.speak_first = "你是指什么？" if decision.language.startswith("zh") else "What do you mean?"
+
+    elif decision.route == "deep_thought":
+        decision.needs_agent = True
+        decision.should_speak = True
+        decision.agents = [agent for agent in decision.agents if agent != "conversation_agent"]
+        if "deepthinking_agent" not in decision.agents:
+            decision.agents.insert(0, "deepthinking_agent")
+        if "speaker_agent" not in decision.agents:
+            decision.agents.append("speaker_agent")
 
     else:
         decision.needs_agent = True

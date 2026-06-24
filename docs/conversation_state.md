@@ -23,6 +23,7 @@ The host store can retain bounded representations of:
 - recent user and assistant turns;
 - active interaction metadata;
 - pending task hints;
+- session working memory for the current task;
 - follow-up context;
 - the current conversation identifier and timestamps.
 
@@ -34,6 +35,14 @@ The state is intended to improve short conversational continuity. It should not
 be treated as authoritative robot state, a durable user profile, or a database
 of completed side effects.
 
+The Orchestrator exposes a compact `session_memory` object to Router and Agent
+prompts. It summarizes the current task, recent user and assistant turns, active
+pending tasks, and the current forgetting policy. This is the prompt-facing
+working memory for the current session, not a permanent memory store.
+The Router can hand complex requests to `deepthinking_agent`, which uses this
+same bounded memory to split tasks, plan, debug, and produce a final spoken
+answer without treating memory as authorization.
+
 ## Boundaries and reset behavior
 
 Configured reset phrases clear the active conversational context. New-topic
@@ -43,6 +52,25 @@ phrases help preserve context for short dependent questions.
 Operational interruption does not erase the entire conversation by default,
 but active interaction and pending execution metadata must be updated so an
 interrupted action is not later represented as completed.
+
+Chromie starts a new conversation when:
+
+- the user says an explicit reset phrase such as `new session`, `start over`,
+  `forget that`, `新的会话`, or `换个话题`;
+- the hard idle timeout expires while any context exists;
+- the soft idle timeout expires and the next utterance looks like a new topic,
+  as long as no active task is still pending;
+- the Orchestrator process restarts, because this memory is process-local.
+
+Task context is forgotten when:
+
+- the conversation boundary resets;
+- the Skill Runtime reports the associated request IDs as completed, failed,
+  cancelled, or expired, and the completed-task retention window elapses;
+- pending-task capacity trims older entries.
+
+Recent completed tasks are retained briefly so follow-up questions such as
+"did it finish?" can still be answered, then pruned from prompt context.
 
 ## Configuration
 
@@ -60,6 +88,7 @@ ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC=1800
 ORCH_CONVERSATION_RESET_PHRASES=
 ORCH_CONVERSATION_NEW_TOPIC_STARTERS=
 ORCH_CONVERSATION_FOLLOWUP_PHRASES=
+ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC=180
 ```
 
 Legacy `ORCH_CONTEXT_*` aliases remain accepted for compatibility. Use the

@@ -126,6 +126,46 @@ class ConversationStateTests(unittest.TestCase):
         self.assertTrue(updated)
         self.assertEqual(manager.snapshot()["active_pending_tasks"], [])
 
+    def test_session_memory_summarizes_active_task_and_reset_clears_it(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="session")
+        manager.record_user_turn("s1", "walk forward", route="robot_action", intent="capability:soridormi.walk_velocity")
+        manager.record_pending_task(
+            sid="s1",
+            task_type="robot_action",
+            summary="soridormi.walk_velocity",
+            metadata={"request_ids": ["skill-1"], "remaining_request_ids": ["skill-1"]},
+        )
+
+        memory = manager.snapshot()["session_memory"]
+
+        self.assertEqual(memory["conversation_id"], "session")
+        self.assertEqual(memory["recent_user_request"], "walk forward")
+        self.assertEqual(memory["current_task"]["summary"], "soridormi.walk_velocity")
+
+        boundary = manager.prepare_for_user_text("new session", "s2")
+
+        self.assertTrue(boundary["started_new"])
+        self.assertIsNone(manager.snapshot()["session_memory"]["current_task"])
+        self.assertEqual(manager.get_history(), [])
+
+    def test_completed_skill_request_closes_active_task_and_can_be_pruned(self) -> None:
+        manager = ConversationStateManager(completed_task_retention_sec=0)
+        manager.record_agent_result(
+            "s1",
+            InteractionResponse(
+                skills=[{"request_id": "skill-1", "skill_id": "soridormi.nod_yes"}],
+            ),
+        )
+
+        updated = manager.update_pending_task_status_for_request_id(
+            request_id="skill-1",
+            status="completed",
+        )
+
+        self.assertTrue(updated)
+        self.assertEqual(manager.snapshot()["active_pending_tasks"], [])
+        self.assertEqual(manager.get_pending_tasks(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

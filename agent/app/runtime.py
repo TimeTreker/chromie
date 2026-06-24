@@ -9,6 +9,7 @@ from .agents import (
     BaseAgent,
     CapabilityAgent,
     ConversationAgent,
+    DeepThinkingAgent,
     MemoryAgent,
     MotionPlannerAgent,
     RobotPoseControllerAgent,
@@ -191,6 +192,7 @@ class _AgentPipeline:
         agents: list[BaseAgent] = [
             CapabilityAgent(services),
             ConversationAgent(services),
+            DeepThinkingAgent(services),
             RobotPoseControllerAgent(services),
             MotionPlannerAgent(services),
             SafetyAgent(services),
@@ -316,6 +318,9 @@ class InteractionRuntime(_AgentPipeline):
         request.context["capability_candidates"] = list(
             request.route_decision.candidate_capabilities
         )
+        if request.route_decision.route == "deep_thought":
+            request.route_decision.agents = ["deepthinking_agent", "speaker_agent"]
+            return
         if (
             request.route_decision.route == "chat"
             and request.route_decision.source == "llm"

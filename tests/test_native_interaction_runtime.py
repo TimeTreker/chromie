@@ -150,6 +150,19 @@ class _AttentionCatalog:
         )
 
 
+class _ChatCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del kwargs
+        return CapabilitySearchResult(
+            query=text,
+            matched=True,
+            suggested_route="chat",
+            suggested_agents=["conversation_agent", "speaker_agent"],
+            catalog_version=3,
+            matches=[],
+        )
+
+
 class _SpeechCatalog:
     async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
         del kwargs
@@ -430,6 +443,28 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             "Why did the robot bring a ladder? To reach the cloud.",
         )
         self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
+
+    async def test_deep_thought_route_survives_capability_preflight(self) -> None:
+        request = _request(
+            text="Let's design the session memory architecture carefully.",
+            route="deep_thought",
+            intent="session_memory_design",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ChatOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_ChatCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="sim_only",
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "deep_thought")
+        self.assertEqual(request.route_decision.agents, ["deepthinking_agent", "speaker_agent"])
+        self.assertEqual(response.speech[0].text, "I am listening.")
+        self.assertEqual(response.skills, [])
 
     async def test_confident_llm_chat_is_not_overwritten_by_motion_catalog(self) -> None:
         request = _request(

@@ -1,6 +1,7 @@
 from .base import AgentServices, BaseAgent
 from .capability import CapabilityAgent
 from .conversation import ConversationAgent
+from .deepthinking import DeepThinkingAgent
 from .memory import MemoryAgent
 from .motion_planner import MotionPlannerAgent
 from .robot_pose_controller import RobotPoseControllerAgent
@@ -14,6 +15,7 @@ __all__ = [
     "BaseAgent",
     "CapabilityAgent",
     "ConversationAgent",
+    "DeepThinkingAgent",
     "MemoryAgent",
     "MotionPlannerAgent",
     "RobotPoseControllerAgent",

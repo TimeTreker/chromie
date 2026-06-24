@@ -104,7 +104,7 @@ async def health() -> HealthResponse:
 @app.get("/routes")
 async def routes() -> dict:
     return {
-        "routes": ["chat", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
+        "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
         "lanes": [
             {
                 "id": "quick_control",
@@ -114,8 +114,8 @@ async def routes() -> dict:
             },
             {
                 "id": "deep_reasoning",
-                "description": "Capability-catalog plus LLM-first semantic routing for chat, body actions, tools, memory, and clarification.",
-                "routes": ["chat", "robot_action", "tool", "memory", "clarify"],
+                "description": "Capability-catalog plus LLM-first semantic routing for chat, deep thought, body actions, tools, memory, and clarification.",
+                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
                 "llm": settings.mode in {"hybrid", "llm_only"},
             },
         ],
@@ -123,6 +123,7 @@ async def routes() -> dict:
         "agents": [
             "capability_agent",
             "conversation_agent",
+            "deepthinking_agent",
             "speaker_agent",
             "robot_pose_controller_agent",
             "motion_planner_agent",

@@ -16,7 +16,16 @@ from .schema import RouteDecision, RouteRequest, finalize_decision
 logger = logging.getLogger("chromie.router.llm")
 
 
-ROUTE_NAMES = {"chat", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"}
+ROUTE_NAMES = {
+    "chat",
+    "deep_thought",
+    "robot_action",
+    "tool",
+    "memory",
+    "clarify",
+    "interrupt",
+    "ignore",
+}
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
@@ -87,7 +96,10 @@ class OllamaLLMRouter:
             "stop/cancel/emergency/noise before this prompt. You are the deep "
             "reasoning lane called before non-urgent semantic fallback. Decide "
             "intent from the whole utterance, capability choice, memory "
-            "references, and speech/body/tool routing.\n"
+            "references, and speech/body/tool routing. Use route deep_thought "
+            "for complex reasoning, multi-step analysis, design discussion, or "
+            "implementation planning that should be handled by deepthinking_agent "
+            "rather than the fast router.\n"
             f"ASR text: {request.text}\n"
             f"Language hint: {request.language or 'auto'}\n"
             f"Session id: {request.sid or ''}\n"
@@ -137,7 +149,7 @@ class OllamaLLMRouter:
                     "content": (
                         "Classify the user intent for a realtime robot voice assistant. "
                         "Return only one JSON object with route exactly one of: chat, "
-                        "robot_action, tool, memory, clarify, interrupt, ignore. "
+                        "deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
                         "Creative speech-only requests like singing, stories, jokes, "
                         "or talking are chat unless physical robot body/head motion is "
                         "explicitly requested. The phrase 'go ahead' is permission, not walking."

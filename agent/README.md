@@ -40,6 +40,7 @@ separate and default-off; enable it only with
 | Agent | Current behavior |
 |---|---|
 | `conversation_agent` | Produces short conversational speech with Ollama or deterministic fallback behavior. |
+| `deepthinking_agent` | Handles `deep_thought` requests by using session working memory to split complex tasks, plan, debug, and produce a spoken final answer. |
 | `speaker_agent` | Normalizes wording, brevity, and speaking style. It never plays audio. |
 | `robot_pose_controller_agent` | Produces legacy high-level pose/head/gesture action proposals. |
 | `motion_planner_agent` | Produces legacy high-level movement proposals. |

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 RouteName = Literal[
     "chat",
+    "deep_thought",
     "robot_action",
     "tool",
     "memory",

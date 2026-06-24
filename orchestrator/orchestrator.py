@@ -1025,6 +1025,7 @@ class VoiceAssistant:
             "session_id": session_id,
             "conversation_id": conversation.get("conversation_id"),
             "conversation": conversation,
+            "session_memory": conversation.get("session_memory", {}),
             "history": conversation.get("history", []),
             "pending_tasks": conversation.get("pending_tasks", []),
             "active_pending_tasks": conversation.get("active_pending_tasks", []),
@@ -1432,6 +1433,10 @@ class VoiceAssistant:
                     result.status,
                     result.reason_code,
                     result.message,
+                )
+                self.conversation_state.update_pending_task_status_for_request_id(
+                    request_id=result.request_id,
+                    status=result.status,
                 )
             return execution
         except asyncio.CancelledError:

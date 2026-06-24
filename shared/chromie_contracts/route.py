@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 RouteName = Literal[
     "chat",
+    "deep_thought",
     "robot_action",
     "tool",
     "memory",

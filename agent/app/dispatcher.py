@@ -5,6 +5,7 @@ from .schema import AgentRunRequest
 
 DEFAULT_AGENT_ORDER: dict[str, list[str]] = {
     "chat": ["conversation_agent", "speaker_agent"],
+    "deep_thought": ["deepthinking_agent", "speaker_agent"],
     "robot_action": ["robot_pose_controller_agent", "motion_planner_agent", "safety_agent", "speaker_agent"],
     "tool": ["tool_agent", "speaker_agent"],
     "memory": ["memory_agent", "speaker_agent"],
@@ -30,6 +31,10 @@ def selected_agents(request: AgentRunRequest) -> list[str]:
             if agent not in requested:
                 requested.append(agent)
 
+    if request.route_decision.route == "deep_thought":
+        requested = [agent for agent in requested if agent != "conversation_agent"]
+        if "deepthinking_agent" not in requested:
+            requested.insert(0, "deepthinking_agent")
     if request.route_decision.route == "chat" and "conversation_agent" not in requested:
         requested.insert(0, "conversation_agent")
     if request.route_decision.should_speak and "speaker_agent" not in requested and request.route_decision.route not in {"ignore", "interrupt"}:

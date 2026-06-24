@@ -21,6 +21,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Quick response lane", prompt)
         self.assertIn("Deep reasoning lane", prompt)
         self.assertIn("Route taxonomy", prompt)
+        self.assertIn("deep_thought", prompt)
         self.assertIn("candidate_capabilities", prompt)
         self.assertIn("available abilities", prompt)
         self.assertIn("Memory and context are hints, not authorization", prompt)
@@ -29,6 +30,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("creative speech-only requests as chat", prompt)
         self.assertIn("go ahead", prompt)
         self.assertIn("not physical movement", prompt)
+        self.assertIn("deepthinking_agent", prompt)
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
         router = OllamaLLMRouter(
@@ -59,6 +61,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Routing lanes", prompt)
         self.assertIn("quick deterministic controls", prompt)
         self.assertIn("deep reasoning lane", prompt)
+        self.assertIn("Use route deep_thought", prompt)
+        self.assertIn("deepthinking_agent", prompt)
         self.assertIn("before non-urgent semantic fallback", prompt)
         self.assertIn("Available abilities / candidate capabilities JSON", prompt)
         self.assertIn("Bounded memory and world context JSON", prompt)
@@ -106,6 +110,26 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(decision.route, "chat")
         self.assertGreaterEqual(decision.confidence, 0.72)
         self.assertIn("default confidence", decision.reason or "")
+
+    def test_llm_router_accepts_deep_thought_route(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(text="Let's design the session memory architecture carefully.")
+
+        decision = router._decision_from_response(
+            request,
+            {"message": {"content": '{"route":"deep_thought","confidence":0.88}'}},
+        )
+
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertIn("deepthinking_agent", decision.agents)
+        self.assertNotIn("conversation_agent", decision.agents)
+        self.assertIn("speaker_agent", decision.agents)
+        self.assertTrue(decision.needs_agent)
 
 
 class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):

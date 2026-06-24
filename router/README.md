@@ -12,7 +12,8 @@ or synthesis, invokes skills, or controls hardware.
 text + bounded context
   -> quick response lane: deterministic interrupt/noise safety rules
   -> shared Agent capability-catalog search
-  -> deep reasoning lane: semantic action parser / optional Ollama route classifier
+  -> quick route model: semantic action parser / optional Ollama route classifier
+  -> optional deep_thought handoff to the Agent deepthinking module
   -> schema finalization
   -> RouteDecision
 ```
@@ -43,13 +44,15 @@ The two routing lanes are intentionally different:
 | Lane | What handles it | Purpose |
 |---|---|---|
 | Quick response | Deterministic Router rules | Stop, cancel, emergency-style interruption, silence, unusable audio, and obvious noise. |
-| Deep reasoning | Catalog search, semantic parser, and optional LLM router | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and select supported capabilities. |
+| Quick route | Catalog search, semantic parser, and small LLM router | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and select supported capabilities. |
+| Deep thought | Agent `deepthinking_agent` after route selection | Split complex tasks, plan, debug, and answer using bounded session memory. |
 
 ## Current route list
 
 | Route | Purpose |
 |---|---|
 | `chat` | Normal conversation and questions that do not need tools. |
+| `deep_thought` | Complex reasoning or planning delegated to `deepthinking_agent` with session working memory. |
 | `robot_action` | High-level body, head, pose, or motion request selected from available capabilities. |
 | `tool` | External information or planning tools, such as web/weather/API work. |
 | `memory` | User asks Chromie to remember or update a preference/fact. |
@@ -60,8 +63,8 @@ The two routing lanes are intentionally different:
 When LLM routing is enabled, the prompt tells the model to consider:
 
 - current candidate capabilities as Chromie's available ability list;
-- bounded memory and context such as pending tasks, robot state, position, and
-  user preferences;
+- bounded memory and context such as `session_memory`, pending tasks, robot
+  state, position, and user preferences;
 - speech plus body intent, while still returning only a route decision;
 - safety boundaries: memory is not authorization, and the model must not invent
   capabilities or low-level robot controls.
