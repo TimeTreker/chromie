@@ -357,6 +357,10 @@ async def route(request: RouteRequest) -> RouteDecision:
                     llm_decision,
                     catalog_result,
                 )
+                if decision.route == "robot_action" and not decision.actions:
+                    semantic_decision = semantic_robot_decision(request, catalog_result)
+                    if semantic_decision is not None:
+                        decision = semantic_decision
 
         if decision is None and settings.mode in ("rules_only", "hybrid"):
             decision = semantic_robot_decision(request, catalog_result)

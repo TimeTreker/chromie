@@ -412,7 +412,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.getenv("SORIDORMI_MCP_URL", "http://127.0.0.1:8000/mcp"),
     )
     parser.add_argument("--manifest", type=Path, default=ROOT / "capabilities" / "soridormi.json")
-    parser.add_argument("--language", default="en-US")
+    parser.add_argument("--language", default=None)
     parser.add_argument("--evidence-dir")
     parser.add_argument(
         "--speaker",

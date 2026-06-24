@@ -9,7 +9,7 @@ from .schema import RouteDecision, RouteRequest, finalize_decision
 
 
 _SEQUENCE_SPLIT = re.compile(
-    r"\s*(?:,?\s+(?:and\s+then|then|after\s+that)\s+|;+)\s*",
+    r"\s*(?:,?\s+(?:and\s+then|then|after\s+that)\s+|[;；，,]|然后|接着|再)\s*",
     re.IGNORECASE,
 )
 _NUMBER_WORDS = {
@@ -28,8 +28,20 @@ _NUMBER_WORDS = {
     "twelve": 12.0,
     "fifteen": 15.0,
     "twenty": 20.0,
+    "零": 0.0,
+    "一": 1.0,
+    "两": 2.0,
+    "二": 2.0,
+    "三": 3.0,
+    "四": 4.0,
+    "五": 5.0,
+    "六": 6.0,
+    "七": 7.0,
+    "八": 8.0,
+    "九": 9.0,
+    "十": 10.0,
 }
-_NOD_RE = re.compile(r"\b(?:nod|nodding|noding)\b")
+_NOD_RE = re.compile(r"\b(?:nod|nodding|noding)\b|点头")
 _HEAD_DIRECTION_PATTERNS = (
     re.compile(
         r"\b(?:turn|rotate|move)\s+(?:your|my|the)?\s*head\s+"
@@ -82,7 +94,7 @@ def _number(value: str | None) -> float | None:
 
 def _duration_s(text: str) -> float | None:
     match = re.search(
-        r"\bfor\s+(-?\d+(?:\.\d+)?|[a-z]+)\s*(?:seconds?|secs?|s)\b",
+        r"(?:\bfor\s+)?(-?\d+(?:\.\d+)?|[a-z]+|[零一两二三四五六七八九十]+)\s*(?:seconds?|secs?|s|秒)\b",
         text,
     )
     return _number(match.group(1)) if match else None
@@ -110,8 +122,12 @@ def _count(text: str, default: int = 2) -> int:
         return 2
     if "once" in text:
         return 1
-    match = re.search(r"\b(\d+|one|two|three|four|five|six|seven|eight)\s+times?\b", text)
-    value = _number(match.group(1)) if match else None
+    match = re.search(
+        r"\b(\d+|one|two|three|four|five|six|seven|eight)\s+times?\b|"
+        r"([零一两二三四五六七八九十]+)\s*(?:次|下)",
+        text,
+    )
+    value = _number(next((group for group in match.groups() if group), "")) if match else None
     return int(value) if value is not None else default
 
 
@@ -139,13 +155,18 @@ def _head_direction(text: str) -> str | None:
 
 def _walk_action(text: str, available: set[str]) -> SemanticAction | None:
     walk_match = re.search(
-        r"\b(?:walk|move|go|travel)\b(?:\s+straight)?(?:\s+(forward|ahead|backward|back|reverse))?\b",
+        r"\b(?:walk|move|go|travel)\b(?:\s+straight)?(?:\s+(forward|ahead|backward|back|reverse))?\b|"
+        r"(向前|往前|前进|朝前|向后|往后|后退)?(?:走|移动|行走)",
         text,
     )
     if not walk_match or "soridormi.walk_velocity" not in available:
         return None
 
-    direction = walk_match.group(1) or "forward"
+    direction = walk_match.group(1) or walk_match.group(2) or "forward"
+    if direction in {"向前", "往前", "前进", "朝前"}:
+        direction = "forward"
+    elif direction in {"向后", "往后", "后退"}:
+        direction = "backward"
     requested_speed = _speed(text)
     speed = requested_speed
     metadata: dict[str, Any] = {}

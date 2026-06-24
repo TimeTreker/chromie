@@ -209,6 +209,63 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.walk_velocity",
         )
 
+    async def test_hybrid_router_recovers_chinese_compound_actions_from_route_only_llm(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="请向前走十秒，然后点头两次。",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=8,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_velocity",
+                    "agent_id": "soridormi.skill",
+                    "description": "Track a bounded body velocity command.",
+                    "score": 0.91,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+                {
+                    "capability_id": "soridormi.nod_yes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Nod the head yes.",
+                    "score": 0.72,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="unknown",
+                confidence=0.50,
+                language="auto",
+                source="llm",
+                reason="route-only JSON",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="请向前走十秒，然后点头两次。"))
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "compound_robot_action")
+        self.assertEqual(decision.language, "zh-CN")
+        self.assertEqual(
+            [item["capability_id"] for item in decision.actions],
+            ["soridormi.walk_velocity", "soridormi.nod_yes"],
+        )
+        self.assertEqual(decision.actions[0]["args"]["duration_s"], 10.0)
+        self.assertEqual(decision.actions[1]["args"]["count"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()
