@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from router.app.config import router_mode_from_env
 from router.app.fallback import fallback_decision
-from router.app.rules import route_by_rules
+from router.app.rules import route_by_deep_thought_rules, route_by_rules
 from router.app.schema import RouteRequest
 
 
@@ -31,6 +31,21 @@ class RouterCoreTests(unittest.TestCase):
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "turn_left")
         self.assertEqual(decision.actions[0]["type"], "head.turn")
+
+    def test_explicit_deep_thought_rule_routes_planning_requests(self) -> None:
+        for text in (
+            "Please think deeply and make an implementation plan.",
+            "请深入思考并给我一个实现计划。",
+        ):
+            with self.subTest(text=text):
+                decision = route_by_deep_thought_rules(RouteRequest(sid="deep", text=text))
+
+                self.assertIsNotNone(decision)
+                assert decision is not None
+                self.assertEqual(decision.route, "deep_thought")
+                self.assertEqual(decision.agents, ["deepthinking_agent", "speaker_agent"])
+                self.assertEqual(decision.intent, "deep_thought_planning")
+                self.assertTrue(decision.should_speak)
 
     def test_rules_only_fallback_routes_unknown_text_to_chat(self) -> None:
         request = RouteRequest(sid="s3", text="tell me something unusual")

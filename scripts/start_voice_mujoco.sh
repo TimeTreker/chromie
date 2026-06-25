@@ -230,6 +230,7 @@ Log check from another terminal:
 No-microphone checks from another terminal:
   ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --speaker
   ./scripts/run_voice_mujoco_text_case.sh "Look at me for three seconds." --no-speaker
+  ./scripts/run_deep_thought_response_case.sh --no-speaker
 
 Logs:
   $LOG_DIR

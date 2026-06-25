@@ -10,6 +10,7 @@ MCP_URL="${SORIDORMI_MCP_URL:-http://127.0.0.1:${SORIDORMI_MCP_PORT:-8000}${SORI
 SPEAKER_FLAG=--speaker
 PREVIEW_ONLY=0
 AUTO_CONFIRM=1
+SKILL_TIMEOUT_S="${CHROMIE_VOICE_MUJOCO_SKILL_TIMEOUT_S:-120}"
 EXPECT_ROUTE=()
 EXPECT_NO_SKILLS=()
 EXPECT_SKILL=()
@@ -34,8 +35,10 @@ Options:
   --no-speaker               Headless check without speaker playback
   --preview-only             Route and validate without executing Soridormi skills
   --no-auto-confirm-sim      Do not auto-confirm simulator skills
-  --expect-route ROUTE       Require Router route: chat, robot_action, tool, memory,
-                             clarify, interrupt, or ignore
+  --skill-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
+  --expect-route ROUTE       Require Router route: chat, deep_thought,
+                             robot_action, tool, memory, clarify, interrupt,
+                             or ignore
   --expect-no-skills         Require no Soridormi action or skill emission
   --expect-skill SKILL_ID    Require at least one planned skill id
   --expect-arg I:KEY=VALUE   Forwarded to interaction_text_mujoco_check.py
@@ -50,6 +53,7 @@ while [ "$#" -gt 0 ]; do
     --no-speaker) SPEAKER_FLAG=--no-speaker; shift ;;
     --preview-only) PREVIEW_ONLY=1; shift ;;
     --no-auto-confirm-sim) AUTO_CONFIRM=0; shift ;;
+    --skill-timeout-s) SKILL_TIMEOUT_S="${2:?--skill-timeout-s requires seconds}"; shift 2 ;;
     --expect-route) EXPECT_ROUTE+=(--expect-route "${2:?--expect-route requires a route}"); shift 2 ;;
     --expect-no-skills) EXPECT_NO_SKILLS+=(--expect-no-skills); shift ;;
     --expect-skill) EXPECT_SKILL+=(--expect-skill "${2:?--expect-skill requires a skill id}"); shift 2 ;;
@@ -100,7 +104,7 @@ args=(
   --manifest capabilities/soridormi.json
   "$SPEAKER_FLAG"
   --require-speech
-  --skill-timeout-s 15
+  --skill-timeout-s "$SKILL_TIMEOUT_S"
 )
 if [ "$PREVIEW_ONLY" = "1" ]; then args+=(--preview-only); fi
 if [ "$AUTO_CONFIRM" = "1" ]; then

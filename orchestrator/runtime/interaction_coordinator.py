@@ -68,6 +68,7 @@ class InteractionRuntimeCoordinator:
         confirmed_request_ids: set[str] | None = None,
     ) -> SkillRuntimeResult:
         prepared = self._with_session_metadata(response, session_id)
+        optional_body_cue = bool(prepared.metadata.get("optional_body_cue"))
         body_requests = [
             request
             for request in prepared.skills
@@ -92,7 +93,19 @@ class InteractionRuntimeCoordinator:
             )
         if body_requests:
             if self.soridormi_invoker is None:
-                await self._ensure_soridormi_catalog()
+                try:
+                    await self._ensure_soridormi_catalog()
+                except RuntimeError as exc:
+                    if optional_body_cue:
+                        return await self._body_setup_failure(
+                            prepared,
+                            body_requests,
+                            session_id=session_id,
+                            reason_code="provider_disabled",
+                            message=str(exc),
+                            suppress_speech=True,
+                        )
+                    raise
             try:
                 await self._ensure_soridormi_catalog()
             except RuntimeError as exc:
@@ -102,6 +115,7 @@ class InteractionRuntimeCoordinator:
                     session_id=session_id,
                     reason_code="catalog_unavailable",
                     message=str(exc),
+                    suppress_speech=optional_body_cue,
                 )
             unavailable = [
                 request
@@ -116,6 +130,7 @@ class InteractionRuntimeCoordinator:
                     session_id=session_id,
                     reason_code="skill_unavailable",
                     message=definition.unavailable_reason or "unavailable",
+                    suppress_speech=optional_body_cue,
                 )
 
         authorized_request_ids = set(confirmed_request_ids or ())
@@ -144,12 +159,32 @@ class InteractionRuntimeCoordinator:
             if gated_requests and after_skills_speech
             else prepared
         )
-        execution = await self.runtime.execute(
-            primary,
-            authorization=RuntimeAuthorization(
-                confirmed_request_ids=authorized_request_ids,
-            ),
-        )
+        try:
+            execution = await self.runtime.execute(
+                primary,
+                authorization=RuntimeAuthorization(
+                    confirmed_request_ids=authorized_request_ids,
+                ),
+            )
+        except ValueError as exc:
+            if optional_body_cue and gated_requests:
+                return SkillRuntimeResult(
+                    interaction_id=prepared.interaction_id,
+                    status="failed",
+                    results=[
+                        SkillResult(
+                            request_id=request.request_id,
+                            skill_id=request.skill_id,
+                            skill_version=request.skill_version,
+                            status="failed",
+                            provider_id="soridormi.mcp",
+                            reason_code="optional_body_cue_unavailable",
+                            message=str(exc),
+                        )
+                        for request in gated_requests
+                    ],
+                )
+            raise
         if not gated_requests:
             return execution
 
@@ -167,6 +202,8 @@ class InteractionRuntimeCoordinator:
         if execution.status == "cancelled":
             return execution
         if failed_body_results:
+            if optional_body_cue:
+                return execution
             fallback = InteractionResponse(
                 interaction_id=prepared.interaction_id,
                 speech=[
@@ -223,6 +260,7 @@ class InteractionRuntimeCoordinator:
         session_id: str | None,
         reason_code: str,
         message: str,
+        suppress_speech: bool = False,
     ) -> SkillRuntimeResult:
         body_results = [
             SkillResult(
@@ -241,6 +279,8 @@ class InteractionRuntimeCoordinator:
             status="failed",
             results=body_results,
         )
+        if suppress_speech:
+            return failed
         fallback = InteractionResponse(
             interaction_id=response.interaction_id,
             speech=[

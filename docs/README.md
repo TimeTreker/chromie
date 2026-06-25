@@ -65,6 +65,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 ## Interaction and execution
 
 - [Interaction Agent and Skill Runtime](interaction_agent_skill_runtime.md)
+- [Chromie High-Level Ability Registry](chromie_ability_registry.md)
 - [Agent Capability Registry](agent_capability_registry.md)
 - [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md)
 - [TaskGraph](agent_task_graph.md)

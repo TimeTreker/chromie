@@ -31,17 +31,21 @@ from orchestrator.vad import VAD
 from orchestrator.clients.action_client import ActionClient
 from orchestrator.clients.agent_client import AgentClient
 from orchestrator.clients.router_client import RouterClient
-from orchestrator.runtime.session import SessionTracker, now_ms
+from orchestrator.runtime.abilities import (
+    AbilityRegistry,
+    build_default_ability_registry,
+)
 from orchestrator.runtime.confirmation import ConfirmationDialogue
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
 )
+from orchestrator.runtime.session import SessionTracker, now_ms
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -82,6 +86,13 @@ class VoiceAssistant:
         self.agent_url = os.getenv("AGENT_URL", "http://127.0.0.1:8092")
         self.action_executor_url = os.getenv("ACTION_EXECUTOR_URL", "http://127.0.0.1:8095")
         self.action_dry_run = env_bool("ORCH_ACTION_DRY_RUN", True)
+        self.abilities = build_default_ability_registry(
+            enable_agent=self.enable_agent,
+            enable_interaction_response=self.enable_interaction_response,
+            enable_soridormi_skills=self.enable_soridormi_skills,
+            auto_confirm_sim_skills=self.auto_confirm_sim_skills,
+            action_dry_run=self.action_dry_run,
+        )
         self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "2000")))
         self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "3000")))
         self.action_client = ActionClient(self.action_executor_url, int(os.getenv("ORCH_ACTION_TIMEOUT_MS", "5000")))
@@ -843,6 +854,7 @@ class VoiceAssistant:
         task = asyncio.create_task(self.synthesize_one(sentence, order, session_id, generation))
         self.active_synthesis_tasks.add(task)
         task.add_done_callback(self.active_synthesis_tasks.discard)
+        self.ensure_playback_worker()
         return {"scheduled": True, "order": order, "generation": generation}
 
     async def schedule_tts_text(
@@ -922,6 +934,13 @@ class VoiceAssistant:
             scheduled["playback_started"] = playback_started
         return scheduled
 
+    def ensure_playback_worker(self) -> None:
+        if not hasattr(self, "playback_queue"):
+            return
+        playback_task = getattr(self, "playback_task", None)
+        if playback_task is None or playback_task.done():
+            self.playback_task = asyncio.create_task(self.playback_worker())
+
     async def reset_playback_ordering(self):
         async with self.order_lock:
             self.resolve_all_playback_start_waiters(
@@ -936,10 +955,15 @@ class VoiceAssistant:
                     self.playback_queue.get_nowait()
                 except asyncio.QueueEmpty:
                     break
-        if self.playback_task is None or self.playback_task.done():
-            self.playback_task = asyncio.create_task(self.playback_worker())
+        self.ensure_playback_worker()
 
-    async def process_llm_tts(self, user_text: str, session_id: Optional[str]):
+    async def process_llm_tts(
+        self,
+        user_text: str,
+        session_id: Optional[str],
+        *,
+        reset_playback: bool = True,
+    ):
         payload = {
             "model": self.ollama_model,
             "prompt": f"{self.voice_system_prompt}\n\nUser: {user_text}\nAssistant:",
@@ -954,7 +978,8 @@ class VoiceAssistant:
             },
         }
         logger.info("[%s] LLM processing: %s", session_id, user_text)
-        await self.reset_playback_ordering()
+        if reset_playback:
+            await self.reset_playback_ordering()
         sentence = ""
         llm_start_ms = now_ms()
         self.session_log(session_id, "llm_request_start: prompt_chars=%s text=%r think=%s num_ctx=%s num_predict=%s", len(user_text), user_text, payload.get("think"), payload["options"]["num_ctx"], payload["options"]["num_predict"])
@@ -1034,6 +1059,177 @@ class VoiceAssistant:
                 "source": "host_orchestrator",
             },
         }
+
+    def _ability_registry(self) -> AbilityRegistry:
+        abilities = getattr(self, "abilities", None)
+        if isinstance(abilities, AbilityRegistry):
+            return abilities
+        return build_default_ability_registry(
+            enable_agent=bool(getattr(self, "enable_agent", True)),
+            enable_interaction_response=bool(
+                getattr(self, "enable_interaction_response", False)
+            ),
+            enable_soridormi_skills=bool(
+                getattr(self, "enable_soridormi_skills", False)
+            ),
+            auto_confirm_sim_skills=bool(
+                getattr(self, "auto_confirm_sim_skills", True)
+            ),
+            action_dry_run=bool(getattr(self, "action_dry_run", True)),
+        )
+
+    def _ability_unavailable_response(
+        self,
+        ability_id: str,
+        *,
+        language: str | None,
+        user_text: str = "",
+    ) -> InteractionResponse:
+        abilities = self._ability_registry()
+        ability = abilities.get(ability_id)
+        return InteractionResponse(
+            speech=[
+                {
+                    "text": abilities.unavailable_message(
+                        ability_id,
+                        language=language,
+                        user_text=user_text,
+                    ),
+                    "style": "brief",
+                    "timing": "immediate",
+                    "priority": "normal",
+                    "interruptible": True,
+                    "metadata": {
+                        "source": "host_ability_registry",
+                        "ability_id": ability.ability_id,
+                        "ability_status": ability.status,
+                    },
+                }
+            ],
+            metadata={
+                "source": "host_ability_registry",
+                "ability_id": ability.ability_id,
+                "ability_status": ability.status,
+            },
+        )
+
+    def _deep_thought_ack_text(
+        self,
+        decision: RouteDecision,
+        user_text: str,
+    ) -> str | None:
+        if decision.route != "deep_thought" or not decision.should_speak:
+            return None
+        if decision.speak_first:
+            return decision.speak_first.strip() or None
+
+        abilities = self._ability_registry()
+        if not abilities.can_execute("speech.thinking_ack"):
+            return None
+        return abilities.localized_speech(
+            "speech.thinking_ack",
+            language=decision.language,
+            user_text=user_text,
+        )
+
+    async def _schedule_deep_thought_ack(
+        self,
+        decision: RouteDecision,
+        user_text: str,
+        session_id: str,
+    ) -> bool:
+        text = self._deep_thought_ack_text(decision, user_text)
+        if not text:
+            return False
+
+        self.session_log(
+            session_id,
+            "deep_thought_ack_schedule: chars=%s text=%r",
+            len(text),
+            text,
+        )
+        scheduled = await self.schedule_tts_text(text, session_id)
+        if scheduled.get("scheduled") is True:
+            self.session_log(
+                session_id,
+                "deep_thought_ack_scheduled: order=%s chunks=%s generation=%s",
+                scheduled.get("order"),
+                scheduled.get("chunks", 1),
+                scheduled.get("generation"),
+            )
+            return True
+
+        self.session_log(
+            session_id,
+            "deep_thought_ack_skipped: reason=%s",
+            scheduled.get("reason", "unknown"),
+        )
+        return False
+
+    def _deep_thought_body_cue_response(
+        self,
+        decision: RouteDecision,
+        user_text: str,
+    ) -> InteractionResponse | None:
+        if decision.route != "deep_thought":
+            return None
+        abilities = self._ability_registry()
+        ability = abilities.get("social.thinking_pose")
+        if not ability.can_execute or not ability.soridormi_skill_id:
+            return None
+
+        language = (decision.language or "").lower()
+        zh = language.startswith("zh") or any(
+            "\u4e00" <= ch <= "\u9fff" for ch in user_text
+        )
+        return InteractionResponse(
+            skills=[
+                SkillRequest(
+                    skill_id=ability.soridormi_skill_id,
+                    args=dict(ability.default_args),
+                    timing="parallel",
+                    timeout_ms=ability.timeout_ms,
+                    requires_confirmation=True,
+                    metadata={
+                        "source": "host_deep_thought_ack",
+                        "ability_id": ability.ability_id,
+                        "ability_status": ability.status,
+                        "reason": "thinking_attention",
+                    },
+                )
+            ],
+            metadata={
+                "source": "host_deep_thought_ack",
+                "ability_id": ability.ability_id,
+                "ability_status": ability.status,
+                "optional_body_cue": True,
+                "language": "zh-CN" if zh else (decision.language or "en-US"),
+            },
+        )
+
+    async def _launch_deep_thought_body_cue(
+        self,
+        decision: RouteDecision,
+        user_text: str,
+        session_id: str,
+    ) -> bool:
+        response = self._deep_thought_body_cue_response(decision, user_text)
+        if response is None:
+            return False
+
+        skill_id = response.skills[0].skill_id if response.skills else "<none>"
+        self.session_log(
+            session_id,
+            "deep_thought_body_cue_launch: skill_id=%s",
+            skill_id,
+        )
+        self._launch_interaction(
+            response,
+            session_id,
+            reset_playback=False,
+            mark_session_done=False,
+        )
+        return True
 
     async def handle_routed_text(self, user_text: str, session_id: str) -> None:
         if await self._handle_confirmation_reply(user_text, session_id):
@@ -1124,6 +1320,19 @@ class VoiceAssistant:
             self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
             return
 
+        deep_thought_ack_scheduled = await self._schedule_deep_thought_ack(
+            decision,
+            user_text,
+            session_id,
+        )
+        await self._launch_deep_thought_body_cue(
+            decision,
+            user_text,
+            session_id,
+        )
+        if deep_thought_ack_scheduled:
+            decision.speak_first = None
+
         agent_start_ms = now_ms()
         self.session_log(session_id, "agent_start: route=%s agents=%s intent=%s", decision.route, ",".join(decision.agents), decision.intent)
         try:
@@ -1168,11 +1377,16 @@ class VoiceAssistant:
                     response,
                     session_id,
                     language=decision.language,
+                    reset_playback=not deep_thought_ack_scheduled,
                 ):
                     return
 
                 self.conversation_state.record_agent_result(session_id, response)
-                self._launch_interaction(response, session_id)
+                self._launch_interaction(
+                    response,
+                    session_id,
+                    reset_playback=not deep_thought_ack_scheduled,
+                )
                 return
 
             result = await self.agent_client.run(
@@ -1194,11 +1408,21 @@ class VoiceAssistant:
                 result.requires_confirmation,
             )
             self.conversation_state.record_agent_result(session_id, result)
-            await self.execute_agent_result(result, session_id)
+            await self.execute_agent_result(
+                result,
+                session_id,
+                reset_playback=not deep_thought_ack_scheduled,
+            )
         except Exception as exc:
             self.session_log(session_id, "agent_exception: agent_ms=%.1f error=%s", now_ms() - agent_start_ms, exc)
             logger.warning("Agent failed; falling back to direct LLM: %s", exc, exc_info=True)
-            self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
+            self.active_llm_task = asyncio.create_task(
+                self.process_llm_tts(
+                    user_text,
+                    session_id,
+                    reset_playback=not deep_thought_ack_scheduled,
+                )
+            )
 
     async def _stage_interaction_confirmation(
         self,
@@ -1206,6 +1430,7 @@ class VoiceAssistant:
         session_id: str,
         *,
         language: str | None,
+        reset_playback: bool = True,
     ) -> bool:
         confirmation_request_ids = (
             await self.interaction_runtime.confirmation_request_ids(response)
@@ -1254,7 +1479,11 @@ class VoiceAssistant:
                 "expires_at": pending.expires_at,
             },
         )
-        self._launch_interaction(prompt_response, session_id)
+        self._launch_interaction(
+            prompt_response,
+            session_id,
+            reset_playback=reset_playback,
+        )
         return True
 
     async def _handle_confirmation_reply(
@@ -1377,12 +1606,16 @@ class VoiceAssistant:
         session_id: str | None,
         *,
         confirmed_request_ids: set[str] | None = None,
+        reset_playback: bool = True,
+        mark_session_done: bool = True,
     ) -> None:
         task = asyncio.create_task(
             self.execute_interaction_response(
                 response,
                 session_id,
                 confirmed_request_ids=confirmed_request_ids,
+                reset_playback=reset_playback,
+                mark_session_done=mark_session_done,
             )
         )
         self.active_interaction_task = task
@@ -1407,8 +1640,11 @@ class VoiceAssistant:
         session_id: str | None,
         *,
         confirmed_request_ids: set[str] | None = None,
+        reset_playback: bool = True,
+        mark_session_done: bool = True,
     ) -> SkillRuntimeResult:
-        await self.reset_playback_ordering()
+        if reset_playback:
+            await self.reset_playback_ordering()
         started_ms = now_ms()
         try:
             execution = await self.interaction_runtime.execute(
@@ -1455,17 +1691,25 @@ class VoiceAssistant:
             )
             raise
         finally:
-            state = self.sessions.state.get(session_id or "")
-            if state is not None:
-                state["llm_done"] = True
-                state["response_chars"] = state.get(
-                    "response_chars",
-                    0,
-                ) + sum(len(item.text) for item in response.speech)
-            self.maybe_session_done(session_id)
+            if mark_session_done:
+                state = self.sessions.state.get(session_id or "")
+                if state is not None:
+                    state["llm_done"] = True
+                    state["response_chars"] = state.get(
+                        "response_chars",
+                        0,
+                    ) + sum(len(item.text) for item in response.speech)
+                self.maybe_session_done(session_id)
 
-    async def execute_agent_result(self, result: AgentResult, session_id: str | None) -> None:
-        await self.reset_playback_ordering()
+    async def execute_agent_result(
+        self,
+        result: AgentResult,
+        session_id: str | None,
+        *,
+        reset_playback: bool = True,
+    ) -> None:
+        if reset_playback:
+            await self.reset_playback_ordering()
         for item in result.speak_immediate:
             await self.schedule_tts_text(item.text, session_id)
 

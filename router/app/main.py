@@ -15,7 +15,7 @@ from .capability_catalog import CapabilityCatalogClient, CapabilityCatalogResult
 from .config import router_mode_from_env
 from .fallback import fallback_decision
 from .llm_router import OllamaLLMRouter
-from .rules import route_by_priority_rules, route_by_rules
+from .rules import route_by_deep_thought_rules, route_by_priority_rules, route_by_rules
 from .semantic_actions import semantic_robot_decision
 from .schema import HealthResponse, RouteDecision, RouteRequest, finalize_decision
 
@@ -339,11 +339,13 @@ async def route(request: RouteRequest) -> RouteDecision:
     if priority is not None:
         decision = priority
     else:
+        decision = route_by_deep_thought_rules(request)
+
+    if decision is None:
         catalog_result = await capability_catalog.search(
             text=request.text,
             language=request.language,
         )
-        decision: RouteDecision | None = None
 
         if settings.mode in ("llm_only", "hybrid"):
             request.context = {

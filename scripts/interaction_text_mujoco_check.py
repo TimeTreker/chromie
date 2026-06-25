@@ -424,7 +424,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi modes. Use only under separate supervision.")
     parser.add_argument("--auto-confirm-sim", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--require-speech", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--expect-route", choices=["chat", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"])
+    parser.add_argument(
+        "--expect-route",
+        choices=[
+            "chat",
+            "deep_thought",
+            "robot_action",
+            "tool",
+            "memory",
+            "clarify",
+            "interrupt",
+            "ignore",
+        ],
+    )
     parser.add_argument("--expect-no-skills", action="store_true", help="Require no Soridormi actions or skills.")
     parser.add_argument("--expect-skill", action="append", default=[])
     parser.add_argument(

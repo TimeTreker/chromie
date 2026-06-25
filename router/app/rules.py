@@ -65,6 +65,17 @@ MEMORY_PATTERNS = [
     r"(记住|帮我记住|不要忘了)",
 ]
 
+DEEP_THOUGHT_PATTERNS = [
+    r"(think deeply|think this through|deep[-\s]?thinking|deep thought)",
+    r"(implementation plan|implementation planning|step[-\s]?by[-\s]?step implementation)",
+    r"(system design|architecture design|design the .* architecture)",
+    r"(debugging strategy|debug strategy|careful reasoning|long[-\s]?context task)",
+    r"(split this (?:task|work)|break this (?:task|work) down)",
+    r"(深入思考|深度思考|仔细想|认真想一下)",
+    r"(实现计划|实施计划|分步骤实现|架构设计|系统设计)",
+    r"(调试方案|排错方案|拆分(?:这个)?任务)",
+]
+
 
 def _matches(text: str, patterns: list[str]) -> bool:
     return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
@@ -93,6 +104,31 @@ def _robot_decision(
             should_speak=True,
             actions=actions or [],
             reason=reason,
+            source="rules",
+        ),
+        request,
+        source="rules",
+    )
+
+
+def route_by_deep_thought_rules(request: RouteRequest) -> RouteDecision | None:
+    """Route explicit careful-reasoning requests to the deepthinking agent."""
+
+    text = _norm(request.text)
+    if not _matches(text, DEEP_THOUGHT_PATTERNS):
+        return None
+    lang = request.language or detect_language(request.text)
+    return finalize_decision(
+        RouteDecision(
+            route="deep_thought",
+            agents=["deepthinking_agent", "speaker_agent"],
+            intent="deep_thought_planning",
+            confidence=0.92,
+            language=lang,
+            priority="normal",
+            needs_agent=True,
+            should_speak=True,
+            reason="Matched explicit deep-thought planning rule",
             source="rules",
         ),
         request,

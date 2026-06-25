@@ -89,6 +89,18 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('Skipping host Orchestrator (--no-orchestrator)', source)
         self.assertIn('ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE"', source)
 
+    def test_voice_mujoco_text_case_allows_long_sim_skills(self) -> None:
+        source = (ROOT / "scripts" / "run_voice_mujoco_text_case.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            'SKILL_TIMEOUT_S="${CHROMIE_VOICE_MUJOCO_SKILL_TIMEOUT_S:-120}"',
+            source,
+        )
+        self.assertIn("--skill-timeout-s SECONDS", source)
+        self.assertIn('--skill-timeout-s "$SKILL_TIMEOUT_S"', source)
+        self.assertNotIn("--skill-timeout-s 15", source)
+
     def test_deprecated_voice_launcher_is_not_advertised(self) -> None:
         self.assertFalse((ROOT / "scripts" / "start_chromie_voice.sh").exists())
 
