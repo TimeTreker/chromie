@@ -9,7 +9,7 @@ from .schema import RouteDecision, RouteRequest, finalize_decision
 
 
 _SEQUENCE_SPLIT = re.compile(
-    r"\s*(?:,?\s+(?:and\s+then|then|after\s+that)\s+|[;；，,]|然后|接着|再)\s*",
+    r"\s*(?:,?\s+(?:and\s+then|then|after\s+that|and)\s+|[;；，,]|然后|接着|再)\s*",
     re.IGNORECASE,
 )
 _NUMBER_WORDS = {
@@ -42,6 +42,7 @@ _NUMBER_WORDS = {
     "十": 10.0,
 }
 _NOD_RE = re.compile(r"\b(?:nod|nodding|noding)\b|点头")
+_BLINK_RE = re.compile(r"\b(?:blink|blinking)\b|眨眼|眨眨眼|眨一眨")
 _HEAD_DIRECTION_PATTERNS = (
     re.compile(
         r"\b(?:turn|rotate|move)\s+(?:your|my|the)?\s*head\s+"
@@ -215,6 +216,13 @@ def _head_gesture_action(
     return None
 
 
+def _blink_action(text: str, available: set[str]) -> SemanticAction | None:
+    if not _BLINK_RE.search(text) or "soridormi.blink_eyes" not in available:
+        return None
+    count = max(1, min(6, _count(text, default=2)))
+    return SemanticAction("soridormi.blink_eyes", {"count": count})
+
+
 def _look_direction_action(text: str, available: set[str]) -> SemanticAction | None:
     direction = _head_direction(text)
     if direction is None or "soridormi.look_direction" not in available:
@@ -234,6 +242,10 @@ def _parse_atomic_segment(text: str, available: set[str]) -> SemanticAction | No
     text = _normalized(text).strip(" ,.!?")
     if not text:
         return None
+
+    blink = _blink_action(text, available)
+    if blink is not None:
+        return blink
 
     head_gesture = _head_gesture_action(text, available)
     if head_gesture is not None:

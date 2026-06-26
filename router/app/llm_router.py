@@ -27,6 +27,8 @@ ROUTE_NAMES = {
     "ignore",
 }
 
+DETERMINISTIC_ONLY_ROUTES = {"interrupt", "ignore"}
+
 
 def _extract_json_object(text: str) -> dict[str, Any]:
     """Parse JSON object from raw model text, tolerating markdown fences."""
@@ -92,14 +94,19 @@ class OllamaLLMRouter:
             "Routing task: act as Chromie's robot-brain router. Understand the "
             "user request, current context, and available abilities, then return "
             "one RouteDecision JSON object.\n"
-            "Routing lanes: quick deterministic controls have already handled "
-            "stop/cancel/emergency/noise before this prompt. You are the deep "
-            "reasoning lane called before non-urgent semantic fallback. Decide "
-            "intent from the whole utterance, capability choice, memory "
-            "references, and speech/body/tool routing. Use route deep_thought "
-            "for complex reasoning, multi-step analysis, design discussion, or "
+            "Routing stages: an emergency filter has already handled "
+            "stop/cancel/emergency/noise before this prompt. You are the quick "
+            "intent-and-meaning router. Decide intent from the whole utterance, "
+            "capability choice, memory references, and speech/body/tool routing. "
+            "Use route deep_thought when you understand that the request needs "
+            "complex reasoning, multi-step analysis, design discussion, or "
             "implementation planning that should be handled by deepthinking_agent "
-            "rather than the fast router.\n"
+            "rather than the quick router. If you are uncertain, return calibrated "
+            "low confidence so Chromie can delegate to deepthinking_agent.\n"
+            "Do not return interrupt or ignore for body commands such as walking, "
+            "looking, nodding, blinking, turning, or moving; those are robot_action. "
+            "Only return interrupt if the text itself is an explicit stop/cancel/"
+            "silence request that somehow reached this prompt.\n"
             f"ASR text: {request.text}\n"
             f"Language hint: {request.language or 'auto'}\n"
             f"Session id: {request.sid or ''}\n"
@@ -112,7 +119,9 @@ class OllamaLLMRouter:
             "stories, jokes, or spoken performance, as chat unless the user "
             "explicitly asks for simultaneous physical movement. Discourse "
             "markers such as 'go ahead', 'okay', 'sure', or 'please' are not "
-            "body movement by themselves. "
+            "body movement by themselves. Compliments or appearance statements "
+            "such as 'you look beautiful' are chat unless the user asks for a "
+            "specific body, head, or eye action. "
             "When selecting a capability, set intent to "
             "capability:<exact capability_id>. For robot_action, the selected "
             "candidate must have interaction_executable=true."
@@ -152,7 +161,10 @@ class OllamaLLMRouter:
                         "deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
                         "Creative speech-only requests like singing, stories, jokes, "
                         "or talking are chat unless physical robot body/head motion is "
-                        "explicitly requested. The phrase 'go ahead' is permission, not walking."
+                        "explicitly requested. Body commands such as walk, look, nod, "
+                        "blink, turn, and move are robot_action, not interrupt. The "
+                        "phrase 'go ahead' is permission, not walking. Compliments such "
+                        "as 'you look beautiful' are chat, not gaze control."
                     ),
                 },
                 {"role": "user", "content": f"Text: {request.text}"},
@@ -215,6 +227,43 @@ class OllamaLLMRouter:
             return reviewed_decision
         return decision
 
+    def _low_confidence_deep_thought_decision(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+        *,
+        reason_prefix: str | None = None,
+    ) -> RouteDecision:
+        candidates = decision.candidate_capabilities
+        if not candidates:
+            raw_candidates = request.context.get("candidate_capabilities", [])
+            candidates = raw_candidates if isinstance(raw_candidates, list) else []
+        reason_parts = [
+            reason_prefix
+            or f"quick router confidence {decision.confidence:.2f} below threshold {self.confidence_threshold:.2f}",
+            f"quick_route={decision.route}",
+            f"quick_intent={decision.intent}",
+        ]
+        if decision.reason:
+            reason_parts.append(f"quick_reason={decision.reason}")
+        return finalize_decision(
+            RouteDecision(
+                route="deep_thought",
+                agents=["deepthinking_agent", "speaker_agent"],
+                intent="deep_thought_low_confidence",
+                confidence=decision.confidence,
+                language=decision.language or request.language or "auto",
+                priority=decision.priority,
+                needs_agent=True,
+                should_speak=True,
+                candidate_capabilities=candidates,
+                reason="; ".join(reason_parts),
+                source="llm",
+            ),
+            request,
+            source="llm",
+        )
+
     async def route(self, request: RouteRequest) -> RouteDecision:
         payload = self.build_payload(request)
 
@@ -240,15 +289,22 @@ class OllamaLLMRouter:
 
         decision = await self._review_route_only_robot_action(request, decision)
 
-        if decision.confidence < self.confidence_threshold and decision.route not in ("interrupt", "ignore"):
+        if decision.route in DETERMINISTIC_ONLY_ROUTES:
             logger.info(
-                "LLM router confidence %.2f below threshold %.2f; falling back",
+                "LLM router returned deterministic-only route %s after priority filter; returning raw quick decision for pipeline recovery",
+                decision.route,
+            )
+            return decision
+
+        if (
+            decision.confidence < self.confidence_threshold
+            and decision.route != "deep_thought"
+        ):
+            logger.info(
+                "LLM router confidence %.2f below threshold %.2f; delegating to deep_thought",
                 decision.confidence,
                 self.confidence_threshold,
             )
-            return fallback_decision(
-                request,
-                reason=f"low_llm_confidence:{decision.confidence:.2f}",
-            )
+            return self._low_confidence_deep_thought_decision(request, decision)
 
         return decision

@@ -194,6 +194,8 @@ class CapabilityAgent(BaseAgent):
             return "Nodding."
         if skill_id == "soridormi.shake_no":
             return "Shaking my head."
+        if skill_id == "soridormi.blink_eyes":
+            return "Blinking."
         return "Okay."
 
     async def _plan(self, request: AgentRunRequest, candidates: list[Any]) -> _CapabilityPlan:

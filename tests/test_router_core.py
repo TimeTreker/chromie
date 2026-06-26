@@ -6,13 +6,17 @@ from unittest.mock import patch
 
 from router.app.config import router_mode_from_env
 from router.app.fallback import fallback_decision
-from router.app.rules import route_by_deep_thought_rules, route_by_rules
+from router.app.rules import (
+    route_by_deep_thought_rules,
+    route_by_priority_rules,
+    route_by_rules,
+)
 from router.app.schema import RouteRequest
 
 
 class RouterCoreTests(unittest.TestCase):
     def test_rules_route_interrupt_without_agent(self) -> None:
-        for text in ("stop", "Stop!", "cancel?"):
+        for text in ("stop", "Stop!", "cancel?", "Stop moving right now.", "停止移动"):
             with self.subTest(text=text):
                 decision = route_by_rules(RouteRequest(sid="s1", text=text))
 
@@ -22,6 +26,19 @@ class RouterCoreTests(unittest.TestCase):
                 self.assertTrue(decision.interrupt_current)
                 self.assertFalse(decision.needs_agent)
                 self.assertFalse(decision.should_speak)
+
+    def test_priority_rules_route_motion_stop_before_model(self) -> None:
+        decision = route_by_priority_rules(
+            RouteRequest(sid="s-stop", text="Stop moving right now.")
+        )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.route, "interrupt")
+        self.assertEqual(decision.source, "rules")
+        self.assertTrue(decision.interrupt_current)
+        self.assertFalse(decision.needs_agent)
+        self.assertFalse(decision.should_speak)
 
     def test_rules_route_robot_action(self) -> None:
         decision = route_by_rules(RouteRequest(sid="s2", text="turn left"))

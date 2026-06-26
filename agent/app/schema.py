@@ -52,6 +52,7 @@ class RouteDecision(BaseModel):
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
     source: DecisionSource = "fallback"
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("agents")
     @classmethod

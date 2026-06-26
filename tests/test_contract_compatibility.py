@@ -40,6 +40,14 @@ class ContractCompatibilityTests(unittest.TestCase):
         service_request = ServiceAgentRequest.model_validate(orchestrator_request.model_dump(mode="json"))
         self.assertEqual(service_request.history[0]["text"], "hello")
         self.assertEqual(service_request.route_decision.intent, "turn_left")
+        self.assertEqual(
+            service_request.route_decision.metadata["task_list"][0]["task_type"],
+            "head.turn",
+        )
+        self.assertEqual(
+            service_request.route_decision.metadata["task_list"][0]["source_stage"],
+            "quick_intent",
+        )
 
     def test_agent_result_survives_orchestrator_and_hardware_round_trip(self) -> None:
         service_result = ServiceAgentResult()

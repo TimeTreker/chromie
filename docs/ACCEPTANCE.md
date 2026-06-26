@@ -198,6 +198,17 @@ manifest loaded and run:
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --no-speaker
+```
+
+That command is the natural no-microphone rehearsal: Chromie infers the route,
+speech, and skills from the text exactly as it would after ASR. Add
+`--expect-*` flags only when you want a regression assertion after planning:
+
+```bash
+python scripts/interaction_text_mujoco_check.py \
+  "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --expect-skill soridormi.walk_velocity \
   --expect-skill soridormi.nod_yes \
   --expect-skill soridormi.turn_in_place \
@@ -210,18 +221,37 @@ python scripts/interaction_text_mujoco_check.py \
 This runner writes `route.json`, `interaction_response.json`,
 `execution.json`, status snapshots, session events, recordings when enabled,
 and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. It fails if
-the ordered Soridormi skills or expected arguments do not match, if Skill
-Runtime execution fails, or if the simulator does not return to safe idle. Use
-`--no-speaker` for headless automation; otherwise Chromie schedules TTS through
+Skill Runtime execution fails, if the simulator does not return to safe idle,
+or, when assertion flags are supplied, if the ordered Soridormi skills or
+expected arguments do not match. Use `--no-speaker` for headless automation;
+otherwise Chromie schedules TTS through
 the configured output device. The runner uses a 120s per-Soridormi-skill
 diagnostic timeout by default; pass `--skill-timeout-s 0` to use catalog/default
-timeouts unchanged. The runner refuses non-`sim` Soridormi modes unless
-`--allow-non-sim` is supplied under separate supervision.
+timeouts unchanged. It prints compact debug lines for route, staged task list,
+skills, speech count, and errors before the JSON summary. The runner refuses
+non-`sim` Soridormi modes unless `--allow-non-sim` is supplied under separate
+supervision.
 
 The retained `20260617T081411Z` text bundle is the M13 text interaction closure
 evidence. It is the right gate when the goal is to skip microphone and ASR while
 proving the interaction contract, trusted Skill Runtime, live Soridormi
 execution, and safe-idle behavior.
+
+Complex robot-brain text scenarios are covered by:
+
+```bash
+conda run -n Chromie python scripts/interaction_text_scenario_suite.py \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
+This suite is preview-only and headless by default. It checks mixed
+conversation/body cases, false-belief questions, compliments, unsupported
+requests, discourse-marker traps such as `go ahead`, deep-thinking handoff, and
+deterministic stop routing. The scenario text is the only input; expected
+routes, skills, and speech snippets are post-run assertions. `expect_no_skills`
+allows chat-only expressive cues such as `soridormi.express_attention`; set
+`allow_expressive_cues: false` in a custom case when strict zero-skill output is
+required.
 
 ## Task-agent bridge acceptance
 

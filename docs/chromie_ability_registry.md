@@ -50,7 +50,8 @@ The first ability-backed social loop is the deep-thinking handoff:
 
 ```text
 User asks for complicated planning
--> Router chooses deep_thought
+-> Emergency filter passes because this is not stop/cancel/noise
+-> Quick intent router chooses deep_thought or returns low confidence
 -> Chromie executes speech.thinking_ack
 -> Chromie optionally executes social.thinking_pose in simulator-safe mode
 -> Deepthinking agent plans

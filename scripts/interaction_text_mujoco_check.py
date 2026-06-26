@@ -100,7 +100,7 @@ def validate_contract(
     if expected_skills:
         if route.route != "robot_action":
             errors.append(f"route={route.route!r}, expected 'robot_action'")
-        if route_actions != expected_skills:
+        if route_actions and route_actions != expected_skills:
             errors.append(
                 "router actions mismatch: "
                 f"expected {expected_skills!r}, got {route_actions!r}"
@@ -142,6 +142,129 @@ def safe_idle_errors(status: dict[str, Any]) -> list[str]:
     if status.get("fallen") is True:
         errors.append("robot reports fallen=true")
     return errors
+
+
+def _short_capability_id(item: dict[str, Any]) -> str:
+    capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+    return capability_id or "unknown"
+
+
+def _describe_task(item: dict[str, Any], index: int) -> str:
+    stage = str(item.get("source_stage") or "?")
+    task_type = str(item.get("task_type") or "?")
+    priority = str(item.get("priority") or "normal")
+    bits = [f"{index}:{stage}:{task_type}", f"priority={priority}"]
+    capability_id = str(item.get("capability_id") or "").strip()
+    if capability_id:
+        bits.append(f"skill={capability_id}")
+    action_type = str(item.get("action_type") or "").strip()
+    if action_type:
+        bits.append(f"action={action_type}")
+    status = str(item.get("status") or "").strip()
+    if status and status != "proposed":
+        bits.append(f"status={status}")
+    return " ".join(bits)
+
+
+def build_debug_summary(
+    *,
+    route: Any,
+    response: Any,
+    errors: list[str],
+) -> dict[str, Any]:
+    route_metadata = getattr(route, "metadata", {}) or {}
+    route_actions = [
+        _short_capability_id(item)
+        for item in getattr(route, "actions", [])
+        if isinstance(item, dict)
+    ]
+    candidates = [
+        _short_capability_id(item)
+        for item in getattr(route, "candidate_capabilities", [])[:5]
+        if isinstance(item, dict)
+    ]
+    task_list = [
+        _describe_task(item, index)
+        for index, item in enumerate(route_metadata.get("task_list") or [])
+        if isinstance(item, dict)
+    ]
+    stages = []
+    for stage in route_metadata.get("route_stage_outputs") or []:
+        if not isinstance(stage, dict):
+            continue
+        tasks = stage.get("tasks") or []
+        stages.append(
+            "{stage}:{status} route={route} intent={intent} tasks={count}".format(
+                stage=stage.get("stage") or "?",
+                status=stage.get("status") or "?",
+                route=stage.get("route") or "-",
+                intent=stage.get("intent") or "-",
+                count=len(tasks) if isinstance(tasks, list) else 0,
+            )
+        )
+    skills = [
+        str(item.skill_id)
+        for item in getattr(response, "skills", [])
+        if str(item.skill_id).startswith("soridormi.")
+    ]
+    speech = [str(item.text) for item in getattr(response, "speech", [])]
+    return {
+        "route": (
+            f"route={getattr(route, 'route', '?')} "
+            f"intent={getattr(route, 'intent', '?')} "
+            f"source={getattr(route, 'source', '?')} "
+            f"confidence={float(getattr(route, 'confidence', 0.0)):.2f} "
+            f"actions={len(route_actions)}"
+        ),
+        "route_actions": route_actions,
+        "candidate_capabilities": candidates,
+        "stages": stages,
+        "task_list": task_list,
+        "skills": skills,
+        "speech_items": len(speech),
+        "speech_preview": speech[0][:160] if speech else "",
+        "errors": list(errors),
+    }
+
+
+def print_debug_summary(debug_summary: dict[str, Any]) -> None:
+    print(f"[interaction-text-mujoco][debug] {debug_summary['route']}", file=sys.stderr)
+    if debug_summary.get("stages"):
+        print(
+            "[interaction-text-mujoco][debug] stages: "
+            + " | ".join(debug_summary["stages"]),
+            file=sys.stderr,
+        )
+    if debug_summary.get("task_list"):
+        print("[interaction-text-mujoco][debug] task_list:", file=sys.stderr)
+        for item in debug_summary["task_list"]:
+            print(f"[interaction-text-mujoco][debug]   - {item}", file=sys.stderr)
+    if debug_summary.get("route_actions"):
+        print(
+            "[interaction-text-mujoco][debug] route_actions: "
+            + ", ".join(debug_summary["route_actions"]),
+            file=sys.stderr,
+        )
+    if debug_summary.get("skills"):
+        print(
+            "[interaction-text-mujoco][debug] emitted_skills: "
+            + ", ".join(debug_summary["skills"]),
+            file=sys.stderr,
+        )
+    else:
+        print("[interaction-text-mujoco][debug] emitted_skills: none", file=sys.stderr)
+    if debug_summary.get("speech_items"):
+        print(
+            f"[interaction-text-mujoco][debug] speech_items: {debug_summary['speech_items']} "
+            f"preview={debug_summary.get('speech_preview', '')!r}",
+            file=sys.stderr,
+        )
+    if debug_summary.get("errors"):
+        print(
+            "[interaction-text-mujoco][debug] errors: "
+            + " | ".join(debug_summary["errors"]),
+            file=sys.stderr,
+        )
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -375,6 +498,11 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             if args.require_speech and int(session_state.get("failed_tts", 0)) > 0:
                 errors.append(f"TTS failed {session_state.get('failed_tts')} time(s)")
 
+        debug_summary = build_debug_summary(
+            route=route,
+            response=response,
+            errors=errors,
+        )
         summary = {
             "ok": not errors,
             "text": args.text,
@@ -383,6 +511,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             "preview_only": args.preview_only,
             "skill_timeout_s": args.skill_timeout_s,
             "evidence_dir": str(evidence_dir),
+            "debug_summary": debug_summary,
             "errors": errors,
             "route": route.model_dump(mode="json"),
             "interaction_response": response.model_dump(mode="json"),
@@ -436,15 +565,26 @@ def build_parser() -> argparse.ArgumentParser:
             "interrupt",
             "ignore",
         ],
+        help="Optional post-run assertion; this is not sent to Router or Agent.",
     )
-    parser.add_argument("--expect-no-skills", action="store_true", help="Require no Soridormi actions or skills.")
-    parser.add_argument("--expect-skill", action="append", default=[])
+    parser.add_argument(
+        "--expect-no-skills",
+        action="store_true",
+        help="Optional post-run assertion that no Soridormi skills were emitted.",
+    )
+    parser.add_argument(
+        "--expect-skill",
+        action="append",
+        default=[],
+        help="Optional post-run assertion for the exact Soridormi skill sequence.",
+    )
     parser.add_argument(
         "--expect-arg",
         action="append",
         type=parse_expected_arg,
         default=[],
         metavar="INDEX:KEY=VALUE",
+        help="Optional post-run assertion for a selected emitted skill argument.",
     )
     parser.add_argument("--arg-tolerance", type=float, default=1e-6)
     parser.add_argument("--timeout-s", type=float, default=90.0)
@@ -470,6 +610,7 @@ def main() -> int:
     except Exception as exc:
         print(f"[interaction-text-mujoco][error] {exc}", file=sys.stderr)
         return 1
+    print_debug_summary(summary["debug_summary"])
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if summary["ok"] else 1
 

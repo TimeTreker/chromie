@@ -63,6 +63,7 @@ class RouteDecision(BaseModel):
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
     source: DecisionSource = "fallback"
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("agents")
     @classmethod
@@ -87,8 +88,315 @@ class HealthResponse(BaseModel):
     rules_first: bool = True
 
 
+STAGE_ORDER: dict[str, int] = {
+    "emergency_filter": 0,
+    "quick_intent": 1,
+    "deep_thought": 2,
+}
+
+
 def default_agents_for_route(route: str) -> list[str]:
     return list(DEFAULT_AGENTS.get(route, ["conversation_agent", "speaker_agent"]))
+
+
+def _priority_rank(priority: str) -> int:
+    return {"urgent": 0, "high": 1, "normal": 2, "low": 3}.get(priority, 2)
+
+
+def _route_task_type(route: str) -> str:
+    return {
+        "chat": "speech.answer",
+        "deep_thought": "cognition.deep_think",
+        "robot_action": "task.execute_robot_action",
+        "tool": "task.use_tool",
+        "memory": "memory.remember_session_context",
+        "clarify": "speech.ask_clarification",
+        "interrupt": "task.cancel_current_action",
+        "ignore": "state.ignore_input",
+    }.get(route, "route.handle_request")
+
+
+def _task_item(
+    *,
+    source_stage: str,
+    kind: str,
+    task_type: str,
+    route: str,
+    intent: str,
+    priority: str,
+    index: int,
+    status: str = "proposed",
+    requires_validation: bool = True,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    item = {
+        "id": f"{source_stage}:{index}:{task_type}",
+        "source_stage": source_stage,
+        "kind": kind,
+        "task_type": task_type,
+        "route": route,
+        "intent": intent,
+        "priority": priority,
+        "status": status,
+        "requires_validation": requires_validation,
+    }
+    if extra:
+        item.update(extra)
+    return item
+
+
+def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[dict[str, Any]]:
+    route = decision.route
+    priority = decision.priority
+    intent = decision.intent
+    tasks: list[dict[str, Any]] = []
+
+    if route == "interrupt":
+        tasks.append(
+            _task_item(
+                source_stage=source_stage,
+                kind="action",
+                task_type="task.cancel_current_action",
+                route=route,
+                intent=intent,
+                priority="urgent",
+                index=0,
+                requires_validation=False,
+            )
+        )
+        tasks.append(
+            _task_item(
+                source_stage=source_stage,
+                kind="action",
+                task_type="body.stop_motion",
+                route=route,
+                intent=intent,
+                priority="urgent",
+                index=1,
+                requires_validation=True,
+            )
+        )
+        return tasks
+
+    if route == "robot_action" and decision.actions:
+        for index, action in enumerate(decision.actions):
+            capability_id = str(action.get("capability_id") or "").strip()
+            action_type = str(action.get("type") or "").strip()
+            args = action.get("args") if isinstance(action.get("args"), dict) else {}
+            extra: dict[str, Any] = {"sequence": index}
+            if capability_id:
+                extra["capability_id"] = capability_id
+                extra["args"] = args
+            if action_type:
+                extra["action_type"] = action_type
+                params = action.get("params")
+                if isinstance(params, dict):
+                    extra["params"] = params
+            tasks.append(
+                _task_item(
+                    source_stage=source_stage,
+                    kind="action",
+                    task_type="task.execute_skill" if capability_id else action_type or "task.execute_robot_action",
+                    route=route,
+                    intent=intent,
+                    priority=priority,
+                    index=index,
+                    extra=extra,
+                )
+            )
+        return tasks
+
+    capability_prefix = "capability:"
+    if route == "robot_action" and intent.startswith(capability_prefix):
+        capability_id = intent[len(capability_prefix) :].strip()
+        tasks.append(
+            _task_item(
+                source_stage=source_stage,
+                kind="action",
+                task_type="task.execute_skill",
+                route=route,
+                intent=intent,
+                priority=priority,
+                index=0,
+                extra={"capability_id": capability_id} if capability_id else None,
+            )
+        )
+        return tasks
+
+    tasks.append(
+        _task_item(
+            source_stage=source_stage,
+            kind="task" if route not in {"ignore"} else "state",
+            task_type=_route_task_type(route),
+            route=route,
+            intent=intent,
+            priority=priority,
+            index=0,
+            requires_validation=route not in {"ignore"},
+        )
+    )
+    return tasks
+
+
+def route_stage_output(
+    decision: RouteDecision,
+    *,
+    stage: str,
+    status: str = "proposed",
+    tasks: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    task_items = tasks if tasks is not None else _tasks_for_decision(decision, source_stage=stage)
+    return {
+        "stage": stage,
+        "status": status,
+        "route": decision.route,
+        "intent": decision.intent,
+        "confidence": decision.confidence,
+        "source": decision.source,
+        "tasks": task_items,
+        "actions": [item for item in task_items if item.get("kind") == "action"],
+    }
+
+
+def passed_stage_output(stage: str) -> dict[str, Any]:
+    return {
+        "stage": stage,
+        "status": "passed",
+        "tasks": [],
+        "actions": [],
+    }
+
+
+def merge_stage_task_list(outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    for stage_output in outputs:
+        if not isinstance(stage_output, dict):
+            continue
+        stage = str(stage_output.get("stage") or "unknown")
+        tasks = stage_output.get("tasks") or []
+        if not isinstance(tasks, list):
+            continue
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+            merged.append(
+                {
+                    **task,
+                    "source_stage": str(task.get("source_stage") or stage),
+                }
+            )
+    merged.sort(
+        key=lambda item: (
+            _priority_rank(str(item.get("priority") or "normal")),
+            STAGE_ORDER.get(str(item.get("source_stage") or ""), 99),
+            int(item.get("sequence", len(merged))) if isinstance(item.get("sequence", 0), int) else 0,
+        )
+    )
+    return [
+        {
+            **item,
+            "merged_sequence": index,
+        }
+        for index, item in enumerate(merged)
+    ]
+
+
+def annotate_stage_outputs(
+    decision: RouteDecision,
+    outputs: list[dict[str, Any]],
+) -> RouteDecision:
+    decision.metadata = {
+        **(decision.metadata or {}),
+        "route_stage_outputs": outputs,
+        "task_list": merge_stage_task_list(outputs),
+    }
+    return decision
+
+
+def annotate_default_stage_output(decision: RouteDecision) -> RouteDecision:
+    if (decision.metadata or {}).get("route_stage_outputs"):
+        decision.metadata = {
+            **decision.metadata,
+            "task_list": merge_stage_task_list(decision.metadata["route_stage_outputs"]),
+        }
+        return decision
+    stage = (
+        "emergency_filter"
+        if decision.route in {"interrupt", "ignore"} and decision.source == "rules"
+        else "deep_thought"
+        if decision.route == "deep_thought"
+        else "quick_intent"
+    )
+    return annotate_stage_outputs(decision, [route_stage_output(decision, stage=stage)])
+
+
+def annotate_pipeline_stage_outputs(
+    decision: RouteDecision,
+    *,
+    emergency_matched: bool = False,
+) -> RouteDecision:
+    if emergency_matched:
+        return annotate_stage_outputs(
+            decision,
+            [route_stage_output(decision, stage="emergency_filter", status="triggered")],
+        )
+
+    outputs: list[dict[str, Any]] = [passed_stage_output("emergency_filter")]
+    if decision.route == "deep_thought":
+        outputs.append(
+            route_stage_output(
+                decision,
+                stage="quick_intent",
+                status="delegated",
+                tasks=[
+                    _task_item(
+                        source_stage="quick_intent",
+                        kind="task",
+                        task_type="cognition.delegate_deep_thought",
+                        route=decision.route,
+                        intent=decision.intent,
+                        priority=decision.priority,
+                        index=0,
+                        extra={
+                            "quick_confidence": decision.confidence,
+                            "reason": decision.reason,
+                        },
+                    )
+                ],
+            )
+        )
+        outputs.append(
+            route_stage_output(
+                decision,
+                stage="deep_thought",
+                status="proposed",
+                tasks=[
+                    _task_item(
+                        source_stage="deep_thought",
+                        kind="action",
+                        task_type="speech.thinking_ack",
+                        route=decision.route,
+                        intent=decision.intent,
+                        priority=decision.priority,
+                        index=0,
+                        requires_validation=False,
+                    ),
+                    _task_item(
+                        source_stage="deep_thought",
+                        kind="task",
+                        task_type="cognition.deep_think",
+                        route=decision.route,
+                        intent=decision.intent,
+                        priority=decision.priority,
+                        index=1,
+                        extra={"candidate_count": len(decision.candidate_capabilities)},
+                    ),
+                ],
+            )
+        )
+    else:
+        outputs.append(route_stage_output(decision, stage="quick_intent"))
+    return annotate_stage_outputs(decision, outputs)
 
 
 def finalize_decision(
@@ -138,7 +446,7 @@ def finalize_decision(
     else:
         decision.needs_agent = True
 
-    return decision
+    return annotate_default_stage_output(decision)
 
 
 def detect_language(text: str) -> str:

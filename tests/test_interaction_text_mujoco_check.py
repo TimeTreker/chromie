@@ -6,6 +6,7 @@ import unittest
 from router.app.schema import RouteDecision
 from scripts.interaction_text_mujoco_check import (
     _apply_soridormi_skill_timeout,
+    build_debug_summary,
     parse_expected_arg,
     safe_idle_errors,
     validate_contract,
@@ -94,6 +95,134 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         )
 
         self.assertEqual(errors, [])
+
+    def test_validate_contract_accepts_agent_skills_when_router_has_no_actions(self) -> None:
+        route = RouteDecision.model_validate(
+            {
+                "route": "robot_action",
+                "intent": "robot_action",
+                "confidence": 0.81,
+                "language": "en-US",
+                "source": "llm",
+                "actions": [],
+            }
+        )
+        response = InteractionResponse.model_validate(
+            {
+                "skills": [
+                    {
+                        "skill_id": "soridormi.walk_velocity",
+                        "args": {"vx_mps": 0.2, "duration_s": 10.0},
+                        "timing": "sequential",
+                    },
+                    {
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "timing": "sequential",
+                    },
+                ]
+            }
+        )
+
+        errors = validate_contract(
+            route=route,
+            response=response,
+            expected_route=None,
+            expected_skills=[
+                "soridormi.walk_velocity",
+                "soridormi.blink_eyes",
+            ],
+            expect_no_skills=False,
+            expected_args=[
+                (0, "vx_mps", 0.2),
+                (1, "count", 2),
+            ],
+            arg_tolerance=1e-6,
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_build_debug_summary_describes_route_stages_tasks_and_skills(self) -> None:
+        route = RouteDecision.model_validate(
+            {
+                "route": "deep_thought",
+                "intent": "deep_thought_low_confidence",
+                "confidence": 0.0,
+                "language": "en-US",
+                "source": "llm",
+                "candidate_capabilities": [
+                    {"capability_id": "soridormi.walk_velocity"},
+                    {"capability_id": "soridormi.blink_eyes"},
+                ],
+                "metadata": {
+                    "route_stage_outputs": [
+                        {"stage": "emergency_filter", "status": "passed", "tasks": []},
+                        {
+                            "stage": "quick_intent",
+                            "status": "delegated",
+                            "route": "deep_thought",
+                            "intent": "deep_thought_low_confidence",
+                            "tasks": [
+                                {
+                                    "source_stage": "quick_intent",
+                                    "task_type": "cognition.delegate_deep_thought",
+                                    "priority": "normal",
+                                }
+                            ],
+                        },
+                    ],
+                    "task_list": [
+                        {
+                            "source_stage": "quick_intent",
+                            "task_type": "cognition.delegate_deep_thought",
+                            "priority": "normal",
+                        },
+                        {
+                            "source_stage": "deep_thought",
+                            "task_type": "speech.thinking_ack",
+                            "priority": "normal",
+                        },
+                    ],
+                },
+            }
+        )
+        response = InteractionResponse.model_validate(
+            {
+                "skills": [
+                    {
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "timing": "sequential",
+                    }
+                ],
+                "speech": [{"text": "Let me think.", "timing": "immediate"}],
+            }
+        )
+
+        summary = build_debug_summary(
+            route=route,
+            response=response,
+            errors=["route='deep_thought', expected 'robot_action'"],
+        )
+
+        self.assertIn("route=deep_thought", summary["route"])
+        self.assertEqual(
+            summary["candidate_capabilities"],
+            ["soridormi.walk_velocity", "soridormi.blink_eyes"],
+        )
+        self.assertTrue(
+            any("quick_intent:delegated" in item for item in summary["stages"])
+        )
+        self.assertEqual(
+            summary["task_list"],
+            [
+                "0:quick_intent:cognition.delegate_deep_thought priority=normal",
+                "1:deep_thought:speech.thinking_ack priority=normal",
+            ],
+        )
+        self.assertEqual(summary["skills"], ["soridormi.blink_eyes"])
+        self.assertEqual(summary["speech_items"], 1)
+        self.assertEqual(len(summary["errors"]), 1)
 
     def test_validate_contract_reports_mismatch(self) -> None:
         route = RouteDecision.model_validate(

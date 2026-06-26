@@ -175,6 +175,37 @@ class RouterSemanticActionTests(unittest.TestCase):
         self.assertEqual(decision.actions[2]["args"]["head_yaw_rad"], 0.35)
         self.assertEqual(decision.actions[2]["args"]["head_pitch_rad"], 0.0)
 
+    def test_plain_and_compound_walk_head_turn_and_blink_preserves_all_actions(self) -> None:
+        decision = semantic_robot_decision(
+            RouteRequest(
+                text=(
+                    "please walk forward at 0.20 for 10 seconds and "
+                    "turn your head right and blink your eyes"
+                )
+            ),
+            _result(
+                "soridormi.walk_velocity",
+                "soridormi.look_direction",
+                "soridormi.blink_eyes",
+            ),
+        )
+        assert decision is not None
+        self.assertEqual(decision.intent, "compound_robot_action")
+        self.assertEqual(
+            [item["capability_id"] for item in decision.actions],
+            [
+                "soridormi.walk_velocity",
+                "soridormi.look_direction",
+                "soridormi.blink_eyes",
+            ],
+        )
+        self.assertEqual(decision.actions[0]["args"]["vx_mps"], 0.2)
+        self.assertEqual(decision.actions[0]["args"]["duration_s"], 10.0)
+        self.assertEqual(decision.actions[0]["args"]["yaw_radps"], 0.0)
+        self.assertEqual(decision.actions[1]["args"]["head_yaw_rad"], 0.35)
+        self.assertEqual(decision.actions[1]["args"]["head_pitch_rad"], 0.0)
+        self.assertEqual(decision.actions[2]["args"], {"count": 2})
+
     def test_head_gesture_duration_is_clamped_to_skill_contract(self) -> None:
         decision = semantic_robot_decision(
             RouteRequest(text="nod your head for 15 seconds"),
@@ -182,6 +213,16 @@ class RouterSemanticActionTests(unittest.TestCase):
         )
         assert decision is not None
         self.assertEqual(decision.actions[0]["args"]["duration_s"], 10.0)
+
+    def test_blink_eyes_routes_as_visual_skill(self) -> None:
+        decision = semantic_robot_decision(
+            RouteRequest(text="please blink your eyes"),
+            _result("soridormi.blink_eyes"),
+        )
+        assert decision is not None
+        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
+        self.assertEqual(decision.actions[0]["capability_id"], "soridormi.blink_eyes")
+        self.assertEqual(decision.actions[0]["args"], {"count": 2})
 
     def test_unknown_segment_does_not_partially_execute(self) -> None:
         decision = semantic_robot_decision(

@@ -62,9 +62,14 @@ and task-level acceptance metrics exist.
 
 The current small Router model is not a single source of truth for routing or
 safety. `qwen3:0.6b` may propose routes for normal requests, but deterministic
-operational controls, capability-catalog constraints, confidence fallback,
-schema validation, host Skill Runtime authorization, and Soridormi provider
-checks remain authoritative. See
+operational controls, capability-catalog constraints, low-confidence
+deepthought delegation, schema validation, host Skill Runtime authorization,
+and Soridormi provider checks remain authoritative. Deterministic semantic
+action parsing is now a rules-only or explicit compatibility fallback rather
+than the normal hybrid brain path. Router decisions now retain staged
+task/action proposals in `metadata.route_stage_outputs` and a merged
+`metadata.task_list`, while execution still requires Agent and provider
+validation. See
 [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
 
 On June 14, 2026, the Linux x86_64 reference host with an NVIDIA GeForce RTX

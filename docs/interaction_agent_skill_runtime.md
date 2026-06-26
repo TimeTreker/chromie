@@ -326,6 +326,17 @@ speaker output while skipping microphone and ASR:
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --no-speaker
+```
+
+This natural rehearsal sends only the text request into Chromie. The
+`--expect-*` flags below are optional regression assertions checked after
+Router, Agent, and Soridormi have produced their outputs:
+
+```bash
+python scripts/interaction_text_mujoco_check.py \
+  "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --expect-skill soridormi.walk_velocity \
   --expect-skill soridormi.nod_yes \
   --expect-skill soridormi.turn_in_place \

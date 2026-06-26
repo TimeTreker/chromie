@@ -11,8 +11,9 @@ def _norm(text: str) -> str:
 
 INTERRUPT_PATTERNS = [
     r"^(stop|cancel|quiet|shut up|be quiet|enough|pause|hold on)(?:\s+(?:now|please))?[.!?]*$",
+    r"^(stop|cancel|pause|halt)(?:\s+(?:moving|motion|walking|everything|all\s+motion|all\s+movement|right\s+now|now|please|immediately))*[.!?]*$",
     r"(stop talking|stop speaking|don't speak|do not speak)",
-    r"^(停|停下|停止|闭嘴|别说了|不要说了|安静|暂停|打住)[。！!？?]*$",
+    r"^(停|停下|停止|闭嘴|别说了|不要说了|安静|暂停|打住)(?:动作|移动|运动|现在|马上|立刻)*[。！!？?]*$",
 ]
 
 IGNORE_PATTERNS = [

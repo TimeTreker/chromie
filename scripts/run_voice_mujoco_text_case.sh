@@ -25,9 +25,12 @@ Run a no-microphone text -> Chromie -> Soridormi/MuJoCo diagnostic case
 against an already-started voice-MuJoCo stack.
 
 Examples:
+  ./scripts/run_voice_mujoco_text_case.sh "Please walk forward for ten seconds." --no-speaker
+  ./scripts/run_voice_mujoco_text_case.sh "Please blink your eyes." --speaker
+
+Regression assertion example:
   ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --speaker
-  ./scripts/run_voice_mujoco_text_case.sh "Look at me for three seconds." --no-speaker
-  ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --expect-skill soridormi.nod_yes
+  ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --no-speaker --expect-skill soridormi.nod_yes
 
 Options:
   --mcp-url URL              Soridormi MCP URL; default: http://127.0.0.1:8000/mcp
@@ -36,12 +39,12 @@ Options:
   --preview-only             Route and validate without executing Soridormi skills
   --no-auto-confirm-sim      Do not auto-confirm simulator skills
   --skill-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
-  --expect-route ROUTE       Require Router route: chat, deep_thought,
+  --expect-route ROUTE       Post-run assertion for Router route: chat, deep_thought,
                              robot_action, tool, memory, clarify, interrupt,
                              or ignore
-  --expect-no-skills         Require no Soridormi action or skill emission
-  --expect-skill SKILL_ID    Require at least one planned skill id
-  --expect-arg I:KEY=VALUE   Forwarded to interaction_text_mujoco_check.py
+  --expect-no-skills         Post-run assertion for no Soridormi skill emission
+  --expect-skill SKILL_ID    Post-run assertion for the exact planned skill sequence
+  --expect-arg I:KEY=VALUE   Post-run assertion for an emitted skill argument
   -h, --help                 Show this help
 USAGE
 }
@@ -76,6 +79,15 @@ if [ -z "$TEXT" ]; then
   echo "[voice-mujoco-text][error] Text request is required." >&2
   usage >&2
   exit 2
+fi
+
+if [ "${#EXPECT_ROUTE[@]}" -eq 0 ] \
+  && [ "${#EXPECT_NO_SKILLS[@]}" -eq 0 ] \
+  && [ "${#EXPECT_SKILL[@]}" -eq 0 ] \
+  && [ "${#EXPECT_ARGS[@]}" -eq 0 ]; then
+  echo "[voice-mujoco-text] Natural input mode: no --expect-* assertions supplied; Chromie will infer route and skills from the text." >&2
+else
+  echo "[voice-mujoco-text] Assertion mode: --expect-* flags validate the output after Chromie has already planned from the text." >&2
 fi
 
 mkdir -p "$EVIDENCE_ROOT"

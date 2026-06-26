@@ -10,25 +10,39 @@ here. Current revision and verification status are maintained in
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health` | Return Router mode, model, Ollama URL, and rule-order state. |
-| `GET` | `/routes` | List route names, routing lanes, active mode, and known Agent names. |
+| `GET` | `/routes` | List route names, routing stages, active mode, and known Agent names. |
 | `POST` | `/route` | Convert text and session context into a validated `RouteDecision`. |
 
 `POST /route` accepts `sid`, `text`, optional `language`, and a free-form
-`context` object. Route names are `chat`, `robot_action`, `tool`, `memory`,
-`clarify`, `interrupt`, and `ignore`.
+`context` object. Route names are `chat`, `deep_thought`, `robot_action`,
+`tool`, `memory`, `clarify`, `interrupt`, and `ignore`.
 
 Interrupt and ignore decisions are normalized deterministically: they do not
 require the Agent and they do not speak. For other input, Router queries the
-Agent-owned shared capability catalog before optional legacy rules or LLM
-routing. `RouteDecision.candidate_capabilities` preserves the ranked evidence
-for the native interaction path.
+Agent-owned shared capability catalog, sends bounded context and candidates to
+the quick intent Router model when enabled, and delegates low-confidence or
+explicitly complex quick routes to `deep_thought`. Legacy robot rules and
+semantic action parsing are compatibility fallbacks only.
+`RouteDecision.candidate_capabilities` preserves the ranked evidence for the
+native interaction path.
 
-The Router exposes two conceptual lanes:
+Router also attaches staged task metadata:
 
-| Lane | Routes | LLM use |
+- `metadata.route_stage_outputs`: one entry per route stage that contributed or
+  passed, each with proposed `tasks` and `actions`;
+- `metadata.task_list`: the merged priority/stage ordered task list.
+
+This metadata is advisory planning state. Concrete skill execution still uses
+validated `RouteDecision.actions`, Agent-selected `InteractionResponse.skills`,
+and Skill Runtime/provider authorization.
+
+The Router exposes three conceptual stages:
+
+| Stage | Routes | LLM use |
 |---|---|---|
-| `quick_control` | `interrupt`, `ignore` | Never |
-| `deep_reasoning` | `chat`, `robot_action`, `tool`, `memory`, `clarify` | Optional when Router mode is `hybrid` or `llm_only` |
+| `emergency_filter` | `interrupt`, `ignore` | Never |
+| `quick_intent` | `chat`, `deep_thought`, `robot_action`, `tool`, `memory`, `clarify` | Optional when Router mode is `hybrid` or `llm_only` |
+| `deep_thought` | `deep_thought` | Handled by Agent after routing |
 
 ## Agent HTTP API — port 8092
 

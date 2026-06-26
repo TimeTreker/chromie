@@ -140,6 +140,34 @@ DEFAULT_CASES: tuple[TextSkillCase, ...] = (
         expected_skills=("soridormi.express_attention",),
         description="Subtle scripted attention gesture.",
     ),
+    TextSkillCase(
+        case_id="blink_eyes",
+        text="please blink your eyes",
+        expected_skills=("soridormi.blink_eyes",),
+        expected_args=((0, "count", 2),),
+        description="Simulator-only visual eye blink.",
+    ),
+    TextSkillCase(
+        case_id="compound_walk_look_blink",
+        text=(
+            "please walk forward at 0.20 for 10 seconds and "
+            "turn your head right and blink your eyes"
+        ),
+        expected_skills=(
+            "soridormi.walk_velocity",
+            "soridormi.look_direction",
+            "soridormi.blink_eyes",
+        ),
+        expected_args=(
+            (0, "vx_mps", 0.2),
+            (0, "duration_s", 10.0),
+            (0, "yaw_radps", 0.0),
+            (1, "head_yaw_rad", 0.35),
+            (1, "head_pitch_rad", 0.0),
+            (2, "count", 2),
+        ),
+        description="Plain-and compound command keeps walk, head turn, and blink.",
+    ),
 )
 
 

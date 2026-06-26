@@ -17,7 +17,13 @@ from .fallback import fallback_decision
 from .llm_router import OllamaLLMRouter
 from .rules import route_by_deep_thought_rules, route_by_priority_rules, route_by_rules
 from .semantic_actions import semantic_robot_decision
-from .schema import HealthResponse, RouteDecision, RouteRequest, finalize_decision
+from .schema import (
+    HealthResponse,
+    RouteDecision,
+    RouteRequest,
+    annotate_pipeline_stage_outputs,
+    finalize_decision,
+)
 
 
 class Settings(BaseModel):
@@ -53,6 +59,12 @@ class Settings(BaseModel):
     allow_legacy_robot_rules: bool = Field(
         default_factory=lambda: os.getenv(
             "ROUTER_ALLOW_LEGACY_ROBOT_RULES",
+            "0",
+        ).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    allow_semantic_action_fallback: bool = Field(
+        default_factory=lambda: os.getenv(
+            "ROUTER_ALLOW_SEMANTIC_ACTION_FALLBACK",
             "0",
         ).strip().lower() not in {"0", "false", "no", "off"}
     )
@@ -107,16 +119,22 @@ async def routes() -> dict:
         "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
         "lanes": [
             {
-                "id": "quick_control",
-                "description": "Deterministic stop, cancel, silence, emergency, and unusable-audio handling before catalog or LLM routing.",
+                "id": "emergency_filter",
+                "description": "Deterministic stop, cancel, silence, emergency, and unusable-audio handling before model routing.",
                 "routes": ["interrupt", "ignore"],
                 "llm": False,
             },
             {
-                "id": "deep_reasoning",
-                "description": "Capability-catalog plus LLM-first semantic routing for chat, deep thought, body actions, tools, memory, and clarification.",
+                "id": "quick_intent",
+                "description": "Capability-catalog bounded quick intent and meaning routing with the small Router model.",
                 "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
                 "llm": settings.mode in {"hybrid", "llm_only"},
+            },
+            {
+                "id": "deep_thought",
+                "description": "Delegated planning/reasoning when the quick router is low confidence or explicitly chooses deep_thought.",
+                "routes": ["deep_thought"],
+                "llm": False,
             },
         ],
         "mode": settings.mode,
@@ -155,6 +173,10 @@ def _capability_executable(item: dict) -> bool:
     return _capability_available(item) and bool(item.get("interaction_executable"))
 
 
+def _interaction_executable_candidates(result: CapabilityCatalogResult) -> list[dict]:
+    return [item for item in result.matches if _capability_executable(item)]
+
+
 def _looks_like_planning_request(text: str) -> bool:
     normalized = " ".join((text or "").lower().split())
     phrases = (
@@ -170,18 +192,57 @@ def _looks_like_planning_request(text: str) -> bool:
     return any(phrase in normalized for phrase in phrases)
 
 
+_ROBOT_ACTION_WORD_RE = re.compile(
+    r"\b("
+    r"blink|bow|come here|come closer|crouch|move|nod|rotate|run|shake|"
+    r"sidestep|sit|smile|stand|step|turn|travel|walk|wave"
+    r")\b"
+)
+_GAZE_ACTION_RE = re.compile(
+    r"\b(?:look|face)\s+(?:at\s+|towards?\s+|to\s+)?"
+    r"(?:me|person|someone|left|right|up|down|forward|back|around|there|here|"
+    r"the\s+person|your\s+left|your\s+right)\b"
+)
+_GO_ACTION_RE = re.compile(
+    r"\bgo\s+(forward|backward|back|left|right|straight|there|home|to|toward|closer|near)\b"
+)
+_OBVIOUS_CHAT_PHRASES = (
+    "do you think",
+    "do you agree",
+    "don't you",
+    "tell me a joke",
+    "tell me a story",
+    "sing a song",
+    "you look beautiful",
+    "you look nice",
+    "you look good",
+)
+_ZH_OBVIOUS_CHAT_PHRASES = (
+    "你觉得",
+    "你同意吗",
+    "讲个笑话",
+    "讲个故事",
+    "唱首歌",
+)
+
+
 def _looks_like_robot_action_request(text: str) -> bool:
     normalized = " ".join((text or "").lower().split())
     if not normalized:
         return False
     return bool(
-        re.search(
-            r"\b("
-            r"bow|come here|crouch|face|go|look|move|nod|rotate|run|shake|"
-            r"sidestep|sit|smile|stand|step|stop|turn|travel|walk|wave"
-            r")\b",
-            normalized,
-        )
+        _ROBOT_ACTION_WORD_RE.search(normalized)
+        or _GAZE_ACTION_RE.search(normalized)
+        or _GO_ACTION_RE.search(normalized)
+    )
+
+
+def _looks_like_obvious_chat_request(text: str) -> bool:
+    normalized = " ".join((text or "").lower().split())
+    if not normalized:
+        return False
+    return any(phrase in normalized for phrase in _OBVIOUS_CHAT_PHRASES) or any(
+        phrase in (text or "") for phrase in _ZH_OBVIOUS_CHAT_PHRASES
     )
 
 
@@ -228,26 +289,36 @@ def _validate_llm_capability_decision(
 
     if decision.route == "robot_action":
         selected = by_id.get(selected_id)
-        if selected is None or not _capability_executable(selected):
+        if selected_id and (selected is None or not _capability_executable(selected)):
             if _looks_like_planning_request(request.text):
                 return _clarify_capability_decision(
                     request,
                     result,
                     reason="planning request cannot be executed as robot_action",
                 )
-            executable = [item for item in candidates if _capability_executable(item)]
+            executable = _interaction_executable_candidates(result)
             if not executable:
                 return _clarify_capability_decision(
                     request,
                     result,
                     reason="no interaction-executable capability is available",
                 )
-            selected_id = _capability_id(executable[0])
+            decision.intent = "robot_action"
             decision.reason = (
                 f"{decision.reason}; " if decision.reason else ""
-            ) + "validator selected the highest-ranked executable capability"
+            ) + "validator cleared invalid capability selection for Agent planning"
 
-        decision.intent = f"capability:{selected_id}"
+        elif not selected_id:
+            executable = _interaction_executable_candidates(result)
+            if not executable:
+                return _clarify_capability_decision(
+                    request,
+                    result,
+                    reason="no interaction-executable capability is available",
+                )
+            if not decision.intent or decision.intent in {"unknown", "interrupt", "ignore"}:
+                decision.intent = "robot_action"
+
         required_agents = ["capability_agent", "safety_agent"]
         if decision.should_speak:
             required_agents.append("speaker_agent")
@@ -265,6 +336,121 @@ def _validate_llm_capability_decision(
             decision.intent = "unknown"
 
     return finalize_decision(decision, request, source="llm")
+
+
+def _deep_thought_from_low_confidence(
+    request: RouteRequest,
+    decision: RouteDecision,
+    *,
+    reason_prefix: str | None = None,
+) -> RouteDecision:
+    candidates = decision.candidate_capabilities
+    if not candidates:
+        raw_candidates = request.context.get("candidate_capabilities", [])
+        candidates = raw_candidates if isinstance(raw_candidates, list) else []
+    reason_parts = [
+        reason_prefix
+        or f"quick router confidence {decision.confidence:.2f} below threshold {settings.confidence_threshold:.2f}",
+        f"quick_route={decision.route}",
+        f"quick_intent={decision.intent}",
+    ]
+    if decision.reason:
+        reason_parts.append(f"quick_reason={decision.reason}")
+    return finalize_decision(
+        RouteDecision(
+            route="deep_thought",
+            agents=["deepthinking_agent", "speaker_agent"],
+            intent="deep_thought_low_confidence",
+            confidence=decision.confidence,
+            language=decision.language or request.language or "auto",
+            priority=decision.priority,
+            needs_agent=True,
+            should_speak=True,
+            candidate_capabilities=candidates,
+            reason="; ".join(reason_parts),
+            source="llm",
+        ),
+        request,
+        source="llm",
+    )
+
+
+def _recover_invalid_operational_llm_decision(
+    request: RouteRequest,
+    decision: RouteDecision,
+    result: CapabilityCatalogResult,
+) -> RouteDecision:
+    reason_prefix = (
+        f"quick router returned deterministic-only route {decision.route}; "
+        "emergency filter did not match"
+    )
+    if (
+        _looks_like_robot_action_request(request.text)
+        and _interaction_executable_candidates(result)
+    ):
+        reason = (
+            f"{reason_prefix}; recovered as robot_action for Agent planning"
+        )
+        if decision.reason:
+            reason = f"{reason}; quick_reason={decision.reason}"
+        return finalize_decision(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="robot_action",
+                confidence=max(settings.confidence_threshold, decision.confidence),
+                language=decision.language or request.language or "auto",
+                priority="normal",
+                needs_agent=True,
+                should_speak=True,
+                candidate_capabilities=list(result.matches),
+                reason=reason,
+                source="llm",
+            ),
+            request,
+            source="llm",
+        )
+
+    if _looks_like_obvious_chat_request(request.text):
+        reason = f"{reason_prefix}; recovered as chat for simple conversation"
+        if decision.reason:
+            reason = f"{reason}; quick_reason={decision.reason}"
+        return fallback_decision(request, reason=reason)
+
+    return _deep_thought_from_low_confidence(
+        request,
+        decision,
+        reason_prefix=reason_prefix,
+    )
+
+
+def _attach_stage_context(
+    request: RouteRequest,
+    *,
+    emergency_matched: bool,
+    catalog_result: CapabilityCatalogResult,
+) -> None:
+    previous = request.context.get("router_stage_context")
+    request.context = {
+        **request.context,
+        "candidate_capabilities": catalog_result.matches,
+        "capability_catalog_version": catalog_result.catalog_version,
+        "router_stage_context": {
+            **(previous if isinstance(previous, dict) else {}),
+            "emergency_filter": {
+                "matched": emergency_matched,
+                "routes": ["interrupt", "ignore"],
+            },
+            "quick_intent": {
+                "model": settings.model,
+                "confidence_threshold": settings.confidence_threshold,
+            },
+        },
+    }
+
+
+def _semantic_action_fallback_enabled() -> bool:
+    return settings.mode == "rules_only" or settings.allow_semantic_action_fallback
 
 
 def _catalog_decision(
@@ -335,37 +521,57 @@ async def route(request: RouteRequest) -> RouteDecision:
     start = time.perf_counter()
     request.text = request.text.strip()
 
+    decision: RouteDecision | None = None
+    emergency_matched = False
     priority = route_by_priority_rules(request)
     if priority is not None:
         decision = priority
-    else:
-        decision = route_by_deep_thought_rules(request)
+        emergency_matched = True
 
     if decision is None:
         catalog_result = await capability_catalog.search(
             text=request.text,
             language=request.language,
         )
+        _attach_stage_context(
+            request,
+            emergency_matched=False,
+            catalog_result=catalog_result,
+        )
 
         if settings.mode in ("llm_only", "hybrid"):
-            request.context = {
-                **request.context,
-                "candidate_capabilities": catalog_result.matches,
-                "capability_catalog_version": catalog_result.catalog_version,
-            }
             llm_decision = await llm_router.route(request)
             if llm_decision.source == "llm":
-                decision = _validate_llm_capability_decision(
-                    request,
-                    llm_decision,
-                    catalog_result,
-                )
-                if decision.route == "robot_action" and not decision.actions:
+                if llm_decision.route in {"interrupt", "ignore"}:
+                    decision = _recover_invalid_operational_llm_decision(
+                        request,
+                        llm_decision,
+                        catalog_result,
+                    )
+                elif (
+                    llm_decision.confidence < settings.confidence_threshold
+                    and llm_decision.route != "deep_thought"
+                ):
+                    decision = _deep_thought_from_low_confidence(request, llm_decision)
+                else:
+                    decision = _validate_llm_capability_decision(
+                        request,
+                        llm_decision,
+                        catalog_result,
+                    )
+                if (
+                    decision.route == "robot_action"
+                    and not decision.actions
+                    and settings.allow_semantic_action_fallback
+                ):
                     semantic_decision = semantic_robot_decision(request, catalog_result)
                     if semantic_decision is not None:
                         decision = semantic_decision
 
-        if decision is None and settings.mode in ("rules_only", "hybrid"):
+        if decision is None and settings.mode == "rules_only":
+            decision = route_by_deep_thought_rules(request)
+
+        if decision is None and _semantic_action_fallback_enabled():
             decision = semantic_robot_decision(request, catalog_result)
 
         if decision is None and settings.mode == "rules_only":
@@ -393,6 +599,10 @@ async def route(request: RouteRequest) -> RouteDecision:
             decision = fallback_decision(request, reason=reason)
 
     decision = finalize_decision(decision, request, source=decision.source)
+    decision = annotate_pipeline_stage_outputs(
+        decision,
+        emergency_matched=emergency_matched,
+    )
     elapsed_ms = (time.perf_counter() - start) * 1000.0
     logger.info(
         "route sid=%s source=%s route=%s intent=%s confidence=%.2f capabilities=%d ms=%.1f",

@@ -26,6 +26,7 @@ class InteractionTextSkillSweepTests(unittest.TestCase):
         self.assertIn("soridormi.turn_in_place", covered)
         self.assertIn("soridormi.nod_yes", covered)
         self.assertIn("soridormi.shake_no", covered)
+        self.assertIn("soridormi.blink_eyes", covered)
 
     def test_case_file_loads_expected_args(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

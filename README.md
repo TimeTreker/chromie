@@ -38,6 +38,11 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 
 - realtime microphone, VAD, ASR, routing, TTS, playback, and barge-in;
 - deterministic stop, cancel, emergency, ignore, and silence handling;
+- three-stage route flow: emergency filter, Qwen quick intent routing, and
+  larger-model deepthought handoff when quick confidence is low or planning is
+  needed;
+- staged task/action proposals merged into `RouteDecision.metadata.task_list`
+  before Agent and Skill Runtime validation;
 - native strict `POST /interaction` plus explicit compatibility rollback;
 - trusted Skill Runtime with validation, confirmation, timeout, cancellation,
   bounded scheduling, and traces;
@@ -122,6 +127,9 @@ are in the [Runbook](CHROMIE_RUNBOOK.md).
 - model output is a request, never authorization;
 - low-level robot controls are forbidden in shared contracts;
 - stop, cancel, emergency, silence, and unusable-audio paths are deterministic;
+- normal natural-language routing goes through the quick intent model, while
+  low-confidence or complex requests go to deepthought instead of deterministic
+  guessing;
 - simulation exemptions never authorize hardware;
 - physical execution stays default-off and Soridormi-owned;
 - implementation, automated verification, target validation, and release

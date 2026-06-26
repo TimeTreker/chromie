@@ -276,6 +276,113 @@ class _SongMotionCatalog:
         )
 
 
+class _CompoundMotionCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del kwargs
+        return CapabilitySearchResult(
+            query=text,
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=13,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.turn_in_place",
+                    agent_id="soridormi.skill",
+                    description="Rotate left or right with near-zero forward velocity.",
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.51,
+                    metadata={"mode": "sim"},
+                ),
+                CapabilityMatch(
+                    capability_id="soridormi.walk_velocity",
+                    agent_id="soridormi.skill",
+                    description="Track a bounded body velocity command.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "vx_mps": {"type": "number"},
+                            "duration_s": {"type": "number"},
+                        },
+                    },
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.43,
+                    metadata={"mode": "sim"},
+                ),
+                CapabilityMatch(
+                    capability_id="soridormi.look_at_person",
+                    agent_id="soridormi.skill",
+                    description="Turn head toward a structured person target direction.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"target_yaw_rad": {"type": "number"}},
+                    },
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.35,
+                    metadata={"mode": "sim"},
+                ),
+                CapabilityMatch(
+                    capability_id="soridormi.blink_eyes",
+                    agent_id="soridormi.skill",
+                    description="Blink the simulated social eyes.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"count": {"type": "number"}},
+                    },
+                    effects=["visual_expression"],
+                    safety_class="low_risk_action",
+                    interaction_executable=True,
+                    requires_confirmation=False,
+                    route="robot_action",
+                    score=0.35,
+                    metadata={"mode": "sim"},
+                ),
+            ],
+        )
+
+
+class _CompoundMotionOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs["response_format"] == "json"
+        assert "soridormi.turn_in_place" in prompt
+        assert "soridormi.walk_velocity" in prompt
+        assert "soridormi.blink_eyes" in prompt
+        return {
+            "decision": "execute",
+            "speech": "I will walk, look right, and blink.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_velocity",
+                    "args": {"vx_mps": 0.2, "duration_s": 10.0},
+                },
+                {
+                    "skill_id": "soridormi.look_at_person",
+                    "args": {"target_yaw_rad": -0.35},
+                },
+                {
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                },
+            ],
+        }
+
+
 def _request(
     *,
     text: str = "nod",
@@ -491,6 +598,40 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("capability_decision", response.metadata)
         self.assertEqual(response.skills, [])
 
+    async def test_broad_llm_robot_action_is_not_narrowed_to_top_catalog_match(self) -> None:
+        request = _request(
+            text="please walk forward at 0.20 for 10 seconds and turn your head right and blink your eyes",
+            route="robot_action",
+            intent="robot_action",
+            agents=["capability_agent", "safety_agent", "speaker_agent"],
+        )
+        request.route_decision.source = "llm"
+        request.route_decision.confidence = 0.55
+
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_CompoundMotionOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_CompoundMotionCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="off",
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "robot_action")
+        self.assertEqual(request.route_decision.intent, "robot_action")
+        self.assertEqual(request.route_decision.source, "llm")
+        self.assertEqual(
+            [skill.skill_id for skill in response.skills],
+            [
+                "soridormi.walk_velocity",
+                "soridormi.look_at_person",
+                "soridormi.blink_eyes",
+            ],
+        )
+        self.assertEqual(response.skills[0].args, {"vx_mps": 0.2, "duration_s": 10.0})
+        self.assertEqual(response.skills[2].args, {"count": 2})
+
     async def test_expressive_body_cues_off_keeps_chat_speech_only(self) -> None:
         request = _request(
             text="Tell me something interesting.",
@@ -514,6 +655,30 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_weak_catalog_motion_match_does_not_override_chat_intent(self) -> None:
         request = _request(
             text="I think the sun is hot and round, do you agree with me?",
+            route="robot_action",
+            intent="capability:soridormi.turn_in_place",
+            agents=["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=None,
+                use_llm=False,
+                max_speak_chars=160,
+                capability_catalog=_WeakAgreementCatalog(),  # type: ignore[arg-type]
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(request.route_decision.reason, "weak_catalog_robot_action_match")
+        self.assertEqual(response.skills, [])
+        self.assertEqual(
+            response.speech[0].text,
+            "I heard you, but my language model is not responding.",
+        )
+
+    async def test_appearance_compliment_does_not_count_as_gaze_action(self) -> None:
+        request = _request(
+            text="You look beautiful, don't you?",
             route="robot_action",
             intent="capability:soridormi.turn_in_place",
             agents=["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],

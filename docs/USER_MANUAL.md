@@ -111,10 +111,18 @@ If the paired stack is already running, the compact no-microphone wrapper is:
 ```bash
 ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --speaker
 ./scripts/run_voice_mujoco_text_case.sh "Look at me for three seconds." --no-speaker
+./scripts/run_voice_mujoco_text_case.sh \
+  "please walk forward at 0.20 for 10 seconds and turn your head right and blink your eyes" \
+  --no-speaker
 ```
 
 The first command also checks speaker playback; the second is better for
 headless automation.
+
+The text request is the only input Chromie uses for routing and skill planning.
+`--expect-*` flags are optional post-run assertions for regression tests; they
+are not sent to Router, Agent, or Soridormi and are not needed for natural
+operator rehearsal.
 
 ```bash
 conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
@@ -135,6 +143,8 @@ Add `--no-speaker` for headless automation. Evidence is written under:
 .chromie/acceptance/text-mujoco/<id>/
 ```
 
+The runner also prints compact `[interaction-text-mujoco][debug]` lines for
+the route, staged task list, emitted skills, speech count, and errors.
 Open `summary.json` first. A passing run has:
 
 - `ok: true`;
@@ -143,6 +153,35 @@ Open `summary.json` first. A passing run has:
 - `status_after.active_task: null`;
 - `status_after.emergency_stop: false`;
 - `status_after.fallen` absent or false.
+
+## Complex Text Scenarios
+
+Use this suite for robot-brain text behavior that is not just a single motion
+skill: false-belief questions, compliments, discourse markers, unsupported
+requests, deep-thinking handoff, emergency stop, and mixed speech/body cases.
+
+```bash
+conda run -n Chromie python scripts/interaction_text_scenario_suite.py --list-cases
+conda run -n Chromie python scripts/interaction_text_scenario_suite.py --only false_belief_sun_shape
+conda run -n Chromie python scripts/interaction_text_scenario_suite.py --only compliment_self_image
+```
+
+By default this is preview-only, headless, and no-microphone. The scenario text
+is the only user input. Expected routes, skills, and speech snippets are checked
+after Chromie has already planned its response. Scenario `expect_no_skills`
+means no user-task Soridormi skills; chat-only expressive cues such as
+`soridormi.express_attention` are allowed unless a case sets
+`allow_expressive_cues: false` or forbids that skill explicitly.
+
+Run all built-in complex scenarios against a running stack:
+
+```bash
+conda run -n Chromie python scripts/interaction_text_scenario_suite.py \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
+Use `--execute` only when you intentionally want emitted Soridormi skills to
+run in the supervised simulator.
 
 ## Skill Sweep
 

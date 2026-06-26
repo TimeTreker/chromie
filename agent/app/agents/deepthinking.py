@@ -101,6 +101,7 @@ class DeepThinkingAgent(BaseAgent):
         session_memory_block = self._format_session_memory(request, zh=zh)
         conversation_id = self._conversation_id(request)
         capability_context = self._capability_context(request, zh=zh)
+        route_context = self._route_context(request, zh=zh)
 
         if zh:
             system = (
@@ -120,6 +121,7 @@ class DeepThinkingAgent(BaseAgent):
                 f"最近对话：\n{history_block}\n\n"
                 f"待处理任务：\n{pending_block}\n\n"
                 f"能力目录：\n{capability_context}\n\n"
+                f"上游路由上下文：\n{route_context}\n\n"
                 f"当前用户说：{request.text}\n"
                 f"当前意图：{request.route_decision.intent}\n"
                 "请结合会话工作记忆，把复杂任务拆清楚，并给出最终可播放回答。"
@@ -142,6 +144,7 @@ class DeepThinkingAgent(BaseAgent):
                 f"Recent conversation:\n{history_block}\n\n"
                 f"Pending tasks:\n{pending_block}\n\n"
                 f"Capability catalog:\n{capability_context}\n\n"
+                f"Upstream routing context:\n{route_context}\n\n"
                 f"Current user said: {request.text}\n"
                 f"Current intent: {request.route_decision.intent}\n"
                 "Use the session working memory, split the complex task clearly when useful, and give the final spoken response."
@@ -303,6 +306,20 @@ class DeepThinkingAgent(BaseAgent):
             label = "可执行" if zh and executable else "仅供规划" if zh else "executable" if executable else "planning only"
             lines.append(f"- {capability_id}: {description} [{label}]")
         return "\n".join(lines) if lines else ("无匹配能力" if zh else "No matching capabilities were supplied.")
+
+    def _route_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        decision = request.route_decision
+        parts = [
+            f"route={decision.route}",
+            f"intent={decision.intent}",
+            f"confidence={decision.confidence:.2f}",
+            f"source={decision.source}",
+        ]
+        if decision.reason:
+            parts.append(f"reason={decision.reason}")
+        if decision.speak_first:
+            parts.append(f"speak_first={decision.speak_first}")
+        return "；".join(parts) if zh else "; ".join(parts)
 
     def _fallback_reply(self, request: AgentRunRequest) -> str:
         if self.is_zh(request):

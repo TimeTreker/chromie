@@ -28,8 +28,9 @@ telemetry, and safety envelopes exist.
 
 The small Router model is also not an execution authority. Treat
 `qwen3:0.6b` as an advisory classifier only: deterministic controls,
-capability-catalog constraints, confidence fallback, schemas, Skill Runtime
-authorization, and Soridormi provider checks must catch wrong model routes.
+capability-catalog constraints, low-confidence deepthought delegation, schemas,
+Skill Runtime authorization, and Soridormi provider checks must catch wrong
+model routes.
 
 Retained closure evidence:
 
@@ -135,10 +136,10 @@ python -m unittest \
 1. Keep physical-motion gates off.
 2. Route rich user requests into Soridormi-declared no-motion task types before
    training motion-control models.
-3. Preserve model-assisted routing guardrails. Qwen may propose normal routes,
-   but stop/cancel/ignore stay deterministic, unknown or low-confidence routes
-   clarify/refuse, and execution still requires registry/runtime/provider
-   validation.
+3. Preserve model-assisted routing guardrails. Stop/cancel/ignore stay
+   deterministic, Qwen handles normal quick intent routing, low-confidence or
+   explicitly complex quick routes delegate to deepthought, and execution still
+   requires registry/runtime/provider validation.
 4. Keep the Soridormi task-agent snapshot aligned with Soridormi's
    authoritative manifest.
 5. Continue acceptance tests for task capability inspection, preview, submit,
@@ -169,7 +170,17 @@ python scripts/check_docs.py
 ./scripts/show_profile.sh
 ```
 
-Run the text-to-MuJoCo closure check:
+Run a natural text-to-MuJoCo rehearsal:
+
+```bash
+conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
+  "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --no-speaker
+```
+
+Add `--expect-*` flags only when the goal is a regression assertion after
+Chromie has already planned from the text:
 
 ```bash
 conda run -n Chromie python scripts/interaction_text_mujoco_check.py \

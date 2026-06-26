@@ -18,8 +18,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         prompt = router.load_system_prompt()
 
         self.assertIn("robot-brain router", prompt)
-        self.assertIn("Quick response lane", prompt)
-        self.assertIn("Deep reasoning lane", prompt)
+        self.assertIn("Emergency filter", prompt)
+        self.assertIn("Quick intent router", prompt)
         self.assertIn("Route taxonomy", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("candidate_capabilities", prompt)
@@ -30,7 +30,11 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("creative speech-only requests as chat", prompt)
         self.assertIn("go ahead", prompt)
         self.assertIn("not physical movement", prompt)
+        self.assertIn("you look beautiful", prompt)
+        self.assertIn("appearance statements", prompt)
         self.assertIn("deepthinking_agent", prompt)
+        self.assertIn("body commands", prompt)
+        self.assertIn("robot_action", prompt)
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
         router = OllamaLLMRouter(
@@ -58,12 +62,12 @@ class RouterLlmPromptTests(unittest.TestCase):
         prompt = router.build_user_prompt(request)
 
         self.assertIn("robot-brain router", prompt)
-        self.assertIn("Routing lanes", prompt)
-        self.assertIn("quick deterministic controls", prompt)
-        self.assertIn("deep reasoning lane", prompt)
+        self.assertIn("Routing stages", prompt)
+        self.assertIn("emergency filter", prompt)
+        self.assertIn("quick intent-and-meaning router", prompt)
         self.assertIn("Use route deep_thought", prompt)
         self.assertIn("deepthinking_agent", prompt)
-        self.assertIn("before non-urgent semantic fallback", prompt)
+        self.assertIn("return calibrated low confidence", prompt)
         self.assertIn("Available abilities / candidate capabilities JSON", prompt)
         self.assertIn("Bounded memory and world context JSON", prompt)
         self.assertIn("soridormi.walk_velocity", prompt)
@@ -73,6 +77,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("never as authorization", prompt)
         self.assertIn("creative speech-only requests", prompt)
         self.assertIn("'go ahead'", prompt)
+        self.assertIn("you look beautiful", prompt)
+        self.assertIn("Do not return interrupt or ignore", prompt)
+        self.assertIn("blinking", prompt)
 
     def test_payload_disables_qwen_thinking_and_supports_relaxed_json_retry(self) -> None:
         router = OllamaLLMRouter(
@@ -131,8 +138,77 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("speaker_agent", decision.agents)
         self.assertTrue(decision.needs_agent)
 
+    def test_low_confidence_decision_becomes_deep_thought_handoff(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(text="Please figure out how to do this unclear task.")
+        quick_decision = router._decision_from_response(
+            request,
+            {
+                "message": {
+                    "content": (
+                        '{"route":"robot_action","intent":"unknown",'
+                        '"confidence":0.42,"reason":"not sure"}'
+                    )
+                }
+            },
+        )
+
+        handoff = router._low_confidence_deep_thought_decision(request, quick_decision)
+
+        self.assertEqual(handoff.source, "llm")
+        self.assertEqual(handoff.route, "deep_thought")
+        self.assertEqual(handoff.intent, "deep_thought_low_confidence")
+        self.assertEqual(handoff.confidence, 0.42)
+        self.assertIn("quick router confidence", handoff.reason or "")
+        self.assertIn("quick_route=robot_action", handoff.reason or "")
+        self.assertIn("deepthinking_agent", handoff.agents)
+
 
 class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_llm_interrupt_output_is_returned_for_pipeline_recovery(self) -> None:
+        class InterruptRouter(OllamaLLMRouter):
+            async def _chat(self, payload: dict) -> dict:
+                del payload
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"interrupt","intent":"interrupt",'
+                            '"confidence":0.0,"reason":"interrupted"}'
+                        )
+                    }
+                }
+
+        router = InterruptRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="please walk forward for 10 seconds",
+            context={
+                "candidate_capabilities": [
+                    {
+                        "capability_id": "soridormi.walk_velocity",
+                        "interaction_executable": True,
+                    }
+                ]
+            },
+        )
+
+        decision = await router.route(request)
+
+        self.assertEqual(decision.route, "interrupt")
+        self.assertEqual(decision.intent, "interrupt")
+        self.assertTrue(decision.interrupt_current)
+        self.assertFalse(decision.needs_agent)
+        self.assertEqual(decision.reason, "interrupted")
+
     async def test_review_model_overrides_underspecified_robot_action(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
             def __init__(self) -> None:

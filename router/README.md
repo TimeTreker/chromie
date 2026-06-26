@@ -10,10 +10,10 @@ or synthesis, invokes skills, or controls hardware.
 
 ```text
 text + bounded context
-  -> quick response lane: deterministic interrupt/noise safety rules
+  -> emergency filter: deterministic interrupt/noise safety rules
   -> shared Agent capability-catalog search
-  -> quick route model: semantic action parser / optional Ollama route classifier
-  -> optional deep_thought handoff to the Agent deepthinking module
+  -> quick intent router: qwen-class quick understanding with catalog bounds
+  -> deep_thought handoff when quick confidence is low or planning is needed
   -> schema finalization
   -> RouteDecision
 ```
@@ -29,23 +29,52 @@ That default uses the small `ROUTER_MODEL` as a fast semantic route classifier
 while `AGENT_MODEL` remains the larger deep-thinking/conversation model.
 Operational interruption/noise handling remains deterministic even when a
 conversational model is available. Robot routing is catalog-first; the old
-phrase-based robot rules are an explicit compatibility rollback only. The Agent
-repeats the same catalog search inside native InteractionRuntime, so Router
-unavailability cannot authorize or suppress execution by itself.
+phrase-based robot rules and semantic action parser are explicit compatibility
+fallbacks only. The Agent repeats the same catalog search inside native
+InteractionRuntime, so Router unavailability cannot authorize or suppress
+execution by itself.
 
 The Router model is a proposer, not the authority. A model route must still pass
 catalog constraints, confidence policy, schema finalization, Agent validation,
 host Skill Runtime authorization, and Soridormi provider checks before anything
 meaningful can execute. See
 [`../docs/MODEL_ASSISTED_ROUTING_GUARDRAILS.md`](../docs/MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
+If the quick model returns a deterministic-only route such as `interrupt` or
+`ignore` after the emergency filter has already passed, Router treats that as a
+model mistake. Clear robot body commands with executable catalog candidates are
+recovered as `robot_action` for Agent capability planning; other invalid
+operational routes are delegated to `deep_thought` or clarification instead of
+interrupting the current task.
 
-The two routing lanes are intentionally different:
+The three routing stages are intentionally different:
 
-| Lane | What handles it | Purpose |
+| Stage | What handles it | Purpose |
 |---|---|---|
-| Quick response | Deterministic Router rules | Stop, cancel, emergency-style interruption, silence, unusable audio, and obvious noise. |
-| Quick route | Catalog search, semantic parser, and small LLM router | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and select supported capabilities. |
-| Deep thought | Agent `deepthinking_agent` after route selection | Split complex tasks, plan, debug, and answer using bounded session memory. |
+| Emergency filter | Deterministic Router rules | Stop, cancel, emergency-style interruption, silence, unusable audio, and obvious noise. |
+| Quick intent | Catalog search plus small LLM router, normally `qwen3:0.6b` | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and select supported routes/capabilities. |
+| Deep thought | Agent `deepthinking_agent` using the larger Agent model | Split complex tasks, plan, debug, and answer using bounded session memory when the quick router is low confidence or explicitly chooses `deep_thought`. |
+
+Each stage receives the context produced above it. The quick intent prompt gets
+the emergency-filter result, bounded session/world context, and catalog
+candidates. The deepthinking Agent receives the final `RouteDecision`, including
+quick-route source, confidence, intent, reason, and candidate capabilities.
+
+Each stage can also produce task/action proposals. Router merges those proposals
+into `RouteDecision.metadata.task_list` while retaining the original per-stage
+records in `RouteDecision.metadata.route_stage_outputs`:
+
+```text
+metadata.route_stage_outputs[]  # emergency_filter / quick_intent / deep_thought
+  -> tasks[] and actions[]      # proposed high-level work from that stage
+metadata.task_list[]            # merged, priority/stage ordered task list
+```
+
+`RouteDecision.actions` remains the compatibility/execution hint for concrete
+capability actions, such as ordered Soridormi skill requests. The merged
+`task_list` is broader: it can include emergency cancellation, thinking
+acknowledgement, deepthinking work, speech, memory, tool, and skill-execution
+proposals. The Agent and Skill Runtime still validate every executable item
+against registered capabilities and safety policy.
 
 ## Current route list
 
@@ -108,8 +137,15 @@ ROUTER_CAPABILITY_CATALOG_URL=http://chromie-agent:8092
 ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=600
 ROUTER_CAPABILITY_MATCH_LIMIT=8
 ROUTER_ALLOW_LEGACY_ROBOT_RULES=0
+ROUTER_ALLOW_SEMANTIC_ACTION_FALLBACK=0
 ROUTER_LOG_LEVEL=INFO
 ```
+
+`ROUTER_ALLOW_SEMANTIC_ACTION_FALLBACK=1` re-enables the deterministic semantic
+action parser after a high-confidence LLM `robot_action` decision that contains
+no explicit action list. It is a compatibility/debug fallback. In the normal
+hybrid path, non-emergency natural-language understanding belongs to the quick
+Router model and low-confidence quick decisions delegate to `deep_thought`.
 
 The host Orchestrator normally connects through:
 

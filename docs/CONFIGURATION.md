@@ -148,7 +148,7 @@ configuration.
 | Variable | Default or profile behavior |
 |---|---|
 | `ROUTER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
-| `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the small Router model for fast semantic routing while quick-control rules remain deterministic. |
+| `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the small Router model for fast semantic routing while the emergency filter remains deterministic. |
 | `ROUTER_RULES_FIRST` | `1`. |
 | `ROUTER_MODEL` | `qwen3:0.6b` in common configuration. |
 | `ROUTER_REVIEW_MODEL` | `gemma4:26b` in common configuration; reviews underspecified LLM `robot_action` choices before any robot skill is selected. |
@@ -160,13 +160,16 @@ configuration.
 | `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `600`. Catalog failure falls back safely and the Agent rechecks in-process. |
 | `ROUTER_CAPABILITY_MATCH_LIMIT` | Maximum ranked candidates attached to one route; default `8`. |
 | `ROUTER_ALLOW_LEGACY_ROBOT_RULES` | Default `0`; enables old phrase-based robot routing only as an explicit compatibility rollback. Interrupt/noise safety rules remain deterministic. |
+| `ROUTER_ALLOW_SEMANTIC_ACTION_FALLBACK` | Default `0`; when enabled, lets the old deterministic semantic action parser fill exact action lists after a high-confidence LLM `robot_action` route. This is compatibility/debug behavior, not the normal hybrid path. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
 | `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 
-Router routing has two lanes. The quick-control lane for interrupt and ignore
-stays deterministic in every mode. The deep-reasoning lane can use catalog
-search, semantic action parsing, and optionally the LLM when `ROUTER_MODE` is
-`hybrid` or `llm_only`.
+Router routing has three stages. The emergency filter for interrupt and ignore
+stays deterministic in every mode. The quick intent stage uses catalog-bounded
+LLM routing when `ROUTER_MODE` is `hybrid` or `llm_only`. The deep-thought stage
+is reached when quick intent returns low confidence or explicitly chooses
+`deep_thought`; it is handled by the Agent deepthinking module, not by the small
+Router model.
 
 ## Agent and TaskGraph
 

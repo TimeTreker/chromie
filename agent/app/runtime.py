@@ -32,10 +32,16 @@ logger = logging.getLogger("chromie.agent.runtime")
 
 _ROBOT_ACTION_WORDS = re.compile(
     r"\b("
-    r"approach|bow|bring|carry|come here|come closer|crouch|deliver|face|fetch|go|"
-    r"inspect|look|move|nod|recover|rotate|run|shake|sidestep|sit|smile|"
+    r"approach|blink|bow|bring|carry|come here|come closer|crouch|deliver|fetch|"
+    r"inspect|move|nod|recover|rotate|run|shake|sidestep|sit|smile|"
     r"stand|step|stop|turn|travel|walk|wave"
     r")\b",
+    re.IGNORECASE,
+)
+_GAZE_ACTION_WORDS = re.compile(
+    r"\b(?:look|face)\s+(?:at\s+|towards?\s+|to\s+)?"
+    r"(?:me|person|someone|left|right|up|down|forward|back|around|there|here|"
+    r"the\s+person|your\s+left|your\s+right)\b",
     re.IGNORECASE,
 )
 _SORIDORMI_TASK_PLANNING_TOOLS = {
@@ -109,11 +115,12 @@ def _looks_like_robot_action_request(text: str) -> bool:
     normalized = _normalized_text(text)
     if not normalized:
         return False
-    if _ROBOT_ACTION_WORDS.search(normalized):
+    if _ROBOT_ACTION_WORDS.search(normalized) or _GAZE_ACTION_WORDS.search(normalized):
         return True
     return bool(
         re.search(
-            r"\b(walk|go|move|travel|navigate)\s+(to|toward|towards|near|into|inside)\b",
+            r"\b(walk|go|move|travel|navigate)\s+(to|toward|towards|near|into|inside|"
+            r"forward|backward|back|left|right|straight|there|home|closer)\b",
             normalized,
         )
     )
@@ -182,6 +189,10 @@ def _has_soridormi_task_planning_match(candidates: list[dict]) -> bool:
         and item.get("available") is not False
         for item in candidates
     )
+
+
+def _has_capability_intent(intent: str) -> bool:
+    return (intent or "").strip().startswith("capability:")
 
 
 class _AgentPipeline:
@@ -387,6 +398,21 @@ class InteractionRuntime(_AgentPipeline):
             )
             request.route_decision.source = "catalog"
             request.route_decision.reason = "Matched shared capability catalog"
+            return
+        if (
+            request.route_decision.route == "robot_action"
+            and search.suggested_route == "robot_action"
+            and request.route_decision.source == "llm"
+            and not request.route_decision.actions
+            and not _has_capability_intent(request.route_decision.intent)
+        ):
+            request.route_decision.agents = list(
+                dict.fromkeys([*request.route_decision.agents, *search.suggested_agents])
+            )
+            request.route_decision.confidence = max(
+                request.route_decision.confidence,
+                search.matches[0].score if search.matches else 0.0,
+            )
             return
         request.route_decision.route = search.suggested_route
         request.route_decision.agents = list(search.suggested_agents)
