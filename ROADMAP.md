@@ -95,6 +95,52 @@ Exit criteria:
 - `python scripts/check_docs.py` and the relevant automated gates pass;
 - any demo tag is created only after the audit, not before it.
 
+## Next implementation phase - Developer usability tools
+
+### Objective
+
+Make the existing Chromie stack easier to inspect, diagnose, and support before
+adding new control-plane architecture or physical capability scope.
+
+The first implementation focus is a dependency-light CLI that can report the
+configured deployment mode, validate generated configuration, inspect risky
+feature gates, probe required services, verify capability manifests, inspect
+retained trace artifacts, and prepare evidence metadata without overstating
+release claims.
+
+The detailed plan is maintained in
+[Developer Usability Tools Plan](docs/DEVELOPER_USABILITY_TOOLS.md).
+
+### Sequence
+
+1. document the milestone and command contract before implementation;
+2. add a standard-library CLI skeleton exposed first as
+   `python -m tools.chromie_cli`;
+3. implement `status`, `config show`, and `config validate`;
+4. implement `doctor` for environment, files, service reachability, optional
+   Soridormi, and host audio checks;
+5. implement `capability check` for manifest provenance, duplicates, feature
+   gate consistency, and forbidden low-level controls;
+6. add evidence-bundle preflight that labels automated, simulator, target GPU,
+   physical audio, and hardware evidence separately;
+7. document the trace schema and implement retained-artifact `trace view`;
+8. defer `trace explain` until causal explanation semantics are stable.
+
+### Exit criteria
+
+- the CLI runs without package installation as
+  `python -m tools.chromie_cli`;
+- Level A tests cover command parsing, exit codes, configuration validation,
+  doctor result classification, manifest safety checks, retained-trace
+  filtering, and evidence preflight;
+- `doctor` reports skipped, warning, failure, and pass states deterministically;
+- service and provider failures include clear causes instead of being hidden by
+  fallback behavior;
+- evidence tooling preserves the four-axis status vocabulary and does not turn
+  automated, dry-run, or no-motion output into target validation or release
+  readiness;
+- `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
+
 ## Completed phase - Robust simulation and provider readiness
 
 This milestone is complete for the high-level provider contract. Soridormi

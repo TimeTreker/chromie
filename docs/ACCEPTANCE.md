@@ -47,7 +47,7 @@ ASR and therefore does not prove physical audio-device quality.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 400 current tests and 20 legacy Agent
+At the current working revision this runs 425 current tests and 20 legacy Agent
 tests. It also runs the documentation consistency checker.
 
 If the host Python environment is intentionally minimal, install the declared

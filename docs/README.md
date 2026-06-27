@@ -30,6 +30,7 @@ When documents disagree, correct the lower-authority document.
 | How do I install, run, inspect, or recover it? | `CHROMIE_RUNBOOK.md` |
 | What does an environment variable mean? | `docs/CONFIGURATION.md` |
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
+| What retained trace artifacts can the CLI inspect? | `docs/TRACE_SCHEMA.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
 | Where should a new collaborator resume? | `docs/HANDOFF.md` |
@@ -70,7 +71,9 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Agent Capability Registry](agent_capability_registry.md)
 - [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md)
 - [TaskGraph](agent_task_graph.md)
+- [Trace Schema](TRACE_SCHEMA.md)
 - [Chromie/Soridormi Task-Agent Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)
+- [Developer Usability Tools Plan](DEVELOPER_USABILITY_TOOLS.md)
 - [TaskGraph Concurrency Decision](task_graph_concurrency_decision.md)
 - [Conversation State](conversation_state.md)
 

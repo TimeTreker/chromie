@@ -122,7 +122,7 @@ contract evidence only; it does not prove physical execution.
 
 The latest full host `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` attempt on
 2026-06-27 installed the declared test dependencies, passed
-`python scripts/check_docs.py`, ran 400 current `unittest` cases with `OK`, and
+`python scripts/check_docs.py`, ran 425 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions.
 
 Focused local slices also passed 46/46 after the simulation-demo documentation
@@ -152,31 +152,37 @@ python -m unittest \
 ## Resume Sequence
 
 1. Keep physical-motion gates off.
-2. Route rich user requests into Soridormi-declared no-motion task types before
+2. Continue the Developer Usability Tools phase in
+   [Developer Usability Tools Plan](DEVELOPER_USABILITY_TOOLS.md): PR0-PR6 are
+   implemented; next harden retained trace examples from real bundles.
+3. Keep `trace explain` deferred until trace identifiers and schemas are
+   documented across Router, Agent, Skill Runtime, Soridormi, TTS/playback, and
+   fallback causes; use [Trace Schema](TRACE_SCHEMA.md) for `trace view`.
+4. Route rich user requests into Soridormi-declared no-motion task types before
    training motion-control models.
-3. Preserve model-assisted routing guardrails. Stop/cancel/ignore stay
+5. Preserve model-assisted routing guardrails. Stop/cancel/ignore stay
    deterministic, Qwen handles normal quick intent routing, low-confidence or
    explicitly complex quick routes delegate to deepthought, and execution still
    requires registry/runtime/provider validation.
-4. Keep the Soridormi task-agent snapshot aligned with Soridormi's
+6. Keep the Soridormi task-agent snapshot aligned with Soridormi's
    authoritative manifest.
-5. Continue acceptance tests for task capability inspection, preview, submit,
+7. Continue acceptance tests for task capability inspection, preview, submit,
    event monitoring, refusal, blocked-subsystem reporting, timeout, and
    cancellation semantics. Use trace `outcome_summary` as the deterministic
    result source when adding report/speech nodes.
-6. Preserve the no-motion `--task-agent-bridge` acceptance as the bridge
+8. Preserve the no-motion `--task-agent-bridge` acceptance as the bridge
    contract gate; rerun it when Soridormi's task API snapshot changes.
-7. Add Chromie routing only for Soridormi-declared task types; keep missing
+9. Add Chromie routing only for Soridormi-declared task types; keep missing
    navigation, approach, and manipulation goals as structured refusals or
    clarifications rather than velocity recipes.
-8. Select one reference robot candidate.
-9. Fill the ignored real candidate record under `.chromie/commissioning/` using
+10. Select one reference robot candidate.
+11. Fill the ignored real candidate record under `.chromie/commissioning/` using
    `commissioning/reference_robot_candidate.schema.json`.
-10. Verify candidate identity, independent emergency stop, network, workspace,
+12. Verify candidate identity, independent emergency stop, network, workspace,
    software revisions, calibration ownership, referenced evidence files,
    evidence-root containment, provider-manifest revision matching, calibration
    hashes, and no-motion procedures.
-11. Continue with no-motion health and shadow/dry-run checks before any bounded
+13. Continue with no-motion health and shadow/dry-run checks before any bounded
    physical skill execution.
 
 ## Useful Commands
@@ -228,5 +234,6 @@ Run the full automated suite in the container runtime:
 - [Current Status](STATUS.md)
 - [Roadmap](../ROADMAP.md)
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
+- [Developer Usability Tools Plan](DEVELOPER_USABILITY_TOOLS.md)
 - [Acceptance and Evidence](ACCEPTANCE.md)
 - [User Manual](USER_MANUAL.md)

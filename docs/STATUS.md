@@ -148,6 +148,7 @@ Target validation or Release readiness.
 | Conversation state across VAD utterances | Implemented in host memory | Boundary, follow-up, and limit tests | Available in the host Orchestrator | Enabled by `.env.common` |
 | High-level Chromie ability self-model | Implemented as a host ability registry above concrete skills, with stable cognition, speech, memory, social, body, task, safety, and state ability IDs; deep-thinking acknowledgement and simulator-only thinking pose now resolve through this registry | Ability-registry and Orchestrator TTS-alignment tests | No broad target-validation claim; only existing text/simulator interaction paths exercise fulfilled abilities | Registry enabled in host Orchestrator; most social/body abilities remain honest stubs |
 | Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and three explicit voice modes implemented; text-MuJoCo evidence writes route, interaction, execution, status, events, and summary artifacts | Preflight, synthetic/virtual-mic framing, isolation, text-MuJoCo, and bundle-verification tests | Clean synthetic, virtual-mic, and text-MuJoCo evidence retained; physical supervised mode remains optional release-support evidence for real audio claims | Acceptance-only |
+| Developer usability CLI | `python -m tools.chromie_cli` implements `status`, `config show`, `config validate`, `doctor`, `capability check`, `trace view`, and `evidence bundle` with plain/JSON output; `trace explain` remains future work | CLI command, output, validation, doctor, manifest-safety, retained-trace, and evidence-preflight unit tests plus full Level A gate | Local doctor can report service reachability, trace view can summarize retained local artifacts, and evidence preflight can label retained bundle pointers, but none create target evidence or release readiness | Tooling |
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |
@@ -176,9 +177,18 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **400** current `unittest` cases under `tests/`;
+- **425** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
+
+The developer-usability CLI through PR6 passed focused CLI tests, documentation
+checks, and the full Level A gate. It currently exposes
+`python -m tools.chromie_cli status`, `config show`, `config validate`, and
+`doctor`, `capability check`, `trace view`, and `evidence bundle`. `doctor`
+performs local reachability checks only, `trace view` summarizes retained local
+artifacts according to `docs/TRACE_SCHEMA.md`, and `evidence bundle` labels
+retained evidence pointers without creating target evidence or release
+readiness.
 
 The current task-agent routing, refusal-reporting, host graph-dispatch,
 no-motion bridge-acceptance, and reference-candidate verifier refresh after
@@ -191,7 +201,7 @@ tests, focused Soridormi acceptance tests, focused robot-candidate verifier
 tests, and dependency-complete Orchestrator AgentClient coverage. The latest
 local `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` attempt on 2026-06-27
 installed the declared host test dependencies, passed
-`python scripts/check_docs.py`, ran 400 current `unittest` cases with `OK`, and
+`python scripts/check_docs.py`, ran 425 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions.
 
 The tests alone do not prove GPU performance, microphone quality, speaker

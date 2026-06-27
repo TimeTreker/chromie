@@ -65,36 +65,43 @@ Soridormi validation gates pass from the intended revisions.
 
 ## Next sequence
 
-1. Treat Soridormi's high-level task and skill surface as declared for the
+1. Continue the Developer Usability Tools phase described in
+   [docs/DEVELOPER_USABILITY_TOOLS.md](docs/DEVELOPER_USABILITY_TOOLS.md):
+   PR0-PR6 are implemented; next harden retained trace examples from real
+   bundles and keep `trace explain` deferred until causal semantics are stable.
+2. Use [docs/TRACE_SCHEMA.md](docs/TRACE_SCHEMA.md) as the trace-viewer
+   contract; avoid explanations that obscure session, interaction, TaskGraph,
+   Skill Runtime, Soridormi, TTS, and fallback semantics.
+3. Treat Soridormi's high-level task and skill surface as declared for the
    current no-motion contract: bounded locomotion, attention, gesture,
    sequence, stop, safe-idle, and planning-hold task types are present in the
    authoritative manifest; navigation, approach, and delivery remain
    future-blocked structured refusals.
-2. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
+4. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
    authoritative manifest. Use structured task goals for rich embodied requests
    and keep concrete named skills for explicit bounded body commands. Preserve
    Soridormi refusal metadata when reporting unsupported embodied tasks.
-3. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
+5. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
    types only. Missing navigation, approach, gaze, gesture, recovery, or
    manipulation goals must remain structured refusals or clarifications rather
    than velocity recipes.
-4. Keep Qwen/small-model routing advisory. Add or revise routing only with
+6. Keep Qwen/small-model routing advisory. Add or revise routing only with
    deterministic-control bypass, catalog constraints, confidence fallback,
    schema validation, Skill Runtime authorization, and Soridormi provider
    refusal/event checks.
-5. Select one reference-robot candidate and complete the identity,
+7. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
    `commissioning/reference_robot_candidate.schema.json` contract and keep the
    real manifest under ignored `.chromie/commissioning/`.
-6. Keep all physical-motion gates off while validating no-motion health,
+8. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
-7. If the next supported release claims real microphone/speaker voice-device
+9. If the next supported release claims real microphone/speaker voice-device
    operation, run the full seven-case `supervised` matrix on the reference host,
    review audible output and MuJoCo safe-idle/recovery behavior, verify the
    bundle with `--require-clean`, then clear the compatibility blocker.
-8. Before publishing a simulation-demo tag, record the paired Chromie and
+10. Before publishing a simulation-demo tag, record the paired Chromie and
    Soridormi revisions, rerun the Chromie documentation/test gate, rerun the
    Soridormi task-agent and locomotion-readiness gates, and keep the tag claim
    limited to simulator evidence.
@@ -124,7 +131,7 @@ Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
 Full Level A baseline:
-400 current unittest cases and 20 legacy Agent tests passed on 2026-06-27 with
+425 current unittest cases and 20 legacy Agent tests passed on 2026-06-27 with
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh`.
 ```
 

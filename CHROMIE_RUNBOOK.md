@@ -11,6 +11,13 @@ Run commands from the repository root unless stated otherwise.
 ```bash
 cp -n .env.local.example .env.local
 ./scripts/show_profile.sh
+python -m tools.chromie_cli status
+python -m tools.chromie_cli config show
+python -m tools.chromie_cli config validate
+python -m tools.chromie_cli doctor
+python -m tools.chromie_cli capability check
+python -m tools.chromie_cli trace view
+python -m tools.chromie_cli evidence bundle
 ```
 
 Generated files:

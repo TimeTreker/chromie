@@ -1,0 +1,587 @@
+"""Trace artifact viewer for the Chromie developer CLI."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
+
+from .output import CommandResult, ExitCode
+
+
+IDENTIFIER_KEYS = {
+    "session": {"sid", "session_id", "origin_session_id", "session_ids"},
+    "interaction": {"interaction_id", "active_interaction_ids"},
+    "graph": {"graph_id", "active_graph_ids"},
+    "trace": {"trace_id"},
+}
+TRACE_JSON_FILENAMES = {
+    "route.json",
+    "interaction_response.json",
+    "execution.json",
+    "trace.json",
+    "summary.json",
+}
+TRACE_CONTENT_KEYS = {
+    "sid",
+    "session_id",
+    "session_ids",
+    "interaction_id",
+    "graph_id",
+    "trace_id",
+    "outcome_summary",
+    "node_results",
+    "events",
+    "traces",
+    "route",
+    "intent",
+    "results",
+    "skills",
+    "debug_summary",
+}
+
+
+def trace_view(
+    root: Path,
+    *,
+    trace_root: Path | None = None,
+    source_file: Path | None = None,
+    session: str | None = None,
+    interaction: str | None = None,
+    graph: str | None = None,
+    trace: str | None = None,
+    limit: int = 20,
+) -> CommandResult:
+    root = root.resolve()
+    warnings: list[str] = []
+    filters = {
+        "session": _clean_filter(session),
+        "interaction": _clean_filter(interaction),
+        "graph": _clean_filter(graph),
+        "trace": _clean_filter(trace),
+    }
+    active_filters = {name: value for name, value in filters.items() if value}
+
+    if source_file is not None:
+        source_file = _resolve_under_root(root, source_file)
+        if not source_file.is_file():
+            return CommandResult(
+                status="failure",
+                message=f"Trace source file does not exist: {source_file}",
+                details={
+                    "schema_version": 1,
+                    "source_file": str(source_file),
+                    "filters": filters,
+                    "warnings": [f"missing trace source file: {source_file}"],
+                },
+                exit_code=ExitCode.FAILURE,
+            )
+        scan_root = source_file.parent
+        paths = [source_file]
+        source = "file"
+    else:
+        scan_root = _resolve_under_root(
+            root,
+            trace_root or Path(".chromie") / "acceptance",
+        )
+        source = "scan"
+        if not scan_root.exists():
+            return _no_trace_result(
+                trace_root=scan_root,
+                source=source,
+                filters=filters,
+                limit=limit,
+                warnings=[f"trace root does not exist: {scan_root}"],
+            )
+        paths = _discover_trace_paths(scan_root)
+
+    artifacts = [
+        artifact
+        for path in paths
+        for artifact in [
+            _read_artifact(
+                path,
+                scan_root=scan_root,
+                filters=active_filters,
+                limit=limit,
+                warnings=warnings,
+                force=source_file is not None,
+            )
+        ]
+        if artifact is not None
+    ]
+    matched_records = sum(int(item.get("matched_records", 0)) for item in artifacts)
+    details = {
+        "schema_version": 1,
+        "source": source,
+        "trace_root": str(scan_root),
+        "filters": filters,
+        "limits": {"records_per_artifact": limit},
+        "artifacts_scanned": len(paths),
+        "artifacts_matched": len(artifacts),
+        "matched_records": matched_records,
+        "warnings": warnings,
+        "artifacts": artifacts,
+        "claim_note": (
+            "Trace view reads retained local artifacts only. It does not create "
+            "target validation, live service evidence, or release readiness."
+        ),
+    }
+    if artifacts:
+        return CommandResult(
+            status="ok",
+            message=(
+                f"Trace view matched {matched_records} record(s) across "
+                f"{len(artifacts)} artifact(s)."
+            ),
+            details=details,
+            exit_code=ExitCode.OK,
+        )
+    if paths:
+        message = "Trace artifacts were found, but none matched the requested filters."
+    else:
+        message = "Trace view found no retained trace artifacts."
+    return CommandResult(
+        status="warning",
+        message=message,
+        details=details,
+        exit_code=ExitCode.WARNING,
+    )
+
+
+def _no_trace_result(
+    *,
+    trace_root: Path,
+    source: str,
+    filters: dict[str, str | None],
+    limit: int,
+    warnings: list[str],
+) -> CommandResult:
+    return CommandResult(
+        status="warning",
+        message="Trace view found no retained trace artifacts.",
+        details={
+            "schema_version": 1,
+            "source": source,
+            "trace_root": str(trace_root),
+            "filters": filters,
+            "limits": {"records_per_artifact": limit},
+            "artifacts_scanned": 0,
+            "artifacts_matched": 0,
+            "matched_records": 0,
+            "warnings": warnings,
+            "artifacts": [],
+            "claim_note": (
+                "Trace view reads retained local artifacts only. It does not "
+                "create target validation, live service evidence, or release "
+                "readiness."
+            ),
+        },
+        exit_code=ExitCode.WARNING,
+    )
+
+
+def _resolve_under_root(root: Path, path: Path) -> Path:
+    expanded = path.expanduser()
+    if expanded.is_absolute():
+        return expanded.resolve()
+    return (root / expanded).resolve()
+
+
+def _clean_filter(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+def _discover_trace_paths(trace_root: Path) -> list[Path]:
+    jsonl = sorted(path for path in trace_root.rglob("*.jsonl") if path.is_file())
+    json_paths = sorted(path for path in trace_root.rglob("*.json") if path.is_file())
+    return [*jsonl, *json_paths]
+
+
+def _read_artifact(
+    path: Path,
+    *,
+    scan_root: Path,
+    filters: dict[str, str],
+    limit: int,
+    warnings: list[str],
+    force: bool,
+) -> dict[str, Any] | None:
+    if path.suffix == ".jsonl":
+        return _read_jsonl_artifact(
+            path,
+            scan_root=scan_root,
+            filters=filters,
+            limit=limit,
+            warnings=warnings,
+            force=force,
+        )
+    if path.suffix == ".json":
+        return _read_json_artifact(
+            path,
+            scan_root=scan_root,
+            filters=filters,
+            limit=limit,
+            warnings=warnings,
+            force=force,
+        )
+    return None
+
+
+def _read_jsonl_artifact(
+    path: Path,
+    *,
+    scan_root: Path,
+    filters: dict[str, str],
+    limit: int,
+    warnings: list[str],
+    force: bool,
+) -> dict[str, Any] | None:
+    records: list[dict[str, Any]] = []
+    parse_errors = 0
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        warnings.append(f"{path}: could not read JSONL artifact: {exc}")
+        return None
+    for line_number, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            loaded = json.loads(line)
+        except json.JSONDecodeError as exc:
+            parse_errors += 1
+            warnings.append(f"{path}:{line_number}: invalid JSONL record: {exc.msg}")
+            continue
+        if isinstance(loaded, dict):
+            records.append(loaded)
+        else:
+            parse_errors += 1
+            warnings.append(f"{path}:{line_number}: JSONL record is not an object")
+
+    if not force and not records:
+        return None
+    matched = _filter_records(records, filters)
+    if filters and not matched:
+        return None
+    sample = matched[:limit]
+    identifiers = _collect_identifiers(records)
+    return {
+        "path": str(path),
+        "relative_path": _relative(path, scan_root),
+        "kind": _jsonl_kind(records),
+        "record_count": len(records),
+        "matched_records": len(matched),
+        "parse_errors": parse_errors,
+        "identifiers": identifiers,
+        "records": [_summarize_event_record(record) for record in sample],
+    }
+
+
+def _read_json_artifact(
+    path: Path,
+    *,
+    scan_root: Path,
+    filters: dict[str, str],
+    limit: int,
+    warnings: list[str],
+    force: bool,
+) -> dict[str, Any] | None:
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        warnings.append(f"{path}: invalid JSON: {exc.msg}")
+        return None
+    except OSError as exc:
+        warnings.append(f"{path}: could not read JSON artifact: {exc}")
+        return None
+
+    if not force and not _looks_like_trace_json(path, loaded):
+        return None
+    if filters and not _matches_filters(loaded, filters):
+        return None
+    identifiers = _collect_identifiers(loaded)
+    summary = _summarize_json_payload(loaded, limit=limit)
+    return {
+        "path": str(path),
+        "relative_path": _relative(path, scan_root),
+        "kind": _json_kind(path, loaded),
+        "record_count": 1,
+        "matched_records": 1,
+        "parse_errors": 0,
+        "identifiers": identifiers,
+        "summary": summary,
+    }
+
+
+def _filter_records(
+    records: Iterable[dict[str, Any]],
+    filters: dict[str, str],
+) -> list[dict[str, Any]]:
+    if not filters:
+        return list(records)
+    return [record for record in records if _matches_filters(record, filters)]
+
+
+def _matches_filters(value: Any, filters: dict[str, str]) -> bool:
+    return all(
+        _contains_identifier(value, IDENTIFIER_KEYS[name], expected)
+        for name, expected in filters.items()
+    )
+
+
+def _contains_identifier(value: Any, keys: set[str], expected: str) -> bool:
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if key in keys and _value_contains(nested, expected):
+                return True
+            if _contains_identifier(nested, keys, expected):
+                return True
+    elif isinstance(value, list):
+        return any(_contains_identifier(item, keys, expected) for item in value)
+    return False
+
+
+def _value_contains(value: Any, expected: str) -> bool:
+    if isinstance(value, str):
+        return value == expected
+    if isinstance(value, (int, float, bool)):
+        return str(value) == expected
+    if isinstance(value, list):
+        return any(_value_contains(item, expected) for item in value)
+    if isinstance(value, dict):
+        return any(_value_contains(item, expected) for item in value.values())
+    return False
+
+
+def _collect_identifiers(value: Any) -> dict[str, list[str]]:
+    collected: dict[str, set[str]] = {name: set() for name in IDENTIFIER_KEYS}
+
+    def visit(item: Any) -> None:
+        if isinstance(item, dict):
+            for key, nested in item.items():
+                for name, keys in IDENTIFIER_KEYS.items():
+                    if key in keys:
+                        collected[name].update(_scalar_values(nested))
+                visit(nested)
+        elif isinstance(item, list):
+            for nested in item:
+                visit(nested)
+
+    visit(value)
+    return {
+        name: sorted(values)
+        for name, values in collected.items()
+        if values
+    }
+
+
+def _scalar_values(value: Any) -> set[str]:
+    if isinstance(value, str):
+        return {value}
+    if isinstance(value, (int, float, bool)):
+        return {str(value)}
+    if isinstance(value, list):
+        values: set[str] = set()
+        for item in value:
+            values.update(_scalar_values(item))
+        return values
+    return set()
+
+
+def _looks_like_trace_json(path: Path, value: Any) -> bool:
+    if path.name in TRACE_JSON_FILENAMES:
+        return True
+    if not isinstance(value, dict):
+        return False
+    return bool(TRACE_CONTENT_KEYS.intersection(value.keys()))
+
+
+def _jsonl_kind(records: list[dict[str, Any]]) -> str:
+    if any({"sid", "event", "message"}.issubset(record.keys()) for record in records):
+        return "session_events_jsonl"
+    return "jsonl_events"
+
+
+def _json_kind(path: Path, value: Any) -> str:
+    if isinstance(value, dict):
+        if "graph_id" in value and ("node_results" in value or "outcome_summary" in value):
+            return "task_graph_trace"
+        if "interaction_id" in value and "traces" in value and "results" in value:
+            return "skill_runtime_execution"
+        if "interaction_id" in value and "skills" in value:
+            return "interaction_response"
+        if "route" in value and "intent" in value:
+            return "route_decision"
+        if path.name == "summary.json":
+            return "acceptance_summary"
+    return "json_trace_artifact"
+
+
+def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {"type": type(value).__name__}
+    summary: dict[str, Any] = {
+        "top_level_keys": sorted(str(key) for key in value.keys())[:40],
+    }
+    for key in (
+        "ok",
+        "status",
+        "route",
+        "intent",
+        "confidence",
+        "sid",
+        "session_id",
+        "interaction_id",
+        "graph_id",
+        "trace_id",
+        "outcome_summary",
+        "summary",
+    ):
+        if key in value:
+            summary[key] = _shorten(value[key])
+    if isinstance(value.get("errors"), list):
+        summary["errors"] = [_shorten(item) for item in value["errors"][:limit]]
+        summary["error_count"] = len(value["errors"])
+    if isinstance(value.get("skills"), list):
+        summary["skill_ids"] = [
+            str(item.get("skill_id") or item.get("id") or "")
+            for item in value["skills"][:limit]
+            if isinstance(item, dict)
+        ]
+        summary["skill_count"] = len(value["skills"])
+    if isinstance(value.get("results"), list):
+        summary["results"] = [
+            _summarize_result(item)
+            for item in value["results"][:limit]
+            if isinstance(item, dict)
+        ]
+        summary["result_count"] = len(value["results"])
+    if isinstance(value.get("traces"), list):
+        summary["traces"] = [
+            _summarize_skill_trace(item)
+            for item in value["traces"][:limit]
+            if isinstance(item, dict)
+        ]
+        summary["trace_count"] = len(value["traces"])
+    if isinstance(value.get("node_results"), list):
+        summary["node_results"] = [
+            _summarize_node_result(item)
+            for item in value["node_results"][:limit]
+            if isinstance(item, dict)
+        ]
+        summary["node_result_count"] = len(value["node_results"])
+    if isinstance(value.get("events"), list):
+        summary["events"] = [
+            _summarize_execution_event(item)
+            for item in value["events"][:limit]
+            if isinstance(item, dict)
+        ]
+        summary["event_count"] = len(value["events"])
+    nested_execution = value.get("execution")
+    if isinstance(nested_execution, dict):
+        summary["execution"] = _summarize_json_payload(nested_execution, limit=limit)
+    return summary
+
+
+def _summarize_event_record(record: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "timestamp_utc",
+        "timestamp",
+        "sid",
+        "session_id",
+        "elapsed_ms",
+        "event",
+        "message",
+        "interaction_id",
+        "graph_id",
+        "trace_id",
+        "status",
+        "route",
+        "intent",
+    )
+    return {
+        key: _shorten(record[key])
+        for key in keys
+        if key in record
+    }
+
+
+def _summarize_result(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: _shorten(item[key])
+        for key in (
+            "request_id",
+            "skill_id",
+            "provider_id",
+            "status",
+            "reason_code",
+            "message",
+            "trace_id",
+        )
+        if key in item
+    }
+
+
+def _summarize_skill_trace(item: dict[str, Any]) -> dict[str, Any]:
+    summary = {
+        key: _shorten(item[key])
+        for key in (
+            "trace_id",
+            "interaction_id",
+            "request_id",
+            "skill_id",
+            "provider_id",
+            "status",
+        )
+        if key in item
+    }
+    events = item.get("events")
+    if isinstance(events, list):
+        summary["events"] = [
+            _summarize_execution_event(event)
+            for event in events[:10]
+            if isinstance(event, dict)
+        ]
+        summary["event_count"] = len(events)
+    return summary
+
+
+def _summarize_node_result(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: _shorten(item[key])
+        for key in (
+            "node_id",
+            "tool",
+            "status",
+            "error",
+            "attempts",
+            "blocked_by",
+        )
+        if key in item
+    }
+
+
+def _summarize_execution_event(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: _shorten(item[key])
+        for key in ("timestamp", "type", "node_id", "tool", "message", "status")
+        if key in item
+    }
+
+
+def _shorten(value: Any, *, max_chars: int = 240) -> Any:
+    if isinstance(value, str) and len(value) > max_chars:
+        return value[: max_chars - 3] + "..."
+    return value
+
+
+def _relative(path: Path, root: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
