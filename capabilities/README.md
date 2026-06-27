@@ -13,7 +13,7 @@ TaskGraph validation and execution.
 [`soridormi.json`](soridormi.json) is generated from Soridormi's authoritative
 capability export and then materialized with Chromie's MCP Streamable HTTP
 transport placeholder. The checked-in snapshot contains six agent records and
-twenty-one tool records. Its `metadata.upstream_commit` records generation provenance
+twenty tool records. Its `metadata.upstream_commit` records generation provenance
 for evidence checks; it is not a compatibility pin for normal paired Chromie/Soridormi development.
 
 Do not hand-edit exported tools, schemas, or safety policy. Refresh the source

@@ -1003,6 +1003,9 @@
               "safe_idle": {
                 "type": "boolean"
               },
+              "readiness_profile": {
+                "type": "string"
+              },
               "task_api_no_motion": {
                 "type": "boolean"
               },
@@ -1038,6 +1041,7 @@
               "schema_version",
               "mode",
               "backend",
+              "readiness_profile",
               "task_api_no_motion",
               "ready_subsystems",
               "task_types"
@@ -1109,6 +1113,7 @@
               "task_type": {
                 "type": "string",
                 "enum": [
+                  "move_forward",
                   "move_velocity",
                   "turn_to_heading",
                   "approach_target",
@@ -1423,7 +1428,7 @@
           "name": "soridormi.task.submit",
           "agent_id": "soridormi.task",
           "display_name": "Submit Soridormi embodied task",
-          "description": "Submit a structured embodied task goal. The M11 contract surface validates and records the request, but returns no_motion=true until task execution is implemented.",
+          "description": "Submit a structured embodied task goal. The contract surface validates and records the request, but returns no_motion=true until task execution is implemented.",
           "version": "0.1.0",
           "llm_visible": true,
           "input_schema": {
@@ -1437,6 +1442,7 @@
               "task_type": {
                 "type": "string",
                 "enum": [
+                  "move_forward",
                   "move_velocity",
                   "turn_to_heading",
                   "approach_target",
@@ -2746,6 +2752,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "0b61367ceec3a8856236bd297eb74417f763fde6"
+    "upstream_commit": "e0b310af090cf0b9451a952eb3de6440daaf530b"
   }
 }

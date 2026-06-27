@@ -20,7 +20,7 @@ and records the upstream commit rather than hand-maintaining tool schemas.
 Current snapshot:
 
 - six agent records;
-- twenty-one tool records;
+- twenty tool records;
 - task status schema includes single-skill dry-run and `skill_sequence`
   dry-run metadata, plus Soridormi-owned `plan_steps` and
   `blocked_subsystems`, and Chromie routing hints in

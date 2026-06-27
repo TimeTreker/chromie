@@ -210,7 +210,7 @@ order at the playback layer.
 
 ## Soridormi contract snapshot
 
-`capabilities/soridormi.json` contains 21 tools grouped under six external
+`capabilities/soridormi.json` contains 20 tools grouped under six external
 agents:
 
 - robot status, mode, and battery reads;
