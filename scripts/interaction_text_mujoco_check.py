@@ -144,6 +144,16 @@ def safe_idle_errors(status: dict[str, Any]) -> list[str]:
     return errors
 
 
+def should_require_tts_speech(route: Any, *, require_speech: bool) -> bool:
+    if not require_speech:
+        return False
+    if getattr(route, "route", "") == "interrupt":
+        return False
+    if getattr(route, "should_speak", True) is False:
+        return False
+    return True
+
+
 def _short_capability_id(item: dict[str, Any]) -> str:
     capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
     return capability_id or "unknown"
@@ -493,9 +503,13 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                 errors.extend(safe_idle_errors(status_after))
 
             session_state = assistant.sessions.state.get(sid) or {}
-            if args.require_speech and int(session_state.get("scheduled_tts", 0)) < 1:
+            require_tts = should_require_tts_speech(
+                route,
+                require_speech=args.require_speech,
+            )
+            if require_tts and int(session_state.get("scheduled_tts", 0)) < 1:
                 errors.append("no TTS speech was scheduled")
-            if args.require_speech and int(session_state.get("failed_tts", 0)) > 0:
+            if require_tts and int(session_state.get("failed_tts", 0)) > 0:
                 errors.append(f"TTS failed {session_state.get('failed_tts')} time(s)")
 
         debug_summary = build_debug_summary(

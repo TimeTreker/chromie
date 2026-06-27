@@ -9,6 +9,7 @@ from scripts.interaction_text_mujoco_check import (
     build_debug_summary,
     parse_expected_arg,
     safe_idle_errors,
+    should_require_tts_speech,
     validate_contract,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
@@ -299,6 +300,35 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             ),
             3,
         )
+
+    def test_tts_speech_requirement_skips_interrupt_routes(self) -> None:
+        route = RouteDecision.model_validate(
+            {
+                "route": "interrupt",
+                "intent": "stop_current_output",
+                "confidence": 0.99,
+                "language": "en-US",
+                "source": "rules",
+                "should_speak": False,
+            }
+        )
+
+        self.assertFalse(should_require_tts_speech(route, require_speech=True))
+
+    def test_tts_speech_requirement_keeps_normal_speech_routes(self) -> None:
+        route = RouteDecision.model_validate(
+            {
+                "route": "chat",
+                "intent": "general_conversation",
+                "confidence": 0.91,
+                "language": "en-US",
+                "source": "llm",
+                "should_speak": True,
+            }
+        )
+
+        self.assertTrue(should_require_tts_speech(route, require_speech=True))
+        self.assertFalse(should_require_tts_speech(route, require_speech=False))
 
     def test_apply_soridormi_timeout_sets_request_timeouts(self) -> None:
         response = InteractionResponse.model_validate(
