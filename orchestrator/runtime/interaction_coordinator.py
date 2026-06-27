@@ -17,10 +17,12 @@ from shared.chromie_contracts.interaction import (
 from .skill_runtime import (
     LocalSpeechSkillProvider,
     RuntimeAuthorization,
+    SessionControlSkillProvider,
     SkillRegistry,
     SkillRuntime,
     SkillRuntimeResult,
     local_speech_definition,
+    session_interrupt_definition,
 )
 from .skill_adapters import TaskGraphHandler, TaskGraphSkillProvider, task_graph_skill_definition
 from .soridormi_skill_provider import SoridormiMcpSkillProvider
@@ -42,6 +44,7 @@ class InteractionRuntimeCoordinator:
     ) -> None:
         self.registry = SkillRegistry()
         self.registry.register(local_speech_definition())
+        self.registry.register(session_interrupt_definition())
         self.registry.register(task_graph_skill_definition())
         self.runtime = SkillRuntime(
             self.registry,
@@ -51,6 +54,7 @@ class InteractionRuntimeCoordinator:
             ),
         )
         self.runtime.register_provider(LocalSpeechSkillProvider(speech_scheduler))
+        self.runtime.register_provider(SessionControlSkillProvider())
         self._task_graph_enabled = task_graph_handler is not None
         if task_graph_handler is not None:
             self.runtime.register_provider(TaskGraphSkillProvider(task_graph_handler))

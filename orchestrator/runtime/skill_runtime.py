@@ -543,6 +543,33 @@ class LocalSpeechSkillProvider:
         self.cancelled_request_ids.add(request.request_id)
 
 
+class SessionControlSkillProvider:
+    provider_id = "chromie.session_control"
+
+    async def execute(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> SkillResult:
+        return SkillResult(
+            request_id=request.request_id,
+            skill_id=request.skill_id,
+            skill_version=definition.version,
+            status="completed",
+            provider_id=self.provider_id,
+            output={"control": "interrupt_acknowledged"},
+        )
+
+    async def cancel(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+    ) -> None:
+        return None
+
+
 class MockSkillProvider:
     def __init__(
         self,
@@ -604,6 +631,25 @@ def local_speech_definition() -> SkillDefinition:
         interruptible=True,
         can_run_parallel=True,
         exclusive_group="chromie.audio",
+    )
+
+
+def session_interrupt_definition() -> SkillDefinition:
+    return SkillDefinition(
+        skill_id="session.interrupt",
+        version="1.0.0",
+        provider_id=SessionControlSkillProvider.provider_id,
+        description="Acknowledge a host session interrupt already applied by the coordinator.",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+        timeout_ms=300,
+        interruptible=False,
+        can_run_parallel=True,
+        idempotent=True,
+        metadata={"control": "session_interrupt"},
     )
 
 

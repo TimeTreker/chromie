@@ -91,6 +91,33 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(scheduled[0]["text"], "Hello.")
         self.assertEqual(scheduled[0]["metadata"]["session_id"], "sid-1")
 
+    async def test_session_interrupt_completes_as_local_control(self) -> None:
+        scheduled: list[dict[str, Any]] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: scheduled.append(args) or {"scheduled": True}
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "interrupt-1",
+                        "skill_id": "session.interrupt",
+                    }
+                ]
+            ),
+            session_id="sid-1",
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.results[0].skill_id, "session.interrupt")
+        self.assertEqual(result.results[0].provider_id, "chromie.session_control")
+        self.assertEqual(
+            result.results[0].output,
+            {"control": "interrupt_acknowledged"},
+        )
+        self.assertEqual(scheduled, [])
+
     async def test_sim_body_skill_discovers_catalog_and_executes(self) -> None:
         invoker = _SoridormiInvoker()
         coordinator = InteractionRuntimeCoordinator(
