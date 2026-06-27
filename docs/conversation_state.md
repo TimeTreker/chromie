@@ -43,6 +43,11 @@ The Router can hand complex requests to `deepthinking_agent`, which uses this
 same bounded memory to split tasks, plan, debug, and produce a final spoken
 answer without treating memory as authorization.
 
+This is separate from the durable mind and experience layer documented in
+[`chromie_mind.md`](chromie_mind.md). Session memory tracks the current
+conversation; the mind profile carries owner-approved principles and long-term
+goals, and the experience journal records outcomes for human-reviewed tuning.
+
 ## Boundaries and reset behavior
 
 Configured reset phrases clear the active conversational context. New-topic

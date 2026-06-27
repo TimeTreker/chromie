@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -48,3 +49,20 @@ class BaseAgent(ABC):
 
     def get_context(self, request: AgentRunRequest, key: str, default: Any = None) -> Any:
         return request.context.get(key, default)
+
+    def mind_context(self, request: AgentRunRequest) -> dict[str, Any]:
+        context = request.context or {}
+        mind = context.get("mind")
+        return mind if isinstance(mind, dict) else {}
+
+    def format_mind_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        mind = self.mind_context(request)
+        if not mind:
+            return "无" if zh else "None"
+        summary = str(mind.get("prompt_summary") or "").strip()
+        if summary:
+            return summary[:1600].rstrip() + ("..." if len(summary) > 1600 else "")
+        compact = json.dumps(mind, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if len(compact) > 1600:
+            compact = compact[:1600].rstrip() + "..."
+        return compact

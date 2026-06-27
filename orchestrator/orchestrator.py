@@ -37,10 +37,12 @@ from orchestrator.runtime.abilities import (
 )
 from orchestrator.runtime.confirmation import ConfirmationDialogue
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.experience import ExperienceManager
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
 )
+from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker, now_ms
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
@@ -132,6 +134,8 @@ class VoiceAssistant:
         self.http_session: aiohttp.ClientSession | None = None
         self.sessions = SessionTracker(enabled=self.enable_session_timing)
         self.conversation_state = ConversationStateManager.from_env()
+        self.mind = MindManager.from_env(project_root=PROJECT_ROOT)
+        self.experience = ExperienceManager.from_env(PROJECT_ROOT)
         self.confirmation_dialogue = ConfirmationDialogue(
             ttl_s=float(os.getenv("ORCH_CONFIRMATION_TTL_SEC", "20")),
         )
@@ -143,6 +147,13 @@ class VoiceAssistant:
             self.conversation_state.soft_idle_timeout_sec,
             self.conversation_state.hard_idle_timeout_sec,
             self.conversation_state.max_context_chars,
+        )
+        logger.info(
+            "Mind profile: profile_id=%s version=%s owner_approved=%s experience_journal=%s",
+            self.mind.profile.profile_id,
+            self.mind.profile.version,
+            self.mind.profile.owner_approved,
+            self.experience.enabled,
         )
         self.active_llm_task: asyncio.Task | None = None
         self.active_interaction_task: asyncio.Task | None = None
@@ -1044,6 +1055,7 @@ class VoiceAssistant:
 
     def build_context(self, session_id: str | None) -> dict[str, Any]:
         conversation = self.conversation_state.snapshot()
+        mind_context = self.mind.context()
         return {
             "is_speaking": self.is_playing_audio,
             "current_generation": self.playback_generation,
@@ -1051,6 +1063,10 @@ class VoiceAssistant:
             "conversation_id": conversation.get("conversation_id"),
             "conversation": conversation,
             "session_memory": conversation.get("session_memory", {}),
+            "mind": mind_context,
+            "core_principles": mind_context.get("core_principles", []),
+            "long_term_goals": mind_context.get("long_term_goals", []),
+            "experience_tuning_policy": mind_context.get("experience_tuning_policy", []),
             "history": conversation.get("history", []),
             "pending_tasks": conversation.get("pending_tasks", []),
             "active_pending_tasks": conversation.get("active_pending_tasks", []),
@@ -1059,6 +1075,52 @@ class VoiceAssistant:
                 "source": "host_orchestrator",
             },
         }
+
+    def _experience_context(
+        self,
+        *,
+        user_text: str,
+        decision: RouteDecision,
+    ) -> dict[str, Any]:
+        return {
+            "user_text": " ".join((user_text or "").strip().split())[:500],
+            "route": decision.route,
+            "intent": decision.intent,
+            "route_source": decision.source,
+            "route_confidence": decision.confidence,
+            "conversation_id": self.conversation_state.conversation_id,
+            "mind_profile_id": self.mind.profile.profile_id,
+            "mind_profile_version": self.mind.profile.version,
+        }
+
+    def _record_experience(
+        self,
+        *,
+        response: InteractionResponse,
+        execution: SkillRuntimeResult | None,
+        session_id: str | None,
+        errors: list[str] | None = None,
+    ) -> None:
+        try:
+            record = self.experience.record_interaction(
+                response=response,
+                execution=execution,
+                session_id=session_id,
+                mind_profile=self.mind.profile,
+                errors=errors,
+            )
+        except Exception as exc:  # pragma: no cover - defensive runtime logging
+            logger.warning("Experience journal write failed: %s", exc, exc_info=True)
+            self.session_log(session_id, "experience_record_failed: error=%s", exc)
+            return
+        if record is not None:
+            self.session_log(
+                session_id,
+                "experience_recorded: experience_id=%s route=%s execution_status=%s",
+                record.experience_id,
+                record.route,
+                record.execution_status,
+            )
 
     def _ability_registry(self) -> AbilityRegistry:
         abilities = getattr(self, "abilities", None)
@@ -1351,6 +1413,10 @@ class VoiceAssistant:
                         "metadata": {
                             **response.metadata,
                             "language": decision.language,
+                            "experience_context": self._experience_context(
+                                user_text=user_text,
+                                decision=decision,
+                            ),
                         }
                     },
                 )
@@ -1674,6 +1740,11 @@ class VoiceAssistant:
                     request_id=result.request_id,
                     status=result.status,
                 )
+            self._record_experience(
+                response=response,
+                execution=execution,
+                session_id=session_id,
+            )
             return execution
         except asyncio.CancelledError:
             self.session_log(
@@ -1688,6 +1759,12 @@ class VoiceAssistant:
                 "skill_runtime_exception: runtime_ms=%.1f error=%s",
                 now_ms() - started_ms,
                 exc,
+            )
+            self._record_experience(
+                response=response,
+                execution=None,
+                session_id=session_id,
+                errors=[str(exc) or exc.__class__.__name__],
             )
             raise
         finally:

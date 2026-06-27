@@ -9,6 +9,14 @@ from .interaction import (
     SkillTrace,
     SkillTraceEvent,
 )
+from .mind import (
+    CorePrinciple,
+    ExperienceRecord,
+    LongTermGoal,
+    MindProfile,
+    MindUpdateProposal,
+    default_mind_profile,
+)
 from .session import SessionContext
 
 __all__ = [
@@ -25,5 +33,11 @@ __all__ = [
     "SkillResult",
     "SkillTrace",
     "SkillTraceEvent",
+    "CorePrinciple",
+    "ExperienceRecord",
+    "LongTermGoal",
+    "MindProfile",
+    "MindUpdateProposal",
+    "default_mind_profile",
     "SessionContext",
 ]

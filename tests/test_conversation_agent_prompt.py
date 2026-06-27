@@ -31,6 +31,14 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
             {
                 "sid": "song-test",
                 "text": "Go ahead and sing a song for me.",
+                "context": {
+                    "mind": {
+                        "prompt_summary": (
+                            "Core principles, owner-approved and not experience-mutable: "
+                            "protect humans; be honest about abilities."
+                        )
+                    }
+                },
                 "route_decision": {
                     "route": "chat",
                     "agents": ["conversation_agent", "speaker_agent"],
@@ -47,10 +55,14 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.speak_immediate[0].text, "Here is a little song I made for you.")
         self.assertEqual(len(ollama.calls), 1)
         system = ollama.calls[0]["system"]
+        prompt = ollama.calls[0]["prompt"]
         self.assertIn("sing original lyrics", system)
         self.assertIn("split them into spoken sections", system)
         self.assertIn("Do not quote copyrighted lyrics", system)
         self.assertIn("do not say you are not programmed to sing", system)
+        self.assertIn("mind principles", system)
+        self.assertIn("Mind principles and long-term goals", prompt)
+        self.assertIn("owner-approved", prompt)
 
     async def test_long_song_response_is_split_into_tts_sized_sections(self) -> None:
         response = (

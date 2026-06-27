@@ -77,6 +77,15 @@ task/action proposals in `metadata.route_stage_outputs` and a merged
 validation. See
 [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
 
+Chromie now has a structured mind context layer for owner-approved core
+principles, long-term goals, reflex policy, deliberation policy, and experience
+tuning boundaries. The Orchestrator attaches a bounded `mind` snapshot to Router
+and Agent context; conversation and deepthinking prompts include that snapshot.
+An append-only experience journal records interaction outcomes, and failed or
+uncertain outcomes can create human-review-only update proposals. Experience is
+not allowed to auto-apply core principle or physical safety changes. See
+[`chromie_mind.md`](chromie_mind.md).
+
 On June 14, 2026, the Linux x86_64 reference host with an NVIDIA GeForce RTX
 5090 retained:
 

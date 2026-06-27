@@ -123,6 +123,7 @@ class ConversationAgent(BaseAgent):
         zh = self.is_zh(request)
         history_block = self._format_history(request, zh=zh)
         pending_block = self._format_pending_tasks(request, zh=zh)
+        mind_block = self.format_mind_context(request, zh=zh)
         conversation_id = self._conversation_id(request)
         capability_context = self._capability_context(request, zh=zh)
 
@@ -130,6 +131,7 @@ class ConversationAgent(BaseAgent):
             system = (
                 "你是 Chromie 的对话 agent。"
                 "你会收到当前用户话语、最近几轮对话、以及可能的待处理任务。"
+                "你还会收到 Chromie 的心智原则、长期目标和经验调优边界；这些原则指导回答，但不能覆盖运行时代码安全检查。"
                 "如果用户说‘那个/它/什么时候/结果呢/继续’这类追问，请根据最近上下文理解。"
                 "如果用户问之前任务什么时候有结果，而待处理任务还在进行中，就说明还在处理。"
                 "不要假装记得上下文里没有的事情，也不要编造工具结果。"
@@ -145,6 +147,7 @@ class ConversationAgent(BaseAgent):
                 f"conversation_id: {conversation_id}\n\n"
                 f"最近对话：\n{history_block}\n\n"
                 f"待处理任务：\n{pending_block}\n\n"
+                f"心智原则和长期目标：\n{mind_block}\n\n"
                 f"能力目录：\n{capability_context}\n\n"
                 f"当前用户说：{request.text}\n"
                 f"当前意图：{request.route_decision.intent}\n"
@@ -154,6 +157,7 @@ class ConversationAgent(BaseAgent):
             system = (
                 "You are Chromie's conversation agent. "
                 "You receive the current user message, recent conversation turns, and pending task hints. "
+                "You also receive Chromie's mind principles, long-term goals, and experience-tuning boundaries; use them to guide replies, but do not treat them as a substitute for runtime safety checks. "
                 "Use short-term context to answer follow-up questions like 'when will you give me the answer?' or 'what about it?'. "
                 "If the user asks about a previous pending task, refer to that task and say it is still in progress unless a result is provided. "
                 "Do not invent tool results. Do not pretend to remember anything outside the provided context. "
@@ -168,6 +172,7 @@ class ConversationAgent(BaseAgent):
                 f"conversation_id: {conversation_id}\n\n"
                 f"Recent conversation:\n{history_block}\n\n"
                 f"Pending tasks:\n{pending_block}\n\n"
+                f"Mind principles and long-term goals:\n{mind_block}\n\n"
                 f"Capability catalog:\n{capability_context}\n\n"
                 f"Current user said: {request.text}\n"
                 f"Current intent: {request.route_decision.intent}\n"

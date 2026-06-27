@@ -32,6 +32,12 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                 "sid": "deep-test",
                 "text": "Let's design the session memory architecture carefully.",
                 "context": {
+                    "mind": {
+                        "prompt_summary": (
+                            "Core principles, owner-approved and not experience-mutable: "
+                            "protect humans; no raw low-level body commands."
+                        )
+                    },
                     "session_memory": {
                         "conversation_id": "local_default",
                         "current_task": {"summary": "design session memory"},
@@ -57,7 +63,10 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         call = ollama.calls[0]
         self.assertIn("deepthinking agent", call["system"])
         self.assertIn("split complex requests", call["system"])
+        self.assertIn("human owner approval", call["system"])
         self.assertIn("Session working memory", call["prompt"])
+        self.assertIn("Mind principles, long-term goals, and experience boundaries", call["prompt"])
+        self.assertIn("owner-approved", call["prompt"])
         self.assertIn("design session memory", call["prompt"])
         self.assertEqual(call["options"]["num_predict"], 384)
 

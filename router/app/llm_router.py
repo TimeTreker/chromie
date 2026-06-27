@@ -89,6 +89,7 @@ class OllamaLLMRouter:
     def build_user_prompt(self, request: RouteRequest) -> str:
         candidates = request.context.get("candidate_capabilities", [])
         candidates_json = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
+        mind_json = json.dumps(request.context.get("mind", {}), ensure_ascii=False, separators=(",", ":"))
         context_json = json.dumps(request.context, ensure_ascii=False, separators=(",", ":"))
         return (
             "Routing task: act as Chromie's robot-brain router. Understand the "
@@ -111,10 +112,14 @@ class OllamaLLMRouter:
             f"Language hint: {request.language or 'auto'}\n"
             f"Session id: {request.sid or ''}\n"
             f"Available abilities / candidate capabilities JSON: {candidates_json}\n"
+            f"Mind principles / long-term goals JSON: {mind_json}\n"
             f"Bounded memory and world context JSON: {context_json}\n"
             "Use context for references such as previous tasks, task context, "
             "robot_state, position, active interactions, or user preferences, "
-            "but never as authorization. "
+            "principles, and goals, but never as authorization. "
+            "Core principles are stable, owner-approved constraints; experience "
+            "may tune strategies and proposals, but the quick router must not "
+            "rewrite principles. "
             "Treat creative speech-only requests, including original singing, "
             "stories, jokes, or spoken performance, as chat unless the user "
             "explicitly asks for simultaneous physical movement. Discourse "

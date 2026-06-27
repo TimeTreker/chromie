@@ -48,6 +48,11 @@ class RouterLlmPromptTests(unittest.TestCase):
             text="continue walking there",
             language="en-US",
             context={
+                "mind": {
+                    "profile_id": "chromie_default_mind",
+                    "prompt_summary": "Core principles: protect humans; owner-approved.",
+                    "owner_approval_required_for_core_changes": True,
+                },
                 "candidate_capabilities": [
                     {
                         "capability_id": "soridormi.walk_velocity",
@@ -69,7 +74,11 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("deepthinking_agent", prompt)
         self.assertIn("return calibrated low confidence", prompt)
         self.assertIn("Available abilities / candidate capabilities JSON", prompt)
+        self.assertIn("Mind principles / long-term goals JSON", prompt)
         self.assertIn("Bounded memory and world context JSON", prompt)
+        self.assertIn("chromie_default_mind", prompt)
+        self.assertIn("owner-approved", prompt)
+        self.assertIn("must not rewrite principles", prompt)
         self.assertIn("soridormi.walk_velocity", prompt)
         self.assertIn("robot_state", prompt)
         self.assertIn("position", prompt)
