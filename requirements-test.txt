@@ -1,2 +1,10 @@
-pydantic==2.13.3
+aiohttp==3.13.3
+fastapi==0.128.2
 httpx==0.28.1
+mcp==1.27.2
+orjson==3.11.8
+pydantic==2.13.3
+pydantic-settings==2.14.0
+python-dotenv==1.2.2
+uvicorn[standard]==0.46.0
+websockets==16.0

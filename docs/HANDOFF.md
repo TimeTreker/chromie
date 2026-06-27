@@ -120,14 +120,12 @@ server with graph `soridormi-task-agent-acceptance-115cc864fd04`, backend
 `capabilities`, `preview`, `submit`, and `events` nodes. This is no-motion
 contract evidence only; it does not prove physical execution.
 
-The latest full host `./scripts/run_tests.sh` attempt on 2026-06-27 passed
-`python scripts/check_docs.py`, ran 381 current `unittest` cases, and ended
-`FAILED (errors=14, skipped=2)` because the host Python environment did not
-have `fastapi`; the legacy Agent function tests did not run after the unittest
-failure. Run the full Level A suite in the dependency-complete
-`chromie-agent` service environment before making new release claims.
+The latest full host `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` attempt on
+2026-06-27 installed the declared test dependencies, passed
+`python scripts/check_docs.py`, ran 400 current `unittest` cases with `OK`, and
+then passed 20 dependency-light legacy Agent test functions.
 
-Focused local slices passed 46/46 after the simulation-demo documentation
+Focused local slices also passed 46/46 after the simulation-demo documentation
 refresh:
 
 ```text

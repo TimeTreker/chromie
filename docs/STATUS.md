@@ -167,7 +167,7 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **381** current `unittest` cases under `tests/`;
+- **400** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -179,17 +179,11 @@ committed base `f4bbb2f` passed `python scripts/check_docs.py`,
 focused
 interaction/catalog task-agent tests, focused host Skill Runtime graph dispatch
 tests, focused Soridormi acceptance tests, focused robot-candidate verifier
-tests, and dependency-complete Orchestrator
-AgentClient coverage that skips locally when `aiohttp` is unavailable. A full
-host run is equivalent only when the host Python environment has the same
-service/test dependencies installed. The latest local `./scripts/run_tests.sh`
-attempt on 2026-06-27 passed `python scripts/check_docs.py`, ran 381 current
-`unittest` cases, and ended `FAILED (errors=14, skipped=2)` because the host
-Python environment did not have `fastapi`; the legacy Agent function tests did
-not run after the unittest failure. Focused local slices for ability registry,
-session memory, deepthinking, text-MuJoCo debug summaries, deepthought
-TTS/body-cue alignment, router LLM prompts, and contract compatibility passed
-46/46 after this documentation refresh.
+tests, and dependency-complete Orchestrator AgentClient coverage. The latest
+local `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` attempt on 2026-06-27
+installed the declared host test dependencies, passed
+`python scripts/check_docs.py`, ran 400 current `unittest` cases with `OK`, and
+then passed 20 dependency-light legacy Agent test functions.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
 quality, or real robot safety. The retained RTX evidence above separately

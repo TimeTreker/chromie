@@ -124,12 +124,8 @@ Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
 Full Level A baseline:
-381 current unittest cases and 20 legacy Agent tests are expected in the
-dependency-complete service environment. The latest local host attempt on
-2026-06-27 passed documentation checks but failed 14 unittest imports because
-`fastapi` was not installed in the host Python environment. Focused ability,
-session memory, deepthinking, text-MuJoCo debug, deepthought TTS/body-cue,
-router prompt, and contract-compatibility slices passed 46/46.
+400 current unittest cases and 20 legacy Agent tests passed on 2026-06-27 with
+`INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh`.
 ```
 
 The focused refresh above is not target evidence and does not replace the full

@@ -47,11 +47,17 @@ ASR and therefore does not prove physical audio-device quality.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 381 current tests and 20 legacy Agent
+At the current working revision this runs 400 current tests and 20 legacy Agent
 tests. It also runs the documentation consistency checker.
 
-If the host Python environment is intentionally minimal, run the same gate in
-the service dependency envelope:
+If the host Python environment is intentionally minimal, install the declared
+host test dependency set while running the gate:
+
+```bash
+INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh
+```
+
+You can also run the same gate in the service dependency envelope:
 
 ```bash
 ./scripts/compose.sh run --rm --no-deps \
