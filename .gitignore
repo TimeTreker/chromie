@@ -1,5 +1,7 @@
 # Ignore local cache/data directories
+/hf_cache
 /hf_cache/
+/ollama_data
 /ollama_data/
 /recordings/
 
