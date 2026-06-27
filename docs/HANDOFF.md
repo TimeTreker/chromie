@@ -1,6 +1,6 @@
 # Project Handoff
 
-Last updated: 2026-06-22
+Last updated: 2026-06-27
 
 This handoff records the current resume point for a developer or operator who
 needs to continue Chromie without replaying the full chat history.
@@ -11,12 +11,13 @@ M13 text-to-MuJoCo interaction closure is complete. The retained text evidence
 shows direct text input flowing through Router, Agent `/interaction`, the trusted
 host Skill Runtime, live Soridormi MCP, and MuJoCo `sim` execution.
 
-The current development focus is physical pilot preparation through the
-Chromie/Soridormi task-agent boundary. Chromie can now represent richer
-embodied requests as structured Soridormi task goals, attach stable
-`client_task_ref` values, submit them through the planning TaskGraph executor,
-and monitor `soridormi.task.events` until Soridormi reports a terminal state.
-This is contract/no-motion preparation; it is not physical execution evidence.
+The current development focus is the simulation-demo release audit across the
+Chromie/Soridormi boundary. Chromie can now represent richer embodied requests
+as structured Soridormi task goals, attach stable `client_task_ref` values,
+submit them through the planning TaskGraph executor, and monitor
+`soridormi.task.events` until Soridormi reports a terminal state. This is
+contract/no-motion preparation plus simulator evidence; it is not physical
+execution evidence.
 
 Soridormi's no-motion task and skill surface is now declared in the paired
 capability snapshot. The next non-hardware implementation section is Chromie
@@ -31,6 +32,11 @@ The small Router model is also not an execution authority. Treat
 capability-catalog constraints, low-confidence deepthought delegation, schemas,
 Skill Runtime authorization, and Soridormi provider checks must catch wrong
 model routes.
+
+The temporary `demo-sim-2026-06-27` tag was withdrawn before publication during
+the paired repository audit. Recreate a demo tag only after the Chromie and
+Soridormi docs, checks, and retained simulator evidence match the intended
+claim.
 
 Retained closure evidence:
 
@@ -114,13 +120,27 @@ server with graph `soridormi-task-agent-acceptance-115cc864fd04`, backend
 `capabilities`, `preview`, `submit`, and `events` nodes. This is no-motion
 contract evidence only; it does not prove physical execution.
 
-The full host `./scripts/run_tests.sh` attempt reached 326 tests and ended
-`FAILED (failures=1, errors=9, skipped=2)`: service dependencies such as
-`fastapi` were absent, one multiprocessing test could not create its forkserver
-socket under the current sandbox, and one temp-path assertion saw
-`/private/var` instead of `/var`. Run the full Level A suite in the
-dependency-complete `chromie-agent` service environment before making new
-release claims.
+The latest full host `./scripts/run_tests.sh` attempt on 2026-06-27 passed
+`python scripts/check_docs.py`, ran 381 current `unittest` cases, and ended
+`FAILED (errors=14, skipped=2)` because the host Python environment did not
+have `fastapi`; the legacy Agent function tests did not run after the unittest
+failure. Run the full Level A suite in the dependency-complete
+`chromie-agent` service environment before making new release claims.
+
+Focused local slices passed 46/46 after the simulation-demo documentation
+refresh:
+
+```text
+python -m unittest \
+  tests.test_ability_registry \
+  tests.test_conversation_state \
+  tests.test_deepthinking_agent \
+  tests.test_interaction_text_mujoco_check \
+  tests.test_orchestrator_tts_alignment
+python -m unittest \
+  tests.test_router_llm_prompt \
+  tests.test_contract_compatibility
+```
 
 Previously focused text/M13 tests also passed:
 
