@@ -82,7 +82,7 @@ physical execution claims.
 
 Current priority task types:
 
-- `move_velocity` and `turn_to_heading` for bounded explicit locomotion;
+- `move_forward`, `move_velocity`, and `turn_to_heading` for bounded explicit locomotion;
 - `look_at_target` for attention, gaze, or facing behavior;
 - `perform_gesture` for nod, shake, and expressive body gestures;
 - `skill_sequence` for ordered Soridormi named-skill requests;
@@ -194,7 +194,7 @@ priority for Soridormi-side enrichment:
 - `look_at_target` for attention and gaze behavior;
 - `perform_gesture` for nod, shake, and expressive body gestures;
 - `recover_safe_idle` for recovery requests;
-- `move_velocity` for explicit concrete motion requests;
+- `move_forward` and `move_velocity` for explicit concrete motion requests;
 - `turn_to_heading` for bounded heading changes;
 - `skill_sequence` for bounded ordered body-skill sequences;
 - `speak_while_moving` for coordinated interaction;

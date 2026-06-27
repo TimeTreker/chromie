@@ -140,7 +140,7 @@ preserve Soridormi refusal metadata for future-blocked goals.
 
 Near-term task targets:
 
-- `move_velocity` and `turn_to_heading` for bounded explicit locomotion;
+- `move_forward`, `move_velocity`, and `turn_to_heading` for bounded explicit locomotion;
 - `look_at_target` and `perform_gesture` for attention and social cues;
 - `skill_sequence` for ordered named-skill requests;
 - `recover_safe_idle` and `stop_now` for safe-idle and stop semantics;

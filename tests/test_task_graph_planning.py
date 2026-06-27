@@ -25,6 +25,7 @@ from shared.chromie_contracts.agent import AgentResult as SharedAgentResult
 
 ROOT = Path(__file__).resolve().parents[1]
 DECLARED_SORIDORMI_TASK_TYPES = {
+    "move_forward",
     "move_velocity",
     "turn_to_heading",
     "approach_target",
@@ -217,6 +218,7 @@ def _declared_soridormi_task_types() -> list[str]:
 
 def _task_args(task_type: str) -> dict[str, Any]:
     parameters_by_type = {
+        "move_forward": {"distance_m": 0.3, "speed": "slow"},
         "move_velocity": {"vx_mps": 0.1, "duration_s": 1.0},
         "turn_to_heading": {"heading_rad": 0.5},
         "approach_target": {"target": "speaker", "speed": "slow"},
