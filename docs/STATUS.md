@@ -1,18 +1,23 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Current committed base revision:** `20ec9b4`; retained target evidence below
+**Current committed base revision:** `53bd882`; retained target evidence below
 records the exact revision that produced each bundle
-**Status refresh date:** 2026-06-22
-**Current focus:** **Physical pilot preparation through the Chromie/Soridormi
-task-agent boundary; physical audio validation remains a separate
-release-support track**
+**Status refresh date:** 2026-06-27
+**Current focus:** **Simulation-demo release audit across the
+Chromie/Soridormi boundary; physical pilot preparation and physical audio
+validation remain separate release-support tracks**
 **Version candidate:** `0.1.0-alpha.1` (prepared, not published)
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
 current implementation, automated evidence, target evidence, and release
 readiness.
+
+The temporary `demo-sim-2026-06-27` tag was withdrawn during the paired
+Chromie/Soridormi documentation and evidence audit. Recreate any demo tag only
+from a revision whose docs, automated checks, and retained simulator evidence
+match the release claim.
 
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
@@ -162,7 +167,7 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **326** current `unittest` cases under `tests/`;
+- **381** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -178,10 +183,13 @@ tests, and dependency-complete Orchestrator
 AgentClient coverage that skips locally when `aiohttp` is unavailable. A full
 host run is equivalent only when the host Python environment has the same
 service/test dependencies installed. The latest local `./scripts/run_tests.sh`
-attempt reached 326 current tests and ended `FAILED (failures=1, errors=9,
-skipped=2)`: `fastapi` was unavailable, the multiprocessing forkserver socket
-was blocked by the sandbox, and one temp-path assertion resolved `/private/var`
-instead of `/var`.
+attempt on 2026-06-27 passed `python scripts/check_docs.py`, ran 381 current
+`unittest` cases, and ended `FAILED (errors=14, skipped=2)` because the host
+Python environment did not have `fastapi`; the legacy Agent function tests did
+not run after the unittest failure. Focused local slices for ability registry,
+session memory, deepthinking, text-MuJoCo debug summaries, deepthought
+TTS/body-cue alignment, router LLM prompts, and contract compatibility passed
+46/46 after this documentation refresh.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
 quality, or real robot safety. The retained RTX evidence above separately
@@ -258,7 +266,8 @@ These legacy evidence tracks do not define the current delivery:
 
 ## Release classification
 
-Treat this revision as a **completed M13 text-to-MuJoCo candidate and a
-prepared voice alpha candidate**, not as a published or production release. The
-release generator refuses a publishable bundle while tracked release blockers
-remain. See [Release and Packaging](RELEASE.md).
+Treat this revision as a **completed M13 text-to-MuJoCo candidate, a
+simulation-demo candidate, and a prepared voice alpha candidate**, not as a
+published or production release. The release generator refuses a publishable
+voice-device bundle while tracked release blockers remain. See
+[Release and Packaging](RELEASE.md).

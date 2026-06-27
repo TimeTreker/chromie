@@ -1,10 +1,11 @@
 # Development Checkpoint
 
-**Current committed Chromie base:** `20ec9b4`
+**Current committed Chromie base:** `53bd882`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-06-22
-**Current focus:** Physical pilot preparation through the Chromie/Soridormi
-task-agent boundary; physical audio validation remains separate
+**Status refresh date:** 2026-06-27
+**Current focus:** Simulation-demo release audit through the
+Chromie/Soridormi boundary; physical pilot preparation and physical audio
+validation remain separate tracks
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -24,6 +25,14 @@ The alpha implementation is present:
   stop/cancel/ignore controls remain deterministic;
 - model-assisted routing guardrails that treat `qwen3:0.6b` as a proposer, not
   the authority for capabilities, safety, or physical execution;
+- short-term session memory exposed to Router and Agent prompts, plus a
+  dedicated deepthinking Agent path for low-confidence or complex requests;
+- three-stage routing metadata where emergency filtering, quick intent routing,
+  and deepthought handoff can each contribute high-level task/action proposals
+  to the merged `RouteDecision.metadata.task_list`;
+- host ability registry entries for cognition, speech, memory, social, body,
+  task, safety, and state abilities, including honest stubs for unavailable
+  human-like behaviors;
 - simulator-bounded expressive body cues and safe defaults for underspecified
   walking requests;
 - ordered TTS playback with bounded chunked generation through configured
@@ -48,6 +57,11 @@ real-microphone/speaker evidence remains open only as a separate voice-device
 release-support track. The robust-simulation and provider-readiness milestone is
 complete with live no-motion MCP conformance, three-profile parity, and 16/16
 Soridormi-owned fault-injection scenarios.
+
+The temporary `demo-sim-2026-06-27` tag was withdrawn on 2026-06-27 before
+publication because the paired repositories needed a documentation/code
+consistency audit. Do not publish or recreate a demo tag until both Chromie and
+Soridormi validation gates pass from the intended revisions.
 
 ## Next sequence
 
@@ -80,6 +94,10 @@ Soridormi-owned fault-injection scenarios.
    operation, run the full seven-case `supervised` matrix on the reference host,
    review audible output and MuJoCo safe-idle/recovery behavior, verify the
    bundle with `--require-clean`, then clear the compatibility blocker.
+8. Before publishing a simulation-demo tag, record the paired Chromie and
+   Soridormi revisions, rerun the Chromie documentation/test gate, rerun the
+   Soridormi task-agent and locomotion-readiness gates, and keep the tag claim
+   limited to simulator evidence.
 
 Do not start physical motion until the first reference robot satisfies the
 commissioning checklist and Soridormi has retained simulator/physical evidence
@@ -106,8 +124,12 @@ Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
 Full Level A baseline:
-326 current unittest cases and 20 legacy Agent tests are expected in the
-dependency-complete service environment
+381 current unittest cases and 20 legacy Agent tests are expected in the
+dependency-complete service environment. The latest local host attempt on
+2026-06-27 passed documentation checks but failed 14 unittest imports because
+`fastapi` was not installed in the host Python environment. Focused ability,
+session memory, deepthinking, text-MuJoCo debug, deepthought TTS/body-cue,
+router prompt, and contract-compatibility slices passed 46/46.
 ```
 
 The focused refresh above is not target evidence and does not replace the full

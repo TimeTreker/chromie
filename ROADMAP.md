@@ -73,6 +73,28 @@ release evidence that cover microphone choice, room noise, ASR recognition,
 audible output, barge-in, request-bound approval and denial, cancellation, stop,
 and simulator recovery.
 
+## Current checkpoint - Simulation-demo release audit
+
+Before publishing or recreating a demo tag, the paired Chromie and Soridormi
+repositories must describe the same supported surface. The demo claim is limited
+to the simulator: text or voice input can route through Chromie's emergency
+filter, quick intent router, optional deepthought handoff, Agent validation, and
+trusted Skill Runtime into Soridormi-owned MuJoCo skills or task contracts.
+
+This checkpoint does not claim physical microphone/speaker quality, Jetson
+packaging, real hardware support, navigation autonomy, manipulation, or
+unattended operation.
+
+Exit criteria:
+
+- Chromie status, roadmap, runbook, and release docs match the current code and
+  retained evidence;
+- Soridormi roadmap and body-control docs agree on the current locomotion gate,
+  task-agent contract, and pre-WBC limitations;
+- exact Chromie and Soridormi revisions are retained;
+- `python scripts/check_docs.py` and the relevant automated gates pass;
+- any demo tag is created only after the audit, not before it.
+
 ## Completed phase - Robust simulation and provider readiness
 
 This milestone is complete for the high-level provider contract. Soridormi
