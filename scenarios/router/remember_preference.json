@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "remember_preference",
+  "suite": "router",
+  "level": "module",
+  "description": "Simple memory request routes to memory, not body motion.",
+  "tags": ["memory", "normal"],
+  "input": {
+    "text": "Remember that my favorite color is blue."
+  },
+  "stub": {
+    "router_mode": "rules_only",
+    "catalog": {
+      "matched": false
+    }
+  },
+  "expect": {
+    "route": "memory",
+    "intent": "remember_user_fact",
+    "source": "rules",
+    "task_types_include": ["memory.remember_session_context"],
+    "llm_calls": 0
+  }
+}

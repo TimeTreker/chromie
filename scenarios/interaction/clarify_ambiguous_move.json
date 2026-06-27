@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "clarify_ambiguous_move",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Ambiguous movement request asks where instead of moving.",
+  "tags": ["clarify", "motion-safety", "ambiguous"],
+  "input": {
+    "text": "Can you move over there a little?"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "clarify",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "clarify_target_location",
+      "confidence": 0.78,
+      "language": "en-US",
+      "source": "llm",
+      "speak_first": "Where exactly should I move?"
+    }
+  },
+  "expect": {
+    "speech_any": ["where exactly"],
+    "no_skills": true
+  }
+}

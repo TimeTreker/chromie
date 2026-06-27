@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "ambiguous_move_there",
+  "suite": "router",
+  "level": "module",
+  "description": "Ambiguous location reference clarifies rather than executing motion.",
+  "tags": ["clarify", "motion-safety", "ambiguous"],
+  "input": {
+    "text": "Can you move over there a little?"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": false
+    },
+    "llm_decision": {
+      "route": "clarify",
+      "agents": [],
+      "intent": "clarify_target_location",
+      "confidence": 0.78,
+      "language": "en-US",
+      "source": "llm",
+      "speak_first": "Where exactly should I move?"
+    }
+  },
+  "expect": {
+    "route": "clarify",
+    "intent": "clarify_target_location",
+    "source": "llm",
+    "task_types_include": ["speech.ask_clarification"],
+    "llm_calls": 1
+  }
+}

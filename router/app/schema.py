@@ -343,6 +343,33 @@ def annotate_pipeline_stage_outputs(
 
     outputs: list[dict[str, Any]] = [passed_stage_output("emergency_filter")]
     if decision.route == "deep_thought":
+        thinking_ack_allowed = (decision.metadata or {}).get("thinking_ack_allowed") is not False
+        deep_thought_tasks = [
+            _task_item(
+                source_stage="deep_thought",
+                kind="task",
+                task_type="cognition.deep_think",
+                route=decision.route,
+                intent=decision.intent,
+                priority=decision.priority,
+                index=1 if thinking_ack_allowed else 0,
+                extra={"candidate_count": len(decision.candidate_capabilities)},
+            ),
+        ]
+        if thinking_ack_allowed:
+            deep_thought_tasks.insert(
+                0,
+                _task_item(
+                    source_stage="deep_thought",
+                    kind="action",
+                    task_type="speech.thinking_ack",
+                    route=decision.route,
+                    intent=decision.intent,
+                    priority=decision.priority,
+                    index=0,
+                    requires_validation=False,
+                ),
+            )
         outputs.append(
             route_stage_output(
                 decision,
@@ -370,28 +397,7 @@ def annotate_pipeline_stage_outputs(
                 decision,
                 stage="deep_thought",
                 status="proposed",
-                tasks=[
-                    _task_item(
-                        source_stage="deep_thought",
-                        kind="action",
-                        task_type="speech.thinking_ack",
-                        route=decision.route,
-                        intent=decision.intent,
-                        priority=decision.priority,
-                        index=0,
-                        requires_validation=False,
-                    ),
-                    _task_item(
-                        source_stage="deep_thought",
-                        kind="task",
-                        task_type="cognition.deep_think",
-                        route=decision.route,
-                        intent=decision.intent,
-                        priority=decision.priority,
-                        index=1,
-                        extra={"candidate_count": len(decision.candidate_capabilities)},
-                    ),
-                ],
+                tasks=deep_thought_tasks,
             )
         )
     else:

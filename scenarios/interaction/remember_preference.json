@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "remember_preference",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Memory request emits memory.store and no Soridormi motion skill.",
+  "tags": ["memory", "normal"],
+  "input": {
+    "text": "Remember that my favorite color is blue."
+  },
+  "stub": {
+    "route_decision": {
+      "route": "memory",
+      "agents": ["memory_agent", "speaker_agent"],
+      "intent": "remember_user_fact",
+      "confidence": 0.86,
+      "language": "en-US",
+      "source": "rules"
+    }
+  },
+  "expect": {
+    "speech_any": ["remember"],
+    "skills": ["memory.store"],
+    "forbidden_skills": ["soridormi.walk_velocity", "soridormi.nod_yes"]
+  }
+}

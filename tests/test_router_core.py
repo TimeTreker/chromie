@@ -16,7 +16,17 @@ from router.app.schema import RouteRequest
 
 class RouterCoreTests(unittest.TestCase):
     def test_rules_route_interrupt_without_agent(self) -> None:
-        for text in ("stop", "Stop!", "cancel?", "Stop moving right now.", "停止移动"):
+        for text in (
+            "stop",
+            "Stop!",
+            "cancel?",
+            "Please stop.",
+            "Can you stop please?",
+            "Could you please stop?",
+            "Stop moving right now.",
+            "停止移动",
+            "请停止移动",
+        ):
             with self.subTest(text=text):
                 decision = route_by_rules(RouteRequest(sid="s1", text=text))
 

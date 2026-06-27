@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "id": "low_confidence_do_it",
+  "suite": "router",
+  "level": "module",
+  "description": "Low-confidence 'do it' handoff avoids automatic thinking filler.",
+  "tags": ["deep-thought", "low-confidence", "filler-regression"],
+  "input": {
+    "text": "Please do it."
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": true,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.walk_velocity",
+          "description": "Bounded walking velocity.",
+          "score": 0.9
+        }
+      ]
+    },
+    "llm_decision": {
+      "route": "robot_action",
+      "agents": [],
+      "intent": "unknown",
+      "confidence": 0.35,
+      "language": "en-US",
+      "source": "llm"
+    }
+  },
+  "expect": {
+    "route": "deep_thought",
+    "intent": "deep_thought_low_confidence",
+    "source": "llm",
+    "task_types_include": ["cognition.delegate_deep_thought", "cognition.deep_think"],
+    "task_types_forbid": ["speech.thinking_ack"],
+    "metadata_false": ["thinking_ack_allowed"],
+    "llm_calls": 1
+  }
+}

@@ -177,9 +177,21 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **425** current `unittest` cases under `tests/`;
+- **439** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
+
+The file-backed behavior scenario runner is implemented for Router and
+InteractionRuntime module checks. It loads one deterministic JSON scenario per
+file from `scenarios/`, evaluates route, speech, skill, confirmation, task, and
+forbidden-output expectations, writes timestamped comparison reports under
+`.chromie/reports/behavior-scenarios/`, and can compare against a previous
+`summary.json` to list regressions and improvements. This is Level A automated
+evidence only and does not create a target, simulator, microphone, speaker, or
+release-readiness claim. Scenario authoring templates and
+`scripts/scenario_author.py` can create draft files, validate the scenario
+library, and print constrained prompts for LLM-assisted candidate generation;
+committed scenarios remain deterministic files reviewed by a human.
 
 The developer-usability CLI through PR6 passed focused CLI tests, documentation
 checks, and the full Level A gate. It currently exposes
@@ -201,7 +213,7 @@ tests, focused Soridormi acceptance tests, focused robot-candidate verifier
 tests, and dependency-complete Orchestrator AgentClient coverage. The latest
 local `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` attempt on 2026-06-27
 installed the declared host test dependencies, passed
-`python scripts/check_docs.py`, ran 425 current `unittest` cases with `OK`, and
+`python scripts/check_docs.py`, ran 439 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions.
 
 The tests alone do not prove GPU performance, microphone quality, speaker

@@ -180,10 +180,11 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
                         },
                         {
                             "source_stage": "deep_thought",
-                            "task_type": "speech.thinking_ack",
+                            "task_type": "cognition.deep_think",
                             "priority": "normal",
                         },
                     ],
+                    "thinking_ack_allowed": False,
                 },
             }
         )
@@ -218,7 +219,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             summary["task_list"],
             [
                 "0:quick_intent:cognition.delegate_deep_thought priority=normal",
-                "1:deep_thought:speech.thinking_ack priority=normal",
+                "1:deep_thought:cognition.deep_think priority=normal",
             ],
         )
         self.assertEqual(summary["skills"], ["soridormi.blink_eyes"])

@@ -77,6 +77,62 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
+    async def test_low_confidence_deep_thought_does_not_schedule_prelude(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+        assistant.order_lock = asyncio.Lock()
+        assistant.synthesis_order = 0
+        assistant.playback_generation = 0
+        assistant.active_synthesis_tasks = set()
+        assistant.playback_start_waiters = {}
+        assistant.tts_text_chunking_enabled = True
+        assistant.tts_chunk_chars = 80
+        assistant.tts_min_chunk_chars = 40
+        assistant.tts_flush_chars = 160
+        seen: list[str] = []
+
+        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
+            self.sessions.log(sid, message, *args)
+
+        async def synthesize_one(
+            self: VoiceAssistant,
+            text: str,
+            order: int,
+            session_id: str | None,
+            generation: int,
+        ) -> None:
+            del order, session_id, generation
+            seen.append(text)
+
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant.synthesize_one = MethodType(synthesize_one, assistant)
+        decision = RouteDecision(
+            route="deep_thought",
+            agents=["deepthinking_agent", "speaker_agent"],
+            intent="deep_thought_low_confidence",
+            language="en-US",
+            metadata={"thinking_ack_allowed": False},
+        )
+
+        scheduled = await assistant._schedule_deep_thought_ack(
+            decision,
+            "Please do it.",
+            session_id,
+        )
+        response = assistant._deep_thought_body_cue_response(
+            decision,
+            "Please do it.",
+        )
+
+        self.assertFalse(scheduled)
+        self.assertEqual(seen, [])
+        self.assertIsNone(response)
+        self.assertEqual(
+            assistant.sessions.state[session_id]["scheduled_tts"],
+            0,
+        )
+
     def test_deep_thought_body_cue_uses_optional_express_attention(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.enable_interaction_response = True

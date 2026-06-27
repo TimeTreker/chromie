@@ -51,12 +51,18 @@ The first ability-backed social loop is the deep-thinking handoff:
 ```text
 User asks for complicated planning
 -> Emergency filter passes because this is not stop/cancel/noise
--> Quick intent router chooses deep_thought or returns low confidence
+-> Quick intent router chooses explicit deep_thought
 -> Chromie executes speech.thinking_ack
 -> Chromie optionally executes social.thinking_pose in simulator-safe mode
 -> Deepthinking agent plans
 -> Chromie speaks the final answer
 ```
+
+Low-confidence routing handoffs do not automatically execute
+`speech.thinking_ack` or `social.thinking_pose`; Chromie should avoid saying
+“let me think” for short operational commands or ambiguous follow-ups. Stop,
+cancel, emergency, silence, and unusable-audio paths stay deterministic and
+bypass this loop.
 
 `social.thinking_pose` resolves to `soridormi.express_attention` only when all
 simulator-safe gates are enabled:

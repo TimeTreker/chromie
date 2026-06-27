@@ -50,6 +50,15 @@ class TextScenarioCase:
 
 DEFAULT_CASES: tuple[TextScenarioCase, ...] = (
     TextScenarioCase(
+        case_id="normal_greeting",
+        text="Hello Chromie, how are you today?",
+        expected_routes=("chat",),
+        expect_no_skills=True,
+        expected_speech_any=("hello", "hi", "here", "listening", "doing"),
+        forbidden_speech_any=("let me think", "thinking about that"),
+        description="Ordinary greeting should stay conversational and not use a thinking filler.",
+    ),
+    TextScenarioCase(
         case_id="false_belief_sun_shape",
         text="I think the sun is not a round sphere, do you think so?",
         expected_routes=("chat", "deep_thought"),
@@ -119,6 +128,22 @@ DEFAULT_CASES: tuple[TextScenarioCase, ...] = (
         description="Ambiguous location reference should ask/decline rather than execute.",
     ),
     TextScenarioCase(
+        case_id="remember_preference",
+        text="Remember that my favorite color is blue.",
+        expected_routes=("memory",),
+        expected_speech_any=("remember", "noted", "got it", "记"),
+        expect_no_skills=True,
+        description="Simple memory request should plan a memory update, not a body action.",
+    ),
+    TextScenarioCase(
+        case_id="weather_check",
+        text="Can you check whether it will rain today?",
+        expected_routes=("tool",),
+        expected_speech_any=("check", "look", "weather", "rain"),
+        expect_no_skills=True,
+        description="Weather query should use the tool lane without robot motion.",
+    ),
+    TextScenarioCase(
         case_id="deep_thought_memory_plan",
         text="Please think carefully and split the work to add long-term memory to Chromie.",
         expected_routes=("deep_thought",),
@@ -133,6 +158,15 @@ DEFAULT_CASES: tuple[TextScenarioCase, ...] = (
         expect_no_skills=True,
         require_speech=False,
         description="Operational stop stays deterministic and emits no Soridormi skill.",
+    ),
+    TextScenarioCase(
+        case_id="polite_stop",
+        text="Could you please stop?",
+        expected_routes=("interrupt",),
+        expect_no_skills=True,
+        forbidden_speech_any=("let me think", "thinking about that"),
+        require_speech=False,
+        description="Polite stop must stay on the deterministic interrupt path.",
     ),
     TextScenarioCase(
         case_id="zh_false_belief_sun_shape",
@@ -453,6 +487,7 @@ def _case_json(case: TextScenarioCase) -> dict[str, Any]:
         "expect_no_skills": case.expect_no_skills,
         "expected_speech_all": list(case.expected_speech_all),
         "expected_speech_any": list(case.expected_speech_any),
+        "forbidden_speech_any": list(case.forbidden_speech_any),
         "forbidden_skills": list(case.forbidden_skills),
         "allow_expressive_cues": case.allow_expressive_cues,
         "require_speech": case.require_speech,

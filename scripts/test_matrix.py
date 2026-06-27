@@ -55,6 +55,17 @@ GROUPS: dict[str, TestGroup] = {
             ),
         ),
     ),
+    "behavior": TestGroup(
+        "File-backed behavior scenarios for Router and InteractionRuntime.",
+        (
+            _unittest(
+                "tests.test_behavior_scenario_runner",
+                "tests.test_behavior_truth_suite",
+                "tests.test_scenario_author",
+            ),
+            (sys.executable, "scripts/scenario_runner.py", "--suite", "router", "--suite", "interaction", "--no-write"),
+        ),
+    ),
     "agent": TestGroup(
         "Agent contracts, native interaction, capability catalog, and conversation state.",
         (
@@ -167,6 +178,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "asr",
         "tts",
         "router",
+        "behavior",
         "agent",
         "skill-runtime",
         "taskgraph",
@@ -180,6 +192,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "asr",
         "tts",
         "router",
+        "behavior",
         "agent",
         "skill-runtime",
         "taskgraph",
@@ -188,7 +201,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "release",
     ),
     "embodiment": ("agent", "skill-runtime", "taskgraph", "soridormi"),
-    "frontend-voice": ("asr", "tts", "router", "agent", "skill-runtime"),
+    "frontend-voice": ("asr", "tts", "router", "behavior", "agent", "skill-runtime"),
 }
 
 

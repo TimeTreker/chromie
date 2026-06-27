@@ -369,6 +369,7 @@ def _deep_thought_from_low_confidence(
             candidate_capabilities=candidates,
             reason="; ".join(reason_parts),
             source="llm",
+            metadata={"thinking_ack_allowed": False},
         ),
         request,
         source="llm",

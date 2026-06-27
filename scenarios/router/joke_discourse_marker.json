@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "joke_discourse_marker",
+  "suite": "router",
+  "level": "module",
+  "description": "Discourse marker 'go ahead' does not become locomotion.",
+  "tags": ["chat", "discourse-marker", "motion-confusion"],
+  "input": {
+    "text": "Go ahead and tell me a short joke about robots."
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": true,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.walk_velocity",
+          "description": "Bounded walking velocity.",
+          "score": 0.9
+        }
+      ]
+    },
+    "llm_decision": {
+      "route": "chat",
+      "agents": [],
+      "intent": "general_conversation",
+      "confidence": 0.91,
+      "language": "en-US",
+      "source": "llm"
+    }
+  },
+  "expect": {
+    "route": "chat",
+    "intent": "general_conversation",
+    "source": "llm",
+    "task_types_include": ["speech.answer"],
+    "task_types_forbid": ["task.execute_skill"],
+    "llm_calls": 1
+  }
+}

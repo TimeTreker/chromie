@@ -47,7 +47,7 @@ ASR and therefore does not prove physical audio-device quality.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 425 current tests and 20 legacy Agent
+At the current working revision this runs 439 current tests and 20 legacy Agent
 tests. It also runs the documentation consistency checker.
 
 If the host Python environment is intentionally minimal, install the declared
@@ -70,6 +70,7 @@ For roadmap-aligned module and combination checks, use:
 ```bash
 python scripts/test_matrix.py --list
 python scripts/test_matrix.py router
+python scripts/test_matrix.py behavior
 python scripts/test_matrix.py asr tts router
 python scripts/test_matrix.py local-modules
 python scripts/test_matrix.py voice-mujoco-alpha
@@ -79,6 +80,34 @@ This runner is a Level A convenience layer over existing tests. It lets modules
 be tested independently or in declared combinations, but it does not replace the
 canonical `./scripts/run_tests.sh` gate and it does not create GPU, microphone,
 MuJoCo, or hardware evidence.
+
+For behavior-quality regression reports, use the file-backed scenario runner:
+
+```bash
+python scripts/scenario_runner.py --suite router --suite interaction
+python scripts/scenario_runner.py --suite router --suite interaction \
+  --baseline .chromie/reports/behavior-scenarios/<previous>/summary.json
+```
+
+The committed fixtures live under [`../scenarios/`](../scenarios/). Each file
+contains one deterministic scenario and expectation set. The runner writes a
+timestamped `summary.json` with pass/fail details and, when a baseline is
+provided, lists regressions, improvements, new cases, and removed cases. These
+reports are Level A automated evidence only; they do not prove live service,
+GPU, microphone, speaker, simulator, or robot behavior.
+
+To grow the scenario library, use the authoring helper:
+
+```bash
+python scripts/scenario_author.py new --suite router --id draft_case \
+  --text "Hello Chromie."
+python scripts/scenario_author.py edit --suite router --id draft_case
+python scripts/scenario_author.py validate-all
+python scripts/scenario_author.py prompt --suite interaction --count 20
+```
+
+The prompt command is for generating reviewed candidate JSON with an LLM; the
+LLM is not used as the pass/fail judge during regression runs.
 
 ## Model-assisted routing guardrails
 

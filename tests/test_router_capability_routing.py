@@ -287,6 +287,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("quick router confidence", decision.reason or "")
         self.assertIn("quick_route=robot_action", decision.reason or "")
         self.assertIn("deepthinking_agent", decision.agents)
+        self.assertFalse(decision.metadata["thinking_ack_allowed"])
         self.assertEqual(
             [item["stage"] for item in decision.metadata["route_stage_outputs"]],
             ["emergency_filter", "quick_intent", "deep_thought"],
@@ -295,7 +296,6 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             [item["task_type"] for item in decision.metadata["task_list"]],
             [
                 "cognition.delegate_deep_thought",
-                "speech.thinking_ack",
                 "cognition.deep_think",
             ],
         )

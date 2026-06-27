@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "normal_greeting",
+  "suite": "router",
+  "level": "module",
+  "description": "Ordinary greeting stays conversational.",
+  "tags": ["chat", "normal"],
+  "input": {
+    "text": "Hello Chromie, how are you today?"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": false
+    },
+    "llm_decision": {
+      "route": "chat",
+      "agents": [],
+      "intent": "general_conversation",
+      "confidence": 0.82,
+      "language": "en-US",
+      "source": "llm"
+    }
+  },
+  "expect": {
+    "route": "chat",
+    "intent": "general_conversation",
+    "source": "llm",
+    "task_types_include": ["speech.answer"],
+    "llm_calls": 1
+  }
+}

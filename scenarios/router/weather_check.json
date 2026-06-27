@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "weather_check",
+  "suite": "router",
+  "level": "module",
+  "description": "Weather question uses the tool lane without robot motion.",
+  "tags": ["tool", "normal"],
+  "input": {
+    "text": "Can you check whether it will rain today?"
+  },
+  "stub": {
+    "router_mode": "rules_only",
+    "catalog": {
+      "matched": false
+    }
+  },
+  "expect": {
+    "route": "tool",
+    "intent": "weather_query",
+    "source": "rules",
+    "task_types_include": ["task.use_tool"],
+    "llm_calls": 0
+  }
+}

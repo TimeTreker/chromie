@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "deep_thought_plan",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Explicit deep-thought request speaks the deepthinking result and no skills.",
+  "tags": ["deep-thought", "planning"],
+  "input": {
+    "text": "Please think deeply and design a test strategy."
+  },
+  "stub": {
+    "route_decision": {
+      "route": "deep_thought",
+      "agents": ["deepthinking_agent", "speaker_agent"],
+      "intent": "deep_thought_planning",
+      "confidence": 0.92,
+      "language": "en-US",
+      "source": "rules",
+      "metadata": {
+        "thinking_ack_allowed": true
+      }
+    },
+    "ollama_reply": "Here is a concise test strategy: start with truth scenarios, then add voice acceptance."
+  },
+  "expect": {
+    "speech_any": ["test strategy", "truth scenarios"],
+    "no_skills": true
+  }
+}

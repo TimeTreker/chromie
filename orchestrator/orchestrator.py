@@ -1175,12 +1175,21 @@ class VoiceAssistant:
             },
         )
 
+    def _deep_thought_prelude_allowed(self, decision: RouteDecision) -> bool:
+        if decision.route != "deep_thought" or not decision.should_speak:
+            return False
+        if decision.intent == "deep_thought_low_confidence":
+            return False
+        if (decision.metadata or {}).get("thinking_ack_allowed") is False:
+            return False
+        return True
+
     def _deep_thought_ack_text(
         self,
         decision: RouteDecision,
         user_text: str,
     ) -> str | None:
-        if decision.route != "deep_thought" or not decision.should_speak:
+        if not self._deep_thought_prelude_allowed(decision):
             return None
         if decision.speak_first:
             return decision.speak_first.strip() or None
@@ -1233,7 +1242,7 @@ class VoiceAssistant:
         decision: RouteDecision,
         user_text: str,
     ) -> InteractionResponse | None:
-        if decision.route != "deep_thought":
+        if not self._deep_thought_prelude_allowed(decision):
             return None
         abilities = self._ability_registry()
         ability = abilities.get("social.thinking_pose")

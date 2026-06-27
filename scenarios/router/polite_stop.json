@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "polite_stop",
+  "suite": "router",
+  "level": "module",
+  "description": "Polite stop stays on the deterministic interrupt path.",
+  "tags": ["interrupt", "safety", "polite"],
+  "input": {
+    "text": "Could you please stop?"
+  },
+  "stub": {
+    "router_mode": "hybrid"
+  },
+  "expect": {
+    "route": "interrupt",
+    "intent": "stop_current_output",
+    "source": "rules",
+    "task_types_include": ["task.cancel_current_action", "body.stop_motion"],
+    "llm_calls": 0,
+    "interrupt_current": true,
+    "should_speak": false
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "$id",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "$description",
+  "tags": ["draft"],
+  "input": {
+    "text": "$text"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "general_conversation",
+      "confidence": 0.8,
+      "language": "en-US",
+      "source": "llm"
+    },
+    "ollama_reply": "Hello, I am here and listening."
+  },
+  "expect": {
+    "speech_any": ["hello", "listening"],
+    "forbidden_speech_any": ["let me think"],
+    "forbidden_skills": ["soridormi.walk_velocity"],
+    "no_skills": true
+  }
+}

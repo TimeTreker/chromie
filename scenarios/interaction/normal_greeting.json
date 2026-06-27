@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "normal_greeting",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Greeting produces friendly speech and no skills.",
+  "tags": ["chat", "normal", "speech"],
+  "input": {
+    "text": "Hello Chromie, how are you today?"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "general_conversation",
+      "confidence": 0.82,
+      "language": "en-US",
+      "source": "llm"
+    },
+    "ollama_reply": "Hello, I am here and listening."
+  },
+  "expect": {
+    "speech_any": ["hello", "listening"],
+    "forbidden_speech_any": ["let me think"],
+    "no_skills": true
+  }
+}
