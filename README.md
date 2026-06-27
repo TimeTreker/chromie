@@ -96,6 +96,8 @@ either generated file directly.
 
 For complete setup, model warming, audio configuration, health checks, and
 recovery, use the [Operations Runbook](CHROMIE_RUNBOOK.md).
+For fresh-machine bootstrap, use [Chromie Deployment](docs/DEPLOYMENT.md) and
+`./scripts/deploy_chromie.sh`.
 
 ## Deployment modes
 

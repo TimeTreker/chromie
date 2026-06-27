@@ -76,6 +76,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 ## Operations and release
 
 - [Bilingual OuteTTS Speaker Guide](../CHROMIE_BILINGUAL_SPEAKER_GUIDE.md)
+- [Deployment](DEPLOYMENT.md)
 - [Voice-to-MuJoCo Quick Start (Chinese)](VOICE_MUJOCO_QUICKSTART.zh-CN.md)
 - [User Manual](USER_MANUAL.md)
 - [Project Handoff](HANDOFF.md)
