@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from typing import Any, cast
 
@@ -175,7 +176,8 @@ class DeepThinkingAgent(BaseAgent):
         options = {
             "temperature": 0.25,
             "top_p": 0.9,
-            "num_predict": 384,
+            "num_ctx": int(os.getenv("AGENT_DEEPTHINKING_NUM_CTX", "8192")),
+            "num_predict": int(os.getenv("AGENT_DEEPTHINKING_NUM_PREDICT", "384")),
             "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
         }
         raw = await self.services.ollama.generate(
@@ -192,7 +194,15 @@ class DeepThinkingAgent(BaseAgent):
             zh=zh,
             options=options,
         )
-        return self._clean_response(response, zh=zh)
+        response = self._clean_response(response, zh=zh)
+        if not self.is_playable_spoken_response(response, zh=zh):
+            logger.warning(
+                "deepthinking_agent_invalid_spoken_response sid=%s response=%r",
+                request.sid,
+                response,
+            )
+            return self.invalid_spoken_response_fallback(zh=zh)
+        return response
 
     def _add_spoken_response(self, result: AgentResult, response: str) -> None:
         for chunk in self._split_spoken_response(response):

@@ -257,7 +257,7 @@ class OllamaLLMRouter:
             return reviewed_decision
         return decision
 
-    async def _review_deterministic_only_decision(
+    async def _recover_deterministic_only_decision(
         self,
         request: RouteRequest,
         decision: RouteDecision,
@@ -266,43 +266,11 @@ class OllamaLLMRouter:
             f"quick router returned deterministic-only route {decision.route} "
             "after deterministic emergency/noise filter did not match"
         )
-        if not self.review_model:
-            return self._low_confidence_deep_thought_decision(
-                request,
-                decision,
-                reason_prefix=reason_prefix,
-            )
-
-        try:
-            reviewed = await self._chat(self.build_intent_review_payload(request))
-            reviewed_decision = self._decision_from_response(request, reviewed)
-        except Exception as exc:
-            logger.warning("LLM review model deterministic-route check failed: %s", exc)
-            return self._low_confidence_deep_thought_decision(
-                request,
-                decision,
-                reason_prefix=reason_prefix,
-            )
-
-        if reviewed_decision.route in DETERMINISTIC_ONLY_ROUTES:
-            return self._low_confidence_deep_thought_decision(
-                request,
-                reviewed_decision,
-                reason_prefix=(
-                    f"{reason_prefix}; review_model:{self.review_model} "
-                    f"also returned deterministic-only route {reviewed_decision.route}"
-                ),
-            )
-
-        reviewed_decision.reason = (
-            f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-        ) + f"review_model:{self.review_model} corrected deterministic-only quick route {decision.route}"
         logger.info(
-            "LLM review model changed deterministic-only route %s to %s",
+            "LLM router returned invalid deterministic-only route %s after priority filter; using safe chat fallback",
             decision.route,
-            reviewed_decision.route,
         )
-        return reviewed_decision
+        return fallback_decision(request, reason=reason_prefix)
 
     def _low_confidence_deep_thought_decision(
         self,
@@ -368,6 +336,6 @@ class OllamaLLMRouter:
         decision = await self._review_route_only_robot_action(request, decision)
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:
-            return await self._review_deterministic_only_decision(request, decision)
+            return await self._recover_deterministic_only_decision(request, decision)
 
         return decision

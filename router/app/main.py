@@ -325,14 +325,12 @@ def _recover_invalid_operational_llm_decision(
     result: CapabilityCatalogResult,
 ) -> RouteDecision:
     del result
-    reason_prefix = (
-        f"quick router returned deterministic-only route {decision.route}; "
-        "emergency filter did not match"
-    )
-    return _deep_thought_from_low_confidence(
+    return fallback_decision(
         request,
-        decision,
-        reason_prefix=reason_prefix,
+        reason=(
+            f"quick router returned deterministic-only route {decision.route}; "
+            "emergency filter did not match"
+        ),
     )
 
 

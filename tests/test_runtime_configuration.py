@@ -48,6 +48,13 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_CAPABILITY_NUM_CTX"], "4096")
         self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "512")
 
+    def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
+        values = _common_env()
+        self.assertEqual(values["AGENT_CONVERSATION_NUM_CTX"], "4096")
+        self.assertEqual(values["AGENT_CONVERSATION_NUM_PREDICT"], "128")
+        self.assertEqual(values["AGENT_DEEPTHINKING_NUM_CTX"], "8192")
+        self.assertEqual(values["AGENT_DEEPTHINKING_NUM_PREDICT"], "384")
+
     def test_orchestrator_warms_router_and_agent_models_when_router_llm_enabled(self) -> None:
         source = (ROOT / "scripts" / "start_orchestrator.sh").read_text(
             encoding="utf-8"

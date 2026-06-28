@@ -44,12 +44,10 @@ meaningful can execute. See
 [`../docs/MODEL_ASSISTED_ROUTING_GUARDRAILS.md`](../docs/MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
 If the quick model returns a deterministic-only route such as `interrupt` or
 `ignore` after the emergency filter has already passed, Router treats that as a
-model mistake. Clear robot body commands with executable catalog candidates are
-recovered as `robot_action` for Agent capability planning; other invalid
-operational routes are delegated to `deep_thought` or clarification instead of
-interrupting the current task. If the quick model delegates an obvious
-executable body command to `deep_thought`, Router also recovers that request to
-catalog-bounded `robot_action`.
+model mistake and falls back to safe chat instead of stopping, ignoring,
+executing catalog motion, or delegating to slow deep thought. If the quick model
+delegates an obvious executable body command to `deep_thought`, Router may still
+recover that request to catalog-bounded `robot_action`.
 
 The Router has three decision stages. Only the first stage may use phrase rules
 to determine a route:

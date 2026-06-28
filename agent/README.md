@@ -91,6 +91,10 @@ Risk-bearing behavior is default-off.
 | `AGENT_RESPONSE_REVIEW_ENABLED` | `1` | Use a model critic to accept or rewrite spoken replies that fail the user request or Chromie persona. |
 | `AGENT_RESPONSE_REVIEW_MODEL` | `qwen3:0.6b` | Fast semantic reviewer model; the main `AGENT_MODEL` still writes the primary answer. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
+| `AGENT_CONVERSATION_NUM_CTX` | `4096` | Context window for normal conversation prompts. |
+| `AGENT_CONVERSATION_NUM_PREDICT` | `128` | Output budget for normal conversation replies. |
+| `AGENT_DEEPTHINKING_NUM_CTX` | `8192` | Context window for deep-thinking prompts with session memory. |
+| `AGENT_DEEPTHINKING_NUM_PREDICT` | `384` | Output budget for deep-thinking replies. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named skills while keeping the last known-good catalog. |

@@ -62,6 +62,8 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("not as a large language model", ollama.calls[0]["prompt"])
         self.assertIn("never say you are a large language model", ollama.calls[0]["system"])
         self.assertIn("trained by Google", ollama.calls[0]["system"])
+        self.assertEqual(ollama.calls[0]["options"]["num_ctx"], 4096)
+        self.assertEqual(ollama.calls[0]["options"]["num_predict"], 128)
 
     async def test_identity_age_question_uses_robot_persona_boundary(self) -> None:
         ollama = _CapturingOllama("I'm 6 years old as Chromie the AI robot.")

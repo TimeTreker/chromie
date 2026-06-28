@@ -70,6 +70,30 @@ class ComposeConfigurationTests(unittest.TestCase):
             agent_block,
         )
 
+    def test_agent_service_passes_conversation_and_deepthinking_budgets(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        agent_block = compose.split("  chromie-agent:", 1)[1].split(
+            "\nnetworks:",
+            1,
+        )[0]
+
+        self.assertIn(
+            "AGENT_CONVERSATION_NUM_CTX: ${AGENT_CONVERSATION_NUM_CTX:-4096}",
+            agent_block,
+        )
+        self.assertIn(
+            "AGENT_CONVERSATION_NUM_PREDICT: ${AGENT_CONVERSATION_NUM_PREDICT:-128}",
+            agent_block,
+        )
+        self.assertIn(
+            "AGENT_DEEPTHINKING_NUM_CTX: ${AGENT_DEEPTHINKING_NUM_CTX:-8192}",
+            agent_block,
+        )
+        self.assertIn(
+            "AGENT_DEEPTHINKING_NUM_PREDICT: ${AGENT_DEEPTHINKING_NUM_PREDICT:-384}",
+            agent_block,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

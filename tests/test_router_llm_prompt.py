@@ -219,7 +219,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.confidence, 0.0)
         self.assertNotEqual(decision.intent, "deep_thought_low_confidence")
 
-    async def test_llm_interrupt_output_degrades_to_deep_thought_without_review_model(self) -> None:
+    async def test_llm_interrupt_output_falls_back_to_chat(self) -> None:
         class InterruptRouter(OllamaLLMRouter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
@@ -252,13 +252,15 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         decision = await router.route(request)
 
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_low_confidence")
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
         self.assertFalse(decision.interrupt_current)
         self.assertTrue(decision.needs_agent)
+        self.assertIn("conversation_agent", decision.agents)
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
 
-    async def test_review_model_corrects_invalid_interrupt_to_chat(self) -> None:
+    async def test_deterministic_only_llm_mistake_skips_review_model(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
             def __init__(self) -> None:
                 super().__init__(
@@ -286,13 +288,11 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         router = ReviewRouter()
         decision = await router.route(RouteRequest(text="What's your name?"))
 
+        self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "identity_question")
-        self.assertIn("corrected deterministic-only quick route interrupt", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
-        review_system = router.payloads[1]["messages"][0]["content"]
-        self.assertIn("deterministic emergency/noise filter has already run", review_system)
-        self.assertIn("Identity, name, age", review_system)
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertIn("deterministic-only route interrupt", decision.reason or "")
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model"])
 
     async def test_review_model_overrides_underspecified_robot_action(self) -> None:
         class ReviewRouter(OllamaLLMRouter):

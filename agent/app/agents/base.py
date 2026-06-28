@@ -93,6 +93,7 @@ class BaseAgent(ABC):
             review_system = (
                 "你是 Chromie 的语义回答质检器。只判断含义，不使用关键词规则。"
                 "如果候选回答自然、直接、符合上下文，并且像 Chromie 机器人本人在说话，就接受。"
+                "如果候选回答为空、只有一个不完整词、明显被截断，或不能作为语音完整播放，请改写。"
                 "如果候选回答只是空泛承诺、没有真正完成用户请求、忽略了已给出的上下文、"
                 "把 Chromie 说成后端模型，或用模型模板拒答，请改写成一条可播放的最终回答。"
                 "如果候选回答主要是在复述、转述或引用用户刚才的话，而不是直接回答，"
@@ -111,6 +112,8 @@ class BaseAgent(ABC):
                 "You are Chromie's semantic spoken-response reviewer. Judge meaning, not keyword rules. "
                 "Accept the candidate when it naturally answers the user, asks a necessary clarification, "
                 "uses the supplied context, and speaks as Chromie the robot herself. "
+                "Revise the candidate when it is empty, only one incomplete word, visibly truncated, "
+                "or too fragmentary to play as speech. "
                 "Revise the candidate when it is an empty promise, fails to actually perform a harmless requested "
                 "creative response, ignores available context, describes Chromie as a backend/model/provider, "
                 "uses a model-style refusal where Chromie should answer normally, or mainly repeats, quotes, "
@@ -200,10 +203,24 @@ class BaseAgent(ABC):
             f"Original task prompt: {agent_prompt}\n"
             f"Candidate spoken response: {response}\n\n"
             "Decide whether the candidate can be spoken now. "
+            "A one-word fragment such as only 'I' is not speakable and must be revised. "
             "Normally Chromie should not repeat, quote, or paraphrase the user's current words; allow that only for confirmation, clarification, or an explicit read-back request. "
             "Return JSON: {\"decision\":\"accept|revise\",\"reason\":\"short reason\","
             "\"spoken_response\":\"empty when accepted; final corrected spoken answer when revised\"}."
         )
+
+    def is_playable_spoken_response(self, response: str, *, zh: bool) -> bool:
+        text = " ".join((response or "").strip().split())
+        if len(text) < 2:
+            return False
+        if not any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in text):
+            return False
+        return True
+
+    def invalid_spoken_response_fallback(self, *, zh: bool) -> str:
+        if zh:
+            return "我刚才组织回答时卡住了，请你再说一次。"
+        return "I got stuck forming that answer. Please say it again."
 
     def _task_context_from_request(self, request: AgentRunRequest) -> dict[str, Any] | None:
         context = request.context or {}

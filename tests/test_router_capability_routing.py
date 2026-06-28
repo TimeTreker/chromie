@@ -623,25 +623,21 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.source, "llm")
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_low_confidence")
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
         self.assertFalse(decision.interrupt_current)
         self.assertTrue(decision.needs_agent)
-        self.assertIn("deepthinking_agent", decision.agents)
+        self.assertIn("conversation_agent", decision.agents)
         self.assertIn("speaker_agent", decision.agents)
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
         self.assertEqual(
             [item["stage"] for item in decision.metadata["route_stage_outputs"]],
-            ["emergency_filter", "quick_intent", "deep_thought"],
+            ["emergency_filter", "quick_intent"],
         )
         self.assertEqual(
             [item["task_type"] for item in decision.metadata["task_list"]],
-            ["cognition.delegate_deep_thought", "cognition.deep_think"],
-        )
-        self.assertEqual(
-            [item["capability_id"] for item in decision.candidate_capabilities],
-            ["soridormi.walk_velocity", "soridormi.blink_eyes"],
+            ["speech.answer"],
         )
 
     async def test_invalid_interrupt_recovery_does_not_use_catalog_for_discourse_marker(self) -> None:
@@ -681,14 +677,14 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(main, "llm_router", llm_router):
             decision = await main.route(RouteRequest(text="Go ahead and sing a song for me."))
 
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_low_confidence")
-        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertEqual(decision.source, "fallback")
         self.assertFalse(decision.interrupt_current)
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
         self.assertEqual(
             [item["task_type"] for item in decision.metadata["task_list"]],
-            ["cognition.delegate_deep_thought", "cognition.deep_think"],
+            ["speech.answer"],
         )
 
     async def test_invalid_interrupt_recovery_does_not_use_catalog_for_appearance_statement(self) -> None:
@@ -729,16 +725,16 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision = await main.route(RouteRequest(text="You look beautiful, don't you?"))
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_low_confidence")
-        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertEqual(decision.source, "fallback")
         self.assertFalse(decision.interrupt_current)
-        self.assertIn("deepthinking_agent", decision.agents)
+        self.assertIn("conversation_agent", decision.agents)
         self.assertIn("speaker_agent", decision.agents)
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
         self.assertEqual(
             [item["task_type"] for item in decision.metadata["task_list"]],
-            ["cognition.delegate_deep_thought", "cognition.deep_think"],
+            ["speech.answer"],
         )
 
     async def test_hybrid_router_does_not_synthesize_actions_with_semantic_parser(self) -> None:

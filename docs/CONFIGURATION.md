@@ -213,6 +213,10 @@ strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 | `AGENT_RESPONSE_REVIEW_MODEL` | Fast Ollama model used to accept or rewrite weak spoken replies; default `qwen3:0.6b`. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | Timeout for the semantic response-review model call; default `4000`. |
 | `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `220`, matching `TTS_MAX_TEXT_CHARS`. |
+| `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; default `4096`. |
+| `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; default `128`. |
+| `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
+| `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `sim_only`; appends simulator-bounded cues such as `soridormi.express_attention` for chat-only speech when the live catalog exposes those skills. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories inside the Agent container. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |

@@ -70,6 +70,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Mind principles, long-term goals, and experience boundaries", call["prompt"])
         self.assertIn("owner-approved", call["prompt"])
         self.assertIn("design session memory", call["prompt"])
+        self.assertEqual(call["options"]["num_ctx"], 8192)
         self.assertEqual(call["options"]["num_predict"], 384)
 
     async def test_conversation_agent_is_not_required_for_deep_thought(self) -> None:
@@ -241,6 +242,48 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(ollama.calls), 2)
         self.assertIn("Tell the user a joke.", ollama.calls[1]["prompt"])
+
+    async def test_truncated_one_character_response_is_replaced_before_tts(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I",
+                {
+                    "decision": "accept",
+                    "reason": "bad reviewer accepted a fragment",
+                    "spoken_response": "",
+                },
+            ]
+        )
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-truncated-output-test",
+                "text": "Can you walk forward for 15 minutes?",
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "deep_thought_low_confidence",
+                    "confidence": 0.0,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "I got stuck forming that answer. Please say it again.",
+        )
+        self.assertEqual(len(ollama.calls), 2)
 
 
 if __name__ == "__main__":

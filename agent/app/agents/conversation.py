@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import json
+import os
 import time
 from typing import Any, cast
 
@@ -204,7 +205,8 @@ class ConversationAgent(BaseAgent):
         options = {
             "temperature": 0.35,
             "top_p": 0.9,
-            "num_predict": 96,
+            "num_ctx": int(os.getenv("AGENT_CONVERSATION_NUM_CTX", "4096")),
+            "num_predict": int(os.getenv("AGENT_CONVERSATION_NUM_PREDICT", "128")),
             "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
         }
         raw = await self.services.ollama.generate(
@@ -221,7 +223,15 @@ class ConversationAgent(BaseAgent):
             zh=zh,
             options=options,
         )
-        return self._clean_response(response, zh=zh)
+        response = self._clean_response(response, zh=zh)
+        if not self.is_playable_spoken_response(response, zh=zh):
+            logger.warning(
+                "conversation_agent_invalid_spoken_response sid=%s response=%r",
+                request.sid,
+                response,
+            )
+            return self.invalid_spoken_response_fallback(zh=zh)
+        return response
 
     def _add_spoken_response(self, result: AgentResult, response: str) -> None:
         for chunk in self._split_spoken_response(response):
