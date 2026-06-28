@@ -139,7 +139,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Use semantic generalization", system)
         self.assertIn("do not turn prompt wording into keyword rules", system)
         self.assertIn("deterministic emergency/noise filter", system)
-        self.assertIn("pragmatically a polite request", system)
+        self.assertIn("pragmatically asking Chromie", system)
         self.assertIn("Candidate capabilities JSON", user)
         self.assertIn("soridormi.shake_no", user)
         self.assertIn("capability:<exact capability_id>", system)
@@ -384,6 +384,74 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "robot_action")
         self.assertIn("review_model:review-model recovered", decision.reason or "")
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+
+    async def test_review_model_repairs_walk_command_misclassified_as_interrupt(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"robot_action","intent":"robot_action",'
+                                '"confidence":0.95,"reason":"walking request"}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"interrupt","intent":"interrupt",'
+                            '"confidence":0.0,"reason":"interrupted"}'
+                        )
+                    }
+                }
+
+        router = ReviewRouter()
+        request = RouteRequest(
+            text="Okay, please walk ahead for a few seconds. Please. Quickly.",
+            language="en-US",
+            context={
+                "candidate_capabilities": [
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "description": "Human-facing wrapper for natural requests like walk forward, walk slowly, and walk quickly.",
+                        "interaction_executable": True,
+                        "available": True,
+                        "effects": ["physical_motion"],
+                        "route": "robot_action",
+                        "score": 0.38,
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "speed": {"type": "string", "enum": ["slow", "normal", "quick"]},
+                                "duration_s": {"type": "number"},
+                            },
+                        },
+                    }
+                ]
+            },
+        )
+
+        decision = await router.route(request)
+        review_user = router.payloads[1]["messages"][1]["content"]
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "robot_action")
+        self.assertIn("review_model:review-model recovered", decision.reason or "")
+        self.assertIn("soridormi.walk_forward", review_user)
+        self.assertNotIn("input_schema", review_user)
 
     async def test_review_failure_does_not_recover_invalid_interrupt_from_catalog_candidate(self) -> None:
         class ReviewFailureRouter(OllamaLLMRouter):

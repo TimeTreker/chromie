@@ -184,6 +184,7 @@ class CapabilityAgent(BaseAgent):
         selected = 0
         selected_requests: list[SkillRequest] = []
         selected_matches: list[Any] = []
+        seen_requests: set[tuple[str, str]] = set()
         for item in plan.skills:
             match = allowed.get(item.skill_id)
             if match is None:
@@ -208,6 +209,11 @@ class CapabilityAgent(BaseAgent):
                     f"LLM capability args failed schema validation for {item.skill_id}: {arg_errors}",
                 )
                 return result
+            dedupe_key = (item.skill_id, self._canonical_args_key(args))
+            if dedupe_key in seen_requests:
+                self.trace(result, f"deduped repeated capability request: {item.skill_id}")
+                continue
+            seen_requests.add(dedupe_key)
             metadata = {
                 "source": "capability_catalog",
                 "catalog_version": search.catalog_version,
@@ -241,7 +247,7 @@ class CapabilityAgent(BaseAgent):
         result.metadata["capability_handled"] = True
         result.metadata["capability_catalog_version"] = search.catalog_version
         result.metadata["capability_selected"] = [
-            item.skill_id for item in plan.skills if item.skill_id in allowed
+            item.skill_id for item in selected_requests
         ]
         self.trace(result, f"selected {selected} catalog capability request(s)")
         return result
@@ -427,6 +433,18 @@ class CapabilityAgent(BaseAgent):
         if isinstance(score, (int, float)) and not isinstance(score, bool):
             return float(score)
         return None
+
+    @staticmethod
+    def _canonical_args_key(args: dict[str, Any]) -> str:
+        try:
+            return json.dumps(
+                args,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        except TypeError:
+            return repr(sorted(args.items()))
 
     def _invalid_args_speech(self, request: AgentRunRequest) -> str:
         if self.is_zh(request):

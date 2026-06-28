@@ -58,6 +58,30 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     return value
 
 
+def _compact_candidate_capabilities(candidates: Any, *, limit: int = 8) -> list[dict[str, Any]]:
+    if not isinstance(candidates, list):
+        return []
+    compact: list[dict[str, Any]] = []
+    for item in candidates[:limit]:
+        if not isinstance(item, dict):
+            continue
+        description = " ".join(str(item.get("description") or "").split())
+        if len(description) > 160:
+            description = description[:160].rstrip() + "..."
+        compact.append(
+            {
+                "capability_id": str(item.get("capability_id") or ""),
+                "route": str(item.get("route") or ""),
+                "interaction_executable": bool(item.get("interaction_executable")),
+                "available": item.get("available") is not False,
+                "effects": list(item.get("effects") or [])[:4],
+                "score": item.get("score"),
+                "description": description,
+            }
+        )
+    return compact
+
+
 class OllamaLLMRouter:
     def __init__(
         self,
@@ -187,7 +211,7 @@ class OllamaLLMRouter:
 
     def build_intent_review_payload(self, request: RouteRequest) -> dict[str, Any]:
         candidates_json = json.dumps(
-            request.context.get("candidate_capabilities", []),
+            _compact_candidate_capabilities(request.context.get("candidate_capabilities", [])),
             ensure_ascii=False,
             separators=(",", ":"),
         )
@@ -200,26 +224,24 @@ class OllamaLLMRouter:
                 {
                     "role": "system",
                     "content": (
-                        "Classify the user intent for a realtime robot voice assistant. "
-                        "Use semantic generalization from the whole text and context; "
-                        "do not turn prompt wording into keyword rules. "
-                        "The deterministic emergency/noise filter has already run before "
-                        "this review. Do not choose interrupt or ignore unless the text is "
-                        "plainly an emergency, stop, cancel, silence, empty, or unusable-audio request. "
-                        "Return only one JSON object with route exactly one of: chat, "
-                        "deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
-                        "Identity, name, age, self-description, and robot-status questions are chat "
-                        "unless the user explicitly asks for a physical body action or external tool. "
-                        "When a capability question is pragmatically a polite request for Chromie to perform "
-                        "a listed body/head motion, choose robot_action rather than chat. "
-                        "Use the supplied candidate capabilities when available; if an interaction-executable candidate clearly matches, "
-                        "set intent to capability:<exact capability_id>. "
-                        "Creative speech-only requests like singing, stories, jokes, "
-                        "or talking are chat unless physical robot body/head motion is "
-                        "explicitly requested. Body commands such as walk, look, nod, "
-                        "blink, turn, and move are robot_action, not interrupt. The "
-                        "phrase 'go ahead' is permission, not walking. Compliments such "
-                        "as 'you look beautiful' are chat, not gaze control."
+                        "Classify intent for Chromie, a realtime robot. Return JSON only "
+                        "with keys route, intent, confidence, and optional reason. Valid "
+                        "routes: chat, deep_thought, robot_action, tool, memory, clarify, "
+                        "interrupt, ignore. The deterministic emergency/noise filter "
+                        "already passed before this review. Do not choose interrupt or "
+                        "ignore unless the text is plainly stop, cancel, silence, empty, "
+                        "or unusable audio. Body/head/pose/motion requests are "
+                        "robot_action when an available interaction_executable candidate "
+                        "can satisfy them. Capability questions can be polite requests; "
+                        "if the user is pragmatically asking Chromie to perform a listed "
+                        "physical action now, choose robot_action. Identity, status, "
+                        "factual, greeting, joke, story, song, and other speech-only "
+                        "requests are chat unless physical motion is explicitly requested. "
+                        "Use semantic generalization from meaning and the supplied "
+                        "candidate capability descriptions; do not use phrase rules, and "
+                        "do not turn prompt wording into keyword rules. If selecting a known "
+                        "candidate, set intent to capability:<exact capability_id>; "
+                        "otherwise use a short semantic intent such as robot_action."
                     ),
                 },
                 {

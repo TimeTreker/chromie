@@ -280,6 +280,26 @@ class _AdverbSpeedOllama:
         }
 
 
+class _DuplicateWalkOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "soridormi.walk_forward" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "Walking forward.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0, "speed": "quick"},
+                },
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"speed": "quick", "duration_s": 1.0},
+                },
+            ],
+        }
+
+
 class _FullApiOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "Available capability API surface" in prompt
@@ -450,6 +470,39 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
         self.assertEqual(response.skills[0].args["speed"], "quick")
         self.assertTrue(response.skills[0].metadata["schema_normalized_args"])
+
+    async def test_capability_plan_dedupes_identical_llm_skill_requests(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_DuplicateWalkOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "duplicate-walk",
+                "text": "Okay, please walk ahead for a few seconds. Please. Quickly.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.95,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(response.skills[0].args, {"duration_s": 1.0, "speed": "quick"})
+        self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
+        self.assertEqual(response.speech[0].text, "Walking forward for 1 second.")
 
     async def test_polite_chinese_head_ability_question_executes_matching_skill(self) -> None:
         runtime = InteractionRuntime(
