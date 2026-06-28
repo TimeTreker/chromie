@@ -145,6 +145,8 @@ class _Ollama:
         system = str(kwargs["system"])
         assert "Only execute a skill when" in system
         assert "Never combine an unrelated spoken answer with a body skill" in system
+        assert "Generalization-first principle" in system
+        assert "examples are guidance, not phrase rules" in system
         return {
             "decision": "execute",
             "speech": "Walking ahead for 10 minutes.",

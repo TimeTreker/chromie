@@ -83,21 +83,26 @@ future production robot backend.
 
 1. **High-level contracts stay stable.** Simulation and physical providers
    should implement the same named-skill and result semantics.
-2. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
+2. **Generalization comes from models and contracts.** Normal conversation,
+   memory, tool, robot-action, capability-selection, and deep-thought behavior
+   should be understood from language meaning, bounded context, capability
+   descriptions, schemas, and task memory. Do not implement normal robot
+   functions as brittle phrase or regex rule lists to pass individual cases.
+3. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
    or unconfirmed work does not execute.
-3. **Operational controls stay deterministic.** Stop, cancel, emergency,
+4. **Operational controls stay deterministic.** Stop, cancel, emergency,
    silence, and unusable-audio paths do not depend on model judgment.
-4. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
+5. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
    the deterministic operational filter. Normal conversation, tool, memory,
    robot-action, and deep-thought intent should come from bounded model
    understanding, catalog constraints, or clarification.
-5. **Simulation precedes hardware.** Logical closure, failure handling, and
+6. **Simulation precedes hardware.** Logical closure, failure handling, and
    recovery are proven in simulation before physical commissioning.
-6. **Evidence is part of the product.** Implemented, automatically verified,
+7. **Evidence is part of the product.** Implemented, automatically verified,
    target validated, and release ready are separate states.
-7. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
+8. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
    supervised multi-skill, and broader autonomy are distinct gates.
-8. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
+9. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
    timing, and recovery causes remain inspectable.
 
 ## Non-goals

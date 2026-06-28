@@ -165,9 +165,18 @@ class CapabilityAgent(BaseAgent):
         plan = await self._plan(request, executable)
         allowed = {match.capability_id: match for match in executable}
         if plan.decision != "execute":
-            if plan.speech:
-                result.add_speak_immediate(plan.speech, style="brief")
-            result.metadata["capability_handled"] = True
+            speech = self._natural_plan_speech(plan.speech)
+            if speech:
+                result.add_speak_immediate(speech, style="brief")
+                result.metadata["capability_handled"] = True
+            elif plan.decision == "unsupported" and "conversation_agent" in request.route_decision.agents:
+                result.metadata["capability_handled"] = False
+            else:
+                result.add_speak_immediate(
+                    self._unsupported_action_speech(request),
+                    style="brief",
+                )
+                result.metadata["capability_handled"] = True
             result.metadata["capability_decision"] = plan.decision
             self.trace(result, f"capability decision={plan.decision}")
             return result
@@ -312,8 +321,11 @@ class CapabilityAgent(BaseAgent):
         candidate_payload = [self._capability_payload(match) for match in candidates]
         system = (
             "You are Chromie's capability selection agent. Select only exact skill_id values from the provided candidates. "
+            "Generalization-first principle: infer the user's desired physical/tool action from meaning, context, capability descriptions, and input_schema; examples are guidance, not phrase rules. "
             "Never invent a skill. Never output raw joint, motor, actuator, position-array, or torque controls. "
             "Return JSON only with keys decision, speech, and skills. decision is execute, clarify, or unsupported. "
+            "The speech field is spoken aloud. Never put status labels such as unsupported, clarify, execute, null, or none in speech. "
+            "For unsupported, either leave speech empty so conversation_agent can answer, or give one natural sentence explaining the safe limitation. "
             "For execute, every skills item must contain skill_id and args satisfying that candidate's input_schema. "
             "Schema obedience is more important than copying the user's words. "
             "Every enum argument must be copied exactly from that field's enum list in input_schema. "
@@ -420,6 +432,21 @@ class CapabilityAgent(BaseAgent):
         if self.is_zh(request):
             return "这个动作参数不够明确，请再说一次。"
         return "Please clarify the action before I move."
+
+    def _unsupported_action_speech(self, request: AgentRunRequest) -> str:
+        if self.is_zh(request):
+            return "我不能把这句话安全地对应到可用动作，请换一种说法。"
+        return "I cannot safely map that to an available action. Please say it another way."
+
+    @staticmethod
+    def _natural_plan_speech(value: str) -> str:
+        text = " ".join((value or "").strip().split())
+        if not text:
+            return ""
+        label = text.strip(" .!?:;，。！？：；").lower().replace("-", "_")
+        if label in {"unsupported", "not_supported", "clarify", "execute", "none", "null", "n/a", "na"}:
+            return ""
+        return text
 
     def _capability_search_text(self, request: AgentRunRequest) -> str:
         parts = [" ".join((request.text or "").split())]

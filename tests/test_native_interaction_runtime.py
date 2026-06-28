@@ -81,6 +81,40 @@ class _ChatOllama:
         return "I am listening."
 
 
+class _JokeWalkIdentityOllama:
+    def __init__(self) -> None:
+        self.spoken_calls = 0
+
+    async def generate(self, prompt: str, **kwargs: Any) -> Any:
+        del prompt
+        if kwargs.get("response_format") == "json":
+            return {
+                "decision": "execute",
+                "speech": "",
+                "skills": [
+                    {
+                        "skill_id": "soridormi.walk_velocity",
+                        "args": {"vx_mps": 0.2, "duration_s": 15.0},
+                    }
+                ],
+            }
+        self.spoken_calls += 1
+        if self.spoken_calls == 1:
+            return "Hello. Why did the robot tell jokes? To keep the room charged."
+        return "I'm Chromie, a 6-year-old AI robot."
+
+
+class _UnsupportedStatusThenChatOllama:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    async def generate(self, prompt: str, **kwargs: Any) -> Any:
+        self.calls.append({"prompt": prompt, **kwargs})
+        if kwargs.get("response_format") == "json":
+            return {"decision": "unsupported", "speech": "unsupported", "skills": []}
+        return "Yes, that joke was pretty silly."
+
+
 class _WeakAgreementCatalog:
     async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
         del kwargs
@@ -228,6 +262,47 @@ class _WalkCatalog:
                     requires_confirmation=True,
                     route="robot_action",
                     score=0.5,
+                    metadata={"mode": "sim"},
+                )
+            ],
+        )
+
+
+class _JokeWalkIdentityCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del kwargs
+        normalized = " ".join((text or "").lower().split())
+        strong_walk = "walk forward" in normalized
+        return CapabilitySearchResult(
+            query=text,
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=15,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.walk_velocity",
+                    agent_id="soridormi.skill",
+                    description="Track a bounded body velocity command.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "vx_mps": {"type": "number", "minimum": -0.2, "maximum": 0.2},
+                            "duration_s": {"type": "number", "minimum": 0.1, "maximum": 20.0},
+                        },
+                        "required": ["vx_mps", "duration_s"],
+                        "additionalProperties": False,
+                    },
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.82 if strong_walk else 0.225,
                     metadata={"mode": "sim"},
                 )
             ],
@@ -577,6 +652,59 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
 
+    async def test_capability_unsupported_status_label_is_not_spoken(self) -> None:
+        ollama = _UnsupportedStatusThenChatOllama()
+        request = _request(
+            text="It's really kidding.",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        request.route_decision.source = "fallback"
+        request.route_decision.confidence = 0.45
+
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_WeakAgreementCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="off",
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertNotIn("capability_decision", response.metadata)
+        self.assertEqual(response.speech[0].text, "Yes, that joke was pretty silly.")
+        self.assertNotEqual(response.speech[0].text.lower(), "unsupported")
+        self.assertIn("conversation_agent", response.metadata["handled_by"])
+        self.assertEqual(len(ollama.calls), 1)
+
+    async def test_capability_unsupported_status_label_gets_natural_fallback_without_conversation(self) -> None:
+        request = _request(
+            text="Walk forward for 15 seconds.",
+            route="robot_action",
+            intent="robot_action",
+            agents=["capability_agent", "safety_agent", "speaker_agent"],
+        )
+
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_UnsupportedStatusThenChatOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_WalkCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="off",
+            )
+        ).run(request)
+
+        self.assertEqual(response.metadata["capability_decision"], "unsupported")
+        self.assertEqual(
+            response.speech[0].text,
+            "I cannot safely map that to an available action. Please say it another way.",
+        )
+        self.assertEqual(response.skills, [])
+
     async def test_deep_thought_route_survives_capability_preflight(self) -> None:
         request = _request(
             text="Let's design the session memory architecture carefully.",
@@ -699,6 +827,113 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             response.speech[0].text,
             "I heard you, but my language model is not responding.",
+        )
+
+    async def test_weak_catalog_match_does_not_promote_chat_identity_to_motion(self) -> None:
+        request = _request(
+            text="Who are you? What's your name?",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        request.route_decision.source = "fallback"
+        request.route_decision.confidence = 0.45
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ChatOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_WeakAgreementCatalog(),  # type: ignore[arg-type]
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(request.route_decision.agents, ["conversation_agent", "speaker_agent"])
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.speech[0].text, "I am listening.")
+        self.assertEqual(
+            request.context["capability_promotion_blocked"]["reason"],
+            "weak_chat_to_physical_match",
+        )
+
+    async def test_joke_walk_identity_sequence_does_not_carry_motion_into_identity_chat(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_JokeWalkIdentityOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_JokeWalkIdentityCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="off",
+            )
+        )
+
+        first = _request(
+            text="Hello, how are you? can you tell me a joke?",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        first.route_decision.source = "fallback"
+        first.route_decision.confidence = 0.45
+        first_response = await runtime.run(first)
+
+        self.assertEqual(first.route_decision.route, "chat")
+        self.assertEqual(first_response.skills, [])
+        self.assertIn("robot", first_response.speech[0].text.lower())
+        self.assertIn("joke", first_response.speech[0].text.lower())
+
+        second = _request(
+            text="OK, please walk forward for 15s quickly, please.",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        second.route_decision.source = "fallback"
+        second.route_decision.confidence = 0.45
+        second.history = [
+            {"role": "user", "text": first.text},
+            {"role": "assistant", "text": first_response.speech[0].text},
+        ]
+        second_response = await runtime.run(second)
+
+        self.assertEqual(second.route_decision.route, "robot_action")
+        self.assertEqual([item.skill_id for item in second_response.skills], ["soridormi.walk_velocity"])
+        self.assertEqual(second_response.skills[0].args, {"vx_mps": 0.2, "duration_s": 15.0})
+        self.assertEqual(second_response.speech[0].text, "Walking forward for 15 seconds.")
+
+        third = _request(
+            text="How are you ? what's your name and how old are you?",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        third.route_decision.source = "fallback"
+        third.route_decision.confidence = 0.45
+        third.history = [
+            {"role": "user", "text": first.text},
+            {"role": "assistant", "text": first_response.speech[0].text},
+            {"role": "user", "text": second.text},
+            {"role": "assistant", "text": second_response.speech[0].text},
+        ]
+        third.context["current_task_context"] = {
+            "task_id": "task-walk-15s",
+            "task_relation": "side_conversation",
+            "task_type": "robot_action",
+            "goal": second.text,
+            "last_meaningful_user_turn": second.text,
+            "last_assistant_response": second_response.speech[0].text,
+        }
+        third_response = await runtime.run(third)
+
+        self.assertEqual(third.route_decision.route, "chat")
+        self.assertEqual(third.route_decision.agents, ["conversation_agent", "speaker_agent"])
+        self.assertEqual(third_response.skills, [])
+        self.assertIn("chromie", third_response.speech[0].text.lower())
+        self.assertIn("6-year-old", third_response.speech[0].text.lower())
+        self.assertNotIn("walking", third_response.speech[0].text.lower())
+        self.assertEqual(
+            third.context["capability_promotion_blocked"]["reason"],
+            "weak_chat_to_physical_match",
         )
 
     async def test_appearance_compliment_is_not_phrase_corrected_in_runtime(self) -> None:

@@ -23,7 +23,7 @@ Chromie's brain context has these layers:
 | Layer | Persistence | Changed by experience? | Purpose |
 |---|---:|---:|---|
 | Identity | Long-lived | No | Stable name, robot nature, gender/pronouns, and age/persona wording |
-| Core principles | Long-lived | No | Safety, honesty, owner-approved behavior boundaries |
+| Core principles | Long-lived | No | Safety, honesty, generalization-first behavior, owner-approved boundaries |
 | Long-term goals | Long-lived | With review | Direction for usefulness, learning, and uncertainty handling |
 | Session memory | Current conversation | Yes, bounded | Current task, recent turns, pending work |
 | Reflex policy | Always available | No automatic change | Fast emergency stop, cancel, and safety behavior |
@@ -40,6 +40,11 @@ robot identity age while preserving the boundary that this is not a human
 biological age. Her base self-description is that she keeps people company and
 can do simple things to help them. When answering identity questions, Chromie
 must describe herself as the robot, not as the backend LLM or model provider.
+The default core principles also make generalization ability explicit: normal
+robot behavior should be driven by LLM meaning-understanding, bounded context,
+capability descriptions, schemas, and task memory rather than brittle phrase
+rules. Phrase and pattern rules remain reserved for the fast deterministic
+emergency/noise filter.
 
 ## Runtime Flow
 

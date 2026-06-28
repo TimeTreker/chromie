@@ -5,6 +5,12 @@ currently configured as `qwen3:0.6b` in common profiles.
 
 ## Position
 
+Generalization ability is a core project principle. Normal user-facing
+behavior should come from model understanding plus bounded contracts, not from
+expanding phrase lists. Prompt examples are teaching signals for the model;
+they must not become the implementation of normal conversation, tool, memory,
+robot-action, capability-selection, or deep-thought behavior.
+
 The Router model is a fast semantic helper. It may propose a route for normal
 requests, but it is not the authority for understanding, execution, safety, or
 physical behavior.
@@ -38,6 +44,8 @@ The ownership invariant is:
   route;
 - quick intent for normal language belongs to the catalog-bounded small Router
   model, not to regexes;
+- capability selection belongs to the Agent model interpreting the user request,
+  capability descriptions, and schemas, not to action phrase lists;
 - deep reasoning, planning, and low-confidence correction belong to
   `deepthinking_agent`;
 - spoken response quality for normal conversation belongs to model-based

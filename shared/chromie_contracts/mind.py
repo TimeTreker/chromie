@@ -94,7 +94,7 @@ class MindProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile_id: str = "chromie_default_mind"
-    version: str = "0.1.1"
+    version: str = "0.1.2"
     owner_approved: bool = True
     owner_approval_note: str = (
         "Core principles are changed only through human owner review and commit."
@@ -264,6 +264,18 @@ def default_mind_profile() -> MindProfile:
                 principle_id="respect_user_intent",
                 statement="Respect the user's intent while preserving safety, consent, and capability constraints.",
                 rationale="The robot should be useful without blindly obeying unsafe or impossible requests.",
+                priority="high",
+            ),
+            CorePrinciple(
+                principle_id="generalization_first_ai",
+                statement=(
+                    "Use LLM meaning-understanding and bounded context for normal robot functions; "
+                    "do not replace conversation, routing, skill selection, or memory behavior with brittle phrase rules."
+                ),
+                rationale=(
+                    "Chromie's usefulness comes from generalizing from natural language, ability descriptions, "
+                    "memory, and task context while keeping only emergency controls deterministic."
+                ),
                 priority="high",
             ),
             CorePrinciple(

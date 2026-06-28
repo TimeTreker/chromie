@@ -18,12 +18,16 @@ class RouterLlmPromptTests(unittest.TestCase):
         prompt = router.load_system_prompt()
 
         self.assertIn("robot-brain router", prompt)
+        self.assertIn("Generalization-first principle", prompt)
+        self.assertIn("Prompt examples are guidance, not phrase", prompt)
+        self.assertIn("Only the emergency filter may use phrase/pattern rules", prompt)
         self.assertIn("Emergency filter", prompt)
         self.assertIn("Quick intent router", prompt)
         self.assertIn("Route taxonomy", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("candidate_capabilities", prompt)
         self.assertIn("available abilities", prompt)
+        self.assertIn("Use semantic understanding, not phrase lists", prompt)
         self.assertIn("Memory and context are hints, not authorization", prompt)
         self.assertIn("voice and/or", prompt)
         self.assertIn("body action", prompt)
@@ -72,6 +76,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         prompt = router.build_user_prompt(request)
 
         self.assertIn("robot-brain router", prompt)
+        self.assertIn("Generalization-first principle", prompt)
+        self.assertIn("not phrase rules", prompt)
+        self.assertIn("do not require exact keyword matches", prompt)
         self.assertIn("Routing stages", prompt)
         self.assertIn("emergency filter", prompt)
         self.assertIn("quick intent-and-meaning router", prompt)
@@ -99,6 +106,23 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("metadata.task_relation", prompt)
         self.assertIn("target_task_id", prompt)
         self.assertIn("latest meaningful", prompt)
+
+    def test_intent_review_prompt_uses_semantic_generalization(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+
+        payload = router.build_intent_review_payload(
+            RouteRequest(text="could you quickly go over there?")
+        )
+        system = payload["messages"][0]["content"]
+
+        self.assertIn("Use semantic generalization", system)
+        self.assertIn("examples are guidance, not keyword rules", system)
+        self.assertIn("deterministic emergency/noise filter", system)
 
     def test_payload_disables_qwen_thinking_and_supports_relaxed_json_retry(self) -> None:
         router = OllamaLLMRouter(

@@ -64,8 +64,12 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         call = ollama.calls[0]
         self.assertIn("deepthinking agent", call["system"])
         self.assertIn("split complex requests", call["system"])
+        self.assertIn("Generalization-first is a core principle", call["system"])
+        self.assertIn("Do not turn examples into keyword rules", call["system"])
         self.assertIn("human owner approval", call["system"])
         self.assertIn("Normally do not repeat, quote, or paraphrase", call["system"])
+        self.assertIn("interpret it as a request to do it now", call["system"])
+        self.assertIn("Do not answer only with ability, willingness, or readiness", call["system"])
         self.assertIn("Session working memory", call["prompt"])
         self.assertIn("Mind principles, long-term goals, and experience boundaries", call["prompt"])
         self.assertIn("owner-approved", call["prompt"])
@@ -241,6 +245,9 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
             "Why did Chromie take a nap? To reboot her sparkle.",
         )
         self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("If recent context shows Chromie already promised", ollama.calls[0]["system"])
+        self.assertIn("the user says they are waiting", ollama.calls[0]["system"])
+        self.assertIn("deliver the promised content now", ollama.calls[0]["system"])
         self.assertIn("Tell the user a joke.", ollama.calls[1]["prompt"])
 
     async def test_truncated_one_character_response_is_replaced_before_tts(self) -> None:

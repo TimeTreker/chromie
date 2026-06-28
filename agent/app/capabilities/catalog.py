@@ -82,7 +82,7 @@ def _tokens(text: str) -> set[str]:
     normalized = {
         _normalize_token(token)
         for token in expanded
-        if token and token not in _STOP_WORDS
+        if token and token not in _STOP_WORDS and not (len(token) == 1 and token.isascii())
     }
     normalized.discard("")
     return normalized

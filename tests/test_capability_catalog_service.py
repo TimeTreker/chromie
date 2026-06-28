@@ -200,6 +200,15 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.matches)
         self.assertTrue(any(match.interaction_executable for match in result.matches))
 
+    async def test_identity_question_apostrophe_s_does_not_match_duration_schema(self) -> None:
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+
+        result = await catalog.search("Who are you? What's your name?", language="en")
+
+        self.assertFalse(result.matched)
+        self.assertEqual(result.suggested_route, "chat")
+        self.assertFalse(any(match.score >= 0.10 for match in result.matches))
+
     async def test_context_distinguishes_executable_from_planning_only(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
 

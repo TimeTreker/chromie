@@ -159,6 +159,8 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.speak_immediate[0].text, "Hello, I'm doing well and listening.")
         self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("Generalization-first is a core principle", ollama.calls[0]["system"])
+        self.assertIn("Do not treat prompt examples as keyword rules", ollama.calls[0]["system"])
 
     async def test_obvious_sun_claim_goes_through_llm_with_factual_prompt(self) -> None:
         ollama = _CapturingOllama("No. The Sun is extremely hot, not cold.")
@@ -232,6 +234,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Chromie's first-person robot persona", ollama.calls[0]["system"])
         self.assertIn("Candidate spoken response", ollama.calls[1]["prompt"])
         self.assertIn("Judge meaning, not keyword rules", ollama.calls[1]["system"])
+        self.assertIn("generalization-first principle", ollama.calls[1]["system"])
         self.assertEqual(ollama.calls[1]["response_format"], "json")
         self.assertEqual(ollama.calls[1]["options"]["temperature"], 0)
 
@@ -365,10 +368,60 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
             "Why did the robot bring a blanket? Its circuits felt a little chilly.",
         )
         self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("interpret it as a request to do it now", ollama.calls[0]["system"])
+        self.assertIn("Do not answer only with ability, willingness, or readiness", ollama.calls[0]["system"])
+        self.assertIn("When a greeting and a request appear together", ollama.calls[0]["system"])
         self.assertIn("Hey, can you tell me a joke?", ollama.calls[1]["prompt"])
         self.assertIn("candidate says 'I can tell you a joke.' => revise", ollama.calls[1]["prompt"])
         self.assertNotIn("Original system prompt", ollama.calls[1]["prompt"])
         self.assertNotIn("Original task prompt", ollama.calls[1]["prompt"])
+
+    async def test_chinese_review_uses_unified_multilingual_prompt(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "我可以讲一个笑话。",
+                {
+                    "decision": "revise",
+                    "reason": "The candidate only promises a joke instead of telling one.",
+                    "spoken_response": "当然。为什么机器人喜欢讲冷笑话？因为散热比较好。",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "zh-joke-review-test",
+                "text": "你能讲个笑话吗？",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "zh-CN",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "当然。为什么机器人喜欢讲冷笑话？因为散热比较好。",
+        )
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("single reviewer prompt is multilingual", ollama.calls[1]["system"])
+        self.assertIn("Judge meaning, not keyword rules", ollama.calls[1]["system"])
+        self.assertIn("Target spoken language: zh-CN", ollama.calls[1]["prompt"])
+        self.assertIn("Current user input: 你能讲个笑话吗？", ollama.calls[1]["prompt"])
+        self.assertNotIn("只输出 JSON", ollama.calls[1]["system"])
 
     async def test_joke_followup_empty_acknowledgement_is_retried(self) -> None:
         ollama = _CapturingOllama(
@@ -415,6 +468,9 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
             "Why did Chromie polish her shoes? She wanted to reboot with a little sparkle.",
         )
         self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("If recent context shows Chromie already promised", ollama.calls[0]["system"])
+        self.assertIn("the user says they are waiting", ollama.calls[0]["system"])
+        self.assertIn("deliver the promised content now", ollama.calls[0]["system"])
         self.assertIn("If Chromie already promised the content", ollama.calls[1]["prompt"])
 
     async def test_repeated_user_utterance_is_revised_by_semantic_reviewer(self) -> None:

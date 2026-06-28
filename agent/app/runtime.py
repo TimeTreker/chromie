@@ -42,6 +42,7 @@ _EXPRESSIVE_ATTENTION_ARGS = {
 _EXPRESSIVE_CUE_CAPABILITY_IDS = (
     "soridormi.express_attention",
 )
+_CHAT_TO_PHYSICAL_PROMOTION_MIN_SCORE = 0.45
 
 
 def _catalog_item(
@@ -217,6 +218,18 @@ class InteractionRuntime(_AgentPipeline):
         ):
             request.route_decision.agents = ["conversation_agent", "speaker_agent"]
             return
+        if (
+            request.route_decision.route == "chat"
+            and search.suggested_route == "robot_action"
+            and not self._strong_chat_capability_promotion(search)
+        ):
+            request.route_decision.agents = ["conversation_agent", "speaker_agent"]
+            request.context["capability_promotion_blocked"] = {
+                "suggested_route": search.suggested_route,
+                "top_score": search.matches[0].score if search.matches else 0.0,
+                "reason": "weak_chat_to_physical_match",
+            }
+            return
         embodied_task_candidate = (
             self.services.task_graph_planner is not None
             and not request.route_decision.actions
@@ -284,6 +297,29 @@ class InteractionRuntime(_AgentPipeline):
         )
         request.route_decision.source = "catalog"
         request.route_decision.reason = "Matched shared capability catalog"
+
+    @staticmethod
+    def _strong_chat_capability_promotion(search: Any) -> bool:
+        if not getattr(search, "matched", False):
+            return False
+        matches = list(getattr(search, "matches", []) or [])
+        if not matches:
+            return False
+        top = matches[0]
+        score = getattr(top, "score", 0.0)
+        if not isinstance(score, (int, float)) or isinstance(score, bool):
+            return False
+        if float(score) < _CHAT_TO_PHYSICAL_PROMOTION_MIN_SCORE:
+            return False
+        return any(
+            getattr(match, "interaction_executable", False) is True
+            and getattr(match, "route", "") == getattr(search, "suggested_route", "")
+            and (
+                getattr(match, "safety_class", "") in {"physical_motion", "safety_critical"}
+                or "physical_motion" in list(getattr(match, "effects", []) or [])
+            )
+            for match in matches[:3]
+        )
 
     async def _ensure_expressive_body_cue_candidates(
         self,
