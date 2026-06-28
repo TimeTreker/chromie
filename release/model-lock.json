@@ -1,16 +1,16 @@
 {
   "asr": {
-    "base.en": {
-      "repository": "Systran/faster-whisper-base.en",
-      "revision": "b9aa26eecb911386885c475d79736c5e76dd09bd"
+    "Systran/faster-whisper-base": {
+      "repository": "Systran/faster-whisper-base",
+      "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
     },
-    "small.en": {
-      "repository": "Systran/faster-whisper-small.en",
-      "revision": "4138ac1f564d20fb698abba4511811dd53533e47"
+    "Systran/faster-whisper-small": {
+      "repository": "Systran/faster-whisper-small",
+      "revision": "536b0662742c02347bc0e980a01041f333bce120"
     },
-    "tiny.en": {
-      "repository": "Systran/faster-whisper-tiny.en",
-      "revision": "53b4a348cf5fad713d6322c9120d56326f831b0d"
+    "Systran/faster-whisper-tiny": {
+      "repository": "Systran/faster-whisper-tiny",
+      "revision": "d90ca5fe260221311c53c58e660288d3deb8d356"
     }
   },
   "ollama": {

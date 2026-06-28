@@ -43,15 +43,19 @@ CHROMIE_HARDWARE_PROFILE=rtx4090_laptop
 
 | Profile | Intended class | ASR default | Agent model default | TTS context |
 |---|---|---|---|---:|
-| `default` | Unknown/conservative | `tiny.en` | `gemma4:e2b` | 2048 |
-| `nvidia_ada` | RTX 4080/4070 class | `base.en` | `gemma4:e2b` | 2048 |
-| `nvidia_blackwell` | RTX 5080/5070 and laptop Blackwell | `base.en` | `gemma4:e2b` | 2048 |
-| `rtx4090` | Desktop RTX 4090 | `small.en` | `gemma4:e2b` | 4096 |
-| `rtx4090_laptop` | RTX 4090 Laptop GPU | `small.en` | `gemma4:e2b` | 4096 |
-| `rtx5090` | Desktop RTX 5090 | `small.en` | `gemma4:26b` | 4096 |
-| `jetson_orin_nano_super` | 8 GB shared-memory Orin edge target | `tiny.en` | `gemma4:e2b` | 2048 |
-| `jetson_agx_orin` | AGX Orin | `base.en` | `gemma4:e2b` | 2048 |
-| `jetson_thor` | AGX Thor placeholder profile | `small.en` | `gemma4:26b` | 4096 |
+| `default` | Unknown/conservative | `Systran/faster-whisper-tiny` | `gemma4:e2b` | 2048 |
+| `nvidia_ada` | RTX 4080/4070 class | `Systran/faster-whisper-base` | `gemma4:e2b` | 2048 |
+| `nvidia_blackwell` | RTX 5080/5070 and laptop Blackwell | `Systran/faster-whisper-base` | `gemma4:e2b` | 2048 |
+| `rtx4090` | Desktop RTX 4090 | `Systran/faster-whisper-small` | `gemma4:e2b` | 4096 |
+| `rtx4090_laptop` | RTX 4090 Laptop GPU | `Systran/faster-whisper-small` | `gemma4:e2b` | 4096 |
+| `rtx5090` | Desktop RTX 5090 | `Systran/faster-whisper-small` | `gemma4:26b` | 4096 |
+| `jetson_orin_nano_super` | 8 GB shared-memory Orin edge target | `Systran/faster-whisper-tiny` | `gemma4:e2b` | 2048 |
+| `jetson_agx_orin` | AGX Orin | `Systran/faster-whisper-base` | `gemma4:e2b` | 2048 |
+| `jetson_thor` | AGX Thor placeholder profile | `Systran/faster-whisper-small` | `gemma4:26b` | 4096 |
+
+Maintained profiles use multilingual Faster-Whisper models so Chromie can
+recognize both English and Chinese. Do not use `.en` ASR models in a maintained
+profile unless the profile is intentionally English-only and documented as such.
 
 Automatic detection prefers:
 

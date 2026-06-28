@@ -24,6 +24,22 @@ class ReleaseProvenanceTests(unittest.TestCase):
     def test_repository_model_lock_matches_profiles(self) -> None:
         self.assertEqual(model_lock_errors(ROOT), [])
 
+    def test_maintained_asr_profiles_are_multilingual(self) -> None:
+        for profile in sorted((ROOT / "env" / "profiles").glob("*.env")):
+            with self.subTest(profile=profile.name):
+                values = {}
+                for line in profile.read_text(encoding="utf-8").splitlines():
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    values[key] = value
+                model = values.get("ASR_MODEL", "")
+                self.assertFalse(
+                    model.endswith(".en"),
+                    f"{profile.relative_to(ROOT)} uses English-only ASR model {model!r}",
+                )
+                self.assertIn("faster-whisper", model)
+
     def test_mutable_image_tags_are_rejected(self) -> None:
         self.assertEqual(mutable_image_errors(["python:3.12.10-slim"]), [])
         self.assertTrue(mutable_image_errors(["python:latest", "local/image"]))

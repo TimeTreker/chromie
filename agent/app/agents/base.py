@@ -147,15 +147,25 @@ class BaseAgent(ABC):
         response: str,
         target_language: str,
     ) -> str:
-        del agent_prompt, agent_system
+        del agent_system
         task_context = self._bounded_json(self._task_context_from_request(request), 1200)
         history = self._bounded_json(self._history_from_request(request), 1400)
+        capabilities = self._bounded_json(
+            {
+                "candidate_capabilities": request.route_decision.candidate_capabilities,
+                "capability_candidates": request.context.get("capability_candidates"),
+            },
+            1600,
+        )
+        original_prompt = agent_prompt[:1800]
         return (
             f"Target spoken language: {target_language}\n"
             "Use an explicit user-requested output language when the current input or context asks for one; otherwise use the target spoken language.\n"
             f"Current user input: {request.text}\n"
             f"Recent conversation: {history}\n"
             f"Task context: {task_context}\n"
+            f"Capability context: {capabilities}\n"
+            f"Original agent prompt excerpt: {original_prompt}\n"
             f"Candidate spoken response: {response}\n\n"
             "Decide whether the candidate can be spoken now. "
             "A one-word fragment such as only 'I' is not speakable and must be revised. "
@@ -163,6 +173,7 @@ class BaseAgent(ABC):
             "including capability-style wording such as whether Chromie can, could, or would do it, the candidate must include the actual content. Example: user asks for a joke and candidate says "
             "'I can tell you a joke.' => revise with a brief original joke. "
             "If Chromie already promised the content and the user says they are waiting, says 'go ahead', 'continue', 'tell me', or 'I know you can', the candidate must deliver it now. "
+            "If the candidate says Chromie lacks a body/tool ability that appears available in Capability context or the original prompt excerpt, revise it to acknowledge the available ability instead of falsely refusing. "
             "Normally Chromie should not repeat, quote, or paraphrase the user's current words; allow that only for confirmation, clarification, or an explicit read-back request. "
             "Return JSON: {\"decision\":\"accept|revise\",\"reason\":\"short reason\","
             "\"spoken_response\":\"empty when accepted; final corrected spoken answer when revised\"}."
@@ -182,6 +193,7 @@ class BaseAgent(ABC):
             "creative response, ignores available context, describes Chromie as a backend/model/provider, "
             "uses a model-style refusal where Chromie should answer normally, or mainly repeats, quotes, "
             "or paraphrases the user's current words instead of directly answering. "
+            "Revise the candidate when it falsely says Chromie cannot perform a body/tool ability that the supplied capability context shows as available. "
             "If the user asks for a joke, story, song, poem, or follows up after Chromie promised one, even when the request is phrased as whether Chromie can, could, would, 能不能, 可不可以, or 会不会 do it, "
             "the candidate must contain the actual creative content. A candidate that only says "
             "'I can tell you a joke', 'I can do that', 'Sure', 'I am ready', 'I will', '我可以讲笑话', '当然可以', or '我准备好了' is incomplete and must be revised. "

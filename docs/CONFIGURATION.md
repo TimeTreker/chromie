@@ -151,10 +151,11 @@ configuration.
 | `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the small Router model for fast semantic routing while the emergency filter remains deterministic. |
 | `ROUTER_RULES_FIRST` | `1`. Only hard interrupt/noise filtering runs before the small Router model; normal intent is not selected by phrase rules. |
 | `ROUTER_MODEL` | `qwen3:0.6b` in common configuration. |
-| `ROUTER_REVIEW_MODEL` | `gemma4:26b` in common configuration; reviews underspecified LLM `robot_action` choices before any robot skill is selected. |
+| `ROUTER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; reviews underspecified or impossible quick-router choices before any robot skill is selected. |
 | `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
 | `ROUTER_TIMEOUT_MS` | `1500` in common configuration. |
-| `ROUTER_LLM_TIMEOUT_MS` | Falls back to `ROUTER_TIMEOUT_MS`. |
+| `ROUTER_LLM_TIMEOUT_MS` | `1500` in common configuration for the fast quick-router model path. |
+| `ROUTER_REVIEW_TIMEOUT_MS` | `3000` in common configuration for the reviewer path that recovers invalid quick-router choices. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `600`. Catalog failure falls back safely and the Agent rechecks in-process. |
@@ -179,6 +180,13 @@ acknowledgment ASR hallucinations. Normal robot, tool, memory, conversation, and
 deep-thought intent must come from catalog-bounded model routing or fallback
 behavior; validators only enforce capability, schema, availability, and safety
 contracts.
+
+The capability catalog is an ability source, not the normal intent brain. In
+`hybrid` and `llm_only`, catalog search ranks and exposes current ability
+descriptions, schemas, and executable IDs to the LLM and validators. It must not
+contain hardcoded per-skill synonym tables that decide body actions in place of
+model understanding. Catalog-only route selection exists only in explicit
+`rules_only` compatibility mode.
 
 ## Mind, Principles, and Experience
 
@@ -220,7 +228,7 @@ strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 | `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `sim_only`; appends simulator-bounded cues such as `soridormi.express_attention` for chat-only speech when the live catalog exposes those skills. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories inside the Agent container. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
-| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for automatic route correction; default `0.16`. |
+| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for marking retrieval candidates as matched; default `0.16`. In normal LLM modes this affects context/validation, not deterministic action selection. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
 | `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; default `4096`. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; default `512`. |
@@ -241,7 +249,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_ROUTER_TIMEOUT_MS` | `3000` in common configuration. It must exceed `ROUTER_TIMEOUT_MS` plus the catalog lookup budget so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_ROUTER_TIMEOUT_MS` | `4500` in common configuration. It must exceed the largest Router LLM/review timeout plus the catalog lookup budget so the Router can finish or report its own timeout before the host falls back. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
@@ -343,6 +351,10 @@ responsible for cross-process resource safety.
 | `ASR_MAX_CONCURRENT_TRANSCRIPTIONS` | Bounded inference-worker count; common default `1`. Blocking faster-whisper work runs off the WebSocket event loop. |
 | `ASR_SAMPLE_RATE` | Server default `16000`. |
 | `ASR_HOST`, `ASR_PORT` | Service bind settings. |
+
+Maintained profiles use multilingual Faster-Whisper models, not `.en`
+English-only variants, so an empty `ASR_LANGUAGE` can auto-detect English and
+Chinese utterances.
 
 ## TTS
 

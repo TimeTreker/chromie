@@ -66,6 +66,7 @@ class OllamaLLMRouter:
         model: str,
         review_model: str | None = None,
         timeout_ms: int,
+        review_timeout_ms: int | None = None,
         confidence_threshold: float,
         prompt_path: Path | None = None,
     ) -> None:
@@ -73,6 +74,10 @@ class OllamaLLMRouter:
         self.model = model
         self.review_model = (review_model or "").strip()
         self.timeout_s = max(0.1, timeout_ms / 1000.0)
+        self.review_timeout_s = max(
+            0.1,
+            (review_timeout_ms if review_timeout_ms is not None else timeout_ms) / 1000.0,
+        )
         self.confidence_threshold = confidence_threshold
         self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "router_system.txt"
 
@@ -140,6 +145,9 @@ class OllamaLLMRouter:
             "rewrite principles. "
             "Identity, name, age, self-description, and robot-status questions are chat "
             "unless the user explicitly asks for a physical body action or external tool. "
+            "When a capability question is pragmatically a polite request for Chromie to perform "
+            "a listed body/head motion, treat it as robot_action if a matching "
+            "interaction-executable candidate exists. "
             "Treat creative speech-only requests, including original singing, "
             "stories, jokes, or spoken performance, as chat unless the user "
             "explicitly asks for simultaneous physical movement. "
@@ -178,6 +186,11 @@ class OllamaLLMRouter:
         return payload
 
     def build_intent_review_payload(self, request: RouteRequest) -> dict[str, Any]:
+        candidates_json = json.dumps(
+            request.context.get("candidate_capabilities", []),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
         return {
             "model": self.review_model or self.model,
             "stream": False,
@@ -189,7 +202,7 @@ class OllamaLLMRouter:
                     "content": (
                         "Classify the user intent for a realtime robot voice assistant. "
                         "Use semantic generalization from the whole text and context; "
-                        "examples are guidance, not keyword rules. "
+                        "do not turn prompt wording into keyword rules. "
                         "The deterministic emergency/noise filter has already run before "
                         "this review. Do not choose interrupt or ignore unless the text is "
                         "plainly an emergency, stop, cancel, silence, empty, or unusable-audio request. "
@@ -197,6 +210,10 @@ class OllamaLLMRouter:
                         "deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
                         "Identity, name, age, self-description, and robot-status questions are chat "
                         "unless the user explicitly asks for a physical body action or external tool. "
+                        "When a capability question is pragmatically a polite request for Chromie to perform "
+                        "a listed body/head motion, choose robot_action rather than chat. "
+                        "Use the supplied candidate capabilities when available; if an interaction-executable candidate clearly matches, "
+                        "set intent to capability:<exact capability_id>. "
                         "Creative speech-only requests like singing, stories, jokes, "
                         "or talking are chat unless physical robot body/head motion is "
                         "explicitly requested. Body commands such as walk, look, nod, "
@@ -205,7 +222,14 @@ class OllamaLLMRouter:
                         "as 'you look beautiful' are chat, not gaze control."
                     ),
                 },
-                {"role": "user", "content": f"Text: {request.text}"},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Text: {request.text}\n"
+                        f"Language hint: {request.language or 'auto'}\n"
+                        f"Candidate capabilities JSON: {candidates_json}"
+                    ),
+                },
             ],
             "options": {
                 "temperature": 0,
@@ -215,7 +239,10 @@ class OllamaLLMRouter:
         }
 
     async def _chat(self, payload: dict[str, Any]) -> dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout_s) as client:
+        timeout_s = self.timeout_s
+        if self.review_model and str(payload.get("model") or "") == self.review_model:
+            timeout_s = self.review_timeout_s
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
             response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
             return response.json()
@@ -274,6 +301,23 @@ class OllamaLLMRouter:
             f"quick router returned deterministic-only route {decision.route} "
             "after deterministic emergency/noise filter did not match"
         )
+        if self.review_model:
+            try:
+                reviewed = await self._chat(self.build_intent_review_payload(request))
+                reviewed_decision = self._decision_from_response(request, reviewed)
+            except Exception as exc:
+                logger.warning("LLM review model deterministic-only recovery failed: %s", exc)
+            else:
+                if reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES:
+                    reviewed_decision.reason = (
+                        f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
+                    ) + f"{reason_prefix}; review_model:{self.review_model} recovered quick-router mistake"
+                    logger.info(
+                        "LLM review model recovered invalid deterministic-only route %s to %s",
+                        decision.route,
+                        reviewed_decision.route,
+                    )
+                    return reviewed_decision
         logger.info(
             "LLM router returned invalid deterministic-only route %s after priority filter; using safe chat fallback",
             decision.route,

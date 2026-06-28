@@ -72,9 +72,11 @@ model snapshot. Maintained hardware profiles provide revisions recorded in
 [`../release/model-lock.json`](../release/model-lock.json). Custom models must
 provide their own immutable revision.
 
-Leaving `ASR_LANGUAGE` empty enables model language detection. Host-side VAD is
-the normal utterance boundary; enabling the model's VAD filter is a separate
-choice.
+Leaving `ASR_LANGUAGE` empty enables model language detection. Maintained
+hardware profiles use multilingual Faster-Whisper models, not `.en`
+English-only variants, so Chromie can recognize both English and Chinese
+utterances. Host-side VAD is the normal utterance boundary; enabling the model's
+VAD filter is a separate choice.
 
 The host waits up to `ORCH_ASR_TIMEOUT_MS` (common default `30000`) for the final
 response. Increase that budget for slower profiles or unusually long

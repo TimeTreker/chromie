@@ -36,9 +36,17 @@ class Settings(BaseModel):
     )
     ollama_url: str = Field(default_factory=lambda: os.getenv("ROUTER_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("ROUTER_MODEL", "qwen3:0.6b"))
-    review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:26b"))
+    review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:e2b"))
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "800")))
     llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "800"))))
+    review_timeout_ms: int = Field(
+        default_factory=lambda: int(
+            os.getenv(
+                "ROUTER_REVIEW_TIMEOUT_MS",
+                os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "800")),
+            )
+        )
+    )
     confidence_threshold: float = Field(
         default_factory=lambda: float(os.getenv("ROUTER_CONFIDENCE_THRESHOLD", "0.55"))
     )
@@ -83,6 +91,7 @@ llm_router = OllamaLLMRouter(
     model=settings.model,
     review_model=settings.review_model,
     timeout_ms=settings.llm_timeout_ms,
+    review_timeout_ms=settings.review_timeout_ms,
     confidence_threshold=settings.confidence_threshold,
     prompt_path=Path(__file__).parent / "prompts" / "router_system.txt",
 )
@@ -300,25 +309,6 @@ def _deep_thought_from_low_confidence(
     )
 
 
-def _catalog_recovery_from_low_confidence(
-    request: RouteRequest,
-    decision: RouteDecision,
-    result: CapabilityCatalogResult,
-) -> RouteDecision | None:
-    recovered = _catalog_decision(request, result)
-    if recovered is None or recovered.route != "robot_action":
-        return None
-    recovered.reason = (
-        "quick router low confidence, recovered executable catalog robot_action; "
-        f"quick_route={decision.route}; quick_intent={decision.intent}"
-    )
-    recovered.metadata = {
-        **(decision.metadata or {}),
-        **(recovered.metadata or {}),
-    }
-    return recovered
-
-
 def _recover_invalid_operational_llm_decision(
     request: RouteRequest,
     decision: RouteDecision,
@@ -454,13 +444,7 @@ async def route(request: RouteRequest) -> RouteDecision:
                     llm_decision.confidence < settings.confidence_threshold
                     and llm_decision.route not in {"chat", "deep_thought"}
                 ):
-                    decision = _catalog_recovery_from_low_confidence(
-                        request,
-                        llm_decision,
-                        catalog_result,
-                    )
-                    if decision is None:
-                        decision = _deep_thought_from_low_confidence(request, llm_decision)
+                    decision = _deep_thought_from_low_confidence(request, llm_decision)
                 elif llm_decision.route == "deep_thought":
                     decision = _validate_llm_capability_decision(
                         request,
@@ -479,10 +463,8 @@ async def route(request: RouteRequest) -> RouteDecision:
             decision = _catalog_decision(request, catalog_result)
 
         if decision is None:
-            decision = _catalog_decision(request, catalog_result)
-        if decision is None:
             reason = (
-                "catalog_rules_and_llm_no_match"
+                "llm_no_route"
                 if settings.mode in ("llm_only", "hybrid")
                 else "catalog_and_rules_no_match"
             )

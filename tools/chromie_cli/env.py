@@ -33,6 +33,8 @@ BOOL_VARS = (
 
 POSITIVE_INT_VARS = (
     "ROUTER_TIMEOUT_MS",
+    "ROUTER_LLM_TIMEOUT_MS",
+    "ROUTER_REVIEW_TIMEOUT_MS",
     "ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS",
     "ROUTER_CAPABILITY_MATCH_LIMIT",
     "AGENT_MAX_SPEAK_CHARS",
@@ -308,6 +310,18 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
         values,
         host_name="ORCH_ROUTER_TIMEOUT_MS",
         service_name="ROUTER_TIMEOUT_MS",
+    )
+    _compare_timeout(
+        diagnostics,
+        values,
+        host_name="ORCH_ROUTER_TIMEOUT_MS",
+        service_name="ROUTER_LLM_TIMEOUT_MS",
+    )
+    _compare_timeout(
+        diagnostics,
+        values,
+        host_name="ORCH_ROUTER_TIMEOUT_MS",
+        service_name="ROUTER_REVIEW_TIMEOUT_MS",
     )
     _compare_timeout(
         diagnostics,

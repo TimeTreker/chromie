@@ -321,7 +321,7 @@ class CapabilityAgent(BaseAgent):
         candidate_payload = [self._capability_payload(match) for match in candidates]
         system = (
             "You are Chromie's capability selection agent. Select only exact skill_id values from the provided candidates. "
-            "Generalization-first principle: infer the user's desired physical/tool action from meaning, context, capability descriptions, and input_schema; examples are guidance, not phrase rules. "
+            "Generalization-first principle: infer the user's desired physical/tool action from meaning, context, capability descriptions, and input_schema; do not turn prompt wording into phrase rules. "
             "Never invent a skill. Never output raw joint, motor, actuator, position-array, or torque controls. "
             "Return JSON only with keys decision, speech, and skills. decision is execute, clarify, or unsupported. "
             "The speech field is spoken aloud. Never put status labels such as unsupported, clarify, execute, null, or none in speech. "
@@ -329,15 +329,15 @@ class CapabilityAgent(BaseAgent):
             "For execute, every skills item must contain skill_id and args satisfying that candidate's input_schema. "
             "Schema obedience is more important than copying the user's words. "
             "Every enum argument must be copied exactly from that field's enum list in input_schema. "
-            "Map natural wording to enum tokens: if enum contains quick and the user says quickly, output quick; "
-            "if enum contains slow and the user says slowly, output slow. Never output words outside the enum. "
+            "Map natural wording to enum tokens by semantic meaning; never output words outside the enum. "
             "Only execute a skill when a physical/tool capability is necessary to satisfy the user's current request. "
             "If the request is a question, identity/name/status request, greeting, joke, story, song, or other speech-only conversation, "
             "return unsupported with no skills; do not add a body motion merely because a capability is available. "
+            "A polite ability-shaped request to perform a listed physical action is not speech-only; "
+            "treat it as a request to execute the matching capability now unless context clearly says they only want an abstract ability explanation. "
             "Never combine an unrelated spoken answer with a body skill. "
             "Use recent conversation and task context to resolve short follow-ups such as durations or 'do that'. "
-            "Do not confuse looking/facing/gazing forward with walking forward. If the user says look forward or face forward, "
-            "select a gaze/head/attention capability if available, not a walking capability. "
+            "Distinguish gaze, attention, and orientation requests from locomotion requests by meaning and by the candidate descriptions. "
             "Use clarify when a required safe parameter is missing. Use unsupported when none of the candidates can satisfy the request. "
             "Keep speech short and suitable for voice."
         )

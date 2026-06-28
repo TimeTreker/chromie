@@ -376,6 +376,58 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Original system prompt", ollama.calls[1]["prompt"])
         self.assertNotIn("Original task prompt", ollama.calls[1]["prompt"])
 
+    async def test_false_missing_body_ability_is_retried_from_capability_context(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "我没有执行“摇头”的动作能力，但我可以帮你做其他事情。",
+                {
+                    "decision": "revise",
+                    "reason": "The capability context lists a matching head-shake skill.",
+                    "spoken_response": "可以，我能摇头。",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "zh-body-capability-review-test",
+                "text": "你能摇头吗？",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "zh-CN",
+                    "source": "llm",
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.shake_no",
+                            "description": "Shake the robot head no.",
+                            "interaction_executable": True,
+                            "available": True,
+                        }
+                    ],
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "可以，我能摇头。")
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("能力目录", ollama.calls[0]["prompt"])
+        self.assertIn("不要说没有这个能力", ollama.calls[0]["system"])
+        self.assertIn("Capability context", ollama.calls[1]["prompt"])
+        self.assertIn("soridormi.shake_no", ollama.calls[1]["prompt"])
+        self.assertIn("falsely says Chromie cannot perform", ollama.calls[1]["system"])
+
     async def test_chinese_review_uses_unified_multilingual_prompt(self) -> None:
         ollama = _CapturingOllama(
             [

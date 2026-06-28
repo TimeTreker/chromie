@@ -80,6 +80,13 @@ InteractionRuntime performs the same search in-process before execution. This
 second check prevents a Router timeout or stale route from silently turning a
 robot request into generic chat.
 
+The catalog is retrieval and validation infrastructure, not the normal intent
+selector. In model-assisted modes it exposes the live ability list to the LLM so
+the model can reason from capability descriptions and schemas. It should not
+carry hardcoded per-skill synonym or alias tables that route ordinary body
+commands without model understanding. Deterministic catalog route selection is
+limited to explicit `rules_only` compatibility behavior.
+
 `GET /capabilities/llm-context?language=en` returns the filtered context used for
 planning and capability-aware conversation. Supplying `text=...` returns only
 the most relevant candidates. The model receives descriptions and schemas, not

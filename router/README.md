@@ -11,8 +11,8 @@ or synthesis, invokes skills, or controls hardware.
 ```text
 text + bounded context
   -> emergency filter: deterministic interrupt/noise safety rules
-  -> shared Agent capability-catalog search
-  -> quick intent router: qwen-class quick understanding with catalog bounds
+  -> shared Agent capability-catalog search for ability context
+  -> quick intent router: qwen-class semantic understanding with catalog bounds
   -> route validation guardrails for impossible/unsafe choices
   -> deep_thought handoff when quick confidence is low or planning is needed
   -> schema finalization
@@ -33,9 +33,12 @@ conversational model is available. The hard filter lives in
 `router/app/rules.py` and is limited to `interrupt` and `ignore` outputs,
 including obvious repeated filler or acknowledgment ASR hallucinations. Normal
 language understanding is handled by the catalog-bounded Router model and later
-validators, not by phrase rules or regex action parsers. The Agent repeats the
-same catalog search inside native InteractionRuntime, so Router unavailability
-cannot authorize or suppress execution by itself.
+validators, not by phrase rules, regex action parsers, or hardcoded skill-alias
+tables. In `hybrid` and `llm_only`, catalog search supplies current ability
+descriptions and schemas to the model; it does not choose normal robot actions
+by itself. The Agent repeats the same catalog search inside native
+InteractionRuntime, so Router unavailability cannot authorize or suppress
+execution by itself.
 
 The Router model is a proposer, not the authority. A model route must still pass
 catalog constraints, confidence policy, schema finalization, Agent validation,
@@ -44,10 +47,10 @@ meaningful can execute. See
 [`../docs/MODEL_ASSISTED_ROUTING_GUARDRAILS.md`](../docs/MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
 If the quick model returns a deterministic-only route such as `interrupt` or
 `ignore` after the emergency filter has already passed, Router treats that as a
-model mistake and falls back to safe chat instead of stopping, ignoring,
-executing catalog motion, or delegating to slow deep thought. If the quick model
-delegates an obvious executable body command to `deep_thought`, Router may still
-recover that request to catalog-bounded `robot_action`.
+model mistake. The review model may correct it semantically; if review fails,
+Router falls back to safe chat instead of stopping, ignoring, or executing
+catalog motion. Low-confidence normal decisions delegate to `deep_thought`
+rather than being recovered by a catalog action rule.
 
 The Router has three decision stages. Only the first stage may use phrase rules
 to determine a route:
@@ -148,8 +151,10 @@ ROUTER_USE_LLM=1
 ROUTER_RULES_FIRST=1
 ROUTER_OLLAMA_URL=http://chromie-llm:11434
 ROUTER_MODEL=qwen3:0.6b
+ROUTER_REVIEW_MODEL=gemma4:e2b
 ROUTER_TIMEOUT_MS=800
 ROUTER_LLM_TIMEOUT_MS=800
+ROUTER_REVIEW_TIMEOUT_MS=3000
 ROUTER_CONFIDENCE_THRESHOLD=0.55
 ROUTER_CAPABILITY_CATALOG_URL=http://chromie-agent:8092
 ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=600

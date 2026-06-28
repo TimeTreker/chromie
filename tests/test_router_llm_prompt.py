@@ -41,6 +41,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("deepthinking_agent", prompt)
         self.assertIn("body commands", prompt)
         self.assertIn("robot_action", prompt)
+        self.assertIn("Capability questions can be polite requests", prompt)
+        self.assertIn("pragmatically asking Chromie", prompt)
         self.assertIn("metadata.task_relation", prompt)
         self.assertIn("task_context_patch", prompt)
         self.assertIn("host task manager owns", prompt)
@@ -103,6 +105,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("robot-status questions are chat", prompt)
         self.assertIn("Do not return interrupt or ignore", prompt)
         self.assertIn("blinking", prompt)
+        self.assertIn("pragmatically a polite request", prompt)
+        self.assertIn("listed body/head motion", prompt)
         self.assertIn("metadata.task_relation", prompt)
         self.assertIn("target_task_id", prompt)
         self.assertIn("latest meaningful", prompt)
@@ -116,13 +120,29 @@ class RouterLlmPromptTests(unittest.TestCase):
         )
 
         payload = router.build_intent_review_payload(
-            RouteRequest(text="could you quickly go over there?")
+            RouteRequest(
+                text="你能摇头吗",
+                language="zh-CN",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.shake_no",
+                            "interaction_executable": True,
+                        }
+                    ]
+                },
+            )
         )
         system = payload["messages"][0]["content"]
+        user = payload["messages"][1]["content"]
 
         self.assertIn("Use semantic generalization", system)
-        self.assertIn("examples are guidance, not keyword rules", system)
+        self.assertIn("do not turn prompt wording into keyword rules", system)
         self.assertIn("deterministic emergency/noise filter", system)
+        self.assertIn("pragmatically a polite request", system)
+        self.assertIn("Candidate capabilities JSON", user)
+        self.assertIn("soridormi.shake_no", user)
+        self.assertIn("capability:<exact capability_id>", system)
 
     def test_payload_disables_qwen_thinking_and_supports_relaxed_json_retry(self) -> None:
         router = OllamaLLMRouter(
@@ -284,7 +304,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("conversation_agent", decision.agents)
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
 
-    async def test_deterministic_only_llm_mistake_skips_review_model(self) -> None:
+    async def test_deterministic_only_llm_mistake_uses_review_model(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
             def __init__(self) -> None:
                 super().__init__(
@@ -312,11 +332,104 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         router = ReviewRouter()
         decision = await router.route(RouteRequest(text="What's your name?"))
 
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "identity_question")
+        self.assertIn("deterministic-only route interrupt", decision.reason or "")
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+
+    async def test_review_model_can_recover_invalid_interrupt_to_robot_action(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {"message": {"content": '{"route":"robot_action","intent":"robot_action","confidence":0.74}'}}
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"interrupt","intent":"interrupt",'
+                            '"confidence":0.0,"reason":"interrupted"}'
+                        )
+                    }
+                }
+
+        router = ReviewRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="你能摇头吗",
+                language="zh-CN",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.shake_no",
+                            "interaction_executable": True,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "robot_action")
+        self.assertIn("review_model:review-model recovered", decision.reason or "")
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+
+    async def test_review_failure_does_not_recover_invalid_interrupt_from_catalog_candidate(self) -> None:
+        class ReviewFailureRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+
+            async def _chat(self, payload: dict) -> dict:
+                if payload["model"] == "review-model":
+                    return {"message": {"content": ""}}
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"interrupt","intent":"interrupt",'
+                            '"confidence":0.0,"reason":"interrupted"}'
+                        )
+                    }
+                }
+
+        router = ReviewFailureRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="你能摇头吗",
+                language="zh-CN",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.shake_no",
+                            "interaction_executable": True,
+                            "available": True,
+                            "score": 0.86,
+                        }
+                    ]
+                },
+            )
+        )
+
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model"])
 
     async def test_review_model_overrides_underspecified_robot_action(self) -> None:
         class ReviewRouter(OllamaLLMRouter):

@@ -350,7 +350,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.walk_velocity",
         )
 
-    async def test_hybrid_router_recovers_low_confidence_body_command_from_catalog(self) -> None:
+    async def test_hybrid_router_delegates_low_confidence_body_command_to_deep_thought(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -398,21 +398,20 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.source, "catalog")
-        self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "capability:soridormi.walk_velocity")
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_low_confidence")
         self.assertEqual(decision.language, "en-US")
-        self.assertIn("low confidence", decision.reason or "")
+        self.assertIn("quick router confidence", decision.reason or "")
         self.assertIn("quick_route=robot_action", decision.reason or "")
-        self.assertIn("capability_agent", decision.agents)
-        self.assertIn("safety_agent", decision.agents)
+        self.assertIn("deepthinking_agent", decision.agents)
         self.assertEqual(
             [item["stage"] for item in decision.metadata["route_stage_outputs"]],
-            ["emergency_filter", "quick_intent"],
+            ["emergency_filter", "quick_intent", "deep_thought"],
         )
         self.assertEqual(
             [item["task_type"] for item in decision.metadata["task_list"]],
-            ["task.execute_skill"],
+            ["cognition.delegate_deep_thought", "cognition.deep_think"],
         )
         self.assertEqual(
             [item["capability_id"] for item in decision.candidate_capabilities],

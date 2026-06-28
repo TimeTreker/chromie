@@ -45,22 +45,24 @@ _STOP_WORDS = {
     "to",
     "you",
     "your",
+    "一",
+    "下",
+    "个",
+    "你",
+    "吗",
+    "呢",
+    "吧",
+    "可",
+    "以",
+    "会",
+    "能",
+    "我",
+    "想",
+    "请",
+    "帮",
+    "麻",
+    "烦",
 }
-
-# These groups normalize ordinary language; they do not assign routes or tool
-# identifiers. Capability descriptions and schemas remain the source of truth.
-_TOKEN_EQUIVALENTS = (
-    {"move", "walk", "go", "travel", "locomotion"},
-    {"nod", "nodd", "yes", "acknowledgement"},
-    {"shake", "shak", "no", "decline"},
-    {"turn", "rotate", "yaw"},
-    {"stop", "cancel", "halt", "pause"},
-    {"status", "state", "health"},
-    {"say", "speak", "tell", "report"},
-    {"forward", "ahead"},
-    {"back", "backward", "reverse"},
-)
-
 
 def _normalize_token(token: str) -> str:
     token = token.strip().lower()
@@ -68,9 +70,8 @@ def _normalize_token(token: str) -> str:
         if len(token) > len(suffix) + 2 and token.endswith(suffix):
             token = token[: -len(suffix)]
             break
-    for group in _TOKEN_EQUIVALENTS:
-        if token in group:
-            return sorted(group)[0]
+    if len(token) > 3 and token[-1] == token[-2]:
+        token = token[:-1]
     return token
 
 
@@ -274,6 +275,25 @@ class CapabilityCatalog:
                     ),
                     reverse=True,
                 )
+        limit = max(1, int(limit))
+        if len(scored) < limit:
+            seen = {item.capability_id for item in scored}
+            context_fill = [
+                CapabilityMatch(
+                    **entry.model_dump(mode="python"),
+                    score=0.0,
+                )
+                for entry in sorted(
+                    (item for item in self.entries() if item.available and item.capability_id not in seen),
+                    key=lambda item: (
+                        item.interaction_executable,
+                        item.invocation_kind == "named_skill",
+                        item.capability_id,
+                    ),
+                    reverse=True,
+                )
+            ]
+            scored.extend(context_fill[: max(0, limit - len(scored))])
         if not scored:
             scored = [
                 CapabilityMatch(
@@ -290,7 +310,7 @@ class CapabilityCatalog:
                     reverse=True,
                 )
             ]
-        matches = scored[: max(1, int(limit))]
+        matches = scored[:limit]
         matched = bool(matches and matches[0].score >= threshold)
         route = self._route_for(matches) if matched else "chat"
         agents = self._agents_for(route, matches) if matched else []

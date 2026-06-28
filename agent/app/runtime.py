@@ -29,11 +29,6 @@ except ImportError:  # pragma: no cover - repository development path
 logger = logging.getLogger("chromie.agent.runtime")
 
 
-_SORIDORMI_TASK_PLANNING_TOOLS = {
-    "soridormi.task.get_capabilities",
-    "soridormi.task.preview",
-    "soridormi.task.submit",
-}
 _EXPRESSIVE_ATTENTION_ARGS = {
     "style": "neutral",
     "duration_s": 2.4,
@@ -42,7 +37,6 @@ _EXPRESSIVE_ATTENTION_ARGS = {
 _EXPRESSIVE_CUE_CAPABILITY_IDS = (
     "soridormi.express_attention",
 )
-_CHAT_TO_PHYSICAL_PROMOTION_MIN_SCORE = 0.45
 
 
 def _catalog_item(
@@ -65,28 +59,6 @@ def _catalog_item(
             return None
         return item
     return None
-
-
-def _has_interaction_executable_match(candidates: list[dict]) -> bool:
-    return any(
-        isinstance(item, dict)
-        and item.get("interaction_executable") is True
-        and item.get("available") is not False
-        for item in candidates
-    )
-
-
-def _has_soridormi_task_planning_match(candidates: list[dict]) -> bool:
-    return any(
-        isinstance(item, dict)
-        and item.get("capability_id") in _SORIDORMI_TASK_PLANNING_TOOLS
-        and item.get("available") is not False
-        for item in candidates
-    )
-
-
-def _has_capability_intent(intent: str) -> bool:
-    return (intent or "").strip().startswith("capability:")
 
 
 class _AgentPipeline:
@@ -212,114 +184,34 @@ class InteractionRuntime(_AgentPipeline):
                     )
                 )
             return
-        if (
-            request.route_decision.route == "chat"
-            and request.route_decision.confidence >= 0.55
-        ):
+        if request.route_decision.route == "chat":
             request.route_decision.agents = ["conversation_agent", "speaker_agent"]
             return
-        if (
-            request.route_decision.route == "chat"
-            and search.suggested_route == "robot_action"
-            and not self._strong_chat_capability_promotion(search)
-        ):
+        if request.route_decision.route == "clarify":
             request.route_decision.agents = ["conversation_agent", "speaker_agent"]
-            request.context["capability_promotion_blocked"] = {
-                "suggested_route": search.suggested_route,
-                "top_score": search.matches[0].score if search.matches else 0.0,
-                "reason": "weak_chat_to_physical_match",
-            }
             return
-        embodied_task_candidate = (
-            self.services.task_graph_planner is not None
-            and not request.route_decision.actions
-            and not _has_interaction_executable_match(
-                request.route_decision.candidate_capabilities
-            )
-            and _has_soridormi_task_planning_match(
-                request.route_decision.candidate_capabilities
-            )
-        )
-        if not search.matched and not embodied_task_candidate:
-            return
-        if (
-            embodied_task_candidate
-            and (search.suggested_route == "robot_action" or not search.matched)
-        ):
-            request.route_decision.route = "tool"
-            request.route_decision.agents = ["tool_agent", "speaker_agent"]
-            request.route_decision.intent = "soridormi_task_planning"
-            request.route_decision.confidence = max(
-                request.route_decision.confidence,
-                search.matches[0].score if search.matches else 0.0,
-            )
-            request.route_decision.source = "catalog"
-            request.route_decision.reason = (
-                "Matched Soridormi task-agent planning capability"
-            )
-            return
-        if search.suggested_route == "chat":
-            request.route_decision.route = "chat"
-            request.route_decision.agents = ["conversation_agent", "speaker_agent"]
-            request.route_decision.intent = "general_conversation"
-            request.route_decision.confidence = max(
-                request.route_decision.confidence,
-                search.matches[0].score if search.matches else 0.0,
-            )
-            request.route_decision.source = "catalog"
-            request.route_decision.reason = "Matched shared capability catalog"
-            return
-        if (
-            request.route_decision.route == "robot_action"
-            and search.suggested_route == "robot_action"
-            and request.route_decision.source == "llm"
-            and not request.route_decision.actions
-            and not _has_capability_intent(request.route_decision.intent)
-        ):
+        if request.route_decision.route == "robot_action":
             request.route_decision.agents = list(
-                dict.fromkeys([*request.route_decision.agents, *search.suggested_agents])
-            )
-            request.route_decision.confidence = max(
-                request.route_decision.confidence,
-                search.matches[0].score if search.matches else 0.0,
+                dict.fromkeys(
+                    [
+                        *request.route_decision.agents,
+                        "capability_agent",
+                        "safety_agent",
+                        "speaker_agent",
+                    ]
+                )
             )
             return
-        request.route_decision.route = search.suggested_route
-        request.route_decision.agents = list(search.suggested_agents)
-        request.route_decision.intent = (
-            f"capability:{search.matches[0].capability_id}"
-            if search.matches
-            else "capability_match"
-        )
-        request.route_decision.confidence = max(
-            request.route_decision.confidence,
-            search.matches[0].score if search.matches else 0.0,
-        )
-        request.route_decision.source = "catalog"
-        request.route_decision.reason = "Matched shared capability catalog"
-
-    @staticmethod
-    def _strong_chat_capability_promotion(search: Any) -> bool:
-        if not getattr(search, "matched", False):
-            return False
-        matches = list(getattr(search, "matches", []) or [])
-        if not matches:
-            return False
-        top = matches[0]
-        score = getattr(top, "score", 0.0)
-        if not isinstance(score, (int, float)) or isinstance(score, bool):
-            return False
-        if float(score) < _CHAT_TO_PHYSICAL_PROMOTION_MIN_SCORE:
-            return False
-        return any(
-            getattr(match, "interaction_executable", False) is True
-            and getattr(match, "route", "") == getattr(search, "suggested_route", "")
-            and (
-                getattr(match, "safety_class", "") in {"physical_motion", "safety_critical"}
-                or "physical_motion" in list(getattr(match, "effects", []) or [])
+        if request.route_decision.route == "tool":
+            request.route_decision.agents = list(
+                dict.fromkeys([*request.route_decision.agents, "tool_agent", "speaker_agent"])
             )
-            for match in matches[:3]
-        )
+            return
+        if request.route_decision.route == "memory":
+            request.route_decision.agents = list(
+                dict.fromkeys([*request.route_decision.agents, "memory_agent", "speaker_agent"])
+            )
+            return
 
     async def _ensure_expressive_body_cue_candidates(
         self,

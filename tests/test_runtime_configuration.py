@@ -29,7 +29,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
         values = _common_env()
         self.assertGreater(
             int(values["ORCH_ROUTER_TIMEOUT_MS"]),
-            int(values["ROUTER_TIMEOUT_MS"])
+            max(
+                int(values["ROUTER_TIMEOUT_MS"]),
+                int(values["ROUTER_LLM_TIMEOUT_MS"]),
+                int(values["ROUTER_REVIEW_TIMEOUT_MS"]),
+            )
             + int(values["ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS"]),
         )
 
@@ -37,6 +41,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
         values = _common_env()
         self.assertEqual(values["ROUTER_USE_LLM"], "1")
         self.assertEqual(values["ROUTER_MODEL"], "qwen3:0.6b")
+        self.assertEqual(values["ROUTER_REVIEW_MODEL"], "gemma4:e2b")
+        self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "1500")
+        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "3000")
 
     def test_ollama_keeps_router_and_agent_models_loaded_without_extra_parallelism(self) -> None:
         values = _common_env()
@@ -65,6 +72,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")', source)
         self.assertIn('AGENT_RESPONSE_REVIEW_MODEL:-gemma4:e2b', source)
         self.assertIn('WARM_MODELS=("${ROUTER_MODEL:-qwen3:0.6b}" "${WARM_MODELS[@]}")', source)
+        self.assertIn('WARM_MODELS+=("${ROUTER_REVIEW_MODEL}")', source)
         self.assertIn('./scripts/warm_ollama.sh "${WARM_MODELS[@]}"', source)
 
     def test_warm_ollama_reports_pull_command_for_missing_model(self) -> None:

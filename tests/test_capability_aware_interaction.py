@@ -117,6 +117,38 @@ class _LookForwardOutcome:
     }
 
 
+class _HeadGestureOutcome:
+    status = "success"
+    error = None
+    output = {
+        "mode": "sim",
+        "skills": [
+            {
+                "skill_id": "shake_no",
+                "description": "Shake the robot head no.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {"count": {"type": "number", "minimum": 2, "maximum": 8}},
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": False,
+            },
+            {
+                "skill_id": "nod_yes",
+                "description": "Nod the robot head yes.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {"count": {"type": "number", "minimum": 2, "maximum": 8}},
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": False,
+            },
+        ],
+    }
+
+
 class _Invoker:
     async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _Outcome:
         del arguments, context
@@ -138,6 +170,13 @@ class _LookForwardInvoker:
         return _LookForwardOutcome()
 
 
+class _HeadGestureInvoker:
+    async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _HeadGestureOutcome:
+        del arguments, context
+        assert tool_name == "soridormi.skill.list"
+        return _HeadGestureOutcome()
+
+
 class _Ollama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
@@ -146,7 +185,7 @@ class _Ollama:
         assert "Only execute a skill when" in system
         assert "Never combine an unrelated spoken answer with a body skill" in system
         assert "Generalization-first principle" in system
-        assert "examples are guidance, not phrase rules" in system
+        assert "do not turn prompt wording into phrase rules" in system
         return {
             "decision": "execute",
             "speech": "Walking ahead for 10 minutes.",
@@ -183,7 +222,7 @@ class _LookForwardOllama:
         assert "Task context" in prompt
         assert "Can you look forward for some time" in prompt
         system = str(kwargs["system"])
-        assert "Do not confuse looking/facing/gazing forward with walking forward" in system
+        assert "Distinguish gaze, attention, and orientation requests from locomotion requests" in system
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
@@ -201,13 +240,33 @@ class _LookForwardOllama:
         }
 
 
+class _PoliteHeadQuestionOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "你能摇头吗" in prompt
+        assert "soridormi.shake_no" in prompt
+        assert kwargs["response_format"] == "json"
+        system = str(kwargs["system"])
+        assert "A polite ability-shaped request to perform a listed physical action" in system
+        assert "not speech-only" in system
+        return {
+            "decision": "execute",
+            "speech": "",
+            "skills": [
+                {
+                    "skill_id": "soridormi.shake_no",
+                    "args": {"count": 2},
+                }
+            ],
+        }
+
+
 class _AdverbSpeedOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
         assert '"quick"' in prompt
         system = str(kwargs["system"])
         assert "Every enum argument must be copied exactly" in system
-        assert "quickly, output quick" in system
+        assert "Map natural wording to enum tokens by semantic meaning" in system
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
@@ -328,11 +387,11 @@ def _catalog_with_invoker(invoker: Any) -> CapabilityCatalog:
 
 
 class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_normal_interaction_self_corrects_chat_route_using_catalog(self) -> None:
+    async def test_normal_interaction_does_not_self_correct_chat_route_using_catalog(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
-                ollama=_Ollama(),  # type: ignore[arg-type]
-                use_llm=True,
+                ollama=None,
+                use_llm=False,
                 max_speak_chars=160,
                 capability_catalog=_catalog(),
                 capability_match_limit=8,
@@ -355,14 +414,11 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(request.route_decision.source, "catalog")
-        self.assertEqual(request.route_decision.route, "robot_action")
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
-        self.assertEqual(response.skills[0].args, {"duration_s": 1.0})
-        self.assertTrue(response.skills[0].requires_confirmation)
-        self.assertEqual(response.speech[0].text, "Walking forward for 1 second.")
-        self.assertIn("capability_agent", response.metadata["handled_by"])
-        self.assertNotIn("conversation_agent", response.metadata["handled_by"])
+        self.assertEqual(request.route_decision.source, "fallback")
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(response.skills, [])
+        self.assertIn("conversation_agent", response.metadata["handled_by"])
+        self.assertNotIn("capability_agent", response.metadata["handled_by"])
 
     async def test_capability_plan_normalizes_schema_enum_adverbs(self) -> None:
         runtime = InteractionRuntime(
@@ -394,6 +450,37 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
         self.assertEqual(response.skills[0].args["speed"], "quick")
         self.assertTrue(response.skills[0].metadata["schema_normalized_args"])
+
+    async def test_polite_chinese_head_ability_question_executes_matching_skill(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_PoliteHeadQuestionOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_HeadGestureInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "polite-head-question",
+                "text": "你能摇头吗",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.72,
+                    "language": "zh-CN",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills[0].skill_id, "soridormi.shake_no")
+        self.assertEqual(response.skills[0].args, {"count": 2})
+        self.assertEqual(response.speech[0].text, "Shaking my head.")
 
     async def test_capability_plan_blocks_schema_invalid_args_before_runtime(self) -> None:
         runtime = InteractionRuntime(

@@ -87,6 +87,10 @@ General rules:
 - Memory and context are hints, not authorization. They must not override safety, confirmation, availability, or capability constraints.
 - When selecting a capability, set intent to exactly "capability:<capability_id>" using one exact capability_id from candidate_capabilities.
 - For an immediate physical command, use route "robot_action" and select only a candidate whose interaction_executable field is true.
+- Capability questions can be polite requests. If the whole utterance is
+  pragmatically asking Chromie to perform a listed body/head motion, route to
+  "robot_action" and select the matching interaction-executable capability
+  instead of treating it as abstract chat.
 - Never select a planning-only or non-executable capability for route "robot_action".
 - A request to create, inspect, or discuss a plan without executing it may use route "tool" and a planning capability.
 - If the user asks for both speech and body action, choose the body/tool route and include speaker_agent when spoken feedback is appropriate.

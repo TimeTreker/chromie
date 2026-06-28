@@ -851,10 +851,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.route_decision.agents, ["conversation_agent", "speaker_agent"])
         self.assertEqual(response.skills, [])
         self.assertEqual(response.speech[0].text, "I am listening.")
-        self.assertEqual(
-            request.context["capability_promotion_blocked"]["reason"],
-            "weak_chat_to_physical_match",
-        )
+        self.assertNotIn("capability_promotion_blocked", request.context)
 
     async def test_joke_walk_identity_sequence_does_not_carry_motion_into_identity_chat(self) -> None:
         runtime = InteractionRuntime(
@@ -884,12 +881,12 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         second = _request(
             text="OK, please walk forward for 15s quickly, please.",
-            route="chat",
-            intent="general_conversation",
-            agents=["conversation_agent", "speaker_agent"],
+            route="robot_action",
+            intent="robot_action",
+            agents=["capability_agent", "safety_agent", "speaker_agent"],
         )
-        second.route_decision.source = "fallback"
-        second.route_decision.confidence = 0.45
+        second.route_decision.source = "llm"
+        second.route_decision.confidence = 0.72
         second.history = [
             {"role": "user", "text": first.text},
             {"role": "assistant", "text": first_response.speech[0].text},
@@ -931,10 +928,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("chromie", third_response.speech[0].text.lower())
         self.assertIn("6-year-old", third_response.speech[0].text.lower())
         self.assertNotIn("walking", third_response.speech[0].text.lower())
-        self.assertEqual(
-            third.context["capability_promotion_blocked"]["reason"],
-            "weak_chat_to_physical_match",
-        )
+        self.assertNotIn("capability_promotion_blocked", third.context)
 
     async def test_appearance_compliment_is_not_phrase_corrected_in_runtime(self) -> None:
         request = _request(

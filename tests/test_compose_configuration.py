@@ -42,6 +42,9 @@ class ComposeConfigurationTests(unittest.TestCase):
 
         self.assertIn("ROUTER_USE_LLM: ${ROUTER_USE_LLM:-1}", router_block)
         self.assertIn("ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:0.6b}", router_block)
+        self.assertIn("ROUTER_REVIEW_MODEL: ${ROUTER_REVIEW_MODEL:-gemma4:e2b}", router_block)
+        self.assertIn("ROUTER_LLM_TIMEOUT_MS: ${ROUTER_LLM_TIMEOUT_MS:-2000}", router_block)
+        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-3000}", router_block)
 
     def test_agent_service_uses_main_model_for_response_review_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")

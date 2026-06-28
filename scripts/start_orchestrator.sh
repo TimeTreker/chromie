@@ -79,6 +79,9 @@ if [ "${WARM_OLLAMA_BEFORE_ORCH:-1}" = "1" ]; then
   fi
   if [[ "${ROUTER_USE_LLM:-0}" =~ ^(1|true|yes|on)$ ]]; then
     WARM_MODELS=("${ROUTER_MODEL:-qwen3:0.6b}" "${WARM_MODELS[@]}")
+    if [ -n "${ROUTER_REVIEW_MODEL:-}" ]; then
+      WARM_MODELS+=("${ROUTER_REVIEW_MODEL}")
+    fi
   fi
   ./scripts/warm_ollama.sh "${WARM_MODELS[@]}"
 fi
