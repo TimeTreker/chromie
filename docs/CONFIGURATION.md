@@ -210,7 +210,7 @@ strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
 | `AGENT_RESPONSE_REVIEW_ENABLED` | Enable model-based semantic review of spoken Agent replies; default `1`. |
-| `AGENT_RESPONSE_REVIEW_MODEL` | Fast Ollama model used to accept or rewrite weak spoken replies; default `qwen3:0.6b`. |
+| `AGENT_RESPONSE_REVIEW_MODEL` | Ollama model used to accept or rewrite weak spoken replies; default `gemma4:e2b`, matching the main Agent model. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | Timeout for the semantic response-review model call; default `4000`. |
 | `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `220`, matching `TTS_MAX_TEXT_CHARS`. |
 | `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; default `4096`. |

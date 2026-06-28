@@ -54,7 +54,7 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     response_review_model: str = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_MODEL", "qwen3:0.6b")
+        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_MODEL", "gemma4:e2b")
     )
     response_review_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_RESPONSE_REVIEW_TIMEOUT_MS", "4000"))

@@ -96,6 +96,8 @@ class BaseAgent(ABC):
                 "如果候选回答为空、只有一个不完整词、明显被截断，或不能作为语音完整播放，请改写。"
                 "如果候选回答只是空泛承诺、没有真正完成用户请求、忽略了已给出的上下文、"
                 "把 Chromie 说成后端模型，或用模型模板拒答，请改写成一条可播放的最终回答。"
+                "如果用户请求笑话、故事、歌曲、诗或继续刚才的创作请求，候选回答必须给出实际内容；"
+                "只说“我可以讲笑话/我会讲/当然可以”必须改写成实际笑话或创作内容。"
                 "如果候选回答主要是在复述、转述或引用用户刚才的话，而不是直接回答，"
                 "也要改写；只有确认、澄清或用户明确要求复述时才可以重复用户的话。"
                 "只输出 JSON。"
@@ -118,6 +120,9 @@ class BaseAgent(ABC):
                 "creative response, ignores available context, describes Chromie as a backend/model/provider, "
                 "uses a model-style refusal where Chromie should answer normally, or mainly repeats, quotes, "
                 "or paraphrases the user's current words instead of directly answering. "
+                "If the user asks for a joke, story, song, poem, or follows up after Chromie promised one, "
+                "the candidate must contain the actual creative content. A candidate that only says "
+                "'I can tell you a joke', 'I can do that', 'Sure', or 'I will' is incomplete and must be revised. "
                 "Repeating the user's words is acceptable only when confirmation, clarification, or an explicit read-back is needed. "
                 "Return JSON only."
             )
@@ -178,8 +183,7 @@ class BaseAgent(ABC):
         response: str,
         zh: bool,
     ) -> str:
-        agent_prompt = self._bounded_text(agent_prompt, 2400)
-        agent_system = self._bounded_text(agent_system, 1800)
+        del agent_prompt, agent_system
         task_context = self._bounded_json(self._task_context_from_request(request), 1200, zh=zh)
         history = self._bounded_json(self._history_from_request(request), 1400, zh=zh)
         if zh:
@@ -187,10 +191,10 @@ class BaseAgent(ABC):
                 f"当前用户输入：{request.text}\n"
                 f"最近对话：{history}\n"
                 f"任务上下文：{task_context}\n"
-                f"原始系统提示：{agent_system}\n"
-                f"原始任务提示：{agent_prompt}\n"
                 f"候选回答：{response}\n\n"
                 "请判断候选回答是否可直接播放。"
+                "如果用户当前或最近要求笑话、故事、歌曲或诗，回答必须包含实际创作内容。"
+                "示例：用户要求讲笑话，候选回答“我可以讲一个笑话。” => revise，改写为一个简短原创笑话。"
                 "正常情况下不要复述用户刚才的话；只有确认、澄清或明确要求复述时才可以。"
                 "输出 JSON：{\"decision\":\"accept|revise\",\"reason\":\"简短原因\","
                 "\"spoken_response\":\"接受时可为空；修改时给出最终可播放回答\"}"
@@ -199,11 +203,13 @@ class BaseAgent(ABC):
             f"Current user input: {request.text}\n"
             f"Recent conversation: {history}\n"
             f"Task context: {task_context}\n"
-            f"Original system prompt: {agent_system}\n"
-            f"Original task prompt: {agent_prompt}\n"
             f"Candidate spoken response: {response}\n\n"
             "Decide whether the candidate can be spoken now. "
             "A one-word fragment such as only 'I' is not speakable and must be revised. "
+            "If the current user input or recent conversation asks for a joke, story, song, poem, or other creative content, "
+            "the candidate must include the actual content. Example: user asks for a joke and candidate says "
+            "'I can tell you a joke.' => revise with a brief original joke. "
+            "If Chromie already promised the content and the user says 'tell me' or 'I know you can', the candidate must deliver it now. "
             "Normally Chromie should not repeat, quote, or paraphrase the user's current words; allow that only for confirmation, clarification, or an explicit read-back request. "
             "Return JSON: {\"decision\":\"accept|revise\",\"reason\":\"short reason\","
             "\"spoken_response\":\"empty when accepted; final corrected spoken answer when revised\"}."

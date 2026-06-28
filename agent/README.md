@@ -89,7 +89,7 @@ Risk-bearing behavior is default-off.
 | Variable | Default | Effect |
 |---|---:|---|
 | `AGENT_RESPONSE_REVIEW_ENABLED` | `1` | Use a model critic to accept or rewrite spoken replies that fail the user request or Chromie persona. |
-| `AGENT_RESPONSE_REVIEW_MODEL` | `qwen3:0.6b` | Fast semantic reviewer model; the main `AGENT_MODEL` still writes the primary answer. |
+| `AGENT_RESPONSE_REVIEW_MODEL` | `gemma4:e2b` | Semantic reviewer model; defaults to the main Agent model so weak replies are judged with enough context. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
 | `AGENT_CONVERSATION_NUM_CTX` | `4096` | Context window for normal conversation prompts. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | `128` | Output budget for normal conversation replies. |

@@ -59,9 +59,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
         source = (ROOT / "scripts" / "start_orchestrator.sh").read_text(
             encoding="utf-8"
         )
+        values = _common_env()
+        self.assertEqual(values["AGENT_RESPONSE_REVIEW_MODEL"], "gemma4:e2b")
         self.assertIn('[[ "${ROUTER_USE_LLM:-0}" =~ ^(1|true|yes|on)$ ]]', source)
         self.assertIn('WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")', source)
-        self.assertIn('AGENT_RESPONSE_REVIEW_MODEL:-qwen3:0.6b', source)
+        self.assertIn('AGENT_RESPONSE_REVIEW_MODEL:-gemma4:e2b', source)
         self.assertIn('WARM_MODELS=("${ROUTER_MODEL:-qwen3:0.6b}" "${WARM_MODELS[@]}")', source)
         self.assertIn('./scripts/warm_ollama.sh "${WARM_MODELS[@]}"', source)
 

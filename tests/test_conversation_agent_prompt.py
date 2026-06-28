@@ -366,6 +366,56 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(ollama.calls), 2)
         self.assertIn("Hey, can you tell me a joke?", ollama.calls[1]["prompt"])
+        self.assertIn("candidate says 'I can tell you a joke.' => revise", ollama.calls[1]["prompt"])
+        self.assertNotIn("Original system prompt", ollama.calls[1]["prompt"])
+        self.assertNotIn("Original task prompt", ollama.calls[1]["prompt"])
+
+    async def test_joke_followup_empty_acknowledgement_is_retried(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I can tell you a joke.",
+                {
+                    "decision": "revise",
+                    "reason": "The user is following up on a joke request and the candidate only promises.",
+                    "spoken_response": "Why did Chromie polish her shoes? She wanted to reboot with a little sparkle.",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "joke-followup-empty-ack-test",
+                "text": "I know you can. Tell me, please.",
+                "history": [
+                    {"role": "user", "text": "Please tell me a joke."},
+                    {"role": "assistant", "text": "I can tell you a joke."},
+                ],
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "Why did Chromie polish her shoes? She wanted to reboot with a little sparkle.",
+        )
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("If Chromie already promised the content", ollama.calls[1]["prompt"])
 
     async def test_repeated_user_utterance_is_revised_by_semantic_reviewer(self) -> None:
         ollama = _CapturingOllama(

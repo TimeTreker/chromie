@@ -43,7 +43,7 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("ROUTER_USE_LLM: ${ROUTER_USE_LLM:-1}", router_block)
         self.assertIn("ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:0.6b}", router_block)
 
-    def test_agent_service_uses_fast_response_review_model_by_default(self) -> None:
+    def test_agent_service_uses_main_model_for_response_review_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         agent_block = compose.split("  chromie-agent:", 1)[1].split(
             "\nnetworks:",
@@ -51,7 +51,7 @@ class ComposeConfigurationTests(unittest.TestCase):
         )[0]
 
         self.assertIn("AGENT_RESPONSE_REVIEW_ENABLED: ${AGENT_RESPONSE_REVIEW_ENABLED:-1}", agent_block)
-        self.assertIn("AGENT_RESPONSE_REVIEW_MODEL: ${AGENT_RESPONSE_REVIEW_MODEL:-qwen3:0.6b}", agent_block)
+        self.assertIn("AGENT_RESPONSE_REVIEW_MODEL: ${AGENT_RESPONSE_REVIEW_MODEL:-gemma4:e2b}", agent_block)
         self.assertIn(
             "AGENT_RESPONSE_REVIEW_TIMEOUT_MS: ${AGENT_RESPONSE_REVIEW_TIMEOUT_MS:-4000}",
             agent_block,
