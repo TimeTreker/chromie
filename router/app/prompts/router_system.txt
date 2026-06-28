@@ -82,6 +82,7 @@ General rules:
 - Never select a planning-only or non-executable capability for route "robot_action".
 - A request to create, inspect, or discuss a plan without executing it may use route "tool" and a planning capability.
 - If the user asks for both speech and body action, choose the body/tool route and include speaker_agent when spoken feedback is appropriate.
+- Treat identity, name, age, self-description, and robot-status questions as chat unless the user explicitly asks for a physical body action or external tool.
 - Treat creative speech-only requests as chat: original singing, telling a
   story, telling a joke, acting a voice, or saying something aloud are speech
   tasks unless the user explicitly asks for simultaneous body motion.

@@ -132,6 +132,8 @@ class OllamaLLMRouter:
             "Core principles are stable, owner-approved constraints; experience "
             "may tune strategies and proposals, but the quick router must not "
             "rewrite principles. "
+            "Identity, name, age, self-description, and robot-status questions are chat "
+            "unless the user explicitly asks for a physical body action or external tool. "
             "Treat creative speech-only requests, including original singing, "
             "stories, jokes, or spoken performance, as chat unless the user "
             "explicitly asks for simultaneous physical movement. Discourse "
@@ -180,8 +182,13 @@ class OllamaLLMRouter:
                     "role": "system",
                     "content": (
                         "Classify the user intent for a realtime robot voice assistant. "
+                        "The deterministic emergency/noise filter has already run before "
+                        "this review. Do not choose interrupt or ignore unless the text is "
+                        "plainly an emergency, stop, cancel, silence, empty, or unusable-audio request. "
                         "Return only one JSON object with route exactly one of: chat, "
                         "deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
+                        "Identity, name, age, self-description, and robot-status questions are chat "
+                        "unless the user explicitly asks for a physical body action or external tool. "
                         "Creative speech-only requests like singing, stories, jokes, "
                         "or talking are chat unless physical robot body/head motion is "
                         "explicitly requested. Body commands such as walk, look, nod, "
@@ -250,6 +257,53 @@ class OllamaLLMRouter:
             return reviewed_decision
         return decision
 
+    async def _review_deterministic_only_decision(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        reason_prefix = (
+            f"quick router returned deterministic-only route {decision.route} "
+            "after deterministic emergency/noise filter did not match"
+        )
+        if not self.review_model:
+            return self._low_confidence_deep_thought_decision(
+                request,
+                decision,
+                reason_prefix=reason_prefix,
+            )
+
+        try:
+            reviewed = await self._chat(self.build_intent_review_payload(request))
+            reviewed_decision = self._decision_from_response(request, reviewed)
+        except Exception as exc:
+            logger.warning("LLM review model deterministic-route check failed: %s", exc)
+            return self._low_confidence_deep_thought_decision(
+                request,
+                decision,
+                reason_prefix=reason_prefix,
+            )
+
+        if reviewed_decision.route in DETERMINISTIC_ONLY_ROUTES:
+            return self._low_confidence_deep_thought_decision(
+                request,
+                reviewed_decision,
+                reason_prefix=(
+                    f"{reason_prefix}; review_model:{self.review_model} "
+                    f"also returned deterministic-only route {reviewed_decision.route}"
+                ),
+            )
+
+        reviewed_decision.reason = (
+            f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
+        ) + f"review_model:{self.review_model} corrected deterministic-only quick route {decision.route}"
+        logger.info(
+            "LLM review model changed deterministic-only route %s to %s",
+            decision.route,
+            reviewed_decision.route,
+        )
+        return reviewed_decision
+
     def _low_confidence_deep_thought_decision(
         self,
         request: RouteRequest,
@@ -314,10 +368,6 @@ class OllamaLLMRouter:
         decision = await self._review_route_only_robot_action(request, decision)
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:
-            logger.info(
-                "LLM router returned deterministic-only route %s after priority filter; returning raw quick decision for pipeline recovery",
-                decision.route,
-            )
-            return decision
+            return await self._review_deterministic_only_decision(request, decision)
 
         return decision

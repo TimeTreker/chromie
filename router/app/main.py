@@ -324,22 +324,11 @@ def _recover_invalid_operational_llm_decision(
     decision: RouteDecision,
     result: CapabilityCatalogResult,
 ) -> RouteDecision:
+    del result
     reason_prefix = (
         f"quick router returned deterministic-only route {decision.route}; "
         "emergency filter did not match"
     )
-    recovered = _catalog_decision(request, result)
-    if recovered is not None and recovered.route == "robot_action":
-        reason = f"{reason_prefix}; recovered catalog robot_action for Agent planning"
-        if decision.reason:
-            reason = f"{reason}; quick_reason={decision.reason}"
-        recovered.reason = reason
-        recovered.metadata = {
-            **(decision.metadata or {}),
-            **(recovered.metadata or {}),
-        }
-        return finalize_decision(recovered, request, source=recovered.source)
-
     return _deep_thought_from_low_confidence(
         request,
         decision,
@@ -486,6 +475,8 @@ async def route(request: RouteRequest) -> RouteDecision:
                         llm_decision,
                         catalog_result,
                     )
+            elif llm_decision.source == "fallback":
+                decision = llm_decision
         if decision is None and settings.mode == "rules_only":
             decision = _catalog_decision(request, catalog_result)
 

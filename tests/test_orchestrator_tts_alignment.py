@@ -19,9 +19,12 @@ if "scipy" not in sys.modules:
 
 from orchestrator.orchestrator import VoiceAssistant
 import orchestrator.orchestrator as orchestrator_module
+from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.route import RouteDecision
+from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
@@ -232,6 +235,39 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIsNone(response)
+
+    def test_direct_llm_prompt_preserves_chromie_robot_identity(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.voice_system_prompt = "Answer briefly for spoken playback."
+        assistant.mind = MindManager(default_mind_profile())
+        assistant.conversation_state = ConversationStateManager(enabled=True)
+        assistant.conversation_state.record_user_turn(
+            "sid-prev",
+            "Hello, how are you?",
+            route="chat",
+            intent="small_talk",
+        )
+        assistant.conversation_state.record_assistant_turn(
+            "sid-prev",
+            "Hello. I am listening.",
+        )
+
+        prompt = assistant._build_direct_llm_prompt(
+            "Can you walk forward for 15 seconds?",
+            "sid-now",
+            fallback_reason="agent_exception",
+            route="robot_action",
+        )
+
+        self.assertIn("You are Chromie speaking as the robot herself", prompt)
+        self.assertIn("name: Chromie", prompt)
+        self.assertIn("age: 6 years old", prompt)
+        self.assertIn("not a backend text model", prompt)
+        self.assertIn("Never say you are text-based", prompt)
+        self.assertIn("Direct fallback reason: agent_exception", prompt)
+        self.assertIn("Route hint: robot_action", prompt)
+        self.assertIn("Hello. I am listening.", prompt)
+        self.assertIn("do not claim you can only respond to text", prompt)
 
     async def test_input_barge_in_does_not_cancel_body_before_routing(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

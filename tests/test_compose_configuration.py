@@ -57,6 +57,19 @@ class ComposeConfigurationTests(unittest.TestCase):
             agent_block,
         )
 
+    def test_agent_service_passes_capability_planner_budget(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        agent_block = compose.split("  chromie-agent:", 1)[1].split(
+            "\nnetworks:",
+            1,
+        )[0]
+
+        self.assertIn("AGENT_CAPABILITY_NUM_CTX: ${AGENT_CAPABILITY_NUM_CTX:-4096}", agent_block)
+        self.assertIn(
+            "AGENT_CAPABILITY_NUM_PREDICT: ${AGENT_CAPABILITY_NUM_PREDICT:-512}",
+            agent_block,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

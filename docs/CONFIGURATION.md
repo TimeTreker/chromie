@@ -218,6 +218,8 @@ strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for automatic route correction; default `0.16`. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
+| `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; default `4096`. |
+| `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; default `512`. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` by default; `legacy-adapter` is the explicit rollback path for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | Default `0`; when enabled, only native contract-validation failures use the compatibility adapter. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |

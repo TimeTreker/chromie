@@ -1134,10 +1134,18 @@ class VoiceAssistant:
         session_id: Optional[str],
         *,
         reset_playback: bool = True,
+        fallback_reason: str | None = None,
+        route: str | None = None,
     ):
+        prompt = self._build_direct_llm_prompt(
+            user_text,
+            session_id,
+            fallback_reason=fallback_reason,
+            route=route,
+        )
         payload = {
             "model": self.ollama_model,
-            "prompt": f"{self.voice_system_prompt}\n\nUser: {user_text}\nAssistant:",
+            "prompt": prompt,
             "stream": True,
             "think": False,
             "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
@@ -1153,7 +1161,7 @@ class VoiceAssistant:
             await self.reset_playback_ordering()
         sentence = ""
         llm_start_ms = now_ms()
-        self.session_log(session_id, "llm_request_start: prompt_chars=%s text=%r think=%s num_ctx=%s num_predict=%s", len(user_text), user_text, payload.get("think"), payload["options"]["num_ctx"], payload["options"]["num_predict"])
+        self.session_log(session_id, "llm_request_start: prompt_chars=%s input_chars=%s text=%r fallback_reason=%s route=%s think=%s num_ctx=%s num_predict=%s", len(prompt), len(user_text), user_text, fallback_reason or "", route or "", payload.get("think"), payload["options"]["num_ctx"], payload["options"]["num_predict"])
         try:
             session = await self.get_http_session()
             async with session.post(self.llm_url, json=payload) as resp:
@@ -1212,6 +1220,84 @@ class VoiceAssistant:
             logger.error("LLM processing failed: %s", exc, exc_info=True)
             self.session_log(session_id, "llm_exception: error=%s", exc)
             self.maybe_session_done(session_id)
+
+    def _build_direct_llm_prompt(
+        self,
+        user_text: str,
+        session_id: str | None,
+        *,
+        fallback_reason: str | None = None,
+        route: str | None = None,
+    ) -> str:
+        mind_summary = self._direct_llm_mind_summary()
+        context_json = self._direct_llm_context_json(session_id)
+        fallback_line = (
+            f"Direct fallback reason: {fallback_reason}."
+            if fallback_reason
+            else "Direct voice mode."
+        )
+        route_line = f"Route hint: {route}." if route else "Route hint: unknown."
+        return (
+            f"{self.voice_system_prompt}\n\n"
+            "You are Chromie speaking as the robot herself.\n"
+            "Chromie's owner-approved mind profile:\n"
+            f"{mind_summary}\n\n"
+            "Hard speaking contract:\n"
+            "- Speak in Chromie's first-person robot persona.\n"
+            "- Chromie is the AI robot in the room, not a backend text model, language model, or provider model.\n"
+            "- Never say you are text-based, a large language model, Gemma, Qwen, Google, OpenAI, or trained by a vendor.\n"
+            "- Reply with only the final spoken response; do not expose reasoning, analysis, JSON, markdown, or internal tool names.\n"
+            "- Normally do not repeat, quote, or paraphrase the user's current words unless confirmation, clarification, or read-back is required.\n"
+            "- Use recent context for follow-up questions, but do not invent tool results or pretend an action ran.\n"
+            "- This direct fallback can speak only. If the user asked for body movement or another action, be honest that Chromie could not start that action and ask them to try again; do not claim you can only respond to text.\n\n"
+            f"{fallback_line}\n"
+            f"{route_line}\n"
+            f"Bounded runtime context JSON: {context_json}\n\n"
+            f"User: {user_text}\n"
+            "Chromie:"
+        )
+
+    def _direct_llm_mind_summary(self) -> str:
+        try:
+            summary = self.mind.prompt_summary()
+        except Exception as exc:
+            logger.warning("direct_llm_mind_summary_failed: %s", exc)
+            summary = ""
+        summary = " ".join(str(summary or "").split())
+        if not summary:
+            return "Identity: Chromie, a 6-year-old female AI robot companion and helper."
+        if len(summary) > 1200:
+            return summary[:1200].rstrip() + "..."
+        return summary
+
+    def _direct_llm_context_json(self, session_id: str | None) -> str:
+        try:
+            conversation = self.conversation_state.snapshot()
+        except Exception as exc:
+            logger.warning("direct_llm_context_snapshot_failed: %s", exc)
+            conversation = {}
+        history = conversation.get("history")
+        if not isinstance(history, list):
+            history = []
+        payload = {
+            "session_id": session_id,
+            "conversation_id": conversation.get("conversation_id"),
+            "recent_history": history[-6:],
+            "active_pending_tasks": conversation.get("active_pending_tasks") or [],
+            "current_task_context": conversation.get("current_task_context"),
+        }
+        return self._compact_json_for_prompt(payload, max_chars=1600)
+
+    @staticmethod
+    def _compact_json_for_prompt(value: Any, *, max_chars: int) -> str:
+        try:
+            text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        except TypeError:
+            text = str(value)
+        text = " ".join(text.split())
+        if len(text) > max_chars:
+            return text[:max_chars].rstrip() + "..."
+        return text
 
     def build_context(self, session_id: str | None) -> dict[str, Any]:
         conversation = self.conversation_state.snapshot()
@@ -1486,7 +1572,14 @@ class VoiceAssistant:
                 intent="unknown",
                 metadata={"source": "router_disabled"},
             )
-            self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
+            self.active_llm_task = asyncio.create_task(
+                self.process_llm_tts(
+                    user_text,
+                    session_id,
+                    fallback_reason="router_disabled",
+                    route="direct_llm",
+                )
+            )
             return
 
         session = await self.get_http_session()
@@ -1543,7 +1636,14 @@ class VoiceAssistant:
                 intent="router_exception",
                 metadata={"source": "router_exception", "error": str(exc)},
             )
-            self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
+            self.active_llm_task = asyncio.create_task(
+                self.process_llm_tts(
+                    user_text,
+                    session_id,
+                    fallback_reason="router_exception",
+                    route="direct_llm",
+                )
+            )
             return
 
         turn_metadata = {
@@ -1584,7 +1684,14 @@ class VoiceAssistant:
             return
 
         if not self.enable_agent or not decision.needs_agent:
-            self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
+            self.active_llm_task = asyncio.create_task(
+                self.process_llm_tts(
+                    user_text,
+                    session_id,
+                    fallback_reason="agent_disabled_or_not_needed",
+                    route=decision.route,
+                )
+            )
             return
 
         deep_thought_ack_scheduled = await self._schedule_deep_thought_ack(
@@ -1692,6 +1799,8 @@ class VoiceAssistant:
                     user_text,
                     session_id,
                     reset_playback=not deep_thought_ack_scheduled,
+                    fallback_reason="agent_exception",
+                    route=decision.route,
                 )
             )
 

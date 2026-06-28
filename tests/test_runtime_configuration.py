@@ -43,6 +43,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
         self.assertEqual(values["OLLAMA_NUM_PARALLEL"], "1")
 
+    def test_capability_planner_has_json_output_budget(self) -> None:
+        values = _common_env()
+        self.assertEqual(values["AGENT_CAPABILITY_NUM_CTX"], "4096")
+        self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "512")
+
     def test_orchestrator_warms_router_and_agent_models_when_router_llm_enabled(self) -> None:
         source = (ROOT / "scripts" / "start_orchestrator.sh").read_text(
             encoding="utf-8"

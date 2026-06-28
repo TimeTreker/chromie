@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
@@ -318,6 +319,10 @@ class CapabilityAgent(BaseAgent):
             "Every enum argument must be copied exactly from that field's enum list in input_schema. "
             "Map natural wording to enum tokens: if enum contains quick and the user says quickly, output quick; "
             "if enum contains slow and the user says slowly, output slow. Never output words outside the enum. "
+            "Only execute a skill when a physical/tool capability is necessary to satisfy the user's current request. "
+            "If the request is a question, identity/name/status request, greeting, joke, story, song, or other speech-only conversation, "
+            "return unsupported with no skills; do not add a body motion merely because a capability is available. "
+            "Never combine an unrelated spoken answer with a body skill. "
             "Use recent conversation and task context to resolve short follow-ups such as durations or 'do that'. "
             "Do not confuse looking/facing/gazing forward with walking forward. If the user says look forward or face forward, "
             "select a gaze/head/attention capability if available, not a walking capability. "
@@ -332,12 +337,32 @@ class CapabilityAgent(BaseAgent):
             f"Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True)}\n"
             "Choose the smallest safe set of executable skills."
         )
-        raw = await self.services.ollama.generate(
-            prompt,
-            system=system,
-            response_format="json",
-            options={"temperature": 0, "top_p": 0.8, "num_predict": 320},
-        )
+        try:
+            raw = await self.services.ollama.generate(
+                prompt,
+                system=system,
+                response_format="json",
+                options={
+                    "temperature": 0,
+                    "top_p": 0.8,
+                    "num_ctx": int(os.getenv("AGENT_CAPABILITY_NUM_CTX", "4096")),
+                    "num_predict": int(os.getenv("AGENT_CAPABILITY_NUM_PREDICT", "512")),
+                },
+            )
+        except Exception as exc:
+            logger.warning(
+                "capability planner LLM failed; returning clarification: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            return _CapabilityPlan(
+                decision="clarify",
+                speech=(
+                    "我刚才没能安全地规划这个动作，请你再说一次。"
+                    if zh
+                    else "I could not safely plan that action. Please try again."
+                ),
+            )
         try:
             return _CapabilityPlan.model_validate(raw)
         except ValidationError as exc:

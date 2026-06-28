@@ -142,6 +142,9 @@ class _Ollama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
         assert kwargs["response_format"] == "json"
+        system = str(kwargs["system"])
+        assert "Only execute a skill when" in system
+        assert "Never combine an unrelated spoken answer with a body skill" in system
         return {
             "decision": "execute",
             "speech": "Walking ahead for 10 minutes.",
@@ -233,6 +236,15 @@ class _FullApiOllama:
                 }
             ],
         }
+
+
+class _BrokenCapabilityPlannerOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Available capability API surface" in prompt
+        assert kwargs["response_format"] == "json"
+        assert kwargs["options"]["num_ctx"] >= 4096
+        assert kwargs["options"]["num_predict"] >= 512
+        raise ValueError("truncated JSON from capability planner")
 
 
 class _FullApiCatalog:
@@ -415,6 +427,40 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             response.metadata["invalid_capability_args"]["errors"],
             ["args has unknown fields: ['duration_s']"],
         )
+
+    async def test_capability_planner_failure_returns_clarification_not_exception(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_BrokenCapabilityPlannerOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "planner-json-failure",
+                "text": "Walk forward for 1 second.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.72,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills, [])
+        self.assertEqual(
+            response.speech[0].text,
+            "I could not safely plan that action. Please try again.",
+        )
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
 
     async def test_capability_plan_uses_task_context_for_look_forward_followup(self) -> None:
         runtime = InteractionRuntime(

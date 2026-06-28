@@ -32,6 +32,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("not physical movement", prompt)
         self.assertIn("you look beautiful", prompt)
         self.assertIn("appearance statements", prompt)
+        self.assertIn("identity, name, age", prompt)
+        self.assertIn("robot-status questions as chat", prompt)
         self.assertIn("deepthinking_agent", prompt)
         self.assertIn("body commands", prompt)
         self.assertIn("robot_action", prompt)
@@ -90,6 +92,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("creative speech-only requests", prompt)
         self.assertIn("'go ahead'", prompt)
         self.assertIn("you look beautiful", prompt)
+        self.assertIn("Identity, name, age", prompt)
+        self.assertIn("robot-status questions are chat", prompt)
         self.assertIn("Do not return interrupt or ignore", prompt)
         self.assertIn("blinking", prompt)
         self.assertIn("metadata.task_relation", prompt)
@@ -215,7 +219,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.confidence, 0.0)
         self.assertNotEqual(decision.intent, "deep_thought_low_confidence")
 
-    async def test_llm_interrupt_output_is_returned_for_pipeline_recovery(self) -> None:
+    async def test_llm_interrupt_output_degrades_to_deep_thought_without_review_model(self) -> None:
         class InterruptRouter(OllamaLLMRouter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
@@ -248,11 +252,47 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         decision = await router.route(request)
 
-        self.assertEqual(decision.route, "interrupt")
-        self.assertEqual(decision.intent, "interrupt")
-        self.assertTrue(decision.interrupt_current)
-        self.assertFalse(decision.needs_agent)
-        self.assertEqual(decision.reason, "interrupted")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_low_confidence")
+        self.assertFalse(decision.interrupt_current)
+        self.assertTrue(decision.needs_agent)
+        self.assertIn("deterministic-only route interrupt", decision.reason or "")
+
+    async def test_review_model_corrects_invalid_interrupt_to_chat(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {"message": {"content": '{"route":"chat","intent":"identity_question"}'}}
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"interrupt","intent":"interrupt",'
+                            '"confidence":0.0,"reason":"interrupted"}'
+                        )
+                    }
+                }
+
+        router = ReviewRouter()
+        decision = await router.route(RouteRequest(text="What's your name?"))
+
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "identity_question")
+        self.assertIn("corrected deterministic-only quick route interrupt", decision.reason or "")
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+        review_system = router.payloads[1]["messages"][0]["content"]
+        self.assertIn("deterministic emergency/noise filter has already run", review_system)
+        self.assertIn("Identity, name, age", review_system)
 
     async def test_review_model_overrides_underspecified_robot_action(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
