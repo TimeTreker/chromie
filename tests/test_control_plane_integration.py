@@ -8,8 +8,37 @@ from agent.app.schema import AgentRunRequest
 from hardware.schema import ActionCommand as HardwareActionCommand
 from hardware.service import HardwareService
 from router.app.fallback import fallback_decision
-from router.app.rules import route_by_rules
-from router.app.schema import RouteRequest
+from router.app.schema import RouteDecision, RouteRequest, finalize_decision
+
+
+def _pose_route(request: RouteRequest) -> RouteDecision:
+    return finalize_decision(
+        RouteDecision(
+            route="robot_action",
+            agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
+            intent="turn_left",
+            confidence=0.95,
+            language="en-US",
+            source="catalog",
+        ),
+        request,
+        source="catalog",
+    )
+
+
+def _motion_route(request: RouteRequest) -> RouteDecision:
+    return finalize_decision(
+        RouteDecision(
+            route="robot_action",
+            agents=["motion_planner_agent", "safety_agent", "speaker_agent"],
+            intent="move_closer_to_user",
+            confidence=0.95,
+            language="en-US",
+            source="catalog",
+        ),
+        request,
+        source="catalog",
+    )
 
 
 class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
@@ -19,9 +48,7 @@ class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_text_to_router_to_agent_to_mock_hardware(self) -> None:
         route_request = RouteRequest(sid="e2e-turn", text="turn left")
-        decision = route_by_rules(route_request)
-        self.assertIsNotNone(decision)
-        assert decision is not None
+        decision = _pose_route(route_request)
 
         agent_request = AgentRunRequest(
             sid=route_request.sid,
@@ -44,9 +71,7 @@ class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(self.hardware.get_action(command.id), hardware_result)
 
     async def test_agent_blocks_motion_when_emergency_stop_is_active(self) -> None:
-        decision = route_by_rules(RouteRequest(sid="blocked", text="come here"))
-        self.assertIsNotNone(decision)
-        assert decision is not None
+        decision = _motion_route(RouteRequest(sid="blocked", text="come here"))
 
         result = await self.runtime.run(
             AgentRunRequest(

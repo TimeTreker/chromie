@@ -11,6 +11,7 @@ try:
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import SkillRequest
 
+from ..capabilities.validator import normalize_args_for_schema
 from ..schema import AgentResult, AgentRunRequest
 from .base import BaseAgent
 
@@ -74,18 +75,22 @@ class CapabilityAgent(BaseAgent):
                 args = action.get("args")
                 if not isinstance(args, dict):
                     args = {}
+                args, normalized = normalize_args_for_schema(args, match.input_schema)
+                metadata = {
+                    "source": "router_actions",
+                    "catalog_version": search.catalog_version,
+                    "catalog_score": match.score,
+                    "sequence": int(action.get("sequence", len(selected_ids))),
+                }
+                if normalized:
+                    metadata["schema_normalized_args"] = True
                 add_skill(
                     SkillRequest(
                         skill_id=capability_id,
                         args=args,
                         timing="sequential",
                         requires_confirmation=match.requires_confirmation,
-                        metadata={
-                            "source": "router_actions",
-                            "catalog_version": search.catalog_version,
-                            "catalog_score": match.score,
-                            "sequence": int(action.get("sequence", len(selected_ids))),
-                        },
+                        metadata=metadata,
                     )
                 )
                 selected_ids.append(capability_id)
@@ -143,31 +148,42 @@ class CapabilityAgent(BaseAgent):
             return result
 
         selected = 0
+        selected_requests: list[SkillRequest] = []
+        selected_matches: list[Any] = []
         for item in plan.skills:
             match = allowed.get(item.skill_id)
             if match is None:
                 logger.warning("LLM selected capability outside candidate set: %s", item.skill_id)
                 continue
+            args, normalized = normalize_args_for_schema(item.args, match.input_schema)
+            metadata = {
+                "source": "capability_catalog",
+                "catalog_version": search.catalog_version,
+                "catalog_score": match.score,
+            }
+            if normalized:
+                metadata["schema_normalized_args"] = True
             request_item = SkillRequest(
                 skill_id=item.skill_id,
-                args=item.args,
+                args=args,
                 timing="sequential",
                 requires_confirmation=match.requires_confirmation,
-                metadata={
-                    "source": "capability_catalog",
-                    "catalog_version": search.catalog_version,
-                    "catalog_score": match.score,
-                },
+                metadata=metadata,
             )
             add_skill(request_item)
+            selected_requests.append(request_item)
+            selected_matches.append(match)
             selected += 1
 
         if selected == 0:
             self.trace(result, "LLM produced no valid capability selection")
             return result
 
-        if plan.speech:
-            result.add_speak_immediate(plan.speech, style="brief")
+        speech = plan.speech
+        if self._uses_body_capability(selected_matches):
+            speech = self._skill_plan_speech(selected_requests)
+        if speech:
+            result.add_speak_immediate(speech, style="brief")
         result.metadata["capability_handled"] = True
         result.metadata["capability_catalog_version"] = search.catalog_version
         result.metadata["capability_selected"] = [
@@ -186,10 +202,31 @@ class CapabilityAgent(BaseAgent):
         skill_id = selected_ids[0]
         args = actions[0].get("args") if actions else {}
         args = args if isinstance(args, dict) else {}
+        return self._skill_plan_speech(
+            [
+                SkillRequest(
+                    skill_id=skill_id,
+                    args=args,
+                )
+            ]
+        )
+
+    def _skill_plan_speech(self, requests: list[SkillRequest]) -> str:
+        if len(requests) > 1:
+            return "I will do those actions in order."
+        if not requests:
+            return "Okay."
+        request = requests[0]
+        skill_id = request.skill_id
+        args = request.args
         if skill_id == "soridormi.walk_velocity":
-            return "Walking backward." if float(args.get("vx_mps", 0.0)) < 0 else "Walking forward."
+            direction = "backward" if float(args.get("vx_mps", 0.0)) < 0 else "forward"
+            return self._movement_speech(f"Walking {direction}", args)
+        if skill_id == "soridormi.walk_forward":
+            return self._movement_speech("Walking forward", args)
         if skill_id == "soridormi.turn_in_place":
-            return "Turning left." if float(args.get("yaw_radps", 0.0)) < 0 else "Turning right."
+            direction = "left" if float(args.get("yaw_radps", 0.0)) < 0 else "right"
+            return self._movement_speech(f"Turning {direction}", args)
         if skill_id == "soridormi.nod_yes":
             return "Nodding."
         if skill_id == "soridormi.shake_no":
@@ -197,6 +234,30 @@ class CapabilityAgent(BaseAgent):
         if skill_id == "soridormi.blink_eyes":
             return "Blinking."
         return "Okay."
+
+    def _movement_speech(self, prefix: str, args: dict[str, Any]) -> str:
+        duration = args.get("duration_s")
+        if isinstance(duration, (int, float)) and not isinstance(duration, bool) and duration > 0:
+            return f"{prefix} for {self._format_seconds(float(duration))}."
+        return f"{prefix}."
+
+    @staticmethod
+    def _format_seconds(value: float) -> str:
+        rounded = round(value, 1)
+        if rounded.is_integer():
+            amount = int(rounded)
+            unit = "second" if amount == 1 else "seconds"
+            return f"{amount} {unit}"
+        return f"{rounded:g} seconds"
+
+    @staticmethod
+    def _uses_body_capability(matches: list[Any]) -> bool:
+        for match in matches:
+            capability_id = str(getattr(match, "capability_id", "") or "")
+            effects = list(getattr(match, "effects", []) or [])
+            if capability_id.startswith("soridormi.") or "physical_motion" in effects:
+                return True
+        return False
 
     async def _plan(self, request: AgentRunRequest, candidates: list[Any]) -> _CapabilityPlan:
         assert self.services.ollama is not None
@@ -217,6 +278,10 @@ class CapabilityAgent(BaseAgent):
             "Never invent a skill. Never output raw joint, motor, actuator, position-array, or torque controls. "
             "Return JSON only with keys decision, speech, and skills. decision is execute, clarify, or unsupported. "
             "For execute, every skills item must contain skill_id and args satisfying that candidate's input_schema. "
+            "Schema obedience is more important than copying the user's words. "
+            "Every enum argument must be copied exactly from that field's enum list in input_schema. "
+            "Map natural wording to enum tokens: if enum contains quick and the user says quickly, output quick; "
+            "if enum contains slow and the user says slowly, output slow. Never output words outside the enum. "
             "Use clarify when a required safe parameter is missing. Use unsupported when none of the candidates can satisfy the request. "
             "Keep speech short and suitable for voice."
         )

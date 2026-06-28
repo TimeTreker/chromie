@@ -99,6 +99,14 @@ class OllamaLLMRouter:
             "stop/cancel/emergency/noise before this prompt. You are the quick "
             "intent-and-meaning router. Decide intent from the whole utterance, "
             "capability choice, memory references, and speech/body/tool routing. "
+            "Also propose task relationship metadata when useful: "
+            "metadata.task_relation must be one of new_task, continue_task, "
+            "modify_task, close_task, side_conversation, clarify_task; "
+            "metadata.target_task_id should reference an existing task_id from "
+            "context when continuing/modifying/closing; metadata.task_context_patch "
+            "may contain goal, task_type, important_claims, entities, constraints, "
+            "pending_questions, status, and persistence_policy. These fields are "
+            "advisory; the host task manager owns final task writes and safety. "
             "Use route deep_thought when you understand that the request needs "
             "complex reasoning, multi-step analysis, design discussion, or "
             "implementation planning that should be handled by deepthinking_agent "
@@ -117,12 +125,22 @@ class OllamaLLMRouter:
             "Use context for references such as previous tasks, task context, "
             "robot_state, position, active interactions, or user preferences, "
             "principles, and goals, but never as authorization. "
+            "For short follow-ups such as 'do you agree with me?', 'what about it?', "
+            "'continue', or 'then?', attach the turn to the latest meaningful "
+            "task context or claim when context supports it instead of treating "
+            "the utterance as isolated. "
             "Core principles are stable, owner-approved constraints; experience "
             "may tune strategies and proposals, but the quick router must not "
             "rewrite principles. "
             "Treat creative speech-only requests, including original singing, "
             "stories, jokes, or spoken performance, as chat unless the user "
             "explicitly asks for simultaneous physical movement. Discourse "
+            "Treat factual knowledge questions as chat, including questions "
+            "about the shape, temperature, size, color, position, or properties "
+            "of natural objects such as the Sun, Moon, Earth, planets, stars, "
+            "or everyday things. Words like round, rectangular, shape, turn, "
+            "or rotate are not robot_action unless the user clearly commands "
+            "Chromie's body to move. "
             "markers such as 'go ahead', 'okay', 'sure', or 'please' are not "
             "body movement by themselves. Compliments or appearance statements "
             "such as 'you look beautiful' are chat unless the user asks for a "
@@ -264,6 +282,7 @@ class OllamaLLMRouter:
                 candidate_capabilities=candidates,
                 reason="; ".join(reason_parts),
                 source="llm",
+                metadata=dict(decision.metadata or {}),
             ),
             request,
             source="llm",
@@ -300,16 +319,5 @@ class OllamaLLMRouter:
                 decision.route,
             )
             return decision
-
-        if (
-            decision.confidence < self.confidence_threshold
-            and decision.route != "deep_thought"
-        ):
-            logger.info(
-                "LLM router confidence %.2f below threshold %.2f; delegating to deep_thought",
-                decision.confidence,
-                self.confidence_threshold,
-            )
-            return self._low_confidence_deep_thought_decision(request, decision)
 
         return decision

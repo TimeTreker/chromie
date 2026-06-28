@@ -1,13 +1,25 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
 from collections import deque
+from pathlib import Path
 from typing import Any, Deque
 
 
 _DONE_TASK_STATUSES = {"done", "failed", "cancelled", "canceled", "expired"}
+_TASK_RELATIONS = {
+    "new_task",
+    "continue_task",
+    "modify_task",
+    "close_task",
+    "side_conversation",
+    "clarify_task",
+}
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_TASK_STORE_PATH = ".chromie/conversation/task_contexts.json"
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -145,6 +157,8 @@ class ConversationStateManager:
         max_context_chars: int = 2200,
         max_pending_tasks: int = 8,
         completed_task_retention_sec: int = 180,
+        task_store_enabled: bool = False,
+        task_store_path: str | os.PathLike[str] | None = None,
         reset_phrases: tuple[str, ...] = DEFAULT_RESET_PHRASES,
         followup_phrases: tuple[str, ...] = DEFAULT_FOLLOWUP_PHRASES,
         new_topic_starters: tuple[str, ...] = DEFAULT_NEW_TOPIC_STARTERS,
@@ -158,6 +172,9 @@ class ConversationStateManager:
         self.max_context_chars = max(200, int(max_context_chars))
         self.max_pending_tasks = max(0, int(max_pending_tasks))
         self.completed_task_retention_sec = max(0, int(completed_task_retention_sec))
+        self.task_store_enabled = bool(task_store_enabled)
+        self.task_store_path = self._resolve_task_store_path(task_store_path)
+        self.last_task_store_error: str | None = None
         self.reset_phrases = tuple(p.lower() for p in reset_phrases)
         self.followup_phrases = tuple(p.lower() for p in followup_phrases)
         self.new_topic_starters = tuple(p.lower() for p in new_topic_starters)
@@ -168,7 +185,10 @@ class ConversationStateManager:
         self.last_activity_ms = self.started_ms
         self._turns: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_turns * 2))
         self._pending_tasks: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_pending_tasks))
+        self._task_contexts: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_pending_tasks))
         self.last_split_reason: str | None = None
+        if self.task_store_enabled:
+            self._restore_task_contexts()
 
     @classmethod
     def from_env(cls) -> "ConversationStateManager":
@@ -190,10 +210,19 @@ class ConversationStateManager:
                 os.getenv("ORCH_CONVERSATION_MAX_PENDING_TASKS", os.getenv("ORCH_CONTEXT_MAX_PENDING_TASKS", "8"))
             ),
             completed_task_retention_sec=int(os.getenv("ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC", "180")),
+            task_store_enabled=_env_bool("ORCH_ENABLE_TASK_CONTEXT_STORE", False),
+            task_store_path=os.getenv("ORCH_TASK_CONTEXT_STORE_PATH", _DEFAULT_TASK_STORE_PATH),
             reset_phrases=_split_phrases(os.getenv("ORCH_CONVERSATION_RESET_PHRASES"), DEFAULT_RESET_PHRASES),
             followup_phrases=_split_phrases(os.getenv("ORCH_CONVERSATION_FOLLOWUP_PHRASES"), DEFAULT_FOLLOWUP_PHRASES),
             new_topic_starters=_split_phrases(os.getenv("ORCH_CONVERSATION_NEW_TOPIC_STARTERS"), DEFAULT_NEW_TOPIC_STARTERS),
         )
+
+    @staticmethod
+    def _resolve_task_store_path(path: str | os.PathLike[str] | None) -> Path:
+        resolved = Path(path or _DEFAULT_TASK_STORE_PATH).expanduser()
+        if not resolved.is_absolute():
+            resolved = _PROJECT_ROOT / resolved
+        return resolved
 
     def _compact_text(self, text: str | None, *, limit: int | None = None) -> str:
         text = " ".join((text or "").strip().split())
@@ -202,13 +231,107 @@ class ConversationStateManager:
             return text[:max_len].rstrip() + "…"
         return text
 
+    def _new_task_id(self) -> str:
+        return f"task_{int(_now_ms())}_{len(self._task_contexts) + 1}"
+
+    def _json_safe(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {str(key): self._json_safe(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._json_safe(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._json_safe(item) for item in value]
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
+
+    def _durable_task_contexts(self) -> list[dict[str, Any]]:
+        if self.max_pending_tasks <= 0:
+            return []
+        durable: list[dict[str, Any]] = []
+        for context in self._task_contexts:
+            status = str(context.get("status") or "open").lower()
+            if status in _DONE_TASK_STATUSES:
+                continue
+            policy = str(context.get("persistence_policy") or "persist_if_unfinished").lower()
+            if policy in {"ephemeral", "memory_only", "do_not_persist", "none"}:
+                continue
+            durable.append(self._json_safe(dict(context)))
+        return durable[-self.max_pending_tasks :]
+
+    def persist_task_contexts(self) -> bool:
+        if not self.enabled or not self.task_store_enabled:
+            return False
+        payload = {
+            "version": 1,
+            "conversation_id": self.conversation_id,
+            "saved_ms": _now_ms(),
+            "task_contexts": self._durable_task_contexts(),
+        }
+        try:
+            self.task_store_path.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = self.task_store_path.with_name(self.task_store_path.name + ".tmp")
+            temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+            temp_path.replace(self.task_store_path)
+            self.last_task_store_error = None
+            return True
+        except OSError as exc:
+            self.last_task_store_error = str(exc)
+            return False
+
+    def _persist_task_contexts_if_enabled(self) -> None:
+        self.persist_task_contexts()
+
+    def _restore_task_contexts(self) -> None:
+        if self.max_pending_tasks <= 0:
+            return
+        if not self.task_store_path.exists():
+            return
+        try:
+            payload = json.loads(self.task_store_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            self.last_task_store_error = str(exc)
+            return
+        raw_contexts = payload.get("task_contexts") if isinstance(payload, dict) else payload
+        if not isinstance(raw_contexts, list):
+            return
+        now = _now_ms()
+        restored: list[dict[str, Any]] = []
+        for item in raw_contexts[-self.max_pending_tasks :]:
+            if not isinstance(item, dict):
+                continue
+            original_status = str(item.get("status") or "open")
+            if original_status.lower() in _DONE_TASK_STATUSES:
+                continue
+            context = dict(item)
+            context["conversation_id"] = self.conversation_id
+            context["status"] = "recoverable"
+            context["task_relation"] = "continue_task"
+            context["updated_ms"] = now
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            context["metadata"] = {
+                **metadata,
+                "restored_from_task_store": True,
+                "restored_original_status": original_status,
+                "restored_ms": now,
+            }
+            if not isinstance(context.get("related_sids"), list):
+                context["related_sids"] = []
+            restored.append(context)
+        if restored:
+            self._task_contexts = deque(restored, maxlen=max(1, self.max_pending_tasks))
+            self.last_split_reason = "restored_task_contexts"
+            self.last_task_store_error = None
+
     @staticmethod
     def _normalized(text: str | None) -> str:
         text = " ".join((text or "").strip().lower().split())
         return text
 
     def _has_any_context(self) -> bool:
-        return bool(self._turns or self._pending_tasks)
+        return bool(self._turns or self._pending_tasks or self._task_contexts)
 
     def _active_pending_tasks(self) -> list[dict[str, Any]]:
         self._prune_completed_tasks()
@@ -218,6 +341,208 @@ class ConversationStateManager:
             if status not in _DONE_TASK_STATUSES:
                 tasks.append(task)
         return tasks
+
+    def _active_task_contexts(self) -> list[dict[str, Any]]:
+        contexts: list[dict[str, Any]] = []
+        for context in self._task_contexts:
+            status = str(context.get("status") or "open").lower()
+            if status not in _DONE_TASK_STATUSES:
+                contexts.append(context)
+        return contexts
+
+    def _current_task_context(self) -> dict[str, Any] | None:
+        active = self._active_task_contexts()
+        if active:
+            return active[-1]
+        if self._task_contexts:
+            return self._task_contexts[-1]
+        return None
+
+    def _task_context_by_id(self, task_id: str | None) -> dict[str, Any] | None:
+        if not task_id:
+            return None
+        for context in reversed(self._task_contexts):
+            if str(context.get("task_id") or "") == task_id:
+                return context
+        return None
+
+    def _looks_like_meaningful_task_text(self, text: str | None) -> bool:
+        normalized = self._normalized(text)
+        if not normalized:
+            return False
+        if len(normalized) <= 2:
+            return False
+        if normalized in {"ok", "okay", "done", "then", "or", "and", "the", "um", "uh"}:
+            return False
+        words = normalized.split()
+        if len(words) <= 2 and normalized.endswith((",", ";", ":")):
+            return False
+        return True
+
+    @staticmethod
+    def _string_list(value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text:
+                out.append(text)
+        return out
+
+    def _merge_string_list(self, current: Any, new_items: Any, *, max_items: int = 8) -> list[str]:
+        merged: list[str] = []
+        seen: set[str] = set()
+        for item in [*self._string_list(current), *self._string_list(new_items)]:
+            key = item.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(self._compact_text(item, limit=180))
+        return merged[-max_items:]
+
+    @staticmethod
+    def _task_patch_from_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+        if not isinstance(metadata, dict):
+            return {}
+        patch = metadata.get("task_context_patch") or metadata.get("task_context")
+        return patch if isinstance(patch, dict) else {}
+
+    @staticmethod
+    def _task_relation_from_metadata(metadata: dict[str, Any] | None) -> str | None:
+        if not isinstance(metadata, dict):
+            return None
+        relation = str(metadata.get("task_relation") or "").strip()
+        return relation if relation in _TASK_RELATIONS else None
+
+    def _default_task_type(self, route: str | None, intent: str | None) -> str:
+        route = str(route or "chat").strip() or "chat"
+        intent = str(intent or "").strip()
+        if route == "robot_action":
+            return "robot_action"
+        if route in {"tool", "memory", "deep_thought"}:
+            return route
+        if intent:
+            return intent
+        return "conversation"
+
+    def _infer_task_relation(
+        self,
+        text: str,
+        *,
+        route: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> str | None:
+        relation = self._task_relation_from_metadata(metadata)
+        if relation:
+            return relation
+        if not self._looks_like_meaningful_task_text(text):
+            return None
+        if self.is_followup_reference(text) and self._current_task_context():
+            return "continue_task"
+        route = str(route or "").strip()
+        if route in {"robot_action", "tool", "memory", "deep_thought"}:
+            return "new_task"
+        return "side_conversation"
+
+    def _record_task_context_from_user_turn(
+        self,
+        *,
+        sid: str | None,
+        text: str,
+        route: str | None,
+        intent: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> None:
+        if not self.enabled or route == "ignore":
+            return
+        relation = self._infer_task_relation(text, route=route, metadata=metadata)
+        if relation is None:
+            return
+
+        patch = self._task_patch_from_metadata(metadata)
+        target_task_id = str((metadata or {}).get("target_task_id") or patch.get("task_id") or "").strip()
+        context = self._task_context_by_id(target_task_id)
+        if context is None and relation in {"continue_task", "modify_task", "close_task", "clarify_task"}:
+            context = self._current_task_context()
+        if context is None and relation in {"continue_task", "modify_task", "close_task", "clarify_task"}:
+            return
+
+        if context is None or relation in {"new_task", "side_conversation"}:
+            task_id = target_task_id or self._new_task_id()
+            now = _now_ms()
+            context = {
+                "task_id": task_id,
+                "conversation_id": self.conversation_id,
+                "status": "open",
+                "task_relation": relation,
+                "task_type": str(patch.get("task_type") or self._default_task_type(route, intent)),
+                "goal": self._compact_text(str(patch.get("goal") or text), limit=220),
+                "important_claims": [],
+                "entities": [],
+                "constraints": {},
+                "pending_questions": [],
+                "last_meaningful_user_turn": None,
+                "last_assistant_response": None,
+                "related_sids": [],
+                "created_ms": now,
+                "updated_ms": now,
+                "persistence_policy": str(
+                    patch.get("persistence_policy") or "persist_if_unfinished"
+                ),
+                "metadata": {},
+            }
+            self._task_contexts.append(context)
+
+        now = _now_ms()
+        context["task_relation"] = relation
+        context["updated_ms"] = now
+        context["last_meaningful_user_turn"] = self._compact_text(text, limit=220)
+        context["task_type"] = str(patch.get("task_type") or context.get("task_type") or self._default_task_type(route, intent))
+        if patch.get("goal"):
+            context["goal"] = self._compact_text(str(patch.get("goal")), limit=220)
+        context["important_claims"] = self._merge_string_list(
+            context.get("important_claims"),
+            patch.get("important_claims") or patch.get("claims"),
+        )
+        if not context["important_claims"] and route == "chat":
+            context["important_claims"] = [self._compact_text(text, limit=180)]
+        context["entities"] = self._merge_string_list(context.get("entities"), patch.get("entities"))
+        context["pending_questions"] = self._merge_string_list(
+            context.get("pending_questions"),
+            patch.get("pending_questions") or patch.get("questions"),
+            max_items=4,
+        )
+        constraints = context.get("constraints")
+        if not isinstance(constraints, dict):
+            constraints = {}
+        patch_constraints = patch.get("constraints")
+        if isinstance(patch_constraints, dict):
+            constraints = {**constraints, **patch_constraints}
+        context["constraints"] = constraints
+        related_sids = context.get("related_sids")
+        if not isinstance(related_sids, list):
+            related_sids = []
+        if sid and sid not in related_sids:
+            related_sids.append(sid)
+        context["related_sids"] = related_sids[-12:]
+        meta = context.get("metadata")
+        if not isinstance(meta, dict):
+            meta = {}
+        context["metadata"] = {
+            **meta,
+            "last_route": route,
+            "last_intent": intent,
+            "source": (metadata or {}).get("source"),
+            "confidence": (metadata or {}).get("confidence"),
+        }
+        if relation == "close_task":
+            context["status"] = str(patch.get("status") or "done")
+        self._persist_task_contexts_if_enabled()
 
     def _prune_completed_tasks(self, now_ms: float | None = None) -> None:
         if not self._pending_tasks:
@@ -281,6 +606,8 @@ class ConversationStateManager:
         self.last_activity_ms = self.started_ms
         self._turns.clear()
         self._pending_tasks.clear()
+        self._task_contexts.clear()
+        self._persist_task_contexts_if_enabled()
         self.last_split_reason = reason
         return {
             "started_new": True,
@@ -353,6 +680,8 @@ class ConversationStateManager:
 
     def session_memory(self) -> dict[str, Any]:
         active_tasks = self._active_pending_tasks()
+        active_task_contexts = self._active_task_contexts()
+        current_task_context = self._current_task_context()
         latest_user = self._latest_turn("user")
         latest_assistant = self._latest_turn("assistant")
         summaries = [
@@ -366,12 +695,20 @@ class ConversationStateManager:
                 "summary": "; ".join(summaries),
                 "tasks": active_tasks[-4:],
             }
+        elif current_task_context:
+            current_task = {
+                "status": current_task_context.get("status") or "open",
+                "summary": current_task_context.get("goal") or current_task_context.get("task_type") or "task",
+                "task_context": current_task_context,
+            }
         return {
             "kind": "short_term_session_memory",
             "conversation_id": self.conversation_id,
             "recent_user_request": latest_user.get("text") if latest_user else None,
             "recent_assistant_response": latest_assistant.get("text") if latest_assistant else None,
             "current_task": current_task,
+            "current_task_context": current_task_context,
+            "active_task_contexts": active_task_contexts[-4:],
             "active_pending_tasks": active_tasks[-4:],
             "forgetting_policy": {
                 "explicit_reset_clears_history_and_tasks": True,
@@ -393,7 +730,15 @@ class ConversationStateManager:
             "history": self.get_history(),
             "pending_tasks": self.get_pending_tasks(),
             "active_pending_tasks": self._active_pending_tasks(),
+            "task_contexts": list(self._task_contexts),
+            "active_task_contexts": self._active_task_contexts(),
+            "current_task_context": self._current_task_context(),
             "session_memory": self.session_memory(),
+            "task_store": {
+                "enabled": self.task_store_enabled,
+                "path": str(self.task_store_path),
+                "last_error": self.last_task_store_error,
+            },
             "limits": {
                 "max_turns": self.max_turns,
                 "max_context_chars": self.max_context_chars,
@@ -432,6 +777,13 @@ class ConversationStateManager:
                 "metadata": metadata or {},
             }
         )
+        self._record_task_context_from_user_turn(
+            sid=sid,
+            text=compact,
+            route=route,
+            intent=intent,
+            metadata=metadata,
+        )
         self.last_activity_ms = _now_ms()
 
     def record_assistant_turn(
@@ -456,6 +808,11 @@ class ConversationStateManager:
                 "metadata": metadata or {},
             }
         )
+        current_task = self._current_task_context()
+        if current_task is not None:
+            current_task["last_assistant_response"] = compact
+            current_task["updated_ms"] = _now_ms()
+            self._persist_task_contexts_if_enabled()
         self.last_activity_ms = _now_ms()
 
     def record_pending_task(
@@ -483,6 +840,19 @@ class ConversationStateManager:
                 "metadata": metadata or {},
             }
         )
+        current_task = self._current_task_context()
+        if current_task is not None:
+            current_task["status"] = status or "pending"
+            current_task["updated_ms"] = timestamp_ms
+            meta = current_task.get("metadata")
+            if not isinstance(meta, dict):
+                meta = {}
+            current_task["metadata"] = {
+                **meta,
+                "pending_task_type": task_type,
+                **(metadata or {}),
+            }
+            self._persist_task_contexts_if_enabled()
         self.last_activity_ms = _now_ms()
 
     def update_pending_task_status(
@@ -502,6 +872,11 @@ class ConversationStateManager:
                 continue
             task["status"] = status
             task["updated_ms"] = _now_ms()
+            current_task = self._current_task_context()
+            if current_task is not None:
+                current_task["status"] = status
+                current_task["updated_ms"] = task["updated_ms"]
+                self._persist_task_contexts_if_enabled()
             self.last_activity_ms = _now_ms()
             return True
         return False
@@ -561,6 +936,18 @@ class ConversationStateManager:
             else:
                 task["status"] = final_status
             task["updated_ms"] = _now_ms()
+            for context in reversed(self._task_contexts):
+                metadata = context.get("metadata")
+                if not isinstance(metadata, dict):
+                    continue
+                request_ids = metadata.get("request_ids")
+                if isinstance(request_ids, str):
+                    request_ids = [request_ids]
+                if isinstance(request_ids, list) and request_id in request_ids:
+                    context["status"] = task["status"]
+                    context["updated_ms"] = task["updated_ms"]
+                    self._persist_task_contexts_if_enabled()
+                    break
             self.last_activity_ms = _now_ms()
             return True
         return False

@@ -22,6 +22,13 @@ class MindProfileTests(unittest.TestCase):
         profile = default_mind_profile()
 
         self.assertTrue(profile.owner_approved)
+        self.assertEqual(profile.identity.name, "Chromie")
+        self.assertEqual(profile.identity.kind, "AI robot")
+        self.assertEqual(profile.identity.gender, "female")
+        self.assertEqual(profile.identity.age_description, "6 years old")
+        self.assertIn("keep people company", profile.identity.short_self_description)
+        self.assertIn("not as a large language model", profile.identity.model_identity_boundary)
+        self.assertIn("she", profile.identity.pronouns)
         self.assertGreaterEqual(len(profile.core_principles), 3)
         self.assertTrue(
             all(not principle.mutable_by_experience for principle in profile.core_principles)
@@ -33,6 +40,10 @@ class MindProfileTests(unittest.TestCase):
             )
         )
         self.assertIn("owner-approved", profile.prompt_summary())
+        self.assertIn("Identity", profile.prompt_summary())
+        self.assertIn("Chromie", profile.prompt_summary())
+        self.assertIn("model identity boundary", profile.prompt_summary())
+        self.assertEqual(profile.prompt_context()["identity"]["name"], "Chromie")
 
     def test_rejects_experience_mutable_core_principle(self) -> None:
         with self.assertRaisesRegex(ValueError, "cannot be mutable by experience"):

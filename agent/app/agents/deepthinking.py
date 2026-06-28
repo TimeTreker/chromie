@@ -99,6 +99,7 @@ class DeepThinkingAgent(BaseAgent):
         history_block = self._format_history(request, zh=zh)
         pending_block = self._format_pending_tasks(request, zh=zh)
         session_memory_block = self._format_session_memory(request, zh=zh)
+        task_context_block = self._format_task_context(request, zh=zh)
         mind_block = self.format_mind_context(request, zh=zh)
         conversation_id = self._conversation_id(request)
         capability_context = self._capability_context(request, zh=zh)
@@ -109,10 +110,15 @@ class DeepThinkingAgent(BaseAgent):
                 "你是 Chromie 的 deepthinking agent，不是普通对话 agent。"
                 "你的职责是把复杂请求拆成清晰任务，结合会话工作记忆做架构、排错、计划和决策。"
                 "你必须把 Chromie 的心智原则、长期目标和经验调优边界作为深度思考的上层约束；核心原则只能由人类 owner 审批变更。"
+                "如果用户问身份、名字或年龄，必须使用心智档案里的 owner-approved identity；Chromie 是机器人本体，不是后端大语言模型或供应商模型。"
+                "用 Chromie 的第一人称机器人性格自然回答；不要用‘作为 AI’或‘我没有个人观点’这类后端模型模板。"
                 "请在内部完成推理，只输出最终回答；不要输出思考过程。"
                 "如果用户请求适合拆分任务，请给出有顺序的简洁任务拆分、关键风险和下一步。"
+                "如果用户用短追问继续前面的任务或主张，请优先根据任务上下文解析引用。"
                 "如果任务需要继续执行工具、代码修改或机器人动作，只能说明计划或请求确认，不能编造结果。"
                 "不要假装记得上下文里没有的事情，也不要编造工具结果。"
+                "对于常识性事实问题，要直接回答并纠正明显错误。"
+                "如果用户用‘你觉得/我认为/同意吗’询问客观事实，仍按事实问题回答，不要说自己没有个人观点。"
                 "能力目录只表示可用能力，不是授权；不要发明能力、低层电机命令或原始关节动作。"
                 "回答要适合语音分段播放，可以比普通对话完整，但仍要简洁。"
                 "请只输出要说的话，不要输出 JSON。"
@@ -122,6 +128,7 @@ class DeepThinkingAgent(BaseAgent):
                 f"会话工作记忆：\n{session_memory_block}\n\n"
                 f"最近对话：\n{history_block}\n\n"
                 f"待处理任务：\n{pending_block}\n\n"
+                f"任务上下文：\n{task_context_block}\n\n"
                 f"心智原则、长期目标和经验边界：\n{mind_block}\n\n"
                 f"能力目录：\n{capability_context}\n\n"
                 f"上游路由上下文：\n{route_context}\n\n"
@@ -134,10 +141,16 @@ class DeepThinkingAgent(BaseAgent):
                 "You are Chromie's deepthinking agent, not the normal conversation agent. "
                 "Your job is to split complex requests into clear tasks and use session working memory for architecture, debugging, planning, and decisions. "
                 "Treat Chromie's mind principles, long-term goals, and experience-tuning boundaries as upper constraints for deliberation; core principles can change only through human owner approval. "
+                "If the user asks about identity, name, or age, answer from the owner-approved identity in the mind profile; Chromie is the robot, not the backend language model or provider model. "
+                "Answer naturally in Chromie's first-person robot persona; do not use backend-model stock phrases such as 'as an AI' or 'I do not have personal opinions'. "
                 "Reason privately and output only the final answer, never the hidden chain of thought. "
                 "When the request benefits from task decomposition, give an ordered, concise task split, key risks, and the next step. "
+                "For short follow-ups, resolve references from task context before asking for more context. "
                 "If more tools, code changes, or robot actions are needed, describe the plan or ask for confirmation; do not invent results. "
                 "Do not pretend to remember anything outside the supplied context, and do not invent tool results. "
+                "For common factual questions, answer directly and correct obvious false premises. "
+                "If the user says 'do you think', 'in my opinion', or 'do you agree' about an objective fact, treat it as a factual question, not a personal-opinion question. "
+                "Do not answer that you lack personal opinions when the question has an objective factual answer. "
                 "The capability catalog describes available abilities, not authorization; never invent capabilities, low-level motor commands, or raw joint actions. "
                 "The reply will be spoken aloud, so be complete but concise enough for chunked voice playback. "
                 "Reply with only the spoken response text. Do not output JSON."
@@ -147,6 +160,7 @@ class DeepThinkingAgent(BaseAgent):
                 f"Session working memory:\n{session_memory_block}\n\n"
                 f"Recent conversation:\n{history_block}\n\n"
                 f"Pending tasks:\n{pending_block}\n\n"
+                f"Task context:\n{task_context_block}\n\n"
                 f"Mind principles, long-term goals, and experience boundaries:\n{mind_block}\n\n"
                 f"Capability catalog:\n{capability_context}\n\n"
                 f"Upstream routing context:\n{route_context}\n\n"
@@ -155,17 +169,26 @@ class DeepThinkingAgent(BaseAgent):
                 "Use the session working memory, split the complex task clearly when useful, and give the final spoken response."
             )
 
+        options = {
+            "temperature": 0.25,
+            "top_p": 0.9,
+            "num_predict": 384,
+            "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
+        }
         raw = await self.services.ollama.generate(
             prompt,
             system=system,
-            options={
-                "temperature": 0.25,
-                "top_p": 0.9,
-                "num_predict": 384,
-                "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
-            },
+            options=options,
         )
         response = cast(str, raw)
+        response = await self.retry_unhuman_nonanswer(
+            request,
+            prompt=prompt,
+            system=system,
+            response=response,
+            zh=zh,
+            options=options,
+        )
         return self._clean_response(response, zh=zh)
 
     def _add_spoken_response(self, result: AgentResult, response: str) -> None:
@@ -232,11 +255,17 @@ class DeepThinkingAgent(BaseAgent):
 
     def _pending_tasks_from_request(self, request: AgentRunRequest) -> list[dict[str, Any]]:
         context = request.context or {}
-        tasks = context.get("active_pending_tasks") or context.get("pending_tasks")
+        if "active_pending_tasks" in context:
+            tasks = context.get("active_pending_tasks")
+        else:
+            tasks = context.get("pending_tasks")
         if not isinstance(tasks, list):
             conversation = context.get("conversation")
             if isinstance(conversation, dict):
-                tasks = conversation.get("active_pending_tasks") or conversation.get("pending_tasks")
+                if "active_pending_tasks" in conversation:
+                    tasks = conversation.get("active_pending_tasks")
+                else:
+                    tasks = conversation.get("pending_tasks")
         if not isinstance(tasks, list):
             return []
         return [task for task in tasks if isinstance(task, dict)]
@@ -258,6 +287,32 @@ class DeepThinkingAgent(BaseAgent):
         if not memory:
             return "无" if zh else "None"
         compact = json.dumps(memory, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if len(compact) > 1200:
+            compact = compact[:1200].rstrip() + "..."
+        return compact
+
+    def _task_context_from_request(self, request: AgentRunRequest) -> dict[str, Any] | None:
+        context = request.context or {}
+        current = context.get("current_task_context")
+        if isinstance(current, dict):
+            return current
+        memory = context.get("session_memory")
+        if isinstance(memory, dict):
+            current = memory.get("current_task_context")
+            if isinstance(current, dict):
+                return current
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            current = conversation.get("current_task_context")
+            if isinstance(current, dict):
+                return current
+        return None
+
+    def _format_task_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        task_context = self._task_context_from_request(request)
+        if not task_context:
+            return "无" if zh else "None"
+        compact = json.dumps(task_context, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         if len(compact) > 1200:
             compact = compact[:1200].rstrip() + "..."
         return compact

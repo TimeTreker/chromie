@@ -15,6 +15,7 @@ from .mind import (
     LongTermGoal,
     MindProfile,
     MindUpdateProposal,
+    RobotIdentity,
     default_mind_profile,
 )
 from .session import SessionContext
@@ -38,6 +39,7 @@ __all__ = [
     "LongTermGoal",
     "MindProfile",
     "MindUpdateProposal",
+    "RobotIdentity",
     "default_mind_profile",
     "SessionContext",
 ]

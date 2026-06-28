@@ -6,11 +6,7 @@ from unittest.mock import patch
 
 from router.app.config import router_mode_from_env
 from router.app.fallback import fallback_decision
-from router.app.rules import (
-    route_by_deep_thought_rules,
-    route_by_priority_rules,
-    route_by_rules,
-)
+from router.app.rules import route_by_priority_rules
 from router.app.schema import RouteRequest
 
 
@@ -28,7 +24,7 @@ class RouterCoreTests(unittest.TestCase):
             "请停止移动",
         ):
             with self.subTest(text=text):
-                decision = route_by_rules(RouteRequest(sid="s1", text=text))
+                decision = route_by_priority_rules(RouteRequest(sid="s1", text=text))
 
                 self.assertIsNotNone(decision)
                 assert decision is not None
@@ -50,34 +46,42 @@ class RouterCoreTests(unittest.TestCase):
         self.assertFalse(decision.needs_agent)
         self.assertFalse(decision.should_speak)
 
-    def test_rules_route_robot_action(self) -> None:
-        decision = route_by_rules(RouteRequest(sid="s2", text="turn left"))
+    def test_priority_rules_do_not_stop_on_negated_or_contextual_stop(self) -> None:
+        for text in (
+            "Don't stop talking.",
+            "Do not stop speaking.",
+            "Can you explain what stop means?",
+            "The stop sign is red.",
+            "Stop by the table means visit the table.",
+        ):
+            with self.subTest(text=text):
+                self.assertIsNone(route_by_priority_rules(RouteRequest(sid="s-safe", text=text)))
+
+    def test_priority_rules_ignore_repeated_ack_hallucination(self) -> None:
+        text = "All right. All right. All right. All right. All right. All right."
+
+        decision = route_by_priority_rules(RouteRequest(sid="s-ack", text=text))
 
         self.assertIsNotNone(decision)
         assert decision is not None
-        self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "turn_left")
-        self.assertEqual(decision.actions[0]["type"], "head.turn")
+        self.assertEqual(decision.route, "ignore")
+        self.assertEqual(decision.intent, "repeated_filler_or_asr_hallucination")
+        self.assertFalse(decision.needs_agent)
+        self.assertFalse(decision.should_speak)
 
-    def test_explicit_deep_thought_rule_routes_planning_requests(self) -> None:
+    def test_priority_rules_do_not_ignore_ack_with_meaningful_request(self) -> None:
         for text in (
-            "Please think deeply and make an implementation plan.",
-            "请深入思考并给我一个实现计划。",
+            "All right, walk forward quickly.",
+            "All right. All right. Can you walk forward quickly?",
+            "All right. All right. All right. All right. Walk forward quickly.",
         ):
             with self.subTest(text=text):
-                decision = route_by_deep_thought_rules(RouteRequest(sid="deep", text=text))
-
-                self.assertIsNotNone(decision)
-                assert decision is not None
-                self.assertEqual(decision.route, "deep_thought")
-                self.assertEqual(decision.agents, ["deepthinking_agent", "speaker_agent"])
-                self.assertEqual(decision.intent, "deep_thought_planning")
-                self.assertTrue(decision.should_speak)
+                self.assertIsNone(route_by_priority_rules(RouteRequest(sid="s-command", text=text)))
 
     def test_rules_only_fallback_routes_unknown_text_to_chat(self) -> None:
         request = RouteRequest(sid="s3", text="tell me something unusual")
 
-        self.assertIsNone(route_by_rules(request))
+        self.assertIsNone(route_by_priority_rules(request))
         decision = fallback_decision(request, reason="rules_only_no_match")
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.source, "fallback")

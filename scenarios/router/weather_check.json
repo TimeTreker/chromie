@@ -3,22 +3,30 @@
   "id": "weather_check",
   "suite": "router",
   "level": "module",
-  "description": "Weather question uses the tool lane without robot motion.",
+  "description": "Weather question is understood by the quick LLM router and uses the tool lane without robot motion.",
   "tags": ["tool", "normal"],
   "input": {
     "text": "Can you check whether it will rain today?"
   },
   "stub": {
-    "router_mode": "rules_only",
+    "router_mode": "hybrid",
     "catalog": {
       "matched": false
+    },
+    "llm_decision": {
+      "route": "tool",
+      "agents": [],
+      "intent": "weather_query",
+      "confidence": 0.84,
+      "language": "en-US",
+      "source": "llm"
     }
   },
   "expect": {
     "route": "tool",
     "intent": "weather_query",
-    "source": "rules",
+    "source": "llm",
     "task_types_include": ["task.use_tool"],
-    "llm_calls": 0
+    "llm_calls": 1
   }
 }

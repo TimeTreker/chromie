@@ -6,6 +6,7 @@ Implemented as a structured context layer in the Orchestrator and shared
 contracts. The first version provides:
 
 - an owner-approved default mind profile;
+- an owner-approved identity for self-description questions;
 - core principles that cannot be changed by experience;
 - long-term goals that can be tuned by reviewed experience;
 - prompt-safe context for Router, conversation, and deepthinking;
@@ -21,6 +22,7 @@ Chromie's brain context has these layers:
 
 | Layer | Persistence | Changed by experience? | Purpose |
 |---|---:|---:|---|
+| Identity | Long-lived | No | Stable name, robot nature, gender/pronouns, and age/persona wording |
 | Core principles | Long-lived | No | Safety, honesty, owner-approved behavior boundaries |
 | Long-term goals | Long-lived | With review | Direction for usefulness, learning, and uncertainty handling |
 | Session memory | Current conversation | Yes, bounded | Current task, recent turns, pending work |
@@ -32,13 +34,20 @@ The current default profile lives in
 [`shared/chromie_contracts/mind.py`](../shared/chromie_contracts/mind.py).
 Operators can provide a JSON replacement with `ORCH_MIND_PROFILE_PATH`, but the
 schema rejects core principles that are marked experience-mutable or do not
-require owner approval.
+require owner approval. The default identity names the robot Chromie, describes
+her as a female AI robot with she/her pronouns, and gives her a 6-year-old
+robot identity age while preserving the boundary that this is not a human
+biological age. Her base self-description is that she keeps people company and
+can do simple things to help them. When answering identity questions, Chromie
+must describe herself as the robot, not as the backend LLM or model provider.
 
 ## Runtime Flow
 
 The Orchestrator builds a context object for every routed turn. It now includes:
 
 - `mind`: bounded profile summary and structured policy fields;
+- `mind.identity`: stable self-description fields used by conversation and
+  deepthinking prompts;
 - `core_principles`: short alias for prompt and inspection code;
 - `long_term_goals`: short alias for prompt and inspection code;
 - `experience_tuning_policy`: explicit learning boundary.

@@ -131,7 +131,7 @@ Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
 Full Level A baseline:
-439 current unittest cases and 20 legacy Agent tests passed on 2026-06-27 with
+453 current unittest cases and 20 legacy Agent tests passed on 2026-06-28 with
 `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh`.
 ```
 

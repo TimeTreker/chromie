@@ -35,6 +35,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("deepthinking_agent", prompt)
         self.assertIn("body commands", prompt)
         self.assertIn("robot_action", prompt)
+        self.assertIn("metadata.task_relation", prompt)
+        self.assertIn("task_context_patch", prompt)
+        self.assertIn("host task manager owns", prompt)
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
         router = OllamaLLMRouter(
@@ -89,6 +92,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("you look beautiful", prompt)
         self.assertIn("Do not return interrupt or ignore", prompt)
         self.assertIn("blinking", prompt)
+        self.assertIn("metadata.task_relation", prompt)
+        self.assertIn("target_task_id", prompt)
+        self.assertIn("latest meaningful", prompt)
 
     def test_payload_disables_qwen_thinking_and_supports_relaxed_json_retry(self) -> None:
         router = OllamaLLMRouter(
@@ -161,7 +167,8 @@ class RouterLlmPromptTests(unittest.TestCase):
                 "message": {
                     "content": (
                         '{"route":"robot_action","intent":"unknown",'
-                        '"confidence":0.42,"reason":"not sure"}'
+                        '"confidence":0.42,"reason":"not sure",'
+                        '"metadata":{"task_relation":"continue_task","target_task_id":"task-1"}}'
                     )
                 }
             },
@@ -176,9 +183,38 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("quick router confidence", handoff.reason or "")
         self.assertIn("quick_route=robot_action", handoff.reason or "")
         self.assertIn("deepthinking_agent", handoff.agents)
+        self.assertEqual(handoff.metadata["task_relation"], "continue_task")
+        self.assertEqual(handoff.metadata["target_task_id"], "task-1")
 
 
 class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_llm_router_returns_low_confidence_raw_for_pipeline_validation(self) -> None:
+        class LowConfidenceRouter(OllamaLLMRouter):
+            async def _chat(self, payload: dict) -> dict:
+                del payload
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"chat","intent":"unknown",'
+                            '"confidence":0.0,"reason":"weak quick intent"}'
+                        )
+                    }
+                }
+
+        router = LowConfidenceRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+
+        decision = await router.route(RouteRequest(text="Hello, how are you doing?"))
+
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "unknown")
+        self.assertEqual(decision.confidence, 0.0)
+        self.assertNotEqual(decision.intent, "deep_thought_low_confidence")
+
     async def test_llm_interrupt_output_is_returned_for_pipeline_recovery(self) -> None:
         class InterruptRouter(OllamaLLMRouter):
             async def _chat(self, payload: dict) -> dict:

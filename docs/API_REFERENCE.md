@@ -21,8 +21,8 @@ Interrupt and ignore decisions are normalized deterministically: they do not
 require the Agent and they do not speak. For other input, Router queries the
 Agent-owned shared capability catalog, sends bounded context and candidates to
 the quick intent Router model when enabled, and delegates low-confidence or
-explicitly complex quick routes to `deep_thought`. Legacy robot rules and
-semantic action parsing are compatibility fallbacks only.
+explicitly complex quick routes to `deep_thought`. Normal robot, tool, memory,
+conversation, and deep-thought intent is not selected by phrase rules.
 `RouteDecision.candidate_capabilities` preserves the ranked evidence for the
 native interaction path.
 
@@ -32,9 +32,22 @@ Router also attaches staged task metadata:
   passed, each with proposed `tasks` and `actions`;
 - `metadata.task_list`: the merged priority/stage ordered task list.
 
+For conversation continuity, the quick Router model may also attach advisory
+task-lifecycle metadata:
+
+- `metadata.task_relation`: `new_task`, `continue_task`, `modify_task`,
+  `close_task`, `side_conversation`, or `clarify_task`;
+- `metadata.target_task_id`: the task context the utterance appears to refer
+  to, when known from bounded context;
+- `metadata.task_context_patch`: compact fields such as goal, task type,
+  important claims, entities, constraints, pending questions, status, and
+  persistence policy.
+
 This metadata is advisory planning state. Concrete skill execution still uses
 validated `RouteDecision.actions`, Agent-selected `InteractionResponse.skills`,
 and Skill Runtime/provider authorization.
+The host Orchestrator owns the final task context write, persistence policy,
+confirmation, cancellation, and safety state.
 
 The Router exposes three conceptual stages:
 

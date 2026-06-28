@@ -150,6 +150,29 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(invoker.calls[-1][2].confirmed)
 
+    async def test_sim_auto_confirm_exemption_is_reportable(self) -> None:
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(),
+            auto_confirm_sim=True,
+        )
+        response = InteractionResponse(
+            skills=[
+                {
+                    "request_id": "nod-1",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                    "requires_confirmation": True,
+                }
+            ]
+        )
+
+        self.assertEqual(await coordinator.confirmation_request_ids(response), set())
+        self.assertEqual(
+            await coordinator.confirmation_exemption_request_ids(response),
+            {"nod-1"},
+        )
+
     async def test_body_skill_fails_closed_when_provider_is_disabled(self) -> None:
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True}

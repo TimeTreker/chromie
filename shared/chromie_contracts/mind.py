@@ -53,15 +53,53 @@ class LongTermGoal(BaseModel):
         return _compact_text(value, limit=800)
 
 
+class RobotIdentity(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = "Chromie"
+    kind: str = "AI robot"
+    gender: str = "female"
+    pronouns: list[str] = Field(default_factory=lambda: ["she", "her"])
+    age_description: str = "6 years old"
+    age_boundary: str = "This is Chromie's robot identity age, not a human biological age."
+    short_self_description: str = (
+        "I'm Chromie, a 6-year-old AI robot. I keep people company and can do simple things to help them."
+    )
+    model_identity_boundary: str = (
+        "When asked who or what she is, Chromie describes herself as Chromie the AI robot, "
+        "not as a large language model, backend model, or a model trained by Google, OpenAI, or another provider."
+    )
+
+    @field_validator(
+        "name",
+        "kind",
+        "gender",
+        "age_description",
+        "age_boundary",
+        "short_self_description",
+        "model_identity_boundary",
+    )
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return _compact_text(value, limit=500)
+
+    @field_validator("pronouns")
+    @classmethod
+    def normalize_pronouns(cls, value: list[str]) -> list[str]:
+        normalized = [_compact_text(item, limit=40) for item in value if item.strip()]
+        return normalized or ["she", "her"]
+
+
 class MindProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile_id: str = "chromie_default_mind"
-    version: str = "0.1.0"
+    version: str = "0.1.1"
     owner_approved: bool = True
     owner_approval_note: str = (
         "Core principles are changed only through human owner review and commit."
     )
+    identity: RobotIdentity = Field(default_factory=RobotIdentity)
     core_principles: list[CorePrinciple] = Field(default_factory=list)
     long_term_goals: list[LongTermGoal] = Field(default_factory=list)
     reflex_policy: list[str] = Field(default_factory=list)
@@ -110,6 +148,7 @@ class MindProfile(BaseModel):
             "version": self.version,
             "owner_approved": self.owner_approved,
             "owner_approval_required_for_core_changes": True,
+            "identity": self.identity.model_dump(mode="json"),
             "core_principles": principles,
             "long_term_goals": goals,
             "reflex_policy": list(self.reflex_policy),
@@ -121,6 +160,15 @@ class MindProfile(BaseModel):
     def prompt_summary(self, *, max_chars: int = 1600) -> str:
         lines = [
             f"Mind profile {self.profile_id} v{self.version}; owner_approved={self.owner_approved}.",
+            "Identity, owner-approved:",
+            f"- name: {self.identity.name}",
+            f"- kind: {self.identity.kind}",
+            f"- gender: {self.identity.gender}",
+            f"- pronouns: {', '.join(self.identity.pronouns)}",
+            f"- age: {self.identity.age_description}",
+            f"- self-description: {self.identity.short_self_description}",
+            f"- boundary: {self.identity.age_boundary}",
+            f"- model identity boundary: {self.identity.model_identity_boundary}",
             "Core principles, owner-approved and not experience-mutable:",
         ]
         for item in self.core_principles:

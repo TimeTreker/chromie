@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -55,6 +57,7 @@ class ConversationStateTests(unittest.TestCase):
             "os.environ",
             {
                 "ORCH_ENABLE_CONVERSATION_STATE": "0",
+                "ORCH_ENABLE_TASK_CONTEXT_STORE": "0",
                 "ORCH_CONVERSATION_MAX_TURNS": "4",
             },
             clear=False,
@@ -147,6 +150,107 @@ class ConversationStateTests(unittest.TestCase):
         self.assertTrue(boundary["started_new"])
         self.assertIsNone(manager.snapshot()["session_memory"]["current_task"])
         self.assertEqual(manager.get_history(), [])
+
+    def test_task_context_keeps_meaningful_claim_across_sessions(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="session")
+        manager.record_user_turn(
+            "s1",
+            "I think the moon is round. Do you think so?",
+            route="chat",
+            intent="general_conversation",
+            metadata={
+                "task_relation": "new_task",
+                "task_context_patch": {
+                    "task_type": "conversation",
+                    "goal": "Discuss whether the Moon is round",
+                    "important_claims": ["The user thinks the Moon is round."],
+                    "entities": ["Moon"],
+                },
+            },
+        )
+        task_id = manager.snapshot()["current_task_context"]["task_id"]
+        manager.record_assistant_turn("s1", "The moon is round.")
+
+        manager.record_user_turn(
+            "s2",
+            "or",
+            route="deep_thought",
+            intent="deep_thought_low_confidence",
+        )
+        manager.record_user_turn(
+            "s3",
+            "Do you agree with me?",
+            route="chat",
+            intent="general_conversation",
+            metadata={
+                "task_relation": "continue_task",
+                "target_task_id": task_id,
+            },
+        )
+
+        context = manager.snapshot()["current_task_context"]
+        self.assertEqual(context["task_id"], task_id)
+        self.assertIn("The user thinks the Moon is round.", context["important_claims"])
+        self.assertEqual(context["last_assistant_response"], "The moon is round.")
+        self.assertIn("s3", context["related_sids"])
+        self.assertEqual(
+            manager.snapshot()["session_memory"]["current_task_context"]["task_id"],
+            task_id,
+        )
+
+    def test_task_context_store_restores_unfinished_context_as_recoverable(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            store_path = Path(temp_dir) / "task_contexts.json"
+            manager = ConversationStateManager(
+                base_conversation_id="session",
+                task_store_enabled=True,
+                task_store_path=store_path,
+            )
+            manager.record_user_turn(
+                "s1",
+                "Walk forward when I confirm.",
+                route="robot_action",
+                intent="capability:soridormi.walk_velocity",
+                metadata={
+                    "task_relation": "new_task",
+                    "task_context_patch": {
+                        "task_type": "robot_action",
+                        "goal": "Walk forward after confirmation",
+                    },
+                },
+            )
+            manager.record_pending_task(
+                sid="s1",
+                task_type="robot_action",
+                status="awaiting_confirmation",
+                summary="soridormi.walk_velocity",
+                metadata={"request_ids": ["skill-1"], "remaining_request_ids": ["skill-1"]},
+            )
+            task_id = manager.snapshot()["current_task_context"]["task_id"]
+
+            restored = ConversationStateManager(
+                base_conversation_id="session",
+                task_store_enabled=True,
+                task_store_path=store_path,
+            )
+            restored_context = restored.snapshot()["current_task_context"]
+
+            self.assertEqual(restored_context["task_id"], task_id)
+            self.assertEqual(restored_context["status"], "recoverable")
+            self.assertTrue(restored_context["metadata"]["restored_from_task_store"])
+            self.assertEqual(
+                restored_context["metadata"]["restored_original_status"],
+                "awaiting_confirmation",
+            )
+
+            manager.update_pending_task_status_for_request_id(request_id="skill-1", status="completed")
+            restored_after_done = ConversationStateManager(
+                base_conversation_id="session",
+                task_store_enabled=True,
+                task_store_path=store_path,
+            )
+
+            self.assertIsNone(restored_after_done.snapshot()["current_task_context"])
 
     def test_completed_skill_request_closes_active_task_and_can_be_pruned(self) -> None:
         manager = ConversationStateManager(completed_task_retention_sec=0)

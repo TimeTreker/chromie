@@ -5,19 +5,457 @@ from typing import Any
 
 from agent.app.agents import AgentServices, ConversationAgent
 from agent.app.schema import AgentResult, AgentRunRequest
+from shared.chromie_contracts.mind import default_mind_profile
 
 
 class _CapturingOllama:
-    def __init__(self, response: str = "Here is a little song I made for you.") -> None:
-        self.response = response
+    def __init__(self, response: str | list[str] = "Here is a little song I made for you.") -> None:
+        self.responses = response if isinstance(response, list) else [response]
         self.calls: list[dict[str, Any]] = []
 
     async def generate(self, prompt: str, **kwargs: Any) -> str:
         self.calls.append({"prompt": prompt, **kwargs})
-        return self.response
+        index = min(len(self.calls) - 1, len(self.responses) - 1)
+        return self.responses[index]
 
 
 class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
+    async def test_identity_question_uses_owner_approved_mind_profile(self) -> None:
+        ollama = _CapturingOllama(
+            "I'm Chromie, a 6-year-old AI robot. I keep people company and can do simple things to help them."
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "identity-test",
+                "text": "Who are you?",
+                "context": {"mind": default_mind_profile().prompt_context()},
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "I'm Chromie, a 6-year-old AI robot. I keep people company and can do simple things to help them.",
+        )
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("Identity, owner-approved", ollama.calls[0]["prompt"])
+        self.assertIn("name: Chromie", ollama.calls[0]["prompt"])
+        self.assertIn("gender: female", ollama.calls[0]["prompt"])
+        self.assertIn("kind: AI robot", ollama.calls[0]["prompt"])
+        self.assertIn("model identity boundary", ollama.calls[0]["prompt"])
+        self.assertIn("not as a large language model", ollama.calls[0]["prompt"])
+        self.assertIn("never say you are a large language model", ollama.calls[0]["system"])
+        self.assertIn("trained by Google", ollama.calls[0]["system"])
+
+    async def test_identity_age_question_uses_robot_persona_boundary(self) -> None:
+        ollama = _CapturingOllama("I'm 6 years old as Chromie the AI robot.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "identity-age-test",
+                "text": "How old are you?",
+                "context": {"mind": default_mind_profile().prompt_context()},
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "I'm 6 years old as Chromie the AI robot.",
+        )
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("age: 6 years old", ollama.calls[0]["prompt"])
+        self.assertIn("not a human biological age", ollama.calls[0]["prompt"])
+
+    async def test_identity_gender_question_uses_she_her_pronouns(self) -> None:
+        ollama = _CapturingOllama("I'm female and use she/her pronouns.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "identity-gender-test",
+                "text": "Are you female?",
+                "context": {"mind": default_mind_profile().prompt_context()},
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "I'm female and use she/her pronouns.")
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("pronouns: she, her", ollama.calls[0]["prompt"])
+
+    async def test_simple_social_question_uses_llm_conversation_path(self) -> None:
+        ollama = _CapturingOllama("Hello, I'm doing well and listening.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "hello-llm-test",
+                "text": "Hello, how are you doing?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "Hello, I'm doing well and listening.")
+        self.assertEqual(len(ollama.calls), 1)
+
+    async def test_obvious_sun_claim_goes_through_llm_with_factual_prompt(self) -> None:
+        ollama = _CapturingOllama("No. The Sun is extremely hot, not cold.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "sun-llm-test",
+                "text": "In my opinion, the sun is cold. Do you agree with me?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "No. The Sun is extremely hot, not cold.")
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("correct obvious false premises", ollama.calls[0]["system"])
+        self.assertIn("Current user said: In my opinion, the sun is cold.", ollama.calls[0]["prompt"])
+
+    async def test_stock_model_disclaimer_is_retried_as_chromie(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I do not have personal opinions on whether the sun is hot.",
+                "Yes. The Sun is extremely hot.",
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "sun-hot-retry-test",
+                "text": "Do you think the sun is hot?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "Yes. The Sun is extremely hot.")
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("Chromie's first-person robot persona", ollama.calls[0]["system"])
+        self.assertIn("Previous draft rejected", ollama.calls[1]["prompt"])
+        self.assertIn("Chromie answering as herself", ollama.calls[1]["prompt"])
+        self.assertEqual(ollama.calls[1]["options"]["temperature"], 0)
+
+    async def test_subjective_preference_disclaimer_is_retried_as_robot_persona(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I do not have personal opinions about favorite colors.",
+                "I like bright yellow; it feels cheerful and easy to see.",
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "preference-retry-test",
+                "text": "What color do you like?",
+                "context": {"mind": default_mind_profile().prompt_context()},
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "I like bright yellow; it feels cheerful and easy to see.",
+        )
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("subjective preference", ollama.calls[1]["system"])
+
+    async def test_short_agreement_followup_uses_task_context_on_retry(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I do not have information to agree or disagree with you.",
+                "Yes, I agree. The Moon is round.",
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        task_context = {
+            "task_id": "task-moon",
+            "status": "open",
+            "task_type": "conversation",
+            "goal": "Discuss whether the Moon is round",
+            "important_claims": ["The user thinks the Moon is round."],
+            "entities": ["Moon"],
+            "last_meaningful_user_turn": "I think the moon is round. Do you think so?",
+            "last_assistant_response": "The moon is round.",
+        }
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "agree-followup-test",
+                "text": "Do you agree with me?",
+                "context": {
+                    "current_task_context": task_context,
+                    "history": [
+                        {
+                            "role": "user",
+                            "text": "I think the moon is round. Do you think so?",
+                        },
+                        {"role": "assistant", "text": "The moon is round."},
+                    ],
+                },
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "Yes, I agree. The Moon is round.")
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("Task context", ollama.calls[0]["prompt"])
+        self.assertIn("The user thinks the Moon is round.", ollama.calls[0]["prompt"])
+        self.assertIn("use that context before claiming uncertainty", ollama.calls[1]["system"])
+
+    async def test_sun_shape_question_goes_through_llm_with_factual_prompt(self) -> None:
+        ollama = _CapturingOllama("The Sun is roughly spherical, not rectangular.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "sun-shape-llm-test",
+                "text": "I mean, do you know if the sun is round or rectangular?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "The Sun is roughly spherical, not rectangular.")
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("correct obvious false premises", ollama.calls[0]["system"])
+        self.assertIn("Current user said: I mean, do you know if the sun is round", ollama.calls[0]["prompt"])
+
+    async def test_moon_shape_question_goes_through_llm_with_factual_prompt(self) -> None:
+        ollama = _CapturingOllama("Yes. The Moon is roughly spherical, so it is round.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "moon-round-llm-test",
+                "text": "I think the moon is round. Do you agree with me?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "Yes. The Moon is roughly spherical, so it is round.")
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("correct obvious false premises", ollama.calls[0]["system"])
+        self.assertIn("Current user said: I think the moon is round.", ollama.calls[0]["prompt"])
+
+    async def test_moon_temperature_claim_goes_through_llm_with_factual_prompt(self) -> None:
+        ollama = _CapturingOllama("No. The Moon's surface temperature varies widely.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "moon-hot-llm-test",
+                "text": "I think the moon is very hot. Do you agree with me?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "No. The Moon's surface temperature varies widely.")
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("correct obvious false premises", ollama.calls[0]["system"])
+
+    async def test_short_follow_up_uses_recent_sun_context_in_llm_prompt(self) -> None:
+        ollama = _CapturingOllama("The Sun is extremely hot.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "sun-follow-up-test",
+                "text": "Is it cold or warm?",
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "In my opinion, the sun is cold. Do you agree with me?",
+                    },
+                    {
+                        "role": "assistant",
+                        "text": "Nope, very hot. The Sun is not cold.",
+                    },
+                ],
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "The Sun is extremely hot.")
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("Recent conversation:", ollama.calls[0]["prompt"])
+        self.assertIn("The Sun is not cold.", ollama.calls[0]["prompt"])
+
     async def test_song_requests_are_left_to_llm_as_original_spoken_creativity(self) -> None:
         ollama = _CapturingOllama()
         agent = ConversationAgent(
@@ -58,11 +496,54 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         prompt = ollama.calls[0]["prompt"]
         self.assertIn("sing original lyrics", system)
         self.assertIn("split them into spoken sections", system)
+        self.assertIn("Never output internal skill or tool identifiers", system)
         self.assertIn("Do not quote copyrighted lyrics", system)
         self.assertIn("do not say you are not programmed to sing", system)
+        self.assertIn("correct obvious false premises", system)
         self.assertIn("mind principles", system)
         self.assertIn("Mind principles and long-term goals", prompt)
         self.assertIn("owner-approved", prompt)
+
+    async def test_completed_pending_tasks_are_not_fed_as_active_context(self) -> None:
+        ollama = _CapturingOllama("Sand can be cold, depending on the environment.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "completed-task-context-test",
+                "text": "Tell me about cold sand.",
+                "context": {
+                    "active_pending_tasks": [],
+                    "pending_tasks": [
+                        {
+                            "type": "robot_action",
+                            "status": "done",
+                            "summary": "soridormi.walk_forward",
+                        }
+                    ],
+                },
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.91,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        await agent.run(request, AgentResult())
+
+        self.assertEqual(len(ollama.calls), 1)
+        prompt = ollama.calls[0]["prompt"]
+        self.assertIn("Pending tasks:\nNone", prompt)
+        self.assertNotIn("soridormi.walk_forward", prompt)
 
     async def test_long_song_response_is_split_into_tts_sized_sections(self) -> None:
         response = (

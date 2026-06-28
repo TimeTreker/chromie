@@ -29,7 +29,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         values = _common_env()
         self.assertGreater(
             int(values["ORCH_ROUTER_TIMEOUT_MS"]),
-            int(values["ROUTER_TIMEOUT_MS"]),
+            int(values["ROUTER_TIMEOUT_MS"])
+            + int(values["ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS"]),
         )
 
     def test_router_uses_fast_llm_by_default(self) -> None:

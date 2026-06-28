@@ -327,9 +327,11 @@ def check_configuration_reference(errors: list[str]) -> None:
     except (KeyError, ValueError) as exc:
         errors.append(f".env.common has invalid Router timeout configuration: {exc}")
     else:
-        if router_host_ms <= router_internal_ms:
+        catalog_ms = int(values.get("ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS", "0"))
+        if router_host_ms <= router_internal_ms + catalog_ms:
             errors.append(
-                "ORCH_ROUTER_TIMEOUT_MS must exceed ROUTER_TIMEOUT_MS so the "
+                "ORCH_ROUTER_TIMEOUT_MS must exceed ROUTER_TIMEOUT_MS plus "
+                "ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS so the "
                 "Router can finish or report its own timeout first"
             )
 

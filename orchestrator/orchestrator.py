@@ -95,7 +95,7 @@ class VoiceAssistant:
             auto_confirm_sim_skills=self.auto_confirm_sim_skills,
             action_dry_run=self.action_dry_run,
         )
-        self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "2000")))
+        self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "3000")))
         self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "3000")))
         self.action_client = ActionClient(self.action_executor_url, int(os.getenv("ORCH_ACTION_TIMEOUT_MS", "5000")))
         self.asr_timeout_s = max(
@@ -107,14 +107,22 @@ class VoiceAssistant:
         self.barge_in_min_rms = float(os.getenv("ORCH_BARGE_IN_MIN_RMS", "350"))
         self.min_audio_ms = int(os.getenv("ORCH_MIN_AUDIO_MS", "1200"))
         self.tts_flush_chars = int(os.getenv("TTS_FLUSH_CHARS", "160"))
+        self.tts_max_text_chars = max(20, int(os.getenv("TTS_MAX_TEXT_CHARS", "220")))
         self.tts_text_chunking_enabled = env_bool("ORCH_TTS_TEXT_CHUNKING", True)
         self.tts_chunk_chars = max(
             20,
-            int(os.getenv("ORCH_TTS_CHUNK_CHARS", str(self.tts_flush_chars))),
+            min(
+                self.tts_max_text_chars,
+                int(os.getenv("ORCH_TTS_CHUNK_CHARS", "120")),
+            ),
+        )
+        self.tts_first_chunk_chars = max(
+            0,
+            int(os.getenv("ORCH_TTS_FIRST_CHUNK_CHARS", "16")),
         )
         self.tts_min_chunk_chars = max(
             1,
-            int(os.getenv("ORCH_TTS_MIN_CHUNK_CHARS", "40")),
+            int(os.getenv("ORCH_TTS_MIN_CHUNK_CHARS", "20")),
         )
         self.default_tts_rate = int(os.getenv("TTS_SAMPLE_RATE", "44100"))
         self.speaker_id = os.getenv("TTS_SPEAKER_ID", "default")
@@ -426,7 +434,7 @@ class VoiceAssistant:
         candidate = self.normalize_tts_candidate(buffer)
         if not candidate:
             return None, ""
-        limit = max(20, int(flush_chars or self.tts_flush_chars))
+        limit = max(4, int(flush_chars or self.tts_flush_chars))
         match = re.search(r".+?[.!?。！？](?:\s+|$)", candidate)
         if match and (match.end() <= limit or len(candidate) <= limit):
             end = match.end()
@@ -435,12 +443,143 @@ class VoiceAssistant:
             cut = candidate[:limit]
             cut_points = [cut.rfind(sep) for sep in (",", "，", "、", ";", ":", " ")]
             cut_at = max(cut_points)
-            if cut_at < max(20, limit // 2):
+            if cut_at < max(4, limit // 2):
                 cut_at = limit
             else:
                 cut_at += 1
             return candidate[:cut_at].strip(), candidate[cut_at:].strip()
         return None, candidate
+
+    @staticmethod
+    def _ends_with_tts_sentence_boundary(text: str) -> bool:
+        stripped = text.rstrip()
+        while stripped and stripped[-1] in "\"'”’)]}」』":
+            stripped = stripped[:-1].rstrip()
+        return bool(stripped and stripped[-1] in ".!?。！？")
+
+    @staticmethod
+    def _ends_with_tts_natural_boundary(text: str) -> bool:
+        stripped = text.rstrip()
+        while stripped and stripped[-1] in "\"'”’)]}」』":
+            stripped = stripped[:-1].rstrip()
+        return bool(stripped and stripped[-1] in ".!?。！？,，、;；:：")
+
+    @staticmethod
+    def _split_tts_sentence_units(text: str) -> list[str]:
+        end_chars = ".!?。！？"
+        closing_chars = "\"'”’)]}」』"
+        units: list[str] = []
+        start = 0
+        i = 0
+        while i < len(text):
+            if text[i] in end_chars:
+                sentence_mark = text[i]
+                end = i + 1
+                while end < len(text) and text[end] in closing_chars:
+                    end += 1
+                if end == len(text) or text[end].isspace() or sentence_mark in "。！？":
+                    unit = text[start:end].strip()
+                    if unit:
+                        units.append(unit)
+                    start = end
+                    while start < len(text) and text[start].isspace():
+                        start += 1
+                    i = start
+                    continue
+            i += 1
+        tail = text[start:].strip()
+        if tail:
+            units.append(tail)
+        return units or [text]
+
+    @staticmethod
+    def _split_tts_clause_units(
+        text: str,
+        *,
+        min_chars: int,
+        trigger_chars: int,
+    ) -> list[str]:
+        if len(text) <= trigger_chars:
+            return [text]
+
+        split_chars = ",，、;；:："
+        opening_quotes = {"“": "”", "「": "」", "『": "』"}
+        closing_quotes = {"”", "」", "』"}
+        quote_stack: list[str] = []
+        in_plain_quote = False
+        units: list[str] = []
+        start = 0
+        i = 0
+        while i < len(text):
+            char = text[i]
+            if char == '"':
+                in_plain_quote = not in_plain_quote
+            elif char in opening_quotes:
+                quote_stack.append(opening_quotes[char])
+            elif char in closing_quotes and quote_stack and char == quote_stack[-1]:
+                quote_stack.pop()
+            elif char in split_chars and not in_plain_quote and not quote_stack:
+                end = i + 1
+                unit = text[start:end].strip()
+                tail = text[end:].strip()
+                if len(unit) >= min_chars and len(tail) >= min_chars:
+                    units.append(unit)
+                    start = end
+                    while start < len(text) and text[start].isspace():
+                        start += 1
+                    i = start
+                    continue
+            i += 1
+
+        tail = text[start:].strip()
+        if tail:
+            units.append(tail)
+        return units or [text]
+
+    @staticmethod
+    def _split_oversized_tts_unit(text: str, hard_limit: int) -> list[str]:
+        if len(text) <= hard_limit:
+            return [text]
+        chunks: list[str] = []
+        remaining = text
+        while len(remaining) > hard_limit:
+            cut = remaining[:hard_limit]
+            cut_points = [
+                cut.rfind(sep)
+                for sep in (",", "，", "、", ";", "；", ":", "：", " ")
+            ]
+            cut_at = max(cut_points)
+            if cut_at < max(20, hard_limit // 2):
+                cut_at = hard_limit
+            else:
+                cut_at += 1
+            chunk = remaining[:cut_at].strip()
+            if chunk:
+                chunks.append(chunk)
+            remaining = remaining[cut_at:].strip()
+        if remaining:
+            chunks.append(remaining)
+        return chunks
+
+    def _should_merge_tts_chunks(
+        self,
+        current: str,
+        chunk: str,
+        *,
+        limit: int,
+        hard_limit: int,
+        min_chars: int,
+    ) -> bool:
+        merged_len = len(current) + 1 + len(chunk)
+        if merged_len > hard_limit:
+            return False
+        if len(current) < min_chars:
+            return True
+        if len(chunk) < min_chars and merged_len <= limit:
+            return True
+        if not self._ends_with_tts_natural_boundary(current) and merged_len <= limit:
+            return True
+        return False
 
     def split_tts_text(self, text: str) -> list[str]:
         candidate = self.normalize_tts_candidate(text)
@@ -448,34 +587,52 @@ class VoiceAssistant:
             return []
         if not getattr(self, "tts_text_chunking_enabled", True):
             return [candidate]
+        max_text_chars = max(20, int(getattr(self, "tts_max_text_chars", 220)))
         limit = max(
             20,
-            int(getattr(self, "tts_chunk_chars", getattr(self, "tts_flush_chars", 160))),
+            min(
+                max_text_chars,
+                int(getattr(self, "tts_chunk_chars", getattr(self, "tts_flush_chars", 160))),
+            ),
         )
-        if len(candidate) <= limit:
-            return [candidate]
+        first_limit = int(getattr(self, "tts_first_chunk_chars", min(limit, 16)) or 0)
+        first_limit = max(4, min(limit, first_limit)) if first_limit > 0 else limit
+        hard_limit = max_text_chars
 
         raw_chunks: list[str] = []
-        remaining = candidate
-        while remaining:
-            chunk, remaining = self.pop_tts_chunk(remaining, flush_chars=limit)
-            if chunk is None:
-                chunk, remaining = remaining, ""
-            if self.is_valid_tts_text(chunk):
-                raw_chunks.append(chunk)
+        min_chars = max(1, int(getattr(self, "tts_min_chunk_chars", 40)))
+        clause_trigger = max(80, min(limit, hard_limit) // 2, min_chars * 3)
+        for unit in self._split_tts_sentence_units(candidate):
+            for clause in self._split_tts_clause_units(
+                unit,
+                min_chars=min_chars,
+                trigger_chars=clause_trigger,
+            ):
+                raw_chunks.extend(self._split_oversized_tts_unit(clause, hard_limit))
         if not raw_chunks:
             return [candidate]
 
         chunks: list[str] = []
         current = ""
-        min_chars = max(1, int(getattr(self, "tts_min_chunk_chars", 40)))
-        overflow_limit = limit + min(10, max(0, min_chars // 4))
-        for chunk in raw_chunks:
+        grouped_chunks = raw_chunks
+        if (
+            first_limit < limit
+            and len(raw_chunks) > 1
+            and len(raw_chunks[0]) <= first_limit
+            and self._ends_with_tts_sentence_boundary(raw_chunks[0])
+        ):
+            chunks.append(raw_chunks[0])
+            grouped_chunks = raw_chunks[1:]
+        for chunk in grouped_chunks:
             merged = f"{current} {chunk}".strip() if current else chunk
             if not current:
                 current = chunk
-            elif len(merged) <= limit or (
-                len(current) < min_chars and len(merged) <= overflow_limit
+            elif self._should_merge_tts_chunks(
+                current,
+                chunk,
+                limit=limit,
+                hard_limit=hard_limit,
+                min_chars=min_chars,
             ):
                 current = merged
             else:
@@ -894,6 +1051,9 @@ class VoiceAssistant:
             )
 
         scheduled: list[dict[str, Any]] = []
+        # Schedule every chunk now. With one TTS slot, synth tasks queue behind
+        # the semaphore and the next chunk starts as soon as prior audio is
+        # queued, overlapping generation with ordered playback.
         for chunk in chunks:
             result = await self.schedule_tts_sentence(chunk, session_id)
             if result.get("scheduled") is True:
@@ -1070,6 +1230,9 @@ class VoiceAssistant:
             "history": conversation.get("history", []),
             "pending_tasks": conversation.get("pending_tasks", []),
             "active_pending_tasks": conversation.get("active_pending_tasks", []),
+            "task_contexts": conversation.get("task_contexts", []),
+            "active_task_contexts": conversation.get("active_task_contexts", []),
+            "current_task_context": conversation.get("current_task_context"),
             "robot_state": {
                 "available": not self.action_dry_run,
                 "source": "host_orchestrator",
@@ -1333,7 +1496,7 @@ class VoiceAssistant:
             "context_snapshot: conversation_id=%s history_turns=%s pending_tasks=%s",
             context.get("conversation_id"),
             len(context.get("history", [])),
-            len(context.get("active_pending_tasks", []) or context.get("pending_tasks", [])),
+            len(context.get("active_pending_tasks", [])),
         )
         router_start_ms = now_ms()
         self.session_log(session_id, "router_start: text_chars=%s text=%r", len(user_text), user_text)
@@ -1353,6 +1516,26 @@ class VoiceAssistant:
         except Exception as exc:
             self.session_log(session_id, "router_exception: router_ms=%.1f error=%s", now_ms() - router_start_ms, exc)
             logger.warning("Router failed; falling back to direct LLM: %s", exc)
+            safe_response = self._router_exception_safe_response(
+                user_text,
+                context=context,
+            )
+            if safe_response is not None:
+                self.conversation_state.record_user_turn(
+                    session_id,
+                    user_text,
+                    route="safe_fallback",
+                    intent="router_exception_embodied",
+                    metadata={"source": "router_exception", "error": str(exc)},
+                )
+                self.session_log(
+                    session_id,
+                    "router_exception_safe_fallback: reason=embodied_request text=%r",
+                    user_text,
+                )
+                self.conversation_state.record_agent_result(session_id, safe_response)
+                self._launch_interaction(safe_response, session_id)
+                return
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
@@ -1363,12 +1546,25 @@ class VoiceAssistant:
             self.active_llm_task = asyncio.create_task(self.process_llm_tts(user_text, session_id))
             return
 
+        turn_metadata = {
+            "source": decision.source,
+            "confidence": decision.confidence,
+        }
+        if isinstance(decision.metadata, dict):
+            for key in (
+                "task_relation",
+                "target_task_id",
+                "task_context_patch",
+            ):
+                if key in decision.metadata:
+                    turn_metadata[key] = decision.metadata[key]
+
         self.conversation_state.record_user_turn(
             session_id,
             user_text,
             route=decision.route,
             intent=decision.intent,
-            metadata={"source": decision.source, "confidence": decision.confidence},
+            metadata=turn_metadata,
         )
 
         if decision.interrupt_current or decision.route == "interrupt":
@@ -1510,6 +1706,15 @@ class VoiceAssistant:
         confirmation_request_ids = (
             await self.interaction_runtime.confirmation_request_ids(response)
         )
+        exempted_request_ids = (
+            await self.interaction_runtime.confirmation_exemption_request_ids(response)
+        )
+        if exempted_request_ids:
+            self.session_log(
+                session_id,
+                "confirmation_exempted: reason=sim_auto_confirm mode=sim request_ids=%s",
+                ",".join(sorted(exempted_request_ids)),
+            )
         if not confirmation_request_ids:
             return False
 
@@ -1651,11 +1856,70 @@ class VoiceAssistant:
         self._launch_interaction(response, session_id)
         return True
 
+    def _router_exception_safe_response(
+        self,
+        user_text: str,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> InteractionResponse | None:
+        if not self._looks_like_embodied_request(user_text, context=context):
+            return None
+        zh = self._looks_zh(user_text)
+        text = (
+            "我没能安全地理解这个动作，请再说一次。"
+            if zh
+            else "I couldn't route that movement safely. Please try again."
+        )
+        return self._host_speech_response(
+            text,
+            style="warning",
+            source="host_router_exception_safe_fallback",
+        )
+
+    def _looks_like_embodied_request(
+        self,
+        user_text: str,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> bool:
+        normalized = " ".join((user_text or "").casefold().split())
+        embodied_terms = (
+            "walk",
+            "move",
+            "go forward",
+            "turn",
+            "nod",
+            "shake your head",
+            "blink",
+            "look at",
+            "快一点",
+            "走",
+            "前进",
+            "转",
+            "点头",
+            "眨眼",
+        )
+        if any(term in normalized for term in embodied_terms):
+            return True
+        for task in (context or {}).get("active_pending_tasks", []) or []:
+            if not isinstance(task, dict):
+                continue
+            summary = str(task.get("summary") or "").casefold()
+            task_type = str(task.get("type") or "").casefold()
+            if "soridormi" in summary or task_type in {"confirmation", "robot_action"}:
+                return True
+        return False
+
+    @staticmethod
+    def _looks_zh(text: str) -> bool:
+        return any("\u4e00" <= ch <= "\u9fff" for ch in text or "")
+
     def _host_speech_response(
         self,
         text: str,
         *,
         style: str,
+        source: str = "host_confirmation_dialogue",
     ) -> InteractionResponse:
         return InteractionResponse(
             speech=[
@@ -1665,10 +1929,10 @@ class VoiceAssistant:
                     "timing": "immediate",
                     "priority": "high",
                     "interruptible": True,
-                    "metadata": {"source": "host_confirmation_dialogue"},
+                    "metadata": {"source": source},
                 }
             ],
-            metadata={"source": "host_confirmation_dialogue"},
+            metadata={"source": source},
         )
 
     async def _execute_planning_task_graph(self, graph: dict[str, Any]) -> dict[str, Any]:
@@ -1749,6 +2013,15 @@ class VoiceAssistant:
                     request_id=result.request_id,
                     status=result.status,
                 )
+            completed_request_ids = {result.request_id for result in execution.results}
+            if execution.status != "completed":
+                for request in response.skills:
+                    if request.request_id in completed_request_ids:
+                        continue
+                    self.conversation_state.update_pending_task_status_for_request_id(
+                        request_id=request.request_id,
+                        status=execution.status,
+                    )
             self._record_experience(
                 response=response,
                 execution=execution,
@@ -1839,7 +2112,12 @@ class VoiceAssistant:
             state["response_chars"] = state.get("response_chars", 0) + sum(len(i.text) for i in result.speak_immediate + result.speak_after)
         self.maybe_session_done(session_id)
 
-    async def interrupt(self, new_session_id: Optional[str] = None):
+    async def interrupt_output(
+        self,
+        new_session_id: Optional[str] = None,
+        *,
+        log_event: bool = True,
+    ):
         self.playback_generation += 1
         self.resolve_all_playback_start_waiters(
             started=False,
@@ -1847,9 +2125,6 @@ class VoiceAssistant:
         )
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
-        if self.active_interaction_task and not self.active_interaction_task.done():
-            self.active_interaction_task.cancel()
-        await self.interaction_runtime.cancel_all()
         for task in list(self.active_synthesis_tasks):
             if not task.done():
                 task.cancel()
@@ -1862,6 +2137,14 @@ class VoiceAssistant:
         self.next_playback_order = 0
         self.synthesis_order = 0
         await self.abort_output_stream()
+        if new_session_id and log_event:
+            self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
+
+    async def interrupt(self, new_session_id: Optional[str] = None):
+        await self.interrupt_output(new_session_id, log_event=False)
+        if self.active_interaction_task and not self.active_interaction_task.done():
+            self.active_interaction_task.cancel()
+        await self.interaction_runtime.cancel_all()
         if new_session_id:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
 
@@ -1900,7 +2183,7 @@ class VoiceAssistant:
         session_id = self.create_session()
         self.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
         self.save_audio(audio, "input", session_id=session_id)
-        await self.interrupt(new_session_id=session_id)
+        await self.interrupt_output(new_session_id=session_id)
 
         try:
             if self.asr_ws is None or getattr(self.asr_ws, "close_code", None) is not None:

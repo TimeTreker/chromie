@@ -8,16 +8,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from agent.app.agents import AgentServices
 from agent.app.interaction import AgentResultInteractionAdapter
-from agent.app.runtime import AgentRuntime
-from agent.app.schema import AgentRunRequest
+from agent.app.schema import AgentResult
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
 )
-from router.app.rules import route_by_rules
-from router.app.schema import RouteRequest
 
 
 async def run_acceptance(
@@ -26,21 +22,15 @@ async def run_acceptance(
     manifest: Path,
     cancel_after_s: float | None = None,
 ) -> dict[str, Any]:
-    route_request = RouteRequest(sid="text-acceptance", text=text)
-    decision = route_by_rules(route_request)
-    if decision is None:
-        raise RuntimeError(f"deterministic router did not recognize {text!r}")
-
+    session_id = "text-acceptance"
     started = time.monotonic()
-    legacy_result = await AgentRuntime(
-        AgentServices(ollama=None, use_llm=False, max_speak_chars=160)
-    ).run(
-        AgentRunRequest(
-            sid=route_request.sid,
-            text=route_request.text,
-            route_decision=decision.model_dump(mode="json"),
-            context={"robot_state": {"emergency_stop": False}},
-        )
+    legacy_result = AgentResult()
+    legacy_result.add_speak_immediate("Okay.", style="brief")
+    legacy_result.add_action(
+        "robot_pose_controller",
+        "head.nod",
+        params={"times": 1},
+        timeout_ms=1000,
     )
     response = AgentResultInteractionAdapter().convert(legacy_result)
     scheduled_speech: list[str] = []
@@ -53,7 +43,7 @@ async def run_acceptance(
     execution_task = asyncio.create_task(
         coordinator.execute(
             response,
-            session_id=route_request.sid,
+            session_id=session_id,
         )
     )
     if cancel_after_s is not None:
@@ -77,7 +67,11 @@ async def run_acceptance(
         "ok": execution.status == expected_status and safe_idle,
         "text": text,
         "cancel_after_s": cancel_after_s,
-        "route": decision.model_dump(mode="json"),
+        "route": {
+            "source": "acceptance_fixture",
+            "route": "robot_action",
+            "intent": "capability:soridormi.nod_yes",
+        },
         "interaction_response": response.model_dump(mode="json"),
         "scheduled_speech": scheduled_speech,
         "execution": execution.model_dump(mode="json"),

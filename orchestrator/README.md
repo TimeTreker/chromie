@@ -77,7 +77,9 @@ ASR -> Ollama -> TTS -> playback
 ```
 
 This fallback produces speech only. It does not gain permission to invoke
-skills or hardware.
+skills or hardware. If the Router fails while the utterance or active pending
+task looks embodied, the Orchestrator uses a deterministic safe-fallback speech
+response instead of the generic conversational LLM path.
 
 ## Configuration precedence
 
@@ -156,12 +158,15 @@ repository-relative files assume the repository root.
 
 ## Conversation state
 
-The current store is in process memory. It retains bounded turns, pending task
-hints, active interaction metadata, and one conversation identifier across
+The current store retains bounded turns, pending task hints, active interaction
+metadata, compact task contexts, and one conversation identifier across
 utterances until reset or expiry. Each utterance still receives its own SID.
 
-State is not durable across process restart and is not a long-term personal
-memory system. See [`../docs/conversation_state.md`](../docs/conversation_state.md).
+State is process-local by default. When `ORCH_ENABLE_TASK_CONTEXT_STORE=1`,
+unfinished compact task contexts are saved locally and restored as recoverable
+after restart; physical work still requires fresh confirmation and never resumes
+blindly. This is not a long-term personal memory system. See
+[`../docs/conversation_state.md`](../docs/conversation_state.md).
 
 ## Scheduling, interruption, and cancellation
 

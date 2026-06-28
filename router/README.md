@@ -13,6 +13,7 @@ text + bounded context
   -> emergency filter: deterministic interrupt/noise safety rules
   -> shared Agent capability-catalog search
   -> quick intent router: qwen-class quick understanding with catalog bounds
+  -> route validation guardrails for impossible/unsafe choices
   -> deep_thought handoff when quick confidence is low or planning is needed
   -> schema finalization
   -> RouteDecision
@@ -20,19 +21,21 @@ text + bounded context
 
 Supported modes:
 
-- `rules_only` — capability-catalog routing, compatible non-robot rules, then a deterministic fallback;
-- `hybrid` — rules first when enabled, then Ollama for unmatched requests;
+- `rules_only` — hard interrupt/noise rules, capability-catalog routing, then a deterministic fallback;
+- `hybrid` — hard interrupt/noise rules first, then Ollama quick routing for normal intent, with deterministic validators afterward;
 - `llm_only` — send routing decisions directly to Ollama.
 
 `ROUTER_USE_LLM=1` selects `hybrid` unless `ROUTER_MODE` is explicitly set.
 That default uses the small `ROUTER_MODEL` as a fast semantic route classifier
 while `AGENT_MODEL` remains the larger deep-thinking/conversation model.
 Operational interruption/noise handling remains deterministic even when a
-conversational model is available. Robot routing is catalog-first; the old
-phrase-based robot rules and semantic action parser are explicit compatibility
-fallbacks only. The Agent repeats the same catalog search inside native
-InteractionRuntime, so Router unavailability cannot authorize or suppress
-execution by itself.
+conversational model is available. The hard filter lives in
+`router/app/rules.py` and is limited to `interrupt` and `ignore` outputs,
+including obvious repeated filler or acknowledgment ASR hallucinations. Normal
+language understanding is handled by the catalog-bounded Router model and later
+validators, not by phrase rules or regex action parsers. The Agent repeats the
+same catalog search inside native InteractionRuntime, so Router unavailability
+cannot authorize or suppress execution by itself.
 
 The Router model is a proposer, not the authority. A model route must still pass
 catalog constraints, confidence policy, schema finalization, Agent validation,
@@ -44,15 +47,23 @@ If the quick model returns a deterministic-only route such as `interrupt` or
 model mistake. Clear robot body commands with executable catalog candidates are
 recovered as `robot_action` for Agent capability planning; other invalid
 operational routes are delegated to `deep_thought` or clarification instead of
-interrupting the current task.
+interrupting the current task. If the quick model delegates an obvious
+executable body command to `deep_thought`, Router also recovers that request to
+catalog-bounded `robot_action`.
 
-The three routing stages are intentionally different:
+The Router has three decision stages. Only the first stage may use phrase rules
+to determine a route:
 
 | Stage | What handles it | Purpose |
 |---|---|---|
-| Emergency filter | Deterministic Router rules | Stop, cancel, emergency-style interruption, silence, unusable audio, and obvious noise. |
+| Emergency filter | Deterministic Router rules | Stop, cancel, emergency-style interruption, silence, unusable audio, repeated filler hallucinations, and obvious noise. |
 | Quick intent | Catalog search plus small LLM router, normally `qwen3:0.6b` | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and select supported routes/capabilities. |
 | Deep thought | Agent `deepthinking_agent` using the larger Agent model | Split complex tasks, plan, debug, and answer using bounded session memory when the quick router is low confidence or explicitly chooses `deep_thought`. |
+
+Deterministic route validation sits between those stages as a guardrail, not as
+another understanding layer. Validators may reject, repair, or clarify
+impossible and unsafe model outputs, but they must not answer the user or select
+normal chat, tool, memory, or body intent by phrase matching.
 
 Each stage receives the context produced above it. The quick intent prompt gets
 the emergency-filter result, bounded session/world context, and catalog
@@ -68,6 +79,15 @@ metadata.route_stage_outputs[]  # emergency_filter / quick_intent / deep_thought
   -> tasks[] and actions[]      # proposed high-level work from that stage
 metadata.task_list[]            # merged, priority/stage ordered task list
 ```
+
+For task continuity, the quick Router model may also propose
+`metadata.task_relation`, `metadata.target_task_id`, and
+`metadata.task_context_patch`. These fields tell the host whether an utterance
+looks like a new task, a continuation, a modification, a closure, side
+conversation, or a clarification, and what compact facts should be merged into
+the task context. They are advisory only: the Orchestrator task manager owns the
+actual task-context write, persistence, confirmation, cancellation, and safety
+state.
 
 `RouteDecision.actions` remains the compatibility/execution hint for concrete
 capability actions, such as ordered Soridormi skill requests. The merged
@@ -87,7 +107,7 @@ against registered capabilities and safety policy.
 | `memory` | User asks Chromie to remember or update a preference/fact. |
 | `clarify` | The request is ambiguous or outside current bounded abilities. |
 | `interrupt` | Stop/cancel/shut up/emergency-style operational controls. |
-| `ignore` | Empty, noisy, accidental, or unusable ASR input. |
+| `ignore` | Empty, noisy, accidental, repeated filler, or unusable ASR input. |
 
 When LLM routing is enabled, the prompt tells the model to consider:
 
@@ -136,16 +156,12 @@ ROUTER_CONFIDENCE_THRESHOLD=0.55
 ROUTER_CAPABILITY_CATALOG_URL=http://chromie-agent:8092
 ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=600
 ROUTER_CAPABILITY_MATCH_LIMIT=8
-ROUTER_ALLOW_LEGACY_ROBOT_RULES=0
-ROUTER_ALLOW_SEMANTIC_ACTION_FALLBACK=0
 ROUTER_LOG_LEVEL=INFO
 ```
 
-`ROUTER_ALLOW_SEMANTIC_ACTION_FALLBACK=1` re-enables the deterministic semantic
-action parser after a high-confidence LLM `robot_action` decision that contains
-no explicit action list. It is a compatibility/debug fallback. In the normal
-hybrid path, non-emergency natural-language understanding belongs to the quick
-Router model and low-confidence quick decisions delegate to `deep_thought`.
+In the normal hybrid path, non-emergency natural-language understanding belongs
+to the quick Router model and low-confidence quick decisions delegate to
+`deep_thought`.
 
 The host Orchestrator normally connects through:
 

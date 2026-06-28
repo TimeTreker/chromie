@@ -8,13 +8,14 @@ from agent.app.schema import AgentResult, AgentRunRequest
 
 
 class _CapturingOllama:
-    def __init__(self, response: str = "Here is the architecture I recommend.") -> None:
-        self.response = response
+    def __init__(self, response: str | list[str] = "Here is the architecture I recommend.") -> None:
+        self.responses = response if isinstance(response, list) else [response]
         self.calls: list[dict[str, Any]] = []
 
     async def generate(self, prompt: str, **kwargs: Any) -> str:
         self.calls.append({"prompt": prompt, **kwargs})
-        return self.response
+        index = min(len(self.calls) - 1, len(self.responses) - 1)
+        return self.responses[index]
 
 
 class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
@@ -100,6 +101,84 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deepthinking_agent", result.handled_by)
         self.assertNotIn("conversation_agent", result.handled_by)
         self.assertGreater(len(result.speak_immediate), 0)
+
+    async def test_completed_pending_tasks_are_not_fed_as_active_context(self) -> None:
+        ollama = _CapturingOllama("Let's reason about the claim directly.")
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-completed-task-context-test",
+                "text": "Think carefully about whether the sun is cold.",
+                "context": {
+                    "active_pending_tasks": [],
+                    "pending_tasks": [
+                        {
+                            "type": "robot_action",
+                            "status": "done",
+                            "summary": "soridormi.walk_forward",
+                        }
+                    ],
+                },
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "reasoning",
+                    "confidence": 0.91,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        await agent.run(request, AgentResult())
+
+        self.assertEqual(len(ollama.calls), 1)
+        prompt = ollama.calls[0]["prompt"]
+        self.assertIn("Pending tasks:\nNone", prompt)
+        self.assertNotIn("soridormi.walk_forward", prompt)
+
+    async def test_stock_model_disclaimer_is_retried_as_chromie(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I do not have personal opinions on whether the sun is hot.",
+                "Yes. The Sun is extremely hot.",
+            ]
+        )
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-sun-hot-retry-test",
+                "text": "Do you think the sun is hot?",
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "deep_thought_low_confidence",
+                    "confidence": 0.55,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "Yes. The Sun is extremely hot.")
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("Chromie's first-person robot persona", ollama.calls[0]["system"])
+        self.assertIn("Previous draft rejected", ollama.calls[1]["prompt"])
+        self.assertIn("Chromie answering as herself", ollama.calls[1]["prompt"])
 
 
 if __name__ == "__main__":

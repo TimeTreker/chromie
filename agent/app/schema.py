@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -29,6 +30,45 @@ ActionTarget = Literal[
     "vision_system",
     "system",
 ]
+
+_INTERNAL_SPEECH_ID_RE = re.compile(
+    r"\b(?:soridormi|chromie)\.[A-Za-z0-9_][A-Za-z0-9_.-]*\b",
+    re.IGNORECASE,
+)
+_LEADING_PUNCT_RE = re.compile(r"^[\s,;:.!?，。！？、]+")
+_SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([,;:.!?，。！？、])")
+_EMPTY_BRACKETS_RE = re.compile(r"\(\s*\)|\[\s*\]|\{\s*\}")
+
+
+def sanitize_spoken_text(value: str | None) -> str:
+    text = " ".join((value or "").strip().split())
+    if not text:
+        return ""
+    text = _INTERNAL_SPEECH_ID_RE.sub("", text)
+    text = _EMPTY_BRACKETS_RE.sub("", text)
+    text = _SPACE_BEFORE_PUNCT_RE.sub(r"\1", text)
+    text = re.sub(r"([,;:，、])\s*([.?!。！？])", r"\2", text)
+    text = _LEADING_PUNCT_RE.sub("", text)
+    text = " ".join(text.strip().split())
+    if text and all(ch in ",;:.!?，。！？、" for ch in text):
+        return ""
+    return text
+
+
+def _normalize_speech_items(items: list["SpeakItem"], max_chars: int) -> list["SpeakItem"]:
+    seen: set[str] = set()
+    out: list[SpeakItem] = []
+    max_chars = max(1, int(max_chars or 1))
+    for item in items:
+        text = sanitize_spoken_text(item.text)
+        if not text or text in seen:
+            continue
+        if len(text) > max_chars:
+            text = text[:max_chars].rstrip("，,。.!！?？ ")
+            text += "。" if any("\u4e00" <= ch <= "\u9fff" for ch in text) else "."
+        seen.add(text)
+        out.append(item.model_copy(update={"text": text}))
+    return out
 
 
 class RouteDecision(BaseModel):
@@ -191,6 +231,10 @@ class AgentResult(BaseModel):
 
     def add_task_graph(self, graph: dict[str, Any]) -> None:
         self.task_graphs.append(graph)
+
+    def normalize_speech(self, max_chars: int) -> None:
+        self.speak_immediate = _normalize_speech_items(self.speak_immediate, max_chars)
+        self.speak_after = _normalize_speech_items(self.speak_after, max_chars)
 
 
 class HealthResponse(BaseModel):

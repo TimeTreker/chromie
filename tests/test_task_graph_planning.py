@@ -63,7 +63,7 @@ class CapabilityOllama:
         self.calls.append({"prompt": prompt, **kwargs})
         return {
             "decision": "execute",
-            "speech": "Walking forward.",
+            "speech": "Walking ahead for 10 minutes.",
             "skills": [
                 {
                     "skill_id": "soridormi.walk_velocity",
@@ -631,7 +631,7 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_velocity")
         self.assertEqual(response.skills[0].args, {"vx_mps": 0.2, "duration_s": 1.0})
         self.assertTrue(response.skills[0].requires_confirmation)
-        self.assertEqual(response.speech[0].text, "Walking forward.")
+        self.assertEqual(response.speech[0].text, "Walking forward for 1 second.")
         self.assertEqual(len(capability_ollama.calls), 1)
 
 

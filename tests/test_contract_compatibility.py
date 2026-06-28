@@ -10,8 +10,7 @@ from orchestrator.schemas.action import ActionResult as OrchestratorActionResult
 from orchestrator.schemas.agent import AgentRequest as OrchestratorAgentRequest
 from orchestrator.schemas.agent import AgentResult as OrchestratorAgentResult
 from orchestrator.schemas.route import RouteDecision as OrchestratorRouteDecision
-from router.app.rules import route_by_rules
-from router.app.schema import RouteRequest
+from router.app.schema import RouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.action import ActionCommand as SharedActionCommand
 from shared.chromie_contracts.agent import AgentResult as SharedAgentResult
 from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
@@ -19,16 +18,35 @@ from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
 
 class ContractCompatibilityTests(unittest.TestCase):
     def test_router_decision_survives_orchestrator_and_agent_round_trip(self) -> None:
-        router_decision = route_by_rules(RouteRequest(sid="contract-route", text="turn left"))
-        self.assertIsNotNone(router_decision)
-        assert router_decision is not None
+        route_request = RouteRequest(sid="contract-route", text="turn left")
+        router_decision = finalize_decision(
+            RouteDecision(
+                route="robot_action",
+                agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
+                intent="turn_left",
+                confidence=0.95,
+                language="en-US",
+                should_speak=True,
+                actions=[
+                    {
+                        "target": "robot_pose_controller",
+                        "type": "head.turn",
+                        "params": {"yaw_degrees": -20, "duration_ms": 600},
+                        "blocking": False,
+                    }
+                ],
+                source="catalog",
+            ),
+            route_request,
+            source="catalog",
+        )
 
         orchestrator_decision = OrchestratorRouteDecision.model_validate(router_decision.model_dump(mode="json"))
         shared_decision = SharedRouteDecision.model_validate(router_decision.model_dump(mode="json"))
         self.assertTrue(orchestrator_decision.should_speak)
-        self.assertEqual(orchestrator_decision.source, "rules")
+        self.assertEqual(orchestrator_decision.source, "catalog")
         self.assertEqual(orchestrator_decision.actions[0]["type"], "head.turn")
-        self.assertEqual(shared_decision.source, "rules")
+        self.assertEqual(shared_decision.source, "catalog")
 
         orchestrator_request = OrchestratorAgentRequest(
             sid="contract-route",

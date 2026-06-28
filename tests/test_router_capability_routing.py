@@ -81,6 +81,34 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.source, "fallback")
 
+    async def test_hybrid_mode_does_not_use_legacy_phrase_rules_after_llm_fallback(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(query="turn left", matched=False)
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=0.45,
+                language="en-US",
+                source="fallback",
+                reason="llm unavailable",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main.settings, "rules_first", True
+        ), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="turn left"))
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.intent, "general_conversation")
+
     async def test_conversation_does_not_become_robot_action_from_weak_catalog_match(self) -> None:
         from router.app import main
 
@@ -115,6 +143,50 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.source, "fallback")
 
+    async def test_factual_shape_question_overrides_llm_robot_action(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="i mean do you know if the sun is round or rectangular",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=4,
+            matches=[
+                {
+                    "capability_id": "soridormi.turn_in_place",
+                    "agent_id": "soridormi.skill",
+                    "description": "Rotate left or right with near-zero forward velocity.",
+                    "score": 0.72,
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
+                intent="robot_action",
+                confidence=0.72,
+                language="en-US",
+                source="llm",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="I mean, do you know if the sun is round or rectangular?")
+            )
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.source, "fallback")
+        self.assertIn("factual conversation", decision.reason or "")
+        self.assertIn("conversation_agent", decision.agents)
+
     async def test_stop_now_is_priority_interrupt(self) -> None:
         from router.app import main
 
@@ -146,10 +218,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         lanes = {item["id"]: item for item in payload["lanes"]}
         self.assertIn("emergency_filter", lanes)
         self.assertIn("quick_intent", lanes)
+        self.assertIn("route_validation", lanes)
         self.assertIn("deep_thought", lanes)
         self.assertFalse(lanes["emergency_filter"]["llm"])
         self.assertIn("interrupt", lanes["emergency_filter"]["routes"])
         self.assertIn("robot_action", lanes["quick_intent"]["routes"])
+        self.assertFalse(lanes["route_validation"]["llm"])
         self.assertIn("deep_thought", lanes["deep_thought"]["routes"])
 
     async def test_chat_catalog_match_does_not_select_speech_tool_as_intent(self) -> None:
@@ -213,14 +287,9 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        def fail_semantic(*_args, **_kwargs):
-            raise AssertionError("semantic fallback should not run after a valid LLM decision")
-
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router), patch.object(
-            main, "semantic_robot_decision", fail_semantic
-        ):
+        ), patch.object(main, "llm_router", llm_router):
             decision = await main.route(RouteRequest(text="Go ahead and sing a song for me."))
 
         self.assertEqual(llm_router.calls, 1)
@@ -234,11 +303,11 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.walk_velocity",
         )
 
-    async def test_hybrid_router_delegates_low_confidence_quick_route_to_deep_thought(self) -> None:
+    async def test_hybrid_router_recovers_low_confidence_body_command_from_catalog(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
-            query="请向前走十秒，然后点头两次。",
+            query="walking forward quickly until i tell you stop",
             matched=True,
             suggested_route="robot_action",
             suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -277,32 +346,188 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="请向前走十秒，然后点头两次。"))
+            decision = await main.route(
+                RouteRequest(text="Walking forward quickly until I tell you stop.")
+            )
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.source, "llm")
-        self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_low_confidence")
-        self.assertEqual(decision.language, "zh-CN")
-        self.assertIn("quick router confidence", decision.reason or "")
+        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_velocity")
+        self.assertEqual(decision.language, "en-US")
+        self.assertIn("low confidence", decision.reason or "")
         self.assertIn("quick_route=robot_action", decision.reason or "")
-        self.assertIn("deepthinking_agent", decision.agents)
-        self.assertFalse(decision.metadata["thinking_ack_allowed"])
+        self.assertIn("capability_agent", decision.agents)
+        self.assertIn("safety_agent", decision.agents)
         self.assertEqual(
             [item["stage"] for item in decision.metadata["route_stage_outputs"]],
-            ["emergency_filter", "quick_intent", "deep_thought"],
+            ["emergency_filter", "quick_intent"],
         )
         self.assertEqual(
             [item["task_type"] for item in decision.metadata["task_list"]],
-            [
-                "cognition.delegate_deep_thought",
-                "cognition.deep_think",
-            ],
+            ["task.execute_skill"],
         )
         self.assertEqual(
             [item["capability_id"] for item in decision.candidate_capabilities],
             ["soridormi.walk_velocity", "soridormi.nod_yes"],
         )
+
+    async def test_hybrid_router_recovers_deep_thought_body_command_from_catalog(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="hey groomy walking forward for 10 seconds quickly please",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=8,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "agent_id": "soridormi.skill",
+                    "description": "Walk forward for a bounded duration.",
+                    "score": 0.91,
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="deep_thought",
+                agents=["deepthinking_agent", "speaker_agent"],
+                intent="deep_thought_low_confidence",
+                confidence=0.55,
+                language="auto",
+                source="llm",
+                reason="quick model was uncertain",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="Hey, Groomy, walking forward for 10 seconds quickly, please.")
+            )
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertIn("delegated an executable body command", decision.reason or "")
+        self.assertIn("capability_agent", decision.agents)
+        self.assertEqual(
+            [item["task_type"] for item in decision.metadata["task_list"]],
+            ["task.execute_skill"],
+        )
+
+    async def test_hybrid_router_keeps_planning_text_in_deep_thought(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="make a plan to walk forward safely",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=8,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "agent_id": "soridormi.skill",
+                    "description": "Walk forward for a bounded duration.",
+                    "score": 0.91,
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="deep_thought",
+                agents=["deepthinking_agent", "speaker_agent"],
+                intent="deep_thought_planning",
+                confidence=0.82,
+                language="en-US",
+                source="llm",
+                reason="explicit planning request",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="Make a plan to walk forward safely."))
+
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_planning")
+        self.assertIn("deepthinking_agent", decision.agents)
+
+    async def test_hybrid_router_delegates_low_confidence_without_catalog_match_to_deep_thought(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="build an unusual robot latency strategy",
+            matched=False,
+            catalog_version=8,
+            matches=[],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="tool",
+                agents=["tool_agent", "speaker_agent"],
+                intent="unknown",
+                confidence=0.50,
+                language="auto",
+                source="llm",
+                reason="weak quick intent",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="Build an unusual robot latency strategy."))
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_low_confidence")
+        self.assertIn("quick router confidence", decision.reason or "")
+        self.assertIn("deepthinking_agent", decision.agents)
+        self.assertFalse(decision.metadata["thinking_ack_allowed"])
+
+    async def test_hybrid_router_keeps_low_confidence_simple_chat_out_of_deep_thought(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="Hello, how are you doing?",
+            matched=False,
+            catalog_version=8,
+            matches=[],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="unknown",
+                confidence=0.0,
+                language="en-US",
+                source="llm",
+                reason="weak quick intent",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="Hello, how are you doing?"))
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertIn("conversation_agent", decision.agents)
+        self.assertNotIn("deepthinking_agent", decision.agents)
 
     async def test_hybrid_router_recovers_llm_interrupt_robot_action_after_emergency_filter(self) -> None:
         from router.app import main
@@ -473,7 +698,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             ["speech.answer"],
         )
 
-    async def test_hybrid_router_uses_semantic_actions_only_when_explicitly_enabled(self) -> None:
+    async def test_hybrid_router_does_not_synthesize_actions_with_semantic_parser(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -514,22 +739,21 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
-            main.settings, "allow_semantic_action_fallback", True
-        ), patch.object(main, "capability_catalog", _Catalog(result)), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(
             main, "llm_router", llm_router
         ):
             decision = await main.route(RouteRequest(text="请向前走十秒，然后点头两次。"))
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "compound_robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_velocity")
+        self.assertEqual(decision.actions, [])
         self.assertEqual(
-            [item["capability_id"] for item in decision.actions],
-            ["soridormi.walk_velocity", "soridormi.nod_yes"],
+            decision.candidate_capabilities[0]["capability_id"],
+            "soridormi.walk_velocity",
         )
-        self.assertEqual(decision.actions[0]["args"]["duration_s"], 10.0)
-        self.assertEqual(decision.actions[1]["args"]["count"], 2)
 
 
 if __name__ == "__main__":

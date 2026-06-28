@@ -14,19 +14,35 @@ wrong model answer should be caught by deterministic controls, catalog
 constraints, schema validation, runtime policy, provider refusal, or
 clarification fallback before it can become a harmful action.
 
-The current runtime uses a staged route pipeline:
+The current runtime has three decision stages, with validation guardrails
+between them:
 
 ```text
 emergency filter
   -> quick intent router
+  -> route validation guardrails
   -> deep_thought handoff when quick confidence is low or planning is needed
   -> schema/runtime/provider validation
 ```
 
 The emergency filter is deterministic and fastest. The quick intent router is
 normally the small Router model (`qwen3:0.6b`) with catalog candidates and
-bounded context. The deepthinking Agent uses the larger Agent model for
-low-confidence or explicitly complex requests.
+bounded context. Route validation is deterministic but does not answer the user:
+it only corrects impossible, unsafe, or clearly non-action routing mistakes and
+must not become another intent-understanding stage. The deepthinking Agent uses
+the larger Agent model for low-confidence or explicitly complex requests.
+
+The ownership invariant is:
+
+- only the emergency filter may use rules or phrase patterns to determine a
+  route;
+- quick intent for normal language belongs to the catalog-bounded small Router
+  model, not to regexes;
+- deep reasoning, planning, and low-confidence correction belong to
+  `deepthinking_agent`;
+- deterministic validators may reject, repair, or clarify unsafe/impossible
+  model outputs, but they must not answer knowledge questions or select normal
+  chat/tool/memory/body intent by phrase matching.
 
 Every stage may propose high-level tasks or actions. Chromie records those
 proposals in `RouteDecision.metadata.route_stage_outputs` and merges them into
@@ -38,7 +54,13 @@ and providers must accept before anything executes.
 
 1. Deterministic operational controls bypass the model.
    Stop, cancel, emergency, ignore, silence, and unusable-audio paths must stay
-   rule-based and deterministic.
+   rule-based and deterministic. These hard filters should stay narrow and
+   high-confidence; ambiguous or negated stop-related text should continue to
+   quick intent routing. In code, `router/app/rules.py` is reserved for this
+   narrow hard-control layer and may only produce `interrupt` or `ignore`,
+   including obvious repeated filler or acknowledgment ASR hallucinations. Broad
+   phrase routing and regex action parsing must not become normal hybrid
+   language understanding.
 2. The capability catalog bounds the model's choices.
    The model may select from known routes, capabilities, or task types. It must
    not invent skills, body controls, hardware state, or hidden provider support.
@@ -51,7 +73,9 @@ and providers must accept before anything executes.
    `interrupt` or `ignore` after the emergency filter has already passed, the
    Router does not let that model output stop the robot. Clear body commands
    with executable catalog candidates are recovered as `robot_action` for Agent
-   capability planning; non-action cases are delegated or clarified.
+   capability planning; the same recovery applies when the quick model sends an
+   obvious executable body command to `deep_thought`. Non-action cases are
+   delegated or clarified.
 4. Schemas and policies revalidate everything.
    `RouteDecision`, `InteractionResponse`, Skill Runtime requests, TaskGraphs,
    and MCP calls must be validated after model output is produced.
@@ -77,6 +101,8 @@ wrong action." The expected outcome is one of:
 - deterministic interrupt/ignore handling wins before model routing;
 - an invalid model `interrupt`/`ignore` after that filter is recovered to
   catalog-bounded `robot_action` only when the text clearly asks for body action;
+- a model `robot_action` for a factual knowledge question is corrected to
+  conversational handling before capability agents can run;
 - the quick Router model returns low confidence and Chromie delegates to
   `deep_thought`;
 - catalog or schema validation rejects the route;

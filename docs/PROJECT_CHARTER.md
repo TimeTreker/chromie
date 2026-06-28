@@ -87,13 +87,17 @@ future production robot backend.
    or unconfirmed work does not execute.
 3. **Operational controls stay deterministic.** Stop, cancel, emergency,
    silence, and unusable-audio paths do not depend on model judgment.
-4. **Simulation precedes hardware.** Logical closure, failure handling, and
+4. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
+   the deterministic operational filter. Normal conversation, tool, memory,
+   robot-action, and deep-thought intent should come from bounded model
+   understanding, catalog constraints, or clarification.
+5. **Simulation precedes hardware.** Logical closure, failure handling, and
    recovery are proven in simulation before physical commissioning.
-5. **Evidence is part of the product.** Implemented, automatically verified,
+6. **Evidence is part of the product.** Implemented, automatically verified,
    target validated, and release ready are separate states.
-6. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
+7. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
    supervised multi-skill, and broader autonomy are distinct gates.
-7. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
+8. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
    timing, and recovery causes remain inspectable.
 
 ## Non-goals

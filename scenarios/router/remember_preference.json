@@ -3,22 +3,30 @@
   "id": "remember_preference",
   "suite": "router",
   "level": "module",
-  "description": "Simple memory request routes to memory, not body motion.",
+  "description": "Simple memory request is understood by the quick LLM router and routes to memory, not body motion.",
   "tags": ["memory", "normal"],
   "input": {
     "text": "Remember that my favorite color is blue."
   },
   "stub": {
-    "router_mode": "rules_only",
+    "router_mode": "hybrid",
     "catalog": {
       "matched": false
+    },
+    "llm_decision": {
+      "route": "memory",
+      "agents": [],
+      "intent": "remember_user_fact",
+      "confidence": 0.86,
+      "language": "en-US",
+      "source": "llm"
     }
   },
   "expect": {
     "route": "memory",
     "intent": "remember_user_fact",
-    "source": "rules",
+    "source": "llm",
     "task_types_include": ["memory.remember_session_context"],
-    "llm_calls": 0
+    "llm_calls": 1
   }
 }

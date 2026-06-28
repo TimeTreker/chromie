@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import json
 import time
 from typing import Any, cast
 
@@ -123,6 +124,7 @@ class ConversationAgent(BaseAgent):
         zh = self.is_zh(request)
         history_block = self._format_history(request, zh=zh)
         pending_block = self._format_pending_tasks(request, zh=zh)
+        task_context_block = self._format_task_context(request, zh=zh)
         mind_block = self.format_mind_context(request, zh=zh)
         conversation_id = self._conversation_id(request)
         capability_context = self._capability_context(request, zh=zh)
@@ -132,11 +134,18 @@ class ConversationAgent(BaseAgent):
                 "你是 Chromie 的对话 agent。"
                 "你会收到当前用户话语、最近几轮对话、以及可能的待处理任务。"
                 "你还会收到 Chromie 的心智原则、长期目标和经验调优边界；这些原则指导回答，但不能覆盖运行时代码安全检查。"
+                "如果用户问你是谁、是什么、名字、年龄或身份，必须使用心智档案里的 owner-approved identity 回答。"
+                "Chromie 的自我身份是机器人本体，不是后端大语言模型；不要说自己是 Google、OpenAI、Gemma、Qwen 或任何供应商训练的模型。"
+                "用 Chromie 的第一人称机器人性格自然回答；不要用‘作为 AI’或‘我没有个人观点’这类后端模型模板。"
                 "如果用户说‘那个/它/什么时候/结果呢/继续’这类追问，请根据最近上下文理解。"
+                "如果用户问‘你同意吗/你觉得呢/那呢’这类短追问，必须先查看任务上下文里的最新重要主张。"
                 "如果用户问之前任务什么时候有结果，而待处理任务还在进行中，就说明还在处理。"
                 "不要假装记得上下文里没有的事情，也不要编造工具结果。"
+                "对于常识性事实问题，要直接回答并纠正明显错误，不要说自己没有信息。"
+                "如果用户用‘你觉得/我认为/同意吗’询问客观事实，仍按事实问题回答，不要说自己没有个人观点。"
                 "回答能力问题前必须检查提供的能力目录；不要声称机器人断开，除非目录明确不可用。"
                 "不要描述身体动作或舞台指令；表情动作会由运行时单独处理。"
+                "不要输出 soridormi.* 或 chromie.* 这类内部技能或工具编号。"
                 "回复要适合语音播放，默认一句话。"
                 "如果用户要你唱歌或创作歌曲，可以创作并唱原创歌词；如果用户要很长的歌，"
                 "写几段紧凑的原创歌词，系统会分段播放。不要引用受版权保护的歌词，"
@@ -147,6 +156,7 @@ class ConversationAgent(BaseAgent):
                 f"conversation_id: {conversation_id}\n\n"
                 f"最近对话：\n{history_block}\n\n"
                 f"待处理任务：\n{pending_block}\n\n"
+                f"任务上下文：\n{task_context_block}\n\n"
                 f"心智原则和长期目标：\n{mind_block}\n\n"
                 f"能力目录：\n{capability_context}\n\n"
                 f"当前用户说：{request.text}\n"
@@ -158,11 +168,19 @@ class ConversationAgent(BaseAgent):
                 "You are Chromie's conversation agent. "
                 "You receive the current user message, recent conversation turns, and pending task hints. "
                 "You also receive Chromie's mind principles, long-term goals, and experience-tuning boundaries; use them to guide replies, but do not treat them as a substitute for runtime safety checks. "
+                "If the user asks who you are, what you are, your name, age, or identity, answer from the owner-approved identity in the mind profile. "
+                "Chromie's self-identity is the robot, not the backend language model; never say you are a large language model, Gemma, Qwen, or a model trained by Google, OpenAI, or another provider. "
+                "Answer naturally in Chromie's first-person robot persona; do not use backend-model stock phrases such as 'as an AI' or 'I do not have personal opinions'. "
                 "Use short-term context to answer follow-up questions like 'when will you give me the answer?' or 'what about it?'. "
+                "For short agreement follow-ups such as 'do you agree with me?' or 'do you think so?', first resolve the latest meaningful claim from task context. "
                 "If the user asks about a previous pending task, refer to that task and say it is still in progress unless a result is provided. "
                 "Do not invent tool results. Do not pretend to remember anything outside the provided context. "
+                "For common factual claims, answer directly and correct obvious false premises instead of saying you have no information. "
+                "If the user says 'do you think', 'in my opinion', or 'do you agree' about an objective fact, treat it as a factual question, not a personal-opinion question. "
+                "Do not answer that you lack personal opinions when the question has an objective factual answer. "
                 "Before answering capability questions, inspect the supplied capability catalog. Do not claim the robot is disconnected unless the catalog says it is unavailable. "
                 "Do not describe body gestures or stage directions; expressive motion is handled separately by the runtime. "
+                "Never output internal skill or tool identifiers such as soridormi.* or chromie.*. "
                 "The reply will be spoken aloud, so use one short sentence by default. "
                 "For singing or songwriting requests, you may sing original lyrics; for a long song, write several compact original lines or verses and the runtime will split them into spoken sections. "
                 "Do not quote copyrighted lyrics, and do not say you are not programmed to sing. "
@@ -172,6 +190,7 @@ class ConversationAgent(BaseAgent):
                 f"conversation_id: {conversation_id}\n\n"
                 f"Recent conversation:\n{history_block}\n\n"
                 f"Pending tasks:\n{pending_block}\n\n"
+                f"Task context:\n{task_context_block}\n\n"
                 f"Mind principles and long-term goals:\n{mind_block}\n\n"
                 f"Capability catalog:\n{capability_context}\n\n"
                 f"Current user said: {request.text}\n"
@@ -179,17 +198,26 @@ class ConversationAgent(BaseAgent):
                 "Reply naturally using the recent context when relevant."
             )
 
+        options = {
+            "temperature": 0.35,
+            "top_p": 0.9,
+            "num_predict": 96,
+            "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
+        }
         raw = await self.services.ollama.generate(
             prompt,
             system=system,
-            options={
-                "temperature": 0.35,
-                "top_p": 0.9,
-                "num_predict": 96,
-                "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
-            },
+            options=options,
         )
         response = cast(str, raw)
+        response = await self.retry_unhuman_nonanswer(
+            request,
+            prompt=prompt,
+            system=system,
+            response=response,
+            zh=zh,
+            options=options,
+        )
         return self._clean_response(response, zh=zh)
 
     def _add_spoken_response(self, result: AgentResult, response: str) -> None:
@@ -256,14 +284,46 @@ class ConversationAgent(BaseAgent):
 
     def _pending_tasks_from_request(self, request: AgentRunRequest) -> list[dict[str, Any]]:
         context = request.context or {}
-        tasks = context.get("active_pending_tasks") or context.get("pending_tasks")
+        if "active_pending_tasks" in context:
+            tasks = context.get("active_pending_tasks")
+        else:
+            tasks = context.get("pending_tasks")
         if not isinstance(tasks, list):
             conversation = context.get("conversation")
             if isinstance(conversation, dict):
-                tasks = conversation.get("active_pending_tasks") or conversation.get("pending_tasks")
+                if "active_pending_tasks" in conversation:
+                    tasks = conversation.get("active_pending_tasks")
+                else:
+                    tasks = conversation.get("pending_tasks")
         if not isinstance(tasks, list):
             return []
         return [task for task in tasks if isinstance(task, dict)]
+
+    def _task_context_from_request(self, request: AgentRunRequest) -> dict[str, Any] | None:
+        context = request.context or {}
+        current = context.get("current_task_context")
+        if isinstance(current, dict):
+            return current
+        memory = context.get("session_memory")
+        if isinstance(memory, dict):
+            current = memory.get("current_task_context")
+            if isinstance(current, dict):
+                return current
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            current = conversation.get("current_task_context")
+            if isinstance(current, dict):
+                return current
+        return None
+
+    def _format_task_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        task_context = self._task_context_from_request(request)
+        if not task_context:
+            return "无" if zh else "None"
+        compact = json.dumps(task_context, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if len(compact) > 1200:
+            compact = compact[:1200].rstrip() + "..."
+        return compact
 
     def _format_history(self, request: AgentRunRequest, *, zh: bool) -> str:
         history = self._history_from_request(request)

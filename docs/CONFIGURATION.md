@@ -149,7 +149,7 @@ configuration.
 |---|---|
 | `ROUTER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
 | `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the small Router model for fast semantic routing while the emergency filter remains deterministic. |
-| `ROUTER_RULES_FIRST` | `1`. |
+| `ROUTER_RULES_FIRST` | `1`. Only hard interrupt/noise filtering runs before the small Router model; normal intent is not selected by phrase rules. |
 | `ROUTER_MODEL` | `qwen3:0.6b` in common configuration. |
 | `ROUTER_REVIEW_MODEL` | `gemma4:26b` in common configuration; reviews underspecified LLM `robot_action` choices before any robot skill is selected. |
 | `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
@@ -159,17 +159,25 @@ configuration.
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `600`. Catalog failure falls back safely and the Agent rechecks in-process. |
 | `ROUTER_CAPABILITY_MATCH_LIMIT` | Maximum ranked candidates attached to one route; default `8`. |
-| `ROUTER_ALLOW_LEGACY_ROBOT_RULES` | Default `0`; enables old phrase-based robot routing only as an explicit compatibility rollback. Interrupt/noise safety rules remain deterministic. |
-| `ROUTER_ALLOW_SEMANTIC_ACTION_FALLBACK` | Default `0`; when enabled, lets the old deterministic semantic action parser fill exact action lists after a high-confidence LLM `robot_action` route. This is compatibility/debug behavior, not the normal hybrid path. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
 | `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 
-Router routing has three stages. The emergency filter for interrupt and ignore
-stays deterministic in every mode. The quick intent stage uses catalog-bounded
-LLM routing when `ROUTER_MODE` is `hybrid` or `llm_only`. The deep-thought stage
-is reached when quick intent returns low confidence or explicitly chooses
+Router routing has three decision stages plus deterministic validation
+guardrails. The hard emergency filter for interrupt and ignore stays
+deterministic in every mode. The quick intent stage uses catalog-bounded LLM
+routing when `ROUTER_MODE` is `hybrid` or `llm_only`. The deep-thought stage is
+reached when quick intent returns low confidence or explicitly chooses
 `deep_thought`; it is handled by the Agent deepthinking module, not by the small
-Router model.
+Router model. Soft deterministic validators may correct impossible or unsafe
+route choices between stages, but they must not answer the user or select normal
+intent by phrase matching.
+
+The hard filter implementation is intentionally narrow in `router/app/rules.py`.
+It is the only Router stage allowed to use phrase patterns to determine a route,
+and it can only produce `interrupt` or `ignore`, including repeated filler or
+acknowledgment ASR hallucinations. Normal robot, tool, memory, conversation, and
+deep-thought intent must come from catalog-bounded model routing, validators, or
+fallback behavior.
 
 ## Mind, Principles, and Experience
 
@@ -181,9 +189,14 @@ Router model.
 | `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl`; relative paths resolve from the project root. |
 | `ORCH_MIND_PROPOSAL_LOG_PATH` | `.chromie/experience/mind_update_proposals.jsonl`; stores human-review-only proposed updates. |
 
-Core principles require owner approval and are not changed by experience. The
-experience journal can support future prompt, test, strategy, and long-term-goal
-tuning, but proposals are never auto-applied. See
+The default mind profile also carries Chromie's owner-approved identity: her
+name is Chromie, she is a female AI robot using she/her pronouns, and her age is
+6 years old as a robot identity age rather than a human biological age. She is
+defined as a companion robot who can keep people company and do simple helpful
+things. Identity answers must describe Chromie as the robot, not as the backend
+LLM or model provider. Core principles require owner approval and are not
+changed by experience. The experience journal can support future prompt, test,
+strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 [`chromie_mind.md`](chromie_mind.md).
 
 ## Agent and TaskGraph
@@ -218,14 +231,15 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_ROUTER_TIMEOUT_MS` | `2000` in common configuration. It must exceed `ROUTER_TIMEOUT_MS` so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_ROUTER_TIMEOUT_MS` | `3000` in common configuration. It must exceed `ROUTER_TIMEOUT_MS` plus the catalog lookup budget so the Router can finish or report its own timeout before the host falls back. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `TTS_FLUSH_CHARS` | Streaming direct-LLM text threshold before scheduling a sentence for TTS; common default `80`, code default `160`. |
 | `ORCH_TTS_TEXT_CHUNKING` | Split complete Agent/interaction speech into ordered TTS chunks before synthesis; common default `true`. |
-| `ORCH_TTS_CHUNK_CHARS` | Maximum preferred character count for complete-speech chunks; common default `80`. |
-| `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common default `40`. |
+| `ORCH_TTS_FIRST_CHUNK_CHARS` | Preferred first complete-speech chunk size; common and code default `16` so short complete openers such as `I'm doing well.`, `Not tired.`, or `Too fast.` can be synthesized before longer follow-up sections. Set `0` to use `ORCH_TTS_CHUNK_CHARS` for every chunk. |
+| `ORCH_TTS_CHUNK_CHARS` | Preferred upper size for complete-speech chunks; common and code default `120`. Complete speech is split on sentence and substantial clause boundaries first; tiny fragments may be grouped, and length splitting is only a fallback for text longer than `TTS_MAX_TEXT_CHARS`. |
+| `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
 | `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for a body-aligned speech item to become audible before continuing; code default `20000`. |
 | `ORCH_VOICE_SYSTEM_PROMPT` | Optional replacement for the direct-LLM voice brevity/style instruction. |
 
@@ -254,11 +268,16 @@ Do not commit a real execution token. Manifest strings may use required
 | `RECORDINGS_DIR` | `recordings`, resolved from repository root when relative. |
 
 The Orchestrator always resamples captured audio to 16 kHz before ASR. For
-speech output, complete Agent/interaction text is split into ordered chunks so
-the first chunk can become audible while later chunks are still being generated.
+speech output, complete Agent/interaction text is split into ordered chunks. The
+first chunk uses a smaller target so it can become audible while later chunks
+are still being generated.
 Playback remains serialized by order. The TTS service owns independent model
 workers when `TTS_WORKER_COUNT>1`; otherwise chunking is pipelined
 generation/playback over the single worker.
+When VAD accepts new user audio, the host interrupts old speech output before
+ASR so the user can barge in. It does not cancel active body skills at that
+point; body cancellation is reserved for a routed `interrupt` decision after ASR
+and Router validation.
 
 ## Conversation state
 
@@ -275,11 +294,17 @@ generation/playback over the single worker.
 | `ORCH_CONVERSATION_RESET_PHRASES` | Optional `|`-separated override. |
 | `ORCH_CONVERSATION_FOLLOWUP_PHRASES` | Optional `|`-separated override. |
 | `ORCH_CONVERSATION_NEW_TOPIC_STARTERS` | Optional `|`-separated override. |
+| `ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC` | `180`; recently completed task hints stay briefly available for follow-up questions. |
+| `ORCH_ENABLE_TASK_CONTEXT_STORE` | `0`; when enabled, compact unfinished task contexts are saved locally and restored as recoverable after restart. |
+| `ORCH_TASK_CONTEXT_STORE_PATH` | `.chromie/conversation/task_contexts.json`; relative paths resolve from the project root. |
 
 `ORCH_CONTEXT_MAX_TURNS`, `ORCH_CONTEXT_IDLE_TIMEOUT_SEC`,
 `ORCH_CONTEXT_MAX_AGE_SECONDS`, `ORCH_CONTEXT_MAX_TEXT_CHARS`, and
 `ORCH_CONTEXT_MAX_PENDING_TASKS` are compatibility aliases. New configuration
 should use the `ORCH_CONVERSATION_*` names.
+The task-context store never resumes physical work by itself; restored
+robot-action tasks are prompt-facing recoverable context and require fresh
+confirmation before any new action can run.
 
 ## Skill Runtime and Soridormi
 
@@ -356,7 +381,12 @@ Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
 model stay resident together when memory allows without increasing per-model
 parallel KV-cache pressure.
 
-Spoken generation paths set `think: false`.
+Spoken generation paths set `think: false`. Conversation and deep-thinking
+prompts ask the model to speak as Chromie, the robot, rather than as a backend
+model. If the first draft uses a stock model disclaimer such as "as an AI" or
+"I do not have personal opinions", the Agent retries once and asks the model to
+choose the right natural answer mode: factual answer, robot-persona preference,
+or brief honest uncertainty.
 
 ## Legacy hardware daemon
 

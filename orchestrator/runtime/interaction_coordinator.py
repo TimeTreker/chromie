@@ -401,6 +401,30 @@ class InteractionRuntimeCoordinator:
             )
         return required
 
+    async def confirmation_exemption_request_ids(
+        self,
+        response: InteractionResponse,
+    ) -> set[str]:
+        body_requests = [
+            request
+            for request in response.skills
+            if request.skill_id.startswith("soridormi.")
+        ]
+        if not body_requests:
+            return set()
+        await self._ensure_soridormi_catalog()
+        if not (
+            self.soridormi_mode == "sim"
+            and self.auto_confirm_sim
+        ):
+            return set()
+        return {
+            request.request_id
+            for request in body_requests
+            if request.requires_confirmation
+            or self.registry.get(request.skill_id).requires_confirmation
+        }
+
     async def cancel_all(self) -> None:
         await self.runtime.cancel_all()
 

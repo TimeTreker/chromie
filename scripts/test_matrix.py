@@ -43,12 +43,11 @@ GROUPS: dict[str, TestGroup] = {
         (_unittest("tests.test_tts_model_sources", "tests.test_tts_cancellable_worker"),),
     ),
     "router": TestGroup(
-        "Deterministic router, capability routing, semantic actions, and regressions.",
+        "Deterministic hard filter, capability routing, model routing, and regressions.",
         (
             _unittest(
                 "tests.test_router_core",
                 "tests.test_router_capability_routing",
-                "tests.test_router_semantic_actions",
                 "tests.test_router_regression_evaluator",
                 "tests.test_llm_capability_routing",
                 "tests.test_capability_router_actions",

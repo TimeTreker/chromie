@@ -3,23 +3,30 @@
   "id": "explicit_deep_thought",
   "suite": "router",
   "level": "module",
-  "description": "Explicit careful-reasoning request schedules a thinking acknowledgement task.",
+  "description": "Explicit careful-reasoning request is understood by the quick LLM router and schedules a thinking acknowledgement task.",
   "tags": ["deep-thought", "planning"],
   "input": {
     "text": "Please think deeply and design a test strategy."
   },
   "stub": {
-    "router_mode": "rules_only",
+    "router_mode": "hybrid",
     "catalog": {
       "matched": false
+    },
+    "llm_decision": {
+      "route": "deep_thought",
+      "agents": [],
+      "intent": "deep_thought_planning",
+      "confidence": 0.92,
+      "language": "en-US",
+      "source": "llm"
     }
   },
   "expect": {
     "route": "deep_thought",
     "intent": "deep_thought_planning",
-    "source": "rules",
+    "source": "llm",
     "task_types_include": ["cognition.delegate_deep_thought", "speech.thinking_ack", "cognition.deep_think"],
-    "metadata_true": ["thinking_ack_allowed"],
-    "llm_calls": 0
+    "llm_calls": 1
   }
 }

@@ -11,9 +11,23 @@ from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
-from router.app.rules import route_by_rules
-from router.app.schema import RouteRequest
+from router.app.schema import RouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.interaction import InteractionSpeech
+
+
+def _nod_route(request: RouteRequest) -> RouteDecision:
+    return finalize_decision(
+        RouteDecision(
+            route="robot_action",
+            agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
+            intent="nod",
+            confidence=0.95,
+            language="en-US",
+            source="catalog",
+        ),
+        request,
+        source="catalog",
+    )
 
 
 class _NamedSkillInvoker:
@@ -93,9 +107,7 @@ class _RichTaskPlanner:
 class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
     async def test_text_nod_reaches_named_skill_runtime(self) -> None:
         route_request = RouteRequest(sid="interaction-nod", text="nod")
-        decision = route_by_rules(route_request)
-        self.assertIsNotNone(decision)
-        assert decision is not None
+        decision = _nod_route(route_request)
 
         response = await InteractionRuntime(
             AgentServices(ollama=None, use_llm=False)

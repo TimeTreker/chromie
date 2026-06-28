@@ -29,6 +29,7 @@ from .loader import (
     parse_manifest_paths,
 )
 from .probe import CapabilityProbeResult, probe_mcp_capabilities
+from .validator import normalize_args_for_schema
 
 __all__ = [
     "CapabilitySearchResult",
@@ -56,4 +57,5 @@ __all__ = [
     "load_capability_bundles",
     "parse_manifest_paths",
     "probe_mcp_capabilities",
+    "normalize_args_for_schema",
 ]
