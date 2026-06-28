@@ -70,7 +70,7 @@ class ConstrainedLlmCapabilityRoutingTests(unittest.TestCase):
         self.assertIn("safety_agent", result.agents)
         self.assertIn("cleared invalid capability selection", result.reason or "")
 
-    def test_explicit_planning_request_does_not_execute_fallback_skill(self) -> None:
+    def test_planning_phrase_is_not_handled_by_validator_regex(self) -> None:
         request = RouteRequest(text="Create a motion plan to walk forward without executing it.")
         decision = RouteDecision(
             route="robot_action",
@@ -82,8 +82,9 @@ class ConstrainedLlmCapabilityRoutingTests(unittest.TestCase):
 
         result = _validate_llm_capability_decision(request, decision, catalog_result())
 
-        self.assertEqual(result.route, "clarify")
-        self.assertEqual(result.intent, "clarify_capability_selection")
+        self.assertEqual(result.route, "robot_action")
+        self.assertEqual(result.intent, "robot_action")
+        self.assertIn("cleared invalid capability selection", result.reason or "")
 
     def test_catalog_fallback_never_routes_planning_tool_as_robot_action(self) -> None:
         request = RouteRequest(text="Walk forward.")

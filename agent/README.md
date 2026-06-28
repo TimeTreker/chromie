@@ -42,9 +42,9 @@ separate and default-off; enable it only with
 | `conversation_agent` | Produces short conversational speech with Ollama or deterministic fallback behavior. |
 | `deepthinking_agent` | Handles `deep_thought` requests by using session working memory to split complex tasks, plan, debug, and produce a spoken final answer. |
 | `speaker_agent` | Normalizes wording, brevity, and speaking style. It never plays audio. |
-| `robot_pose_controller_agent` | Produces legacy high-level pose/head/gesture action proposals. |
-| `motion_planner_agent` | Produces legacy high-level movement proposals. |
-| `safety_agent` | Rejects or clamps unsafe legacy action proposals. |
+| `robot_pose_controller_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
+| `motion_planner_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
+| `safety_agent` | Rejects or clamps unsafe action proposals. |
 | `tool_agent` | Produces a validated TaskGraph when LLM TaskGraph planning is enabled; otherwise emits a compatibility `tool.*` action that this repository does not automatically execute. |
 | `memory_agent` | Produces memory updates and compatibility `memory.store` actions. Chromie's current conversation state is process-local and not a durable memory store. |
 | `vision_agent` | Produces a compatibility `vision.query` proposal. No vision executor is included in this repository. |
@@ -88,6 +88,9 @@ Risk-bearing behavior is default-off.
 
 | Variable | Default | Effect |
 |---|---:|---|
+| `AGENT_RESPONSE_REVIEW_ENABLED` | `1` | Use a model critic to accept or rewrite spoken replies that fail the user request or Chromie persona. |
+| `AGENT_RESPONSE_REVIEW_MODEL` | `qwen3:0.6b` | Fast semantic reviewer model; the main `AGENT_MODEL` still writes the primary answer. |
+| `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named skills while keeping the last known-good catalog. |

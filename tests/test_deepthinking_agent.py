@@ -8,11 +8,11 @@ from agent.app.schema import AgentResult, AgentRunRequest
 
 
 class _CapturingOllama:
-    def __init__(self, response: str | list[str] = "Here is the architecture I recommend.") -> None:
+    def __init__(self, response: Any | list[Any] = "Here is the architecture I recommend.") -> None:
         self.responses = response if isinstance(response, list) else [response]
         self.calls: list[dict[str, Any]] = []
 
-    async def generate(self, prompt: str, **kwargs: Any) -> str:
+    async def generate(self, prompt: str, **kwargs: Any) -> Any:
         self.calls.append({"prompt": prompt, **kwargs})
         index = min(len(self.calls) - 1, len(self.responses) - 1)
         return self.responses[index]
@@ -65,6 +65,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deepthinking agent", call["system"])
         self.assertIn("split complex requests", call["system"])
         self.assertIn("human owner approval", call["system"])
+        self.assertIn("Normally do not repeat, quote, or paraphrase", call["system"])
         self.assertIn("Session working memory", call["prompt"])
         self.assertIn("Mind principles, long-term goals, and experience boundaries", call["prompt"])
         self.assertIn("owner-approved", call["prompt"])
@@ -147,12 +148,17 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         ollama = _CapturingOllama(
             [
                 "I do not have personal opinions on whether the sun is hot.",
-                "Yes. The Sun is extremely hot.",
+                {
+                    "decision": "revise",
+                    "reason": "Objective fact should be answered directly.",
+                    "spoken_response": "Yes. The Sun is extremely hot.",
+                },
             ]
         )
         agent = DeepThinkingAgent(
             AgentServices(
                 ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=220,
             )
@@ -177,8 +183,64 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.speak_immediate[0].text, "Yes. The Sun is extremely hot.")
         self.assertEqual(len(ollama.calls), 2)
         self.assertIn("Chromie's first-person robot persona", ollama.calls[0]["system"])
-        self.assertIn("Previous draft rejected", ollama.calls[1]["prompt"])
-        self.assertIn("Chromie answering as herself", ollama.calls[1]["prompt"])
+        self.assertIn("Candidate spoken response", ollama.calls[1]["prompt"])
+        self.assertIn("Judge meaning, not keyword rules", ollama.calls[1]["system"])
+
+    async def test_empty_joke_acknowledgement_is_retried_in_deep_thought(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I can tell you a joke. Why not?",
+                {
+                    "decision": "revise",
+                    "reason": "The candidate repeats an empty promise instead of telling the joke.",
+                    "spoken_response": "Why did Chromie take a nap? To reboot her sparkle.",
+                },
+            ]
+        )
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-joke-empty-ack-test",
+                "text": "If you can, just tell me. Why not?",
+                "context": {
+                    "history": [
+                        {"role": "user", "text": "Hey, can you tell me a joke?"},
+                        {"role": "assistant", "text": "I can tell you a joke."},
+                    ],
+                    "current_task_context": {
+                        "task_id": "task-joke",
+                        "task_type": "conversation",
+                        "goal": "Tell the user a joke.",
+                        "last_meaningful_user_turn": "Hey, can you tell me a joke?",
+                        "last_assistant_response": "I can tell you a joke.",
+                    },
+                },
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "deep_thought_low_confidence",
+                    "confidence": 0.55,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "Why did Chromie take a nap? To reboot her sparkle.",
+        )
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("Tell the user a joke.", ollama.calls[1]["prompt"])
 
 
 if __name__ == "__main__":

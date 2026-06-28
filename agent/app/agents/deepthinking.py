@@ -119,6 +119,7 @@ class DeepThinkingAgent(BaseAgent):
                 "不要假装记得上下文里没有的事情，也不要编造工具结果。"
                 "对于常识性事实问题，要直接回答并纠正明显错误。"
                 "如果用户用‘你觉得/我认为/同意吗’询问客观事实，仍按事实问题回答，不要说自己没有个人观点。"
+                "正常情况下不要复述、引用或转述用户刚才的话；只有需要确认、澄清，或用户明确要求复述时才可以。"
                 "能力目录只表示可用能力，不是授权；不要发明能力、低层电机命令或原始关节动作。"
                 "回答要适合语音分段播放，可以比普通对话完整，但仍要简洁。"
                 "请只输出要说的话，不要输出 JSON。"
@@ -151,6 +152,8 @@ class DeepThinkingAgent(BaseAgent):
                 "For common factual questions, answer directly and correct obvious false premises. "
                 "If the user says 'do you think', 'in my opinion', or 'do you agree' about an objective fact, treat it as a factual question, not a personal-opinion question. "
                 "Do not answer that you lack personal opinions when the question has an objective factual answer. "
+                "Normally do not repeat, quote, or paraphrase the user's current words; do that only when confirmation, clarification, or an explicit read-back is needed. "
+                "For joke, short-story, singing, or songwriting requests, create brief original harmless content instead of only saying you can do it. "
                 "The capability catalog describes available abilities, not authorization; never invent capabilities, low-level motor commands, or raw joint actions. "
                 "The reply will be spoken aloud, so be complete but concise enough for chunked voice playback. "
                 "Reply with only the spoken response text. Do not output JSON."
@@ -181,7 +184,7 @@ class DeepThinkingAgent(BaseAgent):
             options=options,
         )
         response = cast(str, raw)
-        response = await self.retry_unhuman_nonanswer(
+        response = await self.review_spoken_response(
             request,
             prompt=prompt,
             system=system,
@@ -362,9 +365,17 @@ class DeepThinkingAgent(BaseAgent):
                 continue
             capability_id = str(item.get("capability_id") or item.get("skill_id") or "")
             description = str(item.get("description") or "")
+            api = json.dumps(
+                item.get("input_schema") or {},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if len(api) > 360:
+                api = api[:360].rstrip() + "..."
             executable = bool(item.get("interaction_executable"))
             label = "可执行" if zh and executable else "仅供规划" if zh else "executable" if executable else "planning only"
-            lines.append(f"- {capability_id}: {description} [{label}]")
+            lines.append(f"- {capability_id}: {description} [{label}; api={api}]")
         return "\n".join(lines) if lines else ("无匹配能力" if zh else "No matching capabilities were supplied.")
 
     def _route_context(self, request: AgentRunRequest, *, zh: bool) -> str:

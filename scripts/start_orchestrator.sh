@@ -73,11 +73,14 @@ if ! flock -n 9; then
 fi
 
 if [ "${WARM_OLLAMA_BEFORE_ORCH:-1}" = "1" ]; then
-  if [[ "${ROUTER_USE_LLM:-0}" =~ ^(1|true|yes|on)$ ]]; then
-    ./scripts/warm_ollama.sh "${ROUTER_MODEL:-qwen3:0.6b}" "${AGENT_MODEL:-gemma4:e2b}"
-  else
-    ./scripts/warm_ollama.sh "${AGENT_MODEL:-gemma4:e2b}"
+  WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")
+  if [[ "${AGENT_RESPONSE_REVIEW_ENABLED:-1}" =~ ^(1|true|yes|on)$ ]]; then
+    WARM_MODELS+=("${AGENT_RESPONSE_REVIEW_MODEL:-qwen3:0.6b}")
   fi
+  if [[ "${ROUTER_USE_LLM:-0}" =~ ^(1|true|yes|on)$ ]]; then
+    WARM_MODELS=("${ROUTER_MODEL:-qwen3:0.6b}" "${WARM_MODELS[@]}")
+  fi
+  ./scripts/warm_ollama.sh "${WARM_MODELS[@]}"
 fi
 
 echo "[orchestrator] Starting..."

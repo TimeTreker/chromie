@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import time
 from pathlib import Path
 from typing import Literal
@@ -119,7 +118,7 @@ async def routes() -> dict:
             },
             {
                 "id": "route_validation",
-                "description": "Deterministic validators correct impossible, unsafe, or clearly non-action model routes without answering the user.",
+                "description": "Deterministic validators correct capability-contract, availability, and safety impossibilities without answering the user.",
                 "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
                 "llm": False,
             },
@@ -136,8 +135,6 @@ async def routes() -> dict:
             "conversation_agent",
             "deepthinking_agent",
             "speaker_agent",
-            "robot_pose_controller_agent",
-            "motion_planner_agent",
             "safety_agent",
             "tool_agent",
             "memory_agent",
@@ -168,154 +165,6 @@ def _capability_executable(item: dict) -> bool:
 
 def _interaction_executable_candidates(result: CapabilityCatalogResult) -> list[dict]:
     return [item for item in result.matches if _capability_executable(item)]
-
-
-def _looks_like_planning_request(text: str) -> bool:
-    normalized = " ".join((text or "").lower().split())
-    phrases = (
-        "create a plan",
-        "make a plan",
-        "plan a route",
-        "motion plan",
-        "without executing",
-        "do not execute",
-        "don't execute",
-        "simulate only",
-    )
-    return any(phrase in normalized for phrase in phrases)
-
-
-_ROBOT_ACTION_WORD_RE = re.compile(
-    r"\b("
-    r"blink|blinking|bow|come here|come closer|crouch|move|moving|nod|"
-    r"nodding|rotate|rotating|run|running|shake|sidestep|sit|smile|"
-    r"stand|step|turn|turning|travel|walk|walking|wave|waving"
-    r")\b"
-)
-_GAZE_ACTION_RE = re.compile(
-    r"\b(?:look|face)\s+(?:at\s+|towards?\s+|to\s+)?"
-    r"(?:me|person|someone|left|right|up|down|forward|back|around|there|here|"
-    r"the\s+person|your\s+left|your\s+right)\b"
-)
-_GO_ACTION_RE = re.compile(
-    r"\bgo\s+(forward|backward|back|left|right|straight|there|home|to|toward|closer|near)\b"
-)
-_OBVIOUS_CHAT_PHRASES = (
-    "do you think",
-    "do you agree",
-    "don't you",
-    "tell me a joke",
-    "tell me a story",
-    "sing a song",
-    "you look beautiful",
-    "you look nice",
-    "you look good",
-)
-_ZH_OBVIOUS_CHAT_PHRASES = (
-    "你觉得",
-    "你同意吗",
-    "讲个笑话",
-    "讲个故事",
-    "唱首歌",
-)
-_SIMPLE_CHAT_RE = re.compile(
-    r"^(?:"
-    r"hi|hello|hey|good\s+(?:morning|afternoon|evening)|"
-    r"(?:hi|hello|hey)[, ]+(?:chromie[, ]+)?how\s+are\s+you(?:\s+doing)?|"
-    r"how\s+are\s+you(?:\s+doing)?|"
-    r"are\s+you\s+(?:tired|okay|ok|well|there)|"
-    r"do\s+you\s+(?:agree|feel|think|understand)|"
-    r"is\s+(?:it|that|this)\b.*|"
-    r"are\s+(?:we|they|these|those)\b.*"
-    r")[,?!. ]*$",
-    re.IGNORECASE,
-)
-_SIMPLE_CHAT_COMPLEX_TERMS = (
-    "architecture",
-    "debug",
-    "fix",
-    "implementation",
-    "latency",
-    "optimize",
-    "plan",
-    "root cause",
-    "strategy",
-)
-_FACTUAL_CHAT_RE = re.compile(
-    r"\b(?:"
-    r"do\s+you\s+know|"
-    r"can\s+you\s+(?:tell|explain)|"
-    r"could\s+you\s+(?:tell|explain)|"
-    r"tell\s+me\s+(?:about|if|whether)|"
-    r"what(?:'s|\s+is)|"
-    r"why\s+(?:is|are|does|do)|"
-    r"how\s+(?:is|are|does|do)|"
-    r"which\s+(?:is|are)|"
-    r"is\s+(?:the|a|an|it|this|that)|"
-    r"are\s+(?:the|they|these|those)"
-    r")\b",
-    re.IGNORECASE,
-)
-
-
-def _looks_like_robot_action_request(text: str) -> bool:
-    normalized = " ".join((text or "").lower().split())
-    if not normalized:
-        return False
-    return bool(
-        _ROBOT_ACTION_WORD_RE.search(normalized)
-        or _GAZE_ACTION_RE.search(normalized)
-        or _GO_ACTION_RE.search(normalized)
-    )
-
-
-def _looks_like_obvious_chat_request(text: str) -> bool:
-    normalized = " ".join((text or "").lower().split())
-    if not normalized:
-        return False
-    return any(phrase in normalized for phrase in _OBVIOUS_CHAT_PHRASES) or any(
-        phrase in (text or "") for phrase in _ZH_OBVIOUS_CHAT_PHRASES
-    )
-
-
-def _looks_like_factual_chat_request(text: str) -> bool:
-    normalized = " ".join((text or "").lower().split())
-    if not normalized:
-        return False
-    if _looks_like_obvious_chat_request(text):
-        return True
-    if not (normalized.endswith("?") or _FACTUAL_CHAT_RE.search(normalized)):
-        return False
-    if _looks_like_robot_action_request(normalized):
-        return bool(
-            re.search(
-                r"\b(?:do\s+you\s+know|can\s+you\s+(?:tell|explain)|could\s+you\s+(?:tell|explain)|tell\s+me|what|why|how)\b",
-                normalized,
-            )
-        )
-    return bool(_FACTUAL_CHAT_RE.search(normalized))
-
-
-def _looks_like_simple_chat_request(text: str) -> bool:
-    normalized = " ".join((text or "").lower().split())
-    if not normalized:
-        return False
-    if _looks_like_robot_action_request(normalized) or _looks_like_planning_request(normalized):
-        return False
-    if any(term in normalized for term in _SIMPLE_CHAT_COMPLEX_TERMS):
-        return False
-    if _looks_like_factual_chat_request(text):
-        return True
-    if _looks_like_obvious_chat_request(text):
-        return True
-    if _SIMPLE_CHAT_RE.match(normalized):
-        return True
-    words = normalized.rstrip("?!.").split()
-    return (
-        len(words) <= 7
-        and normalized.endswith("?")
-        and words[0] in {"am", "are", "can", "could", "do", "does", "is", "should", "was", "were", "would"}
-    )
 
 
 def _clarify_capability_decision(
@@ -360,22 +209,8 @@ def _validate_llm_capability_decision(
     selected_id = _intent_capability_id(decision.intent)
 
     if decision.route == "robot_action":
-        if _looks_like_factual_chat_request(request.text):
-            return fallback_decision(
-                request,
-                reason=(
-                    "quick router selected robot_action for factual conversation; "
-                    f"quick_intent={decision.intent}"
-                ),
-            )
         selected = by_id.get(selected_id)
         if selected_id and (selected is None or not _capability_executable(selected)):
-            if _looks_like_planning_request(request.text):
-                return _clarify_capability_decision(
-                    request,
-                    result,
-                    reason="planning request cannot be executed as robot_action",
-                )
             executable = _interaction_executable_candidates(result)
             if not executable:
                 return _clarify_capability_decision(
@@ -403,6 +238,12 @@ def _validate_llm_capability_decision(
         if decision.should_speak:
             required_agents.append("speaker_agent")
         decision.agents = list(dict.fromkeys([*decision.agents, *required_agents]))
+        return finalize_decision(decision, request, source="llm")
+
+    if decision.route == "chat":
+        if not decision.intent or decision.intent == "unknown":
+            decision.intent = "general_conversation"
+        decision.agents = list(dict.fromkeys([*decision.agents, "conversation_agent", "speaker_agent"]))
         return finalize_decision(decision, request, source="llm")
 
     if selected_id:
@@ -464,46 +305,13 @@ def _catalog_recovery_from_low_confidence(
     decision: RouteDecision,
     result: CapabilityCatalogResult,
 ) -> RouteDecision | None:
-    recovered = _catalog_decision(
-        request,
-        result,
-        require_robot_action_text=False,
-    )
+    recovered = _catalog_decision(request, result)
     if recovered is None or recovered.route != "robot_action":
         return None
     recovered.reason = (
         "quick router low confidence, recovered executable catalog robot_action; "
         f"quick_route={decision.route}; quick_intent={decision.intent}"
     )
-    recovered.metadata = {
-        **(decision.metadata or {}),
-        **(recovered.metadata or {}),
-    }
-    return recovered
-
-
-def _catalog_recovery_from_deep_thought_body_command(
-    request: RouteRequest,
-    decision: RouteDecision,
-    result: CapabilityCatalogResult,
-) -> RouteDecision | None:
-    if not _looks_like_robot_action_request(request.text):
-        return None
-    if _looks_like_planning_request(request.text) or _looks_like_factual_chat_request(request.text):
-        return None
-    recovered = _catalog_decision(
-        request,
-        result,
-        require_robot_action_text=True,
-    )
-    if recovered is None or recovered.route != "robot_action":
-        return None
-    recovered.reason = (
-        "quick router delegated an executable body command to deep_thought; "
-        f"quick_route={decision.route}; quick_intent={decision.intent}"
-    )
-    if decision.reason:
-        recovered.reason = f"{recovered.reason}; quick_reason={decision.reason}"
     recovered.metadata = {
         **(decision.metadata or {}),
         **(recovered.metadata or {}),
@@ -520,38 +328,17 @@ def _recover_invalid_operational_llm_decision(
         f"quick router returned deterministic-only route {decision.route}; "
         "emergency filter did not match"
     )
-    if (
-        _looks_like_robot_action_request(request.text)
-        and _interaction_executable_candidates(result)
-    ):
-        reason = (
-            f"{reason_prefix}; recovered as robot_action for Agent planning"
-        )
+    recovered = _catalog_decision(request, result)
+    if recovered is not None and recovered.route == "robot_action":
+        reason = f"{reason_prefix}; recovered catalog robot_action for Agent planning"
         if decision.reason:
             reason = f"{reason}; quick_reason={decision.reason}"
-        return finalize_decision(
-            RouteDecision(
-                route="robot_action",
-                agents=["capability_agent", "safety_agent", "speaker_agent"],
-                intent="robot_action",
-                confidence=max(settings.confidence_threshold, decision.confidence),
-                language=decision.language or request.language or "auto",
-                priority="normal",
-                needs_agent=True,
-                should_speak=True,
-                candidate_capabilities=list(result.matches),
-                reason=reason,
-                source="llm",
-            ),
-            request,
-            source="llm",
-        )
-
-    if _looks_like_obvious_chat_request(request.text):
-        reason = f"{reason_prefix}; recovered as chat for simple conversation"
-        if decision.reason:
-            reason = f"{reason}; quick_reason={decision.reason}"
-        return fallback_decision(request, reason=reason)
+        recovered.reason = reason
+        recovered.metadata = {
+            **(decision.metadata or {}),
+            **(recovered.metadata or {}),
+        }
+        return finalize_decision(recovered, request, source=recovered.source)
 
     return _deep_thought_from_low_confidence(
         request,
@@ -588,8 +375,6 @@ def _attach_stage_context(
 def _catalog_decision(
     request: RouteRequest,
     result: CapabilityCatalogResult,
-    *,
-    require_robot_action_text: bool = True,
 ) -> RouteDecision | None:
     if not result.matched or not result.matches:
         return None
@@ -621,12 +406,6 @@ def _catalog_decision(
             None,
         )
         if top is None:
-            return None
-        if (
-            require_robot_action_text
-            and not _looks_like_robot_action_request(request.text)
-            and not _looks_like_planning_request(request.text)
-        ):
             return None
     selected_id = _capability_id(top)
     if not selected_id:
@@ -686,40 +465,21 @@ async def route(request: RouteRequest) -> RouteDecision:
                     )
                 elif (
                     llm_decision.confidence < settings.confidence_threshold
-                    and llm_decision.route != "deep_thought"
+                    and llm_decision.route not in {"chat", "deep_thought"}
                 ):
-                    if _looks_like_simple_chat_request(request.text):
-                        decision = fallback_decision(
-                            request,
-                            reason=(
-                                "quick router low confidence on simple conversation; "
-                                f"quick_route={llm_decision.route}; quick_intent={llm_decision.intent}"
-                            ),
-                        )
-                        decision.metadata = {
-                            **(llm_decision.metadata or {}),
-                            **(decision.metadata or {}),
-                        }
-                    else:
-                        decision = _catalog_recovery_from_low_confidence(
-                            request,
-                            llm_decision,
-                            catalog_result,
-                        )
-                        if decision is None:
-                            decision = _deep_thought_from_low_confidence(request, llm_decision)
-                elif llm_decision.route == "deep_thought":
-                    decision = _catalog_recovery_from_deep_thought_body_command(
+                    decision = _catalog_recovery_from_low_confidence(
                         request,
                         llm_decision,
                         catalog_result,
                     )
                     if decision is None:
-                        decision = _validate_llm_capability_decision(
-                            request,
-                            llm_decision,
-                            catalog_result,
-                        )
+                        decision = _deep_thought_from_low_confidence(request, llm_decision)
+                elif llm_decision.route == "deep_thought":
+                    decision = _validate_llm_capability_decision(
+                        request,
+                        llm_decision,
+                        catalog_result,
+                    )
                 else:
                     decision = _validate_llm_capability_decision(
                         request,

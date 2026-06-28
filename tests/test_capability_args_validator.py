@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from agent.app.capabilities.validator import normalize_args_for_schema
+from agent.app.capabilities.validator import normalize_args_for_schema, validate_args_for_schema
 
 
 class CapabilityArgsValidatorTests(unittest.TestCase):
@@ -70,6 +70,40 @@ class CapabilityArgsValidatorTests(unittest.TestCase):
 
         self.assertFalse(changed)
         self.assertEqual(normalized["speed"], "reckless")
+
+    def test_reports_unknown_fields_when_schema_forbids_them(self) -> None:
+        errors = validate_args_for_schema(
+            {"duration_s": 5.0},
+            {
+                "type": "object",
+                "properties": {"speed": {"type": "string"}},
+                "additionalProperties": False,
+            },
+        )
+
+        self.assertEqual(errors, ["args has unknown fields: ['duration_s']"])
+
+    def test_reports_nested_enum_and_required_errors(self) -> None:
+        errors = validate_args_for_schema(
+            {"speed": "reckless", "steps": [{}]},
+            {
+                "type": "object",
+                "properties": {
+                    "speed": {"type": "string", "enum": ["slow", "normal"]},
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {"duration_s": {"type": "number"}},
+                            "required": ["duration_s"],
+                        },
+                    },
+                },
+            },
+        )
+
+        self.assertIn("args.speed must be one of ['slow', 'normal']", errors)
+        self.assertIn("args.steps[0] is missing required field 'duration_s'", errors)
 
 
 if __name__ == "__main__":

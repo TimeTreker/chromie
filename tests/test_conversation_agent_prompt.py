@@ -9,11 +9,11 @@ from shared.chromie_contracts.mind import default_mind_profile
 
 
 class _CapturingOllama:
-    def __init__(self, response: str | list[str] = "Here is a little song I made for you.") -> None:
+    def __init__(self, response: Any | list[Any] = "Here is a little song I made for you.") -> None:
         self.responses = response if isinstance(response, list) else [response]
         self.calls: list[dict[str, Any]] = []
 
-    async def generate(self, prompt: str, **kwargs: Any) -> str:
+    async def generate(self, prompt: str, **kwargs: Any) -> Any:
         self.calls.append({"prompt": prompt, **kwargs})
         index = min(len(self.calls) - 1, len(self.responses) - 1)
         return self.responses[index]
@@ -193,12 +193,17 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         ollama = _CapturingOllama(
             [
                 "I do not have personal opinions on whether the sun is hot.",
-                "Yes. The Sun is extremely hot.",
+                {
+                    "decision": "revise",
+                    "reason": "Model-style non-answer to an objective fact.",
+                    "spoken_response": "Yes. The Sun is extremely hot.",
+                },
             ]
         )
         agent = ConversationAgent(
             AgentServices(
                 ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=220,
             )
@@ -223,20 +228,26 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.speak_immediate[0].text, "Yes. The Sun is extremely hot.")
         self.assertEqual(len(ollama.calls), 2)
         self.assertIn("Chromie's first-person robot persona", ollama.calls[0]["system"])
-        self.assertIn("Previous draft rejected", ollama.calls[1]["prompt"])
-        self.assertIn("Chromie answering as herself", ollama.calls[1]["prompt"])
+        self.assertIn("Candidate spoken response", ollama.calls[1]["prompt"])
+        self.assertIn("Judge meaning, not keyword rules", ollama.calls[1]["system"])
+        self.assertEqual(ollama.calls[1]["response_format"], "json")
         self.assertEqual(ollama.calls[1]["options"]["temperature"], 0)
 
     async def test_subjective_preference_disclaimer_is_retried_as_robot_persona(self) -> None:
         ollama = _CapturingOllama(
             [
                 "I do not have personal opinions about favorite colors.",
-                "I like bright yellow; it feels cheerful and easy to see.",
+                {
+                    "decision": "revise",
+                    "reason": "Chromie can answer with a simple robot-persona preference.",
+                    "spoken_response": "I like bright yellow; it feels cheerful and easy to see.",
+                },
             ]
         )
         agent = ConversationAgent(
             AgentServices(
                 ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=220,
             )
@@ -264,18 +275,165 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
             "I like bright yellow; it feels cheerful and easy to see.",
         )
         self.assertEqual(len(ollama.calls), 2)
-        self.assertIn("subjective preference", ollama.calls[1]["system"])
+        self.assertIn("semantic spoken-response reviewer", ollama.calls[1]["system"])
 
-    async def test_short_agreement_followup_uses_task_context_on_retry(self) -> None:
+    async def test_harmless_joke_refusal_is_retried_as_original_joke(self) -> None:
         ollama = _CapturingOllama(
             [
-                "I do not have information to agree or disagree with you.",
-                "Yes, I agree. The Moon is round.",
+                "I do not have a joke right now.",
+                {
+                    "decision": "revise",
+                    "reason": "The user asked for harmless creative content.",
+                    "spoken_response": "Here is one: my battery joined a gym, but it only did power cycles.",
+                },
             ]
         )
         agent = ConversationAgent(
             AgentServices(
                 ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "joke-retry-test",
+                "text": "Tell me a joke please, I'm a little tired.",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "Here is one: my battery joined a gym, but it only did power cycles.",
+        )
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("brief original harmless joke", ollama.calls[0]["system"])
+        self.assertIn("semantic spoken-response reviewer", ollama.calls[1]["system"])
+        self.assertIn("Candidate spoken response", ollama.calls[1]["prompt"])
+
+    async def test_empty_joke_acknowledgement_is_retried_as_original_joke(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I can tell you a joke.",
+                {
+                    "decision": "revise",
+                    "reason": "The candidate only promised a joke instead of telling one.",
+                    "spoken_response": "Why did the robot bring a blanket? Its circuits felt a little chilly.",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "joke-empty-ack-test",
+                "text": "Hey, can you tell me a joke?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "Why did the robot bring a blanket? Its circuits felt a little chilly.",
+        )
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("Hey, can you tell me a joke?", ollama.calls[1]["prompt"])
+
+    async def test_repeated_user_utterance_is_revised_by_semantic_reviewer(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                'I heard you say, "Can you tell me a joke?"',
+                {
+                    "decision": "revise",
+                    "reason": "The candidate repeats the user instead of answering.",
+                    "spoken_response": "Why did Chromie bring a notebook? To keep track of her bright ideas.",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "repeat-user-retry-test",
+                "text": "Can you tell me a joke?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.91,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "Why did Chromie bring a notebook? To keep track of her bright ideas.",
+        )
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn(
+            "Normally do not repeat, quote, or paraphrase",
+            ollama.calls[0]["system"],
+        )
+        self.assertIn(
+            "Normally Chromie should not repeat, quote, or paraphrase",
+            ollama.calls[1]["prompt"],
+        )
+        self.assertIn(
+            "Repeating the user's words is acceptable only when confirmation",
+            ollama.calls[1]["system"],
+        )
+
+    async def test_short_agreement_followup_uses_task_context_on_retry(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I do not have information to agree or disagree with you.",
+                {
+                    "decision": "revise",
+                    "reason": "Task context already provides the claim.",
+                    "spoken_response": "Yes, I agree. The Moon is round.",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=220,
             )
@@ -321,7 +479,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(ollama.calls), 2)
         self.assertIn("Task context", ollama.calls[0]["prompt"])
         self.assertIn("The user thinks the Moon is round.", ollama.calls[0]["prompt"])
-        self.assertIn("use that context before claiming uncertainty", ollama.calls[1]["system"])
+        self.assertIn("The user thinks the Moon is round.", ollama.calls[1]["prompt"])
 
     async def test_sun_shape_question_goes_through_llm_with_factual_prompt(self) -> None:
         ollama = _CapturingOllama("The Sun is roughly spherical, not rectangular.")

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-import re
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from ..clients.ollama_client import OllamaClient
 from ..schema import AgentResult, AgentRunRequest
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 @dataclass(slots=True)
 class AgentServices:
     ollama: OllamaClient | None = None
+    response_reviewer: OllamaClient | None = None
     use_llm: bool = True
     max_speak_chars: int = 120
     expressive_body_cues: str = "sim_only"
@@ -25,26 +26,11 @@ class AgentServices:
     capability_match_limit: int = 8
 
 
+logger = logging.getLogger("chromie.agent.base")
+
+
 class BaseAgent(ABC):
     name: str = "base_agent"
-
-    _UNHUMAN_NONANSWER_RE = re.compile(
-        r"\b(?:"
-        r"do\s+not\s+have\s+personal\s+opinions|"
-        r"don't\s+have\s+personal\s+opinions|"
-        r"do\s+not\s+have\s+opinions|"
-        r"don't\s+have\s+opinions|"
-        r"cannot\s+have\s+opinions|"
-        r"can't\s+have\s+opinions|"
-        r"not\s+have\s+beliefs|"
-        r"do\s+not\s+have\s+information|"
-        r"don't\s+have\s+information|"
-        r"cannot\s+determine\s+from\s+context|"
-        r"can't\s+determine\s+from\s+context|"
-        r"as\s+an\s+ai"
-        r")\b",
-        re.IGNORECASE,
-    )
 
     def __init__(self, services: AgentServices) -> None:
         self.services = services
@@ -86,10 +72,7 @@ class BaseAgent(ABC):
             compact = compact[:1600].rstrip() + "..."
         return compact
 
-    def looks_like_unhuman_nonanswer(self, response: str) -> bool:
-        return bool(self._UNHUMAN_NONANSWER_RE.search(" ".join((response or "").split())))
-
-    async def retry_unhuman_nonanswer(
+    async def review_spoken_response(
         self,
         request: AgentRunRequest,
         *,
@@ -99,49 +82,171 @@ class BaseAgent(ABC):
         zh: bool,
         options: dict[str, Any],
     ) -> str:
-        if self.services.ollama is None:
+        reviewer = self.services.response_reviewer
+        if reviewer is None:
             return response
-        if not self.looks_like_unhuman_nonanswer(response):
+        response = " ".join((response or "").split())
+        if not response:
             return response
 
         if zh:
-            retry_system = (
-                f"{system}"
-                "Chromie 应该像一个真实的陪伴机器人说话，而不是后端模型。"
-                "不要用‘我没有个人观点’或‘作为 AI’这类模板式拒答。"
-                "如果最近对话或任务上下文已经提供了可解析的对象或主张，请先使用这些上下文。"
-                "请由你判断：如果是客观事实，直接回答事实；如果是主观偏好，"
-                "用 Chromie 的机器人性格给出简单自然的偏好；如果确实不确定，"
-                "简短说明不确定并说可以一起查证。"
+            review_system = (
+                "你是 Chromie 的语义回答质检器。只判断含义，不使用关键词规则。"
+                "如果候选回答自然、直接、符合上下文，并且像 Chromie 机器人本人在说话，就接受。"
+                "如果候选回答只是空泛承诺、没有真正完成用户请求、忽略了已给出的上下文、"
+                "把 Chromie 说成后端模型，或用模型模板拒答，请改写成一条可播放的最终回答。"
+                "如果候选回答主要是在复述、转述或引用用户刚才的话，而不是直接回答，"
+                "也要改写；只有确认、澄清或用户明确要求复述时才可以重复用户的话。"
+                "只输出 JSON。"
             )
-            retry_prompt = (
-                f"{prompt}\n\n"
-                f"上一次草稿不合格：{response}\n"
-                "原因：它听起来像后端模型模板拒答，不像 Chromie 本体在回答。"
-                "请只输出一条修正后的可播放回答。"
+            review_prompt = self._response_review_prompt(
+                request,
+                agent_prompt=prompt,
+                agent_system=system,
+                response=response,
+                zh=True,
             )
         else:
-            retry_system = (
-                f"{system}"
-                " Chromie should speak like a real companion robot, not like a backend model. "
-                "Do not use stock disclaimers such as lacking personal opinions or 'as an AI'. "
-                "If recent history or task context provides the referent or claim, use that context before claiming uncertainty. "
-                "Decide the right answer mode yourself: if it is an objective fact, answer the fact; "
-                "if it is a subjective preference, give a simple natural robot-persona preference; "
-                "if it is genuinely uncertain, say so briefly and offer to check together."
+            review_system = (
+                "You are Chromie's semantic spoken-response reviewer. Judge meaning, not keyword rules. "
+                "Accept the candidate when it naturally answers the user, asks a necessary clarification, "
+                "uses the supplied context, and speaks as Chromie the robot herself. "
+                "Revise the candidate when it is an empty promise, fails to actually perform a harmless requested "
+                "creative response, ignores available context, describes Chromie as a backend/model/provider, "
+                "uses a model-style refusal where Chromie should answer normally, or mainly repeats, quotes, "
+                "or paraphrases the user's current words instead of directly answering. "
+                "Repeating the user's words is acceptable only when confirmation, clarification, or an explicit read-back is needed. "
+                "Return JSON only."
             )
-            retry_prompt = (
-                f"{prompt}\n\n"
-                f"Previous draft rejected: {response}\n"
-                "Reason: it sounded like a backend-model disclaimer instead of Chromie answering as herself. "
-                "Return only one corrected spoken answer."
+            review_prompt = self._response_review_prompt(
+                request,
+                agent_prompt=prompt,
+                agent_system=system,
+                response=response,
+                zh=False,
             )
-        raw = await self.services.ollama.generate(
-            retry_prompt,
-            system=retry_system,
-            options={
-                **options,
-                "temperature": 0,
-            },
+
+        try:
+            raw = await reviewer.generate(
+                review_prompt,
+                system=review_system,
+                options={
+                    "temperature": 0,
+                    "top_p": options.get("top_p", 0.9),
+                    "num_predict": 160,
+                },
+                response_format="json",
+            )
+        except Exception as exc:
+            logger.warning(
+                "response_review_failed sid=%s error_type=%s error=%s",
+                request.sid,
+                type(exc).__name__,
+                exc,
+            )
+            return response
+
+        if not isinstance(raw, dict):
+            logger.warning("response_review_invalid sid=%s type=%s", request.sid, type(raw).__name__)
+            return response
+
+        decision = str(raw.get("decision") or raw.get("status") or "").strip().lower()
+        revised = str(
+            raw.get("spoken_response")
+            or raw.get("revised_response")
+            or raw.get("response")
+            or ""
+        ).strip()
+        if decision in {"revise", "rewrite", "reject"} and revised:
+            logger.info(
+                "response_review_revised sid=%s reason=%r",
+                request.sid,
+                str(raw.get("reason") or "")[:200],
+            )
+            return revised
+        return response
+
+    def _response_review_prompt(
+        self,
+        request: AgentRunRequest,
+        *,
+        agent_prompt: str,
+        agent_system: str,
+        response: str,
+        zh: bool,
+    ) -> str:
+        agent_prompt = self._bounded_text(agent_prompt, 2400)
+        agent_system = self._bounded_text(agent_system, 1800)
+        task_context = self._bounded_json(self._task_context_from_request(request), 1200, zh=zh)
+        history = self._bounded_json(self._history_from_request(request), 1400, zh=zh)
+        if zh:
+            return (
+                f"当前用户输入：{request.text}\n"
+                f"最近对话：{history}\n"
+                f"任务上下文：{task_context}\n"
+                f"原始系统提示：{agent_system}\n"
+                f"原始任务提示：{agent_prompt}\n"
+                f"候选回答：{response}\n\n"
+                "请判断候选回答是否可直接播放。"
+                "正常情况下不要复述用户刚才的话；只有确认、澄清或明确要求复述时才可以。"
+                "输出 JSON：{\"decision\":\"accept|revise\",\"reason\":\"简短原因\","
+                "\"spoken_response\":\"接受时可为空；修改时给出最终可播放回答\"}"
+            )
+        return (
+            f"Current user input: {request.text}\n"
+            f"Recent conversation: {history}\n"
+            f"Task context: {task_context}\n"
+            f"Original system prompt: {agent_system}\n"
+            f"Original task prompt: {agent_prompt}\n"
+            f"Candidate spoken response: {response}\n\n"
+            "Decide whether the candidate can be spoken now. "
+            "Normally Chromie should not repeat, quote, or paraphrase the user's current words; allow that only for confirmation, clarification, or an explicit read-back request. "
+            "Return JSON: {\"decision\":\"accept|revise\",\"reason\":\"short reason\","
+            "\"spoken_response\":\"empty when accepted; final corrected spoken answer when revised\"}."
         )
-        return cast(str, raw)
+
+    def _task_context_from_request(self, request: AgentRunRequest) -> dict[str, Any] | None:
+        context = request.context or {}
+        current = context.get("current_task_context")
+        if isinstance(current, dict):
+            return current
+        memory = context.get("session_memory")
+        if isinstance(memory, dict):
+            current = memory.get("current_task_context")
+            if isinstance(current, dict):
+                return current
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            current = conversation.get("current_task_context")
+            if isinstance(current, dict):
+                return current
+        return None
+
+    def _history_from_request(self, request: AgentRunRequest) -> list[dict[str, Any]]:
+        if request.history:
+            return [turn for turn in request.history if isinstance(turn, dict)][-6:]
+        context = request.context or {}
+        history = context.get("history")
+        if isinstance(history, list):
+            return [turn for turn in history if isinstance(turn, dict)][-6:]
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            history = conversation.get("history")
+            if isinstance(history, list):
+                return [turn for turn in history if isinstance(turn, dict)][-6:]
+        return []
+
+    def _bounded_json(self, value: Any, max_chars: int, *, zh: bool) -> str:
+        if value in (None, [], {}):
+            return "无" if zh else "None"
+        return self._bounded_text(
+            json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+            max_chars,
+        )
+
+    @staticmethod
+    def _bounded_text(value: str, max_chars: int) -> str:
+        text = " ".join(str(value or "").split())
+        if len(text) > max_chars:
+            return text[:max_chars].rstrip() + "..."
+        return text

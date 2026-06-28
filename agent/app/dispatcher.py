@@ -6,7 +6,7 @@ from .schema import AgentRunRequest
 DEFAULT_AGENT_ORDER: dict[str, list[str]] = {
     "chat": ["conversation_agent", "speaker_agent"],
     "deep_thought": ["deepthinking_agent", "speaker_agent"],
-    "robot_action": ["robot_pose_controller_agent", "motion_planner_agent", "safety_agent", "speaker_agent"],
+    "robot_action": ["capability_agent", "safety_agent", "speaker_agent"],
     "tool": ["tool_agent", "speaker_agent"],
     "memory": ["memory_agent", "speaker_agent"],
     "clarify": ["conversation_agent", "speaker_agent"],
@@ -24,10 +24,8 @@ def selected_agents(request: AgentRunRequest) -> list[str]:
     if not requested:
         requested = list(DEFAULT_AGENT_ORDER.get(request.route_decision.route, ["conversation_agent", "speaker_agent"]))
 
-    # Expand robot_action to include both pose and motion planners. They are
-    # cheap deterministic planners and will no-op when not relevant.
-    if request.route_decision.route == "robot_action" and "capability_agent" not in requested:
-        for agent in ["robot_pose_controller_agent", "motion_planner_agent", "safety_agent", "speaker_agent"]:
+    if request.route_decision.route == "robot_action":
+        for agent in ["capability_agent", "safety_agent", "speaker_agent"]:
             if agent not in requested:
                 requested.append(agent)
 

@@ -143,6 +143,7 @@ class ConversationAgent(BaseAgent):
                 "不要假装记得上下文里没有的事情，也不要编造工具结果。"
                 "对于常识性事实问题，要直接回答并纠正明显错误，不要说自己没有信息。"
                 "如果用户用‘你觉得/我认为/同意吗’询问客观事实，仍按事实问题回答，不要说自己没有个人观点。"
+                "正常情况下不要复述、引用或转述用户刚才的话；只有需要确认、澄清，或用户明确要求复述时才可以。"
                 "回答能力问题前必须检查提供的能力目录；不要声称机器人断开，除非目录明确不可用。"
                 "不要描述身体动作或舞台指令；表情动作会由运行时单独处理。"
                 "不要输出 soridormi.* 或 chromie.* 这类内部技能或工具编号。"
@@ -178,10 +179,12 @@ class ConversationAgent(BaseAgent):
                 "For common factual claims, answer directly and correct obvious false premises instead of saying you have no information. "
                 "If the user says 'do you think', 'in my opinion', or 'do you agree' about an objective fact, treat it as a factual question, not a personal-opinion question. "
                 "Do not answer that you lack personal opinions when the question has an objective factual answer. "
+                "Normally do not repeat, quote, or paraphrase the user's current words; do that only when confirmation, clarification, or an explicit read-back is needed. "
                 "Before answering capability questions, inspect the supplied capability catalog. Do not claim the robot is disconnected unless the catalog says it is unavailable. "
                 "Do not describe body gestures or stage directions; expressive motion is handled separately by the runtime. "
                 "Never output internal skill or tool identifiers such as soridormi.* or chromie.*. "
                 "The reply will be spoken aloud, so use one short sentence by default. "
+                "For joke or short-story requests, create a brief original harmless joke or story instead of refusing. "
                 "For singing or songwriting requests, you may sing original lyrics; for a long song, write several compact original lines or verses and the runtime will split them into spoken sections. "
                 "Do not quote copyrighted lyrics, and do not say you are not programmed to sing. "
                 "Reply with only the spoken response text. Do not output JSON."
@@ -210,7 +213,7 @@ class ConversationAgent(BaseAgent):
             options=options,
         )
         response = cast(str, raw)
-        response = await self.retry_unhuman_nonanswer(
+        response = await self.review_spoken_response(
             request,
             prompt=prompt,
             system=system,
@@ -373,13 +376,20 @@ class ConversationAgent(BaseAgent):
                 continue
             capability_id = str(item.get("capability_id") or item.get("skill_id") or "")
             description = str(item.get("description") or "")
+            api = json.dumps(
+                item.get("input_schema") or {},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            if len(api) > 360:
+                api = api[:360].rstrip() + "..."
             executable = bool(item.get("interaction_executable"))
             label = "可执行" if zh and executable else "仅供规划" if zh else "executable" if executable else "planning only"
-            lines.append(f"- {capability_id}: {description} [{label}]")
+            lines.append(f"- {capability_id}: {description} [{label}; api={api}]")
         return "\n".join(lines) if lines else ("无匹配能力" if zh else "No matching capabilities were supplied.")
 
     def _fallback_reply(self, request: AgentRunRequest) -> str:
-        text = request.text.strip().lower()
         intent = request.route_decision.intent
         has_history = bool(self._history_from_request(request))
         has_pending = bool(self._pending_tasks_from_request(request))
@@ -387,26 +397,22 @@ class ConversationAgent(BaseAgent):
         if self.is_zh(request):
             if request.route_decision.route == "clarify":
                 return "你是指什么？"
-            if has_pending and any(word in text for word in ["什么时候", "结果", "刚才", "那个", "它", "查到"]):
+            if has_pending:
                 return "我还在处理刚才的任务。"
-            if has_history and any(word in text for word in ["什么时候", "结果", "刚才", "那个", "它"]):
+            if has_history:
                 return "我还记得刚才的上下文。"
             if intent == "emotional_support":
                 return "听起来你有点累。"
-            if text in {"你好", "喂", "哈喽"}:
-                return "你好，我在。"
             return "我听到了，但我现在没连上大脑。"
 
         if request.route_decision.route == "clarify":
             return "What do you mean?"
-        if has_pending and any(phrase in text for phrase in ["when", "answer", "result", "that", "it", "what about", "done"]):
+        if has_pending:
             return "I am still working on the previous task."
-        if has_history and any(phrase in text for phrase in ["when", "answer", "result", "that", "it", "what about"]):
+        if has_history:
             return "I remember the previous context, but my language model is not responding."
         if intent == "emotional_support":
             return "That sounds tiring."
-        if text in {"hello", "hello?", "hi", "hey", "what's up?", "whats up"}:
-            return "Hey, I am here."
         return "I heard you, but my language model is not responding."
 
     def _clean_response(self, response: str, *, zh: bool) -> str:

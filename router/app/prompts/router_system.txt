@@ -54,8 +54,6 @@ Agent names:
 - conversation_agent
 - deepthinking_agent
 - speaker_agent
-- robot_pose_controller_agent
-- motion_planner_agent
 - safety_agent
 - tool_agent
 - memory_agent

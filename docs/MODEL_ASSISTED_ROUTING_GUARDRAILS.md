@@ -28,9 +28,9 @@ emergency filter
 The emergency filter is deterministic and fastest. The quick intent router is
 normally the small Router model (`qwen3:0.6b`) with catalog candidates and
 bounded context. Route validation is deterministic but does not answer the user:
-it only corrects impossible, unsafe, or clearly non-action routing mistakes and
-must not become another intent-understanding stage. The deepthinking Agent uses
-the larger Agent model for low-confidence or explicitly complex requests.
+it only corrects capability-contract, availability, and safety impossibilities
+and must not become another intent-understanding stage. The deepthinking Agent
+uses the larger Agent model for low-confidence or explicitly complex requests.
 
 The ownership invariant is:
 
@@ -40,6 +40,11 @@ The ownership invariant is:
   model, not to regexes;
 - deep reasoning, planning, and low-confidence correction belong to
   `deepthinking_agent`;
+- spoken response quality for normal conversation belongs to model-based
+  semantic review, not to phrase-pattern rejection lists in Agent code;
+- spoken responses should answer directly and should not repeat, quote, or
+  paraphrase the user's current words unless confirmation, clarification, or an
+  explicit read-back is needed;
 - deterministic validators may reject, repair, or clarify unsafe/impossible
   model outputs, but they must not answer knowledge questions or select normal
   chat/tool/memory/body intent by phrase matching.
@@ -71,11 +76,11 @@ and providers must accept before anything executes.
    structured refusal, or fall back to safe chat/ignore.
    If the quick model returns a deterministic-only operational route such as
    `interrupt` or `ignore` after the emergency filter has already passed, the
-   Router does not let that model output stop the robot. Clear body commands
-   with executable catalog candidates are recovered as `robot_action` for Agent
-   capability planning; the same recovery applies when the quick model sends an
-   obvious executable body command to `deep_thought`. Non-action cases are
-   delegated or clarified.
+   Router does not let that model output stop the robot. It may recover to a
+   catalog-bounded `robot_action` only when executable catalog evidence is
+   already present; otherwise the case is delegated or clarified. If the quick
+   model chooses `deep_thought`, deterministic code must not override that by
+   phrase matching.
 4. Schemas and policies revalidate everything.
    `RouteDecision`, `InteractionResponse`, Skill Runtime requests, TaskGraphs,
    and MCP calls must be validated after model output is produced.
@@ -100,9 +105,10 @@ wrong action." The expected outcome is one of:
 
 - deterministic interrupt/ignore handling wins before model routing;
 - an invalid model `interrupt`/`ignore` after that filter is recovered to
-  catalog-bounded `robot_action` only when the text clearly asks for body action;
-- a model `robot_action` for a factual knowledge question is corrected to
-  conversational handling before capability agents can run;
+  catalog-bounded `robot_action` only when executable catalog evidence exists;
+- a model `robot_action` for a factual knowledge question is addressed by the
+  Router prompt/review model and, if it reaches conversation, by semantic
+  spoken-response review rather than phrase-based Agent rules;
 - the quick Router model returns low confidence and Chromie delegates to
   `deep_thought`;
 - catalog or schema validation rejects the route;

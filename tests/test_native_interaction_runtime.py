@@ -408,15 +408,41 @@ def _request(
 
 class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_native_runtime_emits_named_skill_without_result_adapter(self) -> None:
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "native-interaction",
+                "text": "nod",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.nod_yes",
+                    "confidence": 1.0,
+                    "language": "en-US",
+                    "source": "llm",
+                    "actions": [
+                        {
+                            "capability_id": "soridormi.nod_yes",
+                            "args": {"count": 2},
+                            "sequence": 0,
+                        }
+                    ],
+                },
+            }
+        )
         response = await InteractionRuntime(
-            AgentServices(ollama=None, use_llm=False, max_speak_chars=160)
-        ).run(_request())
+            AgentServices(
+                ollama=None,
+                use_llm=False,
+                max_speak_chars=160,
+                capability_catalog=_WeakAgreementCatalog(),  # type: ignore[arg-type]
+            )
+        ).run(request)
 
         self.assertEqual(response.metadata["interaction_output_mode"], "native")
         self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
         self.assertEqual(response.skills[0].args, {"count": 2})
-        self.assertEqual(response.speech[0].text, "Okay.")
-        self.assertIn("robot_pose_controller_agent", response.metadata["handled_by"])
+        self.assertEqual(response.speech[0].text, "Nodding.")
+        self.assertIn("capability_agent", response.metadata["handled_by"])
 
     async def test_speech_while_body_action_waits_for_playback_start(self) -> None:
         request = AgentRunRequest.model_validate(
@@ -450,12 +476,12 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(request)
 
-        self.assertEqual(response.speech[0].timing, "sequential")
-        self.assertEqual(response.speech[0].metadata["alignment"], "body_start")
-        self.assertTrue(response.speech[0].metadata["wait_for_playback_start"])
+        self.assertEqual(response.speech[0].timing, "immediate")
+        self.assertNotIn("alignment", response.speech[0].metadata)
+        self.assertNotIn("wait_for_playback_start", response.speech[0].metadata)
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_velocity")
 
-    async def test_affirmative_chat_adds_parallel_sim_nod_cue(self) -> None:
+    async def test_affirmative_chat_adds_parallel_attention_cue(self) -> None:
         request = _request(
             text="I think the sun is hot and round, do you agree with me?",
             route="chat",
@@ -467,7 +493,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 ollama=_AgreementOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
-                capability_catalog=_WeakAgreementCatalog(),  # type: ignore[arg-type]
+                capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
                 expressive_body_cues="sim_only",
             )
         ).run(request)
@@ -475,10 +501,10 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.route_decision.route, "chat")
         self.assertEqual(response.speech[0].text, "Yes, you are correct.")
         self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
+        self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
         self.assertEqual(
             response.skills[0].args,
-            {"count": 2, "amplitude": "small", "duration_s": 1.4},
+            {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
         )
         self.assertEqual(response.skills[0].timing, "parallel")
         self.assertTrue(response.skills[0].requires_confirmation)
@@ -486,7 +512,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             response.skills[0].metadata["source"],
             "expressive_body_cue",
         )
-        self.assertEqual(response.metadata["expressive_body_cue"], "soridormi.nod_yes")
+        self.assertEqual(response.metadata["expressive_body_cue"], "soridormi.express_attention")
 
     async def test_chat_only_response_adds_attention_cue(self) -> None:
         request = _request(
@@ -652,7 +678,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.speech[0].text, "I am listening.")
         self.assertEqual(response.skills, [])
 
-    async def test_weak_catalog_motion_match_does_not_override_chat_intent(self) -> None:
+    async def test_weak_catalog_motion_match_is_not_phrase_corrected_in_runtime(self) -> None:
         request = _request(
             text="I think the sun is hot and round, do you agree with me?",
             route="robot_action",
@@ -668,15 +694,14 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(request)
 
-        self.assertEqual(request.route_decision.route, "chat")
-        self.assertEqual(request.route_decision.reason, "weak_catalog_robot_action_match")
+        self.assertEqual(request.route_decision.route, "robot_action")
         self.assertEqual(response.skills, [])
         self.assertEqual(
             response.speech[0].text,
             "I heard you, but my language model is not responding.",
         )
 
-    async def test_appearance_compliment_does_not_count_as_gaze_action(self) -> None:
+    async def test_appearance_compliment_is_not_phrase_corrected_in_runtime(self) -> None:
         request = _request(
             text="You look beautiful, don't you?",
             route="robot_action",
@@ -692,8 +717,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(request)
 
-        self.assertEqual(request.route_decision.route, "chat")
-        self.assertEqual(request.route_decision.reason, "weak_catalog_robot_action_match")
+        self.assertEqual(request.route_decision.route, "robot_action")
         self.assertEqual(response.skills, [])
         self.assertEqual(
             response.speech[0].text,
@@ -701,9 +725,13 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_legacy_run_contract_remains_unchanged(self) -> None:
+        request = _request(
+            agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
+        )
+        request.context["allow_legacy_rule_agents"] = True
         result = await AgentRuntime(
             AgentServices(ollama=None, use_llm=False, max_speak_chars=160)
-        ).run(_request())
+        ).run(request)
 
         self.assertEqual(result.actions[0].type, "head.nod")
         self.assertEqual(result.actions[0].params, {"times": 1})

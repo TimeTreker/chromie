@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from pydantic import ValidationError
 
 from .agents import (
@@ -30,71 +29,10 @@ except ImportError:  # pragma: no cover - repository development path
 logger = logging.getLogger("chromie.agent.runtime")
 
 
-_ROBOT_ACTION_WORDS = re.compile(
-    r"\b("
-    r"approach|blink|bow|bring|carry|come here|come closer|crouch|deliver|fetch|"
-    r"inspect|move|nod|recover|rotate|run|shake|sidestep|sit|smile|"
-    r"stand|step|stop|turn|travel|walk|wave"
-    r")\b",
-    re.IGNORECASE,
-)
-_GAZE_ACTION_WORDS = re.compile(
-    r"\b(?:look|face)\s+(?:at\s+|towards?\s+|to\s+)?"
-    r"(?:me|person|someone|left|right|up|down|forward|back|around|there|here|"
-    r"the\s+person|your\s+left|your\s+right)\b",
-    re.IGNORECASE,
-)
 _SORIDORMI_TASK_PLANNING_TOOLS = {
     "soridormi.task.get_capabilities",
     "soridormi.task.preview",
     "soridormi.task.submit",
-}
-_PLANNING_PHRASES = (
-    "create a plan",
-    "make a plan",
-    "plan a route",
-    "motion plan",
-    "without executing",
-    "do not execute",
-    "don't execute",
-    "simulate only",
-)
-_AGREEMENT_PROMPTS = (
-    "do you agree",
-    "right?",
-    "correct?",
-    "is that right",
-    "is that correct",
-    "isn't it",
-    "is that true",
-)
-_ZH_AGREEMENT_PROMPTS = ("对吗", "是不是", "同意吗", "正确吗")
-_AFFIRMATIVE_SPEECH = (
-    "yes",
-    "correct",
-    "you are right",
-    "you're right",
-    "you are correct",
-    "that's right",
-    "that is right",
-    "i agree",
-    "scientifically speaking",
-)
-_NEGATIVE_SPEECH = (
-    "not correct",
-    "incorrect",
-    "i don't agree",
-    "i do not agree",
-    "not exactly",
-    "can't confirm",
-    "cannot confirm",
-)
-_ZH_AFFIRMATIVE_SPEECH = ("是的", "对", "正确", "同意", "没错")
-_ZH_NEGATIVE_SPEECH = ("不对", "不同意", "不能确认", "不完全")
-_EXPRESSIVE_NOD_ARGS = {
-    "count": 2,
-    "amplitude": "small",
-    "duration_s": 1.4,
 }
 _EXPRESSIVE_ATTENTION_ARGS = {
     "style": "neutral",
@@ -102,53 +40,8 @@ _EXPRESSIVE_ATTENTION_ARGS = {
     "hold_fraction": 0.35,
 }
 _EXPRESSIVE_CUE_CAPABILITY_IDS = (
-    "soridormi.nod_yes",
     "soridormi.express_attention",
 )
-
-
-def _normalized_text(text: str) -> str:
-    return " ".join((text or "").strip().lower().split())
-
-
-def _looks_like_robot_action_request(text: str) -> bool:
-    normalized = _normalized_text(text)
-    if not normalized:
-        return False
-    if _ROBOT_ACTION_WORDS.search(normalized) or _GAZE_ACTION_WORDS.search(normalized):
-        return True
-    return bool(
-        re.search(
-            r"\b(walk|go|move|travel|navigate)\s+(to|toward|towards|near|into|inside|"
-            r"forward|backward|back|left|right|straight|there|home|closer)\b",
-            normalized,
-        )
-    )
-
-
-def _looks_like_planning_request(text: str) -> bool:
-    normalized = _normalized_text(text)
-    return any(phrase in normalized for phrase in _PLANNING_PHRASES)
-
-
-def _asks_for_agreement(text: str) -> bool:
-    normalized = _normalized_text(text)
-    return any(phrase in normalized for phrase in _AGREEMENT_PROMPTS) or any(
-        phrase in (text or "") for phrase in _ZH_AGREEMENT_PROMPTS
-    )
-
-
-def _speech_is_affirmative(text: str) -> bool:
-    normalized = _normalized_text(text)
-    if re.search(r"\bno\b", normalized) or any(
-        phrase in normalized for phrase in _NEGATIVE_SPEECH
-    ) or any(
-        phrase in (text or "") for phrase in _ZH_NEGATIVE_SPEECH
-    ):
-        return False
-    return any(phrase in normalized for phrase in _AFFIRMATIVE_SPEECH) or any(
-        phrase in (text or "") for phrase in _ZH_AFFIRMATIVE_SPEECH
-    )
 
 
 def _catalog_item(
@@ -238,23 +131,11 @@ class _AgentPipeline:
             return result
 
         if decision.speak_first and decision.should_speak:
-            if isinstance(result, InteractionDraft) and _should_align_speech_with_body_start(request):
-                result.add_speak_immediate(
-                    decision.speak_first,
-                    style="brief",
-                    priority=decision.priority,
-                    timing="sequential",
-                    metadata={
-                        "wait_for_playback_start": True,
-                        "alignment": "body_start",
-                    },
-                )
-            else:
-                result.add_speak_immediate(
-                    decision.speak_first,
-                    style="brief",
-                    priority=decision.priority,
-                )
+            result.add_speak_immediate(
+                decision.speak_first,
+                style="brief",
+                priority=decision.priority,
+            )
             result.trace.append("runtime: added router speak_first")
 
         for agent_name in selected_agents(request):
@@ -268,21 +149,6 @@ class _AgentPipeline:
             result = await agent.run(request, result)  # type: ignore[arg-type,assignment]
 
         return result
-
-
-def _should_align_speech_with_body_start(request: AgentRunRequest) -> bool:
-    decision = request.route_decision
-    if decision.route != "robot_action" or not decision.actions:
-        return False
-    text = _normalized_text(request.text)
-    if not any(word in text for word in ("while", "whilst")):
-        return False
-    if not any(word in text for word in ("sing", "song", "say", "tell")):
-        return False
-    return any(
-        str(action.get("capability_id") or "").startswith("soridormi.")
-        for action in decision.actions
-    )
 
 
 class AgentRuntime(_AgentPipeline):
@@ -332,9 +198,21 @@ class InteractionRuntime(_AgentPipeline):
         if request.route_decision.route == "deep_thought":
             request.route_decision.agents = ["deepthinking_agent", "speaker_agent"]
             return
+        if request.route_decision.actions:
+            if request.route_decision.route == "robot_action":
+                request.route_decision.agents = list(
+                    dict.fromkeys(
+                        [
+                            *request.route_decision.agents,
+                            "capability_agent",
+                            "safety_agent",
+                            "speaker_agent",
+                        ]
+                    )
+                )
+            return
         if (
             request.route_decision.route == "chat"
-            and request.route_decision.source == "llm"
             and request.route_decision.confidence >= 0.55
         ):
             request.route_decision.agents = ["conversation_agent", "speaker_agent"]
@@ -347,10 +225,6 @@ class InteractionRuntime(_AgentPipeline):
             )
             and _has_soridormi_task_planning_match(
                 request.route_decision.candidate_capabilities
-            )
-            and (
-                _looks_like_robot_action_request(request.text)
-                or _looks_like_planning_request(request.text)
             )
         )
         if not search.matched and not embodied_task_candidate:
@@ -370,23 +244,6 @@ class InteractionRuntime(_AgentPipeline):
             request.route_decision.reason = (
                 "Matched Soridormi task-agent planning capability"
             )
-            return
-        if (
-            search.suggested_route == "robot_action"
-            and not request.route_decision.actions
-            and not _looks_like_robot_action_request(request.text)
-            and not _looks_like_planning_request(request.text)
-        ):
-            if request.route_decision.route == "robot_action":
-                request.route_decision.route = "chat"
-                request.route_decision.agents = ["conversation_agent", "speaker_agent"]
-                request.route_decision.intent = "general_conversation"
-                request.route_decision.confidence = min(
-                    request.route_decision.confidence,
-                    0.45,
-                )
-                request.route_decision.source = "fallback"
-                request.route_decision.reason = "weak_catalog_robot_action_match"
             return
         if search.suggested_route == "chat":
             request.route_decision.route = "chat"
@@ -485,19 +342,6 @@ class InteractionRuntime(_AgentPipeline):
         speech_text = " ".join(item.text for item in result.speak_immediate)
         if not speech_text.strip():
             return
-
-        if _asks_for_agreement(request.text) and _speech_is_affirmative(speech_text):
-            match = self._expressive_cue_catalog_item(request, "soridormi.nod_yes")
-            if match is not None:
-                self._add_expressive_skill(
-                    request,
-                    result,
-                    match,
-                    skill_id="soridormi.nod_yes",
-                    args=dict(_EXPRESSIVE_NOD_ARGS),
-                    reason="affirmative_chat",
-                )
-                return
 
         match = self._expressive_cue_catalog_item(
             request,

@@ -49,6 +49,16 @@ class Settings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL", "gemma4:e2b"))
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS", "30000")))
+    response_review_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    response_review_model: str = Field(
+        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_MODEL", "qwen3:0.6b")
+    )
+    response_review_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_REVIEW_TIMEOUT_MS", "4000"))
+    )
     use_llm: bool = Field(
         default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
         not in {"0", "false", "no", "off"}
@@ -160,6 +170,15 @@ logging.basicConfig(
 logger = logging.getLogger("chromie.agent")
 
 ollama_client = OllamaClient(settings.ollama_url, settings.model, timeout_ms=settings.timeout_ms)
+response_reviewer_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.response_review_model,
+        timeout_ms=settings.response_review_timeout_ms,
+    )
+    if settings.use_llm and settings.response_review_enabled
+    else None
+)
 configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
 capability_registry = configured_registry.registry
 try:
@@ -181,6 +200,7 @@ task_graph_planner = (
 )
 services = AgentServices(
     ollama=ollama_client,
+    response_reviewer=response_reviewer_client,
     use_llm=settings.use_llm,
     max_speak_chars=settings.max_speak_chars,
     expressive_body_cues=settings.expressive_body_cues,
@@ -307,8 +327,8 @@ async def agents() -> dict:
         "agents": runtime.available_agents(),
         "notes": {
             "speaker_agent": "decides wording/style only; it does not access audio devices",
-            "robot_pose_controller_agent": "plans pose/head/gesture commands",
-            "motion_planner_agent": "plans simple safe movement commands",
+            "robot_pose_controller_agent": "legacy compatibility parser; disabled unless context.allow_legacy_rule_agents=true",
+            "motion_planner_agent": "legacy compatibility parser; disabled unless context.allow_legacy_rule_agents=true",
             "safety_agent": "validates and clamps risky actions",
         },
     }

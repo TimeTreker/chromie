@@ -11,7 +11,7 @@ try:
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import SkillRequest
 
-from ..capabilities.validator import normalize_args_for_schema
+from ..capabilities.validator import normalize_args_for_schema, validate_args_for_schema
 from ..schema import AgentResult, AgentRunRequest
 from .base import BaseAgent
 
@@ -40,8 +40,9 @@ class CapabilityAgent(BaseAgent):
         if catalog is None or not callable(add_skill):
             return result
 
+        search_text = self._capability_search_text(request)
         search = await catalog.search(
-            request.text,
+            search_text,
             language=self.language(request),
             limit=self.services.capability_match_limit,
             min_score=0.0,
@@ -50,8 +51,12 @@ class CapabilityAgent(BaseAgent):
         request.route_decision.candidate_capabilities = [
             match.model_dump(mode="json") for match in search.matches
         ]
-        executable = [
+        matched_executable = [
             match for match in search.matches if match.interaction_executable
+        ]
+        executable = self._available_executable_capabilities(catalog, matched_executable)
+        request.route_decision.candidate_capabilities = [
+            self._capability_payload(match) for match in executable
         ]
         direct_actions = list(request.route_decision.actions or [])
         if direct_actions:
@@ -76,12 +81,31 @@ class CapabilityAgent(BaseAgent):
                 if not isinstance(args, dict):
                     args = {}
                 args, normalized = normalize_args_for_schema(args, match.input_schema)
+                arg_errors = validate_args_for_schema(args, match.input_schema)
+                if arg_errors:
+                    result.add_speak_immediate(
+                        self._invalid_args_speech(request),
+                        style="brief",
+                    )
+                    result.metadata["capability_handled"] = True
+                    result.metadata["capability_decision"] = "clarify"
+                    result.metadata["invalid_capability_args"] = {
+                        "skill_id": capability_id,
+                        "errors": arg_errors,
+                    }
+                    self.trace(
+                        result,
+                        f"router action args failed schema validation for {capability_id}: {arg_errors}",
+                    )
+                    return result
                 metadata = {
                     "source": "router_actions",
                     "catalog_version": search.catalog_version,
-                    "catalog_score": match.score,
                     "sequence": int(action.get("sequence", len(selected_ids))),
                 }
+                score = self._catalog_score(match)
+                if score is not None:
+                    metadata["catalog_score"] = score
                 if normalized:
                     metadata["schema_normalized_args"] = True
                 add_skill(
@@ -156,11 +180,31 @@ class CapabilityAgent(BaseAgent):
                 logger.warning("LLM selected capability outside candidate set: %s", item.skill_id)
                 continue
             args, normalized = normalize_args_for_schema(item.args, match.input_schema)
+            arg_errors = validate_args_for_schema(args, match.input_schema)
+            if arg_errors:
+                logger.warning("LLM selected invalid args for %s: %s", item.skill_id, arg_errors)
+                result.add_speak_immediate(
+                    self._invalid_args_speech(request),
+                    style="brief",
+                )
+                result.metadata["capability_handled"] = True
+                result.metadata["capability_decision"] = "clarify"
+                result.metadata["invalid_capability_args"] = {
+                    "skill_id": item.skill_id,
+                    "errors": arg_errors,
+                }
+                self.trace(
+                    result,
+                    f"LLM capability args failed schema validation for {item.skill_id}: {arg_errors}",
+                )
+                return result
             metadata = {
                 "source": "capability_catalog",
                 "catalog_version": search.catalog_version,
-                "catalog_score": match.score,
             }
+            score = self._catalog_score(match)
+            if score is not None:
+                metadata["catalog_score"] = score
             if normalized:
                 metadata["schema_normalized_args"] = True
             request_item = SkillRequest(
@@ -262,17 +306,9 @@ class CapabilityAgent(BaseAgent):
     async def _plan(self, request: AgentRunRequest, candidates: list[Any]) -> _CapabilityPlan:
         assert self.services.ollama is not None
         zh = self.is_zh(request)
-        candidate_payload = [
-            {
-                "skill_id": match.capability_id,
-                "description": match.description,
-                "input_schema": match.input_schema,
-                "effects": match.effects,
-                "requires_confirmation": match.requires_confirmation,
-                "score": match.score,
-            }
-            for match in candidates
-        ]
+        task_context_block = self._format_task_context(request, zh=zh)
+        history_block = self._format_history(request, zh=zh)
+        candidate_payload = [self._capability_payload(match) for match in candidates]
         system = (
             "You are Chromie's capability selection agent. Select only exact skill_id values from the provided candidates. "
             "Never invent a skill. Never output raw joint, motor, actuator, position-array, or torque controls. "
@@ -282,13 +318,18 @@ class CapabilityAgent(BaseAgent):
             "Every enum argument must be copied exactly from that field's enum list in input_schema. "
             "Map natural wording to enum tokens: if enum contains quick and the user says quickly, output quick; "
             "if enum contains slow and the user says slowly, output slow. Never output words outside the enum. "
+            "Use recent conversation and task context to resolve short follow-ups such as durations or 'do that'. "
+            "Do not confuse looking/facing/gazing forward with walking forward. If the user says look forward or face forward, "
+            "select a gaze/head/attention capability if available, not a walking capability. "
             "Use clarify when a required safe parameter is missing. Use unsupported when none of the candidates can satisfy the request. "
             "Keep speech short and suitable for voice."
         )
         prompt = (
             f"Language: {'zh-CN' if zh else 'en-US'}\n"
             f"User request: {request.text}\n"
-            f"Candidate capabilities: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True)}\n"
+            f"Recent conversation:\n{history_block}\n"
+            f"Task context:\n{task_context_block}\n"
+            f"Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True)}\n"
             "Choose the smallest safe set of executable skills."
         )
         raw = await self.services.ollama.generate(
@@ -309,3 +350,121 @@ class CapabilityAgent(BaseAgent):
                     else "Please clarify what action you want me to perform."
                 ),
             )
+
+    def _available_executable_capabilities(self, catalog: Any, matched: list[Any]) -> list[Any]:
+        by_id: dict[str, Any] = {}
+        for match in matched:
+            by_id[str(match.capability_id)] = match
+        entries = catalog.entries() if hasattr(catalog, "entries") else []
+        for entry in entries:
+            if not getattr(entry, "available", False):
+                continue
+            if not getattr(entry, "interaction_executable", False):
+                continue
+            by_id.setdefault(str(entry.capability_id), entry)
+        return sorted(
+            by_id.values(),
+            key=lambda item: (
+                self._catalog_score(item) or 0.0,
+                str(getattr(item, "capability_id", "")),
+            ),
+            reverse=True,
+        )
+
+    def _capability_payload(self, match: Any) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "skill_id": str(getattr(match, "capability_id", "")),
+            "description": str(getattr(match, "description", "")),
+            "input_schema": getattr(match, "input_schema", {}) or {},
+            "effects": list(getattr(match, "effects", []) or []),
+            "requires_confirmation": bool(getattr(match, "requires_confirmation", False)),
+        }
+        score = self._catalog_score(match)
+        if score is not None:
+            payload["score"] = score
+        return payload
+
+    @staticmethod
+    def _catalog_score(match: Any) -> float | None:
+        score = getattr(match, "score", None)
+        if isinstance(score, (int, float)) and not isinstance(score, bool):
+            return float(score)
+        return None
+
+    def _invalid_args_speech(self, request: AgentRunRequest) -> str:
+        if self.is_zh(request):
+            return "这个动作参数不够明确，请再说一次。"
+        return "Please clarify the action before I move."
+
+    def _capability_search_text(self, request: AgentRunRequest) -> str:
+        parts = [" ".join((request.text or "").split())]
+        task_context = self._task_context_from_request(request)
+        if isinstance(task_context, dict):
+            for key in ("goal", "last_meaningful_user_turn", "last_assistant_response"):
+                value = " ".join(str(task_context.get(key) or "").split())
+                if value:
+                    parts.append(value)
+            for claim in task_context.get("important_claims") or []:
+                value = " ".join(str(claim or "").split())
+                if value:
+                    parts.append(value)
+        return " ".join(part for part in parts if part)
+
+    def _task_context_from_request(self, request: AgentRunRequest) -> dict[str, Any] | None:
+        context = request.context or {}
+        current = context.get("current_task_context")
+        if isinstance(current, dict):
+            return current
+        memory = context.get("session_memory")
+        if isinstance(memory, dict):
+            current = memory.get("current_task_context")
+            if isinstance(current, dict):
+                return current
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            current = conversation.get("current_task_context")
+            if isinstance(current, dict):
+                return current
+        return None
+
+    def _format_task_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        task_context = self._task_context_from_request(request)
+        if not task_context:
+            return "无" if zh else "None"
+        compact = json.dumps(task_context, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if len(compact) > 1200:
+            compact = compact[:1200].rstrip() + "..."
+        return compact
+
+    def _history_from_request(self, request: AgentRunRequest) -> list[dict[str, Any]]:
+        if request.history:
+            return [turn for turn in request.history if isinstance(turn, dict)]
+        context = request.context or {}
+        history = context.get("history")
+        if isinstance(history, list):
+            return [turn for turn in history if isinstance(turn, dict)]
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            history = conversation.get("history")
+            if isinstance(history, list):
+                return [turn for turn in history if isinstance(turn, dict)]
+        return []
+
+    def _format_history(self, request: AgentRunRequest, *, zh: bool) -> str:
+        history = self._history_from_request(request)
+        if not history:
+            return "无" if zh else "None"
+        lines: list[str] = []
+        for turn in history[-6:]:
+            role = str(turn.get("role") or "unknown").lower()
+            text = " ".join(str(turn.get("text") or "").split())
+            if not text:
+                continue
+            if len(text) > 180:
+                text = text[:180].rstrip() + "..."
+            if zh:
+                label = "用户" if role == "user" else "Chromie" if role == "assistant" else role
+            else:
+                label = "User" if role == "user" else "Chromie" if role == "assistant" else role
+            lines.append(f"{label}: {text}")
+        return "\n".join(lines) if lines else ("无" if zh else "None")

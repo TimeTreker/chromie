@@ -95,13 +95,11 @@ torque, and actuator fields. Native mode is the Agent default. The response
 metadata includes `interaction_output_mode` (`native`, `legacy-adapter`, or
 `legacy-fallback`) for operator diagnostics. When `AGENT_EXPRESSIVE_BODY_CUES`
 allows it, chat-only speech may include a parallel expressive skill such as
-`soridormi.express_attention`, while affirmative agreement can use
-`soridormi.nod_yes`. The default affirmative cue is a small two-cycle nod over
-about 1.4 seconds; confirmation and simulator/physical safety gates still
-apply. The deterministic text route also distinguishes body turns (`turn
-left/right`) from head-only look requests (`turn your head left/right`, `look
-left/right`) and serializes mixed physical requests such as walking with a head
-gesture. Plain walking requests use a normal safe forward speed of `0.18 m/s`;
+`soridormi.express_attention`; confirmation and simulator/physical safety gates
+still apply. Body and tool requests are routed through the model-assisted
+Router, capability catalog, Agent capability planner, schemas, and Skill
+Runtime validation rather than hidden phrase parsers. Plain walking requests
+use a normal safe forward speed of `0.18 m/s`;
 requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`
 are normalized back to the normal speed and surfaced through `speak_first`.
 Requests to sing while walking are represented as a `speak_first` utterance plus

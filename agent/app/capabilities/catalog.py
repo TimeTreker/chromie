@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import math
 import re
@@ -102,6 +103,13 @@ def _schema_terms(schema: dict[str, Any]) -> str:
 
     walk(schema)
     return " ".join(terms)
+
+
+def json_compact(value: Any, *, max_chars: int = 420) -> str:
+    text = json.dumps(value or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if len(text) > max_chars:
+        return text[:max_chars].rstrip() + "..."
+    return text
 
 
 class CatalogCapability(BaseModel):
@@ -316,9 +324,10 @@ class CapabilityCatalog:
             executable = "可直接执行" if zh else "interaction-executable"
             if not item.interaction_executable:
                 executable = "仅供路由/规划" if zh else "routing/planning only"
+            api = json_compact(item.input_schema)
             lines.append(
                 f"- {item.capability_id}: {item.description} "
-                f"[{executable}; effects={','.join(item.effects) or 'none'}]"
+                f"[{executable}; effects={','.join(item.effects) or 'none'}; api={api}]"
             )
         if zh:
             lines.extend(

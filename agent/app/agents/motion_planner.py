@@ -10,6 +10,9 @@ class MotionPlannerAgent(BaseAgent):
     name = "motion_planner_agent"
 
     async def run(self, request: AgentRunRequest, result: AgentResult) -> AgentResult:
+        if request.context.get("allow_legacy_rule_agents") is not True:
+            self.trace(result, "legacy rule agent disabled")
+            return result
         if request.route_decision.route != "robot_action" and self.name not in request.route_decision.agents:
             return result
 

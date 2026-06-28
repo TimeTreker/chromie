@@ -54,7 +54,10 @@ class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
             sid=route_request.sid,
             text=route_request.text,
             route_decision=decision.model_dump(mode="json"),
-            context={"robot_state": {"emergency_stop": False}},
+            context={
+                "robot_state": {"emergency_stop": False},
+                "allow_legacy_rule_agents": True,
+            },
         )
         agent_result = await self.runtime.run(agent_request)
 
@@ -78,7 +81,10 @@ class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 sid="blocked",
                 text="come here",
                 route_decision=decision.model_dump(mode="json"),
-                context={"robot_state": {"emergency_stop": True}},
+                context={
+                    "robot_state": {"emergency_stop": True},
+                    "allow_legacy_rule_agents": True,
+                },
             )
         )
 
@@ -97,7 +103,10 @@ class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 sid="confirm",
                 text="move somewhere",
                 route_decision=decision.model_dump(mode="json"),
-                context={"robot_state": {"emergency_stop": False}},
+                context={
+                    "robot_state": {"emergency_stop": False},
+                    "allow_legacy_rule_agents": True,
+                },
             )
         )
 

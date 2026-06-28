@@ -4,6 +4,7 @@ import unittest
 from typing import Any
 
 from agent.app.agents import AgentServices
+from agent.app.capabilities.catalog import CapabilityMatch, CapabilitySearchResult
 from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentRunRequest
 from agent.app.task_graph.models import TaskGraph, TaskNode
@@ -17,14 +18,21 @@ from shared.chromie_contracts.interaction import InteractionSpeech
 
 def _nod_route(request: RouteRequest) -> RouteDecision:
     return finalize_decision(
-        RouteDecision(
-            route="robot_action",
-            agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
-            intent="nod",
-            confidence=0.95,
-            language="en-US",
-            source="catalog",
-        ),
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:soridormi.nod_yes",
+                confidence=0.95,
+                language="en-US",
+                actions=[
+                    {
+                        "capability_id": "soridormi.nod_yes",
+                        "args": {"count": 2},
+                        "sequence": 0,
+                    }
+                ],
+                source="catalog",
+            ),
         request,
         source="catalog",
     )
@@ -83,6 +91,36 @@ class _NamedSkillInvoker:
             raise AssertionError(f"{left!r} != {right!r}")
 
 
+class _NodCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del text, kwargs
+        return CapabilitySearchResult(
+            query="nod",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=1,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.nod_yes",
+                    agent_id="soridormi.skill",
+                    description="Nod the robot head yes.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"count": {"type": "number"}},
+                    },
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.91,
+                    metadata={"mode": "sim"},
+                )
+            ],
+        )
+
+
 class _RichTaskPlanner:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -110,7 +148,11 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
         decision = _nod_route(route_request)
 
         response = await InteractionRuntime(
-            AgentServices(ollama=None, use_llm=False)
+            AgentServices(
+                ollama=None,
+                use_llm=False,
+                capability_catalog=_NodCatalog(),  # type: ignore[arg-type]
+            )
         ).run(
             AgentRunRequest(
                 sid=route_request.sid,
@@ -127,7 +169,7 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(execution.status, "completed")
         self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
-        self.assertEqual(spoken, ["Okay."])
+        self.assertEqual(spoken, ["Nodding."])
         self.assertEqual(
             invoker.calls,
             [

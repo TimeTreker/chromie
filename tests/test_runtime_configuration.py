@@ -48,10 +48,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('[[ "${ROUTER_USE_LLM:-0}" =~ ^(1|true|yes|on)$ ]]', source)
-        self.assertIn(
-            './scripts/warm_ollama.sh "${ROUTER_MODEL:-qwen3:0.6b}" "${AGENT_MODEL:-gemma4:e2b}"',
-            source,
-        )
+        self.assertIn('WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")', source)
+        self.assertIn('AGENT_RESPONSE_REVIEW_MODEL:-qwen3:0.6b', source)
+        self.assertIn('WARM_MODELS=("${ROUTER_MODEL:-qwen3:0.6b}" "${WARM_MODELS[@]}")', source)
+        self.assertIn('./scripts/warm_ollama.sh "${WARM_MODELS[@]}"', source)
 
     def test_warm_ollama_reports_pull_command_for_missing_model(self) -> None:
         source = (ROOT / "scripts" / "warm_ollama.sh").read_text(

@@ -23,7 +23,7 @@ DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 DEFAULT_AGENTS: dict[str, list[str]] = {
     "chat": ["conversation_agent", "speaker_agent"],
     "deep_thought": ["deepthinking_agent", "speaker_agent"],
-    "robot_action": ["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
+    "robot_action": ["capability_agent", "safety_agent", "speaker_agent"],
     "tool": ["tool_agent", "speaker_agent"],
     "memory": ["memory_agent", "speaker_agent"],
     "clarify": ["speaker_agent"],
