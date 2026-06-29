@@ -36,6 +36,15 @@ class ComposeConfigurationTests(unittest.TestCase):
             llm_block,
         )
 
+    def test_ollama_cache_mount_is_configurable(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        llm_block = compose.split("  chromie-llm:", 1)[1].split(
+            "  chromie-router:",
+            1,
+        )[0]
+
+        self.assertIn("${OLLAMA_DATA_DIR:-./ollama_data}:/root/.ollama", llm_block)
+
     def test_ollama_service_allows_two_loaded_models_without_extra_parallelism(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         llm_block = compose.split("  chromie-llm:", 1)[1].split(

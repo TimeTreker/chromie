@@ -117,13 +117,14 @@ if [ ! -f orchestrator/.env.local ]; then
   echo "[chromie] Created orchestrator/.env.local."
 fi
 
-mkdir -p .chromie/voice-runtime hf_cache ollama_data recordings
 ./scripts/build_runtime_env.sh
 
 set -a
 # shellcheck disable=SC1091
 source .env.runtime
 set +a
+
+mkdir -p .chromie/voice-runtime hf_cache "${OLLAMA_DATA_DIR:-ollama_data}" recordings
 
 RUNTIME_DIR="$ROOT_DIR/.chromie/voice-runtime"
 COMPOSE_OVERRIDE="$RUNTIME_DIR/compose.voice-mujoco.yaml"

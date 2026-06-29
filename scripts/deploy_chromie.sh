@@ -90,8 +90,6 @@ if [ ! -f orchestrator/.env.local ]; then
   echo "[deploy-chromie] Created orchestrator/.env.local from template."
 fi
 
-mkdir -p .chromie hf_cache ollama_data recordings
-
 echo "[deploy-chromie] Building generated runtime environment..."
 ./scripts/build_runtime_env.sh
 
@@ -99,6 +97,8 @@ set -a
 # shellcheck disable=SC1091
 source .env.runtime
 set +a
+
+mkdir -p .chromie hf_cache "${OLLAMA_DATA_DIR:-ollama_data}" recordings
 
 if [ -n "${CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE:-}" ]; then
   if [ ! -f "$CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE" ]; then

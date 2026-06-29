@@ -42,7 +42,7 @@ ensure_dir() {
 }
 
 ensure_dir hf_cache
-ensure_dir ollama_data
+ensure_dir "${OLLAMA_DATA_DIR:-ollama_data}"
 ensure_dir recordings
 
 # TTS_CUDA_ARCH should normally come from env/profiles/*.env. If it is missing,
