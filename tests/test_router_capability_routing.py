@@ -112,8 +112,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.intent, "general_conversation")
+        assert llm_router.request is not None
+        self.assertEqual(llm_router.request.context["candidate_capabilities"], [])
 
-    async def test_hybrid_mode_uses_llm_fallback_before_bad_catalog_guess(self) -> None:
+    async def test_hybrid_mode_uses_catalog_candidates_after_llm_fallback(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -151,10 +153,16 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision = await main.route(RouteRequest(text="What's your name?"))
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.intent, "general_conversation")
-        self.assertNotIn("capability_agent", decision.agents)
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.intent, "robot_action")
+        self.assertIn("capability_agent", decision.agents)
+        self.assertIn("conversation_agent", decision.agents)
+        self.assertIn("LLM router unavailable", decision.reason or "")
+        self.assertEqual(
+            decision.candidate_capabilities[0]["capability_id"],
+            "soridormi.walk_velocity",
+        )
 
     async def test_rules_only_catalog_decision_does_not_use_chat_phrase_override(self) -> None:
         from router.app import main

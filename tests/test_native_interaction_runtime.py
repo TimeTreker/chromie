@@ -90,7 +90,7 @@ class _JokeWalkIdentityOllama:
         if kwargs.get("response_format") == "json":
             return {
                 "decision": "execute",
-                "speech": "",
+                "speech": "Walking forward for 15 seconds.",
                 "skills": [
                     {
                         "skill_id": "soridormi.walk_velocity",
@@ -516,7 +516,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["interaction_output_mode"], "native")
         self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
         self.assertEqual(response.skills[0].args, {"count": 2})
-        self.assertEqual(response.speech[0].text, "Nodding.")
+        self.assertEqual(response.speech[0].text, "I will run that action.")
         self.assertIn("capability_agent", response.metadata["handled_by"])
 
     async def test_speech_while_body_action_waits_for_playback_start(self) -> None:

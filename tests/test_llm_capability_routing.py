@@ -52,6 +52,39 @@ class ConstrainedLlmCapabilityRoutingTests(unittest.TestCase):
         self.assertEqual(result.intent, "capability:soridormi.walk_velocity")
         self.assertIn("safety_agent", result.agents)
 
+    def test_exact_bare_capability_intent_is_normalized(self) -> None:
+        request = RouteRequest(text="Walk forward at 0.15 speed for 5 seconds.")
+        decision = RouteDecision(
+            route="robot_action",
+            agents=["capability_agent"],
+            intent="soridormi.walk_velocity",
+            confidence=0.95,
+            source="llm",
+            reason="model selected the exact catalog id",
+        )
+
+        result = _validate_llm_capability_decision(request, decision, catalog_result())
+
+        self.assertEqual(result.route, "robot_action")
+        self.assertEqual(result.intent, "capability:soridormi.walk_velocity")
+        self.assertIn("validator normalized exact capability intent", result.reason or "")
+
+    def test_placeholder_capability_intent_fails_closed(self) -> None:
+        request = RouteRequest(text="Hello, how are you.")
+        decision = RouteDecision(
+            route="robot_action",
+            agents=["capability_agent"],
+            intent="capability",
+            confidence=1.0,
+            source="llm",
+        )
+
+        result = _validate_llm_capability_decision(request, decision, catalog_result())
+
+        self.assertEqual(result.source, "fallback")
+        self.assertEqual(result.route, "chat")
+        self.assertIn("placeholder_capability_intent", result.reason or "")
+
     def test_non_executable_robot_selection_is_left_for_agent_planning(self) -> None:
         request = RouteRequest(text="Walk forward at 0.15 speed for 5 seconds.")
         decision = RouteDecision(

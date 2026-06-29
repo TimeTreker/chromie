@@ -155,7 +155,7 @@ configuration.
 | `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
 | `ROUTER_TIMEOUT_MS` | `1500` in common configuration. |
 | `ROUTER_LLM_TIMEOUT_MS` | `1500` in common configuration for the fast quick-router model path. |
-| `ROUTER_REVIEW_TIMEOUT_MS` | `3000` in common configuration for the reviewer path that recovers invalid quick-router choices. |
+| `ROUTER_REVIEW_TIMEOUT_MS` | `8000` in common configuration for the reviewer path that recovers invalid quick-router choices. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `600`. Catalog failure falls back safely and the Agent rechecks in-process. |
@@ -249,7 +249,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_ROUTER_TIMEOUT_MS` | `4500` in common configuration. It must exceed the largest Router LLM/review timeout plus the catalog lookup budget so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_ROUTER_TIMEOUT_MS` | `11000` in common configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |

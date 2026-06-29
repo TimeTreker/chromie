@@ -63,7 +63,7 @@ class CapabilityOllama:
         self.calls.append({"prompt": prompt, **kwargs})
         return {
             "decision": "execute",
-            "speech": "Walking ahead for 10 minutes.",
+            "speech": "Walking forward for 1 second.",
             "skills": [
                 {
                     "skill_id": "soridormi.walk_velocity",

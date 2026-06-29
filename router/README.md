@@ -119,6 +119,12 @@ When LLM routing is enabled, the prompt tells the model to consider:
 - safety boundaries: memory is not authorization, and the model must not invent
   capabilities or low-level robot controls.
 
+The maintained Router prompt follows the project-wide prompt context group
+shape documented in [`../docs/chromie_mind.md`](../docs/chromie_mind.md):
+Global Context Group, Session Context Group, Current Job, Task Context Group,
+Cost Function, and Output Contract. Turn-specific targets belong in Current Job
+or Task Context rather than at the top of the prompt.
+
 ## HTTP API
 
 - `GET /health` — active mode, model, Ollama URL, and rules-first flag

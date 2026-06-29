@@ -169,7 +169,7 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(execution.status, "completed")
         self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")
-        self.assertEqual(spoken, ["Nodding."])
+        self.assertEqual(spoken, ["I will run that action."])
         self.assertEqual(
             invoker.calls,
             [

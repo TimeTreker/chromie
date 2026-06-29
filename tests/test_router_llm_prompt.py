@@ -18,34 +18,28 @@ class RouterLlmPromptTests(unittest.TestCase):
         prompt = router.load_system_prompt()
 
         self.assertIn("robot-brain router", prompt)
+        self.assertIn("Prompt Architecture", prompt)
+        self.assertIn("Global Context Group", prompt)
+        self.assertIn("Session Context Group", prompt)
+        self.assertIn("Current Job", prompt)
+        self.assertIn("Task Context", prompt)
+        self.assertIn("Output Contract", prompt)
+        self.assertLess(prompt.index("Global Context Group"), prompt.index("Current Job"))
+        self.assertLess(prompt.index("Current Job"), prompt.index("Task Context"))
         self.assertIn("Generalization-first principle", prompt)
-        self.assertIn("Prompt examples are guidance, not phrase", prompt)
-        self.assertIn("Only the emergency filter may use phrase/pattern rules", prompt)
-        self.assertIn("Emergency filter", prompt)
-        self.assertIn("Quick intent router", prompt)
-        self.assertIn("Route taxonomy", prompt)
+        self.assertIn("Do not replace normal routing", prompt)
+        self.assertIn("Only deterministic", prompt)
+        self.assertIn("emergency/noise controls", prompt)
+        self.assertIn("phrase/pattern rules", prompt)
+        self.assertIn("quick intent router", prompt)
+        self.assertIn("Route Taxonomy", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("candidate_capabilities", prompt)
-        self.assertIn("available abilities", prompt)
-        self.assertIn("Use semantic understanding, not phrase lists", prompt)
-        self.assertIn("Memory and context are hints, not authorization", prompt)
-        self.assertIn("voice and/or", prompt)
-        self.assertIn("body action", prompt)
-        self.assertIn("creative speech-only requests as chat", prompt)
-        self.assertIn("go ahead", prompt)
-        self.assertIn("not physical movement", prompt)
-        self.assertIn("you look beautiful", prompt)
-        self.assertIn("appearance statements", prompt)
-        self.assertIn("identity, name, age", prompt)
-        self.assertIn("robot-status questions as chat", prompt)
-        self.assertIn("deepthinking_agent", prompt)
-        self.assertIn("body commands", prompt)
+        self.assertIn("not authorization", prompt)
+        self.assertIn("deep_thought", prompt)
         self.assertIn("robot_action", prompt)
-        self.assertIn("Capability questions can be polite requests", prompt)
-        self.assertIn("pragmatically asking Chromie", prompt)
-        self.assertIn("metadata.task_relation", prompt)
-        self.assertIn("task_context_patch", prompt)
-        self.assertIn("host task manager owns", prompt)
+        self.assertIn("placeholder capability IDs", prompt)
+        self.assertIn("RouteDecision JSON object", prompt)
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
         router = OllamaLLMRouter(
@@ -61,6 +55,23 @@ class RouterLlmPromptTests(unittest.TestCase):
             context={
                 "mind": {
                     "profile_id": "chromie_default_mind",
+                    "identity": {
+                        "name": "Chromie",
+                        "age_description": "6 years old in robot identity terms",
+                        "pronouns": ["she", "her"],
+                    },
+                    "core_principles": [
+                        {
+                            "id": "protect_humans",
+                            "statement": "Protect humans first.",
+                        }
+                    ],
+                    "long_term_goals": [
+                        {
+                            "id": "useful_companion_robot",
+                            "statement": "Become a useful companion robot.",
+                        }
+                    ],
                     "prompt_summary": "Core principles: protect humans; owner-approved.",
                     "owner_approval_required_for_core_changes": True,
                 },
@@ -77,39 +88,45 @@ class RouterLlmPromptTests(unittest.TestCase):
 
         prompt = router.build_user_prompt(request)
 
-        self.assertIn("robot-brain router", prompt)
-        self.assertIn("Generalization-first principle", prompt)
+        self.assertIn("Global Context Group", prompt)
+        self.assertIn("Robot Identity", prompt)
+        self.assertIn("Worldview", prompt)
+        self.assertIn("Lifeview", prompt)
+        self.assertIn("Valueview", prompt)
+        self.assertIn("Session Context Group", prompt)
+        self.assertIn("Current Job", prompt)
+        self.assertIn("Task Context Group", prompt)
+        self.assertIn("Cost Function", prompt)
+        self.assertIn("Output Contract", prompt)
+        self.assertLess(prompt.index("Global Context Group"), prompt.index("Session Context Group"))
+        self.assertLess(prompt.index("Session Context Group"), prompt.index("Current Job"))
+        self.assertLess(prompt.index("Current Job"), prompt.index("Task Context Group"))
+        self.assertLess(prompt.index("Task Context Group"), prompt.index("Output Contract"))
+        self.assertIn("Infer from meaning/context/abilities/schemas", prompt)
         self.assertIn("not phrase rules", prompt)
-        self.assertIn("do not require exact keyword matches", prompt)
-        self.assertIn("Routing stages", prompt)
-        self.assertIn("emergency filter", prompt)
-        self.assertIn("quick intent-and-meaning router", prompt)
-        self.assertIn("Use route deep_thought", prompt)
-        self.assertIn("deepthinking_agent", prompt)
-        self.assertIn("return calibrated low confidence", prompt)
-        self.assertIn("Available abilities / candidate capabilities JSON", prompt)
-        self.assertIn("Mind principles / long-term goals JSON", prompt)
-        self.assertIn("Bounded memory and world context JSON", prompt)
+        self.assertIn("deterministic emergency/noise filter", prompt)
+        self.assertIn("quick intent router", prompt)
+        self.assertIn("Choose route deep_thought", prompt)
+        self.assertIn("Return calibrated low confidence", prompt)
+        self.assertIn("Available abilities / candidate_capabilities JSON", prompt)
+        self.assertIn("Bounded session, memory, task, and robot/world context JSON", prompt)
         self.assertIn("chromie_default_mind", prompt)
+        self.assertIn("Chromie", prompt)
+        self.assertIn("6 years old in robot identity terms", prompt)
+        self.assertIn("Protect humans first.", prompt)
+        self.assertIn("Become a useful companion robot.", prompt)
         self.assertIn("owner-approved", prompt)
-        self.assertIn("must not rewrite principles", prompt)
         self.assertIn("soridormi.walk_velocity", prompt)
         self.assertIn("robot_state", prompt)
         self.assertIn("position", prompt)
         self.assertIn("last_task", prompt)
-        self.assertIn("never as authorization", prompt)
-        self.assertIn("creative speech-only requests", prompt)
-        self.assertIn("'go ahead'", prompt)
-        self.assertIn("you look beautiful", prompt)
-        self.assertIn("Identity, name, age", prompt)
-        self.assertIn("robot-status questions are chat", prompt)
+        self.assertIn("authorize side effects", prompt)
+        self.assertIn("Speech-only conversation", prompt)
         self.assertIn("Do not return interrupt or ignore", prompt)
-        self.assertIn("blinking", prompt)
-        self.assertIn("pragmatically a polite request", prompt)
-        self.assertIn("listed body/head motion", prompt)
+        self.assertIn("polite ability-shaped request", prompt)
         self.assertIn("metadata.task_relation", prompt)
-        self.assertIn("target_task_id", prompt)
-        self.assertIn("latest meaningful", prompt)
+        self.assertIn("placeholder intents", prompt)
+        self.assertIn("RouteDecision JSON object", prompt)
 
     def test_intent_review_prompt_uses_semantic_generalization(self) -> None:
         router = OllamaLLMRouter(
@@ -136,6 +153,11 @@ class RouterLlmPromptTests(unittest.TestCase):
         system = payload["messages"][0]["content"]
         user = payload["messages"][1]["content"]
 
+        self.assertIn("Global Context Group", system)
+        self.assertIn("Session Context Group", system)
+        self.assertIn("Current Job", system)
+        self.assertIn("Task Context Group", system)
+        self.assertIn("Output Contract", system)
         self.assertIn("Use semantic generalization", system)
         self.assertIn("do not turn prompt wording into keyword rules", system)
         self.assertIn("deterministic emergency/noise filter", system)
@@ -499,6 +521,200 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "general_conversation")
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
 
+    async def test_fast_repair_model_recovers_when_review_model_fails(self) -> None:
+        class RepairRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {"message": {"content": ""}}
+                system = payload["messages"][0]["content"]
+                if "Repair a realtime robot route" in system:
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"robot_action",'
+                                '"intent":"capability:soridormi.walk_forward",'
+                                '"confidence":0.74,'
+                                '"reason":"semantic repair matched candidate"}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"interrupt","intent":"interrupt",'
+                            '"confidence":0.0,"reason":"interrupted"}'
+                        )
+                    }
+                }
+
+        router = RepairRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="Okay, please walk forward for 15 seconds, quickly, please.",
+                language="en-US",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "description": "Human-facing wrapper for natural walking requests.",
+                            "interaction_executable": True,
+                            "available": True,
+                            "effects": ["physical_motion"],
+                            "route": "robot_action",
+                            "score": 0.515,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertIn("fast_model:test-model repaired", decision.reason or "")
+        self.assertEqual(
+            [payload["model"] for payload in router.payloads],
+            ["test-model", "review-model", "test-model"],
+        )
+
+    async def test_review_model_recovers_primary_router_timeout(self) -> None:
+        class TimeoutRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"robot_action",'
+                                '"intent":"capability:soridormi.walk_forward",'
+                                '"confidence":0.84,'
+                                '"reason":"review matched walk capability"}'
+                            )
+                        }
+                    }
+                raise TimeoutError("quick model timed out")
+
+        router = TimeoutRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="Please walk ahead for 15 seconds.",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "interaction_executable": True,
+                            "available": True,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertIn("review_model:review-model recovered route", decision.reason or "")
+        self.assertEqual(
+            [payload["model"] for payload in router.payloads],
+            ["test-model", "review-model"],
+        )
+
+    async def test_fast_repair_model_runs_after_low_confidence_review_recovery(self) -> None:
+        class RepairRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"robot_action",'
+                                '"intent":"soridormi.motion.create_plan",'
+                                '"confidence":0.27,'
+                                '"reason":"uncertain planning intent"}'
+                            )
+                        }
+                    }
+                system = payload["messages"][0]["content"]
+                if "Repair a realtime robot route" in system:
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"robot_action",'
+                                '"intent":"capability:soridormi.walk_forward",'
+                                '"confidence":0.81,'
+                                '"reason":"semantic repair matched executable candidate"}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"interrupt","intent":"interrupt",'
+                            '"confidence":0.0,"reason":"interrupted"}'
+                        )
+                    }
+                }
+
+        router = RepairRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="Okay, please walk forward for 15 seconds, quickly, please.",
+                language="en-US",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "description": "Human-facing wrapper for natural walking requests.",
+                            "interaction_executable": True,
+                            "available": True,
+                            "effects": ["physical_motion"],
+                            "route": "robot_action",
+                            "score": 0.515,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertIn("fast_model:test-model repaired", decision.reason or "")
+        self.assertEqual(
+            [payload["model"] for payload in router.payloads],
+            ["test-model", "review-model", "test-model"],
+        )
+
     async def test_review_model_overrides_underspecified_robot_action(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
             def __init__(self) -> None:
@@ -528,6 +744,163 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("review_model:review-model", decision.reason or "")
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
         self.assertTrue(all(payload["think"] is False for payload in router.payloads))
+
+    async def test_ambiguous_deep_thought_falls_back_without_review_latency(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"deep_thought","intent":"unknown",'
+                            '"confidence":0.85}'
+                        )
+                    }
+                }
+
+        router = ReviewRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="Hello, how are you.",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "interaction_executable": True,
+                            "available": True,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.route, "chat")
+        self.assertIn("ambiguous_llm_deep_thought", decision.reason or "")
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model"])
+
+    async def test_ambiguous_deep_thought_review_failure_falls_back_to_chat(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+
+            async def _chat(self, payload: dict) -> dict:
+                if payload["model"] == "review-model":
+                    raise TimeoutError("review timed out")
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"deep_thought","intent":"unknown",'
+                            '"confidence":0.85}'
+                        )
+                    }
+                }
+
+        router = ReviewRouter()
+        decision = await router.route(RouteRequest(text="Hello, how are you."))
+
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.route, "chat")
+        self.assertIn("ambiguous_llm_deep_thought", decision.reason or "")
+
+    async def test_placeholder_capability_intent_is_repaired_before_agent(self) -> None:
+        class PlaceholderRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                system = payload["messages"][0]["content"]
+                if "placeholder capability intent" in system:
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"chat","intent":"greeting",'
+                                '"confidence":0.93,"reason":"speech-only greeting"}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"robot_action","intent":"capability",'
+                            '"confidence":1.0,"reason":"bad placeholder"}'
+                        )
+                    }
+                }
+
+        router = PlaceholderRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="Hello, how are you.",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "interaction_executable": True,
+                            "available": True,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "greeting")
+        self.assertIn("repaired placeholder capability intent", decision.reason or "")
+        self.assertEqual(len(router.payloads), 2)
+
+    async def test_placeholder_capability_repair_failure_falls_back_to_chat(self) -> None:
+        class PlaceholderRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+
+            async def _chat(self, payload: dict) -> dict:
+                system = payload["messages"][0]["content"]
+                if "placeholder capability intent" in system:
+                    return {"message": {"content": '{"route":"robot_action","intent":"capability"}'}}
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"robot_action","intent":"capability",'
+                            '"confidence":1.0,"reason":"bad placeholder"}'
+                        )
+                    }
+                }
+
+        router = PlaceholderRouter()
+        decision = await router.route(RouteRequest(text="Hello, how are you."))
+
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.route, "chat")
+        self.assertIn("placeholder capability intent", decision.reason or "")
 
 
 if __name__ == "__main__":

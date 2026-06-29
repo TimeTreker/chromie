@@ -46,6 +46,60 @@ capability descriptions, schemas, and task memory rather than brittle phrase
 rules. Phrase and pattern rules remain reserved for the fast deterministic
 emergency/noise filter.
 
+## Prompt Context Groups
+
+Prompt-facing robot planning is organized into context groups. This is the
+preferred shape for Router, capability-planning, conversation, and deepthinking
+prompts when they need robot identity, principles, session state, abilities, and
+a strict output contract in one prompt.
+
+The group order is intentional:
+
+```text
+Global Context Group
+Session Context Group
+Current Job
+Task Context Group
+Cost Function
+Output Contract
+```
+
+`Target` is not the first section. The model should first receive the robot's
+identity and upper principles, then the current session state, then the specific
+job it is performing. Turn-specific targets belong inside `Current Job` and
+`Task Context Group`.
+
+`Global Context Group` tells the model who Chromie is and what upper principles
+she obeys. It includes Robot Identity, Worldview, Lifeview, Valueview, core
+principles, reflex policy, deliberation policy, and experience boundaries.
+Identity, age/persona wording, and core principles come from the owner-approved
+mind profile.
+
+`Session Context Group` contains bounded current-turn context: user/session
+memory, recent conversation, current task context, robot/runtime state, and
+other evidence supplied by the Orchestrator. This context helps interpretation,
+but it is not authorization.
+
+`Current Job` states which role the model is performing now, such as quick
+router, capability planner, conversation agent, or deepthinking agent. It tells
+the model to use the upper contexts as background and solve only the current
+role's responsibility.
+
+`Task Context Group` contains the latest user input, available abilities,
+candidate capability schemas, selected route/capability hints, constraints, and
+other turn-local facts. Ability descriptions and schemas are used for semantic
+generalization; they are not phrase tables.
+
+`Cost Function` states the local preference order, such as safe before
+obedient, honest before pleasing, small and reversible before broad, clarify
+when required parameters are missing, and use deep thought when quick routing is
+too uncertain.
+
+`Output Contract` defines the exact JSON/schema or response template. The model
+may propose routes, speech, task metadata, or skill plans only through this
+contract. Validators, confirmation gates, Skill Runtime authorization, and
+Soridormi provider checks remain separate runtime authority.
+
 ## Runtime Flow
 
 The Orchestrator builds a context object for every routed turn. It now includes:
@@ -62,9 +116,10 @@ it cannot treat principles as authorization. Emergency filtering, capability
 constraints, confirmation, Skill Runtime validation, and Soridormi provider
 checks remain code-enforced.
 
-The conversation and deepthinking agents include the mind context in their LLM
-prompts. Deepthinking should use it as the upper constraint when planning,
-debugging, or splitting complex tasks.
+The quick Router and native capability planner use the prompt context group
+shape above. The conversation and deepthinking agents include the mind context
+in their LLM prompts. Deepthinking should use it as the upper constraint when
+planning, debugging, or splitting complex tasks.
 
 ## Experience And Proposals
 

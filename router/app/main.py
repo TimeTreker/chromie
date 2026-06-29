@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from .capability_catalog import CapabilityCatalogClient, CapabilityCatalogResult
 from .config import router_mode_from_env
 from .fallback import fallback_decision
-from .llm_router import OllamaLLMRouter
+from .llm_router import OllamaLLMRouter, _is_placeholder_capability_intent
 from .rules import route_by_priority_rules
 from .schema import (
     HealthResponse,
@@ -212,12 +212,27 @@ def _validate_llm_capability_decision(
     decision: RouteDecision,
     result: CapabilityCatalogResult,
 ) -> RouteDecision:
-    candidates = list(result.matches)
+    candidates = list(result.matches if result.matched else [])
     decision.candidate_capabilities = candidates
     by_id = {_capability_id(item): item for item in candidates if _capability_id(item)}
     selected_id = _intent_capability_id(decision.intent)
+    raw_intent = (decision.intent or "").strip()
+    if not selected_id and raw_intent in by_id:
+        selected_id = raw_intent
+        decision.intent = f"capability:{selected_id}"
+        decision.reason = (
+            f"{decision.reason}; " if decision.reason else ""
+        ) + "validator normalized exact capability intent"
 
     if decision.route == "robot_action":
+        if _is_placeholder_capability_intent(raw_intent):
+            return fallback_decision(
+                request,
+                reason=(
+                    "llm_robot_action_placeholder_capability_intent: "
+                    f"{raw_intent or '<empty>'}"
+                ),
+            )
         selected = by_id.get(selected_id)
         if selected_id and (selected is None or not _capability_executable(selected)):
             executable = _interaction_executable_candidates(result)
@@ -331,9 +346,10 @@ def _attach_stage_context(
     catalog_result: CapabilityCatalogResult,
 ) -> None:
     previous = request.context.get("router_stage_context")
+    candidate_capabilities = catalog_result.matches if catalog_result.matched else []
     request.context = {
         **request.context,
-        "candidate_capabilities": catalog_result.matches,
+        "candidate_capabilities": candidate_capabilities,
         "capability_catalog_version": catalog_result.catalog_version,
         "router_stage_context": {
             **(previous if isinstance(previous, dict) else {}),
@@ -408,6 +424,55 @@ def _catalog_decision(
     )
 
 
+def _catalog_planner_fallback_decision(
+    request: RouteRequest,
+    result: CapabilityCatalogResult,
+    *,
+    llm_decision: RouteDecision,
+) -> RouteDecision | None:
+    if result.suggested_route != "robot_action":
+        return _catalog_decision(request, result)
+    executable = _interaction_executable_candidates(result)
+    if not result.matched or not executable:
+        return None
+    top_score = max(
+        (
+            float(item.get("score") or 0.0)
+            for item in executable
+            if isinstance(item.get("score"), (int, float))
+        ),
+        default=0.0,
+    )
+    reason_parts = [
+        "LLM router unavailable; preserving catalog candidates for capability planner",
+        f"catalog_version={result.catalog_version}",
+    ]
+    if llm_decision.reason:
+        reason_parts.append(f"llm_fallback_reason={llm_decision.reason}")
+    return finalize_decision(
+        RouteDecision(
+            route="robot_action",
+            agents=[
+                "capability_agent",
+                "conversation_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            intent="robot_action",
+            confidence=max(0.50, min(0.72, top_score)),
+            language=request.language or "auto",
+            priority="normal",
+            needs_agent=True,
+            should_speak=True,
+            candidate_capabilities=result.matches,
+            reason="; ".join(reason_parts),
+            source="catalog",
+        ),
+        request,
+        source="catalog",
+    )
+
+
 @app.post("/route", response_model=RouteDecision)
 async def route(request: RouteRequest) -> RouteDecision:
     start = time.perf_counter()
@@ -458,7 +523,13 @@ async def route(request: RouteRequest) -> RouteDecision:
                         catalog_result,
                     )
             elif llm_decision.source == "fallback":
-                decision = llm_decision
+                decision = _catalog_planner_fallback_decision(
+                    request,
+                    catalog_result,
+                    llm_decision=llm_decision,
+                )
+                if decision is None:
+                    decision = llm_decision
         if decision is None and settings.mode == "rules_only":
             decision = _catalog_decision(request, catalog_result)
 

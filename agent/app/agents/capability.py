@@ -5,7 +5,7 @@ import logging
 import os
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 try:
     from chromie_contracts.interaction import SkillRequest
@@ -28,6 +28,28 @@ class _CapabilityPlan(BaseModel):
     decision: Literal["execute", "clarify", "unsupported"]
     speech: str = ""
     skills: list[_PlannedSkill] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_skills_for_execute(self) -> "_CapabilityPlan":
+        if self.decision != "execute":
+            return self
+        if not self.skills:
+            raise ValueError("decision=execute requires at least one skill")
+        speech = _natural_speech_or_empty(self.speech)
+        if not speech:
+            raise ValueError("decision=execute requires natural speech")
+        self.speech = speech
+        return self
+
+
+def _natural_speech_or_empty(value: str) -> str:
+    text = " ".join((value or "").strip().split())
+    if not text:
+        return ""
+    label = text.strip(" .!?:;，。！？：；").lower().replace("-", "_")
+    if label in {"unsupported", "not_supported", "clarify", "execute", "none", "null", "n/a", "na"}:
+        return ""
+    return text
 
 
 class CapabilityAgent(BaseAgent):
@@ -123,7 +145,7 @@ class CapabilityAgent(BaseAgent):
                 speech = (
                     ""
                     if request.route_decision.speak_first
-                    else self._direct_plan_speech(selected_ids, direct_actions)
+                    else self._direct_action_ack_speech(request, len(selected_ids))
                 )
                 if speech:
                     result.add_speak_immediate(speech, style="brief")
@@ -151,8 +173,7 @@ class CapabilityAgent(BaseAgent):
                     f"router-selected capability is unavailable or non-executable: {selected_id}",
                 )
                 return result
-            executable = selected
-            self.trace(result, f"honoring router-selected capability: {selected_id}")
+            self.trace(result, f"router-selected capability is available: {selected_id}")
         if not executable:
             result.metadata["capability_search"] = search.model_dump(mode="json")
             self.trace(result, "no interaction-executable capability matched")
@@ -183,7 +204,6 @@ class CapabilityAgent(BaseAgent):
 
         selected = 0
         selected_requests: list[SkillRequest] = []
-        selected_matches: list[Any] = []
         seen_requests: set[tuple[str, str]] = set()
         for item in plan.skills:
             match = allowed.get(item.skill_id)
@@ -232,16 +252,13 @@ class CapabilityAgent(BaseAgent):
             )
             add_skill(request_item)
             selected_requests.append(request_item)
-            selected_matches.append(match)
             selected += 1
 
         if selected == 0:
             self.trace(result, "LLM produced no valid capability selection")
             return result
 
-        speech = plan.speech
-        if self._uses_body_capability(selected_matches):
-            speech = self._skill_plan_speech(selected_requests)
+        speech = self._natural_plan_speech(plan.speech)
         if speech:
             result.add_speak_immediate(speech, style="brief")
         result.metadata["capability_handled"] = True
@@ -252,108 +269,151 @@ class CapabilityAgent(BaseAgent):
         self.trace(result, f"selected {selected} catalog capability request(s)")
         return result
 
-    def _direct_plan_speech(
-        self,
-        selected_ids: list[str],
-        actions: list[dict[str, Any]],
-    ) -> str:
-        if len(selected_ids) > 1:
-            return "I will do those actions in order."
-        skill_id = selected_ids[0]
-        args = actions[0].get("args") if actions else {}
-        args = args if isinstance(args, dict) else {}
-        return self._skill_plan_speech(
-            [
-                SkillRequest(
-                    skill_id=skill_id,
-                    args=args,
-                )
-            ]
+    def _direct_action_ack_speech(self, request: AgentRunRequest, action_count: int) -> str:
+        if action_count <= 0:
+            return ""
+        if self.is_zh(request):
+            return "我会按顺序执行这些动作。" if action_count > 1 else "我会执行这个动作。"
+        return (
+            "I will run the selected actions in order."
+            if action_count > 1
+            else "I will run that action."
         )
 
-    def _skill_plan_speech(self, requests: list[SkillRequest]) -> str:
-        if len(requests) > 1:
-            return "I will do those actions in order."
-        if not requests:
-            return "Okay."
-        request = requests[0]
-        skill_id = request.skill_id
-        args = request.args
-        if skill_id == "soridormi.walk_velocity":
-            direction = "backward" if float(args.get("vx_mps", 0.0)) < 0 else "forward"
-            return self._movement_speech(f"Walking {direction}", args)
-        if skill_id == "soridormi.walk_forward":
-            return self._movement_speech("Walking forward", args)
-        if skill_id == "soridormi.turn_in_place":
-            direction = "left" if float(args.get("yaw_radps", 0.0)) < 0 else "right"
-            return self._movement_speech(f"Turning {direction}", args)
-        if skill_id == "soridormi.nod_yes":
-            return "Nodding."
-        if skill_id == "soridormi.shake_no":
-            return "Shaking my head."
-        if skill_id == "soridormi.blink_eyes":
-            return "Blinking."
-        return "Okay."
+    def _format_session_context(self, request: AgentRunRequest) -> str:
+        context = dict(request.context or {})
+        context.pop("mind", None)
+        context.pop("candidate_capabilities", None)
+        return self._bounded_json(context, 1000)
 
-    def _movement_speech(self, prefix: str, args: dict[str, Any]) -> str:
-        duration = args.get("duration_s")
-        if isinstance(duration, (int, float)) and not isinstance(duration, bool) and duration > 0:
-            return f"{prefix} for {self._format_seconds(float(duration))}."
-        return f"{prefix}."
+    def _format_route_context(self, request: AgentRunRequest) -> str:
+        route = request.route_decision
+        payload = {
+            "route": route.route,
+            "intent": route.intent,
+            "confidence": route.confidence,
+            "language": route.language,
+            "source": route.source,
+            "reason": route.reason,
+            "metadata": route.metadata,
+            "actions": route.actions,
+        }
+        return self._bounded_json(payload, 800)
 
-    @staticmethod
-    def _format_seconds(value: float) -> str:
-        rounded = round(value, 1)
-        if rounded.is_integer():
-            amount = int(rounded)
-            unit = "second" if amount == 1 else "seconds"
-            return f"{amount} {unit}"
-        return f"{rounded:g} seconds"
-
-    @staticmethod
-    def _uses_body_capability(matches: list[Any]) -> bool:
-        for match in matches:
-            capability_id = str(getattr(match, "capability_id", "") or "")
-            effects = list(getattr(match, "effects", []) or [])
-            if capability_id.startswith("soridormi.") or "physical_motion" in effects:
-                return True
-        return False
+    def _format_global_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        mind = self.mind_context(request)
+        summary = " ".join(str(mind.get("prompt_summary") or "").split()) if mind else ""
+        if len(summary) > 500:
+            summary = summary[:500].rstrip() + "..."
+        identity = mind.get("identity") if isinstance(mind.get("identity"), dict) else {}
+        profile = {
+            "profile_id": mind.get("profile_id"),
+            "version": mind.get("version"),
+            "owner_approved": mind.get("owner_approved"),
+            "owner_approval_required_for_core_changes": mind.get(
+                "owner_approval_required_for_core_changes"
+            ),
+        }
+        none_text = "无" if zh else "None"
+        return (
+            "Mind Profile:\n"
+            f"{self._bounded_json(profile, 260)}\n\n"
+            "Robot Identity:\n"
+            f"{self._bounded_json(identity or none_text, 500)}\n\n"
+            "Worldview:\n"
+            "- Chromie is an embodied realtime robot/voice assistant, not the backend model provider.\n"
+            "- Use only supplied sensors, memory, robot state, and available abilities as runtime evidence.\n"
+            "- Do not claim unsupported perception, memory, execution, or runtime facts.\n\n"
+            "Lifeview:\n"
+            f"{self._bounded_json(mind.get('long_term_goals') or none_text, 500)}\n\n"
+            "Valueview:\n"
+            f"{self._bounded_json(mind.get('core_principles') or none_text, 800)}\n\n"
+            "Core Runtime Principles:\n"
+            "- Generalization-first: infer planning from meaning, context, ability descriptions, schemas, and task memory.\n"
+            "- Phrase rules are only for deterministic emergency/noise controls outside this planner.\n"
+            "- Memory, identity, and preferences guide interpretation; they never authorize side effects.\n"
+            "- Never invent abilities or raw motor/joint/actuator/controller-array/torque commands.\n\n"
+            "Reflex Policy:\n"
+            f"{self._bounded_json(mind.get('reflex_policy') or none_text, 300)}\n\n"
+            "Deliberation Policy:\n"
+            f"{self._bounded_json(mind.get('deliberation_policy') or none_text, 300)}\n\n"
+            "Experience Tuning Boundary:\n"
+            f"{self._bounded_json(mind.get('experience_tuning_policy') or none_text, 300)}\n\n"
+            "Owner-Approved Mind Summary:\n"
+            f"{summary or none_text}"
+        )
 
     async def _plan(self, request: AgentRunRequest, candidates: list[Any]) -> _CapabilityPlan:
         assert self.services.ollama is not None
         zh = self.is_zh(request)
+        global_context_block = self._format_global_context(request, zh=zh)
+        session_context_block = self._format_session_context(request)
+        route_context_block = self._format_route_context(request)
         task_context_block = self._format_task_context(request, zh=zh)
         history_block = self._format_history(request, zh=zh)
         candidate_payload = [self._capability_payload(match) for match in candidates]
+        selected_id = ""
+        intent = (request.route_decision.intent or "").strip()
+        if intent.startswith("capability:"):
+            selected_id = intent[len("capability:") :].strip()
+        selected_line = (
+            f"Router-selected exact skill_id: {selected_id}\n"
+            if selected_id
+            else "Router-selected exact skill_id: none\n"
+        )
         system = (
-            "You are Chromie's capability selection agent. Select only exact skill_id values from the provided candidates. "
+            "You are Chromie's capability selection agent. The prompt is organized as Global Context Group, Session Context Group, Current Job, Task Context Group, Cost Function, and Output Contract. "
+            "Read the upper context first, then solve the current job, then return only the contract. "
             "Generalization-first principle: infer the user's desired physical/tool action from meaning, context, capability descriptions, and input_schema; do not turn prompt wording into phrase rules. "
-            "Never invent a skill. Never output raw joint, motor, actuator, position-array, or torque controls. "
-            "Return JSON only with keys decision, speech, and skills. decision is execute, clarify, or unsupported. "
-            "The speech field is spoken aloud. Never put status labels such as unsupported, clarify, execute, null, or none in speech. "
-            "For unsupported, either leave speech empty so conversation_agent can answer, or give one natural sentence explaining the safe limitation. "
-            "For execute, every skills item must contain skill_id and args satisfying that candidate's input_schema. "
+            "Select only exact skill_id values from the provided candidates. Never invent a skill. "
+            "Never output raw joint, motor, actuator, controller-array, position-array, or torque controls. "
             "Schema obedience is more important than copying the user's words. "
-            "Every enum argument must be copied exactly from that field's enum list in input_schema. "
-            "Map natural wording to enum tokens by semantic meaning; never output words outside the enum. "
-            "Only execute a skill when a physical/tool capability is necessary to satisfy the user's current request. "
-            "If the request is a question, identity/name/status request, greeting, joke, story, song, or other speech-only conversation, "
-            "return unsupported with no skills; do not add a body motion merely because a capability is available. "
-            "A polite ability-shaped request to perform a listed physical action is not speech-only; "
-            "treat it as a request to execute the matching capability now unless context clearly says they only want an abstract ability explanation. "
-            "Never combine an unrelated spoken answer with a body skill. "
-            "Use recent conversation and task context to resolve short follow-ups such as durations or 'do that'. "
-            "Distinguish gaze, attention, and orientation requests from locomotion requests by meaning and by the candidate descriptions. "
-            "Use clarify when a required safe parameter is missing. Use unsupported when none of the candidates can satisfy the request. "
-            "Keep speech short and suitable for voice."
+            "Return compact JSON only."
         )
         prompt = (
-            f"Language: {'zh-CN' if zh else 'en-US'}\n"
-            f"User request: {request.text}\n"
-            f"Recent conversation:\n{history_block}\n"
-            f"Task context:\n{task_context_block}\n"
-            f"Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True)}\n"
-            "Choose the smallest safe set of executable skills."
+            "Global Context Group:\n"
+            f"{global_context_block}\n\n"
+            "Additional Robot Worldview:\n"
+            "- Do not claim a physical action is happening unless you output an executable skill request that downstream runtime can validate.\n"
+            "- Do not claim perception, memory, or execution evidence absent from context.\n\n"
+            "Session Context Group:\n"
+            f"- Language: {'zh-CN' if zh else 'en-US'}\n"
+            f"- Session id: {request.sid or ''}\n"
+            f"- Recent conversation:\n{history_block}\n"
+            f"- Task context:\n{task_context_block}\n"
+            f"- Router decision context JSON: {route_context_block}\n"
+            f"- Bounded session/runtime context JSON: {session_context_block}\n\n"
+            "Current Job:\n"
+            "- You are now acting as Chromie's capability planner.\n"
+            "- Use the upper context as background; output execute, clarify, or unsupported.\n"
+            "- Do not answer unrelated chat here; return unsupported with no skills when no physical/tool skill should run.\n\n"
+            "Task Context Group:\n"
+            f"- Latest user input: {request.text}\n"
+            f"- {selected_line.rstrip()}\n"
+            f"- Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+            "- Ability interpretation: choose only from the provided skill_id values and satisfy that candidate's input_schema.\n"
+            "- If Router-selected exact skill_id is best, use it; if another candidate better satisfies the action/schema, choose that candidate.\n"
+            "- Polite ability-shaped requests can be action requests when they ask Chromie to perform a listed physical action now.\n"
+            "- For questions, identity/status, greetings, jokes, stories, songs, or other speech-only conversation, return unsupported with no skills.\n"
+            "- Never combine an unrelated spoken answer with a body skill.\n"
+            "- Use recent conversation/task context for follow-ups; distinguish gaze/attention/orientation from locomotion by meaning and descriptions.\n\n"
+            "Cost Function:\n"
+            "- Choose the smallest safe set of executable skills.\n"
+            "- Prefer human-facing wrapper skills over lower-level velocity/control skills when both satisfy the request.\n"
+            "- Clarify when a required safe parameter is missing; unsupported when no candidate can satisfy the request.\n"
+            "- Prefer natural, brief speech that accurately describes only the selected plan.\n\n"
+            "Output Contract:\n"
+            "- Return JSON only with keys decision, speech, and skills.\n"
+            "- decision must be execute, clarify, or unsupported.\n"
+            "- When decision is execute, skills is required and must contain at least one item. Never return execute with skills omitted, empty, null, or only speech.\n"
+            "- Each execute item must be {\"skill_id\":\"<exact candidate skill_id>\",\"args\":{...}}.\n"
+            "- For execute, every skills item must contain skill_id and args satisfying that candidate's input_schema.\n"
+            "- For execute, speech is required: write one natural brief sentence generated from the chosen capability descriptions, user wording, and validated args.\n"
+            "- Do not depend on downstream code to convert skill_id or args into spoken wording; this planner owns the execution speech.\n"
+            "- Every enum argument must be copied exactly from that field's enum list in input_schema.\n"
+            "- Map natural wording to enum tokens by semantic meaning; never output words outside the enum.\n"
+            "- The speech field is spoken aloud. Never put status labels such as unsupported, clarify, execute, null, or none in speech.\n"
+            "- For unsupported, either leave speech empty so conversation_agent can answer, or give one natural sentence explaining the safe limitation."
         )
         try:
             raw = await self.services.ollama.generate(
@@ -415,10 +475,13 @@ class CapabilityAgent(BaseAgent):
         )
 
     def _capability_payload(self, match: Any) -> dict[str, Any]:
+        description = " ".join(str(getattr(match, "description", "") or "").split())
+        if len(description) > 140:
+            description = description[:140].rstrip() + "..."
         payload: dict[str, Any] = {
             "skill_id": str(getattr(match, "capability_id", "")),
-            "description": str(getattr(match, "description", "")),
-            "input_schema": getattr(match, "input_schema", {}) or {},
+            "description": description,
+            "input_schema": self._compact_input_schema(getattr(match, "input_schema", {}) or {}),
             "effects": list(getattr(match, "effects", []) or []),
             "requires_confirmation": bool(getattr(match, "requires_confirmation", False)),
         }
@@ -426,6 +489,28 @@ class CapabilityAgent(BaseAgent):
         if score is not None:
             payload["score"] = score
         return payload
+
+    def _compact_input_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(schema, dict):
+            return {}
+        compact: dict[str, Any] = {}
+        for key in ("type", "required", "additionalProperties"):
+            if key in schema:
+                compact[key] = schema[key]
+        properties = schema.get("properties")
+        if isinstance(properties, dict):
+            compact_properties: dict[str, Any] = {}
+            for name, prop in properties.items():
+                if not isinstance(prop, dict):
+                    continue
+                compact_prop: dict[str, Any] = {}
+                for key in ("type", "enum", "minimum", "maximum", "default"):
+                    if key in prop:
+                        compact_prop[key] = prop[key]
+                if compact_prop:
+                    compact_properties[str(name)] = compact_prop
+            compact["properties"] = compact_properties
+        return compact
 
     @staticmethod
     def _catalog_score(match: Any) -> float | None:
@@ -458,13 +543,7 @@ class CapabilityAgent(BaseAgent):
 
     @staticmethod
     def _natural_plan_speech(value: str) -> str:
-        text = " ".join((value or "").strip().split())
-        if not text:
-            return ""
-        label = text.strip(" .!?:;，。！？：；").lower().replace("-", "_")
-        if label in {"unsupported", "not_supported", "clarify", "execute", "none", "null", "n/a", "na"}:
-            return ""
-        return text
+        return _natural_speech_or_empty(value)
 
     def _capability_search_text(self, request: AgentRunRequest) -> str:
         parts = [" ".join((request.text or "").split())]

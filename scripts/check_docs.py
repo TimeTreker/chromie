@@ -324,11 +324,11 @@ def check_configuration_reference(errors: list[str]) -> None:
     values = common_env_values()
     try:
         router_base_ms = int(values["ROUTER_TIMEOUT_MS"])
-        router_internal_ms = max(
-            router_base_ms,
-            int(values.get("ROUTER_LLM_TIMEOUT_MS", str(router_base_ms))),
-            int(values.get("ROUTER_REVIEW_TIMEOUT_MS", values.get("ROUTER_LLM_TIMEOUT_MS", str(router_base_ms)))),
+        router_llm_ms = int(values.get("ROUTER_LLM_TIMEOUT_MS", str(router_base_ms)))
+        router_review_ms = int(
+            values.get("ROUTER_REVIEW_TIMEOUT_MS", values.get("ROUTER_LLM_TIMEOUT_MS", str(router_base_ms)))
         )
+        router_internal_ms = router_llm_ms + router_review_ms
         router_host_ms = int(values["ORCH_ROUTER_TIMEOUT_MS"])
     except (KeyError, ValueError) as exc:
         errors.append(f".env.common has invalid Router timeout configuration: {exc}")
@@ -336,10 +336,9 @@ def check_configuration_reference(errors: list[str]) -> None:
         catalog_ms = int(values.get("ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS", "0"))
         if router_host_ms <= router_internal_ms + catalog_ms:
             errors.append(
-                "ORCH_ROUTER_TIMEOUT_MS must exceed ROUTER_TIMEOUT_MS plus "
-                "ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS, including the largest "
-                "Router LLM/review budget, so the Router can finish or report "
-                "its own timeout first"
+                "ORCH_ROUTER_TIMEOUT_MS must exceed ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS "
+                "plus ROUTER_LLM_TIMEOUT_MS and ROUTER_REVIEW_TIMEOUT_MS, so the Router "
+                "can finish or report its own timeout first"
             )
 
 

@@ -49,6 +49,12 @@ separate and default-off; enable it only with
 | `memory_agent` | Produces memory updates and compatibility `memory.store` actions. Chromie's current conversation state is process-local and not a durable memory store. |
 | `vision_agent` | Produces a compatibility `vision.query` proposal. No vision executor is included in this repository. |
 
+The native capability planner prompt follows the project-wide prompt context
+group shape documented in [`../docs/chromie_mind.md`](../docs/chromie_mind.md):
+Global Context Group, Session Context Group, Current Job, Task Context Group,
+Cost Function, and Output Contract. It uses the owner-approved mind profile as
+upper context, then plans only through exact catalog skill IDs and schemas.
+
 ## HTTP API
 
 Core endpoints:

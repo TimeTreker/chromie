@@ -149,6 +149,44 @@ class _HeadGestureOutcome:
     }
 
 
+class _WalkChoiceOutcome:
+    status = "success"
+    error = None
+    output = {
+        "mode": "sim",
+        "skills": [
+            {
+                "skill_id": "walk_velocity",
+                "description": "Track a bounded body velocity command vx, vy, and yaw.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {
+                        "vx_mps": {"type": "number", "default": 0.12},
+                        "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0},
+                    },
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": True,
+            },
+            {
+                "skill_id": "walk_forward",
+                "description": "Human-facing wrapper for natural walk forward speed labels.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {
+                        "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0},
+                        "speed": {"type": "string", "enum": ["slow", "normal", "quick"]},
+                    },
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": True,
+            },
+        ],
+    }
+
+
 class _Invoker:
     async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _Outcome:
         del arguments, context
@@ -177,13 +215,32 @@ class _HeadGestureInvoker:
         return _HeadGestureOutcome()
 
 
+class _WalkChoiceInvoker:
+    async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _WalkChoiceOutcome:
+        del arguments, context
+        assert tool_name == "soridormi.skill.list"
+        return _WalkChoiceOutcome()
+
+
 class _Ollama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
+        assert "Global Context Group" in prompt
+        assert "Worldview" in prompt
+        assert "Lifeview" in prompt
+        assert "Valueview" in prompt
+        assert "Session Context Group" in prompt
+        assert "Current Job" in prompt
+        assert "Task Context Group" in prompt
+        assert "Cost Function" in prompt
+        assert "Output Contract" in prompt
+        assert prompt.index("Global Context Group") < prompt.index("Session Context Group")
+        assert prompt.index("Session Context Group") < prompt.index("Current Job")
+        assert prompt.index("Current Job") < prompt.index("Task Context Group")
         assert kwargs["response_format"] == "json"
         system = str(kwargs["system"])
-        assert "Only execute a skill when" in system
-        assert "Never combine an unrelated spoken answer with a body skill" in system
+        assert "Schema obedience is more important" in system
+        assert "Never combine an unrelated spoken answer with a body skill" in prompt
         assert "Generalization-first principle" in system
         assert "do not turn prompt wording into phrase rules" in system
         return {
@@ -214,15 +271,53 @@ class _InvalidWalkOllama:
         }
 
 
+class _SelectedWalkOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "soridormi.walk_forward" in prompt
+        assert "Router-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert kwargs["response_format"] == "json"
+        assert "When decision is execute, skills is required" in prompt
+        assert "Never return execute with skills omitted" in prompt
+        assert "Router-selected exact skill_id is best" in prompt
+        return {
+            "decision": "execute",
+            "speech": "Walking forward for 3 seconds.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 3.0, "speed": "quick"},
+                }
+            ],
+        }
+
+
+class _SelectedVelocityBetterForwardOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Router-selected exact skill_id: soridormi.walk_velocity" in prompt
+        assert "soridormi.walk_velocity" in prompt
+        assert "soridormi.walk_forward" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "Walking forward quickly for 15 seconds.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15.0, "speed": "quick"},
+                }
+            ],
+        }
+
+
 class _LookForwardOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.look_at_person" in prompt
         assert "soridormi.blink_eyes" in prompt
         assert "soridormi.walk_forward" in prompt
         assert "Task context" in prompt
+        assert "Current Job" in prompt
         assert "Can you look forward for some time" in prompt
-        system = str(kwargs["system"])
-        assert "Distinguish gaze, attention, and orientation requests from locomotion requests" in system
+        assert "distinguish gaze/attention/orientation from locomotion" in prompt
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
@@ -245,9 +340,26 @@ class _PoliteHeadQuestionOllama:
         assert "你能摇头吗" in prompt
         assert "soridormi.shake_no" in prompt
         assert kwargs["response_format"] == "json"
-        system = str(kwargs["system"])
-        assert "A polite ability-shaped request to perform a listed physical action" in system
-        assert "not speech-only" in system
+        assert "Polite ability-shaped requests can be action requests" in prompt
+        assert "physical action now" in prompt
+        assert "For execute, speech is required" in prompt
+        assert "this planner owns the execution speech" in prompt
+        return {
+            "decision": "execute",
+            "speech": "我会摇头。",
+            "skills": [
+                {
+                    "skill_id": "soridormi.shake_no",
+                    "args": {"count": 2},
+                }
+            ],
+        }
+
+
+class _EmptySpeechHeadQuestionOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "soridormi.shake_no" in prompt
+        assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
             "speech": "",
@@ -264,9 +376,8 @@ class _AdverbSpeedOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
         assert '"quick"' in prompt
-        system = str(kwargs["system"])
-        assert "Every enum argument must be copied exactly" in system
-        assert "Map natural wording to enum tokens by semantic meaning" in system
+        assert "Every enum argument must be copied exactly" in prompt
+        assert "Map natural wording to enum tokens by semantic meaning" in prompt
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
@@ -502,7 +613,77 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
         self.assertEqual(response.skills[0].args, {"duration_s": 1.0, "speed": "quick"})
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
-        self.assertEqual(response.speech[0].text, "Walking forward for 1 second.")
+        self.assertEqual(response.speech[0].text, "Walking forward.")
+
+    async def test_router_selected_capability_prompt_requires_exact_skill(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_SelectedWalkOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "router-selected-omitted-skills",
+                "text": "Walk forward quickly for 3 seconds.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.95,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(response.skills[0].args, {"duration_s": 3.0, "speed": "quick"})
+        self.assertEqual(
+            response.skills[0].metadata["source"],
+            "capability_catalog",
+        )
+        self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
+        self.assertEqual(response.speech[0].text, "Walking forward for 3 seconds.")
+
+    async def test_router_selected_capability_does_not_hide_better_candidate(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_SelectedVelocityBetterForwardOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_WalkChoiceInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "router-selected-velocity-better-forward",
+                "text": "Walk forward quickly for 15 seconds.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_velocity",
+                    "confidence": 0.9,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(response.skills[0].args, {"duration_s": 15.0, "speed": "quick"})
+        self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
+        self.assertEqual(response.speech[0].text, "Walking forward quickly for 15 seconds.")
 
     async def test_polite_chinese_head_ability_question_executes_matching_skill(self) -> None:
         runtime = InteractionRuntime(
@@ -533,7 +714,38 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.skills[0].skill_id, "soridormi.shake_no")
         self.assertEqual(response.skills[0].args, {"count": 2})
-        self.assertEqual(response.speech[0].text, "Shaking my head.")
+        self.assertEqual(response.speech[0].text, "我会摇头。")
+
+    async def test_capability_plan_rejects_execute_without_llm_speech(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_EmptySpeechHeadQuestionOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_HeadGestureInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "empty-speech-head-question",
+                "text": "你能摇头吗",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.72,
+                    "language": "zh-CN",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
+        self.assertNotEqual(response.speech[0].text, "Shaking my head.")
 
     async def test_capability_plan_blocks_schema_invalid_args_before_runtime(self) -> None:
         runtime = InteractionRuntime(
@@ -651,7 +863,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.skills[0].args, {"duration_s": 5.0})
         self.assertEqual(response.skills[1].args, {"count": 2})
-        self.assertEqual(response.speech[0].text, "I will do those actions in order.")
+        self.assertEqual(response.speech[0].text, "Looking forward and blinking.")
 
     async def test_capability_plan_sees_full_api_surface_beyond_search_match(self) -> None:
         runtime = InteractionRuntime(

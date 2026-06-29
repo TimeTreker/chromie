@@ -28,6 +28,22 @@ ROUTE_NAMES = {
 }
 
 DETERMINISTIC_ONLY_ROUTES = {"interrupt", "ignore"}
+PLACEHOLDER_CAPABILITY_INTENTS = {
+    "capability",
+    "capability:",
+    "capability_id",
+    "<capability_id>",
+    "<exact capability_id>",
+    "capability:<capability_id>",
+    "capability:<exact capability_id>",
+}
+_ROUTER_CONTEXT_OMIT_KEYS = {
+    "candidate_capabilities",
+    "mind",
+    "core_principles",
+    "long_term_goals",
+    "experience_tuning_policy",
+}
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
@@ -82,6 +98,63 @@ def _compact_candidate_capabilities(candidates: Any, *, limit: int = 8) -> list[
     return compact
 
 
+def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
+    try:
+        text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    except TypeError:
+        text = json.dumps(str(value), ensure_ascii=False)
+    if len(text) > max_chars:
+        return text[:max_chars].rstrip() + "..."
+    return text
+
+
+def _context_without_prompt_globals(context: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in (context or {}).items()
+        if key not in _ROUTER_CONTEXT_OMIT_KEYS
+    }
+
+
+def _router_global_context_section(mind: Any) -> str:
+    if not isinstance(mind, dict) or not mind:
+        mind = {}
+    identity = mind.get("identity") if isinstance(mind.get("identity"), dict) else {}
+    core_principles = mind.get("core_principles", [])
+    long_term_goals = mind.get("long_term_goals", [])
+    summary = " ".join(str(mind.get("prompt_summary") or "").split())
+    if len(summary) > 240:
+        summary = summary[:240].rstrip() + "..."
+    profile = {
+        "profile_id": mind.get("profile_id"),
+        "version": mind.get("version"),
+        "owner_approved": mind.get("owner_approved"),
+    }
+
+    return (
+        "Mind Profile:\n"
+        f"{_bounded_json(profile, max_chars=180)}\n"
+        "Robot Identity:\n"
+        f"{_bounded_json(identity or 'not supplied', max_chars=260)}\n"
+        "Worldview:\n"
+        "- Chromie is an embodied realtime robot/voice assistant; use only supplied runtime evidence.\n"
+        "Lifeview:\n"
+        f"{_bounded_json(long_term_goals or 'not supplied', max_chars=240)}\n"
+        "Valueview:\n"
+        f"{_bounded_json(core_principles or 'not supplied', max_chars=360)}\n"
+        "Core Runtime Principles:\n"
+        "- Infer from meaning/context/abilities/schemas, not phrase rules.\n"
+        "- Memory and preferences guide interpretation; they never authorize side effects.\n"
+        "- Never invent abilities or raw motor/joint/actuator/controller-array/torque commands.\n"
+        "Owner-Approved Mind Summary:\n"
+        f"{summary or 'not supplied'}"
+    )
+
+
+def _is_placeholder_capability_intent(intent: str) -> bool:
+    return (intent or "").strip().lower() in PLACEHOLDER_CAPABILITY_INTENTS
+
+
 class OllamaLLMRouter:
     def __init__(
         self,
@@ -117,77 +190,37 @@ class OllamaLLMRouter:
 
     def build_user_prompt(self, request: RouteRequest) -> str:
         candidates = request.context.get("candidate_capabilities", [])
-        candidates_json = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
-        mind_json = json.dumps(request.context.get("mind", {}), ensure_ascii=False, separators=(",", ":"))
-        context_json = json.dumps(request.context, ensure_ascii=False, separators=(",", ":"))
+        candidates_json = _bounded_json(
+            _compact_candidate_capabilities(candidates),
+            max_chars=1100,
+        )
+        mind = request.context.get("mind", {})
+        session_context = _context_without_prompt_globals(request.context)
+        context_json = _bounded_json(session_context, max_chars=800)
         return (
-            "Routing task: act as Chromie's robot-brain router. Understand the "
-            "user request, current context, and available abilities, then return "
-            "one RouteDecision JSON object.\n"
-            "Generalization-first principle: infer intent from meaning, context, "
-            "ability descriptions, schemas, and task memory. Examples are guidance, "
-            "not phrase rules; do not require exact keyword matches for normal "
-            "conversation, tool, memory, robot-action, or deep-thought routing. "
-            "Only the emergency filter may use phrase/pattern rules for fast "
-            "operational controls.\n"
-            "Routing stages: an emergency filter has already handled "
-            "stop/cancel/emergency/noise before this prompt. You are the quick "
-            "intent-and-meaning router. Decide intent from the whole utterance, "
-            "capability choice, memory references, and speech/body/tool routing. "
-            "Also propose task relationship metadata when useful: "
-            "metadata.task_relation must be one of new_task, continue_task, "
-            "modify_task, close_task, side_conversation, clarify_task; "
-            "metadata.target_task_id should reference an existing task_id from "
-            "context when continuing/modifying/closing; metadata.task_context_patch "
-            "may contain goal, task_type, important_claims, entities, constraints, "
-            "pending_questions, status, and persistence_policy. These fields are "
-            "advisory; the host task manager owns final task writes and safety. "
-            "Use route deep_thought when you understand that the request needs "
-            "complex reasoning, multi-step analysis, design discussion, or "
-            "implementation planning that should be handled by deepthinking_agent "
-            "rather than the quick router. If you are uncertain, return calibrated "
-            "low confidence so Chromie can delegate to deepthinking_agent.\n"
-            "Do not return interrupt or ignore for body commands such as walking, "
-            "looking, nodding, blinking, turning, or moving; those are robot_action. "
-            "Only return interrupt if the text itself is an explicit stop/cancel/"
-            "silence request that somehow reached this prompt.\n"
-            f"ASR text: {request.text}\n"
-            f"Language hint: {request.language or 'auto'}\n"
-            f"Session id: {request.sid or ''}\n"
-            f"Available abilities / candidate capabilities JSON: {candidates_json}\n"
-            f"Mind principles / long-term goals JSON: {mind_json}\n"
-            f"Bounded memory and world context JSON: {context_json}\n"
-            "Use context for references such as previous tasks, task context, "
-            "robot_state, position, active interactions, or user preferences, "
-            "principles, and goals, but never as authorization. "
-            "For short follow-ups such as 'do you agree with me?', 'what about it?', "
-            "'continue', or 'then?', attach the turn to the latest meaningful "
-            "task context or claim when context supports it instead of treating "
-            "the utterance as isolated. "
-            "Core principles are stable, owner-approved constraints; experience "
-            "may tune strategies and proposals, but the quick router must not "
-            "rewrite principles. "
-            "Identity, name, age, self-description, and robot-status questions are chat "
-            "unless the user explicitly asks for a physical body action or external tool. "
-            "When a capability question is pragmatically a polite request for Chromie to perform "
-            "a listed body/head motion, treat it as robot_action if a matching "
-            "interaction-executable candidate exists. "
-            "Treat creative speech-only requests, including original singing, "
-            "stories, jokes, or spoken performance, as chat unless the user "
-            "explicitly asks for simultaneous physical movement. "
-            "Treat factual knowledge questions as chat, including questions "
-            "about the shape, temperature, size, color, position, or properties "
-            "of natural objects such as the Sun, Moon, Earth, planets, stars, "
-            "or everyday things. Words like round, rectangular, shape, turn, "
-            "or rotate are not robot_action unless the user clearly commands "
-            "Chromie's body to move. "
-            "markers such as 'go ahead', 'okay', 'sure', or 'please' are not "
-            "body movement by themselves. Compliments or appearance statements "
-            "such as 'you look beautiful' are chat unless the user asks for a "
-            "specific body, head, or eye action. "
-            "When selecting a capability, set intent to "
-            "capability:<exact capability_id>. For robot_action, the selected "
-            "candidate must have interaction_executable=true."
+            "Global Context Group:\n"
+            f"{_router_global_context_section(mind)}\n\n"
+            "Session Context Group:\n"
+            f"language={request.language or 'auto'} sid={request.sid or ''}\n"
+            f"Bounded session, memory, task, and robot/world context JSON: {context_json}\n\n"
+            "Current Job:\n"
+            "Act as Chromie's quick intent router. Decide route only; do not answer, execute, or authorize side effects. "
+            "Choose route deep_thought for complex reasoning, design, debugging, or implementation planning. "
+            "Return calibrated low confidence when uncertain.\n\n"
+            "Task Context Group:\n"
+            f"Latest user input: {request.text}\n"
+            f"Available abilities / candidate_capabilities JSON: {candidates_json}\n"
+            "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
+            "A polite ability-shaped request can be robot_action when it asks Chromie to perform a listed body/head/pose/motion capability now. "
+            "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran.\n\n"
+            "Cost Function:\n"
+            "Prefer smallest safe downstream action surface; honest capability boundaries; deep_thought for complex planning; clarify for ambiguity; chat for speech-only interaction. "
+            "Prefer supported interaction-executable capability IDs over generic robot_action when a candidate clearly fits.\n\n"
+            "Output Contract:\n"
+            "Return exactly one RouteDecision JSON object. Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
+            "For selected robot_action use intent capability:<exact capability_id> from candidates. Never output placeholder intents such as capability or capability:<exact capability_id>. "
+            "For chat/clarify/interrupt/ignore, do not set capability intent. Include confidence 0.0-1.0. "
+            "metadata.task_relation may be new_task, continue_task, modify_task, close_task, side_conversation, or clarify_task; host task manager owns final writes and safety."
         )
 
     def build_payload(self, request: RouteRequest, *, relaxed_json: bool = False) -> dict[str, Any]:
@@ -215,6 +248,8 @@ class OllamaLLMRouter:
             ensure_ascii=False,
             separators=(",", ":"),
         )
+        mind = request.context.get("mind", {})
+        session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=2400)
         return {
             "model": self.review_model or self.model,
             "stream": False,
@@ -224,31 +259,135 @@ class OllamaLLMRouter:
                 {
                     "role": "system",
                     "content": (
-                        "Classify intent for Chromie, a realtime robot. Return JSON only "
-                        "with keys route, intent, confidence, and optional reason. Valid "
-                        "routes: chat, deep_thought, robot_action, tool, memory, clarify, "
-                        "interrupt, ignore. The deterministic emergency/noise filter "
-                        "already passed before this review. Do not choose interrupt or "
-                        "ignore unless the text is plainly stop, cancel, silence, empty, "
-                        "or unusable audio. Body/head/pose/motion requests are "
-                        "robot_action when an available interaction_executable candidate "
-                        "can satisfy them. Capability questions can be polite requests; "
-                        "if the user is pragmatically asking Chromie to perform a listed "
-                        "physical action now, choose robot_action. Identity, status, "
-                        "factual, greeting, joke, story, song, and other speech-only "
-                        "requests are chat unless physical motion is explicitly requested. "
-                        "Use semantic generalization from meaning and the supplied "
-                        "candidate capability descriptions; do not use phrase rules, and "
-                        "do not turn prompt wording into keyword rules. If selecting a known "
-                        "candidate, set intent to capability:<exact capability_id>; "
-                        "otherwise use a short semantic intent such as robot_action."
+                        "Global Context Group:\n"
+                        f"{_router_global_context_section(mind)}\n\n"
+                        "Session Context Group:\n"
+                        f"- Language hint: {request.language or 'auto'}\n"
+                        f"- Bounded session context JSON: {session_context}\n\n"
+                        "Current Job:\n"
+                        "- You are now acting as Chromie's semantic route reviewer.\n"
+                        "- Use semantic generalization from meaning, session context, and supplied candidate capability descriptions.\n"
+                        "- Do not use phrase rules, and do not turn prompt wording into keyword rules.\n"
+                        "- The deterministic emergency/noise filter already passed before this review.\n\n"
+                        "Task Context Group:\n"
+                        "- Review the latest user input and decide whether the quick route should be chat, deep_thought, robot_action, tool, memory, clarify, interrupt, or ignore.\n"
+                        "- Body/head/pose/motion requests are robot_action when an available interaction_executable candidate can satisfy them.\n"
+                        "- Capability questions can be polite requests; if the user is pragmatically asking Chromie to perform a listed physical action now, choose robot_action.\n"
+                        "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless physical motion is explicitly requested.\n\n"
+                        "Output Contract:\n"
+                        "- Return JSON only with keys route, intent, confidence, and optional reason.\n"
+                        "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
+                        "- Do not choose interrupt or ignore unless the text is plainly stop, cancel, silence, empty, or unusable audio.\n"
+                        "- If selecting a known candidate, set intent to capability:<exact capability_id>; otherwise use a short semantic intent such as robot_action."
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        f"Text: {request.text}\n"
+                        "Task Context Group:\n"
+                        f"- Latest user input: {request.text}\n"
+                        f"- Candidate capabilities JSON: {candidates_json}"
+                    ),
+                },
+            ],
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_predict": 96,
+            },
+        }
+
+    def build_deterministic_route_repair_payload(self, request: RouteRequest) -> dict[str, Any]:
+        candidates_json = json.dumps(
+            _compact_candidate_capabilities(request.context.get("candidate_capabilities", [])),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        mind = request.context.get("mind", {})
+        session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=2400)
+        return {
+            "model": self.model,
+            "stream": False,
+            "think": False,
+            "format": "json",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Global Context Group:\n"
+                        f"{_router_global_context_section(mind)}\n\n"
+                        "Session Context Group:\n"
+                        f"- Language hint: {request.language or 'auto'}\n"
+                        f"- Bounded session context JSON: {session_context}\n\n"
+                        "Current Job:\n"
+                        "- Repair a realtime robot route after the deterministic emergency/noise filter already passed.\n"
+                        "- The quick router incorrectly returned a deterministic-only route; choose the best non-deterministic route from semantic meaning, context, and candidates.\n"
+                        "- Decide from meaning and candidate capability descriptions, not phrase rules.\n\n"
+                        "Task Context Group:\n"
+                        "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
+                        "- Speech-only requests are chat.\n"
+                        "- Use deep_thought for complex reasoning or planning that should leave the quick route path.\n\n"
+                        "Output Contract:\n"
+                        "- Return JSON only with keys route, intent, confidence, and optional reason.\n"
+                        "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
+                        "- Do not use interrupt or ignore.\n"
+                        "- For a selected capability, set intent to capability:<exact capability_id>.\n"
+                        "- Confidence is semantic routing confidence, not the catalog score; use at least 0.72 when the request clearly maps to a candidate."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Task Context Group:\n"
+                        f"- Latest user input: {request.text}\n"
+                        f"- Candidate capabilities JSON: {candidates_json}"
+                    ),
+                },
+            ],
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_predict": 96,
+            },
+        }
+
+    def build_placeholder_capability_repair_payload(self, request: RouteRequest) -> dict[str, Any]:
+        candidates_json = _bounded_json(
+            _compact_candidate_capabilities(request.context.get("candidate_capabilities", [])),
+            max_chars=1800,
+        )
+        session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=1400)
+        return {
+            "model": self.model,
+            "stream": False,
+            "think": False,
+            "format": "json",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Current Job:\n"
+                        "- Repair a malformed route for Chromie after the emergency/noise filter already passed.\n"
+                        "- The quick router returned robot_action with a placeholder capability intent instead of a real capability ID.\n"
+                        "- Decide from semantic meaning, bounded context, and candidates, not phrase rules.\n\n"
+                        "Task Context Group:\n"
+                        "- Speech-only, greeting, identity/status, factual, joke, story, song, and spoken performance requests are chat unless physical/tool action is explicitly requested.\n"
+                        "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
+                        "- Use deep_thought for complex reasoning or planning.\n\n"
+                        "Output Contract:\n"
+                        "- Return JSON only with keys route, intent, confidence, and optional reason.\n"
+                        "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
+                        "- For robot_action with a selected skill, set intent to capability:<exact capability_id> from candidates.\n"
+                        "- Never return placeholder intents such as capability or capability:<exact capability_id>.\n"
+                        "- Confidence is semantic routing confidence, not the catalog score."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Latest user input: {request.text}\n"
                         f"Language hint: {request.language or 'auto'}\n"
+                        f"Bounded session context JSON: {session_context}\n"
                         f"Candidate capabilities JSON: {candidates_json}"
                     ),
                 },
@@ -314,6 +453,35 @@ class OllamaLLMRouter:
             return reviewed_decision
         return decision
 
+    async def _review_ambiguous_deep_thought(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        if not self.review_model:
+            return decision
+        if decision.route != "deep_thought":
+            return decision
+        if decision.reason or decision.intent not in {"", "unknown"}:
+            return decision
+        try:
+            reviewed = await self._chat(self.build_intent_review_payload(request))
+            reviewed_decision = self._decision_from_response(request, reviewed)
+        except Exception as exc:
+            logger.warning("LLM review model ambiguous deep_thought check failed: %s", exc)
+            return decision
+        if reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES:
+            reviewed_decision.reason = (
+                f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
+            ) + f"review_model:{self.review_model} reviewed ambiguous deep_thought"
+            logger.info(
+                "LLM review model changed ambiguous deep_thought to %s/%s",
+                reviewed_decision.route,
+                reviewed_decision.intent,
+            )
+            return reviewed_decision
+        return decision
+
     async def _recover_deterministic_only_decision(
         self,
         request: RouteRequest,
@@ -331,19 +499,72 @@ class OllamaLLMRouter:
                 logger.warning("LLM review model deterministic-only recovery failed: %s", exc)
             else:
                 if reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES:
-                    reviewed_decision.reason = (
-                        f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-                    ) + f"{reason_prefix}; review_model:{self.review_model} recovered quick-router mistake"
+                    if reviewed_decision.confidence >= self.confidence_threshold:
+                        reviewed_decision.reason = (
+                            f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
+                        ) + f"{reason_prefix}; review_model:{self.review_model} recovered quick-router mistake"
+                        logger.info(
+                            "LLM review model recovered invalid deterministic-only route %s to %s",
+                            decision.route,
+                            reviewed_decision.route,
+                        )
+                        return reviewed_decision
                     logger.info(
-                        "LLM review model recovered invalid deterministic-only route %s to %s",
+                        "LLM review model returned low-confidence recovery %.2f for invalid %s; trying fast repair",
+                        reviewed_decision.confidence,
                         decision.route,
-                        reviewed_decision.route,
                     )
-                    return reviewed_decision
+        try:
+            repaired = await self._chat(self.build_deterministic_route_repair_payload(request))
+            repaired_decision = self._decision_from_response(request, repaired)
+        except Exception as exc:
+            logger.warning("LLM fast route repair failed: %s", exc)
+        else:
+            if repaired_decision.route not in DETERMINISTIC_ONLY_ROUTES:
+                repaired_decision.reason = (
+                    f"{repaired_decision.reason}; " if repaired_decision.reason else ""
+                ) + f"{reason_prefix}; fast_model:{self.model} repaired quick-router mistake"
+                logger.info(
+                    "LLM fast repair recovered invalid deterministic-only route %s to %s",
+                    decision.route,
+                    repaired_decision.route,
+                )
+                return repaired_decision
         logger.info(
             "LLM router returned invalid deterministic-only route %s after priority filter; using safe chat fallback",
             decision.route,
         )
+        return fallback_decision(request, reason=reason_prefix)
+
+    async def _recover_placeholder_capability_decision(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        reason_prefix = (
+            "quick router returned robot_action with placeholder capability intent "
+            f"{decision.intent!r}"
+        )
+        try:
+            repaired = await self._chat(self.build_placeholder_capability_repair_payload(request))
+            repaired_decision = self._decision_from_response(request, repaired)
+        except Exception as exc:
+            logger.warning("LLM placeholder capability repair failed: %s", exc)
+        else:
+            if (
+                repaired_decision.route not in DETERMINISTIC_ONLY_ROUTES
+                and not _is_placeholder_capability_intent(repaired_decision.intent)
+            ):
+                repaired_decision.reason = (
+                    f"{repaired_decision.reason}; " if repaired_decision.reason else ""
+                ) + f"{reason_prefix}; fast_model:{self.model} repaired placeholder capability intent"
+                logger.info(
+                    "LLM fast repair recovered placeholder capability intent to %s/%s",
+                    repaired_decision.route,
+                    repaired_decision.intent,
+                )
+                return repaired_decision
+        logger.info("%s; using safe chat fallback", reason_prefix)
         return fallback_decision(request, reason=reason_prefix)
 
     def _low_confidence_deep_thought_decision(
@@ -391,7 +612,27 @@ class OllamaLLMRouter:
             data = await self._chat(payload)
         except Exception as exc:
             logger.warning("Ollama router request failed: %s", exc)
-            return fallback_decision(request, reason=f"llm_router_error: {exc}")
+            if self.review_model:
+                try:
+                    reviewed = await self._chat(self.build_intent_review_payload(request))
+                    reviewed_decision = self._decision_from_response(request, reviewed)
+                except Exception as review_exc:
+                    logger.warning("LLM review model primary-error recovery failed: %s", review_exc)
+                else:
+                    if reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES:
+                        reviewed_decision.reason = (
+                            f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
+                        ) + f"primary router error {type(exc).__name__}; review_model:{self.review_model} recovered route"
+                        logger.info(
+                            "LLM review model recovered primary router error to %s/%s",
+                            reviewed_decision.route,
+                            reviewed_decision.intent,
+                        )
+                        return reviewed_decision
+            return fallback_decision(
+                request,
+                reason=f"llm_router_error:{type(exc).__name__}: {exc}",
+            )
 
         content = ""
         try:
@@ -407,9 +648,26 @@ class OllamaLLMRouter:
                 logger.warning("Relaxed LLM router retry failed: %s", relaxed_exc)
                 return fallback_decision(request, reason=f"invalid_llm_router_response: {exc}")
 
+        if (
+            decision.route == "deep_thought"
+            and decision.intent in {"", "unknown"}
+            and not decision.reason
+        ):
+            logger.info(
+                "LLM router returned ambiguous deep_thought without intent or reason; using safe fallback"
+            )
+            return fallback_decision(
+                request,
+                reason="ambiguous_llm_deep_thought_without_intent_or_reason",
+            )
+
+        decision = await self._review_ambiguous_deep_thought(request, decision)
         decision = await self._review_route_only_robot_action(request, decision)
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:
             return await self._recover_deterministic_only_decision(request, decision)
+
+        if decision.route == "robot_action" and _is_placeholder_capability_intent(decision.intent):
+            return await self._recover_placeholder_capability_decision(request, decision)
 
         return decision

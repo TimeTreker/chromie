@@ -100,7 +100,7 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[2].args["count"], 2)
         self.assertEqual(response.skills[2].args["amplitude"], "small")
         self.assertEqual(response.skills[2].args["duration_s"], 1.4)
-        self.assertEqual(response.speech[0].text, "I will do those actions in order.")
+        self.assertEqual(response.speech[0].text, "I will run the selected actions in order.")
 
     async def test_router_speak_first_suppresses_generic_direct_plan_speech(self) -> None:
         runtime = InteractionRuntime(
