@@ -8,6 +8,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ComposeConfigurationTests(unittest.TestCase):
+    def test_asr_service_passes_backend_and_mode(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        asr_block = compose.split("  chromie-asr:", 1)[1].split(
+            "  chromie-tts:",
+            1,
+        )[0]
+
+        self.assertIn("ASR_BACKEND: ${ASR_BACKEND:-faster_whisper}", asr_block)
+        self.assertIn("ASR_MODE: ${ASR_MODE:-final}", asr_block)
+
     def test_ollama_healthcheck_uses_loopback_client_address(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         llm_block = compose.split("  chromie-llm:", 1)[1].split(

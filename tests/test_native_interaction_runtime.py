@@ -752,6 +752,33 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("capability_decision", response.metadata)
         self.assertEqual(response.skills, [])
 
+    async def test_fallback_chat_is_not_promoted_by_strong_motion_catalog_match(self) -> None:
+        request = _request(
+            text="Walk forward at 0.2 speed for one second.",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        request.route_decision.source = "fallback"
+        request.route_decision.confidence = 0.3
+
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ChatOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_WalkCatalog(),  # type: ignore[arg-type]
+                expressive_body_cues="off",
+            )
+        ).run(request)
+
+        self.assertEqual(request.route_decision.route, "chat")
+        self.assertEqual(request.route_decision.agents, ["conversation_agent", "speaker_agent"])
+        self.assertEqual(request.route_decision.source, "fallback")
+        self.assertEqual(response.speech[0].text, "I am listening.")
+        self.assertEqual(response.skills, [])
+        self.assertNotIn("capability_decision", response.metadata)
+
     async def test_broad_llm_robot_action_is_not_narrowed_to_top_catalog_match(self) -> None:
         request = _request(
             text="please walk forward at 0.20 for 10 seconds and turn your head right and blink your eyes",

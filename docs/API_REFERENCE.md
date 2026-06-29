@@ -182,15 +182,18 @@ configuration variables do not select a production backend.
 The ASR service accepts WebSocket connections and two message forms:
 
 - JSON text `{"type":"health"}` or `{"type":"ping"}` ->
-  `{"type":"pong","service":"asr"}`.
+  `{"type":"pong","service":"asr",...}` with backend, mode, model revision,
+  and bounded-concurrency metadata.
 - Binary PCM16 mono audio at `ASR_SAMPLE_RATE` -> one JSON final result:
   `{"type":"final","text":"...","duration":<seconds>}`.
 
 Failures return `{"type":"error","message":"..."}`. The host Orchestrator
 performs VAD and sends complete utterance audio; this service does not stream
-partial transcripts. Blocking faster-whisper inference and segment consumption
-run in a bounded executor, so health/ping handling remains responsive while a
-transcription is active. The pong reports `max_concurrent_transcriptions`.
+partial transcripts. Blocking final-backend inference runs in a bounded
+executor, so health/ping handling remains responsive while a transcription is
+active. The current supported backend and mode are `faster_whisper` and
+`final`. The pong reports `backend`, `mode`, `model`, `model_revision`, and
+`max_concurrent_transcriptions`.
 
 ## TTS WebSocket protocol — port 5000
 

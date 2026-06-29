@@ -459,12 +459,12 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
                 "sid": "bring-water",
                 "text": "Bring me water from the kitchen.",
                 "route_decision": {
-                    "route": "chat",
-                    "agents": ["conversation_agent", "speaker_agent"],
-                    "intent": "general_conversation",
-                    "confidence": 0.3,
+                    "route": "tool",
+                    "agents": ["tool_agent", "speaker_agent"],
+                    "intent": "soridormi_task_planning",
+                    "confidence": 0.72,
                     "language": "en-US",
-                    "source": "fallback",
+                    "source": "llm",
                 },
             }
         )
@@ -572,12 +572,12 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
                         "sid": sid,
                         "text": text,
                         "route_decision": {
-                            "route": "chat",
-                            "agents": ["conversation_agent", "speaker_agent"],
-                            "intent": "general_conversation",
-                            "confidence": 0.3,
+                            "route": "tool",
+                            "agents": ["tool_agent", "speaker_agent"],
+                            "intent": "soridormi_task_planning",
+                            "confidence": 0.72,
                             "language": "en-US",
-                            "source": "fallback",
+                            "source": "llm",
                         },
                     }
                 )
@@ -615,12 +615,12 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
                 "sid": "walk-forward",
                 "text": "Walk forward at 0.2 speed for one second.",
                 "route_decision": {
-                    "route": "chat",
-                    "agents": ["conversation_agent", "speaker_agent"],
-                    "intent": "general_conversation",
-                    "confidence": 0.3,
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.72,
                     "language": "en-US",
-                    "source": "fallback",
+                    "source": "llm",
                 },
             }
         )

@@ -27,6 +27,8 @@ services:
     environment:
       ASR_HOST: "0.0.0.0"
       ASR_PORT: "9001"
+      ASR_BACKEND: ${ASR_BACKEND:-faster_whisper}
+      ASR_MODE: ${ASR_MODE:-final}
       ASR_MODEL: ${ASR_MODEL}
       ASR_MODEL_REVISION: ${ASR_MODEL_REVISION}
       ASR_DEVICE: ${ASR_DEVICE}

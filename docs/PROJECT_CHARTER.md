@@ -83,19 +83,24 @@ future production robot backend.
 
 1. **High-level contracts stay stable.** Simulation and physical providers
    should implement the same named-skill and result semantics.
-2. **Generalization comes from models and contracts.** Normal conversation,
-   memory, tool, robot-action, capability-selection, and deep-thought behavior
-   should be understood from language meaning, bounded context, capability
-   descriptions, schemas, and task memory. Do not implement normal robot
-   functions as brittle phrase or regex rule lists to pass individual cases.
+2. **Robot thinking belongs to models and contracts.** Outside deterministic
+   operational controls, normal conversation, memory, tool, robot-action,
+   capability-selection, body-goal interpretation, planning, low-confidence
+   correction, and deep-thought behavior must be decided by LLM reasoning over
+   language meaning, bounded context, capability descriptions, schemas, and
+   task memory. Catalog search, score thresholds, regression fixtures, regexes,
+   and phrase tables may retrieve candidates or validate and reject model
+   output, but they must not decide ordinary robot intent or planning by
+   themselves.
 3. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
    or unconfirmed work does not execute.
 4. **Operational controls stay deterministic.** Stop, cancel, emergency,
    silence, and unusable-audio paths do not depend on model judgment.
 5. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
    the deterministic operational filter. Normal conversation, tool, memory,
-   robot-action, and deep-thought intent should come from bounded model
-   understanding, catalog constraints, or clarification.
+   robot-action, and deep-thought intent must come from bounded model
+   understanding and contract validation, or else clarify, delegate to deeper
+   reasoning, or fail closed.
 6. **Simulation precedes hardware.** Logical closure, failure handling, and
    recovery are proven in simulation before physical commissioning.
 7. **Evidence is part of the product.** Implemented, automatically verified,

@@ -3,7 +3,7 @@
   "id": "low_confidence_do_it",
   "suite": "router",
   "level": "module",
-  "description": "Low-confidence body-action handoff can recover through the shared capability catalog instead of adding thinking filler.",
+  "description": "Low-confidence body-action handoff delegates to deep thought instead of letting catalog context authorize motion.",
   "tags": ["deep-thought", "low-confidence", "filler-regression"],
   "input": {
     "text": "Please do it."
@@ -30,11 +30,11 @@
     }
   },
   "expect": {
-    "route": "robot_action",
-    "intent": "capability:soridormi.walk_velocity",
-    "source": "catalog",
-    "task_types_include": ["task.execute_skill"],
-    "task_types_forbid": ["speech.thinking_ack", "cognition.delegate_deep_thought", "cognition.deep_think"],
+    "route": "deep_thought",
+    "intent": "deep_thought_low_confidence",
+    "source": "llm",
+    "task_types_include": ["cognition.delegate_deep_thought", "cognition.deep_think"],
+    "task_types_forbid": ["speech.thinking_ack", "task.execute_skill"],
     "llm_calls": 1
   }
 }

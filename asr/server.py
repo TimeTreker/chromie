@@ -6,9 +6,13 @@ import time
 
 import numpy as np
 import websockets
-from faster_whisper import WhisperModel
 
-from transcription import TranscriptionExecutor
+try:
+    from .backends import ASRBackendConfig, create_final_asr_backend
+    from .transcription import TranscriptionExecutor
+except ImportError:
+    from backends import ASRBackendConfig, create_final_asr_backend
+    from transcription import TranscriptionExecutor
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -18,6 +22,8 @@ logger = logging.getLogger("chromie-asr")
 
 HOST = os.getenv("ASR_HOST", "0.0.0.0")
 PORT = int(os.getenv("ASR_PORT", "9001"))
+ASR_BACKEND = os.getenv("ASR_BACKEND", "faster_whisper")
+ASR_MODE = os.getenv("ASR_MODE", "final")
 MODEL_NAME = os.getenv("ASR_MODEL", "dropbox-dash/faster-whisper-large-v3-turbo")
 MODEL_REVISION = os.getenv("ASR_MODEL_REVISION") or None
 DEVICE = os.getenv("ASR_DEVICE", "cuda")
@@ -33,7 +39,12 @@ ASR_MAX_CONCURRENT_TRANSCRIPTIONS = max(
 )
 
 logger.info(
-    "ASR config: model=%s revision=%s device=%s compute_type=%s language=%s beam_size=%s vad_filter=%s",
+    (
+        "ASR config: backend=%s mode=%s model=%s revision=%s device=%s "
+        "compute_type=%s language=%s beam_size=%s vad_filter=%s"
+    ),
+    ASR_BACKEND,
+    ASR_MODE,
     MODEL_NAME,
     MODEL_REVISION or "unpinned",
     DEVICE,
@@ -42,13 +53,22 @@ logger.info(
     ASR_BEAM_SIZE,
     ASR_VAD_FILTER,
 )
-model = WhisperModel(
-    MODEL_NAME,
-    device=DEVICE,
-    compute_type=COMPUTE_TYPE,
-    revision=MODEL_REVISION,
+asr_backend = create_final_asr_backend(
+    ASRBackendConfig(
+        backend=ASR_BACKEND,
+        mode=ASR_MODE,
+        model_name=MODEL_NAME,
+        model_revision=MODEL_REVISION,
+        device=DEVICE,
+        compute_type=COMPUTE_TYPE,
+    )
 )
-logger.info("Model loaded successfully on %s", DEVICE)
+logger.info(
+    "ASR backend loaded successfully: backend=%s model=%s device=%s",
+    asr_backend.name,
+    asr_backend.model_name,
+    DEVICE,
+)
 transcription_executor = TranscriptionExecutor(ASR_MAX_CONCURRENT_TRANSCRIPTIONS)
 
 
@@ -72,8 +92,10 @@ async def handle_client(ws):
                             "type": "pong",
                             "service": "asr",
                             "max_concurrent_transcriptions": ASR_MAX_CONCURRENT_TRANSCRIPTIONS,
-                            "model": MODEL_NAME,
-                            "model_revision": MODEL_REVISION,
+                            "backend": asr_backend.name,
+                            "mode": ASR_MODE,
+                            "model": asr_backend.model_name,
+                            "model_revision": asr_backend.model_revision,
                         }
                     )
                 )
@@ -88,7 +110,7 @@ async def handle_client(ws):
         start = time.time()
         try:
             text, info = await transcription_executor.transcribe(
-                model,
+                asr_backend,
                 audio,
                 language=ASR_LANGUAGE,
                 beam_size=ASR_BEAM_SIZE,

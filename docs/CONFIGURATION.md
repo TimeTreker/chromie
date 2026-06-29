@@ -340,8 +340,10 @@ responsible for cross-process resource safety.
 
 | Variable | Purpose |
 |---|---|
-| `ASR_MODEL` | Faster-Whisper model; profile-specific. |
-| `ASR_MODEL_REVISION` | Immutable Hugging Face revision paired with `ASR_MODEL`; required by maintained profiles. |
+| `ASR_BACKEND` | ASR backend selector; supported default `faster_whisper`. `sherpa_onnx` is planned and currently fails closed. |
+| `ASR_MODE` | ASR protocol mode; supported default `final`. Streaming partials are future work. |
+| `ASR_MODEL` | Backend model; profile-specific. Maintained profiles currently use Faster-Whisper models. |
+| `ASR_MODEL_REVISION` | Immutable Hugging Face revision paired with `ASR_MODEL`; required by maintained Faster-Whisper profiles. |
 | `ASR_DEVICE` | Common default `cuda`. |
 | `ASR_COMPUTE_TYPE` | Profile-specific, usually `float16` or `int8_float16`. |
 | `ASR_LANGUAGE` | Empty for auto-detection. |
@@ -354,7 +356,8 @@ responsible for cross-process resource safety.
 
 Maintained profiles use multilingual Faster-Whisper models, not `.en`
 English-only variants, so an empty `ASR_LANGUAGE` can auto-detect English and
-Chinese utterances.
+Chinese utterances. Future sherpa-onnx profiles must add their own immutable
+dependency and model provenance before they can become supported defaults.
 
 ## TTS
 

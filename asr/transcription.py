@@ -6,11 +6,9 @@ import functools
 from typing import Any
 
 
-def _transcribe_sync(model: Any, audio: Any, kwargs: dict[str, Any]) -> tuple[str, Any]:
-    """Run the complete faster-whisper call, including generator consumption."""
-    segments, info = model.transcribe(audio, **kwargs)
-    text = " ".join(segment.text.strip() for segment in segments).strip()
-    return text, info
+def _transcribe_sync(backend: Any, audio: Any, kwargs: dict[str, Any]) -> tuple[str, Any]:
+    """Run the complete final-ASR backend call off the event loop."""
+    return backend.transcribe_final(audio, **kwargs)
 
 
 class TranscriptionExecutor:
@@ -32,10 +30,10 @@ class TranscriptionExecutor:
             thread_name_prefix="chromie-asr-transcribe",
         )
 
-    async def transcribe(self, model: Any, audio: Any, **kwargs: Any) -> tuple[str, Any]:
+    async def transcribe(self, backend: Any, audio: Any, **kwargs: Any) -> tuple[str, Any]:
         async with self._semaphore:
             loop = asyncio.get_running_loop()
-            call = functools.partial(_transcribe_sync, model, audio, kwargs)
+            call = functools.partial(_transcribe_sync, backend, audio, kwargs)
             return await loop.run_in_executor(self._executor, call)
 
     def close(self) -> None:

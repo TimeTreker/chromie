@@ -73,6 +73,30 @@ release evidence that cover microphone choice, room noise, ASR recognition,
 audible output, barge-in, request-bound approval and denial, cancellation, stop,
 and simulator recovery.
 
+## Open architecture track - ASR backend migration
+
+The current supported ASR path remains Faster-Whisper final-utterance
+transcription. Chromie now has an explicit ASR backend boundary so that
+sherpa-onnx can be evaluated without changing the current WebSocket protocol,
+Orchestrator VAD ownership, or release claims.
+
+The objective is better local realtime speech operation for Chromie, not a
+hard replacement of a working release path. The staged plan is maintained in
+[ASR Backend Migration Plan](docs/ASR_BACKEND_MIGRATION.md).
+
+Exit criteria before changing the default backend:
+
+- `ASR_BACKEND=sherpa_onnx` is implemented behind a feature flag and passes the
+  same final-utterance protocol tests as `ASR_BACKEND=faster_whisper`;
+- selected sherpa-onnx dependencies and models have immutable provenance and
+  maintained-profile coverage;
+- English, Chinese, and mixed-command benchmarks show equal or better
+  recognition quality and latency for the intended deployment profile;
+- stop, cancel, emergency, silence, unusable-audio, confirmation, timeout,
+  fallback, and barge-in semantics remain unchanged;
+- retained evidence uses the four-axis status vocabulary and does not turn a
+  benchmark into release readiness.
+
 ## Current checkpoint - Simulation-demo release audit
 
 Before publishing or recreating a demo tag, the paired Chromie and Soridormi

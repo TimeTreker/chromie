@@ -58,7 +58,7 @@ echo "[start] CPU: ${CHROMIE_CPU_MODEL:-unknown} cores=${CHROMIE_CPU_CORES:-unkn
 echo "[start] Router model: ${ROUTER_MODEL:-unset} use_llm=${ROUTER_USE_LLM:-unset}"
 echo "[start] Agent model: ${AGENT_MODEL:-unset}"
 echo "[start] Ollama: max_loaded=${OLLAMA_MAX_LOADED_MODELS:-unset} num_parallel=${OLLAMA_NUM_PARALLEL:-unset}"
-echo "[start] ASR model: ${ASR_MODEL:-unset}"
+echo "[start] ASR: backend=${ASR_BACKEND:-unset} mode=${ASR_MODE:-unset} model=${ASR_MODEL:-unset}"
 echo "[start] TTS model size: ${TTS_MODEL_SIZE:-unset}"
 
 COMPOSE_ARGS=(--env-file .env.runtime -f docker-compose.yml)

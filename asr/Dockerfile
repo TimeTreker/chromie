@@ -28,5 +28,5 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1 && pip install -r requirements.txt
 
-COPY server.py transcription.py ./
+COPY backends.py server.py transcription.py ./
 CMD ["python", "server.py"]

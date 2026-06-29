@@ -78,14 +78,14 @@ def resolve_model_sources(
             revision=tokenizer_revision,
             allow_patterns=TOKENIZER_ALLOW_PATTERNS,
         )
-    ).resolve()
+    )
     gguf_snapshot = Path(
         downloader(
             repo_id=gguf_repo,
             revision=gguf_revision,
             allow_patterns=[filename],
         )
-    ).resolve()
+    )
     model_path = gguf_snapshot / filename
     if not model_path.is_file():
         raise FileNotFoundError(
@@ -105,6 +105,6 @@ def resolve_model_sources(
 
 def apply_model_sources(config, sources: ResolvedModelSources):
     """Override OuteTTS auto-config paths with immutable local snapshots."""
-    config.tokenizer_path = sources.tokenizer_path
-    config.model_path = sources.model_path
+    config.tokenizer_path = str(Path(sources.tokenizer_path).resolve())
+    config.model_path = str(Path(sources.model_path).resolve())
     return config

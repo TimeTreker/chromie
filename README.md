@@ -37,6 +37,8 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 ## What works
 
 - realtime microphone, VAD, ASR, routing, TTS, playback, and barge-in;
+- ASR backend boundary with Faster-Whisper as the supported final-utterance
+  default and sherpa-onnx tracked as planned evaluation work;
 - deterministic stop, cancel, emergency, ignore, and silence handling;
 - three-stage route flow: emergency filter, Qwen quick intent routing, and
   larger-model deepthought handoff when quick confidence is low or planning is
@@ -129,6 +131,9 @@ are in the [Runbook](CHROMIE_RUNBOOK.md).
 - model output is a request, never authorization;
 - low-level robot controls are forbidden in shared contracts;
 - stop, cancel, emergency, silence, and unusable-audio paths are deterministic;
+- normal robot thinking, including body-goal interpretation, capability choice,
+  and planning, belongs to LLM reasoning over bounded contracts, not hardcoded
+  phrase, regex, or regression-case matches;
 - normal natural-language routing goes through the quick intent model, while
   low-confidence or complex requests go to deepthought instead of deterministic
   guessing;
@@ -157,6 +162,8 @@ are in the [Runbook](CHROMIE_RUNBOOK.md).
 - [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
 - [Status](docs/STATUS.md): what exists and what is evidenced
 - [Roadmap](ROADMAP.md): milestone order and exit criteria
+- [ASR Backend Migration](docs/ASR_BACKEND_MIGRATION.md): sherpa-onnx goal,
+  gates, and implementation sequence
 - [User Manual](docs/USER_MANUAL.md): current simulator operation
 - [Project Handoff](docs/HANDOFF.md): resume point for the next developer
 - [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point
