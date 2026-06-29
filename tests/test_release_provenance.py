@@ -38,7 +38,13 @@ class ReleaseProvenanceTests(unittest.TestCase):
                     model.endswith(".en"),
                     f"{profile.relative_to(ROOT)} uses English-only ASR model {model!r}",
                 )
-                self.assertIn("faster-whisper", model)
+                backend = values.get("ASR_BACKEND", "faster_whisper")
+                self.assertIn(backend, {"faster_whisper", "sherpa_onnx"})
+                if backend == "faster_whisper":
+                    self.assertIn("faster-whisper", model)
+                else:
+                    self.assertTrue(values.get("ASR_MODEL_REVISION"))
+                    self.assertNotIn("faster-whisper", model)
 
     def test_mutable_image_tags_are_rejected(self) -> None:
         self.assertEqual(mutable_image_errors(["python:3.12.10-slim"]), [])

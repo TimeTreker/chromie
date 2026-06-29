@@ -11,6 +11,14 @@
     "Systran/faster-whisper-tiny": {
       "repository": "Systran/faster-whisper-tiny",
       "revision": "d90ca5fe260221311c53c58e660288d3deb8d356"
+    },
+    "/root/.cache/huggingface/sherpa-onnx/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17": {
+      "backend": "sherpa_onnx",
+      "model_type": "sense_voice",
+      "model_id": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "repository": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+      "revision": "asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "source": "k2-fsa/sherpa-onnx release asset"
     }
   },
   "ollama": {

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import tempfile
 import unittest
+from pathlib import Path
 
 from asr.backends import ASRBackendConfig, canonical_backend_name, create_final_asr_backend
 from asr.transcription import TranscriptionExecutor
@@ -39,20 +41,27 @@ class ASRBackendTests(unittest.TestCase):
         *,
         backend: str = "faster_whisper",
         mode: str = "final",
+        model_name: str = "example/faster-whisper-model",
+        model_revision: str | None = "abc123",
+        device: str = "cpu",
+        **overrides,
     ) -> ASRBackendConfig:
-        return ASRBackendConfig(
+        values = dict(
             backend=backend,
             mode=mode,
-            model_name="example/faster-whisper-model",
-            model_revision="abc123",
-            device="cpu",
+            model_name=model_name,
+            model_revision=model_revision,
+            device=device,
             compute_type="int8",
         )
+        values.update(overrides)
+        return ASRBackendConfig(**values)
 
     def test_backend_name_accepts_existing_faster_whisper_spellings(self) -> None:
         self.assertEqual(canonical_backend_name("faster-whisper"), "faster_whisper")
         self.assertEqual(canonical_backend_name(" faster_whisper "), "faster_whisper")
-        self.assertEqual(canonical_backend_name(""), "faster_whisper")
+        self.assertEqual(canonical_backend_name(""), "sherpa_onnx")
+        self.assertEqual(canonical_backend_name("sherpa-onnx"), "sherpa_onnx")
 
     def test_faster_whisper_backend_uses_injected_model_factory(self) -> None:
         calls: list[dict[str, object]] = []
@@ -88,8 +97,68 @@ class ASRBackendTests(unittest.TestCase):
         )
         self.assertEqual(calls[1]["kwargs"], {"language": "en", "beam_size": 1})
 
-    def test_planned_sherpa_backend_fails_closed(self) -> None:
-        with self.assertRaisesRegex(ValueError, "planned but not implemented"):
+    def test_sherpa_backend_uses_injected_recognizer_factory(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        class FakeResult:
+            text = (
+                '{"lang": "<|en|>", "text": '
+                '"<|en|> hello<|SPECIAL_TOKEN_30|> sherpa <|END|> . ", '
+                '"timestamps": [0.1]}'
+            )
+
+        class FakeStream:
+            result = None
+
+            def accept_waveform(self, sample_rate, audio):
+                calls.append({"sample_rate": sample_rate, "audio": audio})
+
+        class FakeRecognizer:
+            def create_stream(self):
+                return FakeStream()
+
+            def decode_stream(self, stream):
+                stream.result = FakeResult()
+
+        class FakeRecognizerFactory:
+            @staticmethod
+            def from_sense_voice(**kwargs):
+                calls.append({"kwargs": kwargs})
+                return FakeRecognizer()
+
+        with tempfile.TemporaryDirectory() as temp:
+            model_dir = Path(temp)
+            (model_dir / "model.int8.onnx").write_text("model", encoding="utf-8")
+            (model_dir / "tokens.txt").write_text("tokens", encoding="utf-8")
+
+            backend = create_final_asr_backend(
+                self._config(
+                    backend="sherpa-onnx",
+                    model_name=str(model_dir),
+                    model_revision="sense-voice-revision",
+                    device="cuda",
+                    sample_rate=16000,
+                    sherpa_num_threads=2,
+                    sherpa_language="auto",
+                    sherpa_use_itn=True,
+                ),
+                sherpa_onnx_factory=FakeRecognizerFactory,
+            )
+
+            text, info = backend.transcribe_final([0.0])
+
+        self.assertEqual(text, "hello sherpa.")
+        self.assertEqual(info["backend"], "sherpa_onnx")
+        self.assertEqual(info["provider"], "cuda")
+        self.assertEqual(calls[0]["kwargs"]["model"], str(model_dir / "model.int8.onnx"))
+        self.assertEqual(calls[0]["kwargs"]["tokens"], str(model_dir / "tokens.txt"))
+        self.assertEqual(calls[0]["kwargs"]["provider"], "cuda")
+        self.assertEqual(calls[0]["kwargs"]["language"], "auto")
+        self.assertEqual(calls[0]["kwargs"]["use_itn"], True)
+        self.assertEqual(calls[1], {"sample_rate": 16000, "audio": [0.0]})
+
+    def test_sherpa_backend_fails_closed_when_model_files_are_missing(self) -> None:
+        with self.assertRaisesRegex(ValueError, "requires local SenseVoice model files"):
             create_final_asr_backend(self._config(backend="sherpa-onnx"))
 
     def test_streaming_mode_fails_closed_until_protocol_is_added(self) -> None:

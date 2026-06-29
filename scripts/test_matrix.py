@@ -35,8 +35,14 @@ GROUPS: dict[str, TestGroup] = {
         ((sys.executable, "scripts/check_docs.py"),),
     ),
     "asr": TestGroup(
-        "ASR transcription executor and import-safe client behavior.",
-        (_unittest("tests.test_asr_transcription", "tests.test_client_imports"),),
+        "ASR backend selection, accuracy tooling, and import-safe client behavior.",
+        (
+            _unittest(
+                "tests.test_asr_transcription",
+                "tests.test_asr_accuracy_eval",
+                "tests.test_client_imports",
+            ),
+        ),
     ),
     "tts": TestGroup(
         "TTS model-source and cancellable worker behavior.",

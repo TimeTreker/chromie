@@ -75,6 +75,7 @@ IGNORED_MARKDOWN_DIRS = {
     "build",
     "dist",
     "htmlcov",
+    "hf_cache",
     "node_modules",
     "site",
     "venv",

@@ -340,24 +340,39 @@ responsible for cross-process resource safety.
 
 | Variable | Purpose |
 |---|---|
-| `ASR_BACKEND` | ASR backend selector; supported default `faster_whisper`. `sherpa_onnx` is planned and currently fails closed. |
+| `ASR_BACKEND` | ASR backend selector; supported default `sherpa_onnx`. `faster_whisper` remains installed and selectable. |
 | `ASR_MODE` | ASR protocol mode; supported default `final`. Streaming partials are future work. |
-| `ASR_MODEL` | Backend model; profile-specific. Maintained profiles currently use Faster-Whisper models. |
-| `ASR_MODEL_REVISION` | Immutable Hugging Face revision paired with `ASR_MODEL`; required by maintained Faster-Whisper profiles. |
-| `ASR_DEVICE` | Common default `cuda`. |
-| `ASR_COMPUTE_TYPE` | Profile-specific, usually `float16` or `int8_float16`. |
+| `ASR_MODEL` | Backend model; maintained profiles use the local sherpa-onnx SenseVoice directory inside the ASR container unless `SHERPA_ONNX_MODEL_FILE` is set. |
+| `ASR_MODEL_REVISION` | Immutable release/model provenance identifier paired with `ASR_MODEL`. |
+| `ASR_DEVICE` | Common default `cuda`; set `cpu` with `SHERPA_ONNX_PROVIDER=cpu` for CPU fallback. |
+| `ASR_COMPUTE_TYPE` | Profile-specific backend compute setting; maintained sherpa-onnx profiles use `int8`. |
 | `ASR_LANGUAGE` | Empty for auto-detection. |
 | `ASR_BEAM_SIZE` | Common default `1`. |
 | `ASR_VAD_FILTER` | Common default `false`; host VAD already segments utterances. |
 | `ASR_CONDITION_ON_PREVIOUS_TEXT` | Common default `false`. |
-| `ASR_MAX_CONCURRENT_TRANSCRIPTIONS` | Bounded inference-worker count; common default `1`. Blocking faster-whisper work runs off the WebSocket event loop. |
+| `ASR_MAX_CONCURRENT_TRANSCRIPTIONS` | Bounded inference-worker count; common default `1`. Blocking backend work runs off the WebSocket event loop. |
+| `ASR_STARTUP_WARMUP_ENABLED` | Common default `true`; runs a synthetic final-ASR decode before the WebSocket server starts. |
+| `ASR_STARTUP_WARMUP_AUDIO_SECONDS` | Synthetic startup warm-up audio duration; common default `1.0`. |
 | `ASR_SAMPLE_RATE` | Server default `16000`. |
 | `ASR_HOST`, `ASR_PORT` | Service bind settings. |
 
-Maintained profiles use multilingual Faster-Whisper models, not `.en`
-English-only variants, so an empty `ASR_LANGUAGE` can auto-detect English and
-Chinese utterances. Future sherpa-onnx profiles must add their own immutable
-dependency and model provenance before they can become supported defaults.
+Maintained profiles use multilingual SenseVoice, so `SHERPA_ONNX_LANGUAGE=auto`
+can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
+
+The sherpa-onnx backend currently supports non-streaming SenseVoice:
+
+| Variable | Purpose |
+|---|---|
+| `SHERPA_ONNX_MODEL_TYPE` | `sense_voice`; other sherpa-onnx model families are not wired yet. |
+| `SHERPA_ONNX_PROVIDER` | ONNX Runtime provider; maintained desktop default `cuda`, fallback `cpu`. |
+| `SHERPA_ONNX_NUM_THREADS` | Backend neural-network thread count. |
+| `SHERPA_ONNX_LANGUAGE` | SenseVoice language, usually `auto`; valid values include `zh`, `en`, `ja`, `ko`, and `yue`. |
+| `SHERPA_ONNX_USE_ITN` | Enable SenseVoice inverse text normalization. |
+| `SHERPA_ONNX_MODEL_FILE`, `SHERPA_ONNX_TOKENS_FILE` | Optional explicit local paths for `model.int8.onnx`/`model.onnx` and `tokens.txt`. |
+| `SHERPA_ONNX_DEBUG` | Enable sherpa-onnx debug logging for backend troubleshooting. |
+
+Faster-Whisper fallback deployments should keep exact model revisions in
+`release/model-lock.json` before becoming maintained profiles again.
 
 ## TTS
 

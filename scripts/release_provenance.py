@@ -8,7 +8,10 @@ import json
 import re
 import shutil
 import subprocess
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 host tooling fallback.
+    tomllib = None
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -59,6 +62,61 @@ def source_environment(root: Path) -> dict[str, str]:
     return values
 
 
+def load_pyproject_toml(text: str) -> dict[str, Any]:
+    if tomllib is not None:
+        return tomllib.loads(text)
+
+    payload: dict[str, Any] = {}
+    section: str | None = None
+    active_array_key: str | None = None
+    active_array_values: list[str] = []
+
+    def finish_array() -> None:
+        nonlocal active_array_key, active_array_values
+        if section and active_array_key:
+            payload.setdefault(section, {})[active_array_key] = list(active_array_values)
+        active_array_key = None
+        active_array_values = []
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            finish_array()
+            section = line[1:-1].strip()
+            payload.setdefault(section, {})
+            continue
+        if section is None:
+            continue
+        if active_array_key is not None:
+            if line == "]":
+                finish_array()
+                continue
+            value = line.rstrip(",").strip().strip('"').strip("'")
+            if value:
+                active_array_values.append(value)
+            continue
+        if "=" not in line:
+            continue
+
+        key, value = (part.strip() for part in line.split("=", 1))
+        if value == "[":
+            active_array_key = key
+            active_array_values = []
+        elif value.startswith("[") and value.endswith("]"):
+            items = []
+            for item in value[1:-1].split(","):
+                item = item.strip().strip('"').strip("'")
+                if item:
+                    items.append(item)
+            payload.setdefault(section, {})[key] = items
+        else:
+            payload.setdefault(section, {})[key] = value.strip('"').strip("'")
+    finish_array()
+    return payload
+
+
 def exact_requirement_errors(root: Path) -> list[str]:
     errors: list[str] = []
     for relative in REQUIREMENT_FILES:
@@ -76,7 +134,7 @@ def exact_requirement_errors(root: Path) -> list[str]:
     if not pyproject.is_file():
         errors.append("missing dependency lock: shared/pyproject.toml")
     else:
-        payload = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+        payload = load_pyproject_toml(pyproject.read_text(encoding="utf-8"))
         locked = list(payload.get("project", {}).get("dependencies", []))
         locked.extend(payload.get("build-system", {}).get("requires", []))
         for value in locked:

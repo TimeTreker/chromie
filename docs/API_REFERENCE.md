@@ -191,8 +191,7 @@ Failures return `{"type":"error","message":"..."}`. The host Orchestrator
 performs VAD and sends complete utterance audio; this service does not stream
 partial transcripts. Blocking final-backend inference runs in a bounded
 executor, so health/ping handling remains responsive while a transcription is
-active. The current supported backend and mode are `faster_whisper` and
-`final`. The pong reports `backend`, `mode`, `model`, `model_revision`, and
+active. The current supported backend and mode are `sherpa_onnx` and `final`. The pong reports `backend`, `mode`, `model`, `model_revision`, and
 `max_concurrent_transcriptions`.
 
 ## TTS WebSocket protocol — port 5000

@@ -15,8 +15,14 @@ class ComposeConfigurationTests(unittest.TestCase):
             1,
         )[0]
 
-        self.assertIn("ASR_BACKEND: ${ASR_BACKEND:-faster_whisper}", asr_block)
+        self.assertIn("ASR_BACKEND: ${ASR_BACKEND:-sherpa_onnx}", asr_block)
         self.assertIn("ASR_MODE: ${ASR_MODE:-final}", asr_block)
+        self.assertIn("SHERPA_ONNX_MODEL_TYPE: ${SHERPA_ONNX_MODEL_TYPE:-sense_voice}", asr_block)
+        self.assertIn("SHERPA_ONNX_PROVIDER: ${SHERPA_ONNX_PROVIDER:-cuda}", asr_block)
+        self.assertIn("SHERPA_ONNX_DEBUG: ${SHERPA_ONNX_DEBUG:-false}", asr_block)
+        self.assertIn("ASR_STARTUP_WARMUP_ENABLED: ${ASR_STARTUP_WARMUP_ENABLED:-true}", asr_block)
+        self.assertIn("ASR_STARTUP_WARMUP_AUDIO_SECONDS: ${ASR_STARTUP_WARMUP_AUDIO_SECONDS:-1.0}", asr_block)
+        self.assertIn("start_period: 120s", asr_block)
 
     def test_ollama_healthcheck_uses_loopback_client_address(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
