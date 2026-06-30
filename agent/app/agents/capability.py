@@ -42,6 +42,13 @@ class _CapabilityPlan(BaseModel):
         return self
 
 
+class _CapabilityPlanReview(BaseModel):
+    decision: Literal["accept", "revise", "clarify", "unsupported"]
+    reason: str = ""
+    speech: str = ""
+    skills: list[_PlannedSkill] = Field(default_factory=list)
+
+
 def _natural_speech_or_empty(value: str) -> str:
     text = " ".join((value or "").strip().split())
     if not text:
@@ -184,6 +191,7 @@ class CapabilityAgent(BaseAgent):
             return result
 
         plan = await self._plan(request, executable)
+        plan = await self._review_plan(request, plan, executable)
         allowed = {match.capability_id: match for match in executable}
         if plan.decision != "execute":
             speech = self._natural_plan_speech(plan.speech)
@@ -268,6 +276,108 @@ class CapabilityAgent(BaseAgent):
         ]
         self.trace(result, f"selected {selected} catalog capability request(s)")
         return result
+
+    async def _review_plan(
+        self,
+        request: AgentRunRequest,
+        plan: _CapabilityPlan,
+        candidates: list[Any],
+    ) -> _CapabilityPlan:
+        if plan.decision != "execute":
+            return plan
+        reviewer = self.services.response_reviewer
+        if reviewer is None:
+            return plan
+
+        zh = self.is_zh(request)
+        candidate_payload = [self._capability_payload(match) for match in candidates]
+        review_prompt = (
+            "Global Context Group:\n"
+            f"{self._format_global_context(request, zh=zh)}\n\n"
+            "Session Context Group:\n"
+            f"- Language: {self.language(request)}\n"
+            f"- Recent conversation:\n{self._format_history(request, zh=zh)}\n"
+            f"- Task context:\n{self._format_task_context(request, zh=zh)}\n"
+            f"- Router decision context JSON: {self._format_route_context(request)}\n\n"
+            "Current Job:\n"
+            "- You are Chromie's semantic capability-plan reviewer.\n"
+            "- Judge whether the proposed skill sequence directly preserves and satisfies the user's intended physical/tool action.\n"
+            "- Generalize from meaning, context, capability descriptions, schemas, and task memory; do not use keyword or phrase rules.\n"
+            "- If the user request is complex enough to need deeper planning, or if a safe executable plan is not clear, revise to clarify or unsupported with no skills.\n\n"
+            "Task Context Group:\n"
+            f"- Latest user input: {request.text}\n"
+            f"- Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
+            f"- Proposed capability plan JSON: {plan.model_dump_json()}\n\n"
+            "Cost Function:\n"
+            "- Accept only when every selected skill is semantically necessary for the user's request and its arguments fit the schema.\n"
+            "- Reject or revise plans that substitute a different behavior class for the user's intent, such as social acknowledgement, gaze, or attention when the user requested locomotion or another body task.\n"
+            "- Prefer a clarification over executing a skill that merely seems generally robot-like but does not satisfy the request.\n"
+            "- Preserve the no-raw-motor boundary and never invent skills outside the supplied API surface.\n\n"
+            "Output Contract:\n"
+            "- Return JSON only with keys decision, reason, speech, and skills.\n"
+            "- decision=accept keeps the original plan; use empty speech and skills.\n"
+            "- decision=revise replaces the original plan and must include natural speech plus one or more exact candidate skills with schema-valid args.\n"
+            "- decision=clarify or unsupported blocks execution; include natural speech and no skills.\n"
+            "- Spoken speech must be brief and must not expose internal skill IDs."
+        )
+        system = (
+            "You are Chromie's semantic safety reviewer for capability plans. "
+            "Preserve intent by meaning, not phrase rules. Return compact JSON only. "
+            "Do not authorize raw motor, joint, actuator, controller-array, position-array, or torque commands."
+        )
+        try:
+            raw = await reviewer.generate(
+                review_prompt,
+                system=system,
+                response_format="json",
+                options={
+                    "temperature": 0,
+                    "top_p": 0.8,
+                    "num_predict": int(os.getenv("AGENT_CAPABILITY_REVIEW_NUM_PREDICT", "256")),
+                },
+            )
+        except Exception as exc:
+            logger.warning(
+                "capability plan review failed; preserving primary plan: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            return plan
+        try:
+            review = _CapabilityPlanReview.model_validate(raw)
+        except ValidationError as exc:
+            logger.warning("invalid capability plan review; preserving primary plan: %s", exc)
+            return plan
+
+        if review.decision == "accept":
+            return plan
+
+        speech = self._natural_plan_speech(review.speech)
+        if review.decision == "revise":
+            try:
+                return _CapabilityPlan(
+                    decision="execute",
+                    speech=speech,
+                    skills=review.skills,
+                )
+            except ValidationError as exc:
+                logger.warning("capability plan review produced invalid revision: %s", exc)
+                return _CapabilityPlan(
+                    decision="clarify",
+                    speech=(
+                        "请再说明一下你希望我做什么。"
+                        if zh
+                        else "Please clarify what action you want me to perform."
+                    ),
+                )
+
+        if not speech:
+            speech = (
+                "这个动作需要再确认一下，请你更具体地说。"
+                if zh
+                else "Please clarify the action before I move."
+            )
+        return _CapabilityPlan(decision=review.decision, speech=speech)
 
     def _direct_action_ack_speech(self, request: AgentRunRequest, action_count: int) -> str:
         if action_count <= 0:
@@ -400,6 +510,8 @@ class CapabilityAgent(BaseAgent):
             "Cost Function:\n"
             "- Choose the smallest safe set of executable skills.\n"
             "- Prefer human-facing wrapper skills over lower-level velocity/control skills when both satisfy the request.\n"
+            "- Preserve the user's intended action class. Do not use social acknowledgement, gaze, attention, or idle gestures as fallback actions for an unrelated body request.\n"
+            "- If the request needs deeper task decomposition, runtime evidence, or a multi-session plan, clarify or return unsupported instead of guessing a physical skill.\n"
             "- Clarify when a required safe parameter is missing; unsupported when no candidate can satisfy the request.\n"
             "- Prefer natural, brief speech that accurately describes only the selected plan.\n\n"
             "Output Contract:\n"

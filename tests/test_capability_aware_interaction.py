@@ -187,6 +187,53 @@ class _WalkChoiceOutcome:
     }
 
 
+class _WalkAndSocialOutcome:
+    status = "success"
+    error = None
+    output = {
+        "mode": "sim",
+        "skills": [
+            {
+                "skill_id": "walk_velocity",
+                "description": "Walk forward by tracking a bounded body velocity command.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {
+                        "vx_mps": {"type": "number", "minimum": 0.01, "maximum": 0.25},
+                        "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0},
+                    },
+                    "required": ["vx_mps", "duration_s"],
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": True,
+            },
+            {
+                "skill_id": "nod_yes",
+                "description": "Nod the robot head yes as a social acknowledgement.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {"count": {"type": "number", "minimum": 2, "maximum": 8}},
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": False,
+            },
+            {
+                "skill_id": "look_at_person",
+                "description": "Look at the user for a bounded time.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {"duration_s": {"type": "number", "minimum": 0.1, "maximum": 10.0}},
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": False,
+            },
+        ],
+    }
+
+
 class _Invoker:
     async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _Outcome:
         del arguments, context
@@ -220,6 +267,13 @@ class _WalkChoiceInvoker:
         del arguments, context
         assert tool_name == "soridormi.skill.list"
         return _WalkChoiceOutcome()
+
+
+class _WalkAndSocialInvoker:
+    async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _WalkAndSocialOutcome:
+        del arguments, context
+        assert tool_name == "soridormi.skill.list"
+        return _WalkAndSocialOutcome()
 
 
 class _Ollama:
@@ -437,6 +491,46 @@ class _BrokenCapabilityPlannerOllama:
         assert kwargs["options"]["num_ctx"] >= 4096
         assert kwargs["options"]["num_predict"] >= 512
         raise ValueError("truncated JSON from capability planner")
+
+
+class _BadSocialFallbackOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Walk forward for 15 seconds, quickly." in prompt
+        assert "soridormi.walk_velocity" in prompt
+        assert "soridormi.nod_yes" in prompt
+        assert "soridormi.look_at_person" in prompt
+        assert "Preserve the user's intended action class" in prompt
+        assert "Do not use social acknowledgement, gaze, attention, or idle gestures" in prompt
+        assert "deeper task decomposition" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "I will nod my head to acknowledge you.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                }
+            ],
+        }
+
+
+class _RejectSocialFallbackReviewer:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "semantic capability-plan reviewer" in prompt
+        assert "Walk forward for 15 seconds, quickly." in prompt
+        assert "soridormi.walk_velocity" in prompt
+        assert "soridormi.nod_yes" in prompt
+        assert "substitute a different behavior class" in prompt
+        assert "social acknowledgement, gaze, or attention" in prompt
+        assert "Proposed capability plan JSON" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "clarify",
+            "reason": "The proposed nod is a social acknowledgement and does not satisfy walking.",
+            "speech": "Please confirm a safe bounded walking plan before I move.",
+            "skills": [],
+        }
 
 
 class _FullApiCatalog:
@@ -815,6 +909,54 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             "I could not safely plan that action. Please try again.",
         )
         self.assertEqual(response.metadata["capability_decision"], "clarify")
+
+    async def test_capability_plan_reviewer_blocks_social_fallback_for_walking_request(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_BadSocialFallbackOllama(),  # type: ignore[arg-type]
+                response_reviewer=_RejectSocialFallbackReviewer(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_WalkAndSocialInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "walk-not-nod",
+                "text": "Walk forward for 15 seconds, quickly.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.72,
+                    "language": "en-US",
+                    "source": "llm",
+                    "metadata": {"thinking_mode": "fast", "task_relation": "new_task"},
+                },
+                "context": {
+                    "current_task_context": {
+                        "task_type": "robot_action",
+                        "goal": "walk forward only after a safe bounded plan is confirmed",
+                    },
+                    "recent_action_history": [
+                        {
+                            "user_request": "Walk forward for 15 seconds, quickly.",
+                            "outcome": "planner_misselected_social_gesture",
+                        }
+                    ],
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
+        self.assertEqual(
+            response.speech[0].text,
+            "Please confirm a safe bounded walking plan before I move.",
+        )
 
     async def test_capability_plan_uses_task_context_for_look_forward_followup(self) -> None:
         runtime = InteractionRuntime(

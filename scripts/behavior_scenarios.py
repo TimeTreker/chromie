@@ -482,8 +482,12 @@ async def _run_interaction_turn(
     if catalog_capabilities is not None and not isinstance(catalog_capabilities, list):
         raise ValueError(f"{scenario_key}: stub.catalog_capabilities must be a list")
     ollama_reply = stub.get("ollama_reply")
+    reviewer_reply = stub.get("reviewer_reply")
     services = AgentServices(
         ollama=_AgentOllama(ollama_reply),  # type: ignore[arg-type]
+        response_reviewer=(
+            _AgentOllama(reviewer_reply) if reviewer_reply is not None else None
+        ),  # type: ignore[arg-type]
         use_llm=ollama_reply is not None,
         max_speak_chars=int(stub.get("max_speak_chars", 160)),
         capability_catalog=_AgentCatalog(catalog_capabilities),  # type: ignore[arg-type]

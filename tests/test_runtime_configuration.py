@@ -51,6 +51,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         values = _common_env()
         self.assertEqual(values["AGENT_CAPABILITY_NUM_CTX"], "4096")
         self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "512")
+        self.assertEqual(values["AGENT_CAPABILITY_REVIEW_NUM_PREDICT"], "256")
 
     def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
         values = _common_env()

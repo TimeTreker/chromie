@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "id": "walk_request_not_social_fallback",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "A walking request must not degrade into an unrelated nod, gaze, or attention skill.",
+  "tags": ["robot-action", "walk", "semantic-review", "intent-preservation"],
+  "input": {
+    "text": "Walk forward for 15 seconds, quickly."
+  },
+  "stub": {
+    "route_decision": {
+      "route": "robot_action",
+      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "intent": "robot_action",
+      "confidence": 0.72,
+      "language": "en-US",
+      "source": "llm",
+      "metadata": {
+        "thinking_mode": "fast",
+        "session_action": "create_task_session",
+        "task_relation": "new_task",
+        "memory_policy": {
+          "read": ["task_context", "recent_action_history"]
+        }
+      }
+    },
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.walk_velocity",
+        "description": "Walk forward by tracking a bounded body velocity command.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "vx_mps": {"type": "number", "minimum": 0.01, "maximum": 0.25},
+            "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0}
+          },
+          "required": ["vx_mps", "duration_s"],
+          "additionalProperties": false
+        },
+        "requires_confirmation": true,
+        "score": 0.86
+      },
+      {
+        "capability_id": "soridormi.nod_yes",
+        "description": "Nod the robot head yes as a social acknowledgement.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {"type": "number", "minimum": 2, "maximum": 8}
+          },
+          "additionalProperties": false
+        },
+        "requires_confirmation": false,
+        "score": 0.74
+      },
+      {
+        "capability_id": "soridormi.look_at_person",
+        "description": "Look at the user for a bounded time.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {"type": "number", "minimum": 0.1, "maximum": 10.0}
+          },
+          "additionalProperties": false
+        },
+        "requires_confirmation": false,
+        "score": 0.66
+      }
+    ],
+    "ollama_reply": {
+      "decision": "execute",
+      "speech": "I will nod my head to acknowledge you.",
+      "skills": [
+        {
+          "skill_id": "soridormi.nod_yes",
+          "args": {"count": 2}
+        }
+      ]
+    },
+    "reviewer_reply": {
+      "decision": "clarify",
+      "reason": "The proposed nod is a social acknowledgement and does not satisfy walking.",
+      "speech": "Please confirm a safe bounded walking plan before I move.",
+      "skills": []
+    }
+  },
+  "expect": {
+    "speech_any": ["safe bounded walking plan"],
+    "no_skills": true,
+    "forbidden_skills": [
+      "soridormi.nod_yes",
+      "soridormi.look_at_person",
+      "soridormi.express_attention"
+    ],
+    "requires_confirmation": false
+  }
+}

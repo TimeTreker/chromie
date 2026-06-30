@@ -217,7 +217,7 @@ strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 | `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
-| `AGENT_RESPONSE_REVIEW_ENABLED` | Enable model-based semantic review of spoken Agent replies; default `1`. |
+| `AGENT_RESPONSE_REVIEW_ENABLED` | Enable model-based semantic review of spoken Agent replies and executed capability plans; default `1`. |
 | `AGENT_RESPONSE_REVIEW_MODEL` | Ollama model used to accept or rewrite weak spoken replies; default `gemma4:e2b`, matching the main Agent model. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | Timeout for the semantic response-review model call; default `4000`. |
 | `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `220`, matching `TTS_MAX_TEXT_CHARS`. |
@@ -232,6 +232,7 @@ strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
 | `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; default `4096`. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; default `512`. |
+| `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; default `256`. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` by default; `legacy-adapter` is the explicit rollback path for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | Default `0`; when enabled, only native contract-validation failures use the compatibility adapter. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |

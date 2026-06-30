@@ -97,6 +97,10 @@ class ComposeConfigurationTests(unittest.TestCase):
             "AGENT_CAPABILITY_NUM_PREDICT: ${AGENT_CAPABILITY_NUM_PREDICT:-512}",
             agent_block,
         )
+        self.assertIn(
+            "AGENT_CAPABILITY_REVIEW_NUM_PREDICT: ${AGENT_CAPABILITY_REVIEW_NUM_PREDICT:-256}",
+            agent_block,
+        )
 
     def test_agent_service_passes_conversation_and_deepthinking_budgets(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
