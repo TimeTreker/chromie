@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "batch2_clarify_172_do_it_more_carefully",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question for: Do it more carefully.",
+  "tags": [
+    "real-world",
+    "clarify",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "ambiguous_request",
+      "ask": "Do it more carefully.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Which action should be changed?"
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "Which action should be changed"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "clarified_answer",
+      "ask": "I mean the walking request.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarified_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks, I understand you mean the walking request."
+      },
+      "expect": {
+        "speech_any": [
+          "the walking request"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Do it more carefully.",
+          "Which action should be changed"
+        ]
+      }
+    }
+  ]
+}

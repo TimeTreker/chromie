@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "batch2_clarify_162_use_the_other_one",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question for: Use the other one.",
+  "tags": [
+    "real-world",
+    "clarify",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "ambiguous_request",
+      "ask": "Use the other one.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Which alternative do you mean?"
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "Which alternative do you mean"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "clarified_answer",
+      "ask": "I mean the backup adapter.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarified_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks, I understand you mean the backup adapter."
+      },
+      "expect": {
+        "speech_any": [
+          "the backup adapter"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Use the other one.",
+          "Which alternative do you mean"
+        ]
+      }
+    }
+  ]
+}

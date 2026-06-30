@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "remember_tea_preference",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot treats a user's drink preference as conversational context.",
+  "tags": ["real-world", "memory", "preference"],
+  "turns": [
+    {
+      "id": "share_preference",
+      "ask": "For later, I usually like jasmine tea without sugar.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "remember_preference",
+          "confidence": 0.91,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's tea preference",
+              "entities": ["jasmine tea", "without sugar"]
+            }
+          }
+        },
+        "ollama_reply": "Got it. You usually like jasmine tea without sugar."
+      },
+      "expect": {
+        "speech_any": ["jasmine tea without sugar"],
+        "no_skills": true,
+        "current_task_context_contains": ["tea preference", "jasmine tea", "without sugar"]
+      }
+    },
+    {
+      "id": "ask_preference",
+      "ask": "What kind of tea do I like?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_preference",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "You like jasmine tea without sugar."
+      },
+      "expect": {
+        "speech_any": ["jasmine tea without sugar"],
+        "history_contains": ["jasmine tea without sugar"],
+        "session_memory_contains": ["jasmine tea", "without sugar"],
+        "no_skills": true
+      }
+    }
+  ]
+}

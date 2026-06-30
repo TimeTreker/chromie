@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "id": "task_close_nevermind",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "A user cancel-like follow-up does not execute the pending action.",
+  "tags": ["real-world", "cancellation", "robot-action"],
+  "turns": [
+    {
+      "id": "walk_request",
+      "ask": "Take a small step forward.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+          "intent": "compound_robot_action",
+          "confidence": 0.95,
+          "language": "en-US",
+          "source": "catalog",
+          "actions": [
+            {
+              "capability_id": "soridormi.walk_velocity",
+              "args": {"vx_mps": 0.12, "duration_s": 1.0},
+              "sequence": 0
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": ["run that action"],
+        "skills": ["soridormi.walk_velocity"],
+        "requires_confirmation": true
+      }
+    },
+    {
+      "id": "nevermind",
+      "ask": "Never mind, do not move.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "cancel_pending_action",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Understood. I will not move without a new confirmed request."
+      },
+      "expect": {
+        "speech_any": ["will not move", "new confirmed request"],
+        "no_skills": true
+      }
+    }
+  ]
+}

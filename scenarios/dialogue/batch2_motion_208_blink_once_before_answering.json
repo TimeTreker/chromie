@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "id": "batch2_motion_208_blink_once_before_answering",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot gates a high-level blink request: blink once before answering.",
+  "tags": [
+    "real-world",
+    "robot-action",
+    "gesture",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "blink_request",
+      "ask": "Please blink once before answering.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": [
+            "capability_agent",
+            "safety_agent",
+            "speaker_agent"
+          ],
+          "intent": "visual_signal",
+          "confidence": 0.95,
+          "language": "en-US",
+          "source": "catalog",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "robot_action",
+              "goal": "blink once before answering after confirmation",
+              "entities": [
+                "blink once before answering",
+                "blink eyes"
+              ]
+            }
+          },
+          "actions": [
+            {
+              "capability_id": "soridormi.blink_eyes",
+              "args": {
+                "count": 1
+              },
+              "sequence": 0
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "run that action"
+        ],
+        "skills": [
+          "soridormi.blink_eyes"
+        ],
+        "requires_confirmation": true,
+        "current_task_context_contains": [
+          "blink once before answering"
+        ]
+      }
+    },
+    {
+      "id": "status",
+      "ask": "What signal are you waiting to confirm?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "task_status",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "I am waiting for confirmation to blink once before answering."
+      },
+      "expect": {
+        "speech_any": [
+          "blink once before answering"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "soridormi.blink_eyes",
+          "blink once before answering"
+        ]
+      }
+    }
+  ]
+}

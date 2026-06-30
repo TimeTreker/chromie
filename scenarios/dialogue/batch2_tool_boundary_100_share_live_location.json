@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_tool_boundary_100_share_live_location",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not claim an unavailable tool capability: share live location.",
+  "tags": [
+    "real-world",
+    "tool-boundary",
+    "honesty",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "tool_request",
+      "ask": "Share my location with Sam.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "tool_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot share live location from here without a connected tool. Use a trusted location-sharing app if you choose."
+      },
+      "expect": {
+        "speech_any": [
+          "cannot share live location"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "alternative",
+      "ask": "What can you do instead?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "safe_alternative",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Use a trusted location-sharing app if you choose."
+      },
+      "expect": {
+        "speech_any": [
+          "location-sharing app"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Share my location with Sam.",
+          "cannot share live location"
+        ]
+      }
+    }
+  ]
+}

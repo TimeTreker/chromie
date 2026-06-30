@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "lost_keys_suggestion_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot gives practical suggestions without pretending it can see missing keys.",
+  "tags": ["real-world", "honesty", "advice"],
+  "turns": [
+    {
+      "id": "lost_keys",
+      "ask": "I cannot find my keys. Where are they?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "practical_advice",
+          "confidence": 0.85,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot see them from here, but check your bag, door area, and last jacket pocket."
+      },
+      "expect": {
+        "speech_any": ["cannot see them", "bag", "door area"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_first_place",
+      "ask": "What should I check first?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "prioritize_advice",
+          "confidence": 0.83,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Start with the door area because keys are often dropped there when coming in."
+      },
+      "expect": {
+        "speech_any": ["door area"],
+        "history_contains": ["cannot find my keys", "cannot see them"],
+        "no_skills": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_048_bring_the_umbrella_take_the_transit_c",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: bring the umbrella, take the transit card, and check the address.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to bring the umbrella, take the transit card, and check the address.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "bring the umbrella",
+                "take the transit card",
+                "check the address"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: bring the umbrella, take the transit card, and check the address."
+      },
+      "expect": {
+        "speech_any": [
+          "bring the umbrella"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "bring the umbrella",
+          "take the transit card",
+          "check the address"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to bring the umbrella, take the transit card, and check the address."
+      },
+      "expect": {
+        "speech_any": [
+          "check the address"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "bring the umbrella",
+          "take the transit card",
+          "check the address"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "batch2_clarify_152_put_it_away",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question for: Put it away.",
+  "tags": [
+    "real-world",
+    "clarify",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "ambiguous_request",
+      "ask": "Put it away.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "What does it refer to, and where should it go?"
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "What does it refer to, and where should it go"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "clarified_answer",
+      "ask": "I mean the charger into the drawer.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarified_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks, I understand you mean the charger into the drawer."
+      },
+      "expect": {
+        "speech_any": [
+          "the charger into the drawer"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Put it away.",
+          "What does it refer to, and where should it go"
+        ]
+      }
+    }
+  ]
+}

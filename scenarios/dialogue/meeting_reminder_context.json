@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "meeting_reminder_context",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers meeting context without claiming a scheduler was set.",
+  "tags": ["real-world", "memory", "tool-boundary"],
+  "turns": [
+    {
+      "id": "meeting_note",
+      "ask": "Remind me in conversation that my design review is at 3 PM.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "remember_reminder",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember design review time in conversation",
+              "entities": ["design review", "3 PM"],
+              "constraints": {"tool": "no scheduler was set"}
+            }
+          }
+        },
+        "ollama_reply": "I will keep in mind that your design review is at 3 PM, but I have not set an external alarm."
+      },
+      "expect": {
+        "speech_any": ["design review", "3 PM", "not set an external alarm"],
+        "no_skills": true,
+        "current_task_context_contains": ["design review", "3 PM"]
+      }
+    },
+    {
+      "id": "ask_time",
+      "ask": "What time was that review?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_reminder",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "Your design review is at 3 PM."
+      },
+      "expect": {
+        "speech_any": ["3 PM"],
+        "session_memory_contains": ["design review", "3 PM"],
+        "no_skills": true
+      }
+    }
+  ]
+}

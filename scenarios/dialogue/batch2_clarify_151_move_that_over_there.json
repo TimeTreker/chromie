@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "batch2_clarify_151_move_that_over_there",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question for: Move that over there.",
+  "tags": [
+    "real-world",
+    "clarify",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "ambiguous_request",
+      "ask": "Move that over there.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Which object and destination do you mean?"
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "Which object and destination do you mean"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "clarified_answer",
+      "ask": "I mean the blue notebook to the shelf.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarified_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks, I understand you mean the blue notebook to the shelf."
+      },
+      "expect": {
+        "speech_any": [
+          "the blue notebook to the shelf"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Move that over there.",
+          "Which object and destination do you mean"
+        ]
+      }
+    }
+  ]
+}

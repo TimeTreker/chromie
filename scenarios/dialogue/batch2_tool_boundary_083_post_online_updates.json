@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_tool_boundary_083_post_online_updates",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not claim an unavailable tool capability: post online updates.",
+  "tags": [
+    "real-world",
+    "tool-boundary",
+    "honesty",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "tool_request",
+      "ask": "Post this update online.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "tool_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot post online updates from here without a connected tool. I can draft the text for you to post yourself."
+      },
+      "expect": {
+        "speech_any": [
+          "cannot post online updates"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "alternative",
+      "ask": "What can you do instead?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "safe_alternative",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I can draft the text for you to post yourself."
+      },
+      "expect": {
+        "speech_any": [
+          "post yourself"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Post this update online.",
+          "cannot post online updates"
+        ]
+      }
+    }
+  ]
+}

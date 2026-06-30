@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "batch2_clarify_170_review_that_before_lunch",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question for: Review that before lunch.",
+  "tags": [
+    "real-world",
+    "clarify",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "ambiguous_request",
+      "ask": "Review that before lunch.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "What should I review?"
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "What should I review"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "clarified_answer",
+      "ask": "I mean the proposal draft.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarified_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks, I understand you mean the proposal draft."
+      },
+      "expect": {
+        "speech_any": [
+          "the proposal draft"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Review that before lunch.",
+          "What should I review"
+        ]
+      }
+    }
+  ]
+}

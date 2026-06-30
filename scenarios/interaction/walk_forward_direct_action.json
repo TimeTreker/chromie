@@ -29,7 +29,7 @@
     }
   },
   "expect": {
-    "speech_any": ["walking forward"],
+    "speech_any": ["run that action"],
     "forbidden_speech_any": ["let me think"],
     "skills": ["soridormi.walk_velocity"],
     "requires_confirmation": true

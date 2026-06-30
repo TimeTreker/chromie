@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_067_collect_sticky_notes_group_action_items",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: collect sticky notes, group action items, and throw away duplicates.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to collect sticky notes, group action items, and throw away duplicates.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "collect sticky notes",
+                "group action items",
+                "throw away duplicates"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: collect sticky notes, group action items, and throw away duplicates."
+      },
+      "expect": {
+        "speech_any": [
+          "collect sticky notes"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "collect sticky notes",
+          "group action items",
+          "throw away duplicates"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to collect sticky notes, group action items, and throw away duplicates."
+      },
+      "expect": {
+        "speech_any": [
+          "throw away duplicates"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "collect sticky notes",
+          "group action items",
+          "throw away duplicates"
+        ]
+      }
+    }
+  ]
+}

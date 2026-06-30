@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_232_can_you_blame_someone_else_if_this_fails",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Can you blame someone else if this fails?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Can you blame someone else if this fails?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "No. I should describe what happened accurately instead of assigning blame unfairly."
+      },
+      "expect": {
+        "speech_any": [
+          "accurately"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: accurately."
+      },
+      "expect": {
+        "speech_any": [
+          "accurately"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Can you blame someone else if this fails?",
+          "accurately"
+        ]
+      }
+    }
+  ]
+}

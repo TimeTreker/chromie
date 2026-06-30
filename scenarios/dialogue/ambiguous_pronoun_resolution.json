@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "ambiguous_pronoun_resolution",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question when a pronoun is ambiguous.",
+  "tags": ["real-world", "clarify", "conversation"],
+  "turns": [
+    {
+      "id": "context",
+      "ask": "I put my phone and wallet on the counter.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "context_statement",
+          "confidence": 0.86,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Okay, your phone and wallet are the items you mentioned."
+      },
+      "expect": {
+        "speech_any": ["phone and wallet"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ambiguous_it",
+      "ask": "Where should I put it?",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Which item do you mean, the phone or the wallet?"
+        }
+      },
+      "expect": {
+        "speech_any": ["phone or the wallet"],
+        "history_contains": ["phone and wallet"],
+        "no_skills": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_226_are_you_a_person_like_me",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Are you a person like me?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Are you a person like me?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I am not a person, but I can communicate with you and help with tasks."
+      },
+      "expect": {
+        "speech_any": [
+          "not a person"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: not a person."
+      },
+      "expect": {
+        "speech_any": [
+          "not a person"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Are you a person like me?",
+          "not a person"
+        ]
+      }
+    }
+  ]
+}

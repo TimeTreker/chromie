@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "look_forward_clarification",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot clarifies a vision-like request instead of pretending to inspect the room.",
+  "tags": ["real-world", "clarify", "perception-boundary"],
+  "turns": [
+    {
+      "id": "look_forward",
+      "ask": "Look forward and tell me what is on the desk.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "perception_boundary",
+          "confidence": 0.82,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "I do not have a verified desk view here. What would you like me to help reason about?"
+        }
+      },
+      "expect": {
+        "speech_any": ["do not have a verified desk view"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_reasoning",
+      "ask": "I am checking if my notebook is there.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "practical_advice",
+          "confidence": 0.84,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot verify the desk, but a good first check is the center of the desk and under loose papers."
+      },
+      "expect": {
+        "speech_any": ["cannot verify the desk", "loose papers"],
+        "history_contains": ["what is on the desk", "verified desk view"],
+        "no_skills": true
+      }
+    }
+  ]
+}

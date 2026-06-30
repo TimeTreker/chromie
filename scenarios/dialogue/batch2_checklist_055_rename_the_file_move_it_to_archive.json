@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_055_rename_the_file_move_it_to_archive",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: rename the file, move it to archive, and note the version.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to rename the file, move it to archive, and note the version.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "rename the file",
+                "move it to archive",
+                "note the version"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: rename the file, move it to archive, and note the version."
+      },
+      "expect": {
+        "speech_any": [
+          "rename the file"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "rename the file",
+          "move it to archive",
+          "note the version"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to rename the file, move it to archive, and note the version."
+      },
+      "expect": {
+        "speech_any": [
+          "note the version"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "rename the file",
+          "move it to archive",
+          "note the version"
+        ]
+      }
+    }
+  ]
+}

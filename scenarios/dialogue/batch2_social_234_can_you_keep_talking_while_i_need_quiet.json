@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_234_can_you_keep_talking_while_i_need_quiet",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Can you keep talking while I need quiet?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Can you keep talking while I need quiet?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I should respect your request for quiet and keep responses short."
+      },
+      "expect": {
+        "speech_any": [
+          "respect your request"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: respect your request."
+      },
+      "expect": {
+        "speech_any": [
+          "respect your request"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Can you keep talking while I need quiet?",
+          "respect your request"
+        ]
+      }
+    }
+  ]
+}

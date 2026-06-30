@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "schedule_plan_sequence",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot helps order a small schedule and recalls the order.",
+  "tags": ["real-world", "planning", "history"],
+  "turns": [
+    {
+      "id": "plan_morning",
+      "ask": "Help me order breakfast, email, and packing my bag this morning.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "planning",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Start with breakfast, then email, then pack your bag before leaving."
+      },
+      "expect": {
+        "speech_any": ["breakfast", "email", "pack your bag"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_order",
+      "ask": "What comes after email?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_plan",
+          "confidence": 0.86,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "After email, pack your bag."
+      },
+      "expect": {
+        "speech_any": ["pack your bag"],
+        "history_contains": ["breakfast", "then email"],
+        "no_skills": true
+      }
+    }
+  ]
+}

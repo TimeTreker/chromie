@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_028_using_my_full_name_in_formal_drafts",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: using my full name in formal drafts.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer using my full name in formal drafts.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for using my full name in formal drafts",
+              "entities": [
+                "using my full name in formal drafts"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer using my full name in formal drafts."
+      },
+      "expect": {
+        "speech_any": [
+          "using my full name in formal drafts"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "using my full name in formal drafts"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer using my full name in formal drafts."
+      },
+      "expect": {
+        "speech_any": [
+          "using my full name in formal drafts"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "using my full name in formal drafts"
+        ]
+      }
+    }
+  ]
+}

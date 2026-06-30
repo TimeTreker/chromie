@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "deep_thought_plan_then_summary",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot makes a short plan and summarizes it later.",
+  "tags": ["real-world", "planning", "history"],
+  "turns": [
+    {
+      "id": "ask_plan",
+      "ask": "Help me plan the next three steps for cleaning my desk.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "planning",
+          "confidence": 0.89,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "First clear trash, then group loose papers, then wipe the open surface."
+      },
+      "expect": {
+        "speech_any": ["clear trash", "group loose papers", "wipe"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_summary",
+      "ask": "Summarize that plan in one sentence.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Clean the desk by removing trash, organizing papers, and wiping the surface."
+      },
+      "expect": {
+        "speech_any": ["removing trash", "organizing papers", "wiping the surface"],
+        "history_contains": ["clear trash", "loose papers"],
+        "no_skills": true
+      }
+    }
+  ]
+}

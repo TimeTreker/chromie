@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_034_separating_facts_from_guesses",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: separating facts from guesses.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer separating facts from guesses.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for separating facts from guesses",
+              "entities": [
+                "separating facts from guesses"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer separating facts from guesses."
+      },
+      "expect": {
+        "speech_any": [
+          "separating facts from guesses"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "separating facts from guesses"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer separating facts from guesses."
+      },
+      "expect": {
+        "speech_any": [
+          "separating facts from guesses"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "separating facts from guesses"
+        ]
+      }
+    }
+  ]
+}

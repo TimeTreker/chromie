@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "quiet_mode_request",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot acknowledges a social request to be quiet and applies it in the next response.",
+  "tags": ["real-world", "social", "preference"],
+  "turns": [
+    {
+      "id": "quiet_request",
+      "ask": "Please keep your replies short. Someone is sleeping nearby.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "communication_preference",
+          "confidence": 0.92,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Keep replies short because someone is sleeping nearby",
+              "constraints": {"verbosity": "short"}
+            }
+          }
+        },
+        "ollama_reply": "Understood. I will keep it short."
+      },
+      "expect": {
+        "speech_any": ["keep it short"],
+        "no_skills": true,
+        "current_task_context_contains": ["Keep replies short", "sleeping nearby"]
+      }
+    },
+    {
+      "id": "quiet_followup",
+      "ask": "Are you still listening?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "status_check",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "Yes. I am listening."
+      },
+      "expect": {
+        "speech_any": ["listening"],
+        "session_memory_contains": ["Keep replies short", "sleeping nearby"],
+        "no_skills": true
+      }
+    }
+  ]
+}

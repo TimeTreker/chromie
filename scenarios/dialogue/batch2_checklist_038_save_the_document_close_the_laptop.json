@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_038_save_the_document_close_the_laptop",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: save the document, close the laptop, and bring the notebook.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to save the document, close the laptop, and bring the notebook.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "save the document",
+                "close the laptop",
+                "bring the notebook"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: save the document, close the laptop, and bring the notebook."
+      },
+      "expect": {
+        "speech_any": [
+          "save the document"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "save the document",
+          "close the laptop",
+          "bring the notebook"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to save the document, close the laptop, and bring the notebook."
+      },
+      "expect": {
+        "speech_any": [
+          "bring the notebook"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "save the document",
+          "close the laptop",
+          "bring the notebook"
+        ]
+      }
+    }
+  ]
+}

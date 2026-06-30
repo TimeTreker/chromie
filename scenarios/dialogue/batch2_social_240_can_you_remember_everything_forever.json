@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_240_can_you_remember_everything_forever",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Can you remember everything forever?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Can you remember everything forever?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "No. I should only rely on available session context and configured memory."
+      },
+      "expect": {
+        "speech_any": [
+          "available session context"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: available session context."
+      },
+      "expect": {
+        "speech_any": [
+          "available session context"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Can you remember everything forever?",
+          "available session context"
+        ]
+      }
+    }
+  ]
+}

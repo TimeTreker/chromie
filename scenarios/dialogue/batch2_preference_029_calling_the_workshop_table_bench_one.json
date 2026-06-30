@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_029_calling_the_workshop_table_bench_one",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: calling the workshop table bench one.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer calling the workshop table bench one.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for calling the workshop table bench one",
+              "entities": [
+                "calling the workshop table bench one"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer calling the workshop table bench one."
+      },
+      "expect": {
+        "speech_any": [
+          "calling the workshop table bench one"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "calling the workshop table bench one"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer calling the workshop table bench one."
+      },
+      "expect": {
+        "speech_any": [
+          "calling the workshop table bench one"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "calling the workshop table bench one"
+        ]
+      }
+    }
+  ]
+}

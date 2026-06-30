@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_027_keeping_the_hallway_clear",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: keeping the hallway clear.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer keeping the hallway clear.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for keeping the hallway clear",
+              "entities": [
+                "keeping the hallway clear"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer keeping the hallway clear."
+      },
+      "expect": {
+        "speech_any": [
+          "keeping the hallway clear"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "keeping the hallway clear"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer keeping the hallway clear."
+      },
+      "expect": {
+        "speech_any": [
+          "keeping the hallway clear"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "keeping the hallway clear"
+        ]
+      }
+    }
+  ]
+}

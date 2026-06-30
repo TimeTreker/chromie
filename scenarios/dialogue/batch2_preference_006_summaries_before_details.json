@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_006_summaries_before_details",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: summaries before details.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer summaries before details.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for summaries before details",
+              "entities": [
+                "summaries before details"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer summaries before details."
+      },
+      "expect": {
+        "speech_any": [
+          "summaries before details"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "summaries before details"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer summaries before details."
+      },
+      "expect": {
+        "speech_any": [
+          "summaries before details"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "summaries before details"
+        ]
+      }
+    }
+  ]
+}

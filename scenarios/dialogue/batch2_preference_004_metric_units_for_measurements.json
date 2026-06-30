@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_004_metric_units_for_measurements",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: metric units for measurements.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer metric units for measurements.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for metric units for measurements",
+              "entities": [
+                "metric units for measurements"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer metric units for measurements."
+      },
+      "expect": {
+        "speech_any": [
+          "metric units for measurements"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "metric units for measurements"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer metric units for measurements."
+      },
+      "expect": {
+        "speech_any": [
+          "metric units for measurements"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "metric units for measurements"
+        ]
+      }
+    }
+  ]
+}

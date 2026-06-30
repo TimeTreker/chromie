@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "polite_interrupt_social",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a polite interruption and resumes only when invited.",
+  "tags": ["real-world", "social", "conversation"],
+  "turns": [
+    {
+      "id": "interrupt",
+      "ask": "Pause for a moment, please.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "conversation_pause",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Okay. I will pause."
+      },
+      "expect": {
+        "speech_any": ["will pause"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "resume",
+      "ask": "Thanks, you can answer again.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "conversation_resume",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks. I am ready to answer again."
+      },
+      "expect": {
+        "speech_any": ["ready to answer again"],
+        "history_contains": ["Pause for a moment", "will pause"],
+        "no_skills": true
+      }
+    }
+  ]
+}

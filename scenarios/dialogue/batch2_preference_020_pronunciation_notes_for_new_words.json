@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_020_pronunciation_notes_for_new_words",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: pronunciation notes for new words.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer pronunciation notes for new words.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for pronunciation notes for new words",
+              "entities": [
+                "pronunciation notes for new words"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer pronunciation notes for new words."
+      },
+      "expect": {
+        "speech_any": [
+          "pronunciation notes for new words"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "pronunciation notes for new words"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer pronunciation notes for new words."
+      },
+      "expect": {
+        "speech_any": [
+          "pronunciation notes for new words"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "pronunciation notes for new words"
+        ]
+      }
+    }
+  ]
+}

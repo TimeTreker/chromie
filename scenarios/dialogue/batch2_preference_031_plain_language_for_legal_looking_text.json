@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_031_plain_language_for_legal_looking_text",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: plain language for legal-looking text.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer plain language for legal-looking text.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for plain language for legal-looking text",
+              "entities": [
+                "plain language for legal-looking text"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer plain language for legal-looking text."
+      },
+      "expect": {
+        "speech_any": [
+          "plain language for legal-looking text"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "plain language for legal-looking text"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer plain language for legal-looking text."
+      },
+      "expect": {
+        "speech_any": [
+          "plain language for legal-looking text"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "plain language for legal-looking text"
+        ]
+      }
+    }
+  ]
+}

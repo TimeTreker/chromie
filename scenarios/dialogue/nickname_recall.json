@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "nickname_recall",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot acknowledges a temporary nickname and recalls it in the next turn.",
+  "tags": ["real-world", "memory", "identity"],
+  "turns": [
+    {
+      "id": "set_nickname",
+      "ask": "Today you can call me Alex.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "remember_name",
+          "confidence": 0.89,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Use the temporary name Alex",
+              "entities": ["Alex"]
+            }
+          }
+        },
+        "ollama_reply": "Okay, I will call you Alex today."
+      },
+      "expect": {
+        "speech_any": ["Alex"],
+        "no_skills": true,
+        "current_task_context_contains": ["Alex"]
+      }
+    },
+    {
+      "id": "ask_name",
+      "ask": "What are you calling me today?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_name",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "I am calling you Alex today."
+      },
+      "expect": {
+        "speech_any": ["Alex"],
+        "history_contains": ["call me Alex"],
+        "session_memory_contains": ["Alex"],
+        "no_skills": true
+      }
+    }
+  ]
+}

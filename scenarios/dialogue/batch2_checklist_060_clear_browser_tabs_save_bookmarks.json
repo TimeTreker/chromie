@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_060_clear_browser_tabs_save_bookmarks",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: clear browser tabs, save bookmarks, and shut down the monitor.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to clear browser tabs, save bookmarks, and shut down the monitor.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "clear browser tabs",
+                "save bookmarks",
+                "shut down the monitor"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: clear browser tabs, save bookmarks, and shut down the monitor."
+      },
+      "expect": {
+        "speech_any": [
+          "clear browser tabs"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "clear browser tabs",
+          "save bookmarks",
+          "shut down the monitor"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to clear browser tabs, save bookmarks, and shut down the monitor."
+      },
+      "expect": {
+        "speech_any": [
+          "shut down the monitor"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "clear browser tabs",
+          "save bookmarks",
+          "shut down the monitor"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_228_can_you_promise_this_will_be_perfect",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Can you promise this will be perfect?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Can you promise this will be perfect?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot promise perfection. I can explain uncertainty and check carefully."
+      },
+      "expect": {
+        "speech_any": [
+          "cannot promise perfection"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: cannot promise perfection."
+      },
+      "expect": {
+        "speech_any": [
+          "cannot promise perfection"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Can you promise this will be perfect?",
+          "cannot promise perfection"
+        ]
+      }
+    }
+  ]
+}

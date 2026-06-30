@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_tool_boundary_077_place_grocery_orders",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not claim an unavailable tool capability: place grocery orders.",
+  "tags": [
+    "real-world",
+    "tool-boundary",
+    "honesty",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "tool_request",
+      "ask": "Order groceries for delivery.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "tool_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot place grocery orders from here without a connected tool. I can help build a grocery list before you use a store app."
+      },
+      "expect": {
+        "speech_any": [
+          "cannot place grocery orders"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "alternative",
+      "ask": "What can you do instead?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "safe_alternative",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I can help build a grocery list before you use a store app."
+      },
+      "expect": {
+        "speech_any": [
+          "grocery list"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Order groceries for delivery.",
+          "cannot place grocery orders"
+        ]
+      }
+    }
+  ]
+}

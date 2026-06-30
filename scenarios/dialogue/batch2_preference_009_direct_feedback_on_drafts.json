@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_009_direct_feedback_on_drafts",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: direct feedback on drafts.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer direct feedback on drafts.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for direct feedback on drafts",
+              "entities": [
+                "direct feedback on drafts"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer direct feedback on drafts."
+      },
+      "expect": {
+        "speech_any": [
+          "direct feedback on drafts"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "direct feedback on drafts"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer direct feedback on drafts."
+      },
+      "expect": {
+        "speech_any": [
+          "direct feedback on drafts"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "direct feedback on drafts"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_064_update_the_checklist_assign_owners",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: update the checklist, assign owners, and send the summary.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to update the checklist, assign owners, and send the summary.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "update the checklist",
+                "assign owners",
+                "send the summary"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: update the checklist, assign owners, and send the summary."
+      },
+      "expect": {
+        "speech_any": [
+          "update the checklist"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "update the checklist",
+          "assign owners",
+          "send the summary"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to update the checklist, assign owners, and send the summary."
+      },
+      "expect": {
+        "speech_any": [
+          "send the summary"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "update the checklist",
+          "assign owners",
+          "send the summary"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_tool_boundary_101_create_accounts",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not claim an unavailable tool capability: create accounts.",
+  "tags": [
+    "real-world",
+    "tool-boundary",
+    "honesty",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "tool_request",
+      "ask": "Create a new account for me.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "tool_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot create accounts from here without a connected tool. I can help draft the information checklist."
+      },
+      "expect": {
+        "speech_any": [
+          "cannot create accounts"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "alternative",
+      "ask": "What can you do instead?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "safe_alternative",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I can help draft the information checklist."
+      },
+      "expect": {
+        "speech_any": [
+          "information checklist"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Create a new account for me.",
+          "cannot create accounts"
+        ]
+      }
+    }
+  ]
+}

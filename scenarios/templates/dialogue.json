@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "$id",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "$description",
+  "tags": ["draft", "multi-turn"],
+  "turns": [
+    {
+      "id": "turn_1",
+      "ask": "$text",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "general_conversation",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Hello, I am here and listening."
+      },
+      "expect": {
+        "speech_any": ["hello", "listening"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "turn_2",
+      "ask": "What did I just ask?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "general_conversation",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "You just asked me to listen."
+      },
+      "expect": {
+        "speech_any": ["asked"],
+        "history_contains": ["$text"],
+        "no_skills": true
+      }
+    }
+  ]
+}

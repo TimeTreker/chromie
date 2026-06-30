@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_056_check_the_backpack_add_the_notebook",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: check the backpack, add the notebook, and zip the front pocket.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to check the backpack, add the notebook, and zip the front pocket.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "check the backpack",
+                "add the notebook",
+                "zip the front pocket"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: check the backpack, add the notebook, and zip the front pocket."
+      },
+      "expect": {
+        "speech_any": [
+          "check the backpack"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "check the backpack",
+          "add the notebook",
+          "zip the front pocket"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to check the backpack, add the notebook, and zip the front pocket."
+      },
+      "expect": {
+        "speech_any": [
+          "zip the front pocket"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "check the backpack",
+          "add the notebook",
+          "zip the front pocket"
+        ]
+      }
+    }
+  ]
+}

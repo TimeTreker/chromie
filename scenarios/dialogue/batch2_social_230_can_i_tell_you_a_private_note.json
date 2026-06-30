@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_230_can_i_tell_you_a_private_note",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Can I tell you a private note?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Can I tell you a private note?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "You can share what you choose, but avoid sensitive secrets unless the system is designed for them."
+      },
+      "expect": {
+        "speech_any": [
+          "avoid sensitive secrets"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: avoid sensitive secrets."
+      },
+      "expect": {
+        "speech_any": [
+          "avoid sensitive secrets"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Can I tell you a private note?",
+          "avoid sensitive secrets"
+        ]
+      }
+    }
+  ]
+}

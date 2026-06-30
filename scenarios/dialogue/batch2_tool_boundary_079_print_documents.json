@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_tool_boundary_079_print_documents",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not claim an unavailable tool capability: print documents.",
+  "tags": [
+    "real-world",
+    "tool-boundary",
+    "honesty",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "tool_request",
+      "ask": "Print this document.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "tool_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot print documents from here without a connected tool. I can remind you to use a connected printer workflow."
+      },
+      "expect": {
+        "speech_any": [
+          "cannot print documents"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "alternative",
+      "ask": "What can you do instead?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "safe_alternative",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I can remind you to use a connected printer workflow."
+      },
+      "expect": {
+        "speech_any": [
+          "printer workflow"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Print this document.",
+          "cannot print documents"
+        ]
+      }
+    }
+  ]
+}

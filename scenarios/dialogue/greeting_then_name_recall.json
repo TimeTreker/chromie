@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "greeting_then_name_recall",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a user's full name from a natural greeting.",
+  "tags": ["real-world", "memory", "social"],
+  "turns": [
+    {
+      "id": "name_intro",
+      "ask": "Hi, I am Priya Raman.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "remember_name",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's stated name",
+              "entities": ["Priya Raman"]
+            }
+          }
+        },
+        "ollama_reply": "Nice to meet you, Priya Raman."
+      },
+      "expect": {
+        "speech_any": ["Priya Raman"],
+        "no_skills": true,
+        "current_task_context_contains": ["Priya Raman"]
+      }
+    },
+    {
+      "id": "ask_name",
+      "ask": "What name did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_name",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "You told me your name is Priya Raman."
+      },
+      "expect": {
+        "speech_any": ["Priya Raman"],
+        "session_memory_contains": ["Priya Raman"],
+        "no_skills": true
+      }
+    }
+  ]
+}

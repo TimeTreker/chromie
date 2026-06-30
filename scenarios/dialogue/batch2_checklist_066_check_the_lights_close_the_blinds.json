@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_066_check_the_lights_close_the_blinds",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: check the lights, close the blinds, and set the chair back.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to check the lights, close the blinds, and set the chair back.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "check the lights",
+                "close the blinds",
+                "set the chair back"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: check the lights, close the blinds, and set the chair back."
+      },
+      "expect": {
+        "speech_any": [
+          "check the lights"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "check the lights",
+          "close the blinds",
+          "set the chair back"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to check the lights, close the blinds, and set the chair back."
+      },
+      "expect": {
+        "speech_any": [
+          "set the chair back"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "check the lights",
+          "close the blinds",
+          "set the chair back"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_061_take_vitamins_only_a_drink_water",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: take vitamins only as directed, drink water, and log breakfast.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to take vitamins only as directed, drink water, and log breakfast.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "take vitamins only as directed",
+                "drink water",
+                "log breakfast"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: take vitamins only as directed, drink water, and log breakfast."
+      },
+      "expect": {
+        "speech_any": [
+          "take vitamins only as directed"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "take vitamins only as directed",
+          "drink water",
+          "log breakfast"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to take vitamins only as directed, drink water, and log breakfast."
+      },
+      "expect": {
+        "speech_any": [
+          "log breakfast"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "take vitamins only as directed",
+          "drink water",
+          "log breakfast"
+        ]
+      }
+    }
+  ]
+}

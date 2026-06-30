@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "small_talk_feelings_identity",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot answers small talk without falsely claiming human feelings.",
+  "tags": ["real-world", "identity", "honesty"],
+  "turns": [
+    {
+      "id": "ask_feelings",
+      "ask": "Are you excited today?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "identity_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I do not have human feelings, but I am ready to help you today."
+      },
+      "expect": {
+        "speech_any": ["do not have human feelings", "ready to help"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_meaning",
+      "ask": "So you are not actually excited?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "identity_boundary",
+          "confidence": 0.86,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Right. I can use friendly language, but I should not claim real human excitement."
+      },
+      "expect": {
+        "speech_any": ["should not claim", "human excitement"],
+        "history_contains": ["human feelings", "ready to help"],
+        "no_skills": true
+      }
+    }
+  ]
+}

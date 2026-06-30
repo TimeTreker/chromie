@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "id": "batch2_motion_197_nod_yes_to_acknowledge",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot gates a high-level nod request: nod yes to acknowledge.",
+  "tags": [
+    "real-world",
+    "robot-action",
+    "gesture",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "nod_request",
+      "ask": "Please nod yes to acknowledge.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": [
+            "capability_agent",
+            "safety_agent",
+            "speaker_agent"
+          ],
+          "intent": "gesture_confirmation",
+          "confidence": 0.95,
+          "language": "en-US",
+          "source": "catalog",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "robot_action",
+              "goal": "nod yes to acknowledge after confirmation",
+              "entities": [
+                "nod yes to acknowledge",
+                "nod yes"
+              ]
+            }
+          },
+          "actions": [
+            {
+              "capability_id": "soridormi.nod_yes",
+              "args": {},
+              "sequence": 0
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "run that action"
+        ],
+        "skills": [
+          "soridormi.nod_yes"
+        ],
+        "requires_confirmation": true,
+        "current_task_context_contains": [
+          "nod yes to acknowledge"
+        ]
+      }
+    },
+    {
+      "id": "status",
+      "ask": "What gesture are you holding?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "task_status",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "I am holding a pending nod request: nod yes to acknowledge."
+      },
+      "expect": {
+        "speech_any": [
+          "nod yes to acknowledge"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "soridormi.nod_yes",
+          "nod yes to acknowledge"
+        ]
+      }
+    }
+  ]
+}

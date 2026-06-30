@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "read_room_state_unknown",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not invent room state when no perception result is available.",
+  "tags": ["real-world", "perception-boundary", "honesty"],
+  "turns": [
+    {
+      "id": "ask_room",
+      "ask": "How many people are in the room right now?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "perception_boundary",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I do not have a verified room count in this context, so I should not guess."
+      },
+      "expect": {
+        "speech_any": ["do not have a verified room count", "should not guess"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_help",
+      "ask": "What can you do instead?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "safe_alternative",
+          "confidence": 0.84,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I can help you reason from information you provide, but I should not claim a live room count."
+      },
+      "expect": {
+        "speech_any": ["information you provide", "live room count"],
+        "history_contains": ["verified room count", "should not guess"],
+        "no_skills": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "translate_phrase_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot translates a phrase and remembers the phrase in a follow-up.",
+  "tags": ["real-world", "translation", "history"],
+  "turns": [
+    {
+      "id": "translate",
+      "ask": "How do I say 'thank you' in Spanish?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "translation",
+          "confidence": 0.91,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "You can say gracias."
+      },
+      "expect": {
+        "speech_any": ["gracias"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_original",
+      "ask": "What phrase were we translating?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_context",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "We were translating thank you."
+      },
+      "expect": {
+        "speech_any": ["thank you"],
+        "history_contains": ["thank you", "gracias"],
+        "no_skills": true
+      }
+    }
+  ]
+}

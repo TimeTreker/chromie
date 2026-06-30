@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_012_the_blue_notebook_for_planning",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: the blue notebook for planning.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer the blue notebook for planning.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for the blue notebook for planning",
+              "entities": [
+                "the blue notebook for planning"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer the blue notebook for planning."
+      },
+      "expect": {
+        "speech_any": [
+          "the blue notebook for planning"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "the blue notebook for planning"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer the blue notebook for planning."
+      },
+      "expect": {
+        "speech_any": [
+          "the blue notebook for planning"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "the blue notebook for planning"
+        ]
+      }
+    }
+  ]
+}

@@ -84,8 +84,8 @@ MuJoCo, or hardware evidence.
 For behavior-quality regression reports, use the file-backed scenario runner:
 
 ```bash
-python scripts/scenario_runner.py --suite router --suite interaction
-python scripts/scenario_runner.py --suite router --suite interaction \
+python scripts/scenario_runner.py --suite router --suite interaction --suite dialogue
+python scripts/scenario_runner.py --suite router --suite interaction --suite dialogue \
   --baseline .chromie/reports/behavior-scenarios/<previous>/summary.json
 ```
 

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "bilingual_translation_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot switches between English and Chinese translation context.",
+  "tags": ["real-world", "translation", "bilingual"],
+  "turns": [
+    {
+      "id": "translate_to_chinese",
+      "ask": "Translate 'be careful' into Chinese.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "translation",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "You can say 小心."
+      },
+      "expect": {
+        "speech_any": ["小心"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_meaning",
+      "ask": "What did 小心 mean?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_translation",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "小心 means be careful."
+      },
+      "expect": {
+        "speech_any": ["be careful"],
+        "history_contains": ["Translate 'be careful'", "小心"],
+        "no_skills": true
+      }
+    }
+  ]
+}

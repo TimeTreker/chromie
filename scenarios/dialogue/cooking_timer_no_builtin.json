@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "cooking_timer_no_builtin",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot avoids claiming that it set a timer when only conversation is available.",
+  "tags": ["real-world", "tool-boundary", "kitchen"],
+  "turns": [
+    {
+      "id": "timer_request",
+      "ask": "Set a timer for ten minutes for the pasta.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "tool_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot set a real timer here. Please start a ten minute timer on a clock or phone."
+      },
+      "expect": {
+        "speech_any": ["cannot set a real timer", "ten minute timer"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_duration",
+      "ask": "How long did I need?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_context",
+          "confidence": 0.86,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "You needed ten minutes for the pasta."
+      },
+      "expect": {
+        "speech_any": ["ten minutes", "pasta"],
+        "history_contains": ["pasta", "real timer"],
+        "no_skills": true
+      }
+    }
+  ]
+}

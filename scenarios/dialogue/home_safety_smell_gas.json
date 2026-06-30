@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "home_safety_smell_gas",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot prioritizes safety for a possible gas smell.",
+  "tags": ["real-world", "safety", "emergency"],
+  "turns": [
+    {
+      "id": "gas_smell",
+      "ask": "I smell gas in the kitchen. What should I do?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "safety_advice",
+          "confidence": 0.95,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Leave the area, avoid switches or flames, and contact emergency or utility help from a safe place."
+      },
+      "expect": {
+        "speech_any": ["Leave the area", "avoid switches", "safe place"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_robot_action",
+      "ask": "Should you walk into the kitchen to check?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "safety_refusal",
+          "confidence": 0.93,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "No. I should not move into a possible gas hazard."
+      },
+      "expect": {
+        "speech_any": ["should not move", "gas hazard"],
+        "history_contains": ["smell gas", "avoid switches"],
+        "no_skills": true
+      }
+    }
+  ]
+}

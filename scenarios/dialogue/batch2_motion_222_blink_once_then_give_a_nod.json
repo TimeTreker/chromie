@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "id": "batch2_motion_222_blink_once_then_give_a_nod",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot gates a compound high-level action sequence: blink once, then give a nod.",
+  "tags": [
+    "real-world",
+    "robot-action",
+    "compound",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "compound_request",
+      "ask": "Please blink once, then give a nod.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": [
+            "capability_agent",
+            "safety_agent",
+            "speaker_agent"
+          ],
+          "intent": "compound_robot_action",
+          "confidence": 0.95,
+          "language": "en-US",
+          "source": "catalog",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "robot_action",
+              "goal": "blink once, then give a nod after confirmation",
+              "entities": [
+                "blink once, then give a nod"
+              ]
+            }
+          },
+          "actions": [
+            {
+              "capability_id": "soridormi.blink_eyes",
+              "args": {
+                "count": 1
+              },
+              "sequence": 0
+            },
+            {
+              "capability_id": "soridormi.nod_yes",
+              "args": {},
+              "sequence": 1
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "selected actions in order"
+        ],
+        "skills": [
+          "soridormi.blink_eyes",
+          "soridormi.nod_yes"
+        ],
+        "requires_confirmation": true,
+        "current_task_context_contains": [
+          "blink once, then give a nod"
+        ]
+      }
+    },
+    {
+      "id": "status",
+      "ask": "What sequence are you holding?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "task_status",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "I am holding the pending sequence to blink once, then give a nod."
+      },
+      "expect": {
+        "speech_any": [
+          "blink once, then give a nod"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "soridormi.blink_eyes",
+          "soridormi.nod_yes"
+        ]
+      }
+    }
+  ]
+}

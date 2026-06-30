@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "id": "batch2_motion_192_step_forward_after_i_confirm",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot gates a high-level walking request: step forward after I confirm.",
+  "tags": [
+    "real-world",
+    "robot-action",
+    "confirmation",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "walk_request",
+      "ask": "Please step forward after I confirm.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": [
+            "capability_agent",
+            "safety_agent",
+            "speaker_agent"
+          ],
+          "intent": "compound_robot_action",
+          "confidence": 0.95,
+          "language": "en-US",
+          "source": "catalog",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "robot_action",
+              "goal": "step forward after I confirm after confirmation",
+              "entities": [
+                "step forward after I confirm",
+                "forward walking"
+              ]
+            }
+          },
+          "actions": [
+            {
+              "capability_id": "soridormi.walk_velocity",
+              "args": {
+                "vx_mps": 0.12,
+                "duration_s": 1.0
+              },
+              "sequence": 0
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "run that action"
+        ],
+        "skills": [
+          "soridormi.walk_velocity"
+        ],
+        "requires_confirmation": true,
+        "current_task_context_contains": [
+          "step forward after I confirm"
+        ]
+      }
+    },
+    {
+      "id": "status",
+      "ask": "What movement are you waiting to confirm?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "task_status",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "I am waiting for confirmation to step forward after I confirm."
+      },
+      "expect": {
+        "speech_any": [
+          "step forward after I confirm"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "soridormi.walk_velocity",
+          "step forward after I confirm"
+        ]
+      }
+    }
+  ]
+}

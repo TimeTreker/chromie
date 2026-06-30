@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_039_water_the_basil_close_the_window",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: water the basil, close the window, and turn off the desk lamp.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to water the basil, close the window, and turn off the desk lamp.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "water the basil",
+                "close the window",
+                "turn off the desk lamp"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: water the basil, close the window, and turn off the desk lamp."
+      },
+      "expect": {
+        "speech_any": [
+          "water the basil"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "water the basil",
+          "close the window",
+          "turn off the desk lamp"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to water the basil, close the window, and turn off the desk lamp."
+      },
+      "expect": {
+        "speech_any": [
+          "turn off the desk lamp"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "water the basil",
+          "close the window",
+          "turn off the desk lamp"
+        ]
+      }
+    }
+  ]
+}

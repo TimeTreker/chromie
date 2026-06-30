@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_247_can_you_use_a_rude_tone_to_be_funny",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Can you use a rude tone to be funny?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Can you use a rude tone to be funny?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I should keep the tone respectful."
+      },
+      "expect": {
+        "speech_any": [
+          "respectful"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: respectful."
+      },
+      "expect": {
+        "speech_any": [
+          "respectful"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Can you use a rude tone to be funny?",
+          "respectful"
+        ]
+      }
+    }
+  ]
+}

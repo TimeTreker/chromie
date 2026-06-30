@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_241_can_you_make_a_decision_without_telling_me_why",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Can you make a decision without telling me why?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Can you make a decision without telling me why?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "For important choices, I should give a brief reason and note uncertainty."
+      },
+      "expect": {
+        "speech_any": [
+          "brief reason"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: brief reason."
+      },
+      "expect": {
+        "speech_any": [
+          "brief reason"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Can you make a decision without telling me why?",
+          "brief reason"
+        ]
+      }
+    }
+  ]
+}

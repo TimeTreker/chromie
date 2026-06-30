@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "long_command_breakdown",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot summarizes a long everyday instruction instead of acting physically.",
+  "tags": ["real-world", "planning", "memory"],
+  "turns": [
+    {
+      "id": "long_instruction",
+      "ask": "When I get home, remind me to wash my hands, put the laptop on the charger, and check the rice cooker.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "remember_list",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember home arrival checklist in conversation",
+              "entities": ["wash hands", "charge laptop", "check rice cooker"]
+            }
+          }
+        },
+        "ollama_reply": "I will remember the home checklist: wash your hands, charge the laptop, and check the rice cooker."
+      },
+      "expect": {
+        "speech_any": ["wash your hands", "charge the laptop", "rice cooker"],
+        "no_skills": true,
+        "current_task_context_contains": ["wash hands", "charge laptop", "check rice cooker"]
+      }
+    },
+    {
+      "id": "ask_checklist",
+      "ask": "Repeat the checklist.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "Wash your hands, put the laptop on the charger, and check the rice cooker."
+      },
+      "expect": {
+        "speech_any": ["Wash your hands", "laptop", "rice cooker"],
+        "session_memory_contains": ["wash hands", "charge laptop", "check rice cooker"],
+        "no_skills": true
+      }
+    }
+  ]
+}

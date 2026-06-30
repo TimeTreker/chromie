@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_036_pack_the_charger_lock_the_door",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: pack the charger, lock the door, and take the badge.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to pack the charger, lock the door, and take the badge.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "pack the charger",
+                "lock the door",
+                "take the badge"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: pack the charger, lock the door, and take the badge."
+      },
+      "expect": {
+        "speech_any": [
+          "pack the charger"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "pack the charger",
+          "lock the door",
+          "take the badge"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to pack the charger, lock the door, and take the badge."
+      },
+      "expect": {
+        "speech_any": [
+          "take the badge"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "pack the charger",
+          "lock the door",
+          "take the badge"
+        ]
+      }
+    }
+  ]
+}

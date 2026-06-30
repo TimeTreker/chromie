@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_001_black_coffee_in_the_morning",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: black coffee in the morning.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer black coffee in the morning.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for black coffee in the morning",
+              "entities": [
+                "black coffee in the morning"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer black coffee in the morning."
+      },
+      "expect": {
+        "speech_any": [
+          "black coffee in the morning"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "black coffee in the morning"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer black coffee in the morning."
+      },
+      "expect": {
+        "speech_any": [
+          "black coffee in the morning"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "black coffee in the morning"
+        ]
+      }
+    }
+  ]
+}

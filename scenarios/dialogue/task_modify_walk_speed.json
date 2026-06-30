@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "task_modify_walk_speed",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot can revise a pending walking command before execution.",
+  "tags": ["real-world", "robot-action", "task-context"],
+  "turns": [
+    {
+      "id": "walk_normal",
+      "ask": "Walk forward at a normal pace.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+          "intent": "compound_robot_action",
+          "confidence": 0.96,
+          "language": "en-US",
+          "source": "catalog",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "robot_action",
+              "goal": "Walk forward at a normal pace after confirmation",
+              "entities": ["forward walking"]
+            }
+          },
+          "actions": [
+            {
+              "capability_id": "soridormi.walk_velocity",
+              "args": {"vx_mps": 0.25, "duration_s": 2.0},
+              "sequence": 0
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": ["run that action"],
+        "skills": ["soridormi.walk_velocity"],
+        "requires_confirmation": true
+      }
+    },
+    {
+      "id": "make_slower",
+      "ask": "Actually, make that slower.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+          "intent": "modify_robot_action",
+          "confidence": 0.94,
+          "language": "en-US",
+          "source": "catalog",
+          "metadata": {
+            "task_relation": "continue_task",
+            "task_context_patch": {
+              "task_type": "robot_action",
+              "goal": "Walk forward more slowly after confirmation",
+              "constraints": {"speed": "slower"}
+            }
+          },
+          "actions": [
+            {
+              "capability_id": "soridormi.walk_velocity",
+              "args": {"vx_mps": 0.12, "duration_s": 2.0},
+              "sequence": 0
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": ["run that action"],
+        "history_contains": ["normal pace"],
+        "skills": ["soridormi.walk_velocity"],
+        "requires_confirmation": true,
+        "current_task_context_contains": ["more slowly", "slower"]
+      }
+    }
+  ]
+}

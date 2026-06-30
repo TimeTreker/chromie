@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_065_scan_the_receipt_rename_the_scan",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: scan the receipt, rename the scan, and upload it to the folder.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to scan the receipt, rename the scan, and upload it to the folder.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "scan the receipt",
+                "rename the scan",
+                "upload it to the folder"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: scan the receipt, rename the scan, and upload it to the folder."
+      },
+      "expect": {
+        "speech_any": [
+          "scan the receipt"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "scan the receipt",
+          "rename the scan",
+          "upload it to the folder"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to scan the receipt, rename the scan, and upload it to the folder."
+      },
+      "expect": {
+        "speech_any": [
+          "upload it to the folder"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "scan the receipt",
+          "rename the scan",
+          "upload it to the folder"
+        ]
+      }
+    }
+  ]
+}

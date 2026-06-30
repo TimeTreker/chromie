@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_051_sort_the_mail_recycle_envelopes",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: sort the mail, recycle envelopes, and keep the bill.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to sort the mail, recycle envelopes, and keep the bill.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "sort the mail",
+                "recycle envelopes",
+                "keep the bill"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: sort the mail, recycle envelopes, and keep the bill."
+      },
+      "expect": {
+        "speech_any": [
+          "sort the mail"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "sort the mail",
+          "recycle envelopes",
+          "keep the bill"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to sort the mail, recycle envelopes, and keep the bill."
+      },
+      "expect": {
+        "speech_any": [
+          "keep the bill"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "sort the mail",
+          "recycle envelopes",
+          "keep the bill"
+        ]
+      }
+    }
+  ]
+}

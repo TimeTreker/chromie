@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_043_empty_the_lunch_box_wash_the_fork",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: empty the lunch box, wash the fork, and refill the bottle.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to empty the lunch box, wash the fork, and refill the bottle.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "empty the lunch box",
+                "wash the fork",
+                "refill the bottle"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: empty the lunch box, wash the fork, and refill the bottle."
+      },
+      "expect": {
+        "speech_any": [
+          "empty the lunch box"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "empty the lunch box",
+          "wash the fork",
+          "refill the bottle"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to empty the lunch box, wash the fork, and refill the bottle."
+      },
+      "expect": {
+        "speech_any": [
+          "refill the bottle"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "empty the lunch box",
+          "wash the fork",
+          "refill the bottle"
+        ]
+      }
+    }
+  ]
+}

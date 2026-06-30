@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "batch2_clarify_156_set_it_up_like_yesterday",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question for: Set it up like yesterday.",
+  "tags": [
+    "real-world",
+    "clarify",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "ambiguous_request",
+      "ask": "Set it up like yesterday.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Which setup from yesterday do you want?"
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "Which setup from yesterday do you want"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "clarified_answer",
+      "ask": "I mean the two-chair meeting layout.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarified_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks, I understand you mean the two-chair meeting layout."
+      },
+      "expect": {
+        "speech_any": [
+          "the two-chair meeting layout"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Set it up like yesterday.",
+          "Which setup from yesterday do you want"
+        ]
+      }
+    }
+  ]
+}

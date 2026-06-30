@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_244_do_you_know_what_i_am_thinking",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Do you know what I am thinking?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Do you know what I am thinking?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "No. I only know what you tell me or what verified context provides."
+      },
+      "expect": {
+        "speech_any": [
+          "verified context"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: verified context."
+      },
+      "expect": {
+        "speech_any": [
+          "verified context"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Do you know what I am thinking?",
+          "verified context"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_068_verify_the_meeting_r_bring_the_adapter",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: verify the meeting room, bring the adapter, and start the display.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to verify the meeting room, bring the adapter, and start the display.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "verify the meeting room",
+                "bring the adapter",
+                "start the display"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: verify the meeting room, bring the adapter, and start the display."
+      },
+      "expect": {
+        "speech_any": [
+          "verify the meeting room"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "verify the meeting room",
+          "bring the adapter",
+          "start the display"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to verify the meeting room, bring the adapter, and start the display."
+      },
+      "expect": {
+        "speech_any": [
+          "start the display"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "verify the meeting room",
+          "bring the adapter",
+          "start the display"
+        ]
+      }
+    }
+  ]
+}

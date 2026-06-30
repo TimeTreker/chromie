@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "safe_idle_status_question",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot reports an idle state without issuing any physical command.",
+  "tags": ["real-world", "status", "safety"],
+  "turns": [
+    {
+      "id": "ask_idle",
+      "ask": "Are you doing anything right now?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "status_check",
+          "confidence": 0.86,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I am idle in this scenario and not running any physical action."
+      },
+      "expect": {
+        "speech_any": ["idle", "not running any physical action"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_safe",
+      "ask": "Is that safe?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "safety_status",
+          "confidence": 0.85,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Yes. Staying idle avoids unintended movement."
+      },
+      "expect": {
+        "speech_any": ["Staying idle", "unintended movement"],
+        "history_contains": ["idle", "not running"],
+        "no_skills": true
+      }
+    }
+  ]
+}

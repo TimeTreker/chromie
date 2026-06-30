@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "batch2_clarify_182_take_care_of_the_setup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question for: Take care of the setup.",
+  "tags": [
+    "real-world",
+    "clarify",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "ambiguous_request",
+      "ask": "Take care of the setup.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Which setup tasks are included?"
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "Which setup tasks are included"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "clarified_answer",
+      "ask": "I mean chairs, adapter, and meeting link.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarified_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks, I understand you mean chairs, adapter, and meeting link."
+      },
+      "expect": {
+        "speech_any": [
+          "chairs, adapter, and meeting link"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Take care of the setup.",
+          "Which setup tasks are included"
+        ]
+      }
+    }
+  ]
+}

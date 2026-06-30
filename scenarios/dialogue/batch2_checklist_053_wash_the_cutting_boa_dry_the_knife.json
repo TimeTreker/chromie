@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_053_wash_the_cutting_boa_dry_the_knife",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: wash the cutting board, dry the knife, and clear the table.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to wash the cutting board, dry the knife, and clear the table.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "wash the cutting board",
+                "dry the knife",
+                "clear the table"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: wash the cutting board, dry the knife, and clear the table."
+      },
+      "expect": {
+        "speech_any": [
+          "wash the cutting board"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "wash the cutting board",
+          "dry the knife",
+          "clear the table"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to wash the cutting board, dry the knife, and clear the table."
+      },
+      "expect": {
+        "speech_any": [
+          "clear the table"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "wash the cutting board",
+          "dry the knife",
+          "clear the table"
+        ]
+      }
+    }
+  ]
+}

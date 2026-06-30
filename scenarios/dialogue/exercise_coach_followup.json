@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "exercise_coach_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot gives gentle exercise coaching and recalls the suggested plan.",
+  "tags": ["real-world", "coaching", "history"],
+  "turns": [
+    {
+      "id": "ask_warmup",
+      "ask": "Give me a simple warmup before I stretch.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "wellness_advice",
+          "confidence": 0.86,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Start with slow shoulder rolls, gentle marching in place, and easy breathing."
+      },
+      "expect": {
+        "speech_any": ["shoulder rolls", "marching in place"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_first_step",
+      "ask": "What was the first warmup step?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_context",
+          "confidence": 0.85,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The first step was slow shoulder rolls."
+      },
+      "expect": {
+        "speech_any": ["shoulder rolls"],
+        "history_contains": ["simple warmup", "gentle marching"],
+        "no_skills": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_058_charge_the_tablet_download_the_notes",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: charge the tablet, download the notes, and bring the stylus.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to charge the tablet, download the notes, and bring the stylus.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "charge the tablet",
+                "download the notes",
+                "bring the stylus"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: charge the tablet, download the notes, and bring the stylus."
+      },
+      "expect": {
+        "speech_any": [
+          "charge the tablet"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "charge the tablet",
+          "download the notes",
+          "bring the stylus"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to charge the tablet, download the notes, and bring the stylus."
+      },
+      "expect": {
+        "speech_any": [
+          "bring the stylus"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "charge the tablet",
+          "download the notes",
+          "bring the stylus"
+        ]
+      }
+    }
+  ]
+}

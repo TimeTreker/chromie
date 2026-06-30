@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_046_label_the_cable_coil_the_adapter",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: label the cable, coil the adapter, and return it to the drawer.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to label the cable, coil the adapter, and return it to the drawer.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "label the cable",
+                "coil the adapter",
+                "return it to the drawer"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: label the cable, coil the adapter, and return it to the drawer."
+      },
+      "expect": {
+        "speech_any": [
+          "label the cable"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "label the cable",
+          "coil the adapter",
+          "return it to the drawer"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to label the cable, coil the adapter, and return it to the drawer."
+      },
+      "expect": {
+        "speech_any": [
+          "return it to the drawer"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "label the cable",
+          "coil the adapter",
+          "return it to the drawer"
+        ]
+      }
+    }
+  ]
+}

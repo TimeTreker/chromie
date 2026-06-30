@@ -84,6 +84,29 @@ class ScenarioAuthorTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
 
+    def test_new_creates_dialogue_scenario_from_template(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            code = scenario_author.main(
+                [
+                    "new",
+                    "--suite",
+                    "dialogue",
+                    "--id",
+                    "draft_dialogue",
+                    "--text",
+                    "Hi Chromie.",
+                    "--scenario-root",
+                    temp_dir,
+                ]
+            )
+            path = Path(temp_dir) / "dialogue" / "draft_dialogue.json"
+            scenario = load_scenario_file(path)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(scenario.scenario_id, "draft_dialogue")
+        self.assertEqual(scenario.suite, "dialogue")
+        self.assertEqual(scenario.turns[0]["ask"], "Hi Chromie.")
+
     def test_edit_dry_run_prints_editor_command_for_existing_scenario(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -150,6 +173,27 @@ class ScenarioAuthorTests(unittest.TestCase):
         self.assertIn("Generate 3 candidate JSON scenario files", text)
         self.assertIn("deterministic expectations", text)
         self.assertIn("scenarios/router/<id>.json", text)
+
+    def test_dialogue_prompt_mentions_multi_turn_expectations(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            code = scenario_author.main(
+                [
+                    "prompt",
+                    "--suite",
+                    "dialogue",
+                    "--count",
+                    "2",
+                    "--focus",
+                    "follow-up task context",
+                ]
+            )
+
+        self.assertEqual(code, 0)
+        text = output.getvalue()
+        self.assertIn("turns[]", text)
+        self.assertIn("history_contains", text)
+        self.assertIn("scenarios/dialogue/<id>.json", text)
 
 
 if __name__ == "__main__":

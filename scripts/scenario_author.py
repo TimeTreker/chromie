@@ -191,11 +191,21 @@ def _scenario_schema_summary(suite: str) -> str:
             "optional stub.llm_decision, and expect route/intent/source/task_types/"
             "metadata/llm_calls. Use task_types_forbid for unsafe motion checks."
         )
+    if suite == "dialogue":
+        return (
+            "Dialogue scenarios must set turns[], where each turn has id, ask, "
+            "stub.route_decision, optional stub.ollama_reply/catalog_capabilities, "
+            "and expect fields. Expect speech_any/speech_all, forbidden_speech_any, "
+            "skills, forbidden_skills, no_skills, requires_confirmation, status, "
+            "skill_args, history_contains, session_memory_contains, "
+            "post_history_contains, post_session_memory_contains, and "
+            "current_task_context_contains."
+        )
     return (
         "Interaction scenarios must set stub.route_decision and optional "
         "stub.ollama_reply/catalog_capabilities. Expect speech_any/speech_all, "
-        "forbidden_speech_any, skills, forbidden_skills, no_skills, and "
-        "requires_confirmation."
+        "forbidden_speech_any, skills, forbidden_skills, no_skills, "
+        "skill_args, status, metadata booleans, and requires_confirmation."
     )
 
 

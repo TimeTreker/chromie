@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_054_open_the_window_brie_dust_the_shelf",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: open the window briefly, dust the shelf, and close the window.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to open the window briefly, dust the shelf, and close the window.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "open the window briefly",
+                "dust the shelf",
+                "close the window"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: open the window briefly, dust the shelf, and close the window."
+      },
+      "expect": {
+        "speech_any": [
+          "open the window briefly"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "open the window briefly",
+          "dust the shelf",
+          "close the window"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to open the window briefly, dust the shelf, and close the window."
+      },
+      "expect": {
+        "speech_any": [
+          "close the window"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "open the window briefly",
+          "dust the shelf",
+          "close the window"
+        ]
+      }
+    }
+  ]
+}

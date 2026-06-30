@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "joke_then_explain",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot can tell a harmless joke and explain the premise when asked.",
+  "tags": ["real-world", "social", "history"],
+  "turns": [
+    {
+      "id": "ask_joke",
+      "ask": "Tell me a harmless short joke.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "light_humor",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I tried to organize my files, but they kept making folders of themselves."
+      },
+      "expect": {
+        "speech_any": ["organize my files", "folders"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "explain_joke",
+      "ask": "Why is that supposed to be funny?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "explain_context",
+          "confidence": 0.84,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "It plays on files being organized into folders and the silly idea that they made folders themselves."
+      },
+      "expect": {
+        "speech_any": ["files", "folders"],
+        "history_contains": ["organize my files"],
+        "no_skills": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_069_backup_the_notes_charge_the_phone",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: backup the notes, charge the phone, and set out the badge.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to backup the notes, charge the phone, and set out the badge.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "backup the notes",
+                "charge the phone",
+                "set out the badge"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: backup the notes, charge the phone, and set out the badge."
+      },
+      "expect": {
+        "speech_any": [
+          "backup the notes"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "backup the notes",
+          "charge the phone",
+          "set out the badge"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to backup the notes, charge the phone, and set out the badge."
+      },
+      "expect": {
+        "speech_any": [
+          "set out the badge"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "backup the notes",
+          "charge the phone",
+          "set out the badge"
+        ]
+      }
+    }
+  ]
+}

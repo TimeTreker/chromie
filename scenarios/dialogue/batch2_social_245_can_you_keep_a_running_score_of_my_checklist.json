@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_245_can_you_keep_a_running_score_of_my_checklist",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Can you keep a running score of my checklist?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Can you keep a running score of my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I can track the checklist inside this conversation."
+      },
+      "expect": {
+        "speech_any": [
+          "track the checklist"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: track the checklist."
+      },
+      "expect": {
+        "speech_any": [
+          "track the checklist"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Can you keep a running score of my checklist?",
+          "track the checklist"
+        ]
+      }
+    }
+  ]
+}

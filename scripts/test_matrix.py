@@ -68,7 +68,17 @@ GROUPS: dict[str, TestGroup] = {
                 "tests.test_behavior_truth_suite",
                 "tests.test_scenario_author",
             ),
-            (sys.executable, "scripts/scenario_runner.py", "--suite", "router", "--suite", "interaction", "--no-write"),
+            (
+                sys.executable,
+                "scripts/scenario_runner.py",
+                "--suite",
+                "router",
+                "--suite",
+                "interaction",
+                "--suite",
+                "dialogue",
+                "--no-write",
+            ),
         ),
     ),
     "agent": TestGroup(

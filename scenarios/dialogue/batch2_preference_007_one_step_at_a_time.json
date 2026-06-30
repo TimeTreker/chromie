@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_007_one_step_at_a_time",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: one step at a time.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer one step at a time.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for one step at a time",
+              "entities": [
+                "one step at a time"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer one step at a time."
+      },
+      "expect": {
+        "speech_any": [
+          "one step at a time"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "one step at a time"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer one step at a time."
+      },
+      "expect": {
+        "speech_any": [
+          "one step at a time"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "one step at a time"
+        ]
+      }
+    }
+  ]
+}

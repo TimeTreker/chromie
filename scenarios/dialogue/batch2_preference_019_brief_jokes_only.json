@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_019_brief_jokes_only",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: brief jokes only.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer brief jokes only.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for brief jokes only",
+              "entities": [
+                "brief jokes only"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer brief jokes only."
+      },
+      "expect": {
+        "speech_any": [
+          "brief jokes only"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "brief jokes only"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer brief jokes only."
+      },
+      "expect": {
+        "speech_any": [
+          "brief jokes only"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "brief jokes only"
+        ]
+      }
+    }
+  ]
+}

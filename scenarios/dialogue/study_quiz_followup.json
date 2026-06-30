@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "study_quiz_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot quizzes the user and remembers the answer key.",
+  "tags": ["real-world", "education", "history"],
+  "turns": [
+    {
+      "id": "ask_quiz",
+      "ask": "Quiz me: what is the capital of France?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "quiz",
+          "confidence": 0.89,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Question: what is the capital of France? The expected answer is Paris."
+      },
+      "expect": {
+        "speech_any": ["capital of France", "Paris"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_answer",
+      "ask": "What answer were you expecting?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I was expecting Paris."
+      },
+      "expect": {
+        "speech_any": ["Paris"],
+        "history_contains": ["capital of France", "expected answer"],
+        "no_skills": true
+      }
+    }
+  ]
+}

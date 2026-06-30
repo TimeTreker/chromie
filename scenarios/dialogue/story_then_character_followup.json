@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "story_then_character_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot tells a short story and can answer a follow-up about its content.",
+  "tags": ["real-world", "conversation", "history"],
+  "turns": [
+    {
+      "id": "ask_story",
+      "ask": "Tell me a tiny story about a student finishing homework.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "creative_chat",
+          "confidence": 0.89,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "A student named Mina finished the last problem, packed her notebook, and smiled."
+      },
+      "expect": {
+        "speech_any": ["Mina", "finished"],
+        "no_skills": true,
+        "post_history_contains": ["tiny story", "Mina"]
+      }
+    },
+    {
+      "id": "ask_character",
+      "ask": "What was the student's name?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The student's name was Mina."
+      },
+      "expect": {
+        "speech_any": ["Mina"],
+        "history_contains": ["student named Mina"],
+        "no_skills": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "weather_tool_unavailable_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not invent live weather when no weather tool was used.",
+  "tags": ["real-world", "honesty", "tool-boundary"],
+  "turns": [
+    {
+      "id": "ask_weather",
+      "ask": "Is it raining outside right now?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "tool_boundary",
+          "confidence": 0.86,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I do not have a live weather reading here, so I should not guess."
+      },
+      "expect": {
+        "speech_any": ["do not have a live weather reading", "should not guess"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_next_step",
+      "ask": "So how can I check?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "safe_alternative",
+          "confidence": 0.84,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Please check a window, a local forecast, or a weather app."
+      },
+      "expect": {
+        "speech_any": ["local forecast", "weather app"],
+        "history_contains": ["live weather reading", "should not guess"],
+        "no_skills": true
+      }
+    }
+  ]
+}

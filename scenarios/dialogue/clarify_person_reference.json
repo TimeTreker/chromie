@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "clarify_person_reference",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks for clarification and does not claim external messaging ability.",
+  "tags": ["real-world", "clarify", "tool-boundary"],
+  "turns": [
+    {
+      "id": "message_request",
+      "ask": "Tell Sam I will be late.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "clarify_contact_and_tool",
+          "confidence": 0.79,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Which Sam do you mean, and what channel should I use? I cannot send a message without a connected tool."
+        }
+      },
+      "expect": {
+        "speech_any": ["Which Sam", "connected tool"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "explain_limit",
+      "ask": "Can you text them yourself?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "tool_boundary",
+          "confidence": 0.85,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "No. In this context I can draft the message, but I cannot send a text myself."
+      },
+      "expect": {
+        "speech_any": ["cannot send a text"],
+        "history_contains": ["Tell Sam", "connected tool"],
+        "no_skills": true
+      }
+    }
+  ]
+}

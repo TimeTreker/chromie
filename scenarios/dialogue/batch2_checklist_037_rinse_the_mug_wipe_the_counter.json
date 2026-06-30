@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_037_rinse_the_mug_wipe_the_counter",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: rinse the mug, wipe the counter, and start the dishwasher.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to rinse the mug, wipe the counter, and start the dishwasher.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "rinse the mug",
+                "wipe the counter",
+                "start the dishwasher"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: rinse the mug, wipe the counter, and start the dishwasher."
+      },
+      "expect": {
+        "speech_any": [
+          "rinse the mug"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "rinse the mug",
+          "wipe the counter",
+          "start the dishwasher"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to rinse the mug, wipe the counter, and start the dishwasher."
+      },
+      "expect": {
+        "speech_any": [
+          "start the dishwasher"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "rinse the mug",
+          "wipe the counter",
+          "start the dishwasher"
+        ]
+      }
+    }
+  ]
+}

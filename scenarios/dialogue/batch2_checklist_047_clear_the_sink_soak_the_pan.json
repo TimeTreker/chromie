@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_047_clear_the_sink_soak_the_pan",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: clear the sink, soak the pan, and wipe the stove area.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to clear the sink, soak the pan, and wipe the stove area.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "clear the sink",
+                "soak the pan",
+                "wipe the stove area"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: clear the sink, soak the pan, and wipe the stove area."
+      },
+      "expect": {
+        "speech_any": [
+          "clear the sink"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "clear the sink",
+          "soak the pan",
+          "wipe the stove area"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to clear the sink, soak the pan, and wipe the stove area."
+      },
+      "expect": {
+        "speech_any": [
+          "wipe the stove area"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "clear the sink",
+          "soak the pan",
+          "wipe the stove area"
+        ]
+      }
+    }
+  ]
+}

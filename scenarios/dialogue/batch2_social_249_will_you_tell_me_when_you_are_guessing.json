@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "batch2_social_249_will_you_tell_me_when_you_are_guessing",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a social or identity boundary: Will you tell me when you are guessing?",
+  "tags": [
+    "real-world",
+    "social",
+    "boundary",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "boundary_question",
+      "ask": "Will you tell me when you are guessing?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "social_boundary",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Yes. I should separate guesses from verified facts."
+      },
+      "expect": {
+        "speech_any": [
+          "verified facts"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup",
+      "ask": "What should I take from that?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "summarize_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "The important point is that I should be clear, safe, and honest: verified facts."
+      },
+      "expect": {
+        "speech_any": [
+          "verified facts"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Will you tell me when you are guessing?",
+          "verified facts"
+        ]
+      }
+    }
+  ]
+}

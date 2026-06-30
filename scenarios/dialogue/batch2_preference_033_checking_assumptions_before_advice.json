@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_033_checking_assumptions_before_advice",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: checking assumptions before advice.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer checking assumptions before advice.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for checking assumptions before advice",
+              "entities": [
+                "checking assumptions before advice"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer checking assumptions before advice."
+      },
+      "expect": {
+        "speech_any": [
+          "checking assumptions before advice"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "checking assumptions before advice"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer checking assumptions before advice."
+      },
+      "expect": {
+        "speech_any": [
+          "checking assumptions before advice"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "checking assumptions before advice"
+        ]
+      }
+    }
+  ]
+}

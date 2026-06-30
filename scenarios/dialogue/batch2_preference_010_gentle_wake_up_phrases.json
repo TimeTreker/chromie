@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "batch2_preference_010_gentle_wake_up_phrases",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a real-world preference: gentle wake-up phrases.",
+  "tags": [
+    "real-world",
+    "memory",
+    "preference",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_preference",
+      "ask": "Please remember that I prefer gentle wake-up phrases.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's preference for gentle wake-up phrases",
+              "entities": [
+                "gentle wake-up phrases"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember that you prefer gentle wake-up phrases."
+      },
+      "expect": {
+        "speech_any": [
+          "gentle wake-up phrases"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "gentle wake-up phrases"
+        ]
+      }
+    },
+    {
+      "id": "recall_preference",
+      "ask": "What preference did I give you?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_preference",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "You prefer gentle wake-up phrases."
+      },
+      "expect": {
+        "speech_any": [
+          "gentle wake-up phrases"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "gentle wake-up phrases"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "ambiguous_move_over_there",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks for a target instead of moving on an ambiguous instruction.",
+  "tags": ["real-world", "clarify", "motion-safety"],
+  "turns": [
+    {
+      "id": "ambiguous_move",
+      "ask": "Can you move over there a little?",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "clarify_target_location",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Where exactly should I move?"
+        }
+      },
+      "expect": {
+        "speech_any": ["Where exactly"],
+        "no_skills": true,
+        "post_history_contains": ["move over there", "Where exactly"]
+      }
+    },
+    {
+      "id": "clarify_target",
+      "ask": "Just one small step forward.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+          "intent": "compound_robot_action",
+          "confidence": 0.95,
+          "language": "en-US",
+          "source": "catalog",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "robot_action",
+              "goal": "Take one small step forward after confirmation",
+              "entities": ["forward"],
+              "constraints": {"distance": "small step"}
+            }
+          },
+          "actions": [
+            {
+              "capability_id": "soridormi.walk_velocity",
+              "args": {"vx_mps": 0.12, "duration_s": 1.0},
+              "sequence": 0
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": ["run that action"],
+        "skills": ["soridormi.walk_velocity"],
+        "requires_confirmation": true,
+        "history_contains": ["Where exactly should I move?"],
+        "current_task_context_contains": ["small step forward", "forward"]
+      }
+    }
+  ]
+}

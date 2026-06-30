@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "music_request_no_speaker_claim",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not claim to play music through a missing media tool.",
+  "tags": ["real-world", "tool-boundary", "honesty"],
+  "turns": [
+    {
+      "id": "music_request",
+      "ask": "Play some calm music while I read.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "tool_boundary",
+          "confidence": 0.86,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I cannot start music from here, but I can suggest a calm playlist style."
+      },
+      "expect": {
+        "speech_any": ["cannot start music", "calm playlist"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_style",
+      "ask": "What style would you suggest?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "suggestion",
+          "confidence": 0.84,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Try quiet piano or low-volume ambient music for reading."
+      },
+      "expect": {
+        "speech_any": ["quiet piano", "ambient"],
+        "history_contains": ["calm music", "cannot start music"],
+        "no_skills": true
+      }
+    }
+  ]
+}

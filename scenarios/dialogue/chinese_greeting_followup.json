@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "chinese_greeting_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a Chinese greeting and preserves that context.",
+  "tags": ["real-world", "zh-CN", "social"],
+  "turns": [
+    {
+      "id": "greeting",
+      "ask": "你好，Chromie。",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "general_conversation",
+          "confidence": 0.93,
+          "language": "zh-CN",
+          "source": "llm"
+        },
+        "ollama_reply": "你好，我在这里，可以帮你。"
+      },
+      "expect": {
+        "speech_any": ["你好"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_language",
+      "ask": "我刚才用什么语言问候你？",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_context",
+          "confidence": 0.88,
+          "language": "zh-CN",
+          "source": "llm"
+        },
+        "ollama_reply": "你刚才用中文问候我。"
+      },
+      "expect": {
+        "speech_any": ["中文"],
+        "history_contains": ["你好，Chromie。"],
+        "no_skills": true
+      }
+    }
+  ]
+}

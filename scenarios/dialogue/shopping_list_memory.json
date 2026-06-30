@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "shopping_list_memory",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot stores a short shopping list as dialogue context.",
+  "tags": ["real-world", "memory", "list"],
+  "turns": [
+    {
+      "id": "list_items",
+      "ask": "Help me remember milk, rice, and batteries for the store.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "remember_list",
+          "confidence": 0.91,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember store items",
+              "entities": ["milk", "rice", "batteries"]
+            }
+          }
+        },
+        "ollama_reply": "I will remember milk, rice, and batteries for the store."
+      },
+      "expect": {
+        "speech_any": ["milk", "rice", "batteries"],
+        "no_skills": true,
+        "current_task_context_contains": ["milk", "rice", "batteries"]
+      }
+    },
+    {
+      "id": "ask_list",
+      "ask": "What were the store items?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_list",
+          "confidence": 0.89,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "The store items were milk, rice, and batteries."
+      },
+      "expect": {
+        "speech_any": ["milk", "rice", "batteries"],
+        "session_memory_contains": ["milk", "rice", "batteries"],
+        "no_skills": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_040_fold_the_towels_clear_the_dryer_li",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: fold the towels, clear the dryer lint, and put soap on the list.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to fold the towels, clear the dryer lint, and put soap on the list.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "fold the towels",
+                "clear the dryer lint",
+                "put soap on the list"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: fold the towels, clear the dryer lint, and put soap on the list."
+      },
+      "expect": {
+        "speech_any": [
+          "fold the towels"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "fold the towels",
+          "clear the dryer lint",
+          "put soap on the list"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to fold the towels, clear the dryer lint, and put soap on the list."
+      },
+      "expect": {
+        "speech_any": [
+          "put soap on the list"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "fold the towels",
+          "clear the dryer lint",
+          "put soap on the list"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_050_set_out_shoes_pack_the_gym_card",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: set out shoes, pack the gym card, and fill the water bottle.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to set out shoes, pack the gym card, and fill the water bottle.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "set out shoes",
+                "pack the gym card",
+                "fill the water bottle"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: set out shoes, pack the gym card, and fill the water bottle."
+      },
+      "expect": {
+        "speech_any": [
+          "set out shoes"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "set out shoes",
+          "pack the gym card",
+          "fill the water bottle"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to set out shoes, pack the gym card, and fill the water bottle."
+      },
+      "expect": {
+        "speech_any": [
+          "fill the water bottle"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "set out shoes",
+          "pack the gym card",
+          "fill the water bottle"
+        ]
+      }
+    }
+  ]
+}

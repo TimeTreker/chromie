@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "batch2_checklist_059_confirm_the_address_pack_the_receipt",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a practical checklist: confirm the address, pack the receipt, and leave ten minutes early.",
+  "tags": [
+    "real-world",
+    "memory",
+    "checklist",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "store_checklist",
+      "ask": "Help me remember to confirm the address, pack the receipt, and leave ten minutes early.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "remember_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Remember the user's checklist",
+              "entities": [
+                "confirm the address",
+                "pack the receipt",
+                "leave ten minutes early"
+              ]
+            }
+          }
+        },
+        "ollama_reply": "I will remember: confirm the address, pack the receipt, and leave ten minutes early."
+      },
+      "expect": {
+        "speech_any": [
+          "confirm the address"
+        ],
+        "no_skills": true,
+        "current_task_context_contains": [
+          "confirm the address",
+          "pack the receipt",
+          "leave ten minutes early"
+        ]
+      }
+    },
+    {
+      "id": "recall_checklist",
+      "ask": "What was my checklist?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "recall_list",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": "Your checklist was to confirm the address, pack the receipt, and leave ten minutes early."
+      },
+      "expect": {
+        "speech_any": [
+          "leave ten minutes early"
+        ],
+        "no_skills": true,
+        "session_memory_contains": [
+          "confirm the address",
+          "pack the receipt",
+          "leave ten minutes early"
+        ]
+      }
+    }
+  ]
+}

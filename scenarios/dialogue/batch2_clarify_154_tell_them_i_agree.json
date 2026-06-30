@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "batch2_clarify_154_tell_them_i_agree",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks a clarifying question for: Tell them I agree.",
+  "tags": [
+    "real-world",
+    "clarify",
+    "batch2"
+  ],
+  "turns": [
+    {
+      "id": "ambiguous_request",
+      "ask": "Tell them I agree.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarify_reference",
+          "confidence": 0.8,
+          "language": "en-US",
+          "source": "llm",
+          "speak_first": "Who should receive the message, and by what channel?"
+        }
+      },
+      "expect": {
+        "speech_any": [
+          "Who should receive the message, and by what channel"
+        ],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "clarified_answer",
+      "ask": "I mean the design team in the meeting notes.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": [
+            "conversation_agent",
+            "speaker_agent"
+          ],
+          "intent": "clarified_context",
+          "confidence": 0.87,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks, I understand you mean the design team in the meeting notes."
+      },
+      "expect": {
+        "speech_any": [
+          "the design team in the meeting notes"
+        ],
+        "no_skills": true,
+        "history_contains": [
+          "Tell them I agree.",
+          "Who should receive the message, and by what channel"
+        ]
+      }
+    }
+  ]
+}

@@ -30,6 +30,14 @@ class BehaviorTruthSuiteTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(report["ok"], _format_failures(report))
         self.assertEqual(report["case_count"], 7)
 
+    async def test_dialogue_behavior_scenario_files(self) -> None:
+        scenarios = load_scenarios(suites={"dialogue"})
+
+        report = await run_scenarios(scenarios)
+
+        self.assertTrue(report["ok"], _format_failures(report))
+        self.assertEqual(report["case_count"], 300)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "morning_greeting_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot handles a normal morning greeting and can refer to the previous turn.",
+  "tags": ["real-world", "social", "history"],
+  "turns": [
+    {
+      "id": "greet",
+      "ask": "Good morning, Chromie.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "general_conversation",
+          "confidence": 0.94,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Good morning. I am here and ready to help."
+      },
+      "expect": {
+        "speech_any": ["Good morning"],
+        "no_skills": true,
+        "post_history_contains": ["Good morning, Chromie.", "ready to help"]
+      }
+    },
+    {
+      "id": "recall_greeting",
+      "ask": "What did I just say?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_context",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "You just said good morning to me."
+      },
+      "expect": {
+        "speech_any": ["good morning"],
+        "history_contains": ["Good morning, Chromie.", "ready to help"],
+        "no_skills": true
+      }
+    }
+  ]
+}

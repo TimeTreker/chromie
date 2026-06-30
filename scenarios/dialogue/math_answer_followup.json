@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "math_answer_followup",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot answers a simple calculation and can explain which numbers were used.",
+  "tags": ["real-world", "reasoning", "history"],
+  "turns": [
+    {
+      "id": "ask_math",
+      "ask": "What is 14 plus 28?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "answer_question",
+          "confidence": 0.92,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "14 plus 28 is 42."
+      },
+      "expect": {
+        "speech_any": ["42"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_numbers",
+      "ask": "Which numbers did I ask you to add?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_context",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "You asked me to add 14 and 28."
+      },
+      "expect": {
+        "speech_any": ["14", "28"],
+        "history_contains": ["14 plus 28", "42"],
+        "no_skills": true
+      }
+    }
+  ]
+}
