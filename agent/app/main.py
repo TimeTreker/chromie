@@ -59,6 +59,9 @@ class Settings(BaseModel):
     response_review_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_RESPONSE_REVIEW_TIMEOUT_MS", "4000"))
     )
+    response_review_mode: str = Field(
+        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_MODE", "auto")
+    )
     use_llm: bool = Field(
         default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
         not in {"0", "false", "no", "off"}
@@ -205,6 +208,7 @@ task_graph_planner = (
 services = AgentServices(
     ollama=ollama_client,
     response_reviewer=response_reviewer_client,
+    response_review_mode=settings.response_review_mode,
     use_llm=settings.use_llm,
     max_speak_chars=settings.max_speak_chars,
     expressive_body_cues=settings.expressive_body_cues,

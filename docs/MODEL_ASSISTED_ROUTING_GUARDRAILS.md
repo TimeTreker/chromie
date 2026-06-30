@@ -63,6 +63,14 @@ proposals in `RouteDecision.metadata.route_stage_outputs` and merges them into
 the inspectable plan substrate that later validators, agents, Skill Runtime,
 and providers must accept before anything executes.
 
+The host can act on the first safe part of that substrate before every slower
+proposal has arrived. Today this is limited to `ORCH_FAST_FIRST_RESPONSE_ENABLED`
+speech: a short route-level phrase such as `Checking.` or `I'll answer.` after
+Router returns. It is provisional and correctable. Later Agent or deep-thinking
+output can amend the turn, ask a clarification, or cancel/stop work, but the
+first phrase must never claim that a physical action or tool side effect has
+already happened.
+
 ## Required layers
 
 1. Deterministic operational controls bypass the model.

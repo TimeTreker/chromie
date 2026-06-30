@@ -621,6 +621,27 @@ class _RejectSocialFallbackReviewer:
         }
 
 
+class _AcceptCapabilityReviewer:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "semantic capability-plan reviewer" in prompt
+        assert "Proposed capability plan JSON" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "accept",
+            "reason": "The proposed skill preserves the routed action.",
+            "speech": "",
+            "skills": [],
+        }
+
+
+class _TimeoutCapabilityReviewer:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "semantic capability-plan reviewer" in prompt
+        assert "Walk forward for 15 seconds, quickly." in prompt
+        assert kwargs["response_format"] == "json"
+        raise TimeoutError("review timeout")
+
+
 class _AcceptBadSubstitutionReviewer:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "Router-selected exact skill_id: soridormi.walk_forward" in prompt
@@ -816,6 +837,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         runtime = InteractionRuntime(
             AgentServices(
                 ollama=_SelectedWalkOllama(),  # type: ignore[arg-type]
+                response_reviewer=_AcceptCapabilityReviewer(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_catalog(),
@@ -1060,6 +1082,42 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             response.speech[0].text,
             "Please confirm a safe bounded walking plan before I move.",
+        )
+
+    async def test_required_robot_action_review_timeout_blocks_social_fallback(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_BadSocialFallbackOllama(),  # type: ignore[arg-type]
+                response_reviewer=_TimeoutCapabilityReviewer(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_WalkAndSocialInvoker()),
+                capability_match_limit=8,
+                require_capability_plan_review=True,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "generic-walk-not-nod-timeout",
+                "text": "Walk forward for 15 seconds, quickly.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.50,
+                    "language": "en-US",
+                    "source": "catalog",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
+        self.assertEqual(
+            response.speech[0].text,
+            "I need to re-check that action plan. Please say the movement you want again.",
         )
 
     async def test_exact_router_intent_substitution_fails_closed_without_reviewer(self) -> None:

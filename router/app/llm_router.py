@@ -479,6 +479,12 @@ class OllamaLLMRouter:
         except Exception as exc:
             logger.warning("LLM review model ambiguous deep_thought check failed: %s", exc)
             return decision
+        if (
+            reviewed_decision.route == "deep_thought"
+            and reviewed_decision.intent in {"", "unknown"}
+            and not reviewed_decision.reason
+        ):
+            return decision
         if reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES:
             reviewed_decision.reason = (
                 f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
@@ -662,15 +668,23 @@ class OllamaLLMRouter:
             and decision.intent in {"", "unknown"}
             and not decision.reason
         ):
-            logger.info(
-                "LLM router returned ambiguous deep_thought without intent or reason; using safe fallback"
-            )
-            return fallback_decision(
-                request,
-                reason="ambiguous_llm_deep_thought_without_intent_or_reason",
-            )
-
-        decision = await self._review_ambiguous_deep_thought(request, decision)
+            reviewed = await self._review_ambiguous_deep_thought(request, decision)
+            if not (
+                reviewed.route == "deep_thought"
+                and reviewed.intent in {"", "unknown"}
+                and not reviewed.reason
+            ):
+                decision = reviewed
+            else:
+                logger.info(
+                    "LLM router returned ambiguous deep_thought without intent or reason; using safe fallback"
+                )
+                return fallback_decision(
+                    request,
+                    reason="ambiguous_llm_deep_thought_without_intent_or_reason",
+                )
+        else:
+            decision = await self._review_ambiguous_deep_thought(request, decision)
         decision = await self._review_route_only_robot_action(request, decision)
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:

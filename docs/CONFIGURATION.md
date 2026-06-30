@@ -76,6 +76,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `0` | Use Agent `/interaction` and the trusted Skill Runtime instead of `/run`. |
 | `ORCH_ENABLE_SORIDORMI_SKILLS` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_AUTO_CONFIRM_SIM_SKILLS` | `1` | Apply only Soridormi-declared simulation confirmation exemptions. |
+| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Let the host speak a short truthful route-level first phrase before the slower Agent response completes. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Use native structured output for `/interaction`; set `legacy-adapter` only for rollback. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | Opt in to legacy adapter fallback after native schema validation fails. Default-off preserves fail-closed behavior. |
@@ -233,13 +234,14 @@ python scripts/evaluate_experience_episodes.py \
 | `AGENT_RESPONSE_REVIEW_ENABLED` | Enable model-based semantic review of spoken Agent replies and executed capability plans; default `1`. |
 | `AGENT_RESPONSE_REVIEW_MODEL` | Ollama model used to accept or rewrite weak spoken replies; default `gemma4:e2b`, matching the main Agent model. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | Timeout for the semantic response-review model call; default `4000`. |
+| `AGENT_RESPONSE_REVIEW_MODE` | `auto` skips the extra spoken-response review for clearly low-risk chat replies; `always` reviews every spoken reply. Capability-plan review for executable robot actions remains controlled by `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW`. |
 | `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `220`, matching `TTS_MAX_TEXT_CHARS`. |
 | `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; default `4096`. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; default `128`. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `off`; enable only when expressive chat motion has been reviewed for the target robot/sim. |
-| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Default `1`; if the Router selected an exact capability and the Agent planner proposes a different skill, execution fails closed unless semantic capability-plan review revises it. |
+| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Default `1`; executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If the Router selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories inside the Agent container. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for marking retrieval candidates as matched; default `0.16`. In normal LLM modes this affects context/validation, not deterministic action selection. |

@@ -97,8 +97,9 @@ Risk-bearing behavior is default-off.
 | `AGENT_RESPONSE_REVIEW_ENABLED` | `1` | Use a model critic to accept or rewrite spoken replies and review executed capability plans for semantic intent fit. |
 | `AGENT_RESPONSE_REVIEW_MODEL` | `gemma4:e2b` | Semantic reviewer model; defaults to the main Agent model so weak replies are judged with enough context. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
+| `AGENT_RESPONSE_REVIEW_MODE` | `auto` | In `auto`, skip the extra spoken-response review for clearly low-risk chat replies while still reviewing task/capability/action-risk replies. Use `always` for diagnostics. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Optional native chat body cue policy: `off`, `sim_only`, or `on`. Leave off unless the target robot/sim has reviewed expressive motion. |
-| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `1` | Fail closed when a plan replaces a Router-selected exact capability without a semantic reviewer revision. |
+| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `1` | Fail closed when semantic review is unavailable for an executable robot action; exact Router capability substitutions require a reviewer revision. |
 | `AGENT_CONVERSATION_NUM_CTX` | `4096` | Context window for normal conversation prompts. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | `128` | Output budget for normal conversation replies. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | `8192` | Context window for deep-thinking prompts with session memory. |

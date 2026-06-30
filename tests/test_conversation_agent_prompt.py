@@ -193,6 +193,49 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("correct obvious false premises", ollama.calls[0]["system"])
         self.assertIn("Current user said: In my opinion, the sun is cold.", ollama.calls[0]["prompt"])
 
+    async def test_response_review_auto_skips_low_risk_greeting(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "Hello! I'm doing great, thanks for asking.",
+                {
+                    "decision": "revise",
+                    "reason": "Should not be called for low-risk greeting.",
+                    "spoken_response": "Unexpected reviewer rewrite.",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                response_review_mode="auto",
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "review-auto-greeting-test",
+                "text": "Hello, how are you?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "Hello! I'm doing great, thanks for asking.",
+        )
+        self.assertEqual(len(ollama.calls), 1)
+
     async def test_stock_model_disclaimer_is_retried_as_chromie(self) -> None:
         ollama = _CapturingOllama(
             [
@@ -208,6 +251,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
             AgentServices(
                 ollama=ollama,  # type: ignore[arg-type]
                 response_reviewer=ollama,  # type: ignore[arg-type]
+                response_review_mode="auto",
                 use_llm=True,
                 max_speak_chars=220,
             )
@@ -237,6 +281,52 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("generalization-first principle", ollama.calls[1]["system"])
         self.assertEqual(ollama.calls[1]["response_format"], "json")
         self.assertEqual(ollama.calls[1]["options"]["temperature"], 0)
+
+    async def test_chat_route_action_promise_is_revised_to_safe_action_clarification(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "好的，这就为你往前走 15 秒。",
+                {
+                    "decision": "revise",
+                    "reason": "Chat route cannot promise physical movement without a robot_action skill.",
+                    "spoken_response": "我需要把这个作为机器人动作来确认，不能只用对话执行移动。",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "chat-action-promise-test",
+                "text": "往前走个15秒。",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "zh-CN",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "我需要把这个作为机器人动作来确认，不能只用对话执行移动。",
+        )
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("Route context:", ollama.calls[1]["prompt"])
+        self.assertIn('"route":"chat"', ollama.calls[1]["prompt"])
+        self.assertIn("no robot_action route or skill request is present", ollama.calls[1]["prompt"])
+        self.assertIn("claims Chromie will now execute movement", ollama.calls[1]["system"])
 
     async def test_subjective_preference_disclaimer_is_retried_as_robot_persona(self) -> None:
         ollama = _CapturingOllama(

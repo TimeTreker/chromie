@@ -138,6 +138,111 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             0,
         )
 
+    def test_fast_first_response_text_is_route_truthful(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.fast_first_response_enabled = True
+
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                RouteDecision(route="chat", intent="general_conversation", language="en-US"),
+                "Hello, how are you?",
+            ),
+            "I'm here.",
+        )
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                RouteDecision(route="chat", intent="fact_question", language="en-US"),
+                "What is 2 plus 2?",
+            ),
+            "I'll answer.",
+        )
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                RouteDecision(route="robot_action", intent="robot_action", language="en-US"),
+                "Walk forward for 15 seconds.",
+            ),
+            "Checking.",
+        )
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                RouteDecision(route="robot_action", intent="robot_action", language="zh-CN"),
+                "往前走个15秒。",
+            ),
+            "我先确认。",
+        )
+        self.assertIsNone(
+            assistant._fast_first_response_text(
+                RouteDecision(route="clarify", intent="clarify_target_location", language="en-US"),
+                "Move over there.",
+            )
+        )
+
+    def test_fast_first_response_can_be_disabled(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.fast_first_response_enabled = False
+
+        self.assertIsNone(
+            assistant._fast_first_response_text(
+                RouteDecision(route="robot_action", intent="robot_action", language="en-US"),
+                "Walk forward.",
+            )
+        )
+
+    async def test_fast_first_response_schedules_before_agent(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.fast_first_response_enabled = True
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+        assistant.order_lock = asyncio.Lock()
+        assistant.synthesis_order = 0
+        assistant.playback_generation = 0
+        assistant.active_synthesis_tasks = set()
+        assistant.playback_start_waiters = {}
+        assistant.tts_text_chunking_enabled = True
+        assistant.tts_chunk_chars = 80
+        assistant.tts_min_chunk_chars = 40
+        assistant.tts_flush_chars = 160
+        seen: list[tuple[int, str]] = []
+
+        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
+            self.sessions.log(sid, message, *args)
+
+        async def synthesize_one(
+            self: VoiceAssistant,
+            text: str,
+            order: int,
+            session_id: str | None,
+            generation: int,
+        ) -> None:
+            del session_id, generation
+            seen.append((order, text))
+            await asyncio.sleep(0)
+
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant.synthesize_one = MethodType(synthesize_one, assistant)
+        decision = RouteDecision(
+            route="robot_action",
+            agents=["capability_agent", "speaker_agent"],
+            intent="robot_action",
+            language="en-US",
+        )
+
+        scheduled = await assistant._schedule_fast_first_response(
+            decision,
+            "Walk forward for 15 seconds.",
+            session_id,
+        )
+        pending = list(assistant.active_synthesis_tasks)
+        if pending:
+            await asyncio.gather(*pending)
+
+        self.assertTrue(scheduled)
+        self.assertEqual(seen, [(0, "Checking.")])
+        self.assertEqual(
+            assistant.sessions.state[session_id]["scheduled_tts"],
+            1,
+        )
+
     def test_deep_thought_body_cue_uses_optional_express_attention(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.enable_interaction_response = True
@@ -235,6 +340,41 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIsNone(response)
+
+    def test_auto_confirm_suppresses_confirmation_only_speech_chunk(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+
+        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
+            self.sessions.log(sid, message, *args)
+
+        assistant.session_log = MethodType(session_log, assistant)
+        response = InteractionResponse(
+            speech=[
+                {"text": "I will walk forward quickly for 15 seconds."},
+                {"text": "Can you confirm this action?"},
+            ],
+            skills=[
+                {
+                    "request_id": "walk-1",
+                    "skill_id": "soridormi.walk_forward",
+                    "requires_confirmation": True,
+                }
+            ],
+        )
+
+        assistant._suppress_auto_confirm_confirmation_speech(
+            response,
+            exempted_request_ids={"walk-1"},
+            session_id=session_id,
+        )
+
+        self.assertEqual(
+            [item.text for item in response.speech],
+            ["I will walk forward quickly for 15 seconds."],
+        )
+        self.assertEqual(response.metadata["auto_confirm_suppressed_confirmation_speech"], 1)
 
     def test_direct_llm_prompt_preserves_chromie_robot_identity(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

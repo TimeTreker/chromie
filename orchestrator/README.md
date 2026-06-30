@@ -146,6 +146,12 @@ This generates runtime configuration, activates the selected Conda environment,
 installs changed requirements, warms Ollama, avoids duplicate processes, and
 starts the module from the repository root.
 
+The Orchestrator can emit a fast first phrase after Router returns and before
+the slower Agent finishes. `ORCH_FAST_FIRST_RESPONSE_ENABLED=1` is the default.
+The phrase is route-level and truthful, for example "Checking." for robot
+actions or "I'm here." for simple chat; it is not authorization, and later Agent
+speech, confirmation, or correction still owns the final turn.
+
 Manual development start:
 
 ```bash
@@ -209,7 +215,11 @@ python scripts/interaction_text_mujoco_check.py --no-speaker
 Session timing logs can be enabled with `ORCH_SESSION_TIMING_LOGS=1`. Set
 `ORCH_EVENT_LOG_PATH` to append correlated JSONL records containing UTC time,
 SID, elapsed milliseconds, event name, and rendered details. Evidence writing
-is best-effort and never authorizes or changes execution.
+is best-effort and never authorizes or changes execution. Finished sessions
+also write `session_workflow` and `session_workflow_graph` evidence covering
+VAD, ASR, Router, Agent, Skill Runtime, TTS, playback, per-stage deltas, and
+final timing. The operator console keeps only a compact
+`session_workflow_summary` line with the slowest steps.
 
 Run the complete guided matrix with:
 

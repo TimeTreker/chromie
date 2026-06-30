@@ -44,9 +44,29 @@ Most abilities are deliberately `stub` until a trusted implementation exists.
 This lets Chromie be honest about missing abilities while preserving stable
 names for future implementation.
 
-## First Fulfilled Loop
+## Fast-First Speech Loop
 
-The first ability-backed social loop is the deep-thinking handoff:
+The host may speak a short route-level first phrase before the slower Agent
+finishes. This is the first implemented slice of the live proposal/arbiter
+model: fast output is preferred, and later Agent or deep-thinking output may
+clarify, correct, confirm, cancel, or complete the turn.
+
+The first phrase must be a truthful state signal, not an execution claim:
+
+- chat: `I'm here.` / `我在。`
+- factual or non-small-talk chat: `I'll answer.` / `我来回答。`
+- robot action: `Checking.` / `我先确认。`
+- tool lookup: `Checking.` / `我查一下。`
+- memory request: `I'll note that.` / `我记一下。`
+- deep thought: `Okay, let me think about that.` / `好的，我想一下。`
+
+`ORCH_FAST_FIRST_RESPONSE_ENABLED=1` enables this behavior by default. It does
+not authorize skills, memory writes, tools, or body motion. It only reduces the
+silence between Router completion and Agent completion.
+
+## Deep-Thinking Fulfilled Loop
+
+The first ability-backed social/body loop remains the deep-thinking handoff:
 
 ```text
 User asks for complicated planning

@@ -758,7 +758,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
         self.assertTrue(all(payload["think"] is False for payload in router.payloads))
 
-    async def test_ambiguous_deep_thought_falls_back_without_review_latency(self) -> None:
+    async def test_ambiguous_deep_thought_tries_review_before_fallback(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
             def __init__(self) -> None:
                 super().__init__(
@@ -800,7 +800,70 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
         self.assertIn("ambiguous_llm_deep_thought", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model"])
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+
+    async def test_ambiguous_deep_thought_review_recovers_chinese_walk_command(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"robot_action",'
+                                '"intent":"capability:soridormi.walk_forward",'
+                                '"confidence":0.86,'
+                                '"reason":"semantic review matched a walking request"}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"deep_thought","intent":"unknown",'
+                            '"confidence":0.85}'
+                        )
+                    }
+                }
+
+        router = ReviewRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="往前走个15秒。",
+                language="zh-CN",
+                context={
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "description": "Human-facing wrapper for natural walking requests.",
+                            "interaction_executable": True,
+                            "available": True,
+                            "effects": ["physical_motion"],
+                            "route": "robot_action",
+                            "score": 0.0,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertIn("review_model:review-model reviewed ambiguous deep_thought", decision.reason or "")
+        review_prompt = router.payloads[1]["messages"][1]["content"]
+        self.assertIn("往前走个15秒", review_prompt)
+        self.assertIn("soridormi.walk_forward", review_prompt)
 
     async def test_ambiguous_deep_thought_review_failure_falls_back_to_chat(self) -> None:
         class ReviewRouter(OllamaLLMRouter):

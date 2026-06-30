@@ -212,7 +212,7 @@ def _validate_llm_capability_decision(
     decision: RouteDecision,
     result: CapabilityCatalogResult,
 ) -> RouteDecision:
-    candidates = list(result.matches if result.matched else [])
+    candidates = list(result.matches or [])
     decision.candidate_capabilities = candidates
     by_id = {_capability_id(item): item for item in candidates if _capability_id(item)}
     selected_id = _intent_capability_id(decision.intent)
@@ -346,7 +346,11 @@ def _attach_stage_context(
     catalog_result: CapabilityCatalogResult,
 ) -> None:
     previous = request.context.get("router_stage_context")
-    candidate_capabilities = catalog_result.matches if catalog_result.matched else []
+    # Preserve low-score context-fill candidates for semantic recovery. A
+    # lexical catalog miss can still provide the correct ability surface for
+    # multilingual or ASR-noisy requests; only catalog-owned fallback execution
+    # is gated on ``matched``.
+    candidate_capabilities = list(catalog_result.matches or [])
     request.context = {
         **request.context,
         "candidate_capabilities": candidate_capabilities,

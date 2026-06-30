@@ -48,6 +48,19 @@ Session event JSONL records should include:
 }
 ```
 
+When a voice session reaches `session_done`, the Orchestrator also emits
+workflow evidence:
+
+- `session_workflow`: a compact, bounded breadcrumb chain in JSONL evidence.
+- `session_workflow_graph`: a structured graph with `nodes`, `edges`,
+  `elapsed_ms`, `delta_from_previous_ms`, and `total_ms`.
+- `session_workflow_summary`: one operator-console timing line with the
+  slowest graph deltas.
+
+These cover the same per-session stages, such as VAD, ASR, Router, Agent,
+fast-first response, Skill Runtime, TTS, playback, and final timing. They are
+debug evidence only; they do not authorize or change execution.
+
 TaskGraph traces should follow the Agent `ExecutionTrace` model:
 
 ```json

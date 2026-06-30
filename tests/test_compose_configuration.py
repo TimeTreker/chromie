@@ -84,6 +84,7 @@ class ComposeConfigurationTests(unittest.TestCase):
             "AGENT_RESPONSE_REVIEW_TIMEOUT_MS: ${AGENT_RESPONSE_REVIEW_TIMEOUT_MS:-4000}",
             agent_block,
         )
+        self.assertIn("AGENT_RESPONSE_REVIEW_MODE: ${AGENT_RESPONSE_REVIEW_MODE:-auto}", agent_block)
 
     def test_agent_service_passes_capability_planner_budget(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")

@@ -85,6 +85,10 @@ class VoiceAssistant:
             "ORCH_AUTO_CONFIRM_SIM_SKILLS",
             True,
         )
+        self.fast_first_response_enabled = env_bool(
+            "ORCH_FAST_FIRST_RESPONSE_ENABLED",
+            True,
+        )
         self.router_url = os.getenv("ROUTER_URL", "http://127.0.0.1:8091")
         self.agent_url = os.getenv("AGENT_URL", "http://127.0.0.1:8092")
         self.action_executor_url = os.getenv("ACTION_EXECUTOR_URL", "http://127.0.0.1:8095")
@@ -323,11 +327,12 @@ class VoiceAssistant:
             auto_confirm_sim=self.auto_confirm_sim_skills,
         )
         logger.info(
-            "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s confirmation_ttl_s=%.1f",
+            "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s confirmation_ttl_s=%.1f fast_first_response=%s",
             self.enable_interaction_response,
             self.enable_soridormi_skills,
             self.auto_confirm_sim_skills,
             self.confirmation_dialogue.ttl_s,
+            self.fast_first_response_enabled,
         )
 
     @property
@@ -1518,6 +1523,91 @@ class VoiceAssistant:
         )
         return False
 
+    def _fast_first_response_text(
+        self,
+        decision: RouteDecision,
+        user_text: str,
+    ) -> str | None:
+        if not self.fast_first_response_enabled:
+            return None
+        if not decision.should_speak or decision.route in {"interrupt", "ignore", "clarify"}:
+            return None
+        if decision.route == "deep_thought":
+            return self._deep_thought_ack_text(decision, user_text)
+
+        language = (decision.language or "").lower()
+        zh = language.startswith("zh") or any(
+            "\u4e00" <= ch <= "\u9fff" for ch in user_text
+        )
+        if decision.speak_first:
+            return decision.speak_first.strip() or None
+        if decision.route == "robot_action":
+            return "我先确认。" if zh else "Checking."
+        if decision.route == "tool":
+            return "我查一下。" if zh else "Checking."
+        if decision.route == "memory":
+            return "我记一下。" if zh else "I'll note that."
+        if decision.route == "chat":
+            intent = (decision.intent or "").casefold()
+            if any(part in intent for part in ("greeting", "small_talk", "general_conversation")):
+                return "我在。" if zh else "I'm here."
+            return "我来回答。" if zh else "I'll answer."
+        return None
+
+    async def _schedule_fast_first_response(
+        self,
+        decision: RouteDecision,
+        user_text: str,
+        session_id: str,
+    ) -> bool:
+        if decision.route == "deep_thought":
+            return await self._schedule_deep_thought_ack(
+                decision,
+                user_text,
+                session_id,
+            )
+        text = self._fast_first_response_text(decision, user_text)
+        if not text:
+            self.session_log(
+                session_id,
+                "fast_first_response_skipped: route=%s intent=%s reason=%s",
+                decision.route,
+                decision.intent,
+                "not_applicable",
+            )
+            return False
+
+        self.session_log(
+            session_id,
+            "fast_first_response_schedule: route=%s intent=%s chars=%s text=%r",
+            decision.route,
+            decision.intent,
+            len(text),
+            text,
+        )
+        scheduled = await self.schedule_tts_text(text, session_id)
+        if scheduled.get("scheduled") is True:
+            self.session_log(
+                session_id,
+                "fast_first_response_scheduled: route=%s order=%s chunks=%s generation=%s",
+                decision.route,
+                scheduled.get("order"),
+                scheduled.get("chunks", 1),
+                scheduled.get("generation"),
+            )
+            if decision.speak_first and decision.speak_first.strip() == text:
+                decision.speak_first = None
+            return True
+
+        self.session_log(
+            session_id,
+            "fast_first_response_skipped: route=%s intent=%s reason=%s",
+            decision.route,
+            decision.intent,
+            scheduled.get("reason", "unknown"),
+        )
+        return False
+
     def _deep_thought_body_cue_response(
         self,
         decision: RouteDecision,
@@ -1727,7 +1817,7 @@ class VoiceAssistant:
             )
             return
 
-        deep_thought_ack_scheduled = await self._schedule_deep_thought_ack(
+        fast_first_scheduled = await self._schedule_fast_first_response(
             decision,
             user_text,
             session_id,
@@ -1737,7 +1827,7 @@ class VoiceAssistant:
             user_text,
             session_id,
         )
-        if deep_thought_ack_scheduled:
+        if fast_first_scheduled and decision.route == "deep_thought":
             decision.speak_first = None
 
         agent_start_ms = now_ms()
@@ -1791,7 +1881,7 @@ class VoiceAssistant:
                     response,
                     session_id,
                     language=decision.language,
-                    reset_playback=not deep_thought_ack_scheduled,
+                    reset_playback=not fast_first_scheduled,
                 ):
                     return
 
@@ -1799,7 +1889,7 @@ class VoiceAssistant:
                 self._launch_interaction(
                     response,
                     session_id,
-                    reset_playback=not deep_thought_ack_scheduled,
+                    reset_playback=not fast_first_scheduled,
                 )
                 return
 
@@ -1825,7 +1915,7 @@ class VoiceAssistant:
             await self.execute_agent_result(
                 result,
                 session_id,
-                reset_playback=not deep_thought_ack_scheduled,
+                reset_playback=not fast_first_scheduled,
             )
         except Exception as exc:
             self.session_log(session_id, "agent_exception: agent_ms=%.1f error=%s", now_ms() - agent_start_ms, exc)
@@ -1834,7 +1924,7 @@ class VoiceAssistant:
                 self.process_llm_tts(
                     user_text,
                     session_id,
-                    reset_playback=not deep_thought_ack_scheduled,
+                    reset_playback=not fast_first_scheduled,
                     fallback_reason="agent_exception",
                     route=decision.route,
                 )
@@ -1861,6 +1951,12 @@ class VoiceAssistant:
                 ",".join(sorted(exempted_request_ids)),
             )
         if not confirmation_request_ids:
+            if exempted_request_ids:
+                self._suppress_auto_confirm_confirmation_speech(
+                    response,
+                    exempted_request_ids=exempted_request_ids,
+                    session_id=session_id,
+                )
             return False
 
         pending = self.confirmation_dialogue.begin(
@@ -1910,6 +2006,55 @@ class VoiceAssistant:
             reset_playback=reset_playback,
         )
         return True
+
+    def _suppress_auto_confirm_confirmation_speech(
+        self,
+        response: InteractionResponse,
+        *,
+        exempted_request_ids: set[str],
+        session_id: str,
+    ) -> None:
+        if not exempted_request_ids or len(response.speech) < 2:
+            return
+        kept = []
+        dropped_text: list[str] = []
+        for speech in response.speech:
+            if self._is_confirmation_only_speech(speech.text):
+                dropped_text.append(speech.text)
+                continue
+            kept.append(speech)
+        if not dropped_text or not kept:
+            return
+        response.speech = kept
+        response.metadata = {
+            **response.metadata,
+            "auto_confirm_suppressed_confirmation_speech": len(dropped_text),
+        }
+        self.session_log(
+            session_id,
+            "auto_confirm_speech_suppressed: dropped=%s kept=%s request_ids=%s",
+            len(dropped_text),
+            len(kept),
+            ",".join(sorted(exempted_request_ids)),
+        )
+
+    @staticmethod
+    def _is_confirmation_only_speech(text: str) -> bool:
+        normalized = " ".join((text or "").casefold().split())
+        if not normalized:
+            return False
+        confirmation_needles = (
+            "can you confirm",
+            "please confirm",
+            "confirm this action",
+            "confirm the action",
+            "do you confirm",
+            "确认这个动作",
+            "请确认",
+            "你确认",
+            "确认吗",
+        )
+        return any(needle in normalized for needle in confirmation_needles)
 
     async def _handle_confirmation_reply(
         self,

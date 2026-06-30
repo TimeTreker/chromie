@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_chinese_walk_chat_must_not_promise_motion",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Regression from the 2026-06-30 live voice log: if a Chinese walking command reaches chat, speech must not promise motion without a robot_action skill.",
+  "tags": [
+    "voice-log",
+    "zh-CN",
+    "router-agent-contract",
+    "robot-action",
+    "walk",
+    "fail-closed"
+  ],
+  "input": {
+    "text": "往前走个15秒。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "general_conversation",
+      "confidence": 0.45,
+      "language": "zh-CN",
+      "source": "fallback"
+    },
+    "ollama_reply": "好的，这就为你往前走 15 秒。",
+    "reviewer_reply": {
+      "decision": "revise",
+      "reason": "Chat route cannot promise physical movement without a robot_action skill.",
+      "spoken_response": "我需要把这个作为机器人动作来确认，不能只用对话执行移动。"
+    }
+  },
+  "expect": {
+    "speech_any": ["机器人动作", "不能只用对话"],
+    "forbidden_speech_any": ["这就为你往前走", "马上往前走"],
+    "no_skills": true,
+    "forbidden_skills": ["soridormi.walk_forward", "soridormi.walk_velocity"],
+    "requires_confirmation": false
+  }
+}

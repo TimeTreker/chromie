@@ -285,13 +285,19 @@ class CapabilityAgent(BaseAgent):
     ) -> _CapabilityPlan:
         if plan.decision != "execute":
             return plan
-        mandatory_review = self._requires_exact_intent_review(request, plan, candidates)
+        mandatory_review = self._requires_robot_action_review(request, plan)
+        exact_intent_substitution = self._requires_exact_intent_review(
+            request,
+            plan,
+            candidates,
+        )
         reviewer = self.services.response_reviewer
         if reviewer is None:
             if mandatory_review:
                 logger.warning(
-                    "capability plan changed router-selected exact intent without reviewer; blocking execution sid=%s intent=%s plan=%s",
+                    "capability plan review is required but unavailable; blocking execution sid=%s route=%s intent=%s plan=%s",
                     request.sid,
+                    request.route_decision.route,
                     request.route_decision.intent,
                     [item.skill_id for item in plan.skills],
                 )
@@ -307,12 +313,10 @@ class CapabilityAgent(BaseAgent):
             else "- Router-selected exact skill_id: none\n"
         )
         review_prompt = (
-            "Global Context Group:\n"
-            f"{self._format_global_context(request, zh=zh)}\n\n"
             "Session Context Group:\n"
             f"- Language: {self.language(request)}\n"
-            f"- Recent conversation:\n{self._format_history(request, zh=zh)}\n"
-            f"- Task context:\n{self._format_task_context(request, zh=zh)}\n"
+            f"- Recent conversation:\n{self._bounded_text(self._format_history(request, zh=zh), 900)}\n"
+            f"- Task context:\n{self._bounded_text(self._format_task_context(request, zh=zh), 900)}\n"
             f"- Router decision context JSON: {self._format_route_context(request)}\n\n"
             "Current Job:\n"
             "- You are Chromie's semantic capability-plan reviewer.\n"
@@ -357,6 +361,8 @@ class CapabilityAgent(BaseAgent):
             logger.warning(
                 "capability plan review failed%s: error_type=%s error=%s",
                 "; blocking exact-intent substitution"
+                if exact_intent_substitution
+                else "; blocking required robot action review"
                 if mandatory_review
                 else "; preserving primary plan",
                 type(exc).__name__,
@@ -371,6 +377,8 @@ class CapabilityAgent(BaseAgent):
             logger.warning(
                 "invalid capability plan review%s: %s",
                 "; blocking exact-intent substitution"
+                if exact_intent_substitution
+                else "; blocking required robot action review"
                 if mandatory_review
                 else "; preserving primary plan",
                 exc,
@@ -380,7 +388,7 @@ class CapabilityAgent(BaseAgent):
             return plan
 
         if review.decision == "accept":
-            if mandatory_review:
+            if exact_intent_substitution:
                 logger.warning(
                     "capability plan reviewer accepted an exact-intent substitution; blocking execution sid=%s intent=%s plan=%s reason=%r",
                     request.sid,
@@ -417,6 +425,17 @@ class CapabilityAgent(BaseAgent):
                 else "Please clarify the action before I move."
             )
         return _CapabilityPlan(decision=review.decision, speech=speech)
+
+    def _requires_robot_action_review(
+        self,
+        request: AgentRunRequest,
+        plan: _CapabilityPlan,
+    ) -> bool:
+        if not self.services.require_capability_plan_review:
+            return False
+        if request.route_decision.route != "robot_action":
+            return False
+        return plan.decision == "execute" and bool(plan.skills)
 
     def _router_selected_capability_id(self, request: AgentRunRequest) -> str:
         intent = (request.route_decision.intent or "").strip()

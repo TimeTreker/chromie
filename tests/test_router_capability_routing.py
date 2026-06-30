@@ -358,6 +358,61 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.walk_velocity",
         )
 
+    async def test_hybrid_router_preserves_low_score_candidates_for_semantic_recovery(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="往前走个15秒。",
+            matched=False,
+            suggested_route="chat",
+            suggested_agents=[],
+            catalog_version=10,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "agent_id": "soridormi.skill",
+                    "description": "Human-facing wrapper for natural walking requests.",
+                    "score": 0.0,
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["physical_motion"],
+                    "route": "robot_action",
+                }
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:soridormi.walk_forward",
+                confidence=0.86,
+                language="zh-CN",
+                source="llm",
+                reason="semantic review recovered walking intent",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="往前走个15秒。", language="zh-CN"))
+
+        self.assertEqual(llm_router.calls, 1)
+        assert llm_router.request is not None
+        self.assertEqual(
+            llm_router.request.context["candidate_capabilities"][0]["capability_id"],
+            "soridormi.walk_forward",
+        )
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertIn("capability_agent", decision.agents)
+        self.assertIn("safety_agent", decision.agents)
+        self.assertEqual(
+            decision.candidate_capabilities[0]["capability_id"],
+            "soridormi.walk_forward",
+        )
+
     async def test_hybrid_router_delegates_low_confidence_body_command_to_deep_thought(self) -> None:
         from router.app import main
 

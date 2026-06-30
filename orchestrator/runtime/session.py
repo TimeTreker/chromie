@@ -39,6 +39,7 @@ class SessionEventWriter:
         elapsed_ms: float,
         message: str,
         args: tuple[Any, ...],
+        extra: dict[str, Any] | None = None,
     ) -> None:
         if self.path is None:
             return
@@ -54,6 +55,8 @@ class SessionEventWriter:
             "event": event_name,
             "message": rendered,
         }
+        if extra:
+            record.update(extra)
         try:
             with self._lock:
                 with self.path.open("a", encoding="utf-8") as handle:
@@ -64,6 +67,35 @@ class SessionEventWriter:
 
 
 class SessionTracker:
+    _WORKFLOW_EVENT_PREFIXES = (
+        "session_start",
+        "session_interrupted_by_new_session",
+        "vad_valid_end",
+        "asr_final",
+        "context_snapshot",
+        "router_start",
+        "router_done",
+        "fast_first_response_schedule",
+        "fast_first_response_scheduled",
+        "fast_first_response_skipped",
+        "agent_start",
+        "interaction_done",
+        "skill_runtime_done",
+        "skill_result",
+        "experience_recorded",
+        "episode_recorded",
+        "tts_text_split",
+        "tts_schedule",
+        "tts_request_start",
+        "tts_stream_start",
+        "tts_stream_end",
+        "tts_stream_failed",
+        "tts_playback_start_waiter_resolved",
+        "playback_start",
+        "playback_end",
+        "session_done",
+    )
+
     def __init__(
         self,
         enabled: bool = True,
@@ -90,6 +122,7 @@ class SessionTracker:
             "done_logged": False,
             "response_chars": 0,
             "interrupted": False,
+            "workflow_events": [],
         }
         if previous and previous != sid:
             prev = self.state.get(previous)
@@ -108,6 +141,8 @@ class SessionTracker:
             return
         sid = sid or "unknown"
         elapsed = self.elapsed_ms(sid)
+        rendered = self._render_message(message, args)
+        self._remember_workflow_event(sid, rendered)
         self.event_writer.write(
             sid=sid,
             elapsed_ms=elapsed,
@@ -142,3 +177,143 @@ class SessionTracker:
                 s.get("response_chars", 0),
                 self.elapsed_ms(sid),
             )
+            workflow = self._workflow_summary(sid)
+            if workflow:
+                self.event_writer.write(
+                    sid=sid,
+                    elapsed_ms=self.elapsed_ms(sid),
+                    message="session_workflow: %s",
+                    args=(workflow,),
+                )
+            graph = self._workflow_graph(sid)
+            if graph:
+                self._emit_workflow_graph(sid, graph)
+                summary = self._workflow_timing_summary(graph)
+                if summary:
+                    self.log(sid, "session_workflow_summary: %s", summary)
+
+    def _render_message(self, message: str, args: tuple[Any, ...]) -> str:
+        try:
+            return message % args if args else message
+        except Exception:
+            return f"{message} args={args!r}"
+
+    def _remember_workflow_event(self, sid: str, rendered: str) -> None:
+        if rendered.startswith("session_workflow"):
+            return
+        state = self.state.get(sid)
+        if not state:
+            return
+        event_name = rendered.split(":", 1)[0].strip()
+        if event_name not in self._WORKFLOW_EVENT_PREFIXES:
+            return
+        workflow_events = state.setdefault("workflow_events", [])
+        if not isinstance(workflow_events, list):
+            workflow_events = []
+            state["workflow_events"] = workflow_events
+        workflow_events.append(
+            {
+                "event": event_name,
+                "elapsed_ms": round(self.elapsed_ms(sid), 3),
+                "message": self._compact_workflow_message(rendered),
+            }
+        )
+
+    def _compact_workflow_message(self, rendered: str, *, limit: int = 320) -> str:
+        text = " ".join(rendered.split())
+        if len(text) <= limit:
+            return text
+        return text[: limit - 3].rstrip() + "..."
+
+    def _workflow_summary(self, sid: str) -> str:
+        state = self.state.get(sid)
+        if not state:
+            return ""
+        workflow_events = state.get("workflow_events") or []
+        if not isinstance(workflow_events, list):
+            return ""
+        messages: list[str] = []
+        for item in workflow_events:
+            if isinstance(item, dict):
+                messages.append(str(item.get("message") or ""))
+            elif item:
+                messages.append(str(item))
+        return " -> ".join(item for item in messages if item)
+
+    def _workflow_graph(self, sid: str) -> dict[str, Any]:
+        state = self.state.get(sid)
+        if not state:
+            return {}
+        workflow_events = state.get("workflow_events") or []
+        if not isinstance(workflow_events, list):
+            return {}
+        nodes: list[dict[str, Any]] = []
+        for index, item in enumerate(workflow_events):
+            if not isinstance(item, dict):
+                continue
+            elapsed_ms = float(item.get("elapsed_ms") or 0.0)
+            previous_elapsed = float(nodes[-1]["elapsed_ms"]) if nodes else elapsed_ms
+            nodes.append(
+                {
+                    "id": f"n{index}",
+                    "index": index,
+                    "event": str(item.get("event") or "session_event"),
+                    "elapsed_ms": round(elapsed_ms, 3),
+                    "delta_from_previous_ms": round(max(0.0, elapsed_ms - previous_elapsed), 3),
+                    "message": str(item.get("message") or ""),
+                }
+            )
+        edges = [
+            {
+                "from": nodes[index - 1]["id"],
+                "to": nodes[index]["id"],
+                "delta_ms": round(
+                    max(0.0, float(nodes[index]["elapsed_ms"]) - float(nodes[index - 1]["elapsed_ms"])),
+                    3,
+                ),
+            }
+            for index in range(1, len(nodes))
+        ]
+        return {
+            "schema_version": 1,
+            "sid": sid,
+            "total_ms": round(self.elapsed_ms(sid), 3),
+            "nodes": nodes,
+            "edges": edges,
+        }
+
+    def _emit_workflow_graph(self, sid: str, graph: dict[str, Any]) -> None:
+        nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
+        edges = graph.get("edges") if isinstance(graph.get("edges"), list) else []
+        total_ms = float(graph.get("total_ms") or self.elapsed_ms(sid))
+        self.event_writer.write(
+            sid=sid,
+            elapsed_ms=self.elapsed_ms(sid),
+            message="session_workflow_graph: nodes=%s edges=%s total_ms=%.1f",
+            args=(len(nodes), len(edges), total_ms),
+            extra={"graph": graph},
+        )
+
+    def _workflow_timing_summary(self, graph: dict[str, Any]) -> str:
+        nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
+        if not nodes:
+            return ""
+        total_ms = float(graph.get("total_ms") or 0.0)
+        slow_nodes = sorted(
+            (
+                node
+                for node in nodes
+                if isinstance(node, dict)
+                and float(node.get("delta_from_previous_ms") or 0.0) > 0.0
+            ),
+            key=lambda node: float(node.get("delta_from_previous_ms") or 0.0),
+            reverse=True,
+        )[:5]
+        slowest = ", ".join(
+            f"{node.get('event')}+{float(node.get('delta_from_previous_ms') or 0.0):.1f}ms"
+            for node in slow_nodes
+        )
+        return (
+            f"nodes={len(nodes)} edges={max(0, len(nodes) - 1)} "
+            f"total_ms={total_ms:.1f} slowest={slowest or 'none'}"
+        )
