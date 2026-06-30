@@ -148,9 +148,10 @@ starts the module from the repository root.
 
 The Orchestrator can emit a fast first phrase after Router returns and before
 the slower Agent finishes. `ORCH_FAST_FIRST_RESPONSE_ENABLED=1` is the default.
-The phrase is route-level and truthful, for example "Checking." for robot
-actions or "I'm here." for simple chat; it is not authorization, and later Agent
-speech, confirmation, or correction still owns the final turn.
+The phrase is route-level and truthful, for example "I'll check if I can do
+that safely." for robot actions or "I'm here." for simple chat; it is not
+authorization, and later Agent speech, confirmation, or correction still owns
+the final turn.
 
 Manual development start:
 

@@ -701,7 +701,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["capability_decision"], "unsupported")
         self.assertEqual(
             response.speech[0].text,
-            "I cannot safely map that to an available action. Please say it another way.",
+            "I cannot map that to an available action, so I will not move.",
         )
         self.assertEqual(response.skills, [])
 

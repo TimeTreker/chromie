@@ -90,9 +90,11 @@ class HealthResponse(BaseModel):
 
 STAGE_ORDER: dict[str, int] = {
     "emergency_filter": 0,
-    "quick_intent": 1,
-    "deep_thought": 2,
+    "post_interrupt_review": 1,
+    "quick_intent": 2,
+    "deep_thought": 3,
 }
+ROUTE_MERGE_SCHEMA_VERSION = 1
 
 
 def default_agents_for_route(route: str) -> list[str]:
@@ -301,25 +303,102 @@ def merge_stage_task_list(outputs: list[dict[str, Any]]) -> list[dict[str, Any]]
     ]
 
 
+def _stage_names(outputs: list[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for output in outputs:
+        if not isinstance(output, dict):
+            continue
+        stage = str(output.get("stage") or "").strip()
+        if stage:
+            names.append(stage)
+    return names
+
+
+def _infer_selected_stage(decision: RouteDecision, outputs: list[dict[str, Any]]) -> str | None:
+    for output in reversed(outputs):
+        if not isinstance(output, dict):
+            continue
+        if output.get("status") == "passed":
+            continue
+        if output.get("route") == decision.route:
+            return str(output.get("stage") or "") or None
+    for output in outputs:
+        if not isinstance(output, dict):
+            continue
+        if output.get("status") != "passed":
+            return str(output.get("stage") or "") or None
+    return None
+
+
+def _route_merge_summary(
+    decision: RouteDecision,
+    outputs: list[dict[str, Any]],
+    task_list: list[dict[str, Any]],
+    *,
+    strategy: str,
+    selected_stage: str | None = None,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "schema_version": ROUTE_MERGE_SCHEMA_VERSION,
+        "strategy": strategy,
+        "final_route": decision.route,
+        "final_intent": decision.intent,
+        "final_source": decision.source,
+        "selected_stage": selected_stage or _infer_selected_stage(decision, outputs),
+        "proposal_count": len([item for item in outputs if isinstance(item, dict)]),
+        "task_count": len(task_list),
+        "stages": _stage_names(outputs),
+        "task_source_stages": sorted(
+            {
+                str(item.get("source_stage") or "")
+                for item in task_list
+                if str(item.get("source_stage") or "").strip()
+            },
+            key=lambda stage: STAGE_ORDER.get(stage, 99),
+        ),
+    }
+    if reason:
+        summary["reason"] = reason
+    return summary
+
+
 def annotate_stage_outputs(
     decision: RouteDecision,
     outputs: list[dict[str, Any]],
+    *,
+    merge_strategy: str = "stage_priority",
+    merge_reason: str | None = None,
+    selected_stage: str | None = None,
 ) -> RouteDecision:
+    task_list = merge_stage_task_list(outputs)
     decision.metadata = {
         **(decision.metadata or {}),
         "route_stage_outputs": outputs,
-        "task_list": merge_stage_task_list(outputs),
+        "task_list": task_list,
+        "route_merge": _route_merge_summary(
+            decision,
+            outputs,
+            task_list,
+            strategy=merge_strategy,
+            selected_stage=selected_stage,
+            reason=merge_reason,
+        ),
     }
     return decision
 
 
 def annotate_default_stage_output(decision: RouteDecision) -> RouteDecision:
     if (decision.metadata or {}).get("route_stage_outputs"):
-        decision.metadata = {
-            **decision.metadata,
-            "task_list": merge_stage_task_list(decision.metadata["route_stage_outputs"]),
-        }
-        return decision
+        return annotate_stage_outputs(
+            decision,
+            decision.metadata["route_stage_outputs"],
+            merge_strategy=str(
+                (decision.metadata.get("route_merge") or {}).get("strategy")
+                or "preserve_existing_stage_outputs"
+            ),
+            selected_stage=(decision.metadata.get("route_merge") or {}).get("selected_stage"),
+        )
     stage = (
         "emergency_filter"
         if decision.route in {"interrupt", "ignore"} and decision.source == "rules"
@@ -327,7 +406,11 @@ def annotate_default_stage_output(decision: RouteDecision) -> RouteDecision:
         if decision.route == "deep_thought"
         else "quick_intent"
     )
-    return annotate_stage_outputs(decision, [route_stage_output(decision, stage=stage)])
+    return annotate_stage_outputs(
+        decision,
+        [route_stage_output(decision, stage=stage)],
+        merge_strategy="single_stage",
+    )
 
 
 def annotate_pipeline_stage_outputs(
@@ -335,10 +418,42 @@ def annotate_pipeline_stage_outputs(
     *,
     emergency_matched: bool = False,
 ) -> RouteDecision:
+    existing_outputs = (decision.metadata or {}).get("route_stage_outputs")
+    existing_stages = [
+        str(item.get("stage") or "")
+        for item in existing_outputs
+        if isinstance(item, dict)
+    ] if isinstance(existing_outputs, list) else []
+    if (
+        isinstance(existing_outputs, list)
+        and existing_stages
+        and existing_stages[0] == "emergency_filter"
+        and (emergency_matched or len(existing_stages) > 1)
+    ):
+        existing_merge = decision.metadata.get("route_merge") or {}
+        is_plain_interrupt = emergency_matched and len(existing_stages) == 1
+        return annotate_stage_outputs(
+            decision,
+            existing_outputs,
+            merge_strategy=str(
+                "safety_interrupt"
+                if is_plain_interrupt
+                else existing_merge.get("strategy")
+                or "preserve_existing_pipeline_outputs"
+            ),
+            selected_stage=(
+                "emergency_filter"
+                if is_plain_interrupt
+                else existing_merge.get("selected_stage")
+            ),
+        )
+
     if emergency_matched:
         return annotate_stage_outputs(
             decision,
             [route_stage_output(decision, stage="emergency_filter", status="triggered")],
+            merge_strategy="safety_interrupt",
+            selected_stage="emergency_filter",
         )
 
     outputs: list[dict[str, Any]] = [passed_stage_output("emergency_filter")]
@@ -402,7 +517,15 @@ def annotate_pipeline_stage_outputs(
         )
     else:
         outputs.append(route_stage_output(decision, stage="quick_intent"))
-    return annotate_stage_outputs(decision, outputs)
+    return annotate_stage_outputs(
+        decision,
+        outputs,
+        merge_strategy=(
+            "safety_filter_then_deep_thought"
+            if decision.route == "deep_thought"
+            else "safety_filter_then_quick_intent"
+        ),
+    )
 
 
 def finalize_decision(

@@ -29,6 +29,49 @@ from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
+    def test_post_interrupt_corrected_decision_is_normal_followup(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        interrupt = RouteDecision(
+            route="interrupt",
+            intent="stop_current_output",
+            confidence=0.99,
+            metadata={
+                "post_interrupt_review": {"status": "corrected"},
+                "post_interrupt_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "explain_phrase",
+                    "confidence": 0.86,
+                    "language": "en-US",
+                    "source": "llm",
+                    "speak_first": "Sorry, I misheard that as a stop command.",
+                },
+            },
+        )
+
+        corrected = assistant._post_interrupt_corrected_decision(interrupt)
+
+        self.assertIsNotNone(corrected)
+        assert corrected is not None
+        self.assertEqual(corrected.route, "chat")
+        self.assertFalse(corrected.interrupt_current)
+        self.assertTrue(corrected.metadata["post_interrupt_correction"])
+        self.assertEqual(
+            corrected.metadata["original_interrupt_intent"],
+            "stop_current_output",
+        )
+
+    def test_post_interrupt_confirmed_decision_has_no_followup(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        interrupt = RouteDecision(
+            route="interrupt",
+            intent="stop_current_output",
+            confidence=0.99,
+            metadata={"post_interrupt_review": {"status": "confirmed"}},
+        )
+
+        self.assertIsNone(assistant._post_interrupt_corrected_decision(interrupt))
+
     async def test_deep_thought_ack_is_language_matched_and_scheduled(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
@@ -161,14 +204,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 RouteDecision(route="robot_action", intent="robot_action", language="en-US"),
                 "Walk forward for 15 seconds.",
             ),
-            "Checking.",
+            "I heard the movement request.",
         )
         self.assertEqual(
             assistant._fast_first_response_text(
                 RouteDecision(route="robot_action", intent="robot_action", language="zh-CN"),
                 "往前走个15秒。",
             ),
-            "我先确认。",
+            "我听到了这个动作请求。",
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -237,7 +280,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(*pending)
 
         self.assertTrue(scheduled)
-        self.assertEqual(seen, [(0, "Checking.")])
+        self.assertEqual(seen, [(0, "I heard the movement request.")])
         self.assertEqual(
             assistant.sessions.state[session_id]["scheduled_tts"],
             1,
@@ -324,7 +367,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assert response is not None
         self.assertEqual(
             response.speech[0].text,
-            "I couldn't route that movement safely. Please try again.",
+            "I heard a movement request, but routing did not produce a valid motion result, so I will not move.",
         )
         self.assertEqual(
             response.metadata["source"],
@@ -407,7 +450,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Direct fallback reason: agent_exception", prompt)
         self.assertIn("Route hint: robot_action", prompt)
         self.assertIn("Hello. I am listening.", prompt)
-        self.assertIn("do not claim you can only respond to text", prompt)
+        self.assertIn("no valid motion result was produced", prompt)
 
     async def test_input_barge_in_does_not_cancel_body_before_routing(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

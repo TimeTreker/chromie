@@ -20,11 +20,12 @@ wrong model answer should be caught by deterministic controls, catalog
 constraints, schema validation, runtime policy, provider refusal, or
 clarification fallback before it can become a harmful action.
 
-The current runtime has three decision stages, with validation guardrails
-between them:
+The current runtime has four decision stages, with validation guardrails between
+them:
 
 ```text
 emergency filter
+  -> optional post-interrupt semantic review after an interrupt is applied
   -> quick intent router
   -> route validation guardrails
   -> deep_thought handoff when quick confidence is low or planning is needed
@@ -59,17 +60,26 @@ The ownership invariant is:
 
 Every stage may propose high-level tasks or actions. Chromie records those
 proposals in `RouteDecision.metadata.route_stage_outputs` and merges them into
-`RouteDecision.metadata.task_list`. This task list is not authorization: it is
-the inspectable plan substrate that later validators, agents, Skill Runtime,
-and providers must accept before anything executes.
+`RouteDecision.metadata.task_list`. `RouteDecision.metadata.route_merge` records
+the merge strategy, final route, selected stage, proposal count, and task source
+stages. These fields are not authorization: they are the inspectable plan
+substrate that later validators, agents, Skill Runtime, and providers must
+accept before anything executes.
 
 The host can act on the first safe part of that substrate before every slower
 proposal has arrived. Today this is limited to `ORCH_FAST_FIRST_RESPONSE_ENABLED`
-speech: a short route-level phrase such as `Checking.` or `I'll answer.` after
-Router returns. It is provisional and correctable. Later Agent or deep-thinking
-output can amend the turn, ask a clarification, or cancel/stop work, but the
-first phrase must never claim that a physical action or tool side effect has
-already happened.
+speech: a short route-level phrase such as `I'll check if I can do that
+safely.` or `I'll answer.` after Router returns. It is provisional and
+correctable. Later Agent or deep-thinking output can amend the turn, ask a
+clarification, or cancel/stop work, but the first phrase must never claim that a
+physical action or tool side effect has already happened.
+
+Operational interrupts are the other first-safe action: the emergency filter may
+cancel current output or motion immediately. If
+`ROUTER_POST_INTERRUPT_REVIEW_ENABLED=1`, a slower semantic reviewer can confirm
+that stop interpretation or attach a corrected non-interrupt follow-up route.
+That correction may apologize for mishearing and continue through normal
+validation, but it must not automatically resume interrupted physical work.
 
 ## Required layers
 

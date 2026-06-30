@@ -11,6 +11,7 @@ or synthesis, invokes skills, or controls hardware.
 ```text
 text + bounded context
   -> emergency filter: deterministic interrupt/noise safety rules
+  -> optional post-interrupt semantic review after an interrupt is applied
   -> shared Agent capability-catalog search for ability context
   -> quick intent router: qwen-class semantic understanding with catalog bounds
   -> route validation guardrails for impossible/unsafe choices
@@ -52,12 +53,13 @@ Router falls back to safe chat instead of stopping, ignoring, or executing
 catalog motion. Low-confidence normal decisions delegate to `deep_thought`
 rather than being recovered by a catalog action rule.
 
-The Router has three decision stages. Only the first stage may use phrase rules
+The Router has four decision stages. Only the first stage may use phrase rules
 to determine a route:
 
 | Stage | What handles it | Purpose |
 |---|---|---|
 | Emergency filter | Deterministic Router rules | Stop, cancel, emergency-style interruption, silence, unusable audio, repeated filler hallucinations, and obvious noise. |
+| Post-interrupt review | Review model after the interrupt has already been applied | Confirm the stop/cancel interpretation or propose a corrected non-interrupt task when ASR/wording was misheard. |
 | Quick intent | Catalog search plus small LLM router, normally `qwen3:0.6b` | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and select supported routes/capabilities. |
 | Deep thought | Agent `deepthinking_agent` using the larger Agent model | Split complex tasks, plan, debug, and answer using bounded session memory when the quick router is low confidence or explicitly chooses `deep_thought`. |
 
@@ -76,9 +78,10 @@ into `RouteDecision.metadata.task_list` while retaining the original per-stage
 records in `RouteDecision.metadata.route_stage_outputs`:
 
 ```text
-metadata.route_stage_outputs[]  # emergency_filter / quick_intent / deep_thought
+metadata.route_stage_outputs[]  # emergency_filter / quick_intent / post_interrupt_review / deep_thought
   -> tasks[] and actions[]      # proposed high-level work from that stage
 metadata.task_list[]            # merged, priority/stage ordered task list
+metadata.route_merge            # merge strategy, final route, selected stage
 ```
 
 For task continuity, the quick Router model may also propose
@@ -96,6 +99,16 @@ capability actions, such as ordered Soridormi skill requests. The merged
 acknowledgement, deepthinking work, speech, memory, tool, and skill-execution
 proposals. The Agent and Skill Runtime still validate every executable item
 against registered capabilities and safety policy.
+
+When the emergency filter triggers `interrupt`, the host may already have
+cancelled current output or motion before slower semantic review finishes. If
+`ROUTER_POST_INTERRUPT_REVIEW_ENABLED=1`, Router can attach
+`metadata.post_interrupt_review`. A confirmed review adds no duplicate stop
+task. A corrected review keeps the original urgent stop tasks and adds a normal
+validated follow-up proposal in `metadata.post_interrupt_decision`; the
+Orchestrator may run that corrected route after the interrupt, but it must not
+resume interrupted physical work without the normal Agent/Skill validation and
+confirmation path.
 
 ## Current route list
 
@@ -160,11 +173,14 @@ ROUTER_MODEL=qwen3:0.6b
 ROUTER_REVIEW_MODEL=gemma4:e2b
 ROUTER_TIMEOUT_MS=800
 ROUTER_LLM_TIMEOUT_MS=800
-ROUTER_REVIEW_TIMEOUT_MS=3000
+ROUTER_LLM_NUM_PREDICT=192
+ROUTER_REVIEW_TIMEOUT_MS=1200
 ROUTER_CONFIDENCE_THRESHOLD=0.55
 ROUTER_CAPABILITY_CATALOG_URL=http://chromie-agent:8092
-ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=600
+ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=400
 ROUTER_CAPABILITY_MATCH_LIMIT=8
+ROUTER_POST_INTERRUPT_REVIEW_ENABLED=0
+ROUTER_SLOW_REVIEW_RECOVERY_ENABLED=0
 ROUTER_LOG_LEVEL=INFO
 ```
 

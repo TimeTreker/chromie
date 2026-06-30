@@ -20,7 +20,9 @@ from .schema import (
     RouteDecision,
     RouteRequest,
     annotate_pipeline_stage_outputs,
+    annotate_stage_outputs,
     finalize_decision,
+    route_stage_output,
 )
 
 
@@ -39,6 +41,7 @@ class Settings(BaseModel):
     review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:e2b"))
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "800")))
     llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "800"))))
+    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "192")))
     review_timeout_ms: int = Field(
         default_factory=lambda: int(
             os.getenv(
@@ -62,6 +65,14 @@ class Settings(BaseModel):
     capability_match_limit: int = Field(
         default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_MATCH_LIMIT", "8"))
     )
+    post_interrupt_review_enabled: bool = Field(
+        default_factory=lambda: os.getenv("ROUTER_POST_INTERRUPT_REVIEW_ENABLED", "0").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    slow_review_recovery_enabled: bool = Field(
+        default_factory=lambda: os.getenv("ROUTER_SLOW_REVIEW_RECOVERY_ENABLED", "0").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
     log_level: str = Field(default_factory=lambda: os.getenv("ROUTER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
 
 
@@ -72,6 +83,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
 )
 logger = logging.getLogger("chromie.router")
+CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE = 0.30
 
 app = FastAPI(
     title="Chromie Router",
@@ -93,6 +105,8 @@ llm_router = OllamaLLMRouter(
     timeout_ms=settings.llm_timeout_ms,
     review_timeout_ms=settings.review_timeout_ms,
     confidence_threshold=settings.confidence_threshold,
+    slow_review_recovery_enabled=settings.slow_review_recovery_enabled,
+    num_predict=settings.llm_num_predict,
     prompt_path=Path(__file__).parent / "prompts" / "router_system.txt",
 )
 
@@ -118,6 +132,12 @@ async def routes() -> dict:
                 "description": "Deterministic stop, cancel, silence, emergency, and unusable-audio handling before model routing.",
                 "routes": ["interrupt", "ignore"],
                 "llm": False,
+            },
+            {
+                "id": "post_interrupt_review",
+                "description": "Optional semantic review after an interrupt has already been applied, used only to confirm or correct likely stop/cancel mishearing.",
+                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
+                "llm": settings.mode in {"hybrid", "llm_only"} and settings.post_interrupt_review_enabled,
             },
             {
                 "id": "quick_intent",
@@ -270,6 +290,12 @@ def _validate_llm_capability_decision(
         decision.agents = list(dict.fromkeys([*decision.agents, "conversation_agent", "speaker_agent"]))
         return finalize_decision(decision, request, source="llm")
 
+    if decision.route == "deep_thought":
+        decision.metadata = {
+            **(decision.metadata or {}),
+            "thinking_ack_allowed": False,
+        }
+
     if selected_id:
         selected = by_id.get(selected_id)
         if selected is None or not _capability_available(selected):
@@ -369,6 +395,153 @@ def _attach_stage_context(
     }
 
 
+def _decision_summary(decision: RouteDecision) -> dict:
+    return {
+        "route": decision.route,
+        "agents": list(decision.agents),
+        "intent": decision.intent,
+        "confidence": decision.confidence,
+        "language": decision.language,
+        "priority": decision.priority,
+        "interrupt_current": decision.interrupt_current,
+        "needs_agent": decision.needs_agent,
+        "should_speak": decision.should_speak,
+        "speak_first": decision.speak_first,
+        "actions": list(decision.actions),
+        "candidate_capabilities": list(decision.candidate_capabilities),
+        "reason": decision.reason,
+        "source": decision.source,
+        "metadata": {
+            key: value
+            for key, value in (decision.metadata or {}).items()
+            if key not in {"route_stage_outputs", "task_list", "route_merge"}
+        },
+    }
+
+
+def _attach_post_interrupt_review(
+    interrupt_decision: RouteDecision,
+    advisory: RouteDecision | None,
+    *,
+    status: str,
+    reason: str | None = None,
+) -> RouteDecision:
+    outputs = [
+        route_stage_output(
+            interrupt_decision,
+            stage="emergency_filter",
+            status="triggered",
+        )
+    ]
+    review: dict = {"status": status}
+    if reason:
+        review["reason"] = reason
+
+    if advisory is not None:
+        review["decision"] = _decision_summary(advisory)
+        if status == "corrected":
+            outputs.append(
+                route_stage_output(
+                    advisory,
+                    stage="post_interrupt_review",
+                    status="corrected_after_interrupt",
+                )
+            )
+            review["post_interrupt_decision"] = _decision_summary(advisory)
+        else:
+            outputs.append(
+                route_stage_output(
+                    advisory,
+                    stage="post_interrupt_review",
+                    status=status,
+                    tasks=[],
+                )
+            )
+
+    interrupt_decision.metadata = {
+        **(interrupt_decision.metadata or {}),
+        "post_interrupt_review": review,
+    }
+    if status == "corrected" and advisory is not None:
+        interrupt_decision.metadata["post_interrupt_decision"] = _decision_summary(advisory)
+    return annotate_stage_outputs(
+        interrupt_decision,
+        outputs,
+        merge_strategy="safety_interrupt_then_semantic_review",
+        merge_reason=reason,
+        selected_stage="emergency_filter",
+    )
+
+
+async def _review_priority_interrupt(
+    request: RouteRequest,
+    interrupt_decision: RouteDecision,
+) -> RouteDecision:
+    if not settings.post_interrupt_review_enabled:
+        return interrupt_decision
+    if settings.mode not in {"hybrid", "llm_only"}:
+        return interrupt_decision
+    if interrupt_decision.route != "interrupt":
+        return interrupt_decision
+
+    try:
+        catalog_result = await capability_catalog.search(
+            text=request.text,
+            language=request.language,
+        )
+    except Exception as exc:
+        logger.warning("post-interrupt catalog context failed: %s", exc)
+        return _attach_post_interrupt_review(
+            interrupt_decision,
+            None,
+            status="unavailable",
+            reason=f"catalog_error:{type(exc).__name__}",
+        )
+
+    _attach_stage_context(
+        request,
+        emergency_matched=True,
+        catalog_result=catalog_result,
+    )
+    interrupt_decision.candidate_capabilities = list(catalog_result.matches or [])
+
+    try:
+        advisory = await llm_router.review_after_priority_interrupt(
+            request,
+            interrupt_decision,
+        )
+    except Exception as exc:
+        logger.warning("post-interrupt semantic review failed: %s", exc)
+        return _attach_post_interrupt_review(
+            interrupt_decision,
+            None,
+            status="unavailable",
+            reason=f"review_error:{type(exc).__name__}",
+        )
+
+    if advisory.route in {"interrupt", "ignore"}:
+        return _attach_post_interrupt_review(
+            interrupt_decision,
+            advisory,
+            status="confirmed" if advisory.route == "interrupt" else "ignored",
+        )
+    if advisory.confidence < settings.confidence_threshold:
+        return _attach_post_interrupt_review(
+            interrupt_decision,
+            advisory,
+            status="uncertain",
+            reason=(
+                f"confidence {advisory.confidence:.2f} below threshold "
+                f"{settings.confidence_threshold:.2f}"
+            ),
+        )
+    return _attach_post_interrupt_review(
+        interrupt_decision,
+        advisory,
+        status="corrected",
+    )
+
+
 def _catalog_decision(
     request: RouteRequest,
     result: CapabilityCatalogResult,
@@ -403,6 +576,9 @@ def _catalog_decision(
             None,
         )
         if top is None:
+            return None
+        score = float(top.get("score") or 0.0)
+        if score < CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE:
             return None
     selected_id = _capability_id(top)
     if not selected_id:
@@ -447,6 +623,8 @@ def _catalog_planner_fallback_decision(
         ),
         default=0.0,
     )
+    if top_score < CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE:
+        return None
     reason_parts = [
         "LLM router unavailable; preserving catalog candidates for capability planner",
         f"catalog_version={result.catalog_version}",
@@ -486,7 +664,7 @@ async def route(request: RouteRequest) -> RouteDecision:
     emergency_matched = False
     priority = route_by_priority_rules(request)
     if priority is not None:
-        decision = priority
+        decision = await _review_priority_interrupt(request, priority)
         emergency_matched = True
 
     if decision is None:

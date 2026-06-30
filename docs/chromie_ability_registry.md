@@ -55,8 +55,8 @@ The first phrase must be a truthful state signal, not an execution claim:
 
 - chat: `I'm here.` / `我在。`
 - factual or non-small-talk chat: `I'll answer.` / `我来回答。`
-- robot action: `Checking.` / `我先确认。`
-- tool lookup: `Checking.` / `我查一下。`
+- robot action: `I heard the movement request.` / `我听到了这个动作请求。`
+- tool lookup: `I'll check that.` / `我查一下。`
 - memory request: `I'll note that.` / `我记一下。`
 - deep thought: `Okay, let me think about that.` / `好的，我想一下。`
 

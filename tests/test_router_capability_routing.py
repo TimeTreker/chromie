@@ -17,15 +17,33 @@ class _Catalog:
 
 
 class _LlmRouter:
-    def __init__(self, decision: RouteDecision) -> None:
+    def __init__(
+        self,
+        decision: RouteDecision,
+        *,
+        interrupt_review_decision: RouteDecision | None = None,
+    ) -> None:
         self.decision = decision
+        self.interrupt_review_decision = interrupt_review_decision
         self.calls = 0
+        self.interrupt_review_calls = 0
         self.request: RouteRequest | None = None
+        self.interrupt_review_request: RouteRequest | None = None
 
     async def route(self, request: RouteRequest) -> RouteDecision:
         self.calls += 1
         self.request = request
         return self.decision
+
+    async def review_after_priority_interrupt(
+        self,
+        request: RouteRequest,
+        interrupt_decision: RouteDecision,
+    ) -> RouteDecision:
+        del interrupt_decision
+        self.interrupt_review_calls += 1
+        self.interrupt_review_request = request
+        return self.interrupt_review_decision or self.decision
 
 
 class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
@@ -68,6 +86,13 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision.metadata["task_list"][0]["capability_id"],
             "soridormi.walk_forward",
         )
+        self.assertEqual(
+            decision.metadata["route_merge"]["strategy"],
+            "safety_filter_then_quick_intent",
+        )
+        self.assertEqual(decision.metadata["route_merge"]["final_route"], "robot_action")
+        self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "quick_intent")
+        self.assertEqual(decision.metadata["route_merge"]["task_count"], 1)
         self.assertEqual(
             decision.candidate_capabilities[0]["capability_id"],
             "soridormi.walk_forward",
@@ -164,7 +189,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.walk_velocity",
         )
 
-    async def test_rules_only_catalog_decision_does_not_use_chat_phrase_override(self) -> None:
+    async def test_rules_only_catalog_decision_ignores_weak_factual_word_overlap(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -195,9 +220,57 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 RouteRequest(text="I think the sun is hot and round, do you agree with me?")
             )
 
-        self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.source, "catalog")
-        self.assertEqual(decision.intent, "capability:soridormi.turn_in_place")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.intent, "general_conversation")
+
+    async def test_hybrid_llm_fallback_ignores_weak_factual_word_overlap(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="i think the moon is not round do you agree with me",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "conversation_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=4,
+            matches=[
+                {
+                    "capability_id": "soridormi.turn_in_place",
+                    "agent_id": "soridormi.skill",
+                    "description": "Rotate left or right with near-zero forward velocity.",
+                    "score": 0.165,
+                    "interaction_executable": True,
+                }
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=0.45,
+                language="en-US",
+                source="fallback",
+                reason="invalid_llm_router_response: no JSON object in model response",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="I think the moon is not round. Do you agree with me?")
+            )
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.intent, "general_conversation")
 
     async def test_main_validator_does_not_phrase_override_llm_robot_action(self) -> None:
         from router.app import main
@@ -262,6 +335,128 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             all(item["source_stage"] == "emergency_filter" for item in decision.metadata["task_list"])
         )
+        self.assertEqual(decision.metadata["route_merge"]["strategy"], "safety_interrupt")
+        self.assertEqual(decision.metadata["route_merge"]["final_route"], "interrupt")
+        self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "emergency_filter")
+        self.assertEqual(decision.metadata["route_merge"]["task_count"], 2)
+
+    async def test_priority_interrupt_can_be_semantically_confirmed_by_second_router(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(query="stop now", matched=False, matches=[])
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=0.45,
+                language="en-US",
+                source="fallback",
+            ),
+            interrupt_review_decision=RouteDecision(
+                route="interrupt",
+                agents=[],
+                intent="stop_current_output",
+                confidence=0.98,
+                language="en-US",
+                source="llm",
+                reason="The user really asked to stop.",
+            ),
+        )
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main.settings, "post_interrupt_review_enabled", True
+        ), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="Stop now."))
+
+        self.assertEqual(decision.route, "interrupt")
+        self.assertTrue(decision.interrupt_current)
+        self.assertEqual(llm_router.calls, 0)
+        self.assertEqual(llm_router.interrupt_review_calls, 1)
+        self.assertEqual(
+            [item["stage"] for item in decision.metadata["route_stage_outputs"]],
+            ["emergency_filter", "post_interrupt_review"],
+        )
+        self.assertEqual(decision.metadata["post_interrupt_review"]["status"], "confirmed")
+        self.assertNotIn("post_interrupt_decision", decision.metadata)
+        self.assertEqual(
+            [item["task_type"] for item in decision.metadata["task_list"]],
+            ["task.cancel_current_action", "body.stop_motion"],
+        )
+        self.assertEqual(
+            decision.metadata["route_merge"]["strategy"],
+            "safety_interrupt_then_semantic_review",
+        )
+        self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "emergency_filter")
+        self.assertEqual(decision.metadata["route_merge"]["proposal_count"], 2)
+        self.assertEqual(
+            decision.metadata["route_merge"]["task_source_stages"],
+            ["emergency_filter"],
+        )
+
+    async def test_priority_interrupt_can_record_corrected_second_router_task(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(query="stop", matched=False, matches=[])
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="interrupt",
+                agents=[],
+                intent="stop_current_output",
+                confidence=0.99,
+                language="en-US",
+                source="llm",
+            ),
+            interrupt_review_decision=RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="explain_phrase",
+                confidence=0.86,
+                language="en-US",
+                source="llm",
+                speak_first="Sorry, I heard that as a stop command; I will answer the phrase instead.",
+                reason="The user was asking about the phrase stop by.",
+            ),
+        )
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main.settings, "post_interrupt_review_enabled", True
+        ), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(
+                    text="Stop.",
+                    context={"asr_alternatives": ["Stop by the table means what?"]},
+                )
+            )
+
+        self.assertEqual(decision.route, "interrupt")
+        self.assertTrue(decision.interrupt_current)
+        self.assertEqual(decision.metadata["post_interrupt_review"]["status"], "corrected")
+        correction = decision.metadata["post_interrupt_decision"]
+        self.assertEqual(correction["route"], "chat")
+        self.assertEqual(correction["intent"], "explain_phrase")
+        self.assertIn("Sorry", correction["speak_first"])
+        self.assertEqual(
+            [item["task_type"] for item in decision.metadata["task_list"]],
+            ["task.cancel_current_action", "body.stop_motion", "speech.answer"],
+        )
+        self.assertEqual(
+            [item["source_stage"] for item in decision.metadata["task_list"]],
+            ["emergency_filter", "emergency_filter", "post_interrupt_review"],
+        )
+        self.assertEqual(
+            decision.metadata["route_merge"]["strategy"],
+            "safety_interrupt_then_semantic_review",
+        )
+        self.assertEqual(decision.metadata["route_merge"]["final_route"], "interrupt")
+        self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "emergency_filter")
+        self.assertEqual(decision.metadata["route_merge"]["task_count"], 3)
+        self.assertEqual(
+            decision.metadata["route_merge"]["task_source_stages"],
+            ["emergency_filter", "post_interrupt_review"],
+        )
 
     async def test_routes_endpoint_lists_quick_and_deep_lanes(self) -> None:
         from router.app import main
@@ -274,11 +469,13 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("emergency_filter", lanes)
         self.assertIn("quick_intent", lanes)
         self.assertIn("route_validation", lanes)
+        self.assertIn("post_interrupt_review", lanes)
         self.assertIn("deep_thought", lanes)
         self.assertFalse(lanes["emergency_filter"]["llm"])
         self.assertIn("interrupt", lanes["emergency_filter"]["routes"])
         self.assertIn("robot_action", lanes["quick_intent"]["routes"])
         self.assertFalse(lanes["route_validation"]["llm"])
+        self.assertIn("interrupt", lanes["post_interrupt_review"]["routes"])
         self.assertIn("deep_thought", lanes["deep_thought"]["routes"])
 
     async def test_chat_catalog_match_does_not_select_speech_tool_as_intent(self) -> None:
@@ -525,8 +722,13 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_low_confidence")
         self.assertIn("deepthinking_agent", decision.agents)
+        self.assertFalse(decision.metadata["thinking_ack_allowed"])
         self.assertIn(
             "cognition.deep_think",
+            [item["task_type"] for item in decision.metadata["task_list"]],
+        )
+        self.assertNotIn(
+            "speech.thinking_ack",
             [item["task_type"] for item in decision.metadata["task_list"]],
         )
 

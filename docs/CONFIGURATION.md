@@ -153,27 +153,32 @@ configuration.
 | `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the small Router model for fast semantic routing while the emergency filter remains deterministic. |
 | `ROUTER_RULES_FIRST` | `1`. Only hard interrupt/noise filtering runs before the small Router model; normal intent is not selected by phrase rules. |
 | `ROUTER_MODEL` | `qwen3:0.6b` in common configuration. |
-| `ROUTER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; reviews underspecified or impossible quick-router choices before any robot skill is selected. |
+| `ROUTER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; used only when an optional review path is enabled. |
 | `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
-| `ROUTER_TIMEOUT_MS` | `1500` in common configuration. |
-| `ROUTER_LLM_TIMEOUT_MS` | `1500` in common configuration for the fast quick-router model path. |
-| `ROUTER_REVIEW_TIMEOUT_MS` | `8000` in common configuration for the reviewer path that recovers invalid quick-router choices. |
+| `ROUTER_TIMEOUT_MS` | `800` in common low-latency configuration. |
+| `ROUTER_LLM_TIMEOUT_MS` | `800` in common configuration for the fast quick-router model path. |
+| `ROUTER_LLM_NUM_PREDICT` | `192`; compact JSON output budget for the fast quick-router model. |
+| `ROUTER_REVIEW_TIMEOUT_MS` | `1200` in common configuration for optional reviewer paths. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
-| `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `600`. Catalog failure falls back safely and the Agent rechecks in-process. |
+| `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
 | `ROUTER_CAPABILITY_MATCH_LIMIT` | Maximum ranked candidates attached to one route; default `8`. |
+| `ROUTER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
+| `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `0` in common low-latency runtime; enables slower semantic review/repair passes after malformed or timed-out quick-router outputs. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
 | `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 
-Router routing has three decision stages plus deterministic validation
+Router routing has four decision stages plus deterministic validation
 guardrails. The hard emergency filter for interrupt and ignore stays
-deterministic in every mode. The quick intent stage uses catalog-bounded LLM
-routing when `ROUTER_MODE` is `hybrid` or `llm_only`. The deep-thought stage is
-reached when quick intent returns low confidence or explicitly chooses
-`deep_thought`; it is handled by the Agent deepthinking module, not by the small
-Router model. Soft deterministic validators may correct impossible or unsafe
-route choices between stages, but they must not answer the user or select normal
-intent by phrase matching.
+deterministic in every mode. The optional post-interrupt review runs only after
+that interrupt is already applied, so it cannot delay cancellation; it may only
+confirm the stop or attach a corrected follow-up route. The quick intent stage
+uses catalog-bounded LLM routing when `ROUTER_MODE` is `hybrid` or `llm_only`.
+The deep-thought stage is reached when quick intent returns low confidence or
+explicitly chooses `deep_thought`; it is handled by the Agent deepthinking
+module, not by the small Router model. Soft deterministic validators may correct
+impossible or unsafe route choices between stages, but they must not answer the
+user or select normal intent by phrase matching.
 
 The hard filter implementation is intentionally narrow in `router/app/rules.py`.
 It is the only Router stage allowed to use phrase patterns to determine a route,
@@ -231,24 +236,24 @@ python scripts/evaluate_experience_episodes.py \
 | `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
-| `AGENT_RESPONSE_REVIEW_ENABLED` | Enable model-based semantic review of spoken Agent replies and executed capability plans; default `1`. |
+| `AGENT_RESPONSE_REVIEW_ENABLED` | Enable model-based semantic review of spoken Agent replies; common low-latency default `0`. |
 | `AGENT_RESPONSE_REVIEW_MODEL` | Ollama model used to accept or rewrite weak spoken replies; default `gemma4:e2b`, matching the main Agent model. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | Timeout for the semantic response-review model call; default `4000`. |
 | `AGENT_RESPONSE_REVIEW_MODE` | `auto` skips the extra spoken-response review for clearly low-risk chat replies; `always` reviews every spoken reply. Capability-plan review for executable robot actions remains controlled by `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW`. |
-| `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `220`, matching `TTS_MAX_TEXT_CHARS`. |
-| `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; default `4096`. |
-| `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; default `128`. |
+| `AGENT_MAX_SPEAK_CHARS` | Trim Agent speech before TTS; common default `140`. |
+| `AGENT_CONVERSATION_NUM_CTX` | Ollama context window for normal conversation prompts; common default `2048`. |
+| `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `off`; enable only when expressive chat motion has been reviewed for the target robot/sim. |
-| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Default `1`; executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If the Router selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
+| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Common low-latency default `0`; set to `1` for stricter review where executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If the Router selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories inside the Agent container. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for marking retrieval candidates as matched; default `0.16`. In normal LLM modes this affects context/validation, not deterministic action selection. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
-| `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; default `4096`. |
-| `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; default `256`. |
-| `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; default `160`. |
+| `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
+| `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
+| `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` by default; `legacy-adapter` is the explicit rollback path for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | Default `0`; when enabled, only native contract-validation failures use the compatibility adapter. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
@@ -266,7 +271,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_ROUTER_TIMEOUT_MS` | `11000` in common configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_ROUTER_TIMEOUT_MS` | `3000` in common low-latency configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
@@ -405,14 +410,14 @@ Faster-Whisper fallback deployments should keep exact model revisions in
 | `TTS_MAX_LENGTH` | Generation-token budget, **not** a text limit. |
 | `MIN_TTS_GENERATION_LENGTH` | Minimum safe generation budget; profiles use `1024`. |
 | `TTS_MAX_TEXT_CHARS` | Spoken text character limit. |
-| `TTS_MIN_TEXT_CHARS` | Minimum accepted text; default `4`. |
+| `TTS_MIN_TEXT_CHARS` | Minimum accepted text; common default `1` so short Chinese acknowledgements such as `我在。` synthesize instead of returning empty audio. |
 | `TTS_N_BATCH`, `TTS_THREADS` | Profile-specific llama.cpp settings. |
 | `TTS_SAMPLE_RATE` | PCM output rate; common default `44100`. |
 | `TTS_CHUNK_MS` | Stream chunk size; common default `120`. |
 | `TTS_MAX_CONCURRENT_SYNTHESIS` | Request semaphore; common default `1`; RTX 5090 profile uses `2`. |
 | `TTS_WORKER_COUNT` | Number of independent OuteTTS model workers; common/default value `1`; RTX 5090 profile uses `2`. |
 | `TTS_GENERATION_RETRIES` | Common default `1`. |
-| `TTS_RESET_LLAMA_STATE` | Common default `1`. |
+| `TTS_RESET_LLAMA_STATE` | Common low-latency default `0`; set to `1` for stricter per-request state reset at the cost of slower first audio. |
 | `TTS_AUDIO_CODEC_DEVICE` | Common default `cpu`. |
 | `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY` | Common defaults `0.4`, `1.1`. |
 | `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Maximum wait for initial or post-cancellation model-worker startup; default `600`. |

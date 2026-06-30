@@ -68,8 +68,17 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("ROUTER_USE_LLM: ${ROUTER_USE_LLM:-1}", router_block)
         self.assertIn("ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:0.6b}", router_block)
         self.assertIn("ROUTER_REVIEW_MODEL: ${ROUTER_REVIEW_MODEL:-gemma4:e2b}", router_block)
-        self.assertIn("ROUTER_LLM_TIMEOUT_MS: ${ROUTER_LLM_TIMEOUT_MS:-2000}", router_block)
-        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-8000}", router_block)
+        self.assertIn("ROUTER_LLM_TIMEOUT_MS: ${ROUTER_LLM_TIMEOUT_MS:-800}", router_block)
+        self.assertIn("ROUTER_LLM_NUM_PREDICT: ${ROUTER_LLM_NUM_PREDICT:-192}", router_block)
+        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-1200}", router_block)
+        self.assertIn(
+            "ROUTER_POST_INTERRUPT_REVIEW_ENABLED: ${ROUTER_POST_INTERRUPT_REVIEW_ENABLED:-0}",
+            router_block,
+        )
+        self.assertIn(
+            "ROUTER_SLOW_REVIEW_RECOVERY_ENABLED: ${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-0}",
+            router_block,
+        )
 
     def test_agent_service_uses_main_model_for_response_review_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
@@ -78,7 +87,7 @@ class ComposeConfigurationTests(unittest.TestCase):
             1,
         )[0]
 
-        self.assertIn("AGENT_RESPONSE_REVIEW_ENABLED: ${AGENT_RESPONSE_REVIEW_ENABLED:-1}", agent_block)
+        self.assertIn("AGENT_RESPONSE_REVIEW_ENABLED: ${AGENT_RESPONSE_REVIEW_ENABLED:-0}", agent_block)
         self.assertIn("AGENT_RESPONSE_REVIEW_MODEL: ${AGENT_RESPONSE_REVIEW_MODEL:-gemma4:e2b}", agent_block)
         self.assertIn(
             "AGENT_RESPONSE_REVIEW_TIMEOUT_MS: ${AGENT_RESPONSE_REVIEW_TIMEOUT_MS:-4000}",
@@ -95,12 +104,12 @@ class ComposeConfigurationTests(unittest.TestCase):
 
         self.assertIn("AGENT_EXPRESSIVE_BODY_CUES: ${AGENT_EXPRESSIVE_BODY_CUES:-off}", agent_block)
         self.assertIn(
-            "AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW: ${AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW:-1}",
+            "AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW: ${AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW:-0}",
             agent_block,
         )
-        self.assertIn("AGENT_CAPABILITY_NUM_CTX: ${AGENT_CAPABILITY_NUM_CTX:-4096}", agent_block)
+        self.assertIn("AGENT_CAPABILITY_NUM_CTX: ${AGENT_CAPABILITY_NUM_CTX:-24576}", agent_block)
         self.assertIn(
-            "AGENT_CAPABILITY_NUM_PREDICT: ${AGENT_CAPABILITY_NUM_PREDICT:-256}",
+            "AGENT_CAPABILITY_NUM_PREDICT: ${AGENT_CAPABILITY_NUM_PREDICT:-512}",
             agent_block,
         )
         self.assertIn(
@@ -116,11 +125,11 @@ class ComposeConfigurationTests(unittest.TestCase):
         )[0]
 
         self.assertIn(
-            "AGENT_CONVERSATION_NUM_CTX: ${AGENT_CONVERSATION_NUM_CTX:-4096}",
+            "AGENT_CONVERSATION_NUM_CTX: ${AGENT_CONVERSATION_NUM_CTX:-2048}",
             agent_block,
         )
         self.assertIn(
-            "AGENT_CONVERSATION_NUM_PREDICT: ${AGENT_CONVERSATION_NUM_PREDICT:-128}",
+            "AGENT_CONVERSATION_NUM_PREDICT: ${AGENT_CONVERSATION_NUM_PREDICT:-64}",
             agent_block,
         )
         self.assertIn(

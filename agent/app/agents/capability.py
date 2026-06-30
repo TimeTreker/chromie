@@ -466,11 +466,11 @@ class CapabilityAgent(BaseAgent):
         if self.is_zh(request):
             return _CapabilityPlan(
                 decision="clarify",
-                speech="我需要重新确认这个动作计划，请你再说一次要我做的动作。",
+                speech="这个动作计划没有可靠的复核结果，所以我不会移动。",
             )
         return _CapabilityPlan(
             decision="clarify",
-            speech="I need to re-check that action plan. Please say the movement you want again.",
+            speech="That motion plan did not get a reliable review result, so I will not move.",
         )
 
     def _direct_action_ack_speech(self, request: AgentRunRequest, action_count: int) -> str:
@@ -507,42 +507,31 @@ class CapabilityAgent(BaseAgent):
     def _format_global_context(self, request: AgentRunRequest, *, zh: bool) -> str:
         mind = self.mind_context(request)
         summary = " ".join(str(mind.get("prompt_summary") or "").split()) if mind else ""
-        if len(summary) > 500:
-            summary = summary[:500].rstrip() + "..."
+        if len(summary) > 220:
+            summary = summary[:220].rstrip() + "..."
         identity = mind.get("identity") if isinstance(mind.get("identity"), dict) else {}
         profile = {
             "profile_id": mind.get("profile_id"),
             "version": mind.get("version"),
             "owner_approved": mind.get("owner_approved"),
-            "owner_approval_required_for_core_changes": mind.get(
-                "owner_approval_required_for_core_changes"
-            ),
         }
         none_text = "无" if zh else "None"
         return (
             "Mind Profile:\n"
-            f"{self._bounded_json(profile, 260)}\n\n"
+            f"{self._bounded_json(profile, 180)}\n\n"
             "Robot Identity:\n"
-            f"{self._bounded_json(identity or none_text, 500)}\n\n"
+            f"{self._bounded_json(identity or none_text, 220)}\n\n"
             "Worldview:\n"
-            "- Chromie is an embodied realtime robot/voice assistant, not the backend model provider.\n"
-            "- Use only supplied sensors, memory, robot state, and available abilities as runtime evidence.\n"
-            "- Do not claim unsupported perception, memory, execution, or runtime facts.\n\n"
+            "- Chromie is an embodied realtime robot. Use only supplied runtime context and abilities as evidence.\n"
+            "- Never claim unsupported perception, memory, execution, or runtime facts.\n\n"
             "Lifeview:\n"
-            f"{self._bounded_json(mind.get('long_term_goals') or none_text, 500)}\n\n"
+            f"{self._bounded_json(mind.get('long_term_goals') or none_text, 180)}\n\n"
             "Valueview:\n"
-            f"{self._bounded_json(mind.get('core_principles') or none_text, 800)}\n\n"
+            f"{self._bounded_json(mind.get('core_principles') or none_text, 260)}\n\n"
             "Core Runtime Principles:\n"
-            "- Generalization-first: infer planning from meaning, context, ability descriptions, schemas, and task memory.\n"
-            "- Phrase rules are only for deterministic emergency/noise controls outside this planner.\n"
-            "- Memory, identity, and preferences guide interpretation; they never authorize side effects.\n"
+            "- Plan by meaning, context, ability descriptions, and schemas; phrase rules are only for emergency/noise controls outside this planner.\n"
+            "- Memory, identity, and preferences guide interpretation but never authorize side effects.\n"
             "- Never invent abilities or raw motor/joint/actuator/controller-array/torque commands.\n\n"
-            "Reflex Policy:\n"
-            f"{self._bounded_json(mind.get('reflex_policy') or none_text, 300)}\n\n"
-            "Deliberation Policy:\n"
-            f"{self._bounded_json(mind.get('deliberation_policy') or none_text, 300)}\n\n"
-            "Experience Tuning Boundary:\n"
-            f"{self._bounded_json(mind.get('experience_tuning_policy') or none_text, 300)}\n\n"
             "Owner-Approved Mind Summary:\n"
             f"{summary or none_text}"
         )
@@ -602,11 +591,11 @@ class CapabilityAgent(BaseAgent):
             "- Never combine an unrelated spoken answer with a body skill.\n"
             "- Use recent conversation/task context for follow-ups; distinguish gaze/attention/orientation from locomotion by meaning and descriptions.\n\n"
             "Cost Function:\n"
-            "- Choose the smallest safe set of executable skills.\n"
+            "- Choose the smallest validated set of executable skills.\n"
             "- Prefer human-facing wrapper skills over lower-level velocity/control skills when both satisfy the request.\n"
             "- Preserve the user's intended action class. Do not use social acknowledgement, gaze, attention, or idle gestures as fallback actions for an unrelated body request.\n"
             "- If the request needs deeper task decomposition, runtime evidence, or a multi-session plan, clarify or return unsupported instead of guessing a physical skill.\n"
-            "- Clarify when a required safe parameter is missing; unsupported when no candidate can satisfy the request.\n"
+            "- Clarify when a required parameter is missing; unsupported when no candidate can satisfy the request.\n"
             "- Prefer natural, brief speech that accurately describes only the selected plan.\n\n"
             "Output Contract:\n"
             "- Return JSON only with keys decision, speech, and skills.\n"
@@ -619,7 +608,7 @@ class CapabilityAgent(BaseAgent):
             "- Every enum argument must be copied exactly from that field's enum list in input_schema.\n"
             "- Map natural wording to enum tokens by semantic meaning; never output words outside the enum.\n"
             "- The speech field is spoken aloud. Never put status labels such as unsupported, clarify, execute, null, or none in speech.\n"
-            "- For unsupported, either leave speech empty so conversation_agent can answer, or give one natural sentence explaining the safe limitation."
+            "- For unsupported, either leave speech empty so conversation_agent can answer, or give one natural sentence explaining the runtime limitation."
         )
         try:
             raw = await self.services.ollama.generate(
@@ -629,8 +618,8 @@ class CapabilityAgent(BaseAgent):
                 options={
                     "temperature": 0,
                     "top_p": 0.8,
-                    "num_ctx": int(os.getenv("AGENT_CAPABILITY_NUM_CTX", "4096")),
-                    "num_predict": int(os.getenv("AGENT_CAPABILITY_NUM_PREDICT", "256")),
+                    "num_ctx": int(os.getenv("AGENT_CAPABILITY_NUM_CTX", "24576")),
+                    "num_predict": int(os.getenv("AGENT_CAPABILITY_NUM_PREDICT", "512")),
                 },
             )
         except Exception as exc:
@@ -642,9 +631,9 @@ class CapabilityAgent(BaseAgent):
             return _CapabilityPlan(
                 decision="clarify",
                 speech=(
-                    "我刚才没能安全地规划这个动作，请你再说一次。"
+                    "我听到了这个动作请求，但没有生成有效的动作指令，所以我不会移动。"
                     if zh
-                    else "I could not safely plan that action. Please try again."
+                    else "I heard the movement request, but I could not produce a valid motion command, so I will not move."
                 ),
             )
         try:
@@ -739,13 +728,13 @@ class CapabilityAgent(BaseAgent):
 
     def _invalid_args_speech(self, request: AgentRunRequest) -> str:
         if self.is_zh(request):
-            return "这个动作参数不够明确，请再说一次。"
+            return "这个动作缺少必要参数，所以我还不能移动。"
         return "Please clarify the action before I move."
 
     def _unsupported_action_speech(self, request: AgentRunRequest) -> str:
         if self.is_zh(request):
-            return "我不能把这句话安全地对应到可用动作，请换一种说法。"
-        return "I cannot safely map that to an available action. Please say it another way."
+            return "我没有找到能对应这句话的可用动作，所以我不会移动。"
+        return "I cannot map that to an available action, so I will not move."
 
     @staticmethod
     def _natural_plan_speech(value: str) -> str:

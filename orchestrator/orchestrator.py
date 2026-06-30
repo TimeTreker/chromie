@@ -1262,7 +1262,7 @@ class VoiceAssistant:
             "- Reply with only the final spoken response; do not expose reasoning, analysis, JSON, markdown, or internal tool names.\n"
             "- Normally do not repeat, quote, or paraphrase the user's current words unless confirmation, clarification, or read-back is required.\n"
             "- Use recent context for follow-up questions, but do not invent tool results or pretend an action ran.\n"
-            "- This direct fallback can speak only. If the user asked for body movement or another action, be honest that Chromie could not start that action and ask them to try again; do not claim you can only respond to text.\n\n"
+            "- This direct fallback can speak only. If the user asked for body movement or another action, be honest that Chromie could not start that action because no valid motion result was produced; ask for a clearer command only when the request is actually ambiguous.\n\n"
             f"{fallback_line}\n"
             f"{route_line}\n"
             f"Bounded runtime context JSON: {context_json}\n\n"
@@ -1542,9 +1542,9 @@ class VoiceAssistant:
         if decision.speak_first:
             return decision.speak_first.strip() or None
         if decision.route == "robot_action":
-            return "我先确认。" if zh else "Checking."
+            return "我听到了这个动作请求。" if zh else "I heard the movement request."
         if decision.route == "tool":
-            return "我查一下。" if zh else "Checking."
+            return "我查一下。" if zh else "I'll check that."
         if decision.route == "memory":
             return "我记一下。" if zh else "I'll note that."
         if decision.route == "chat":
@@ -1781,6 +1781,15 @@ class VoiceAssistant:
             ):
                 if key in decision.metadata:
                     turn_metadata[key] = decision.metadata[key]
+            review = decision.metadata.get("post_interrupt_review")
+            if isinstance(review, dict):
+                turn_metadata["post_interrupt_review_status"] = review.get("status")
+                corrected = decision.metadata.get("post_interrupt_decision") or review.get(
+                    "post_interrupt_decision"
+                )
+                if isinstance(corrected, dict):
+                    turn_metadata["post_interrupt_corrected_route"] = corrected.get("route")
+                    turn_metadata["post_interrupt_corrected_intent"] = corrected.get("intent")
 
         self.conversation_state.record_user_turn(
             session_id,
@@ -1792,6 +1801,25 @@ class VoiceAssistant:
 
         if decision.interrupt_current or decision.route == "interrupt":
             await self.interrupt(new_session_id=session_id)
+            correction = self._post_interrupt_corrected_decision(decision)
+            if correction is not None and self.enable_agent and correction.needs_agent:
+                self.session_log(
+                    session_id,
+                    "post_interrupt_correction_start: route=%s intent=%s confidence=%.2f",
+                    correction.route,
+                    correction.intent,
+                    correction.confidence,
+                )
+                self.active_llm_task = asyncio.create_task(
+                    self._run_post_interrupt_correction(
+                        session,
+                        user_text=user_text,
+                        session_id=session_id,
+                        context=context,
+                        decision=correction,
+                    )
+                )
+                return
             state = self.sessions.state.get(session_id)
             if state is not None:
                 state["llm_done"] = True
@@ -1926,6 +1954,158 @@ class VoiceAssistant:
                     session_id,
                     reset_playback=not fast_first_scheduled,
                     fallback_reason="agent_exception",
+                    route=decision.route,
+                )
+            )
+
+    def _post_interrupt_corrected_decision(
+        self,
+        decision: RouteDecision,
+    ) -> RouteDecision | None:
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        review = metadata.get("post_interrupt_review")
+        if not isinstance(review, dict) or review.get("status") != "corrected":
+            return None
+        raw = metadata.get("post_interrupt_decision") or review.get("post_interrupt_decision")
+        if not isinstance(raw, dict):
+            return None
+        try:
+            corrected = RouteDecision.model_validate(raw)
+        except Exception as exc:
+            logger.warning("Invalid post-interrupt corrected route: %s", exc)
+            return None
+        if corrected.route in {"interrupt", "ignore"} or corrected.interrupt_current:
+            return None
+        corrected.metadata = {
+            **(corrected.metadata or {}),
+            "post_interrupt_correction": True,
+            "original_interrupt_intent": decision.intent,
+            "original_interrupt_confidence": decision.confidence,
+        }
+        return corrected
+
+    async def _run_post_interrupt_correction(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        user_text: str,
+        session_id: str,
+        context: dict[str, Any],
+        decision: RouteDecision,
+    ) -> None:
+        fast_first_scheduled = False
+        if decision.speak_first:
+            fast_first_scheduled = await self._schedule_fast_first_response(
+                decision,
+                user_text,
+                session_id,
+            )
+
+        agent_start_ms = now_ms()
+        self.session_log(
+            session_id,
+            "post_interrupt_agent_start: route=%s agents=%s intent=%s",
+            decision.route,
+            ",".join(decision.agents),
+            decision.intent,
+        )
+        try:
+            if self.enable_interaction_response:
+                response = await self.agent_client.run_interaction(
+                    session,
+                    text=user_text,
+                    route_decision=decision,
+                    sid=session_id,
+                    context=context,
+                    history=context.get("history", []),
+                )
+                agent_latency_ms = now_ms() - agent_start_ms
+                response = response.model_copy(
+                    deep=True,
+                    update={
+                        "metadata": {
+                            **response.metadata,
+                            "language": decision.language,
+                            "post_interrupt_correction": True,
+                        }
+                    },
+                )
+                self.session_log(
+                    session_id,
+                    "post_interrupt_interaction_done: agent_ms=%.1f speech=%s skills=%s requires_confirmation=%s",
+                    agent_latency_ms,
+                    len(response.speech),
+                    len(response.skills),
+                    response.requires_confirmation,
+                )
+                for request in response.skills:
+                    self.session_log(
+                        session_id,
+                        "skill_proposed: request_id=%s skill_id=%s timing=%s "
+                        "cancellable=%s requires_confirmation=%s",
+                        request.request_id,
+                        request.skill_id,
+                        request.timing,
+                        request.cancellable,
+                        request.requires_confirmation,
+                    )
+                if await self._stage_interaction_confirmation(
+                    response,
+                    session_id,
+                    language=decision.language,
+                    reset_playback=not fast_first_scheduled,
+                ):
+                    return
+                self.conversation_state.record_agent_result(session_id, response)
+                self._launch_interaction(
+                    response,
+                    session_id,
+                    reset_playback=not fast_first_scheduled,
+                )
+                return
+
+            result = await self.agent_client.run(
+                session,
+                text=user_text,
+                route_decision=decision,
+                sid=session_id,
+                context=context,
+                history=context.get("history", []),
+            )
+            self.session_log(
+                session_id,
+                "post_interrupt_agent_done: agent_ms=%.1f speak_immediate=%s actions=%s task_graphs=%s speak_after=%s requires_confirmation=%s",
+                now_ms() - agent_start_ms,
+                len(result.speak_immediate),
+                len(result.actions),
+                len(result.task_graphs),
+                len(result.speak_after),
+                result.requires_confirmation,
+            )
+            self.conversation_state.record_agent_result(session_id, result)
+            await self.execute_agent_result(
+                result,
+                session_id,
+                reset_playback=not fast_first_scheduled,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "post_interrupt_agent_exception: agent_ms=%.1f error=%s",
+                now_ms() - agent_start_ms,
+                exc,
+            )
+            logger.warning(
+                "Post-interrupt correction Agent failed: %s",
+                exc,
+                exc_info=True,
+            )
+            self.active_llm_task = asyncio.create_task(
+                self.process_llm_tts(
+                    user_text,
+                    session_id,
+                    reset_playback=not fast_first_scheduled,
+                    fallback_reason="post_interrupt_agent_exception",
                     route=decision.route,
                 )
             )
@@ -2156,9 +2336,9 @@ class VoiceAssistant:
             return None
         zh = self._looks_zh(user_text)
         text = (
-            "我没能安全地理解这个动作，请再说一次。"
+            "我听到了动作请求，但路由没有生成有效的动作结果，所以我不会移动。"
             if zh
-            else "I couldn't route that movement safely. Please try again."
+            else "I heard a movement request, but routing did not produce a valid motion result, so I will not move."
         )
         return self._host_speech_response(
             text,

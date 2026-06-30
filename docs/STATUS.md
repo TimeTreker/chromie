@@ -73,8 +73,10 @@ and Soridormi provider checks remain authoritative. Deterministic semantic
 action parsing is now a rules-only or explicit compatibility fallback rather
 than the normal hybrid brain path. Router decisions now retain staged
 task/action proposals in `metadata.route_stage_outputs` and a merged
-`metadata.task_list`, while execution still requires Agent and provider
-validation. See
+`metadata.task_list` with a `metadata.route_merge` ledger, while execution still
+requires Agent and provider validation. Optional post-interrupt review can attach
+a corrected follow-up route after deterministic cancellation has already
+happened, but it does not authorize automatic physical resume. See
 [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
 
 Chromie now has a structured mind context layer for owner-approved identity,

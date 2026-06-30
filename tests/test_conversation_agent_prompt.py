@@ -791,7 +791,39 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.speak_immediate[0].text, "Yes. The Moon is roughly spherical, so it is round.")
         self.assertEqual(len(ollama.calls), 1)
         self.assertIn("correct obvious false premises", ollama.calls[0]["system"])
+        self.assertIn("The Moon is roughly spherical", ollama.calls[0]["system"])
         self.assertIn("Current user said: I think the moon is round.", ollama.calls[0]["prompt"])
+
+    async def test_false_moon_shape_claim_goes_through_llm_with_factual_prompt(self) -> None:
+        ollama = _CapturingOllama("No. The Moon is roughly spherical, so it is round.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "moon-not-round-llm-test",
+                "text": "I think the moon is not round. Do you agree with me?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "No. The Moon is roughly spherical, so it is round.")
+        self.assertEqual(len(ollama.calls), 1)
+        self.assertIn("objective factual answer", ollama.calls[0]["system"])
+        self.assertIn("Current user said: I think the moon is not round.", ollama.calls[0]["prompt"])
 
     async def test_moon_temperature_claim_goes_through_llm_with_factual_prompt(self) -> None:
         ollama = _CapturingOllama("No. The Moon's surface temperature varies widely.")

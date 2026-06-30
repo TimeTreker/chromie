@@ -16,7 +16,7 @@ The first supported schema covers these retained artifact families:
 | Family | Files | Producer | Purpose |
 |---|---|---|---|
 | Session events | `events.jsonl`, other `*.jsonl` files | Host Orchestrator acceptance runners | Correlate VAD, ASR, Router, Agent, Skill Runtime, TTS, playback, cancellation, and fallback log events by session id. |
-| Route decision | `route.json` | Text/MuJoCo acceptance runner | Retain Router route, intent, confidence, candidate actions, and merged task metadata. |
+| Route decision | `route.json` | Text/MuJoCo acceptance runner | Retain Router route, intent, confidence, candidate actions, stage proposals, merge ledger, merged task metadata, and optional post-interrupt review/correction metadata. |
 | Interaction response | `interaction_response.json` | Agent `/interaction` response | Retain speech, skill requests, confirmation requirements, interaction id, and response status. |
 | Skill Runtime execution | `execution.json` | Host trusted Skill Runtime | Retain interaction-level status, per-skill results, and per-skill trace events. |
 | TaskGraph trace | `trace.json` or API-returned trace JSON | Agent TaskGraph service | Retain graph id, graph status, node results, execution events, and deterministic `outcome_summary`. |

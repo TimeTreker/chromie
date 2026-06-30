@@ -556,9 +556,30 @@ class _BrokenCapabilityPlannerOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "Available capability API surface" in prompt
         assert kwargs["response_format"] == "json"
-        assert kwargs["options"]["num_ctx"] >= 4096
-        assert kwargs["options"]["num_predict"] >= 256
+        assert kwargs["options"]["num_ctx"] >= 8192
+        assert kwargs["options"]["num_predict"] >= 384
         raise ValueError("truncated JSON from capability planner")
+
+
+class _PromptBudgetOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Global Context Group" in prompt
+        assert "Worldview" in prompt
+        assert "Lifeview" in prompt
+        assert "Valueview" in prompt
+        assert "Task Context Group" in prompt
+        assert len(prompt) < 9000
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "Walking forward for one second.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0},
+                }
+            ],
+        }
 
 
 class _BadSocialFallbackOllama:
@@ -1032,9 +1053,58 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills, [])
         self.assertEqual(
             response.speech[0].text,
-            "I could not safely plan that action. Please try again.",
+            "I heard the movement request, but I could not produce a valid motion command, so I will not move.",
         )
         self.assertEqual(response.metadata["capability_decision"], "clarify")
+
+    async def test_capability_planner_keeps_large_mind_context_bounded(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_PromptBudgetOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        large_mind = {
+            "profile_id": "chromie_default_mind",
+            "version": "0.1.2",
+            "owner_approved": True,
+            "identity": {
+                "name": "Chromie",
+                "description": " ".join(["embodied realtime robot"] * 80),
+            },
+            "long_term_goals": [" ".join(["be useful"] * 120)],
+            "core_principles": [" ".join(["be safe and honest"] * 160)],
+            "prompt_summary": " ".join(["owner-approved robot mind summary"] * 100),
+        }
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "large-mind-planner",
+                "text": "Walk forward for one second.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.72,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+                "context": {
+                    "mind": large_mind,
+                    "history": [
+                        {"role": "user", "text": "Hello, how are you."},
+                        {"role": "assistant", "text": "Hello."},
+                    ],
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(response.speech[0].text, "Walking forward for one second.")
 
     async def test_capability_plan_reviewer_blocks_social_fallback_for_walking_request(self) -> None:
         runtime = InteractionRuntime(
@@ -1117,7 +1187,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.speech[0].text,
-            "I need to re-check that action plan. Please say the movement you want again.",
+            "That motion plan did not get a reliable review result, so I will not move.",
         )
 
     async def test_exact_router_intent_substitution_fails_closed_without_reviewer(self) -> None:
@@ -1152,7 +1222,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.speech[0].text,
-            "I need to re-check that action plan. Please say the movement you want again.",
+            "That motion plan did not get a reliable review result, so I will not move.",
         )
 
     async def test_exact_router_intent_substitution_reviewer_accept_is_not_enough(self) -> None:
@@ -1188,7 +1258,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.speech[0].text,
-            "I need to re-check that action plan. Please say the movement you want again.",
+            "That motion plan did not get a reliable review result, so I will not move.",
         )
 
     async def test_capability_plan_uses_task_context_for_look_forward_followup(self) -> None:

@@ -30,7 +30,10 @@ Router also attaches staged task metadata:
 
 - `metadata.route_stage_outputs`: one entry per route stage that contributed or
   passed, each with proposed `tasks` and `actions`;
-- `metadata.task_list`: the merged priority/stage ordered task list.
+- `metadata.task_list`: the merged priority/stage ordered task list;
+- `metadata.route_merge`: the concise merge ledger, including merge strategy,
+  final route/intent/source, selected stage, proposal count, task count, and
+  task source stages.
 
 For conversation continuity, the quick Router model may also attach advisory
 task-lifecycle metadata:
@@ -49,12 +52,14 @@ and Skill Runtime/provider authorization.
 The host Orchestrator owns the final task context write, persistence policy,
 confirmation, cancellation, and safety state.
 
-The Router exposes three conceptual stages:
+The Router exposes four conceptual stages plus deterministic validation:
 
 | Stage | Routes | LLM use |
 |---|---|---|
 | `emergency_filter` | `interrupt`, `ignore` | Never |
+| `post_interrupt_review` | `chat`, `deep_thought`, `robot_action`, `tool`, `memory`, `clarify`, `interrupt`, `ignore` | Optional after an interrupt has already been applied |
 | `quick_intent` | `chat`, `deep_thought`, `robot_action`, `tool`, `memory`, `clarify` | Optional when Router mode is `hybrid` or `llm_only` |
+| `route_validation` | `chat`, `deep_thought`, `robot_action`, `tool`, `memory`, `clarify` | Never |
 | `deep_thought` | `deep_thought` | Handled by Agent after routing |
 
 ## Agent HTTP API — port 8092

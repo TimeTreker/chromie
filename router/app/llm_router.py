@@ -165,6 +165,8 @@ class OllamaLLMRouter:
         timeout_ms: int,
         review_timeout_ms: int | None = None,
         confidence_threshold: float,
+        slow_review_recovery_enabled: bool = True,
+        num_predict: int = 192,
         prompt_path: Path | None = None,
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
@@ -176,6 +178,8 @@ class OllamaLLMRouter:
             (review_timeout_ms if review_timeout_ms is not None else timeout_ms) / 1000.0,
         )
         self.confidence_threshold = confidence_threshold
+        self.slow_review_recovery_enabled = slow_review_recovery_enabled
+        self.num_predict = max(32, num_predict)
         self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "router_system.txt"
 
     def load_system_prompt(self) -> str:
@@ -206,30 +210,38 @@ class OllamaLLMRouter:
             "Current Job:\n"
             "Act as Chromie's quick intent router. Decide route only; do not answer, execute, or authorize side effects. "
             "Choose route deep_thought for complex reasoning, design, debugging, or implementation planning. "
+            "Choosing route=deep_thought is only delegation; do not perform or reveal reasoning inside the router. "
+            "Do not choose deep_thought for ordinary single-turn facts, factual agreement/disagreement, greetings, jokes, songs, or simple chat. "
             "Also decide whether the request is a fast single-turn response or needs deeper thought, task-session creation, or task-session continuation. "
             "Return calibrated low confidence when uncertain.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Available abilities / candidate_capabilities JSON: {candidates_json}\n"
             "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
-            "A polite ability-shaped request can be robot_action when it asks Chromie to perform a listed body/head/pose/motion capability now. "
+            "Factual agreement/disagreement is chat: questions about the Moon, Sun, shape, temperature, or other world knowledge are not deep_thought or robot_action even if ability candidates share words such as round, turn, left, right, walk, or move. "
+            "The quick router does not solve the fact; it routes common-fact questions to chat so the conversation Agent can answer. "
+            "A polite ability-shaped request can be robot_action only when it asks Chromie to perform a listed body/head/pose/motion capability now. "
             "Use bounded working memory, current task context, and recent action history to resolve follow-ups, but do not let memory authorize an action by itself. "
             "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran.\n\n"
             "Cost Function:\n"
-            "Prefer smallest safe downstream action surface; honest capability boundaries; deep_thought for complex planning; clarify for ambiguity; chat for speech-only interaction. "
+            "Prefer smallest safe downstream action surface; honest capability boundaries; chat for speech-only interaction and common factual claims; deep_thought only for complex multi-step reasoning or planning; clarify for ambiguity. "
             "Prefer supported interaction-executable capability IDs over generic robot_action when a candidate clearly fits.\n\n"
+            "Semantic Examples:\n"
+            "- If the user asks whether you agree with a common factual claim about the Moon, Sun, shape, heat, or similar world knowledge, return {\"route\":\"chat\",\"intent\":\"factual_agreement\",\"confidence\":0.9}.\n"
+            "- If the user asks Chromie to walk, turn, nod, shake her head, blink, or pose now and a matching interaction-executable candidate is listed, return robot_action with intent capability:<exact capability_id>.\n"
+            "- If candidates are planning-only or weak background context and the user is only chatting or asking a fact, ignore those candidates for routing.\n"
+            "Generalize these examples from meaning; do not make phrase rules.\n\n"
             "Output Contract:\n"
-            "Return exactly one RouteDecision JSON object. Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
+            "Return compact JSON only. Required keys: route, intent, confidence. Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
+            "Minimal ordinary example: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9}. "
+            "Omit agents, actions, metadata, candidate_capabilities, and explanations unless they change downstream routing. "
+            "Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object. "
             "For selected robot_action use intent capability:<exact capability_id> from candidates. Never output placeholder intents such as capability or capability:<exact capability_id>. "
-            "For chat/clarify/interrupt/ignore, do not set capability intent. Include confidence 0.0-1.0. "
-            "metadata.thinking_mode should be fast or deepthought. metadata.session_action may be none, continue_current, or create_task_session. "
-            "metadata.task_relation may be new_task, continue_task, modify_task, close_task, side_conversation, or clarify_task. "
-            "metadata.memory_policy may name read/write context classes such as working_memory, task_context, recent_action_history, episodic_memory, or user_preferences. "
-            "Host task manager owns final writes and safety."
+            "For chat/clarify/interrupt/ignore, do not set capability intent. For deep_thought, use a short semantic intent such as deep_thought_complex_reasoning. "
+            "Confidence is 0.0-1.0. Host task manager owns final writes and safety."
         )
 
     def build_payload(self, request: RouteRequest, *, relaxed_json: bool = False) -> dict[str, Any]:
-        schema = RouteDecision.model_json_schema()
         payload: dict[str, Any] = {
             "model": self.model,
             "stream": False,
@@ -241,10 +253,10 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
-                "num_predict": 256,
+                "num_predict": self.num_predict,
             },
         }
-        payload["format"] = "json" if relaxed_json else schema
+        payload["format"] = "json"
         return payload
 
     def build_intent_review_payload(self, request: RouteRequest) -> dict[str, Any]:
@@ -282,8 +294,9 @@ class OllamaLLMRouter:
                         "- Use working memory, task context, and recent action history for follow-up resolution, but not as authorization for side effects.\n"
                         "- Choose deep_thought for complex reasoning, debugging, design, implementation planning, or multi-step task-session work.\n\n"
                         "Output Contract:\n"
-                        "- Return JSON only with keys route, intent, confidence, and optional reason.\n"
+                        "- Return compact JSON only with keys route, intent, and confidence.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
+                        "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not choose interrupt or ignore unless the text is plainly stop, cancel, silence, empty, or unusable audio.\n"
                         "- If selecting a known candidate, set intent to capability:<exact capability_id>; otherwise use a short semantic intent such as robot_action."
                     ),
@@ -300,7 +313,7 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
-                "num_predict": 96,
+                "num_predict": self.num_predict,
             },
         }
 
@@ -336,8 +349,9 @@ class OllamaLLMRouter:
                         "- Use deep_thought for complex reasoning or planning that should leave the quick route path.\n\n"
                         "- Use task context and recent action history for follow-ups, but never as standalone authorization.\n\n"
                         "Output Contract:\n"
-                        "- Return JSON only with keys route, intent, confidence, and optional reason.\n"
+                        "- Return compact JSON only with keys route, intent, and confidence.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
+                        "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not use interrupt or ignore.\n"
                         "- For a selected capability, set intent to capability:<exact capability_id>.\n"
                         "- Confidence is semantic routing confidence, not the catalog score; use at least 0.72 when the request clearly maps to a candidate."
@@ -355,7 +369,7 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
-                "num_predict": 96,
+                "num_predict": self.num_predict,
             },
         }
 
@@ -384,8 +398,9 @@ class OllamaLLMRouter:
                         "- Use deep_thought for complex reasoning or planning.\n\n"
                         "- Use working memory, task context, and recent action history to resolve follow-ups, but not to authorize side effects.\n\n"
                         "Output Contract:\n"
-                        "- Return JSON only with keys route, intent, confidence, and optional reason.\n"
+                        "- Return compact JSON only with keys route, intent, and confidence.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
+                        "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- For robot_action with a selected skill, set intent to capability:<exact capability_id> from candidates.\n"
                         "- Never return placeholder intents such as capability or capability:<exact capability_id>.\n"
                         "- Confidence is semantic routing confidence, not the catalog score."
@@ -404,7 +419,78 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
-                "num_predict": 96,
+                "num_predict": self.num_predict,
+            },
+        }
+
+    def build_post_interrupt_review_payload(
+        self,
+        request: RouteRequest,
+        interrupt_decision: RouteDecision,
+    ) -> dict[str, Any]:
+        candidates_json = _bounded_json(
+            _compact_candidate_capabilities(request.context.get("candidate_capabilities", [])),
+            max_chars=1800,
+        )
+        mind = request.context.get("mind", {})
+        session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=1800)
+        interrupt_json = _bounded_json(
+            {
+                "route": interrupt_decision.route,
+                "intent": interrupt_decision.intent,
+                "confidence": interrupt_decision.confidence,
+                "reason": interrupt_decision.reason,
+                "source": interrupt_decision.source,
+            },
+            max_chars=500,
+        )
+        return {
+            "model": self.review_model or self.model,
+            "stream": False,
+            "think": False,
+            "format": "json",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Global Context Group:\n"
+                        f"{_router_global_context_section(mind)}\n\n"
+                        "Session Context Group:\n"
+                        f"- Language hint: {request.language or 'auto'}\n"
+                        f"- Bounded session context JSON: {session_context}\n"
+                        f"- Already-applied emergency-filter decision JSON: {interrupt_json}\n\n"
+                        "Current Job:\n"
+                        "- You are Chromie's post-interrupt semantic reviewer.\n"
+                        "- The host has already applied the deterministic interrupt/cancel lane immediately for safety.\n"
+                        "- Your job is only to confirm that interpretation or propose the correct non-interrupt route if the text was misheard/misread.\n"
+                        "- Decide from meaning, context, and supplied abilities; do not create phrase rules.\n\n"
+                        "Task Context Group:\n"
+                        "- Choose interrupt when the user truly asked to stop, cancel, pause, be quiet, or halt current work.\n"
+                        "- Choose a non-interrupt route when the text merely mentions stop, uses stop in another meaning, or asks for a different chat/tool/memory/body task.\n"
+                        "- If correcting to robot_action, use intent capability:<exact capability_id> when a supplied candidate clearly fits.\n"
+                        "- Physical actions are still only proposals; downstream Agent and Skill Runtime must validate and confirm them.\n\n"
+                        "Output Contract:\n"
+                        "- Return one compact RouteDecision JSON object.\n"
+                        "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
+                        "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
+                        "- If the emergency interpretation was correct, return route=interrupt and intent=stop_current_output.\n"
+                        "- If it was a misunderstanding, return the corrected non-interrupt route with confidence >= 0.72 when clear.\n"
+                        "- For a correction, speak_first may contain one brief apology/correction sentence, but must not claim a physical action or tool side effect has executed."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Task Context Group:\n"
+                        f"- Latest user input: {request.text}\n"
+                        f"- Candidate capabilities JSON: {candidates_json}"
+                    ),
+                },
+            ],
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_predict": max(128, self.num_predict),
             },
         }
 
@@ -439,7 +525,7 @@ class OllamaLLMRouter:
         request: RouteRequest,
         decision: RouteDecision,
     ) -> RouteDecision:
-        if not self.review_model:
+        if not self.slow_review_recovery_enabled or not self.review_model:
             return decision
         if decision.route != "robot_action" or decision.intent.startswith("capability:") or decision.actions:
             return decision
@@ -467,7 +553,7 @@ class OllamaLLMRouter:
         request: RouteRequest,
         decision: RouteDecision,
     ) -> RouteDecision:
-        if not self.review_model:
+        if not self.slow_review_recovery_enabled or not self.review_model:
             return decision
         if decision.route != "deep_thought":
             return decision
@@ -506,7 +592,13 @@ class OllamaLLMRouter:
             f"quick router returned deterministic-only route {decision.route} "
             "after deterministic emergency/noise filter did not match"
         )
-        if self.review_model:
+        if not self.slow_review_recovery_enabled:
+            logger.info("%s; slow repair disabled; using safe chat fallback", reason_prefix)
+            return fallback_decision(
+                request,
+                reason=f"{reason_prefix}; slow repair disabled",
+            )
+        if self.slow_review_recovery_enabled and self.review_model:
             try:
                 reviewed = await self._chat(self.build_intent_review_payload(request))
                 reviewed_decision = self._decision_from_response(request, reviewed)
@@ -560,6 +652,12 @@ class OllamaLLMRouter:
             "quick router returned robot_action with placeholder capability intent "
             f"{decision.intent!r}"
         )
+        if not self.slow_review_recovery_enabled:
+            logger.info("%s; slow repair disabled; using safe chat fallback", reason_prefix)
+            return fallback_decision(
+                request,
+                reason=f"{reason_prefix}; slow repair disabled",
+            )
         try:
             repaired = await self._chat(self.build_placeholder_capability_repair_payload(request))
             repaired_decision = self._decision_from_response(request, repaired)
@@ -581,6 +679,26 @@ class OllamaLLMRouter:
                 return repaired_decision
         logger.info("%s; using safe chat fallback", reason_prefix)
         return fallback_decision(request, reason=reason_prefix)
+
+    async def review_after_priority_interrupt(
+        self,
+        request: RouteRequest,
+        interrupt_decision: RouteDecision,
+    ) -> RouteDecision:
+        data = await self._chat(
+            self.build_post_interrupt_review_payload(request, interrupt_decision)
+        )
+        decision = self._decision_from_response(request, data)
+        if decision.route == "interrupt":
+            decision.intent = "stop_current_output"
+            decision.reason = (
+                f"{decision.reason}; " if decision.reason else ""
+            ) + "post-interrupt review confirmed deterministic interrupt"
+            return decision
+        decision.reason = (
+            f"{decision.reason}; " if decision.reason else ""
+        ) + "post-interrupt review corrected deterministic interrupt"
+        return decision
 
     def _low_confidence_deep_thought_decision(
         self,
@@ -627,7 +745,7 @@ class OllamaLLMRouter:
             data = await self._chat(payload)
         except Exception as exc:
             logger.warning("Ollama router request failed: %s", exc)
-            if self.review_model:
+            if self.slow_review_recovery_enabled and self.review_model:
                 try:
                     reviewed = await self._chat(self.build_intent_review_payload(request))
                     reviewed_decision = self._decision_from_response(request, reviewed)

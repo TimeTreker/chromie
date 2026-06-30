@@ -39,8 +39,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ROUTER_USE_LLM"], "1")
         self.assertEqual(values["ROUTER_MODEL"], "qwen3:0.6b")
         self.assertEqual(values["ROUTER_REVIEW_MODEL"], "gemma4:e2b")
-        self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "1500")
-        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "8000")
+        self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "800")
+        self.assertEqual(values["ROUTER_LLM_NUM_PREDICT"], "192")
+        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "1200")
+        self.assertEqual(values["ROUTER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
+        self.assertEqual(values["ROUTER_SLOW_REVIEW_RECOVERY_ENABLED"], "0")
 
     def test_ollama_keeps_router_and_agent_models_loaded_without_extra_parallelism(self) -> None:
         values = _common_env()
@@ -50,16 +53,18 @@ class RuntimeConfigurationTests(unittest.TestCase):
 
     def test_capability_planner_has_json_output_budget(self) -> None:
         values = _common_env()
-        self.assertEqual(values["AGENT_CAPABILITY_NUM_CTX"], "4096")
-        self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "256")
+        self.assertEqual(values["AGENT_RESPONSE_REVIEW_ENABLED"], "0")
+        self.assertEqual(values["AGENT_CAPABILITY_NUM_CTX"], "24576")
+        self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "512")
         self.assertEqual(values["AGENT_CAPABILITY_REVIEW_NUM_PREDICT"], "160")
-        self.assertEqual(values["AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW"], "1")
+        self.assertEqual(values["AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW"], "0")
         self.assertEqual(values["AGENT_EXPRESSIVE_BODY_CUES"], "off")
 
     def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
         values = _common_env()
-        self.assertEqual(values["AGENT_CONVERSATION_NUM_CTX"], "4096")
-        self.assertEqual(values["AGENT_CONVERSATION_NUM_PREDICT"], "128")
+        self.assertEqual(values["AGENT_MAX_SPEAK_CHARS"], "140")
+        self.assertEqual(values["AGENT_CONVERSATION_NUM_CTX"], "2048")
+        self.assertEqual(values["AGENT_CONVERSATION_NUM_PREDICT"], "64")
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_CTX"], "8192")
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_PREDICT"], "384")
 
@@ -79,6 +84,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")', source)
         self.assertIn('AGENT_RESPONSE_REVIEW_MODEL:-gemma4:e2b', source)
         self.assertIn('WARM_MODELS=("${ROUTER_MODEL:-qwen3:0.6b}" "${WARM_MODELS[@]}")', source)
+        self.assertIn('ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-0', source)
         self.assertIn('WARM_MODELS+=("${ROUTER_REVIEW_MODEL}")', source)
         self.assertIn('./scripts/warm_ollama.sh "${WARM_MODELS[@]}"', source)
 
