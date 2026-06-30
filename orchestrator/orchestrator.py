@@ -37,6 +37,7 @@ from orchestrator.runtime.abilities import (
 )
 from orchestrator.runtime.confirmation import ConfirmationDialogue
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.episode import EpisodeRecorder
 from orchestrator.runtime.experience import ExperienceManager
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
@@ -144,6 +145,7 @@ class VoiceAssistant:
         self.conversation_state = ConversationStateManager.from_env()
         self.mind = MindManager.from_env(project_root=PROJECT_ROOT)
         self.experience = ExperienceManager.from_env(PROJECT_ROOT)
+        self.episode_recorder = EpisodeRecorder.from_env(PROJECT_ROOT)
         self.confirmation_dialogue = ConfirmationDialogue(
             ttl_s=float(os.getenv("ORCH_CONFIRMATION_TTL_SEC", "20")),
         )
@@ -162,6 +164,12 @@ class VoiceAssistant:
             self.mind.profile.version,
             self.mind.profile.owner_approved,
             self.experience.enabled,
+        )
+        logger.info(
+            "Episode recorder: enabled=%s path=%s max_turns=%s",
+            self.episode_recorder.enabled,
+            self.episode_recorder.log_path,
+            self.episode_recorder.max_turns,
         )
         self.active_llm_task: asyncio.Task | None = None
         self.active_interaction_task: asyncio.Task | None = None
@@ -1330,6 +1338,8 @@ class VoiceAssistant:
         *,
         user_text: str,
         decision: RouteDecision,
+        router_latency_ms: float | None = None,
+        agent_latency_ms: float | None = None,
     ) -> dict[str, Any]:
         return {
             "user_text": " ".join((user_text or "").strip().split())[:500],
@@ -1337,6 +1347,8 @@ class VoiceAssistant:
             "intent": decision.intent,
             "route_source": decision.source,
             "route_confidence": decision.confidence,
+            "router_latency_ms": router_latency_ms,
+            "agent_latency_ms": agent_latency_ms,
             "conversation_id": self.conversation_state.conversation_id,
             "mind_profile_id": self.mind.profile.profile_id,
             "mind_profile_version": self.mind.profile.version,
@@ -1350,6 +1362,7 @@ class VoiceAssistant:
         session_id: str | None,
         errors: list[str] | None = None,
     ) -> None:
+        record = None
         try:
             record = self.experience.record_interaction(
                 response=response,
@@ -1361,7 +1374,6 @@ class VoiceAssistant:
         except Exception as exc:  # pragma: no cover - defensive runtime logging
             logger.warning("Experience journal write failed: %s", exc, exc_info=True)
             self.session_log(session_id, "experience_record_failed: error=%s", exc)
-            return
         if record is not None:
             self.session_log(
                 session_id,
@@ -1369,6 +1381,26 @@ class VoiceAssistant:
                 record.experience_id,
                 record.route,
                 record.execution_status,
+            )
+        try:
+            episode = self.episode_recorder.record_interaction(
+                response=response,
+                execution=execution,
+                session_id=session_id,
+                mind_profile=self.mind.profile,
+                errors=errors,
+            )
+        except Exception as exc:  # pragma: no cover - defensive runtime logging
+            logger.warning("Episode record write failed: %s", exc, exc_info=True)
+            self.session_log(session_id, "episode_record_failed: error=%s", exc)
+            return
+        if episode is not None:
+            self.session_log(
+                session_id,
+                "episode_recorded: episode_id=%s conversation_id=%s turns=%s",
+                episode.episode_id,
+                episode.conversation_id,
+                len(episode.turns),
             )
 
     def _ability_registry(self) -> AbilityRegistry:
@@ -1595,10 +1627,11 @@ class VoiceAssistant:
         self.session_log(session_id, "router_start: text_chars=%s text=%r", len(user_text), user_text)
         try:
             decision = await self.router_client.route(session, text=user_text, sid=session_id, context=context)
+            router_latency_ms = now_ms() - router_start_ms
             self.session_log(
                 session_id,
                 "router_done: router_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
-                now_ms() - router_start_ms,
+                router_latency_ms,
                 decision.route,
                 ",".join(decision.agents),
                 decision.intent,
@@ -1719,6 +1752,7 @@ class VoiceAssistant:
                     context=context,
                     history=context.get("history", []),
                 )
+                agent_latency_ms = now_ms() - agent_start_ms
                 response = response.model_copy(
                     deep=True,
                     update={
@@ -1728,6 +1762,8 @@ class VoiceAssistant:
                             "experience_context": self._experience_context(
                                 user_text=user_text,
                                 decision=decision,
+                                router_latency_ms=router_latency_ms,
+                                agent_latency_ms=agent_latency_ms,
                             ),
                         }
                     },
@@ -1735,7 +1771,7 @@ class VoiceAssistant:
                 self.session_log(
                     session_id,
                     "interaction_done: agent_ms=%.1f speech=%s skills=%s requires_confirmation=%s",
-                    now_ms() - agent_start_ms,
+                    agent_latency_ms,
                     len(response.speech),
                     len(response.skills),
                     response.requires_confirmation,

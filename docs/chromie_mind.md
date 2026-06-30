@@ -15,6 +15,9 @@ contracts. The first version provides:
 
 This is not autonomous self-modification. Experience can create proposals, but
 no proposal is applied automatically.
+The planned loop for scoring finished dialogue/task episodes and mining
+low-scoring episodes into reviewed scenario candidates is documented in
+[Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md).
 
 ## Layer Model
 
@@ -155,6 +158,9 @@ the robot's spine under human ownership.
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1` | Enable local experience/proposal JSONL writes. |
 | `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl` | Durable local experience journal path. |
 | `ORCH_MIND_PROPOSAL_LOG_PATH` | `.chromie/experience/mind_update_proposals.jsonl` | Human-review proposal journal path. |
+| `ORCH_ENABLE_EPISODE_RECORDING` | `1` | Enable rolling dialogue/task episode snapshots. |
+| `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl` | Episode snapshot JSONL path. |
+| `ORCH_EPISODE_MAX_TURNS` | `12` | Maximum recent turns retained in one episode snapshot. |
 
 ## Validation
 

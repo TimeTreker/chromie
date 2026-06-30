@@ -92,13 +92,18 @@ class ComposeConfigurationTests(unittest.TestCase):
             1,
         )[0]
 
+        self.assertIn("AGENT_EXPRESSIVE_BODY_CUES: ${AGENT_EXPRESSIVE_BODY_CUES:-off}", agent_block)
+        self.assertIn(
+            "AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW: ${AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW:-1}",
+            agent_block,
+        )
         self.assertIn("AGENT_CAPABILITY_NUM_CTX: ${AGENT_CAPABILITY_NUM_CTX:-4096}", agent_block)
         self.assertIn(
-            "AGENT_CAPABILITY_NUM_PREDICT: ${AGENT_CAPABILITY_NUM_PREDICT:-512}",
+            "AGENT_CAPABILITY_NUM_PREDICT: ${AGENT_CAPABILITY_NUM_PREDICT:-256}",
             agent_block,
         )
         self.assertIn(
-            "AGENT_CAPABILITY_REVIEW_NUM_PREDICT: ${AGENT_CAPABILITY_REVIEW_NUM_PREDICT:-256}",
+            "AGENT_CAPABILITY_REVIEW_NUM_PREDICT: ${AGENT_CAPABILITY_REVIEW_NUM_PREDICT:-160}",
             agent_block,
         )
 

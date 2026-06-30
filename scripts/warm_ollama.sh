@@ -19,6 +19,9 @@ REQUEST_TIMEOUT_SECONDS="${OLLAMA_WARM_REQUEST_TIMEOUT_SECONDS:-300}"
 KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:-24h}"
 NUM_CTX="${OLLAMA_NUM_CTX:-${OLLAMA_CONTEXT_LENGTH:-2048}}"
 NUM_PREDICT="${OLLAMA_NUM_PREDICT:-16}"
+AUTO_RESTART_ON_CRASH="${OLLAMA_AUTO_RESTART_ON_CRASH:-1}"
+OLLAMA_SERVICE_NAME="${OLLAMA_SERVICE_NAME:-chromie-llm}"
+restart_attempted=0
 
 if [ "$#" -gt 0 ]; then
   MODELS=("$@")
@@ -51,14 +54,47 @@ echo "[warm-ollama] Max wait: ${WARM_TIMEOUT_SECONDS}s"
 
 deadline=$((SECONDS + WARM_TIMEOUT_SECONDS))
 
-echo "[warm-ollama] Waiting for Ollama server..."
-until curl -fsS "${OLLAMA_URL}/api/tags" >/dev/null 2>&1; do
-  if (( SECONDS >= deadline )); then
-    echo "[warm-ollama][error] Ollama server did not become ready in ${WARM_TIMEOUT_SECONDS}s." >&2
-    exit 1
+wait_for_ollama_server() {
+  local phase="$1"
+  echo "[warm-ollama] Waiting for Ollama server (${phase})..."
+  until curl -fsS "${OLLAMA_URL}/api/tags" >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+      echo "[warm-ollama][error] Ollama server did not become ready in ${WARM_TIMEOUT_SECONDS}s." >&2
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
+body_indicates_runner_crash() {
+  local body="$1"
+  echo "$body" | grep -Eiq "llama-server process has terminated|segmentation fault|core dumped"
+}
+
+restart_ollama_after_crash() {
+  local model="$1"
+  if ! [[ "$AUTO_RESTART_ON_CRASH" =~ ^(1|true|yes|on)$ ]]; then
+    return 1
   fi
-  sleep 2
-done
+  if [ "$restart_attempted" = "1" ]; then
+    return 1
+  fi
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "[warm-ollama][warn] docker is unavailable; cannot restart ${OLLAMA_SERVICE_NAME} after runner crash." >&2
+    return 1
+  fi
+
+  restart_attempted=1
+  echo "[warm-ollama][warn] Ollama runner crashed while warming ${model}; restarting ${OLLAMA_SERVICE_NAME} once."
+  if ! docker compose restart "$OLLAMA_SERVICE_NAME"; then
+    echo "[warm-ollama][warn] Could not restart ${OLLAMA_SERVICE_NAME}; continuing with normal warmup failure handling." >&2
+    return 1
+  fi
+  wait_for_ollama_server "after ${OLLAMA_SERVICE_NAME} restart"
+  return 0
+}
+
+wait_for_ollama_server "initial startup"
 
 echo "[warm-ollama] Ollama server is reachable."
 echo "[warm-ollama] Warming model(s). Large models may take several minutes on first load..."
@@ -112,6 +148,18 @@ PY
     echo "[warm-ollama][warn] Warm attempt failed for $model. HTTP status=$status"
     echo "$body" | head -c 1200
     echo
+
+    if [ "$status" = "500" ] && body_indicates_runner_crash "$body"; then
+      if restart_ollama_after_crash "$model"; then
+        echo "[warm-ollama] Retrying $model after ${OLLAMA_SERVICE_NAME} restart..."
+        continue
+      fi
+      echo "[warm-ollama][error] Ollama native runner crashed while warming $model." >&2
+      echo "[warm-ollama][hint] Try restarting the LLM service and checking GPU visibility:" >&2
+      echo "[warm-ollama][hint]   docker compose restart ${OLLAMA_SERVICE_NAME}" >&2
+      echo "[warm-ollama][hint]   docker exec ${OLLAMA_SERVICE_NAME} nvidia-smi" >&2
+      exit 1
+    fi
 
     if [ "$status" = "404" ] && echo "$body" | grep -qi "not found"; then
       echo "[warm-ollama][error] Ollama model is not present locally: $model" >&2

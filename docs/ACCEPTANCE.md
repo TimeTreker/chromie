@@ -292,10 +292,9 @@ This suite is preview-only and headless by default. It checks mixed
 conversation/body cases, false-belief questions, compliments, unsupported
 requests, discourse-marker traps such as `go ahead`, deep-thinking handoff, and
 deterministic stop routing. The scenario text is the only input; expected
-routes, skills, and speech snippets are post-run assertions. `expect_no_skills`
-allows chat-only expressive cues such as `soridormi.express_attention`; set
-`allow_expressive_cues: false` in a custom case when strict zero-skill output is
-required.
+routes, skills, and speech snippets are post-run assertions. Chat-only
+expressive cues are default-off; cases that opt in can still allow reviewed
+expressive skills such as `soridormi.express_attention`.
 
 ## Task-agent bridge acceptance
 

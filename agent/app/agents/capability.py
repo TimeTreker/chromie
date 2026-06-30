@@ -285,12 +285,27 @@ class CapabilityAgent(BaseAgent):
     ) -> _CapabilityPlan:
         if plan.decision != "execute":
             return plan
+        mandatory_review = self._requires_exact_intent_review(request, plan, candidates)
         reviewer = self.services.response_reviewer
         if reviewer is None:
+            if mandatory_review:
+                logger.warning(
+                    "capability plan changed router-selected exact intent without reviewer; blocking execution sid=%s intent=%s plan=%s",
+                    request.sid,
+                    request.route_decision.intent,
+                    [item.skill_id for item in plan.skills],
+                )
+                return self._review_unavailable_plan(request)
             return plan
 
         zh = self.is_zh(request)
         candidate_payload = [self._capability_payload(match) for match in candidates]
+        selected_id = self._router_selected_capability_id(request)
+        selected_line = (
+            f"- Router-selected exact skill_id: {selected_id}\n"
+            if selected_id
+            else "- Router-selected exact skill_id: none\n"
+        )
         review_prompt = (
             "Global Context Group:\n"
             f"{self._format_global_context(request, zh=zh)}\n\n"
@@ -306,10 +321,12 @@ class CapabilityAgent(BaseAgent):
             "- If the user request is complex enough to need deeper planning, or if a safe executable plan is not clear, revise to clarify or unsupported with no skills.\n\n"
             "Task Context Group:\n"
             f"- Latest user input: {request.text}\n"
+            f"{selected_line}"
             f"- Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
             f"- Proposed capability plan JSON: {plan.model_dump_json()}\n\n"
             "Cost Function:\n"
             "- Accept only when every selected skill is semantically necessary for the user's request and its arguments fit the schema.\n"
+            "- If the Router selected an exact skill_id and the proposed plan replaced it, do not use decision=accept. Revise to an executable plan that preserves the routed intent, or return clarify/unsupported with no skills.\n"
             "- Reject or revise plans that substitute a different behavior class for the user's intent, such as social acknowledgement, gaze, or attention when the user requested locomotion or another body task.\n"
             "- Prefer a clarification over executing a skill that merely seems generally robot-like but does not satisfy the request.\n"
             "- Preserve the no-raw-motor boundary and never invent skills outside the supplied API surface.\n\n"
@@ -333,23 +350,45 @@ class CapabilityAgent(BaseAgent):
                 options={
                     "temperature": 0,
                     "top_p": 0.8,
-                    "num_predict": int(os.getenv("AGENT_CAPABILITY_REVIEW_NUM_PREDICT", "256")),
+                    "num_predict": int(os.getenv("AGENT_CAPABILITY_REVIEW_NUM_PREDICT", "160")),
                 },
             )
         except Exception as exc:
             logger.warning(
-                "capability plan review failed; preserving primary plan: error_type=%s error=%s",
+                "capability plan review failed%s: error_type=%s error=%s",
+                "; blocking exact-intent substitution"
+                if mandatory_review
+                else "; preserving primary plan",
                 type(exc).__name__,
                 exc,
             )
+            if mandatory_review:
+                return self._review_unavailable_plan(request)
             return plan
         try:
             review = _CapabilityPlanReview.model_validate(raw)
         except ValidationError as exc:
-            logger.warning("invalid capability plan review; preserving primary plan: %s", exc)
+            logger.warning(
+                "invalid capability plan review%s: %s",
+                "; blocking exact-intent substitution"
+                if mandatory_review
+                else "; preserving primary plan",
+                exc,
+            )
+            if mandatory_review:
+                return self._review_unavailable_plan(request)
             return plan
 
         if review.decision == "accept":
+            if mandatory_review:
+                logger.warning(
+                    "capability plan reviewer accepted an exact-intent substitution; blocking execution sid=%s intent=%s plan=%s reason=%r",
+                    request.sid,
+                    request.route_decision.intent,
+                    [item.skill_id for item in plan.skills],
+                    review.reason[:200],
+                )
+                return self._review_unavailable_plan(request)
             return plan
 
         speech = self._natural_plan_speech(review.speech)
@@ -378,6 +417,42 @@ class CapabilityAgent(BaseAgent):
                 else "Please clarify the action before I move."
             )
         return _CapabilityPlan(decision=review.decision, speech=speech)
+
+    def _router_selected_capability_id(self, request: AgentRunRequest) -> str:
+        intent = (request.route_decision.intent or "").strip()
+        if not intent.startswith("capability:"):
+            return ""
+        return intent[len("capability:") :].strip()
+
+    def _requires_exact_intent_review(
+        self,
+        request: AgentRunRequest,
+        plan: _CapabilityPlan,
+        candidates: list[Any],
+    ) -> bool:
+        if not self.services.require_capability_plan_review:
+            return False
+        if request.route_decision.route != "robot_action":
+            return False
+        selected_id = self._router_selected_capability_id(request)
+        if not selected_id:
+            return False
+        candidate_ids = {str(getattr(match, "capability_id", "")) for match in candidates}
+        if selected_id not in candidate_ids:
+            return False
+        planned_ids = {item.skill_id for item in plan.skills}
+        return bool(planned_ids) and selected_id not in planned_ids
+
+    def _review_unavailable_plan(self, request: AgentRunRequest) -> _CapabilityPlan:
+        if self.is_zh(request):
+            return _CapabilityPlan(
+                decision="clarify",
+                speech="我需要重新确认这个动作计划，请你再说一次要我做的动作。",
+            )
+        return _CapabilityPlan(
+            decision="clarify",
+            speech="I need to re-check that action plan. Please say the movement you want again.",
+        )
 
     def _direct_action_ack_speech(self, request: AgentRunRequest, action_count: int) -> str:
         if action_count <= 0:
@@ -536,7 +611,7 @@ class CapabilityAgent(BaseAgent):
                     "temperature": 0,
                     "top_p": 0.8,
                     "num_ctx": int(os.getenv("AGENT_CAPABILITY_NUM_CTX", "4096")),
-                    "num_predict": int(os.getenv("AGENT_CAPABILITY_NUM_PREDICT", "512")),
+                    "num_predict": int(os.getenv("AGENT_CAPABILITY_NUM_PREDICT", "256")),
                 },
             )
         except Exception as exc:

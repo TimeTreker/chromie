@@ -46,12 +46,15 @@ class RuntimeConfigurationTests(unittest.TestCase):
         values = _common_env()
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
         self.assertEqual(values["OLLAMA_NUM_PARALLEL"], "1")
+        self.assertEqual(values["OLLAMA_AUTO_RESTART_ON_CRASH"], "1")
 
     def test_capability_planner_has_json_output_budget(self) -> None:
         values = _common_env()
         self.assertEqual(values["AGENT_CAPABILITY_NUM_CTX"], "4096")
-        self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "512")
-        self.assertEqual(values["AGENT_CAPABILITY_REVIEW_NUM_PREDICT"], "256")
+        self.assertEqual(values["AGENT_CAPABILITY_NUM_PREDICT"], "256")
+        self.assertEqual(values["AGENT_CAPABILITY_REVIEW_NUM_PREDICT"], "160")
+        self.assertEqual(values["AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW"], "1")
+        self.assertEqual(values["AGENT_EXPRESSIVE_BODY_CUES"], "off")
 
     def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
         values = _common_env()
@@ -59,6 +62,12 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_CONVERSATION_NUM_PREDICT"], "128")
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_CTX"], "8192")
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_PREDICT"], "384")
+
+    def test_episode_recording_is_enabled_by_default(self) -> None:
+        values = _common_env()
+        self.assertEqual(values["ORCH_ENABLE_EPISODE_RECORDING"], "1")
+        self.assertEqual(values["ORCH_EPISODE_LOG_PATH"], ".chromie/experience/episodes.jsonl")
+        self.assertEqual(values["ORCH_EPISODE_MAX_TURNS"], "12")
 
     def test_orchestrator_warms_router_and_agent_models_when_router_llm_enabled(self) -> None:
         source = (ROOT / "scripts" / "start_orchestrator.sh").read_text(
@@ -79,6 +88,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertIn('docker exec chromie-llm ollama pull $model', source)
         self.assertIn("Ollama model is not present locally", source)
+        self.assertIn("OLLAMA_AUTO_RESTART_ON_CRASH", source)
+        self.assertIn('docker compose restart "$OLLAMA_SERVICE_NAME"', source)
+        self.assertIn("Ollama native runner crashed", source)
 
     def test_compose_wrapper_loads_generated_runtime_env(self) -> None:
         source = (ROOT / "scripts" / "compose.sh").read_text(encoding="utf-8")

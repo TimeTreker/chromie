@@ -10,11 +10,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from agent.app.agents import AgentServices
 from agent.app.capabilities.catalog import CapabilityMatch, CapabilitySearchResult
@@ -24,7 +29,6 @@ from orchestrator.runtime.conversation_state import ConversationStateManager
 from router.app.capability_catalog import CapabilityCatalogResult
 from router.app.schema import RouteDecision, RouteRequest
 
-ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
 SUPPORTED_SUITES = {"router", "interaction", "dialogue"}
@@ -492,6 +496,7 @@ async def _run_interaction_turn(
         max_speak_chars=int(stub.get("max_speak_chars", 160)),
         capability_catalog=_AgentCatalog(catalog_capabilities),  # type: ignore[arg-type]
         expressive_body_cues=str(stub.get("expressive_body_cues") or "off"),
+        require_capability_plan_review=bool(stub.get("require_capability_plan_review", False)),
     )
     return await InteractionRuntime(services).run(
         AgentRunRequest.model_validate(

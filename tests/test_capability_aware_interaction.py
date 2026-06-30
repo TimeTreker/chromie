@@ -49,6 +49,21 @@ class _StrictWalkOutcome:
         "mode": "sim",
         "skills": [
             {
+                "skill_id": "walk_velocity",
+                "description": "Walk forward by tracking a bounded body velocity command.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {
+                        "vx_mps": {"type": "number", "minimum": 0.01, "maximum": 0.25},
+                        "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0},
+                    },
+                    "required": ["vx_mps", "duration_s"],
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": True,
+            },
+            {
                 "skill_id": "walk_forward",
                 "description": "Walk forward a short distance at a safe speed.",
                 "parameters_schema": {
@@ -230,6 +245,52 @@ class _WalkAndSocialOutcome:
                 "available": True,
                 "requires_confirmation": False,
             },
+            {
+                "skill_id": "look_at_person",
+                "description": "Look at the user for a bounded time.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {"duration_s": {"type": "number", "minimum": 0.1, "maximum": 10.0}},
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": False,
+            },
+        ],
+    }
+
+
+class _ForwardAndSocialOutcome:
+    status = "success"
+    error = None
+    output = {
+        "mode": "sim",
+        "skills": [
+            {
+                "skill_id": "walk_forward",
+                "description": "Walk forward a short distance at a safe speed.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {
+                        "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0},
+                        "speed": {"type": "string", "enum": ["slow", "normal", "quick"]},
+                    },
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": True,
+            },
+            {
+                "skill_id": "nod_yes",
+                "description": "Nod the robot head yes as a social acknowledgement.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {"count": {"type": "number", "minimum": 2, "maximum": 8}},
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": False,
+            },
         ],
     }
 
@@ -274,6 +335,13 @@ class _WalkAndSocialInvoker:
         del arguments, context
         assert tool_name == "soridormi.skill.list"
         return _WalkAndSocialOutcome()
+
+
+class _ForwardAndSocialInvoker:
+    async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _ForwardAndSocialOutcome:
+        del arguments, context
+        assert tool_name == "soridormi.skill.list"
+        return _ForwardAndSocialOutcome()
 
 
 class _Ollama:
@@ -489,7 +557,7 @@ class _BrokenCapabilityPlannerOllama:
         assert "Available capability API surface" in prompt
         assert kwargs["response_format"] == "json"
         assert kwargs["options"]["num_ctx"] >= 4096
-        assert kwargs["options"]["num_predict"] >= 512
+        assert kwargs["options"]["num_predict"] >= 256
         raise ValueError("truncated JSON from capability planner")
 
 
@@ -502,6 +570,26 @@ class _BadSocialFallbackOllama:
         assert "Preserve the user's intended action class" in prompt
         assert "Do not use social acknowledgement, gaze, attention, or idle gestures" in prompt
         assert "deeper task decomposition" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "I will nod my head to acknowledge you.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                }
+            ],
+        }
+
+
+class _ExactBadSocialFallbackOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Walk forward for 15 seconds, quickly." in prompt
+        assert "Router-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert "soridormi.walk_forward" in prompt
+        assert "soridormi.nod_yes" in prompt
+        assert "Preserve the user's intended action class" in prompt
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
@@ -529,6 +617,21 @@ class _RejectSocialFallbackReviewer:
             "decision": "clarify",
             "reason": "The proposed nod is a social acknowledgement and does not satisfy walking.",
             "speech": "Please confirm a safe bounded walking plan before I move.",
+            "skills": [],
+        }
+
+
+class _AcceptBadSubstitutionReviewer:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Router-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert "do not use decision=accept" in prompt
+        assert "soridormi.walk_forward" in prompt
+        assert "soridormi.nod_yes" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "accept",
+            "reason": "Bad review fixture accepting a substitution.",
+            "speech": "",
             "skills": [],
         }
 
@@ -717,6 +820,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 max_speak_chars=160,
                 capability_catalog=_catalog(),
                 capability_match_limit=8,
+                require_capability_plan_review=True,
             )
         )
         request = AgentRunRequest.model_validate(
@@ -956,6 +1060,77 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             response.speech[0].text,
             "Please confirm a safe bounded walking plan before I move.",
+        )
+
+    async def test_exact_router_intent_substitution_fails_closed_without_reviewer(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_ExactBadSocialFallbackOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_ForwardAndSocialInvoker()),
+                capability_match_limit=8,
+                require_capability_plan_review=True,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "exact-walk-not-nod-no-reviewer",
+                "text": "Walk forward for 15 seconds, quickly.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.86,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
+        self.assertEqual(
+            response.speech[0].text,
+            "I need to re-check that action plan. Please say the movement you want again.",
+        )
+
+    async def test_exact_router_intent_substitution_reviewer_accept_is_not_enough(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_ExactBadSocialFallbackOllama(),  # type: ignore[arg-type]
+                response_reviewer=_AcceptBadSubstitutionReviewer(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_ForwardAndSocialInvoker()),
+                capability_match_limit=8,
+                require_capability_plan_review=True,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "exact-walk-not-nod-bad-reviewer",
+                "text": "Walk forward for 15 seconds, quickly.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.86,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
+        self.assertEqual(
+            response.speech[0].text,
+            "I need to re-check that action plan. Please say the movement you want again.",
         )
 
     async def test_capability_plan_uses_task_context_for_look_forward_followup(self) -> None:

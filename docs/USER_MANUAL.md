@@ -249,11 +249,9 @@ M13 text closure does not require the supervised real-microphone run.
   speech uses a short original line and still applies the same walking safety
   normalization. Chromie waits until that speech is actually audible before
   starting the body walk, so the song and walk overlap.
-- Chat-only speech can add a small parallel `soridormi.express_attention`
-  gesture while Chromie talks when `AGENT_EXPRESSIVE_BODY_CUES=sim_only` and
-  Soridormi reports simulator mode. Affirmative agreement uses a small, quicker
-  `soridormi.nod_yes` cue instead. Set `AGENT_EXPRESSIVE_BODY_CUES=off` in
-  `.env.local` if you want speech-only conversation.
+- Chat-only speech is speech-only by default. You can opt in to reviewed
+  simulator-only expressive gestures with `AGENT_EXPRESSIVE_BODY_CUES=sim_only`;
+  leave it `off` for latency-sensitive or strict behavior tests.
 - Compound requests should preserve order unless a safety or validation rule
   refuses the request.
 

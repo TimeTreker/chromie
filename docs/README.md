@@ -68,6 +68,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Interaction Agent and Skill Runtime](interaction_agent_skill_runtime.md)
 - [Chromie High-Level Ability Registry](chromie_ability_registry.md)
 - [Chromie Mind, Principles, and Experience](chromie_mind.md)
+- [Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md)
 - [Agent Capability Registry](agent_capability_registry.md)
 - [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md)
 - [TaskGraph](agent_task_graph.md)

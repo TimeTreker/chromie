@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_exact_walk_forward_not_nod",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Regression from the 2026-06-30 live voice log: Router selected walk_forward but the Agent tried to execute nod_yes.",
+  "tags": [
+    "voice-log",
+    "robot-action",
+    "walk",
+    "semantic-review",
+    "intent-preservation"
+  ],
+  "input": {
+    "text": "Walk forward."
+  },
+  "stub": {
+    "require_capability_plan_review": true,
+    "route_decision": {
+      "route": "robot_action",
+      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "intent": "capability:soridormi.walk_forward",
+      "confidence": 0.86,
+      "language": "en-US",
+      "source": "llm",
+      "metadata": {
+        "thinking_mode": "fast",
+        "session_action": "create_task_session",
+        "task_relation": "new_task"
+      }
+    },
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.walk_forward",
+        "description": "Walk forward a short distance at a safe speed.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0},
+            "speed": {"type": "string", "enum": ["slow", "normal", "quick"]}
+          },
+          "additionalProperties": false
+        },
+        "requires_confirmation": true,
+        "score": 0.91
+      },
+      {
+        "capability_id": "soridormi.nod_yes",
+        "description": "Nod the robot head yes as a social acknowledgement.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {"type": "number", "minimum": 2, "maximum": 8}
+          },
+          "additionalProperties": false
+        },
+        "requires_confirmation": false,
+        "score": 0.62
+      },
+      {
+        "capability_id": "soridormi.express_attention",
+        "description": "Small head-only attention/listening gesture.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "style": {"type": "string"},
+            "duration_s": {"type": "number"}
+          },
+          "additionalProperties": false
+        },
+        "requires_confirmation": true,
+        "score": 0.51
+      }
+    ],
+    "ollama_reply": {
+      "decision": "execute",
+      "speech": "I will nod my head to say yes for you.",
+      "skills": [
+        {
+          "skill_id": "soridormi.nod_yes",
+          "args": {"count": 2}
+        }
+      ]
+    }
+  },
+  "expect": {
+    "speech_any": ["re-check", "movement"],
+    "no_skills": true,
+    "forbidden_skills": [
+      "soridormi.nod_yes",
+      "soridormi.express_attention"
+    ],
+    "requires_confirmation": false
+  }
+}

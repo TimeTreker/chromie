@@ -92,3 +92,16 @@ python scripts/generate_dialogue_scenario_batch.py --target-count 300
 LLMs may help author new candidate scenarios, but committed scenario files must
 contain deterministic expectations. Normal regression runs must not depend on
 an LLM to decide whether the robot behaved correctly.
+
+The planned experience loop for turning low-scoring real dialogue/task episodes
+into reviewed scenario candidates is described in
+[Experience Evaluation and Scenario Mining](../docs/EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md).
+
+To score recorded runtime episodes and write candidate scenarios for review:
+
+```bash
+python scripts/evaluate_experience_episodes.py \
+  --episodes .chromie/experience/episodes.jsonl \
+  --output .chromie/experience/evaluations.jsonl \
+  --candidate-dir .chromie/scenario_candidates
+```

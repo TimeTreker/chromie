@@ -103,6 +103,7 @@ Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
 | `CHROMIE_PULL_POLICY` | Compose pull policy used by `start_services.sh`; default `never` for local project images. |
 | `CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced by `start_services.sh` after `.env.runtime`; intended for acceptance/service harnesses that need temporary Compose variables. |
 | `WARM_OLLAMA_BEFORE_ORCH` | Warm the Agent model before opening the microphone; when Router LLM is enabled, also warm the small Router model. Default `1`. |
+| `OLLAMA_AUTO_RESTART_ON_CRASH` | `1` by default. During host warmup, restart `chromie-llm` once if Ollama reports a native `llama-server` crash such as a segmentation fault, then retry generation. |
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 
@@ -197,6 +198,9 @@ model understanding. Catalog-only route selection exists only in explicit
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1`; append interaction outcomes to the local experience journal. |
 | `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl`; relative paths resolve from the project root. |
 | `ORCH_MIND_PROPOSAL_LOG_PATH` | `.chromie/experience/mind_update_proposals.jsonl`; stores human-review-only proposed updates. |
+| `ORCH_ENABLE_EPISODE_RECORDING` | `1`; append dialogue/task episode snapshots for offline scoring and scenario mining. |
+| `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl`; stores rolling conversation-thread snapshots keyed by `conversation_id`. |
+| `ORCH_EPISODE_MAX_TURNS` | `12`; maximum recent turns retained in one episode snapshot. |
 
 The default mind profile also carries Chromie's owner-approved identity: her
 name is Chromie, she is a female AI robot using she/her pronouns, and her age is
@@ -207,6 +211,15 @@ LLM or model provider. Core principles require owner approval and are not
 changed by experience. The experience journal can support future prompt, test,
 strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 [`chromie_mind.md`](chromie_mind.md).
+
+Episode snapshots can be scored and mined offline:
+
+```bash
+python scripts/evaluate_experience_episodes.py \
+  --episodes .chromie/experience/episodes.jsonl \
+  --output .chromie/experience/evaluations.jsonl \
+  --candidate-dir .chromie/scenario_candidates
+```
 
 ## Agent and TaskGraph
 
@@ -225,14 +238,15 @@ strategy, and long-term-goal tuning, but proposals are never auto-applied. See
 | `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; default `128`. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
-| `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `sim_only`; appends simulator-bounded cues such as `soridormi.express_attention` for chat-only speech when the live catalog exposes those skills. |
+| `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `off`; enable only when expressive chat motion has been reviewed for the target robot/sim. |
+| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Default `1`; if the Router selected an exact capability and the Agent planner proposes a different skill, execution fails closed unless semantic capability-plan review revises it. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories inside the Agent container. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for marking retrieval candidates as matched; default `0.16`. In normal LLM modes this affects context/validation, not deterministic action selection. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
 | `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; default `4096`. |
-| `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; default `512`. |
-| `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; default `256`. |
+| `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; default `256`. |
+| `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; default `160`. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` by default; `legacy-adapter` is the explicit rollback path for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | Default `0`; when enabled, only native contract-validation failures use the compatibility adapter. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
@@ -421,6 +435,13 @@ Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
 `OLLAMA_NUM_PARALLEL=1`, which lets the small Router model and larger Agent
 model stay resident together when memory allows without increasing per-model
 parallel KV-cache pressure.
+
+`scripts/warm_ollama.sh` performs a real `/api/generate` request for every model
+that must be ready before the microphone opens. If Ollama is reachable but the
+native `llama-server` runner crashes, warmup restarts `chromie-llm` once when
+`OLLAMA_AUTO_RESTART_ON_CRASH=1`, waits for `/api/tags`, and retries the same
+model. A second native crash fails fast with commands to restart the LLM service
+and check GPU visibility.
 
 Spoken generation paths set `think: false`. Conversation and deep-thinking
 prompts ask the model to speak as Chromie, the robot, rather than as a backend

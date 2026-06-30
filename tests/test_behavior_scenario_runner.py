@@ -24,7 +24,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 317)
+        self.assertEqual(len(all_cases), 318)
         self.assertEqual(len(router_cases), 8)
         self.assertEqual(len(dialogue_cases), 301)
         self.assertIn("dialogue/walk_then_followup_status", dialogue_keys)
