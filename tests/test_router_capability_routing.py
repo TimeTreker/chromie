@@ -98,6 +98,52 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.walk_forward",
         )
 
+    async def test_hybrid_deep_thought_for_direct_motion_recovers_to_catalog_robot_action(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="walk forward quickly",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=12,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "agent_id": "soridormi.skill",
+                    "description": "Walk forward for a bounded duration.",
+                    "score": 0.88,
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="deep_thought",
+                agents=["deepthinking_agent", "speaker_agent"],
+                intent="deep_thought",
+                confidence=0.90,
+                language="en-US",
+                source="llm",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="Walk forward for 15 seconds, quickly.")
+            )
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertIn("capability_agent", decision.agents)
+        self.assertIn("safety_agent", decision.agents)
+        self.assertEqual(decision.metadata["recovered_from_route"], "deep_thought")
+
     async def test_catalog_miss_does_not_use_legacy_robot_phrase_rule_by_default(self) -> None:
         from router.app import main
 

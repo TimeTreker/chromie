@@ -52,6 +52,26 @@ class SpeakerAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(updated.speak_immediate[0].text, "I understand.")
 
+    async def test_filters_internal_plan_labels_before_tts(self) -> None:
+        result = AgentResult()
+        result.add_speak_immediate(
+            'I\'ll get moving. Execute soridormi.walk_forward with speed="quick".'
+        )
+        result.add_speak_immediate("Task Split: 1.")
+        result.add_speak_immediate(
+            'Execute soridormi.walk_forward with speed="quick".'
+        )
+        result.add_speak_immediate("Key Risk: duration is near a safety limit.")
+        result.add_speak_immediate("Next Step: initiating the walk command now.")
+
+        updated = await SpeakerAgent(AgentServices(max_speak_chars=220)).run(
+            _chat_request(),
+            result,
+        )
+
+        self.assertEqual(len(updated.speak_immediate), 1)
+        self.assertEqual(updated.speak_immediate[0].text, "I'll get moving.")
+
 
 if __name__ == "__main__":
     unittest.main()

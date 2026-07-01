@@ -604,6 +604,7 @@ class CapabilityAgent(BaseAgent):
             "- Each execute item must be {\"skill_id\":\"<exact candidate skill_id>\",\"args\":{...}}.\n"
             "- For execute, every skills item must contain skill_id and args satisfying that candidate's input_schema.\n"
             "- For execute, speech is required: write one natural brief sentence generated from the chosen capability descriptions, user wording, and validated args.\n"
+            "- Execution speech must be a short acknowledgement, not an implementation explanation; do not include Task Split, Key Risk, Next Step, internal skill IDs, schema field names, or raw args.\n"
             "- Do not depend on downstream code to convert skill_id or args into spoken wording; this planner owns the execution speech.\n"
             "- Every enum argument must be copied exactly from that field's enum list in input_schema.\n"
             "- Map natural wording to enum tokens by semantic meaning; never output words outside the enum.\n"

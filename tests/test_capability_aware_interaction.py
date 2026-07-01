@@ -431,6 +431,23 @@ class _SelectedVelocityBetterForwardOllama:
         }
 
 
+class _RecoveredDeepThoughtWalkOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Router-selected exact skill_id: soridormi." in prompt
+        assert "Task Split, Key Risk, Next Step" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "Walking forward quickly for 15 seconds.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15.0, "speed": "quick"},
+                }
+            ],
+        }
+
+
 class _LookForwardOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.look_at_person" in prompt
@@ -925,6 +942,48 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args, {"duration_s": 15.0, "speed": "quick"})
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
         self.assertEqual(response.speech[0].text, "Walking forward quickly for 15 seconds.")
+
+    async def test_deep_thought_direct_motion_recovers_to_capability_planner(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_RecoveredDeepThoughtWalkOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_WalkChoiceInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-thought-direct-motion",
+                "text": "Walk forward for 15 seconds, quickly.",
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "deep_thought",
+                    "confidence": 0.90,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(
+            response.skills[0].args,
+            {"duration_s": 15.0, "speed": "quick"},
+        )
+        self.assertEqual(
+            response.metadata["capability_selected"],
+            ["soridormi.walk_forward"],
+        )
+        self.assertEqual(response.speech[0].text, "Walking forward quickly for 15 seconds.")
+        spoken = " ".join(item.text for item in response.speech)
+        self.assertNotIn("Task Split", spoken)
+        self.assertNotIn("soridormi", spoken)
 
     async def test_polite_chinese_head_ability_question_executes_matching_skill(self) -> None:
         runtime = InteractionRuntime(

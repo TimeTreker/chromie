@@ -35,6 +35,14 @@ _INTERNAL_SPEECH_ID_RE = re.compile(
     r"\b(?:soridormi|chromie)\.[A-Za-z0-9_][A-Za-z0-9_.-]*\b",
     re.IGNORECASE,
 )
+_INTERNAL_PLAN_LABEL_RE = re.compile(
+    r"\b(?:task split|key risk|next step)\s*:",
+    re.IGNORECASE,
+)
+_INTERNAL_EXECUTION_RE = re.compile(
+    r"\b(?:execute|call|run)\s+(?:soridormi|chromie)\.",
+    re.IGNORECASE,
+)
 _LEADING_PUNCT_RE = re.compile(r"^[\s,;:.!?，。！？、]+")
 _SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([,;:.!?，。！？、])")
 _EMPTY_BRACKETS_RE = re.compile(r"\(\s*\)|\[\s*\]|\{\s*\}")
@@ -44,6 +52,16 @@ def sanitize_spoken_text(value: str | None) -> str:
     text = " ".join((value or "").strip().split())
     if not text:
         return ""
+    execution = _INTERNAL_EXECUTION_RE.search(text)
+    if execution:
+        text = text[: execution.start()].strip()
+        if not text:
+            return ""
+    label = _INTERNAL_PLAN_LABEL_RE.search(text)
+    if label:
+        text = text[: label.start()].strip()
+        if not text:
+            return ""
     text = _INTERNAL_SPEECH_ID_RE.sub("", text)
     text = _EMPTY_BRACKETS_RE.sub("", text)
     text = _SPACE_BEFORE_PUNCT_RE.sub(r"\1", text)

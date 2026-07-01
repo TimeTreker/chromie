@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from typing import Any
+from unittest.mock import patch
 
 from agent.app.agents import AgentServices, ConversationAgent
 from agent.app.schema import AgentResult, AgentRunRequest
@@ -47,7 +48,8 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
-        result = await agent.run(request, AgentResult())
+        with patch.dict("os.environ", {}, clear=True):
+            result = await agent.run(request, AgentResult())
 
         self.assertEqual(
             result.speak_immediate[0].text,

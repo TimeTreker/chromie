@@ -84,6 +84,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("chromie.router")
 CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE = 0.30
+CATALOG_DEEP_THOUGHT_ROBOT_ACTION_RECOVERY_MIN_SCORE = 0.30
+DEEP_THOUGHT_ACTION_RECOVERY_MIN_CONFIDENCE = 0.72
 
 app = FastAPI(
     title="Chromie Router",
@@ -194,6 +196,95 @@ def _capability_executable(item: dict) -> bool:
 
 def _interaction_executable_candidates(result: CapabilityCatalogResult) -> list[dict]:
     return [item for item in result.matches if _capability_executable(item)]
+
+
+def _top_scored_capability(items: list[dict]) -> tuple[dict | None, float]:
+    top: dict | None = None
+    top_score = 0.0
+    for item in items:
+        score = item.get("score")
+        if not isinstance(score, (int, float)) or isinstance(score, bool):
+            score = 0.0
+        if top is None or float(score) > top_score:
+            top = item
+            top_score = float(score)
+    return top, top_score
+
+
+def _recover_deep_thought_catalog_action(
+    request: RouteRequest,
+    result: CapabilityCatalogResult,
+    *,
+    llm_decision: RouteDecision,
+) -> RouteDecision | None:
+    if llm_decision.route != "deep_thought":
+        return None
+    if not _deep_thought_action_recovery_allowed(llm_decision):
+        return None
+    if result.suggested_route != "robot_action" or not result.matched:
+        return None
+    top, top_score = _top_scored_capability(_interaction_executable_candidates(result))
+    if top is None or top_score < CATALOG_DEEP_THOUGHT_ROBOT_ACTION_RECOVERY_MIN_SCORE:
+        return None
+    selected_id = _capability_id(top)
+    if not selected_id:
+        return None
+    reason_parts = [
+        "Catalog recovered direct robot action from quick deep_thought route",
+        f"catalog_version={result.catalog_version}",
+        f"catalog_score={top_score:.2f}",
+    ]
+    if llm_decision.reason:
+        reason_parts.append(f"llm_reason={llm_decision.reason}")
+    return finalize_decision(
+        RouteDecision(
+            route="robot_action",
+            agents=["capability_agent", "safety_agent", "speaker_agent"],
+            intent=f"capability:{selected_id}",
+            confidence=max(0.56, min(0.95, top_score)),
+            language=request.language or llm_decision.language or "auto",
+            priority=llm_decision.priority,
+            needs_agent=True,
+            should_speak=True,
+            candidate_capabilities=list(result.matches),
+            reason="; ".join(reason_parts),
+            source="catalog",
+            metadata={
+                **(llm_decision.metadata or {}),
+                "recovered_from_route": llm_decision.route,
+                "recovered_from_intent": llm_decision.intent,
+            },
+        ),
+        request,
+        source="catalog",
+    )
+
+
+def _deep_thought_action_recovery_allowed(decision: RouteDecision) -> bool:
+    if decision.confidence < DEEP_THOUGHT_ACTION_RECOVERY_MIN_CONFIDENCE:
+        return False
+    intent = (decision.intent or "").casefold()
+    reason = (decision.reason or "").casefold()
+    blocked_intent_terms = (
+        "low_confidence",
+        "planning",
+        "complex",
+        "debug",
+        "design",
+        "strategy",
+        "architecture",
+        "implementation",
+    )
+    if any(term in intent for term in blocked_intent_terms):
+        return False
+    blocked_reason_terms = (
+        "explicit planning",
+        "make a plan",
+        "user asked for a plan",
+        "uncertain",
+        "low confidence",
+    )
+    return not any(term in reason for term in blocked_reason_terms)
 
 
 def _clarify_capability_decision(
@@ -693,11 +784,17 @@ async def route(request: RouteRequest) -> RouteDecision:
                 ):
                     decision = _deep_thought_from_low_confidence(request, llm_decision)
                 elif llm_decision.route == "deep_thought":
-                    decision = _validate_llm_capability_decision(
+                    decision = _recover_deep_thought_catalog_action(
                         request,
-                        llm_decision,
                         catalog_result,
+                        llm_decision=llm_decision,
                     )
+                    if decision is None:
+                        decision = _validate_llm_capability_decision(
+                            request,
+                            llm_decision,
+                            catalog_result,
+                        )
                 else:
                     decision = _validate_llm_capability_decision(
                         request,
