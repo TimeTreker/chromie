@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import json
 import os
+import re
 import time
 from typing import Any, cast
 
@@ -242,6 +243,7 @@ class ConversationAgent(BaseAgent):
             options=options,
         )
         response = self._clean_response(response, zh=zh)
+        response = self._ensure_factual_subject_anchor(request, response, zh=zh)
         if not self.is_playable_spoken_response(response, zh=zh):
             logger.warning(
                 "conversation_agent_invalid_spoken_response sid=%s response=%r",
@@ -462,4 +464,25 @@ class ConversationAgent(BaseAgent):
                 response = response[len(prefix) :].strip()
                 break
 
+        return response
+
+    def _ensure_factual_subject_anchor(
+        self,
+        request: AgentRunRequest,
+        response: str,
+        *,
+        zh: bool,
+    ) -> str:
+        if zh:
+            return response
+        text = (request.text or "").casefold()
+        lowered = (response or "").casefold()
+        if not re.search(r"\bsun\b", text) or re.search(r"\bsun\b", lowered):
+            return response
+        if not re.search(r"\b(?:round|sphere|spherical|rectangular|shape|hot|cold|temperature)\b", lowered):
+            return response
+        if re.search(r"\b(?:round|sphere|spherical|rectangular|shape)\b", text):
+            return f"The Sun is roughly spherical. {response}"
+        if re.search(r"\b(?:hot|cold|temperature)\b", text):
+            return f"The Sun is extremely hot. {response}"
         return response

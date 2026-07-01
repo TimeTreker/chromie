@@ -3,12 +3,19 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import functools
+import threading
 from typing import Any
 
 
-def _transcribe_sync(backend: Any, audio: Any, kwargs: dict[str, Any]) -> tuple[str, Any]:
+def _transcribe_sync(
+    gate: threading.BoundedSemaphore,
+    backend: Any,
+    audio: Any,
+    kwargs: dict[str, Any],
+) -> tuple[str, Any]:
     """Run the complete final-ASR backend call off the event loop."""
-    return backend.transcribe_final(audio, **kwargs)
+    with gate:
+        return backend.transcribe_final(audio, **kwargs)
 
 
 class TranscriptionExecutor:
@@ -23,18 +30,17 @@ class TranscriptionExecutor:
         if max_concurrency < 1:
             raise ValueError("max_concurrency must be at least 1")
         self.max_concurrency = max_concurrency
-        self._semaphore = asyncio.Semaphore(max_concurrency)
+        self._gate = threading.BoundedSemaphore(max_concurrency)
         self._owns_executor = executor is None
         self._executor = executor or concurrent.futures.ThreadPoolExecutor(
-            max_workers=max_concurrency,
+            max_workers=max_concurrency + 1,
             thread_name_prefix="chromie-asr-transcribe",
         )
 
     async def transcribe(self, backend: Any, audio: Any, **kwargs: Any) -> tuple[str, Any]:
-        async with self._semaphore:
-            loop = asyncio.get_running_loop()
-            call = functools.partial(_transcribe_sync, backend, audio, kwargs)
-            return await loop.run_in_executor(self._executor, call)
+        loop = asyncio.get_running_loop()
+        call = functools.partial(_transcribe_sync, self._gate, backend, audio, kwargs)
+        return await loop.run_in_executor(self._executor, call)
 
     def close(self) -> None:
         if self._owns_executor:

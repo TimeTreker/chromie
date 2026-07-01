@@ -1047,6 +1047,98 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             ["speech.answer"],
         )
 
+    async def test_llm_fallback_does_not_use_catalog_motion_for_social_compliment(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="you look beautiful don't you",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=9,
+            matches=[
+                {
+                    "capability_id": "soridormi.bow",
+                    "agent_id": "soridormi.skill",
+                    "description": "Perform a small social bow gesture.",
+                    "score": 0.52,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=0.45,
+                language="en-US",
+                source="fallback",
+                reason="llm_router_error:ReadTimeout",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="You look beautiful, don't you?"))
+
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertEqual(decision.source, "fallback")
+        self.assertIn("speech-only social", decision.reason or "")
+        self.assertEqual(
+            [item["task_type"] for item in decision.metadata["task_list"]],
+            ["speech.answer"],
+        )
+
+    async def test_catalog_chat_does_not_swallow_explicit_deep_thought_request(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="please think carefully and split the work to add long-term memory",
+            matched=True,
+            suggested_route="chat",
+            suggested_agents=["conversation_agent", "speaker_agent"],
+            catalog_version=10,
+            matches=[
+                {
+                    "capability_id": "chromie.speak",
+                    "agent_id": "chromie.speech",
+                    "description": "Speak a short message to the user.",
+                    "score": 0.42,
+                    "available": True,
+                    "interaction_executable": False,
+                },
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=0.45,
+                language="en-US",
+                source="fallback",
+                reason="llm_router_error:ReadTimeout",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(
+                    text="Please think carefully and split the work to add long-term memory to Chromie."
+                )
+            )
+
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_planning")
+        self.assertEqual(decision.source, "fallback")
+        self.assertFalse(decision.metadata.get("thinking_ack_allowed", True))
+
     async def test_hybrid_router_does_not_synthesize_actions_with_semantic_parser(self) -> None:
         from router.app import main
 

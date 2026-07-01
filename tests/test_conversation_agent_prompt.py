@@ -195,6 +195,37 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("correct obvious false premises", ollama.calls[0]["system"])
         self.assertIn("Current user said: In my opinion, the sun is cold.", ollama.calls[0]["prompt"])
 
+    async def test_sun_shape_reply_names_subject_even_when_model_uses_pronoun(self) -> None:
+        ollama = _CapturingOllama("It is indeed a massive, nearly perfect sphere.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "sun-shape-anchor-test",
+                "text": "I think the sun is not a round sphere, do you think so?",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "fallback",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "The Sun is roughly spherical. It is indeed a massive, nearly perfect sphere.",
+        )
+
     async def test_response_review_auto_skips_low_risk_greeting(self) -> None:
         ollama = _CapturingOllama(
             [

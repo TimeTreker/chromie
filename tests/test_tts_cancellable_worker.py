@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import multiprocessing
 import time
 import unittest
 
@@ -24,13 +25,20 @@ def _fake_generation_worker(connection) -> None:
         return
 
 
+def _worker_context_name() -> str:
+    methods = multiprocessing.get_all_start_methods()
+    if "fork" in methods:
+        return "fork"
+    return methods[0]
+
+
 class RestartableProcessWorkerTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancel_terminates_stale_work_and_restarts_worker(self) -> None:
         worker = RestartableProcessWorker(
             _fake_generation_worker,
             name="chromie-test-generation",
             startup_timeout_s=2.0,
-            context_name="forkserver",
+            context_name=_worker_context_name(),
         )
         await worker.start()
         try:

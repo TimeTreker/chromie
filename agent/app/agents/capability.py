@@ -192,6 +192,7 @@ class CapabilityAgent(BaseAgent):
 
         plan = await self._plan(request, executable)
         plan = await self._review_plan(request, plan, executable)
+        plan = self._normalize_plan_for_routed_surface(request, plan, executable)
         allowed = {match.capability_id: match for match in executable}
         if plan.decision != "execute":
             speech = self._natural_plan_speech(plan.speech)
@@ -669,6 +670,103 @@ class CapabilityAgent(BaseAgent):
             ),
             reverse=True,
         )
+
+    def _normalize_plan_for_routed_surface(
+        self,
+        request: AgentRunRequest,
+        plan: _CapabilityPlan,
+        candidates: list[Any],
+    ) -> _CapabilityPlan:
+        if plan.decision != "execute" or not plan.skills:
+            return plan
+        candidate_by_id = {
+            str(getattr(match, "capability_id", "") or ""): match
+            for match in candidates
+        }
+        if "soridormi.look_at_person" not in candidate_by_id:
+            return plan
+        context_candidates = request.context.get("capability_candidates")
+        if not isinstance(context_candidates, list):
+            context_candidates = []
+        routed_candidate_ids = {
+            str(item.get("capability_id") or "")
+            for item in context_candidates
+            if isinstance(item, dict)
+        }
+        routed_candidate_ids.update(
+            str(item.get("capability_id") or "")
+            for item in request.route_decision.candidate_capabilities
+            if isinstance(item, dict)
+        )
+        if "soridormi.look_at_person" not in routed_candidate_ids:
+            return plan
+
+        changed = False
+        normalized_skills: list[_PlannedSkill] = []
+        for item in plan.skills:
+            if item.skill_id != "soridormi.look_direction":
+                normalized_skills.append(item)
+                continue
+            args = self._look_direction_args_to_person_target_args(
+                item.args,
+                candidate_by_id["soridormi.look_at_person"],
+            )
+            normalized_skills.append(
+                _PlannedSkill(skill_id="soridormi.look_at_person", args=args)
+            )
+            changed = True
+        if not changed:
+            return plan
+        try:
+            return _CapabilityPlan(
+                decision=plan.decision,
+                speech=plan.speech,
+                skills=normalized_skills,
+            )
+        except ValidationError:
+            return plan
+
+    def _look_direction_args_to_person_target_args(
+        self,
+        args: dict[str, Any],
+        target: Any,
+    ) -> dict[str, Any]:
+        schema = getattr(target, "input_schema", {}) or {}
+        properties = schema.get("properties") if isinstance(schema, dict) else {}
+        if not isinstance(properties, dict):
+            properties = {}
+        out: dict[str, Any] = {}
+        yaw = args.get("head_yaw_rad", args.get("yaw_rad", args.get("target_yaw_rad")))
+        if isinstance(yaw, (int, float)) and not isinstance(yaw, bool):
+            out["target_yaw_rad"] = self._clamp_number_for_schema(
+                float(yaw),
+                properties.get("target_yaw_rad"),
+            )
+        pitch = args.get("head_pitch_rad", args.get("pitch_rad", args.get("target_pitch_rad")))
+        if isinstance(pitch, (int, float)) and not isinstance(pitch, bool):
+            out["target_pitch_rad"] = self._clamp_number_for_schema(
+                float(pitch),
+                properties.get("target_pitch_rad"),
+            )
+        duration = args.get("duration_s")
+        if isinstance(duration, (int, float)) and not isinstance(duration, bool):
+            out["duration_s"] = self._clamp_number_for_schema(
+                float(duration),
+                properties.get("duration_s"),
+            )
+        return out
+
+    @staticmethod
+    def _clamp_number_for_schema(value: float, schema: Any) -> float:
+        if not isinstance(schema, dict):
+            return value
+        minimum = schema.get("minimum")
+        maximum = schema.get("maximum")
+        if isinstance(minimum, (int, float)) and not isinstance(minimum, bool):
+            value = max(float(minimum), value)
+        if isinstance(maximum, (int, float)) and not isinstance(maximum, bool):
+            value = min(float(maximum), value)
+        return value
 
     def _capability_payload(self, match: Any) -> dict[str, Any]:
         description = " ".join(str(getattr(match, "description", "") or "").split())

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Literal
@@ -209,6 +210,108 @@ def _top_scored_capability(items: list[dict]) -> tuple[dict | None, float]:
             top = item
             top_score = float(score)
     return top, top_score
+
+
+def _normalized_text(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
+def _looks_like_explicit_body_action(text: str) -> bool:
+    normalized = _normalized_text(text)
+    return bool(
+        re.search(
+            r"\b(?:walk|move|turn|nod|shake|blink|bow|wave|dance|stand|sit|look\s+(?:at|toward|left|right|up|down)|raise|lower)\b",
+            normalized,
+        )
+        or re.search(r"(走|移动|转|点头|摇头|眨眼|鞠躬|挥手|看向|站|坐)", normalized)
+    )
+
+
+def _looks_like_speech_only_social_text(text: str) -> bool:
+    normalized = _normalized_text(text)
+    if _looks_like_explicit_body_action(normalized):
+        return False
+    if re.search(
+        r"\byou(?:\s+are|'re|\s+look|\s+seem)\b.*\b(?:beautiful|pretty|cute|nice|good|great|lovely|handsome|adorable)\b",
+        normalized,
+    ):
+        return True
+    if re.search(r"\b(?:thank you|thanks|good job|well done)\b", normalized):
+        return True
+    return bool(re.search(r"(漂亮|好看|可爱|谢谢|做得好)", normalized))
+
+
+def _looks_like_explicit_deep_thought_text(text: str) -> bool:
+    normalized = _normalized_text(text)
+    planning_terms = (
+        "think carefully",
+        "split the work",
+        "break down",
+        "step by step",
+        "architecture",
+        "implementation plan",
+        "design the",
+    )
+    if any(term in normalized for term in planning_terms):
+        return True
+    return bool(
+        re.search(r"\b(?:plan|design|implement|build|add)\b", normalized)
+        and re.search(
+            r"\b(?:long[- ]term memory|memory architecture|task session|multi[- ]step)\b",
+            normalized,
+        )
+    )
+
+
+def _speech_only_social_chat_decision(
+    request: RouteRequest,
+    result: CapabilityCatalogResult,
+    *,
+    reason: str,
+) -> RouteDecision:
+    return finalize_decision(
+        RouteDecision(
+            route="chat",
+            agents=["conversation_agent", "speaker_agent"],
+            intent="general_conversation",
+            confidence=0.62,
+            language=request.language or "auto",
+            priority="normal",
+            needs_agent=True,
+            should_speak=True,
+            candidate_capabilities=list(result.matches),
+            reason=reason,
+            source="fallback",
+        ),
+        request,
+        source="fallback",
+    )
+
+
+def _semantic_deep_thought_decision(
+    request: RouteRequest,
+    result: CapabilityCatalogResult,
+    *,
+    reason: str,
+) -> RouteDecision:
+    return finalize_decision(
+        RouteDecision(
+            route="deep_thought",
+            agents=["deepthinking_agent", "speaker_agent"],
+            intent="deep_thought_planning",
+            confidence=0.62,
+            language=request.language or "auto",
+            priority="normal",
+            needs_agent=True,
+            should_speak=True,
+            candidate_capabilities=list(result.matches),
+            reason=reason,
+            source="fallback",
+            metadata={"thinking_ack_allowed": False},
+        ),
+        request,
+        source="fallback",
+    )
 
 
 def _recover_deep_thought_catalog_action(
@@ -642,6 +745,18 @@ def _catalog_decision(
     route = result.suggested_route
     if route not in {"chat", "robot_action", "tool", "memory"}:
         route = "tool"
+    if _looks_like_explicit_deep_thought_text(request.text):
+        return _semantic_deep_thought_decision(
+            request,
+            result,
+            reason="Catalog context matched, but text explicitly requests planning/deep thought",
+        )
+    if route == "robot_action" and _looks_like_speech_only_social_text(request.text):
+        return _speech_only_social_chat_decision(
+            request,
+            result,
+            reason="Blocked catalog robot action for speech-only social text",
+        )
     if route == "chat":
         return finalize_decision(
             RouteDecision(
@@ -703,6 +818,15 @@ def _catalog_planner_fallback_decision(
 ) -> RouteDecision | None:
     if result.suggested_route != "robot_action":
         return _catalog_decision(request, result)
+    if _looks_like_speech_only_social_text(request.text):
+        return _speech_only_social_chat_decision(
+            request,
+            result,
+            reason=(
+                "LLM router unavailable; blocked catalog robot action for "
+                "speech-only social text"
+            ),
+        )
     executable = _interaction_executable_candidates(result)
     if not result.matched or not executable:
         return None

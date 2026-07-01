@@ -458,6 +458,88 @@ class _CompoundMotionOllama:
         }
 
 
+class _HeadDirectionCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del kwargs
+        return CapabilitySearchResult(
+            query=text,
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=14,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.look_at_person",
+                    agent_id="soridormi.skill",
+                    description="Turn head toward a structured person target direction.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "target_yaw_rad": {
+                                "type": "number",
+                                "minimum": -0.55,
+                                "maximum": 0.55,
+                            },
+                            "duration_s": {
+                                "type": "number",
+                                "minimum": 2.0,
+                                "maximum": 10.0,
+                            },
+                        },
+                        "additionalProperties": False,
+                    },
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.36,
+                    metadata={"mode": "sim"},
+                ),
+                CapabilityMatch(
+                    capability_id="soridormi.look_direction",
+                    agent_id="soridormi.skill",
+                    description="Turn head by a bounded yaw/pitch offset.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "head_yaw_rad": {"type": "number"},
+                            "duration_s": {"type": "number"},
+                        },
+                    },
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.25,
+                    metadata={"mode": "sim"},
+                ),
+            ],
+        )
+
+
+class _HeadDirectionOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs["response_format"] == "json"
+        assert "soridormi.look_at_person" in prompt
+        assert "soridormi.look_direction" in prompt
+        return {
+            "decision": "execute",
+            "speech": "I will turn my head right.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.look_direction",
+                    "args": {"head_yaw_rad": 0.3, "duration_s": 1.0},
+                }
+            ],
+        }
+
+
 def _request(
     *,
     text: str = "nod",
@@ -518,6 +600,27 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args, {"count": 2})
         self.assertEqual(response.speech[0].text, "I will run that action.")
         self.assertIn("capability_agent", response.metadata["handled_by"])
+
+    async def test_native_runtime_preserves_routed_head_target_wrapper(self) -> None:
+        request = _request(
+            text="Please turn your head right.",
+            route="robot_action",
+            intent="robot_action",
+            agents=["capability_agent", "safety_agent", "speaker_agent"],
+        )
+
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_HeadDirectionOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_HeadDirectionCatalog(),  # type: ignore[arg-type]
+            )
+        ).run(request)
+
+        self.assertEqual(response.skills[0].skill_id, "soridormi.look_at_person")
+        self.assertEqual(response.skills[0].args["target_yaw_rad"], 0.3)
+        self.assertEqual(response.skills[0].args["duration_s"], 2.0)
 
     async def test_speech_while_body_action_waits_for_playback_start(self) -> None:
         request = AgentRunRequest.model_validate(
