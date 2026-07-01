@@ -431,7 +431,6 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
     for key in (
         "ok",
         "status",
-        "route",
         "intent",
         "confidence",
         "sid",
@@ -441,9 +440,25 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
         "trace_id",
         "outcome_summary",
         "summary",
+        "text",
     ):
         if key in value:
             summary[key] = _shorten(value[key])
+    route = value.get("route")
+    if isinstance(route, dict):
+        summary["route"] = _summarize_route_decision(route, limit=limit)
+    elif "route" in value:
+        summary["route"] = _shorten(value["route"])
+    interaction_response = value.get("interaction_response")
+    if isinstance(interaction_response, dict):
+        summary["interaction_response"] = _summarize_interaction_response(
+            interaction_response,
+            limit=limit,
+        )
+    for key in ("session_state", "status_before", "status_after", "checks"):
+        nested = value.get(key)
+        if isinstance(nested, dict):
+            summary[key] = _summarize_scalar_mapping(nested, limit=limit)
     if isinstance(value.get("errors"), list):
         summary["errors"] = [_shorten(item) for item in value["errors"][:limit]]
         summary["error_count"] = len(value["errors"])
@@ -485,6 +500,132 @@ def _summarize_json_payload(value: Any, *, limit: int) -> dict[str, Any]:
     nested_execution = value.get("execution")
     if isinstance(nested_execution, dict):
         summary["execution"] = _summarize_json_payload(nested_execution, limit=limit)
+    return summary
+
+
+def _summarize_route_decision(route: dict[str, Any], *, limit: int) -> dict[str, Any]:
+    summary = {
+        key: _shorten(route[key])
+        for key in (
+            "route",
+            "intent",
+            "confidence",
+            "source",
+            "language",
+            "priority",
+            "reason",
+        )
+        if key in route
+    }
+    agents = route.get("agents")
+    if isinstance(agents, list):
+        summary["agents"] = [str(agent) for agent in agents[:limit]]
+        summary["agent_count"] = len(agents)
+    actions = route.get("actions")
+    if isinstance(actions, list):
+        summary["actions"] = [
+            _summarize_route_action(item)
+            for item in actions[:limit]
+            if isinstance(item, dict)
+        ]
+        summary["action_count"] = len(actions)
+    candidates = route.get("candidate_capabilities")
+    if isinstance(candidates, list):
+        summary["candidate_capability_ids"] = [
+            str(item.get("capability_id") or item.get("id") or "")
+            for item in candidates[:limit]
+            if isinstance(item, dict)
+        ]
+        summary["candidate_count"] = len(candidates)
+    metadata = route.get("metadata")
+    if isinstance(metadata, dict):
+        route_merge = metadata.get("route_merge")
+        if isinstance(route_merge, dict):
+            summary["route_merge"] = _summarize_scalar_mapping(route_merge, limit=limit)
+        task_list = metadata.get("task_list")
+        if isinstance(task_list, list):
+            summary["task_types"] = [
+                str(item.get("task_type") or "")
+                for item in task_list[:limit]
+                if isinstance(item, dict)
+            ]
+            summary["task_count"] = len(task_list)
+    return summary
+
+
+def _summarize_route_action(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: _shorten(item[key])
+        for key in (
+            "capability_id",
+            "skill_id",
+            "sequence",
+            "timing",
+            "requires_confirmation",
+        )
+        if key in item
+    }
+
+
+def _summarize_interaction_response(
+    response: dict[str, Any],
+    *,
+    limit: int,
+) -> dict[str, Any]:
+    summary = {
+        key: _shorten(response[key])
+        for key in (
+            "interaction_id",
+            "status",
+            "reason",
+            "requires_confirmation",
+        )
+        if key in response
+    }
+    speech = response.get("speech")
+    if isinstance(speech, list):
+        summary["speech"] = [
+            _summarize_speech_item(item)
+            for item in speech[:limit]
+            if isinstance(item, dict)
+        ]
+        summary["speech_count"] = len(speech)
+    skills = response.get("skills")
+    if isinstance(skills, list):
+        summary["skill_ids"] = [
+            str(item.get("skill_id") or item.get("id") or "")
+            for item in skills[:limit]
+            if isinstance(item, dict)
+        ]
+        summary["skill_count"] = len(skills)
+    metadata = response.get("metadata")
+    if isinstance(metadata, dict):
+        summary["metadata_keys"] = sorted(str(key) for key in metadata.keys())[:limit]
+    return summary
+
+
+def _summarize_speech_item(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: _shorten(item[key])
+        for key in ("id", "text", "style", "timing", "priority")
+        if key in item
+    }
+
+
+def _summarize_scalar_mapping(value: dict[str, Any], *, limit: int) -> dict[str, Any]:
+    summary: dict[str, Any] = {}
+    for key in sorted(value.keys())[:limit]:
+        nested = value[key]
+        if isinstance(nested, (str, int, float, bool)) or nested is None:
+            summary[str(key)] = _shorten(nested)
+        elif isinstance(nested, list):
+            summary[str(key)] = [_shorten(item) for item in nested[:limit]]
+            summary[f"{key}_count"] = len(nested)
+        elif isinstance(nested, dict):
+            summary[str(key)] = {
+                "keys": sorted(str(item_key) for item_key in nested.keys())[:limit],
+            }
+    summary["key_count"] = len(value)
     return summary
 
 

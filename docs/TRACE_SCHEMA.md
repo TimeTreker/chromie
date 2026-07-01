@@ -120,7 +120,11 @@ and ordered events.
 Artifacts report their path, kind, record counts, parse errors, discovered
 identifiers, and a bounded summary. JSONL artifacts include summarized records;
 JSON artifacts include a summarized payload. Use `--limit` to bound records per
-artifact.
+artifact. Acceptance `summary.json` files may embed large route decisions,
+capability catalogs, interaction responses, execution traces, and simulator
+status snapshots; `trace view` summarizes those nested objects with counts,
+selected identifiers, statuses, and short speech/result snippets rather than
+echoing the full catalog or schema payload.
 
 Supported commands:
 

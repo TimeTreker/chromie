@@ -194,6 +194,119 @@ class ChromieCliTests(unittest.TestCase):
         )
         self.assertEqual(stderr, "")
 
+    def test_trace_view_bounds_real_acceptance_summary_payloads(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            trace_dir = root / ".chromie" / "acceptance" / "text-mujoco" / "case-1"
+            trace_dir.mkdir(parents=True)
+            long_description = "long capability description " * 80
+            (trace_dir / "summary.json").write_text(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "sid": "sid-real",
+                        "text": "Walk forward.",
+                        "session_state": {
+                            "done_logged": True,
+                            "played_tts": 1,
+                            "queued_tts": 1,
+                            "large_nested": {"unneeded": "details"},
+                        },
+                        "route": {
+                            "route": "robot_action",
+                            "intent": "capability:soridormi.walk_velocity",
+                            "confidence": 0.99,
+                            "source": "catalog",
+                            "actions": [
+                                {
+                                    "capability_id": "soridormi.walk_velocity",
+                                    "sequence": 0,
+                                    "timing": "sequential",
+                                    "args": {"duration_s": 15, "vx_mps": 0.2},
+                                }
+                            ],
+                            "candidate_capabilities": [
+                                {
+                                    "capability_id": "soridormi.walk_velocity",
+                                    "description": long_description,
+                                    "input_schema": {"properties": {"vx_mps": {"type": "number"}}},
+                                },
+                                {
+                                    "capability_id": "soridormi.nod_yes",
+                                    "description": "Nod yes.",
+                                },
+                                {
+                                    "capability_id": "soridormi.turn_in_place",
+                                    "description": "Turn.",
+                                },
+                            ],
+                        },
+                        "interaction_response": {
+                            "interaction_id": "interaction-real",
+                            "status": "ok",
+                            "requires_confirmation": True,
+                            "speech": [
+                                {
+                                    "id": "speech-1",
+                                    "text": "Walking forward.",
+                                    "style": "brief",
+                                    "timing": "immediate",
+                                }
+                            ],
+                            "skills": [
+                                {
+                                    "request_id": "skill-1",
+                                    "skill_id": "soridormi.walk_velocity",
+                                    "args": {"duration_s": 15, "vx_mps": 0.2},
+                                }
+                            ],
+                            "metadata": {"trace": ["capability_agent accepted"]},
+                        },
+                        "execution": {
+                            "interaction_id": "interaction-real",
+                            "status": "completed",
+                            "results": [
+                                {
+                                    "request_id": "skill-1",
+                                    "skill_id": "soridormi.walk_velocity",
+                                    "provider_id": "soridormi.mcp",
+                                    "status": "completed",
+                                    "trace_id": "trace-real",
+                                }
+                            ],
+                            "traces": [],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "trace",
+                "view",
+                "--file",
+                str(trace_dir / "summary.json"),
+                "--limit",
+                "2",
+            )
+        self.assertEqual(code, int(ExitCode.OK))
+        payload = json.loads(stdout)
+        artifact = payload["details"]["artifacts"][0]
+        summary = artifact["summary"]
+        self.assertEqual(summary["route"]["route"], "robot_action")
+        self.assertEqual(summary["route"]["candidate_count"], 3)
+        self.assertEqual(
+            summary["route"]["candidate_capability_ids"],
+            ["soridormi.walk_velocity", "soridormi.nod_yes"],
+        )
+        self.assertNotIn("candidate_capabilities", summary["route"])
+        self.assertEqual(summary["interaction_response"]["skill_count"], 1)
+        self.assertEqual(summary["session_state"]["done_logged"], True)
+        self.assertNotIn(long_description, stdout)
+        self.assertEqual(stderr, "")
+
     def test_trace_view_warns_when_filters_do_not_match(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
