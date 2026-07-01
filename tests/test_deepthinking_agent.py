@@ -108,6 +108,48 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("conversation_agent", result.handled_by)
         self.assertGreater(len(result.speak_immediate), 0)
 
+    async def test_chinese_deep_thought_uses_english_internal_prompt_with_target_language(self) -> None:
+        ollama = _CapturingOllama("我会用中文回答。")
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-zh-prompt-test",
+                "text": "请认真想一下这个架构问题。",
+                "history": [
+                    {"role": "user", "text": "我们要减少提示词漂移。"},
+                    {"role": "assistant", "text": "我会检查深度思考提示词。"},
+                ],
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "architecture_review",
+                    "confidence": 0.91,
+                    "language": "zh-CN",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "我会用中文回答。")
+        self.assertEqual(len(ollama.calls), 1)
+        call = ollama.calls[0]
+        self.assertIn("You are Chromie's deepthinking agent", call["system"])
+        self.assertIn("speak the final response in Chinese", call["system"])
+        self.assertIn("English is the main language for all internal thinking or action", call["system"])
+        self.assertNotIn("你是 Chromie 的 deepthinking agent", call["system"])
+        self.assertIn("Target spoken language: zh-CN", call["prompt"])
+        self.assertIn("Recent conversation", call["prompt"])
+        self.assertIn("User:", call["prompt"])
+        self.assertNotIn("最近对话", call["prompt"])
+
     async def test_completed_pending_tasks_are_not_fed_as_active_context(self) -> None:
         ollama = _CapturingOllama("Let's reason about the claim directly.")
         agent = DeepThinkingAgent(
