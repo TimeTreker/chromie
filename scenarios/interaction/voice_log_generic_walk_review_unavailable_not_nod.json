@@ -85,7 +85,7 @@
     }
   },
   "expect": {
-    "speech_any": ["re-check", "movement"],
+    "speech_any": ["reliable review", "will not move"],
     "no_skills": true,
     "forbidden_skills": [
       "soridormi.nod_yes",

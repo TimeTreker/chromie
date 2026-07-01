@@ -3,7 +3,7 @@
   "id": "explicit_deep_thought",
   "suite": "router",
   "level": "module",
-  "description": "Explicit careful-reasoning request is understood by the quick LLM router and schedules a thinking acknowledgement task.",
+  "description": "Explicit careful-reasoning request is understood by the quick LLM router and delegates to deep thought without a route-level thinking acknowledgement.",
   "tags": ["deep-thought", "planning"],
   "input": {
     "text": "Please think deeply and design a test strategy."
@@ -26,7 +26,8 @@
     "route": "deep_thought",
     "intent": "deep_thought_planning",
     "source": "llm",
-    "task_types_include": ["cognition.delegate_deep_thought", "speech.thinking_ack", "cognition.deep_think"],
+    "task_types_include": ["cognition.delegate_deep_thought", "cognition.deep_think"],
+    "task_types_forbid": ["speech.thinking_ack"],
     "llm_calls": 1
   }
 }
