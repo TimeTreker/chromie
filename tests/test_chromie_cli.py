@@ -138,6 +138,101 @@ class ChromieCliTests(unittest.TestCase):
         self.assertIn("router_done: route=chat confidence=0.91", messages)
         self.assertEqual(stderr, "")
 
+    def test_trace_view_summarizes_session_workflow_graph_jsonl(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            events_dir = root / ".chromie" / "acceptance" / "voice" / "case-1"
+            events_dir.mkdir(parents=True)
+            graph = {
+                "schema_version": 1,
+                "sid": "sid-graph",
+                "total_ms": 1420.5,
+                "nodes": [
+                    {
+                        "id": "n0",
+                        "index": 0,
+                        "event": "session_start",
+                        "elapsed_ms": 0.0,
+                        "delta_from_previous_ms": 0.0,
+                        "message": "session_start",
+                    },
+                    {
+                        "id": "n1",
+                        "index": 1,
+                        "event": "asr_final",
+                        "elapsed_ms": 120.0,
+                        "delta_from_previous_ms": 120.0,
+                        "message": "asr_final: text='walk'",
+                    },
+                    {
+                        "id": "n2",
+                        "index": 2,
+                        "event": "router_done",
+                        "elapsed_ms": 420.0,
+                        "delta_from_previous_ms": 300.0,
+                        "message": "router_done: route=robot_action",
+                    },
+                    {
+                        "id": "n3",
+                        "index": 3,
+                        "event": "playback_end",
+                        "elapsed_ms": 1420.5,
+                        "delta_from_previous_ms": 1000.5,
+                        "message": "playback_end: played_tts=1",
+                    },
+                ],
+                "edges": [
+                    {"from": "n0", "to": "n1", "delta_ms": 120.0},
+                    {"from": "n1", "to": "n2", "delta_ms": 300.0},
+                    {"from": "n2", "to": "n3", "delta_ms": 1000.5},
+                ],
+            }
+            (events_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(record)
+                    for record in (
+                        {
+                            "sid": "sid-graph",
+                            "elapsed_ms": 0.0,
+                            "event": "session_start",
+                            "message": "session_start",
+                        },
+                        {
+                            "sid": "sid-graph",
+                            "elapsed_ms": 1420.5,
+                            "event": "session_workflow_graph",
+                            "message": "session_workflow_graph: nodes=4 edges=3 total_ms=1420.5",
+                            "graph": graph,
+                        },
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "trace",
+                "view",
+                "--session",
+                "sid-graph",
+                "--limit",
+                "2",
+            )
+        self.assertEqual(code, int(ExitCode.OK))
+        payload = json.loads(stdout)
+        artifact = payload["details"]["artifacts"][0]
+        self.assertEqual(artifact["workflow_graph_count"], 1)
+        workflow_graph = artifact["workflow_graphs"][0]
+        self.assertEqual(workflow_graph["node_count"], 4)
+        self.assertEqual(workflow_graph["edge_count"], 3)
+        self.assertEqual(workflow_graph["events"], ["session_start", "asr_final"])
+        self.assertEqual(workflow_graph["slowest_nodes"][0]["event"], "playback_end")
+        record_graph = artifact["records"][1]["workflow_graph"]
+        self.assertEqual(record_graph["total_ms"], 1420.5)
+        self.assertEqual(stderr, "")
+
     def test_trace_view_summarizes_task_graph_trace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

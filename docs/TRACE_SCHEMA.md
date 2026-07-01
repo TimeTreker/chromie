@@ -59,7 +59,10 @@ workflow evidence:
 
 These cover the same per-session stages, such as VAD, ASR, Router, Agent,
 fast-first response, Skill Runtime, TTS, playback, and final timing. They are
-debug evidence only; they do not authorize or change execution.
+debug evidence only; they do not authorize or change execution. `trace view`
+summarizes `session_workflow_graph` JSONL records with `workflow_graph_count`,
+bounded `workflow_graphs[]`, node and edge counts, first event names, total
+milliseconds, and slowest node deltas.
 
 TaskGraph traces should follow the Agent `ExecutionTrace` model:
 

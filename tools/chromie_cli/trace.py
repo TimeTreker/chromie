@@ -270,7 +270,7 @@ def _read_jsonl_artifact(
         return None
     sample = matched[:limit]
     identifiers = _collect_identifiers(records)
-    return {
+    artifact = {
         "path": str(path),
         "relative_path": _relative(path, scan_root),
         "kind": _jsonl_kind(records),
@@ -280,6 +280,16 @@ def _read_jsonl_artifact(
         "identifiers": identifiers,
         "records": [_summarize_event_record(record) for record in sample],
     }
+    workflow_graphs = [
+        _summarize_workflow_graph(record.get("graph"), limit=limit)
+        for record in matched
+        if record.get("event") == "session_workflow_graph"
+        and isinstance(record.get("graph"), dict)
+    ]
+    if workflow_graphs:
+        artifact["workflow_graphs"] = workflow_graphs[:limit]
+        artifact["workflow_graph_count"] = len(workflow_graphs)
+    return artifact
 
 
 def _read_json_artifact(
@@ -645,11 +655,56 @@ def _summarize_event_record(record: dict[str, Any]) -> dict[str, Any]:
         "route",
         "intent",
     )
-    return {
+    summary = {
         key: _shorten(record[key])
         for key in keys
         if key in record
     }
+    if record.get("event") == "session_workflow_graph" and isinstance(
+        record.get("graph"),
+        dict,
+    ):
+        summary["workflow_graph"] = _summarize_workflow_graph(record["graph"], limit=5)
+    return summary
+
+
+def _summarize_workflow_graph(value: Any, *, limit: int) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    nodes = value.get("nodes") if isinstance(value.get("nodes"), list) else []
+    edges = value.get("edges") if isinstance(value.get("edges"), list) else []
+    summary: dict[str, Any] = {
+        "schema_version": value.get("schema_version"),
+        "sid": value.get("sid"),
+        "total_ms": value.get("total_ms"),
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+    }
+    if nodes:
+        summary["events"] = [
+            str(node.get("event") or "")
+            for node in nodes[:limit]
+            if isinstance(node, dict)
+        ]
+        slow_nodes = sorted(
+            (
+                node
+                for node in nodes
+                if isinstance(node, dict)
+                and isinstance(node.get("delta_from_previous_ms"), (int, float))
+            ),
+            key=lambda node: float(node.get("delta_from_previous_ms") or 0.0),
+            reverse=True,
+        )[:limit]
+        summary["slowest_nodes"] = [
+            {
+                "event": str(node.get("event") or ""),
+                "delta_from_previous_ms": _shorten(node.get("delta_from_previous_ms")),
+                "elapsed_ms": _shorten(node.get("elapsed_ms")),
+            }
+            for node in slow_nodes
+        ]
+    return summary
 
 
 def _summarize_result(item: dict[str, Any]) -> dict[str, Any]:
