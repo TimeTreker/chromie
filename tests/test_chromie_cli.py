@@ -138,6 +138,83 @@ class ChromieCliTests(unittest.TestCase):
         self.assertIn("router_done: route=chat confidence=0.91", messages)
         self.assertEqual(stderr, "")
 
+    def test_trace_view_adds_bounded_jsonl_event_timeline(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            events_dir = root / ".chromie" / "acceptance" / "voice" / "case-1"
+            events_dir.mkdir(parents=True)
+            (events_dir / "events.jsonl").write_text(
+                "\n".join(
+                    json.dumps(record)
+                    for record in (
+                        {
+                            "sid": "sid-timeline",
+                            "elapsed_ms": 0.0,
+                            "event": "session_start",
+                            "message": "session_start",
+                        },
+                        {
+                            "sid": "sid-timeline",
+                            "elapsed_ms": 110.0,
+                            "event": "router_done",
+                            "status": "ok",
+                            "message": "router_done: route=interrupt intent=stop_current_output",
+                        },
+                        {
+                            "sid": "sid-timeline",
+                            "elapsed_ms": 460.0,
+                            "event": "skill_runtime_done",
+                            "status": "cancelled",
+                            "message": "skill_runtime_done: fallback speech after cancellation",
+                        },
+                        {
+                            "sid": "sid-timeline",
+                            "elapsed_ms": 910.0,
+                            "event": "playback_end",
+                            "status": "ok",
+                            "message": "playback_end: played_tts=1 failed_tts=0",
+                        },
+                        {
+                            "sid": "sid-other",
+                            "elapsed_ms": 10.0,
+                            "event": "session_start",
+                            "message": "session_start",
+                        },
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "trace",
+                "view",
+                "--session",
+                "sid-timeline",
+                "--limit",
+                "3",
+            )
+        self.assertEqual(code, int(ExitCode.OK))
+        payload = json.loads(stdout)
+        timeline = payload["details"]["artifacts"][0]["event_timeline"]
+        self.assertEqual(timeline["record_count"], 4)
+        self.assertEqual(
+            timeline["events"],
+            ["session_start", "router_done", "skill_runtime_done"],
+        )
+        self.assertEqual(timeline["event_counts"]["session_start"], 1)
+        self.assertEqual(timeline["status_counts"], {"ok": 2, "cancelled": 1})
+        self.assertEqual(timeline["first_elapsed_ms"], 0.0)
+        self.assertEqual(timeline["last_elapsed_ms"], 910.0)
+        self.assertEqual(timeline["duration_ms"], 910.0)
+        self.assertEqual(
+            timeline["markers"],
+            {"fallback": True, "cancellation": True, "stop": True},
+        )
+        self.assertEqual(stderr, "")
+
     def test_trace_view_summarizes_session_workflow_graph_jsonl(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

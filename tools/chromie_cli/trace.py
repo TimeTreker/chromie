@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -279,6 +281,7 @@ def _read_jsonl_artifact(
         "parse_errors": parse_errors,
         "identifiers": identifiers,
         "records": [_summarize_event_record(record) for record in sample],
+        "event_timeline": _summarize_event_timeline(matched, limit=limit),
     }
     workflow_graphs = [
         _summarize_workflow_graph(record.get("graph"), limit=limit)
@@ -666,6 +669,105 @@ def _summarize_event_record(record: dict[str, Any]) -> dict[str, Any]:
     ):
         summary["workflow_graph"] = _summarize_workflow_graph(record["graph"], limit=5)
     return summary
+
+
+def _summarize_event_timeline(
+    records: list[dict[str, Any]],
+    *,
+    limit: int,
+) -> dict[str, Any]:
+    if not records:
+        return {"record_count": 0}
+    event_names = [
+        str(record.get("event") or record.get("type") or "")
+        for record in records
+        if record.get("event") is not None or record.get("type") is not None
+    ]
+    status_names = [
+        str(record.get("status"))
+        for record in records
+        if record.get("status") is not None
+    ]
+    elapsed_values = [
+        float(record["elapsed_ms"])
+        for record in records
+        if isinstance(record.get("elapsed_ms"), (int, float))
+    ]
+    summary: dict[str, Any] = {
+        "record_count": len(records),
+        "events": event_names[:limit],
+        "event_counts": _top_counts(event_names, limit=limit),
+    }
+    if status_names:
+        summary["status_counts"] = _top_counts(status_names, limit=limit)
+    if elapsed_values:
+        first_elapsed = elapsed_values[0]
+        last_elapsed = elapsed_values[-1]
+        summary["first_elapsed_ms"] = _shorten(first_elapsed)
+        summary["last_elapsed_ms"] = _shorten(last_elapsed)
+        summary["duration_ms"] = _shorten(max(0.0, last_elapsed - first_elapsed))
+    markers = {
+        "fallback": _records_have_marker(records, "fallback"),
+        "cancellation": _records_have_marker(records, "cancellation"),
+        "stop": _records_have_marker(records, "stop"),
+        "emergency": _records_have_marker(records, "emergency"),
+        "timeout": _records_have_marker(records, "timeout"),
+        "error": _records_have_marker(records, "error"),
+    }
+    active_markers = {
+        name: present
+        for name, present in markers.items()
+        if present
+    }
+    if active_markers:
+        summary["markers"] = active_markers
+    return summary
+
+
+def _records_have_marker(records: list[dict[str, Any]], marker: str) -> bool:
+    return any(_record_has_marker(record, marker) for record in records)
+
+
+def _record_has_marker(record: dict[str, Any], marker: str) -> bool:
+    status = str(record.get("status") or "").lower()
+    text = (
+        str(record.get("event") or "")
+        + "\n"
+        + status
+        + "\n"
+        + str(record.get("message") or "")
+    ).lower()
+    if marker == "fallback":
+        return "fallback" in text
+    if marker == "cancellation":
+        return status in {"cancelled", "canceled"} or re.search(
+            r"\bcancel(?:led|ed|lation)?\b",
+            text,
+        ) is not None
+    if marker == "stop":
+        return (
+            re.search(r"\bstop(?:_current_output|_now|_polling)?\b", text)
+            is not None
+        )
+    if marker == "emergency":
+        return "emergency" in text
+    if marker == "timeout":
+        return status in {"timeout", "timed_out"} or re.search(
+            r"\btimeout\b|\btimed out\b|\btimed_out\b",
+            text,
+        ) is not None
+    if marker == "error":
+        return status in {"failed", "failure", "error"} or re.search(
+            r"\b(?:error|failed|failure)\b"
+            r"|\berrors=[1-9]\d*\b"
+            r"|\bfailed_[a-z_]+=[1-9]\d*\b",
+            text,
+        ) is not None
+    return False
+
+
+def _top_counts(values: list[str], *, limit: int) -> dict[str, int]:
+    return dict(Counter(value for value in values if value).most_common(limit))
 
 
 def _summarize_workflow_graph(value: Any, *, limit: int) -> dict[str, Any]:
