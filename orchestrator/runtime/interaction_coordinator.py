@@ -10,6 +10,7 @@ from agent.app.capabilities.loader import build_configured_registry
 from agent.app.tool_invocation import AsyncToolInvoker, McpStreamableHttpInvoker
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
+    InteractionSpeech,
     SkillRequest,
     SkillResult,
 )
@@ -26,6 +27,8 @@ from .skill_runtime import (
 )
 from .skill_adapters import TaskGraphHandler, TaskGraphSkillProvider, task_graph_skill_definition
 from .soridormi_skill_provider import SoridormiMcpSkillProvider
+from .interaction_preflight import annotate_preflight_validation
+from .task_proposals import annotate_task_proposal_ledger
 
 SpeechScheduler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
 _TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
@@ -71,7 +74,11 @@ class InteractionRuntimeCoordinator:
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
     ) -> SkillRuntimeResult:
-        prepared = self._with_session_metadata(response, session_id)
+        prepared = self.prepare_response(
+            response,
+            session_id=session_id,
+            confirmed_request_ids=confirmed_request_ids,
+        )
         optional_body_cue = bool(prepared.metadata.get("optional_body_cue"))
         body_requests = [
             request
@@ -255,6 +262,26 @@ class InteractionRuntimeCoordinator:
                 ),
             )
         return execution
+
+    def prepare_response(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+        confirmed_request_ids: set[str] | None = None,
+    ) -> InteractionResponse:
+        return annotate_task_proposal_ledger(
+            annotate_preflight_validation(
+                self._reconcile_truth(
+                    self._with_session_metadata(response, session_id),
+                    session_id=session_id,
+                ),
+                registry=self.registry,
+                provider_ids=self.runtime.provider_ids(),
+                confirmed_request_ids=confirmed_request_ids,
+                soridormi_catalog_loaded=self._catalog_loaded,
+            )
+        )
 
     async def _body_setup_failure(
         self,
@@ -484,6 +511,130 @@ class InteractionRuntimeCoordinator:
                     for speech in response.speech
                 ]
             },
+        )
+
+    def _reconcile_truth(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+    ) -> InteractionResponse:
+        proposed = self._int_metadata(
+            response,
+            "deepthinking_proposed_effect_task_count",
+            fallback_key="deepthinking_proposed_action_count",
+        )
+        valid = self._int_metadata(
+            response,
+            "deepthinking_valid_effect_task_count",
+            fallback_key="deepthinking_valid_action_count",
+        )
+        if proposed <= 0 or valid > 0:
+            return response
+        if self._has_effectful_runtime_skill(response):
+            return response
+        language = str(response.metadata.get("language") or "")
+        text = self._truth_reconciliation_message(response, language=language)
+        reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
+        if not reason:
+            reason = "deepthinking_effect_task_without_valid_skill"
+        metadata = {
+            **response.metadata,
+            "truth_reconciled": True,
+            "truth_reconciliation_reason": reason,
+        }
+        return response.model_copy(
+            deep=True,
+            update={
+                "speech": [
+                    InteractionSpeech(
+                        text=text,
+                        timing="sequential",
+                        style="warning",
+                        priority="high",
+                        interruptible=True,
+                        metadata={
+                            "source": "host_truth_reconciliation",
+                            "session_id": session_id,
+                        },
+                    )
+                ],
+                "metadata": metadata,
+            },
+        )
+
+    def _truth_reconciliation_message(
+        self,
+        response: InteractionResponse,
+        *,
+        language: str,
+    ) -> str:
+        zh = language.lower().startswith("zh")
+        if self._looks_like_warning_correction(response):
+            return (
+                "抱歉，我刚才把提醒误解成了方向指令。谢谢提醒，我会保持不动。"
+                if zh
+                else "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still."
+            )
+        return (
+            "抱歉，我没有生成可验证的动作指令，所以我不会说已经执行。"
+            if zh
+            else "Sorry, I could not turn that into a verified action, so I will not say I executed it."
+        )
+
+    @staticmethod
+    def _looks_like_warning_correction(response: InteractionResponse) -> bool:
+        metadata = response.metadata
+        route_intent = str(metadata.get("route_intent") or "").casefold()
+        reason = str(metadata.get("truth_reconciliation_reason") or "").casefold()
+        if "warning" in route_intent or "warning" in reason:
+            return True
+        superseded = metadata.get("superseded_task_proposals")
+        if isinstance(superseded, list):
+            for item in superseded:
+                if not isinstance(item, dict):
+                    continue
+                text = " ".join(
+                    str(item.get(key) or "")
+                    for key in ("reason", "intent", "task_type", "skill_id")
+                ).casefold()
+                if "warning" in text:
+                    return True
+        return False
+
+    @staticmethod
+    def _int_metadata(
+        response: InteractionResponse,
+        key: str,
+        *,
+        fallback_key: str | None = None,
+    ) -> int:
+        value = response.metadata.get(key)
+        if value is None and fallback_key:
+            value = response.metadata.get(fallback_key)
+        if isinstance(value, bool):
+            return 0
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if isinstance(value, str):
+            try:
+                return int(value)
+            except ValueError:
+                return 0
+        return 0
+
+    @staticmethod
+    def _has_effectful_runtime_skill(response: InteractionResponse) -> bool:
+        return any(
+            request.skill_id.startswith("soridormi.")
+            or request.skill_id == _TASK_GRAPH_SKILL_ID
+            or (
+                request.skill_id not in {"chromie.speak"}
+                and request.skill_id.startswith("chromie.")
+            )
+            for request in response.skills
         )
 
 

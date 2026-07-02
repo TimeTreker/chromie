@@ -3,7 +3,7 @@
 **Status authority:** this file describes what is present in the repository snapshot.
 **Current committed base revision:** `53bd882`; retained target evidence below
 records the exact revision that produced each bundle
-**Status refresh date:** 2026-06-27
+**Status refresh date:** 2026-07-02
 **Current focus:** **Simulation-demo release audit across the
 Chromie/Soridormi boundary; physical pilot preparation and physical audio
 validation remain separate release-support tracks**
@@ -73,11 +73,35 @@ and Soridormi provider checks remain authoritative. Deterministic semantic
 action parsing is now a rules-only or explicit compatibility fallback rather
 than the normal hybrid brain path. Router decisions now retain staged
 task/action proposals in `metadata.route_stage_outputs` and a merged
-`metadata.task_list` with a `metadata.route_merge` ledger, while execution still
-requires Agent and provider validation. Optional post-interrupt review can attach
-a corrected follow-up route after deterministic cancellation has already
-happened, but it does not authorize automatic physical resume. See
+shared-schema `metadata.task_proposals` list plus legacy `metadata.task_list`
+and a `metadata.route_merge` ledger, while execution still requires Agent and
+provider validation. Optional post-interrupt review can attach a corrected
+follow-up route after deterministic cancellation has already happened, but it
+does not authorize automatic physical resume. See
 [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
+The structured host interaction path now copies Router stage proposals into an
+internal Orchestrator task-proposal ledger before execution. The ledger marks
+effectful Router tasks as `not_committed` unless the final
+`InteractionResponse` contains a matching committed skill, and records committed
+speech/skills, static preflight status, and rejected deepthinking tasks for
+later diagnostics. Later-stage merge corrections can attach
+`revised_task_proposals`, which records the replacement proposal and an
+automatic `superseded` marker for the earlier proposal without authorizing
+execution by itself. The host preflight audit checks only what can be known
+before execution, such as skill registry presence, provider registration,
+schema validity, availability, confirmation, and safety-monitor requirements;
+real world feasibility remains a Skill Runtime and Soridormi evidence question.
+The ledger is now validated through the shared `TaskProposalLedger` contract.
+Router emits shared `task_proposals`, and the Agent deepthinking path emits
+shared `deepthinking_task_proposals` for proposed speech/skills and rejected
+candidate tasks. Final Agent speech and skills now emit shared
+`agent_task_proposals`, with speech represented as the local `chromie.speak`
+skill.
+Experience records now retain proposal/preflight summaries and can create
+owner-review-only tuning proposals when a mismatch is detected. This is
+implemented and automatically verified; it does not execute proposed tasks,
+auto-apply learned rules, or change physical authorization policy. See
+[Orchestrator Task Proposal Merge](ORCHESTRATOR_TASK_PROPOSAL_MERGE.md).
 
 Chromie now has a structured mind context layer for owner-approved identity,
 core principles, long-term goals, reflex policy, deliberation policy, and
@@ -186,7 +210,7 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **453** current `unittest` cases under `tests/`;
+- **593** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -201,6 +225,12 @@ release-readiness claim. Scenario authoring templates and
 `scripts/scenario_author.py` can create draft files, validate the scenario
 library, and print constrained prompts for LLM-assisted candidate generation;
 committed scenarios remain deterministic files reviewed by a human.
+Interaction scenarios can optionally run the host `prepare_response()` layer to
+verify static preflight, proposal ledger, and deterministic correction metadata.
+The `look_out_warning_correction` and
+`revise_window_gaze_to_warning_speech` fixtures verify that quick window-gaze
+proposals for warning utterances are superseded or revised into warning repair
+speech with no Soridormi motion skill.
 
 The developer-usability CLI through PR6 passed focused CLI tests, documentation
 checks, and the full Level A gate. It currently exposes
@@ -220,9 +250,8 @@ focused
 interaction/catalog task-agent tests, focused host Skill Runtime graph dispatch
 tests, focused Soridormi acceptance tests, focused robot-candidate verifier
 tests, and dependency-complete Orchestrator AgentClient coverage. The latest
-local `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` attempt on 2026-06-28
-installed the declared host test dependencies, passed
-`python scripts/check_docs.py`, ran 453 current `unittest` cases with `OK`, and
+local `./scripts/run_tests.sh` attempt on 2026-07-02 passed
+`python scripts/check_docs.py`, ran 593 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
@@ -233,6 +262,14 @@ validates the target GPU and automated host audio paths.
 speaker-output, live-MuJoCo checks that skip microphone and ASR. The retained
 `20260617T081411Z` bundle is the historical M13 text interaction closure
 evidence. It does not prove physical microphone recognition or speaker quality.
+On 2026-07-02, local live simulator rehearsals also passed through the current
+Router/Agent/Skill Runtime/Soridormi MCP stack: warning text
+`Look out, there is a cable in front of you.` emitted no Soridormi skills and
+kept sim safe-idle under
+`.chromie/acceptance/text-mujoco/20260702T055149Z`, and `Please nod twice.`
+executed `soridormi.nod_yes` in MuJoCo `sim` mode and returned safe-idle under
+`.chromie/acceptance/text-mujoco/20260702T055207Z`. These are local text-input
+simulator evidence, not microphone, speaker-device, or physical-robot evidence.
 
 `scripts/interaction_text_skill_sweep.py` is available for text-input
 preview sweeps across maintained Soridormi skill prompts. It reports live

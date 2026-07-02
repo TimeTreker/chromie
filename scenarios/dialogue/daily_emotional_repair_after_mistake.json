@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "daily_emotional_repair_after_mistake",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot responds supportively to a user's mistake without claiming human disappointment.",
+  "tags": ["daily-life", "social", "emotional-support"],
+  "turns": [
+    {
+      "id": "ask_if_disappointed",
+      "ask": "I messed up the meeting. Are you disappointed in me?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "supportive_social_response",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "No. I am not here to judge you. I can help you recover and plan the next step."
+      },
+      "expect": {
+        "speech_any": ["not here to judge", "plan the next step"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "ask_next_step",
+      "ask": "What should I do now?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "repair_plan",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Write down what happened, send a short correction if needed, and prepare one concrete follow-up."
+      },
+      "expect": {
+        "speech_any": ["short correction", "concrete follow-up"],
+        "history_contains": ["not here to judge"],
+        "no_skills": true
+      }
+    }
+  ]
+}

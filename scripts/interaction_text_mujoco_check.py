@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -29,6 +30,14 @@ DEFAULT_TEXT = (
     "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, "
     "then turn left"
 )
+INTERNAL_SPEECH_PATTERNS = [
+    r"\bTask Split\b",
+    r"\bKey Risk\b",
+    r"\bNext Step\b",
+    r"\bExecute\s+soridormi\.",
+    r"\bsoridormi\.[A-Za-z0-9_.-]+",
+    r"\bchromie\.[A-Za-z0-9_.-]+",
+]
 
 
 def acceptance_id() -> str:
@@ -130,6 +139,29 @@ def validate_contract(
                 f"arg mismatch for skill[{index}] {skills[index].skill_id} "
                 f"{key}: expected {expected!r}, got {actual!r}"
             )
+    return errors
+
+
+def validate_speech_contract(
+    response: Any,
+    reject_patterns: list[str],
+) -> list[str]:
+    errors: list[str] = []
+    if not reject_patterns:
+        return errors
+    compiled = [
+        (pattern, re.compile(pattern, flags=re.IGNORECASE))
+        for pattern in reject_patterns
+    ]
+    for index, item in enumerate(getattr(response, "speech", [])):
+        text = str(getattr(item, "text", "") or "")
+        for pattern, regex in compiled:
+            if regex.search(text):
+                preview = text.replace("\n", " ")[:220]
+                errors.append(
+                    f"speech[{index}] matched forbidden pattern {pattern!r}: "
+                    f"{preview!r}"
+                )
     return errors
 
 
@@ -459,6 +491,10 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                 arg_tolerance=args.arg_tolerance,
             )
         )
+        reject_speech_patterns = list(getattr(args, "reject_speech_pattern", []) or [])
+        if bool(getattr(args, "reject_internal_speech", False)):
+            reject_speech_patterns = INTERNAL_SPEECH_PATTERNS + reject_speech_patterns
+        errors.extend(validate_speech_contract(response, reject_speech_patterns))
 
         if response.requires_confirmation and not args.auto_confirm_sim:
             errors.append(
@@ -601,6 +637,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional post-run assertion for a selected emitted skill argument.",
     )
     parser.add_argument("--arg-tolerance", type=float, default=1e-6)
+    parser.add_argument(
+        "--reject-internal-speech",
+        action="store_true",
+        help=(
+            "Fail if TTS text leaks internal planner labels or model-facing "
+            "skill IDs such as Task Split, Key Risk, Next Step, or soridormi.*."
+        ),
+    )
+    parser.add_argument(
+        "--reject-speech-pattern",
+        action="append",
+        default=[],
+        metavar="REGEX",
+        help="Additional case-insensitive regex that must not appear in emitted speech.",
+    )
     parser.add_argument("--timeout-s", type=float, default=90.0)
     parser.add_argument(
         "--skill-timeout-s",

@@ -13,6 +13,8 @@ acceptance tools. It includes:
 - agent requests, `AgentResult`, speech, memory, and compatibility actions;
 - strict `InteractionResponse`, `InteractionSpeech`, `SkillRequest`,
   `SkillResult`, and `SkillTrace` contracts;
+- shared `TaskProposal`, `TaskProposalLedger`, and preflight-summary contracts
+  for Router/Agent/Orchestrator proposal merge diagnostics;
 - hardware action and robot-state contracts;
 - conversation-state structures.
 

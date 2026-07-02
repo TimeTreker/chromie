@@ -154,6 +154,25 @@ Open `summary.json` first. A passing run has:
 - `status_after.emergency_stop: false`;
 - `status_after.fallen` absent or false.
 
+To diagnose the failure class where a physical request is misrouted through
+deep thought and internal plan text leaks into TTS, run the same checker in
+preview mode with internal speech rejection enabled:
+
+```bash
+conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
+  "Wal forward for 15 seconds, quickly." \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --preview-only \
+  --no-speaker \
+  --expect-skill soridormi.walk_forward \
+  --reject-internal-speech
+```
+
+This writes the normal text-MuJoCo evidence bundle and fails if Chromie emits
+no walking skill, routes to the wrong final mode, or speaks planner labels such
+as `Task Split`, `Key Risk`, `Next Step`, or model-facing `soridormi.*` skill
+IDs.
+
 ## Complex Text Scenarios
 
 Use this suite for robot-brain text behavior that is not just a single motion

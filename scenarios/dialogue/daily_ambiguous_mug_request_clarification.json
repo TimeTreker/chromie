@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "daily_ambiguous_mug_request_clarification",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot asks for clarification on vague object placement and then respects missing pickup capability.",
+  "tags": ["daily-life", "clarification", "capability-boundary"],
+  "turns": [
+    {
+      "id": "vague_object_request",
+      "ask": "Put that over there.",
+      "stub": {
+        "route_decision": {
+          "route": "clarify",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "clarify_object_and_location",
+          "confidence": 0.82,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Which item do you mean, and where exactly should it go?"
+      },
+      "expect": {
+        "speech_any": ["Which item", "where exactly"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "unsupported_pickup_detail",
+      "ask": "The mug on the desk. Put it on the high shelf.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "capability_boundary",
+          "confidence": 0.89,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "I do not have an approved pickup and placement skill here, so a person should move the mug."
+      },
+      "expect": {
+        "speech_any": ["do not have an approved pickup", "person should move the mug"],
+        "history_contains": ["Which item", "where exactly"],
+        "no_skills": true
+      }
+    }
+  ]
+}

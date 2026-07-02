@@ -5,12 +5,14 @@ import unittest
 
 from router.app.schema import RouteDecision
 from scripts.interaction_text_mujoco_check import (
+    INTERNAL_SPEECH_PATTERNS,
     _apply_soridormi_skill_timeout,
     build_debug_summary,
     parse_expected_arg,
     safe_idle_errors,
     should_require_tts_speech,
     validate_contract,
+    validate_speech_contract,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 
@@ -275,6 +277,43 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             expected_args=[],
             arg_tolerance=1e-6,
         )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_speech_contract_rejects_internal_planner_leakage(self) -> None:
+        response = InteractionResponse.model_validate(
+            {
+                "speech": [
+                    {
+                        "text": (
+                            "I'll walk forward quickly. Task Split: 1. "
+                            "Execute soridormi.walk_forward now."
+                        ),
+                        "timing": "immediate",
+                    }
+                ]
+            }
+        )
+
+        errors = validate_speech_contract(response, INTERNAL_SPEECH_PATTERNS)
+
+        self.assertGreaterEqual(len(errors), 2)
+        self.assertTrue(any("Task Split" in item for item in errors))
+        self.assertTrue(any("soridormi" in item for item in errors))
+
+    def test_validate_speech_contract_allows_natural_spoken_text(self) -> None:
+        response = InteractionResponse.model_validate(
+            {
+                "speech": [
+                    {
+                        "text": "Walking forward now. I will stop if anything looks unsafe.",
+                        "timing": "immediate",
+                    }
+                ]
+            }
+        )
+
+        errors = validate_speech_contract(response, INTERNAL_SPEECH_PATTERNS)
 
         self.assertEqual(errors, [])
 

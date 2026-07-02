@@ -80,6 +80,16 @@ class ComposeConfigurationTests(unittest.TestCase):
             router_block,
         )
 
+    def test_router_build_context_includes_shared_contracts(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        router_block = compose.split("  chromie-router:", 1)[1].split(
+            "  chromie-agent:",
+            1,
+        )[0]
+
+        self.assertIn("      context: .", router_block)
+        self.assertIn("      dockerfile: router/Dockerfile", router_block)
+
     def test_agent_service_uses_main_model_for_response_review_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         agent_block = compose.split("  chromie-agent:", 1)[1].split(
@@ -114,6 +124,14 @@ class ComposeConfigurationTests(unittest.TestCase):
         )
         self.assertIn(
             "AGENT_CAPABILITY_REVIEW_NUM_PREDICT: ${AGENT_CAPABILITY_REVIEW_NUM_PREDICT:-160}",
+            agent_block,
+        )
+        self.assertIn(
+            "AGENT_CAPABILITY_MANIFESTS: ${AGENT_CAPABILITY_MANIFESTS:-/app/capabilities/soridormi.json}",
+            agent_block,
+        )
+        self.assertIn(
+            "SORIDORMI_MCP_URL: ${SORIDORMI_MCP_URL:-http://host.docker.internal:8000/mcp}",
             agent_block,
         )
 

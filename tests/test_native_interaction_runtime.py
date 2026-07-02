@@ -11,6 +11,7 @@ from agent.app.interaction import (
 )
 from agent.app.runtime import AgentRuntime, InteractionRuntime
 from agent.app.schema import AgentResult, AgentRunRequest
+from shared.chromie_contracts.task_proposal import TaskProposal
 from agent.app.task_graph.models import TaskGraph, TaskNode
 
 
@@ -600,6 +601,17 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args, {"count": 2})
         self.assertEqual(response.speech[0].text, "I will run that action.")
         self.assertIn("capability_agent", response.metadata["handled_by"])
+        proposals = [
+            TaskProposal.model_validate(item)
+            for item in response.metadata["agent_task_proposals"]
+        ]
+        self.assertEqual([item.proposal_kind for item in proposals], ["speech", "skill"])
+        self.assertEqual(proposals[0].skill_id, "chromie.speak")
+        self.assertEqual(proposals[0].speech_id, response.speech[0].id)
+        self.assertFalse(proposals[0].effectful)
+        self.assertEqual(proposals[1].skill_id, "soridormi.nod_yes")
+        self.assertEqual(proposals[1].request_id, response.skills[0].request_id)
+        self.assertTrue(proposals[1].effectful)
 
     async def test_native_runtime_preserves_routed_head_target_wrapper(self) -> None:
         request = _request(

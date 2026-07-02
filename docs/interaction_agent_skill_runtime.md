@@ -46,6 +46,35 @@ user speech
 The execution boundary—not the model—owns validation, availability,
 confirmation, resource policy, timeout, cancellation, and provider calls.
 
+Before execution, the host also attaches a static preflight audit to the
+`InteractionResponse`. This audit can identify unknown skills, missing
+providers, version mismatches, unavailable definitions, schema-invalid
+arguments, pending confirmation, pending safety-monitor requirements, and
+Soridormi catalog checks that must be deferred. It is diagnostic and
+fail-closed input for the trusted runtime; it does not prove that the physical
+world will allow the action.
+
+Deep-thinking output follows the same boundary. When `deepthinking_agent` needs
+to act as the slow semantic brain, it returns a unified ordered list of robot
+skill tasks. Speech is represented as the `chromie.speak` skill, and embodied or
+tool work is represented as schema-validated candidate `SkillRequest` objects
+from the supplied capability catalog. If deep-thinking proposes an effectful
+task but no valid runtime skill survives validation, the host coordinator
+replaces any optimistic task speech with a deterministic correction before TTS
+playback.
+The same deep-thinking tasks are also retained as shared-schema
+`deepthinking_task_proposals` metadata so the Orchestrator can audit proposed,
+committed, rejected, and not-committed work in one `TaskProposalLedger`.
+The final Agent response also emits shared-schema `agent_task_proposals` for
+every committed speech and skill item; speech is represented as the local
+`chromie.speak` skill rather than as a separate privileged lane.
+The deep-thinking prompt includes an explicit output contract block: top-level
+JSON keys are `tasks` and `reason`, each task contains `skill_id`, `args`,
+`timing`, `timeout_ms`, `cancellable`, `requires_confirmation`, and `reason`,
+and non-speech task IDs must come from the supplied capability catalog. The
+slow-path prompt and spoken-response reviewer use extracted task/session
+context rather than raw transcript history.
+
 ## Multi-Agent Boundary
 
 Chromie and Soridormi are both agent-like systems, but they operate at different
@@ -158,8 +187,9 @@ against a trusted definition and provider before execution.
 1. run the specialized-agent pipeline with `InteractionDraft`;
 2. create `InteractionSpeech` and `SkillRequest` objects as agents add speech,
    actions, or TaskGraphs;
-3. serialize and revalidate the complete `InteractionResponse` contract;
-4. return native output with `interaction_output_mode=native` metadata.
+3. add shared-schema `agent_task_proposals` for the final speech and skills;
+4. serialize and revalidate the complete `InteractionResponse` contract;
+5. return native output with `interaction_output_mode=native` metadata.
 
 `POST /run` continues to use `AgentResult`. The old
 `AgentResultInteractionAdapter` is retained only for explicit rollback mode or

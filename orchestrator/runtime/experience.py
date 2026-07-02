@@ -105,6 +105,7 @@ class ExperienceManager:
             metadata={
                 "response_reason": response.reason,
                 "requires_confirmation": response.requires_confirmation,
+                **self._proposal_learning_metadata(response),
             },
         )
         self._append_jsonl(self.log_path, record.model_dump(mode="json"))
@@ -122,28 +123,126 @@ class ExperienceManager:
             str(result.get("status") or "").lower() in failure_statuses
             for result in record.skill_results
         )
+        learning_signal = self._learning_signal_from_metadata(record.metadata)
         if (
             record.execution_status.lower() not in failure_statuses
             and not failed_skill
             and not record.errors
+            and not learning_signal
         ):
             return None
+        proposed_change = (
+            "Review the failed or uncertain interaction and consider updating "
+            "routing examples, skill-selection preferences, tests, or long-term "
+            "goals. Do not change core principles without owner approval."
+        )
+        if learning_signal:
+            proposed_change = (
+                "Review the proposal/preflight mismatch and consider updating "
+                "router merge examples, deepthinking output contracts, scenario "
+                "coverage, or skill-selection preferences. Do not change core "
+                "principles or physical safety rules without owner approval."
+            )
         return MindUpdateProposal(
             target="experience_tuned_strategy",
-            proposed_change=(
-                "Review the failed or uncertain interaction and consider updating "
-                "routing examples, skill-selection preferences, tests, or long-term "
-                "goals. Do not change core principles without owner approval."
-            ),
+            proposed_change=proposed_change,
             rationale=(
                 f"Experience {record.experience_id} ended with execution_status="
                 f"{record.execution_status!r}, route={record.route!r}, "
                 f"intent={record.intent!r}."
+                + (f" Learning signal: {learning_signal}." if learning_signal else "")
             ),
             evidence_ids=[record.experience_id],
             requires_owner_approval=True,
             auto_apply=False,
         )
+
+    @classmethod
+    def _proposal_learning_metadata(
+        cls,
+        response: InteractionResponse,
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {}
+        ledger = response.metadata.get("task_proposal_ledger")
+        if isinstance(ledger, dict):
+            summary = cls._safe_summary(ledger.get("summary"))
+            if summary:
+                metadata["task_proposal_summary"] = summary
+        preflight = response.metadata.get("preflight_validation")
+        if isinstance(preflight, dict):
+            summary = cls._safe_summary(preflight.get("summary"))
+            if summary:
+                metadata["preflight_summary"] = summary
+        if response.metadata.get("truth_reconciled") is True:
+            metadata["truth_reconciled"] = True
+            reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
+            if reason:
+                metadata["truth_reconciliation_reason"] = reason[:160]
+        return metadata
+
+    @classmethod
+    def _learning_signal_from_metadata(cls, metadata: dict[str, Any]) -> str:
+        proposal = metadata.get("task_proposal_summary")
+        preflight = metadata.get("preflight_summary")
+        signals: list[str] = []
+        if isinstance(proposal, dict):
+            not_committed = cls._int_from_summary(
+                proposal,
+                "not_committed_effectful_count",
+            )
+            rejected = cls._int_from_mapping(proposal.get("states"), "rejected")
+            superseded = cls._int_from_summary(proposal, "superseded_count")
+            if not_committed > 0:
+                signals.append(f"{not_committed} effectful proposal(s) were not committed")
+            if rejected > 0:
+                signals.append(f"{rejected} proposal(s) were rejected")
+            if superseded > 0:
+                signals.append(f"{superseded} proposal(s) were superseded")
+        if isinstance(preflight, dict):
+            blocked = cls._int_from_summary(preflight, "blocked_count")
+            if blocked > 0:
+                signals.append(f"{blocked} committed skill(s) failed static preflight")
+        if metadata.get("truth_reconciled") is True:
+            signals.append("truth reconciliation corrected optimistic action speech")
+        return "; ".join(signals)
+
+    @staticmethod
+    def _safe_summary(value: Any) -> dict[str, Any]:
+        if not isinstance(value, dict):
+            return {}
+        out: dict[str, Any] = {}
+        for key, item in value.items():
+            if isinstance(item, (str, int, float, bool)) or item is None:
+                out[str(key)] = item
+                continue
+            if isinstance(item, dict):
+                nested: dict[str, Any] = {}
+                for nested_key, nested_item in item.items():
+                    if isinstance(nested_item, (str, int, float, bool)) or nested_item is None:
+                        nested[str(nested_key)] = nested_item
+                if nested:
+                    out[str(key)] = nested
+        return out
+
+    @staticmethod
+    def _int_from_summary(summary: dict[str, Any], key: str) -> int:
+        value = summary.get(key)
+        if isinstance(value, bool):
+            return 0
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        try:
+            return int(str(value))
+        except (TypeError, ValueError):
+            return 0
+
+    @classmethod
+    def _int_from_mapping(cls, value: Any, key: str) -> int:
+        if not isinstance(value, dict):
+            return 0
+        return cls._int_from_summary(value, key)
 
     @staticmethod
     def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:

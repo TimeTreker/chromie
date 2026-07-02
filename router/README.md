@@ -73,14 +73,16 @@ the emergency-filter result, bounded session/world context, and catalog
 candidates. The deepthinking Agent receives the final `RouteDecision`, including
 quick-route source, confidence, intent, reason, and candidate capabilities.
 
-Each stage can also produce task/action proposals. Router merges those proposals
-into `RouteDecision.metadata.task_list` while retaining the original per-stage
-records in `RouteDecision.metadata.route_stage_outputs`:
+Each stage can also produce task/action proposals. Router now writes those
+proposals through the shared `TaskProposal` schema while retaining the original
+legacy task-list surface for compatibility:
 
 ```text
 metadata.route_stage_outputs[]  # emergency_filter / quick_intent / post_interrupt_review / deep_thought
-  -> tasks[] and actions[]      # proposed high-level work from that stage
-metadata.task_list[]            # merged, priority/stage ordered task list
+  -> tasks[] and actions[]      # legacy proposed high-level work from that stage
+  -> task_proposals[]           # shared-schema proposals from that stage
+metadata.task_list[]            # legacy merged, priority/stage ordered task list
+metadata.task_proposals[]       # preferred shared-schema merged proposals
 metadata.route_merge            # merge strategy, final route, selected stage
 ```
 
@@ -95,10 +97,11 @@ state.
 
 `RouteDecision.actions` remains the compatibility/execution hint for concrete
 capability actions, such as ordered Soridormi skill requests. The merged
-`task_list` is broader: it can include emergency cancellation, thinking
-acknowledgement, deepthinking work, speech, memory, tool, and skill-execution
-proposals. The Agent and Skill Runtime still validate every executable item
-against registered capabilities and safety policy.
+`task_proposals` surface is broader: it can include emergency cancellation,
+thinking acknowledgement, deepthinking work, speech, memory, tool, and
+skill-execution proposals. `task_list` remains present for older diagnostics.
+The Agent and Skill Runtime still validate every executable item against
+registered capabilities and safety policy.
 
 When the emergency filter triggers `interrupt`, the host may already have
 cancelled current output or motion before slower semantic review finishes. If

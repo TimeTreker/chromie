@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "id": "daily_hot_drink_base_hold",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot does not move when the user reports a hot drink near its base.",
+  "tags": ["daily-life", "safety", "robot-action"],
+  "turns": [
+    {
+      "id": "hot_drink_warning",
+      "ask": "Wait, there is a hot drink next to your base.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "environment_warning",
+          "confidence": 0.93,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Got it. I will stay still so I do not bump the hot drink."
+      },
+      "expect": {
+        "speech_any": ["stay still", "hot drink"],
+        "forbidden_speech_any": ["Moving now", "Executing", "I will turn"],
+        "forbidden_skills": ["soridormi.walk_velocity", "soridormi.turn_in_place"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "followup_after_moved",
+      "ask": "I moved it away.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "environment_update",
+          "confidence": 0.88,
+          "language": "en-US",
+          "source": "llm"
+        },
+        "ollama_reply": "Thanks. I will still wait for your next clear instruction before moving."
+      },
+      "expect": {
+        "speech_any": ["wait", "next clear instruction"],
+        "history_contains": ["hot drink next to your base"],
+        "no_skills": true
+      }
+    }
+  ]
+}

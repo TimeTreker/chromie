@@ -120,9 +120,8 @@ server with graph `soridormi-task-agent-acceptance-115cc864fd04`, backend
 `capabilities`, `preview`, `submit`, and `events` nodes. This is no-motion
 contract evidence only; it does not prove physical execution.
 
-The latest full host `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh` attempt on
-2026-06-28 installed the declared test dependencies, passed
-`python scripts/check_docs.py`, ran 453 current `unittest` cases with `OK`, and
+The latest full host `./scripts/run_tests.sh` attempt on 2026-07-02 passed
+`python scripts/check_docs.py`, ran 593 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions.
 
 Focused local slices also passed 46/46 after the simulation-demo documentation

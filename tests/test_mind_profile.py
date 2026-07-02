@@ -175,6 +175,77 @@ class ExperienceManagerTests(unittest.TestCase):
             self.assertFalse(proposal["auto_apply"])
             self.assertEqual(proposal["target"], "experience_tuned_strategy")
 
+    def test_proposal_mismatch_creates_review_proposal_from_summaries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manager = ExperienceManager(
+                enabled=True,
+                log_path=root / "experience.jsonl",
+                proposal_path=root / "proposals.jsonl",
+            )
+            profile = default_mind_profile()
+            response = InteractionResponse(
+                metadata={
+                    "experience_context": {
+                        "user_text": "Look out!",
+                        "route": "deep_thought",
+                        "intent": "warning",
+                    },
+                    "truth_reconciled": True,
+                    "truth_reconciliation_reason": "quick_intent_misread_warning",
+                    "task_proposal_ledger": {
+                        "summary": {
+                            "proposal_count": 2,
+                            "not_committed_effectful_count": 1,
+                            "states": {"committed": 1, "not_committed": 1},
+                        },
+                        "proposals": [
+                            {
+                                "id": "quick:0",
+                                "state": "not_committed",
+                                "args": {"do_not_store": "raw proposal payload"},
+                            }
+                        ],
+                    },
+                    "preflight_validation": {
+                        "summary": {
+                            "checked_skill_count": 1,
+                            "blocked_count": 1,
+                            "statuses": {"blocked": 1},
+                        },
+                        "items": [
+                            {
+                                "request_id": "bad-1",
+                                "message": "do not store raw preflight item",
+                            }
+                        ],
+                    },
+                },
+                speech=[{"text": "Thanks for warning me. I will hold still."}],
+            )
+            execution = SkillRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="completed",
+            )
+
+            record = manager.record_interaction(
+                response=response,
+                execution=execution,
+                session_id="sid-look-out",
+                mind_profile=profile,
+            )
+
+            self.assertIsNotNone(record)
+            log_payload = json.loads(manager.log_path.read_text(encoding="utf-8"))
+            self.assertIn("task_proposal_summary", log_payload["metadata"])
+            self.assertIn("preflight_summary", log_payload["metadata"])
+            self.assertNotIn("proposals", json.dumps(log_payload["metadata"]))
+            self.assertNotIn("items", json.dumps(log_payload["metadata"]))
+            proposal = json.loads(manager.proposal_path.read_text(encoding="utf-8"))
+            self.assertTrue(proposal["requires_owner_approval"])
+            self.assertFalse(proposal["auto_apply"])
+            self.assertIn("proposal/preflight mismatch", proposal["proposed_change"])
+
 
 if __name__ == "__main__":
     unittest.main()

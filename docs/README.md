@@ -71,6 +71,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md)
 - [Agent Capability Registry](agent_capability_registry.md)
 - [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md)
+- [Orchestrator Task Proposal Merge](ORCHESTRATOR_TASK_PROPOSAL_MERGE.md)
 - [TaskGraph](agent_task_graph.md)
 - [Trace Schema](TRACE_SCHEMA.md)
 - [Chromie/Soridormi Task-Agent Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)

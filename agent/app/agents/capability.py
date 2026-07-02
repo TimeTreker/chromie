@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
@@ -193,6 +194,14 @@ class CapabilityAgent(BaseAgent):
         plan = await self._plan(request, executable)
         plan = await self._review_plan(request, plan, executable)
         plan = self._normalize_plan_for_routed_surface(request, plan, executable)
+        batched_count_metadata: dict[str, Any] | None = None
+        batched_recovery = self._recover_batched_over_limit_count_plan(
+            request,
+            plan,
+            executable,
+        )
+        if batched_recovery is not None:
+            plan, batched_count_metadata = batched_recovery
         allowed = {match.capability_id: match for match in executable}
         if plan.decision != "execute":
             speech = self._natural_plan_speech(plan.speech)
@@ -239,7 +248,7 @@ class CapabilityAgent(BaseAgent):
                 )
                 return result
             dedupe_key = (item.skill_id, self._canonical_args_key(args))
-            if dedupe_key in seen_requests:
+            if batched_count_metadata is None and dedupe_key in seen_requests:
                 self.trace(result, f"deduped repeated capability request: {item.skill_id}")
                 continue
             seen_requests.add(dedupe_key)
@@ -250,6 +259,16 @@ class CapabilityAgent(BaseAgent):
             score = self._catalog_score(match)
             if score is not None:
                 metadata["catalog_score"] = score
+            if batched_count_metadata is not None:
+                metadata.update(
+                    {
+                        "batched_over_limit": True,
+                        "batch_index": selected + 1,
+                        "batch_count": batched_count_metadata["batch_count"],
+                        "requested_count": batched_count_metadata["requested_count"],
+                        "max_per_call": batched_count_metadata["max_per_call"],
+                    }
+                )
             if normalized:
                 metadata["schema_normalized_args"] = True
             request_item = SkillRequest(
@@ -271,10 +290,13 @@ class CapabilityAgent(BaseAgent):
         if speech:
             result.add_speak_immediate(speech, style="brief")
         result.metadata["capability_handled"] = True
+        result.metadata["capability_decision"] = "execute"
         result.metadata["capability_catalog_version"] = search.catalog_version
         result.metadata["capability_selected"] = [
             item.skill_id for item in selected_requests
         ]
+        if batched_count_metadata is not None:
+            result.metadata["capability_batched_over_limit"] = batched_count_metadata
         self.trace(result, f"selected {selected} catalog capability request(s)")
         return result
 
@@ -767,6 +789,268 @@ class CapabilityAgent(BaseAgent):
         if isinstance(maximum, (int, float)) and not isinstance(maximum, bool):
             value = min(float(maximum), value)
         return value
+
+    def _recover_batched_over_limit_count_plan(
+        self,
+        request: AgentRunRequest,
+        plan: _CapabilityPlan,
+        candidates: list[Any],
+    ) -> tuple[_CapabilityPlan, dict[str, Any]] | None:
+        selected_id = self._router_selected_capability_id(request)
+        if not selected_id:
+            return None
+        target = next(
+            (
+                match
+                for match in candidates
+                if str(getattr(match, "capability_id", "") or "") == selected_id
+            ),
+            None,
+        )
+        if target is None or not self._can_batch_over_limit_count_skill(target):
+            return None
+
+        schema = getattr(target, "input_schema", {}) or {}
+        properties = schema.get("properties") if isinstance(schema, dict) else {}
+        count_schema = properties.get("count") if isinstance(properties, dict) else None
+        if not isinstance(count_schema, dict):
+            return None
+        maximum = count_schema.get("maximum")
+        if not isinstance(maximum, (int, float)) or isinstance(maximum, bool):
+            return None
+        max_count = int(maximum)
+        if max_count <= 0:
+            return None
+        minimum = count_schema.get("minimum")
+        min_count = (
+            int(minimum)
+            if isinstance(minimum, (int, float)) and not isinstance(minimum, bool)
+            else 1
+        )
+        if min_count <= 0:
+            min_count = 1
+
+        requested_count: int | None = None
+        if plan.decision == "execute":
+            if len(plan.skills) != 1:
+                return None
+            item = plan.skills[0]
+            if item.skill_id != selected_id:
+                return None
+            planned_count = self._positive_int(item.args.get("count"))
+            text_count = self._extract_requested_count(request.text)
+            if (
+                text_count is not None
+                and text_count > max_count
+                and (planned_count is None or planned_count <= max_count)
+            ):
+                requested_count = text_count
+            else:
+                requested_count = planned_count
+        elif plan.decision in {"clarify", "unsupported"}:
+            requested_count = self._extract_requested_count(request.text)
+        if requested_count is None or requested_count <= max_count:
+            return None
+
+        chunks = self._split_count_into_schema_batches(
+            requested_count,
+            min_count=min_count,
+            max_count=max_count,
+        )
+        if chunks is None:
+            return None
+
+        speech = self._batched_count_speech(
+            request,
+            target,
+            requested_count=requested_count,
+            max_count=max_count,
+            batch_count=len(chunks),
+        )
+        try:
+            recovered = _CapabilityPlan(
+                decision="execute",
+                speech=speech,
+                skills=[
+                    _PlannedSkill(skill_id=selected_id, args={"count": chunk})
+                    for chunk in chunks
+                ],
+            )
+        except ValidationError:
+            return None
+        return recovered, {
+            "skill_id": selected_id,
+            "requested_count": requested_count,
+            "max_per_call": max_count,
+            "batch_count": len(chunks),
+            "batches": chunks,
+            "source": "exact_routed_count_batch_recovery",
+        }
+
+    def _can_batch_over_limit_count_skill(self, match: Any) -> bool:
+        if bool(getattr(match, "requires_confirmation", False)):
+            return False
+        safety_class = str(getattr(match, "safety_class", "") or "").lower()
+        if safety_class in {"physical_motion", "safety_critical", "restricted"}:
+            return False
+        effects = {
+            str(item).strip().lower()
+            for item in (getattr(match, "effects", []) or [])
+            if str(item).strip()
+        }
+        if "physical_motion" in effects or "safety_control" in effects:
+            return False
+        schema = getattr(match, "input_schema", {}) or {}
+        if not isinstance(schema, dict):
+            return False
+        properties = schema.get("properties")
+        if not isinstance(properties, dict):
+            return False
+        count_schema = properties.get("count")
+        if not isinstance(count_schema, dict):
+            return False
+        type_value = count_schema.get("type")
+        if isinstance(type_value, str):
+            types = {str(type_value)}
+        elif isinstance(type_value, list):
+            types = {str(item) for item in type_value}
+        else:
+            types = set()
+        if types and not types.intersection({"integer", "number"}):
+            return False
+        if "maximum" not in count_schema:
+            return False
+        required = schema.get("required")
+        if isinstance(required, list):
+            required_fields = {str(item) for item in required}
+            if not required_fields.issubset({"count"}):
+                return False
+        return True
+
+    def _split_count_into_schema_batches(
+        self,
+        requested_count: int,
+        *,
+        min_count: int,
+        max_count: int,
+    ) -> list[int] | None:
+        max_batches = 6
+        chunks: list[int] = []
+        remaining = requested_count
+        while remaining > 0:
+            chunk = min(max_count, remaining)
+            remainder = remaining - chunk
+            if 0 < remainder < min_count:
+                needed = min_count - remainder
+                chunk -= needed
+                remainder += needed
+            if chunk < min_count or chunk > max_count:
+                return None
+            chunks.append(chunk)
+            remaining = remainder
+            if len(chunks) > max_batches:
+                return None
+        return chunks if chunks else None
+
+    def _batched_count_speech(
+        self,
+        request: AgentRunRequest,
+        match: Any,
+        *,
+        requested_count: int,
+        max_count: int,
+        batch_count: int,
+    ) -> str:
+        action = "do that"
+        capability_id = str(getattr(match, "capability_id", "") or "")
+        description = str(getattr(match, "description", "") or "").lower()
+        if "blink" in capability_id or "blink" in description:
+            action = "blink"
+        elif "nod" in capability_id or "nod" in description:
+            action = "nod"
+        elif "shake" in capability_id or "shake" in description:
+            action = "shake my head"
+        if self.is_zh(request):
+            if action == "blink":
+                zh_action = "眨眼"
+            elif action == "nod":
+                zh_action = "点头"
+            elif action == "shake my head":
+                zh_action = "摇头"
+            else:
+                zh_action = "执行这个动作"
+            return f"单次最多{max_count}次，所以我会分{batch_count}批{zh_action}{requested_count}次。"
+        return (
+            f"I can {action} up to {max_count} times per batch, "
+            f"so I will {action} {requested_count} times in {batch_count} batches."
+        )
+
+    @staticmethod
+    def _positive_int(value: Any) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value if value > 0 else None
+        if isinstance(value, float) and value.is_integer():
+            number = int(value)
+            return number if number > 0 else None
+        if isinstance(value, str) and re.fullmatch(r"\s*\d{1,4}\s*", value):
+            number = int(value.strip())
+            return number if number > 0 else None
+        return None
+
+    @classmethod
+    def _extract_requested_count(cls, text: str) -> int | None:
+        match = re.search(r"(?<![\d.])(\d{1,4})(?![\d.])", text or "")
+        if match:
+            number = int(match.group(1))
+            return number if number > 0 else None
+        words = re.findall(r"[a-zA-Z]+", (text or "").lower())
+        for index, word in enumerate(words):
+            if word in {"once", "a"}:
+                return 1
+            if word == "twice":
+                return 2
+            if word == "thrice":
+                return 3
+            number = cls._number_word_to_int(word)
+            if number is not None:
+                if index + 1 < len(words):
+                    next_number = cls._number_word_to_int(words[index + 1])
+                    if number >= 20 and next_number is not None and 0 < next_number < 10:
+                        number += next_number
+                return number if number > 0 else None
+        return None
+
+    @staticmethod
+    def _number_word_to_int(word: str) -> int | None:
+        return {
+            "zero": 0,
+            "one": 1,
+            "two": 2,
+            "three": 3,
+            "four": 4,
+            "five": 5,
+            "six": 6,
+            "seven": 7,
+            "eight": 8,
+            "nine": 9,
+            "ten": 10,
+            "eleven": 11,
+            "twelve": 12,
+            "thirteen": 13,
+            "fourteen": 14,
+            "fifteen": 15,
+            "sixteen": 16,
+            "seventeen": 17,
+            "eighteen": 18,
+            "nineteen": 19,
+            "twenty": 20,
+            "thirty": 30,
+            "forty": 40,
+            "fifty": 50,
+            "sixty": 60,
+        }.get(word)
 
     def _capability_payload(self, match: Any) -> dict[str, Any]:
         description = " ".join(str(getattr(match, "description", "") or "").split())

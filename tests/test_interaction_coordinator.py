@@ -91,6 +91,206 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(scheduled[0]["text"], "Hello.")
         self.assertEqual(scheduled[0]["metadata"]["session_id"], "sid-1")
 
+    async def test_unverified_deepthinking_action_promise_is_corrected_before_speech(
+        self,
+    ) -> None:
+        scheduled: list[dict[str, Any]] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: scheduled.append(args) or {"scheduled": True}
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                speech=[{"text": "Moving now."}],
+                metadata={
+                    "language": "en-US",
+                    "deepthinking_output_mode": "skill_tasks",
+                    "deepthinking_proposed_effect_task_count": 1,
+                    "deepthinking_valid_effect_task_count": 0,
+                },
+            ),
+            session_id="sid-unverified-action",
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(
+            scheduled[0]["text"],
+            "Sorry, I could not turn that into a verified action, so I will not say I executed it.",
+        )
+        self.assertEqual(
+            scheduled[0]["metadata"]["source"],
+            "host_truth_reconciliation",
+        )
+        self.assertEqual(
+            scheduled[0]["metadata"]["session_id"],
+            "sid-unverified-action",
+        )
+
+    async def test_prepare_response_exposes_truth_correction_and_proposal_ledger(
+        self,
+    ) -> None:
+        coordinator = InteractionRuntimeCoordinator(lambda args: {"scheduled": True})
+
+        prepared = coordinator.prepare_response(
+            InteractionResponse(
+                speech=[{"text": "Moving now."}],
+                metadata={
+                    "language": "en-US",
+                    "route_task_list": [
+                        {
+                            "id": "quick_intent:0:task.execute_skill",
+                            "source_stage": "quick_intent",
+                            "kind": "action",
+                            "task_type": "task.execute_skill",
+                            "capability_id": "walk_forward",
+                        }
+                    ],
+                    "deepthinking_output_mode": "skill_tasks",
+                    "deepthinking_proposed_effect_task_count": 1,
+                    "deepthinking_valid_effect_task_count": 0,
+                },
+            ),
+            session_id="sid-prepared",
+        )
+
+        self.assertEqual(
+            prepared.speech[0].text,
+            "Sorry, I could not turn that into a verified action, so I will not say I executed it.",
+        )
+        ledger = prepared.metadata["task_proposal_ledger"]
+        self.assertEqual(ledger["summary"]["not_committed_effectful_count"], 1)
+        self.assertEqual(ledger["proposals"][0]["state"], "not_committed")
+        self.assertEqual(prepared.speech[0].metadata["session_id"], "sid-prepared")
+
+    async def test_warning_misread_uses_specific_truth_repair_speech(self) -> None:
+        coordinator = InteractionRuntimeCoordinator(lambda args: {"scheduled": True})
+
+        prepared = coordinator.prepare_response(
+            InteractionResponse(
+                speech=[
+                    {
+                        "text": "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still."
+                    }
+                ],
+                metadata={
+                    "language": "en-US",
+                    "route_intent": "warning",
+                    "truth_reconciliation_reason": "quick_intent_misread_warning",
+                    "superseded_task_proposals": [
+                        {
+                            "id": "quick_intent:0:task.execute_skill:superseded",
+                            "source": "quick_intent",
+                            "proposal_kind": "action",
+                            "task_type": "task.execute_skill",
+                            "skill_id": "soridormi.look_at_window",
+                            "reason": "deepthinking interpreted Look out as a warning",
+                            "superseded_by": "deepthinking:0:speech.speak",
+                        }
+                    ],
+                    "deepthinking_output_mode": "skill_tasks",
+                    "deepthinking_proposed_effect_task_count": 1,
+                    "deepthinking_valid_effect_task_count": 0,
+                },
+            ),
+            session_id="sid-look-out",
+        )
+
+        self.assertEqual(
+            prepared.speech[0].text,
+            "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still.",
+        )
+        self.assertEqual(
+            prepared.metadata["truth_reconciliation_reason"],
+            "quick_intent_misread_warning",
+        )
+        ledger = prepared.metadata["task_proposal_ledger"]
+        self.assertEqual(ledger["summary"]["superseded_count"], 1)
+
+    async def test_prepare_response_adds_static_preflight_audit(self) -> None:
+        coordinator = InteractionRuntimeCoordinator(lambda args: {"scheduled": True})
+
+        prepared = coordinator.prepare_response(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "local-unknown",
+                        "skill_id": "chromie.unknown",
+                    },
+                    {
+                        "request_id": "body-deferred",
+                        "skill_id": "soridormi.nod_yes",
+                    },
+                ]
+            ),
+            session_id="sid-preflight",
+        )
+
+        preflight = prepared.metadata["preflight_validation"]
+        by_request = {
+            item["request_id"]: item for item in preflight["items"]
+        }
+        self.assertEqual(
+            by_request["local-unknown"]["status"],
+            "blocked",
+        )
+        self.assertEqual(
+            by_request["local-unknown"]["reason_code"],
+            "unknown_skill",
+        )
+        self.assertEqual(
+            by_request["body-deferred"]["status"],
+            "deferred",
+        )
+        self.assertEqual(preflight["summary"]["blocked_count"], 1)
+        self.assertEqual(preflight["summary"]["deferred_count"], 1)
+
+        skill_proposals = [
+            proposal
+            for proposal in prepared.metadata["task_proposal_ledger"]["proposals"]
+            if proposal["proposal_kind"] == "skill"
+        ]
+        self.assertEqual(
+            [proposal["preflight"]["status"] for proposal in skill_proposals],
+            ["blocked", "deferred"],
+        )
+
+    async def test_prepare_response_preflight_uses_loaded_catalog_and_confirmation(
+        self,
+    ) -> None:
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(),
+            auto_confirm_sim=False,
+        )
+        response = InteractionResponse(
+            skills=[
+                {
+                    "request_id": "nod-1",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                }
+            ]
+        )
+
+        request_ids = await coordinator.confirmation_request_ids(response)
+        self.assertEqual(request_ids, {"nod-1"})
+
+        needs_confirmation = coordinator.prepare_response(
+            response,
+            session_id="sid-preflight-confirm",
+        )
+        item = needs_confirmation.metadata["preflight_validation"]["items"][0]
+        self.assertEqual(item["status"], "needs_confirmation")
+        self.assertEqual(item["reason_code"], "confirmation_required")
+
+        confirmed = coordinator.prepare_response(
+            response,
+            session_id="sid-preflight-confirmed",
+            confirmed_request_ids={"nod-1"},
+        )
+        confirmed_item = confirmed.metadata["preflight_validation"]["items"][0]
+        self.assertEqual(confirmed_item["status"], "passed")
+
     async def test_session_interrupt_completes_as_local_control(self) -> None:
         scheduled: list[dict[str, Any]] = []
         coordinator = InteractionRuntimeCoordinator(

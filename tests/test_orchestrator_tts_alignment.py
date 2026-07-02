@@ -199,19 +199,28 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ),
             "I'll answer.",
         )
-        self.assertEqual(
+        self.assertIsNone(
             assistant._fast_first_response_text(
                 RouteDecision(route="robot_action", intent="robot_action", language="en-US"),
                 "Walk forward for 15 seconds.",
-            ),
-            "I heard the movement request.",
+            )
         )
-        self.assertEqual(
+        self.assertIsNone(
             assistant._fast_first_response_text(
                 RouteDecision(route="robot_action", intent="robot_action", language="zh-CN"),
                 "往前走个15秒。",
-            ),
-            "我听到了这个动作请求。",
+            )
+        )
+        self.assertIsNone(
+            assistant._fast_first_response_text(
+                RouteDecision(
+                    route="robot_action",
+                    intent="robot_action",
+                    language="en-US",
+                    speak_first="I heard the movement request.",
+                ),
+                "Walk forward for 15 seconds.",
+            )
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -279,11 +288,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         if pending:
             await asyncio.gather(*pending)
 
-        self.assertTrue(scheduled)
-        self.assertEqual(seen, [(0, "I heard the movement request.")])
+        self.assertFalse(scheduled)
+        self.assertEqual(seen, [])
         self.assertEqual(
             assistant.sessions.state[session_id]["scheduled_tts"],
-            1,
+            0,
         )
 
     def test_deep_thought_body_cue_uses_optional_express_attention(self) -> None:

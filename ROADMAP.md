@@ -97,6 +97,32 @@ Exit criteria before changing the default backend:
 - retained evidence uses the four-axis status vocabulary and does not turn a
   benchmark into release readiness.
 
+## Open architecture track - Orchestrator task proposal merge
+
+Router, quick intent, and deepthinking stages may all propose tasks, but
+effectful work must become an Orchestrator commitment before execution. The
+detailed design and implementation sequence are maintained in
+[Orchestrator Task Proposal Merge](docs/ORCHESTRATOR_TASK_PROPOSAL_MERGE.md).
+
+Exit criteria before treating this as a complete smart merge layer:
+
+- Router, Agent, and deepthinking task proposals use one shared schema; the
+  shared `TaskProposalLedger` contract exists and Router emits shared
+  `task_proposals`, the Agent deepthinking path emits shared
+  `deepthinking_task_proposals`, and final Agent speech/skills emit shared
+  `agent_task_proposals`;
+- the Orchestrator can accept, reject, revise, supersede, or commit proposals
+  with deterministic audit metadata;
+- static host preflight records schema/provider/availability/confirmation
+  status without pretending to prove real-world feasibility;
+- effectful proposals never execute until committed and authorized through the
+  trusted Skill Runtime;
+- later-stage corrections can produce concise user-facing repair speech without
+  claiming unverified execution;
+- retained traces and experience summaries expose proposal, commit, execution,
+  and correction causes without injecting raw history into prompts;
+- `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
+
 ## Current checkpoint - Simulation-demo release audit
 
 Before publishing or recreating a demo tag, the paired Chromie and Soridormi

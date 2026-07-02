@@ -1539,10 +1539,10 @@ class VoiceAssistant:
         zh = language.startswith("zh") or any(
             "\u4e00" <= ch <= "\u9fff" for ch in user_text
         )
+        if decision.route == "robot_action":
+            return None
         if decision.speak_first:
             return decision.speak_first.strip() or None
-        if decision.route == "robot_action":
-            return "我听到了这个动作请求。" if zh else "I heard the movement request."
         if decision.route == "tool":
             return "我查一下。" if zh else "I'll check that."
         if decision.route == "memory":
@@ -1877,6 +1877,7 @@ class VoiceAssistant:
                         "metadata": {
                             **response.metadata,
                             "language": decision.language,
+                            **self._route_proposal_metadata(decision),
                             "experience_context": self._experience_context(
                                 user_text=user_text,
                                 decision=decision,
@@ -1885,6 +1886,10 @@ class VoiceAssistant:
                             ),
                         }
                     },
+                )
+                response = self.interaction_runtime.prepare_response(
+                    response,
+                    session_id=session_id,
                 )
                 self.session_log(
                     session_id,
@@ -2027,8 +2032,13 @@ class VoiceAssistant:
                             **response.metadata,
                             "language": decision.language,
                             "post_interrupt_correction": True,
+                            **self._route_proposal_metadata(decision),
                         }
                     },
+                )
+                response = self.interaction_runtime.prepare_response(
+                    response,
+                    session_id=session_id,
                 )
                 self.session_log(
                     session_id,
@@ -2405,6 +2415,43 @@ class VoiceAssistant:
             metadata={"source": source},
         )
 
+    @staticmethod
+    def _route_proposal_metadata(decision: RouteDecision) -> dict[str, Any]:
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        out: dict[str, Any] = {
+            "route_final": decision.route,
+            "route_intent": decision.intent,
+            "route_source": decision.source,
+            "route_confidence": decision.confidence,
+        }
+        route_stage_outputs = metadata.get("route_stage_outputs")
+        if isinstance(route_stage_outputs, list):
+            out["route_stage_outputs"] = route_stage_outputs
+        task_proposals = metadata.get("task_proposals")
+        if isinstance(task_proposals, list):
+            out["route_task_proposals"] = task_proposals
+        task_list = metadata.get("task_list")
+        if isinstance(task_list, list):
+            out["route_task_list"] = task_list
+        route_merge = metadata.get("route_merge")
+        if isinstance(route_merge, dict):
+            out["route_merge"] = route_merge
+        superseded = metadata.get("superseded_task_proposals")
+        if isinstance(superseded, list):
+            out["superseded_task_proposals"] = superseded
+        revised = metadata.get("revised_task_proposals")
+        if isinstance(revised, list):
+            out["revised_task_proposals"] = revised
+        revisions = metadata.get("task_proposal_revisions")
+        if isinstance(revisions, list):
+            out["task_proposal_revisions"] = revisions
+        if metadata.get("truth_reconciled") is True:
+            out["truth_reconciled"] = True
+        truth_reason = metadata.get("truth_reconciliation_reason")
+        if isinstance(truth_reason, str) and truth_reason.strip():
+            out["truth_reconciliation_reason"] = truth_reason.strip()
+        return out
+
     async def _execute_planning_task_graph(self, graph: dict[str, Any]) -> dict[str, Any]:
         session = await self.get_http_session()
         return await self.agent_client.execute_planning_task_graph(session, graph)
@@ -2493,7 +2540,11 @@ class VoiceAssistant:
                         status=execution.status,
                     )
             self._record_experience(
-                response=response,
+                response=self._prepared_interaction_response_for_record(
+                    response,
+                    session_id=session_id,
+                    confirmed_request_ids=confirmed_request_ids,
+                ),
                 execution=execution,
                 session_id=session_id,
             )
@@ -2513,7 +2564,11 @@ class VoiceAssistant:
                 exc,
             )
             self._record_experience(
-                response=response,
+                response=self._prepared_interaction_response_for_record(
+                    response,
+                    session_id=session_id,
+                    confirmed_request_ids=confirmed_request_ids,
+                ),
                 execution=None,
                 session_id=session_id,
                 errors=[str(exc) or exc.__class__.__name__],
@@ -2529,6 +2584,22 @@ class VoiceAssistant:
                         0,
                     ) + sum(len(item.text) for item in response.speech)
                 self.maybe_session_done(session_id)
+
+    def _prepared_interaction_response_for_record(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+        confirmed_request_ids: set[str] | None,
+    ) -> InteractionResponse:
+        prepare = getattr(self.interaction_runtime, "prepare_response", None)
+        if not callable(prepare):
+            return response
+        return prepare(
+            response,
+            session_id=session_id,
+            confirmed_request_ids=confirmed_request_ids,
+        )
 
     async def execute_agent_result(
         self,

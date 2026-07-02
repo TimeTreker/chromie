@@ -11,12 +11,14 @@ try:
         InteractionSpeech,
         SkillRequest,
     )
+    from chromie_contracts.task_proposal import TaskProposal
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import (
         InteractionResponse,
         InteractionSpeech,
         SkillRequest,
     )
+    from shared.chromie_contracts.task_proposal import TaskProposal
 
 from .schema import (
     ActionCommand,
@@ -313,6 +315,10 @@ class InteractionDraft:
 
     def to_response(self) -> InteractionResponse:
         status = "refused" if self.status == "blocked" else self.status
+        agent_task_proposals = _agent_task_proposals(
+            self._speech,
+            self._skills,
+        )
         return InteractionResponse.model_validate(
             {
                 "status": status,
@@ -328,6 +334,7 @@ class InteractionDraft:
                     "memory_updates": [
                         update.model_dump(mode="json") for update in self.memory_updates
                     ],
+                    "agent_task_proposals": agent_task_proposals,
                 },
             }
         )
@@ -427,6 +434,7 @@ class AgentResultInteractionAdapter:
             )
             for graph in result.task_graphs
         )
+        agent_task_proposals = _agent_task_proposals(speech, skills)
         return InteractionResponse(
             status="refused" if result.status == "blocked" else result.status,
             speech=speech,
@@ -440,6 +448,7 @@ class AgentResultInteractionAdapter:
                 "memory_updates": [
                     update.model_dump(mode="json") for update in result.memory_updates
                 ],
+                "agent_task_proposals": agent_task_proposals,
             },
         )
 
@@ -456,6 +465,74 @@ class LegacyAgentRuntime(Protocol):
 
 class NativeInteractionOutputError(RuntimeError):
     """Raised when native Agent output does not satisfy InteractionResponse."""
+
+
+def _agent_task_proposals(
+    speech: list[InteractionSpeech],
+    skills: list[SkillRequest],
+) -> list[dict[str, Any]]:
+    proposals: list[dict[str, Any]] = []
+    for index, item in enumerate(speech):
+        proposals.append(
+            TaskProposal(
+                id=f"agent:speech:{item.id}",
+                source=str(item.metadata.get("source") or "agent"),
+                proposal_kind="speech",
+                task_type="speech.speak",
+                skill_id="chromie.speak",
+                state="committed",
+                reason="Agent speech committed to InteractionResponse",
+                effectful=False,
+                priority=item.priority,
+                sequence=index,
+                speech_id=item.id,
+                timing=item.timing,
+                text_chars=len(item.text),
+            ).model_dump(mode="json", exclude_none=True)
+        )
+    offset = len(proposals)
+    for index, item in enumerate(skills):
+        skill_id = item.skill_id
+        proposals.append(
+            TaskProposal(
+                id=f"agent:skill:{item.request_id}",
+                source=str(item.metadata.get("source") or "agent"),
+                proposal_kind="skill",
+                task_type=_task_type_for_skill(skill_id),
+                state="committed",
+                reason="Agent skill committed to InteractionResponse",
+                effectful=_is_effectful_skill(skill_id),
+                priority="normal",
+                sequence=offset + index,
+                skill_id=skill_id,
+                request_id=item.request_id,
+                timing=item.timing,
+                requires_confirmation=item.requires_confirmation,
+            ).model_dump(mode="json", exclude_none=True)
+        )
+    return proposals
+
+
+def _task_type_for_skill(skill_id: str) -> str:
+    if skill_id == "chromie.speak":
+        return "speech.speak"
+    if skill_id == "session.interrupt":
+        return "task.cancel_current_action"
+    if skill_id == "chromie.task_graph.execute":
+        return "task.execute_task_graph"
+    return "task.execute_skill"
+
+
+def _is_effectful_skill(skill_id: str) -> bool:
+    return (
+        skill_id.startswith("soridormi.")
+        or skill_id == "session.interrupt"
+        or skill_id == "chromie.task_graph.execute"
+        or (
+            skill_id.startswith("chromie.")
+            and skill_id != "chromie.speak"
+        )
+    )
 
 
 class InteractionOutputCoordinator:

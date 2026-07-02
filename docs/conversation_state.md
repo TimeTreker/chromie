@@ -55,8 +55,12 @@ prompts. It summarizes the current task, recent user and assistant turns, active
 pending tasks, and the current forgetting policy. This is the prompt-facing
 working memory for the current session, not a permanent memory store.
 The Router can hand complex requests to `deepthinking_agent`, which uses this
-same bounded memory to split tasks, plan, debug, and produce a final spoken
-answer without treating memory as authorization.
+same bounded memory to split tasks, plan, debug, and produce unified robot
+skill tasks without treating memory as authorization.
+Deep-thinking prompts should
+consume extracted task context, claims, entities, constraints, pending
+questions, and pending-task summaries rather than injecting raw conversation
+transcript turns.
 
 Each task context should preserve the information that later sessions need:
 

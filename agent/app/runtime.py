@@ -285,7 +285,6 @@ class InteractionRuntime(_AgentPipeline):
         blocked_intent_terms = (
             "low_confidence",
             "planning",
-            "complex",
             "debug",
             "design",
             "strategy",

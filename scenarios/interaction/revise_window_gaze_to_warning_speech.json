@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "id": "revise_window_gaze_to_warning_speech",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "A later merge revision replaces an early window-gaze action proposal with warning speech only.",
+  "tags": [
+    "deep-thought",
+    "task-proposal",
+    "revision",
+    "safety",
+    "daily-life"
+  ],
+  "input": {
+    "text": "Look out, there is a cable in front of you.",
+    "language": "en-US"
+  },
+  "stub": {
+    "host_prepare_response": true,
+    "catalog_capabilities": [],
+    "route_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "warning",
+      "confidence": 0.72,
+      "language": "en-US",
+      "source": "llm",
+      "metadata": {
+        "task_proposals": [
+          {
+            "id": "quick_intent:0:task.execute_skill",
+            "source": "quick_intent",
+            "proposal_kind": "action",
+            "task_type": "task.execute_skill",
+            "state": "advisory",
+            "reason": "quick router misread look out as a window gaze request",
+            "effectful": true,
+            "priority": "high",
+            "sequence": 0,
+            "skill_id": "soridormi.look_at_window"
+          }
+        ],
+        "revised_task_proposals": [
+          {
+            "id": "deep_reconciler:0:speech.speak",
+            "source": "deep_reconciler",
+            "proposal_kind": "speech",
+            "task_type": "speech.speak",
+            "skill_id": "chromie.speak",
+            "state": "committed",
+            "reason": "warning speech replaces the earlier window gaze interpretation",
+            "effectful": false,
+            "priority": "high",
+            "sequence": 1,
+            "supersedes_id": "quick_intent:0:task.execute_skill",
+            "superseded_task_type": "task.execute_skill",
+            "superseded_skill_id": "soridormi.look_at_window",
+            "superseded_reason": "later warning interpretation superseded window gaze",
+            "superseded_effectful": true
+          }
+        ]
+      }
+    },
+    "ollama_reply": "Thanks for warning me. I will hold still until the cable is clear."
+  },
+  "expect": {
+    "speech_all": ["Thanks for warning me", "hold still", "cable"],
+    "forbidden_speech_any": ["Looking out", "out of the window", "Moving now"],
+    "no_skills": true,
+    "forbidden_skills": ["soridormi.look_at_window"],
+    "requires_confirmation": false,
+    "status": "ok",
+    "metadata_json_contains": [
+      "task_proposal_ledger",
+      "revised_task_proposals",
+      "deep_reconciler:0:speech.speak",
+      "quick_intent:0:task.execute_skill:superseded",
+      "supersedes",
+      "soridormi.look_at_window",
+      "not_committed",
+      "superseded",
+      "chromie.speak"
+    ]
+  }
+}

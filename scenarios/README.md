@@ -79,11 +79,23 @@ and metadata fields as interaction scenarios. They can also check
 `post_history_contains`, `post_session_memory_contains`, and
 `current_task_context_contains`.
 
-The committed dialogue suite includes 300 real-world conversation scenarios
+Interaction scenarios may set `stub.host_prepare_response=true` when they need
+to exercise the host `InteractionRuntimeCoordinator.prepare_response()` layer.
+That path attaches static preflight and `task_proposal_ledger` metadata without
+executing live TTS, simulator, or hardware work. Expectations can use
+`metadata_json_contains` and `metadata_json_forbid` for ledger-level evidence
+such as `not_committed`, `superseded`, `chromie.speak`, or rejected
+capabilities. The `look_out_warning_correction` scenario covers the correction
+case where a quick window-gaze proposal for "Look out!" is superseded by
+warning speech and no physical skill is emitted.
+
+The committed dialogue suite includes 300+ real-world conversation scenarios
 that score social recall, preference memory, clarification, safe refusal,
 tool/perception honesty, confirmation-gated movement, multilingual requests,
-and low-level runtime boundaries. The `batch2_*` files are generated from
-reviewable deterministic templates:
+low-level runtime boundaries, and daily-life human-like judgment around
+privacy, uncertainty, nearby people, spills, calls, medicine, allergies, and
+truthful correction. The `batch2_*` files are generated from reviewable
+deterministic templates:
 
 ```bash
 python scripts/generate_dialogue_scenario_batch.py --target-count 300

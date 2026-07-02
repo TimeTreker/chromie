@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from router.app.capability_catalog import CapabilityCatalogResult
 from router.app.schema import RouteDecision, RouteRequest
+from shared.chromie_contracts.task_proposal import TaskProposal
 
 
 class _Catalog:
@@ -86,10 +87,15 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision.metadata["task_list"][0]["capability_id"],
             "soridormi.walk_forward",
         )
+        proposal = TaskProposal.model_validate(decision.metadata["task_proposals"][0])
+        self.assertEqual(proposal.skill_id, "soridormi.walk_forward")
+        self.assertEqual(proposal.state, "advisory")
+        self.assertTrue(proposal.effectful)
         self.assertEqual(
             decision.metadata["route_merge"]["strategy"],
             "safety_filter_then_quick_intent",
         )
+        self.assertEqual(decision.metadata["route_merge"]["task_proposal_count"], 1)
         self.assertEqual(decision.metadata["route_merge"]["final_route"], "robot_action")
         self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "quick_intent")
         self.assertEqual(decision.metadata["route_merge"]["task_count"], 1)
@@ -776,6 +782,54 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(
             "speech.thinking_ack",
             [item["task_type"] for item in decision.metadata["task_list"]],
+        )
+
+    async def test_hybrid_router_recovers_complex_deep_thought_direct_motion(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="wal forward for 15 seconds quickly",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=8,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "agent_id": "soridormi.skill",
+                    "description": "Walk forward for a bounded duration.",
+                    "score": 0.91,
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="deep_thought",
+                agents=["deepthinking_agent", "speaker_agent"],
+                intent="deep_thought_complex_reasoning",
+                confidence=0.90,
+                language="en-US",
+                source="llm",
+                reason="quick route treated this as complex reasoning",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="Wal forward for 15 seconds, quickly."))
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertIn("capability_agent", decision.agents)
+        self.assertEqual(decision.metadata["recovered_from_route"], "deep_thought")
+        self.assertEqual(
+            decision.metadata["recovered_from_intent"],
+            "deep_thought_complex_reasoning",
         )
 
     async def test_hybrid_router_keeps_planning_text_in_deep_thought(self) -> None:

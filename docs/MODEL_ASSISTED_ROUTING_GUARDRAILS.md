@@ -60,11 +60,13 @@ The ownership invariant is:
 
 Every stage may propose high-level tasks or actions. Chromie records those
 proposals in `RouteDecision.metadata.route_stage_outputs` and merges them into
-`RouteDecision.metadata.task_list`. `RouteDecision.metadata.route_merge` records
-the merge strategy, final route, selected stage, proposal count, and task source
-stages. These fields are not authorization: they are the inspectable plan
-substrate that later validators, agents, Skill Runtime, and providers must
-accept before anything executes.
+`RouteDecision.metadata.task_proposals` using the shared `TaskProposal` schema.
+`RouteDecision.metadata.task_list` remains as a legacy diagnostic surface.
+`RouteDecision.metadata.route_merge` records the merge strategy, final route,
+selected stage, proposal count, task-proposal count, and task source stages.
+These fields are not authorization: they are the inspectable plan substrate
+that later validators, agents, Skill Runtime, and providers must accept before
+anything executes.
 
 The host can act on the first safe part of that substrate before every slower
 proposal has arrived. Today this is limited to `ORCH_FAST_FIRST_RESPONSE_ENABLED`

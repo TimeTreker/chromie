@@ -30,6 +30,26 @@ The alpha implementation is present:
 - three-stage routing metadata where emergency filtering, quick intent routing,
   and deepthought handoff can each contribute high-level task/action proposals
   to the merged `RouteDecision.metadata.task_list`;
+- host-side task-proposal merge ledger that treats Router task list entries as
+  proposals, marks effectful proposals as `not_committed` until matched by a
+  final `InteractionResponse` skill, and audits committed speech/skills plus
+  static preflight status and rejected deepthinking tasks without widening
+  execution authority;
+- experience records retain task-proposal and preflight summaries as
+  owner-review-only learning signals when mismatches, blocked static checks, or
+  truth reconciliation occur; these summaries do not auto-apply rules and do
+  not inject raw proposal payloads into prompts;
+- host truth reconciliation has a first warning-misread repair path: a mistaken
+  quick proposal such as window gaze for "Look out!" is superseded by specific
+  warning speech and no physical skill is emitted;
+- `shared/chromie_contracts/task_proposal.py` defines the first shared
+  proposal ledger contract, including preflight annotations and the
+  `superseded` state; Orchestrator ledger output is validated through this
+  contract, and Router now emits shared `metadata.task_proposals` alongside
+  legacy `metadata.task_list`; the Agent deepthinking path now emits shared
+  `metadata.deepthinking_task_proposals`; final Agent speech and skills now
+  emit shared `metadata.agent_task_proposals`, including speech as the local
+  `chromie.speak` skill;
 - host ability registry entries for cognition, speech, memory, social, body,
   task, safety, and state abilities, including honest stubs for unavailable
   human-like behaviors;
@@ -131,8 +151,8 @@ Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
 Full Level A baseline:
-453 current unittest cases and 20 legacy Agent tests passed on 2026-06-28 with
-`INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh`.
+593 current unittest cases and 20 legacy Agent tests passed on 2026-07-02 with
+`./scripts/run_tests.sh`.
 ```
 
 The focused refresh above is not target evidence and does not replace the full

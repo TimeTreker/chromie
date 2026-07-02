@@ -14,6 +14,11 @@ from router.app.schema import RouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.action import ActionCommand as SharedActionCommand
 from shared.chromie_contracts.agent import AgentResult as SharedAgentResult
 from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
+from shared.chromie_contracts.task_proposal import (
+    TaskProposal,
+    TaskProposalLedger,
+    TaskProposalSummary,
+)
 
 
 class ContractCompatibilityTests(unittest.TestCase):
@@ -66,6 +71,12 @@ class ContractCompatibilityTests(unittest.TestCase):
             service_request.route_decision.metadata["task_list"][0]["source_stage"],
             "quick_intent",
         )
+        shared_proposal = TaskProposal.model_validate(
+            service_request.route_decision.metadata["task_proposals"][0]
+        )
+        self.assertEqual(shared_proposal.task_type, "head.turn")
+        self.assertEqual(shared_proposal.source, "quick_intent")
+        self.assertEqual(shared_proposal.state, "advisory")
 
     def test_agent_result_survives_orchestrator_and_hardware_round_trip(self) -> None:
         service_result = ServiceAgentResult()
@@ -103,3 +114,38 @@ class ContractCompatibilityTests(unittest.TestCase):
         parsed = OrchestratorActionResult.model_validate(hardware_result.model_dump(mode="json"))
         self.assertEqual(parsed.status, "completed")
         self.assertEqual(parsed.result, {"ok": True})
+
+    def test_task_proposal_ledger_is_shared_and_rejects_low_level_metadata(self) -> None:
+        ledger = TaskProposalLedger(
+            strategy="contract-test",
+            summary=TaskProposalSummary(
+                proposal_count=1,
+                states={"committed": 1},
+                sources={"interaction_response": 1},
+            ),
+            proposals=[
+                TaskProposal(
+                    id="proposal-1",
+                    source="interaction_response",
+                    proposal_kind="skill",
+                    task_type="task.execute_skill",
+                    state="committed",
+                    skill_id="soridormi.nod_yes",
+                    request_id="nod-1",
+                    effectful=True,
+                )
+            ],
+        )
+
+        parsed = TaskProposalLedger.model_validate(ledger.model_dump(mode="json"))
+        self.assertEqual(parsed.proposals[0].state, "committed")
+
+        with self.assertRaisesRegex(ValueError, "forbidden low-level field"):
+            TaskProposal(
+                id="bad-proposal",
+                source="test",
+                proposal_kind="skill",
+                task_type="task.execute_skill",
+                state="committed",
+                metadata={"joint_target": [0.1, 0.2]},
+            )

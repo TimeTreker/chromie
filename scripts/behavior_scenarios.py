@@ -26,6 +26,7 @@ from agent.app.capabilities.catalog import CapabilityMatch, CapabilitySearchResu
 from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentRunRequest
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from router.app.capability_catalog import CapabilityCatalogResult
 from router.app.schema import RouteDecision, RouteRequest
 
@@ -466,7 +467,51 @@ def _evaluate_interaction_expectations(
     for key in _tuple_of_strings(expect.get("metadata_false")):
         if metadata.get(key) is not False:
             errors.append(f"metadata {key!r}={metadata.get(key)!r}, expected False")
+    metadata_json = _json_text(metadata)
+    for phrase in _tuple_of_strings(expect.get("metadata_json_contains")):
+        if phrase not in metadata_json:
+            errors.append(f"metadata JSON missing phrase {phrase!r}: {metadata_json!r}")
+    for phrase in _tuple_of_strings(expect.get("metadata_json_forbid")):
+        if phrase in metadata_json:
+            errors.append(f"metadata JSON contained forbidden phrase {phrase!r}: {metadata_json!r}")
     return errors
+
+
+def _route_proposal_metadata_for_response(decision: RouteDecision) -> dict[str, Any]:
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    out: dict[str, Any] = {
+        "route_final": decision.route,
+        "route_intent": decision.intent,
+        "route_source": decision.source,
+        "route_confidence": decision.confidence,
+    }
+    route_stage_outputs = metadata.get("route_stage_outputs")
+    if isinstance(route_stage_outputs, list):
+        out["route_stage_outputs"] = route_stage_outputs
+    task_proposals = metadata.get("task_proposals")
+    if isinstance(task_proposals, list):
+        out["route_task_proposals"] = task_proposals
+    task_list = metadata.get("task_list")
+    if isinstance(task_list, list):
+        out["route_task_list"] = task_list
+    route_merge = metadata.get("route_merge")
+    if isinstance(route_merge, dict):
+        out["route_merge"] = route_merge
+    superseded = metadata.get("superseded_task_proposals")
+    if isinstance(superseded, list):
+        out["superseded_task_proposals"] = superseded
+    revised = metadata.get("revised_task_proposals")
+    if isinstance(revised, list):
+        out["revised_task_proposals"] = revised
+    revisions = metadata.get("task_proposal_revisions")
+    if isinstance(revisions, list):
+        out["task_proposal_revisions"] = revisions
+    if metadata.get("truth_reconciled") is True:
+        out["truth_reconciled"] = True
+    truth_reason = metadata.get("truth_reconciliation_reason")
+    if isinstance(truth_reason, str) and truth_reason.strip():
+        out["truth_reconciliation_reason"] = truth_reason.strip()
+    return out
 
 
 async def _run_interaction_turn(
@@ -498,18 +543,30 @@ async def _run_interaction_turn(
         expressive_body_cues=str(stub.get("expressive_body_cues") or "off"),
         require_capability_plan_review=bool(stub.get("require_capability_plan_review", False)),
     )
-    return await InteractionRuntime(services).run(
-        AgentRunRequest.model_validate(
-            {
-                "sid": scenario_id,
-                "text": text,
-                "language": language,
-                "route_decision": route_decision,
-                "context": context or {},
-                "history": history or [],
-            }
-        )
+    request = AgentRunRequest.model_validate(
+        {
+            "sid": scenario_id,
+            "text": text,
+            "language": language,
+            "route_decision": route_decision,
+            "context": context or {},
+            "history": history or [],
+        }
     )
+    response = await InteractionRuntime(services).run(request)
+    if bool(stub.get("host_prepare_response", False)):
+        response = response.model_copy(
+            deep=True,
+            update={
+                "metadata": {
+                    **response.metadata,
+                    **_route_proposal_metadata_for_response(request.route_decision),
+                }
+            },
+        )
+        coordinator = InteractionRuntimeCoordinator(lambda payload: {"status": "scheduled"})
+        response = coordinator.prepare_response(response, session_id=scenario_id)
+    return response
 
 
 def _interaction_actual(response: Any) -> dict[str, Any]:

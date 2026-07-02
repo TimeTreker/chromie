@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "daily_correct_pending_motion_status",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot corrects a false completion assumption when motion is still waiting for confirmation.",
+  "tags": ["daily-life", "truthfulness", "confirmation", "robot-action"],
+  "turns": [
+    {
+      "id": "request_motion",
+      "ask": "Take one slow step forward after I confirm.",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+          "intent": "compound_robot_action",
+          "confidence": 0.96,
+          "language": "en-US",
+          "source": "catalog",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "robot_action",
+              "goal": "Take one slow step forward after confirmation",
+              "entities": ["slow forward step"]
+            }
+          },
+          "actions": [
+            {
+              "capability_id": "soridormi.walk_velocity",
+              "args": {"vx_mps": 0.1, "duration_s": 1.0},
+              "sequence": 0
+            }
+          ]
+        }
+      },
+      "expect": {
+        "speech_any": ["run that action"],
+        "skills": ["soridormi.walk_velocity"],
+        "requires_confirmation": true,
+        "current_task_context_contains": ["slow step forward"]
+      }
+    },
+    {
+      "id": "false_completion_assumption",
+      "ask": "So you already moved, right?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "task_status_correction",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "No. I am still waiting for confirmation before moving, sorry if that was unclear."
+      },
+      "expect": {
+        "speech_any": ["still waiting for confirmation", "sorry if that was unclear"],
+        "history_contains": ["Take one slow step forward"],
+        "session_memory_contains": ["soridormi.walk_velocity", "slow forward step"],
+        "no_skills": true
+      }
+    }
+  ]
+}

@@ -29,11 +29,14 @@ native interaction path.
 Router also attaches staged task metadata:
 
 - `metadata.route_stage_outputs`: one entry per route stage that contributed or
-  passed, each with proposed `tasks` and `actions`;
-- `metadata.task_list`: the merged priority/stage ordered task list;
+  passed, each with legacy proposed `tasks`/`actions` and shared
+  `task_proposals`;
+- `metadata.task_list`: the legacy merged priority/stage ordered task list;
+- `metadata.task_proposals`: the preferred shared-schema merged task proposal
+  list;
 - `metadata.route_merge`: the concise merge ledger, including merge strategy,
-  final route/intent/source, selected stage, proposal count, task count, and
-  task source stages.
+  final route/intent/source, selected stage, proposal count, task count,
+  task-proposal count, and task source stages.
 
 For conversation continuity, the quick Router model may also attach advisory
 task-lifecycle metadata:

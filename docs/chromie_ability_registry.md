@@ -55,7 +55,8 @@ The first phrase must be a truthful state signal, not an execution claim:
 
 - chat: `I'm here.` / `我在。`
 - factual or non-small-talk chat: `I'll answer.` / `我来回答。`
-- robot action: `I heard the movement request.` / `我听到了这个动作请求。`
+- robot action: no host fast-first phrase; the committed Agent `chromie.speak`
+  task owns the single spoken acknowledgement.
 - tool lookup: `I'll check that.` / `我查一下。`
 - memory request: `I'll note that.` / `我记一下。`
 - deep thought: `Okay, let me think about that.` / `好的，我想一下。`

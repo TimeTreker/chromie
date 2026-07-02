@@ -9,6 +9,12 @@ from .interaction import (
     SkillTrace,
     SkillTraceEvent,
 )
+from .task_proposal import (
+    TaskProposal,
+    TaskProposalLedger,
+    TaskProposalPreflight,
+    TaskProposalSummary,
+)
 from .mind import (
     CorePrinciple,
     ExperienceRecord,
@@ -34,6 +40,10 @@ __all__ = [
     "SkillResult",
     "SkillTrace",
     "SkillTraceEvent",
+    "TaskProposal",
+    "TaskProposalLedger",
+    "TaskProposalPreflight",
+    "TaskProposalSummary",
     "CorePrinciple",
     "ExperienceRecord",
     "LongTermGoal",

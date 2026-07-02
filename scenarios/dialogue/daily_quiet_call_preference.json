@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "daily_quiet_call_preference",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "The robot remembers a temporary quiet-call preference and keeps the next response brief.",
+  "tags": ["daily-life", "preference", "social"],
+  "turns": [
+    {
+      "id": "set_quiet_preference",
+      "ask": "I am joining a work call. Keep your replies brief and quiet for now.",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "remember_temporary_preference",
+          "confidence": 0.91,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "new_task",
+            "task_context_patch": {
+              "task_type": "conversation",
+              "goal": "Keep replies brief and quiet during the user's work call",
+              "entities": ["work call", "brief replies", "quiet replies"]
+            }
+          }
+        },
+        "ollama_reply": "Got it. I will keep replies brief and quiet while you are on the call."
+      },
+      "expect": {
+        "speech_any": ["brief and quiet", "on the call"],
+        "no_skills": true,
+        "current_task_context_contains": ["brief", "quiet", "work call"]
+      }
+    },
+    {
+      "id": "check_preference",
+      "ask": "How should you answer me right now?",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "recall_temporary_preference",
+          "confidence": 0.9,
+          "language": "en-US",
+          "source": "llm",
+          "metadata": {"task_relation": "continue_task"}
+        },
+        "ollama_reply": "Briefly and quietly."
+      },
+      "expect": {
+        "speech_any": ["briefly and quietly"],
+        "history_contains": ["brief and quiet"],
+        "session_memory_contains": ["work call", "quiet replies"],
+        "no_skills": true
+      }
+    }
+  ]
+}

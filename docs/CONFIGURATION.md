@@ -139,7 +139,7 @@ VAD and ASR.
 | `ROUTER_URL` | `http://127.0.0.1:8091` |
 | `AGENT_URL` | `http://127.0.0.1:8092` |
 | `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
-| `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL |
+| `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
 
 Inside Docker, use Compose service names such as
 `http://chromie-llm:11434`; do not copy host loopback URLs into container
@@ -247,7 +247,7 @@ python scripts/evaluate_experience_episodes.py \
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `off`; enable only when expressive chat motion has been reviewed for the target robot/sim. |
 | `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Common low-latency default `0`; set to `1` for stricter review where executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If the Router selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
-| `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories inside the Agent container. |
+| `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for marking retrieval candidates as matched; default `0.16`. In normal LLM modes this affects context/validation, not deterministic action selection. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |

@@ -47,7 +47,7 @@ ASR and therefore does not prove physical audio-device quality.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 453 current tests and 20 legacy Agent
+At the current working revision this runs 593 current tests and 20 legacy Agent
 tests. It also runs the documentation consistency checker.
 
 If the host Python environment is intentionally minimal, install the declared
@@ -95,6 +95,9 @@ timestamped `summary.json` with pass/fail details and, when a baseline is
 provided, lists regressions, improvements, new cases, and removed cases. These
 reports are Level A automated evidence only; they do not prove live service,
 GPU, microphone, speaker, simulator, or robot behavior.
+Interaction fixtures may opt into host response preparation to assert
+preflight, proposal-ledger, revision/supersede, and correction metadata without
+executing live TTS, simulator, or hardware side effects.
 
 To grow the scenario library, use the authoring helper:
 
@@ -268,13 +271,30 @@ and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. It fails if
 Skill Runtime execution fails, if the simulator does not return to safe idle,
 or, when assertion flags are supplied, if the ordered Soridormi skills or
 expected arguments do not match. Use `--no-speaker` for headless automation;
-otherwise Chromie schedules TTS through
-the configured output device. The runner uses a 120s per-Soridormi-skill
-diagnostic timeout by default; pass `--skill-timeout-s 0` to use catalog/default
-timeouts unchanged. It prints compact debug lines for route, staged task list,
-skills, speech count, and errors before the JSON summary. The runner refuses
-non-`sim` Soridormi modes unless `--allow-non-sim` is supplied under separate
-supervision.
+otherwise Chromie schedules TTS through the configured output device. The
+runner uses a 120s per-Soridormi-skill diagnostic timeout by default; pass
+`--skill-timeout-s 0` to use catalog/default timeouts unchanged. It prints
+compact debug lines for route, staged task list, skills, speech count, and
+errors before the JSON summary. The runner refuses non-`sim` Soridormi modes
+unless `--allow-non-sim` is supplied under separate supervision.
+
+Use `--reject-internal-speech` when investigating planner/TTS leakage. For the
+known ASR-style walk typo regression, run:
+
+```bash
+python scripts/interaction_text_mujoco_check.py \
+  "Wal forward for 15 seconds, quickly." \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --preview-only \
+  --no-speaker \
+  --expect-skill soridormi.walk_forward \
+  --reject-internal-speech
+```
+
+That preview-only check fails if no walking skill is emitted or if spoken text
+contains internal labels such as `Task Split`, `Key Risk`, `Next Step`, or
+model-facing `soridormi.*` skill IDs. It still writes `route.json`,
+`interaction_response.json`, session events, and `summary.json` for diagnosis.
 
 The retained `20260617T081411Z` text bundle is the M13 text interaction closure
 evidence. It is the right gate when the goal is to skip microphone and ASR while

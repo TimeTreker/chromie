@@ -272,7 +272,10 @@ class BaseAgent(ABC):
     ) -> str:
         del agent_system
         task_context = self._bounded_json(self._task_context_from_request(request), 1200)
-        history = self._bounded_json(self._history_from_request(request), 1400)
+        extracted_context = self._bounded_text(
+            self._extracted_context_summary(request),
+            1400,
+        )
         capabilities = self._bounded_json(
             {
                 "candidate_capabilities": request.route_decision.candidate_capabilities,
@@ -296,17 +299,17 @@ class BaseAgent(ABC):
             "Use an explicit user-requested output language when the current input or context asks for one; otherwise use the target spoken language.\n"
             f"Current user input: {request.text}\n"
             f"Route context: {route_context}\n"
-            f"Recent conversation: {history}\n"
+            f"Extracted conversation context: {extracted_context}\n"
             f"Task context: {task_context}\n"
             f"Capability context: {capabilities}\n"
             f"Original agent prompt excerpt: {original_prompt}\n"
             f"Candidate spoken response: {response}\n\n"
             "Decide whether the candidate can be spoken now. "
             "A one-word fragment such as only 'I' is not speakable and must be revised. "
-            "If the current user input or recent conversation asks for a joke, story, song, poem, or other creative content, "
+            "If the current user input or extracted context asks for a joke, story, song, poem, or other creative content, "
             "including capability-style wording such as whether Chromie can, could, or would do it, the candidate must include the actual content. Example: user asks for a joke and candidate says "
             "'I can tell you a joke.' => revise with a brief original joke. "
-            "If Chromie already promised the content and the user says they are waiting, says 'go ahead', 'continue', 'tell me', or 'I know you can', the candidate must deliver it now. "
+            "If Chromie already promised the content according to the extracted context and the user says they are waiting, says 'go ahead', 'continue', 'tell me', or 'I know you can', the candidate must deliver it now. "
             "If the candidate says Chromie lacks a body/tool ability that appears available in Capability context or the original prompt excerpt, revise it to acknowledge the available ability instead of falsely refusing. "
             "If Route context is chat or clarify and the candidate promises, confirms, or implies that Chromie will now execute a physical body action, movement, or tool side effect, revise it to a safe clarification that the action must be routed through the robot action planner before execution. "
             "Do not let a speech-only response claim that a movement or tool action is being performed when no robot_action route or skill request is present. "
@@ -384,6 +387,71 @@ class BaseAgent(ABC):
             if isinstance(history, list):
                 return [turn for turn in history if isinstance(turn, dict)][-6:]
         return []
+
+    def _extracted_context_summary(self, request: AgentRunRequest) -> str:
+        lines: list[str] = []
+        context = request.context or {}
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            conversation_id = str(conversation.get("conversation_id") or "").strip()
+            if conversation_id:
+                lines.append(f"conversation_id={conversation_id}")
+        task_context = self._task_context_from_request(request)
+        if isinstance(task_context, dict):
+            for key in ("task_id", "status", "task_type", "goal"):
+                value = " ".join(str(task_context.get(key) or "").split())
+                if value:
+                    lines.append(f"{key}={self._bounded_text(value, 180)}")
+            for key in ("important_claims", "pending_questions"):
+                values = self._compact_string_list(task_context.get(key), limit=4)
+                if values:
+                    lines.append(f"{key}={'; '.join(values)}")
+        pending = self._pending_tasks_from_request(request)
+        if pending:
+            summarized: list[str] = []
+            for task in pending[-4:]:
+                if not isinstance(task, dict):
+                    continue
+                task_type = " ".join(str(task.get("type") or "task").split())
+                status = " ".join(str(task.get("status") or "pending").split())
+                summarized.append(f"{task_type}:{status}")
+            if summarized:
+                lines.append(f"pending_tasks={'; '.join(summarized)}")
+        return "\n".join(lines) if lines else "None"
+
+    def _pending_tasks_from_request(self, request: AgentRunRequest) -> list[dict[str, Any]]:
+        context = request.context or {}
+        pending = context.get("pending_tasks")
+        if isinstance(pending, list):
+            return [task for task in pending if isinstance(task, dict)]
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            pending = conversation.get("pending_tasks")
+            if isinstance(pending, list):
+                return [task for task in pending if isinstance(task, dict)]
+        return []
+
+    def _compact_string_list(self, value: Any, *, limit: int) -> list[str]:
+        if isinstance(value, str):
+            candidates = [value]
+        elif isinstance(value, list):
+            candidates = [item for item in value if isinstance(item, str)]
+        else:
+            return []
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in candidates:
+            text = " ".join(item.split())
+            if not text:
+                continue
+            key = text.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(self._bounded_text(text, 160))
+            if len(out) >= limit:
+                break
+        return out
 
     def _bounded_json(self, value: Any, max_chars: int) -> str:
         if value in (None, [], {}):

@@ -15,6 +15,8 @@ EXPECT_ROUTE=()
 EXPECT_NO_SKILLS=()
 EXPECT_SKILL=()
 EXPECT_ARGS=()
+REJECT_INTERNAL_SPEECH=()
+REJECT_SPEECH_PATTERNS=()
 TEXT=""
 
 usage() {
@@ -45,6 +47,9 @@ Options:
   --expect-no-skills         Post-run assertion for no Soridormi skill emission
   --expect-skill SKILL_ID    Post-run assertion for the exact planned skill sequence
   --expect-arg I:KEY=VALUE   Post-run assertion for an emitted skill argument
+  --reject-internal-speech   Fail if spoken output leaks planner labels or
+                             model-facing skill IDs
+  --reject-speech-pattern RE Regex that must not appear in emitted speech
   -h, --help                 Show this help
 USAGE
 }
@@ -61,6 +66,8 @@ while [ "$#" -gt 0 ]; do
     --expect-no-skills) EXPECT_NO_SKILLS+=(--expect-no-skills); shift ;;
     --expect-skill) EXPECT_SKILL+=(--expect-skill "${2:?--expect-skill requires a skill id}"); shift 2 ;;
     --expect-arg) EXPECT_ARGS+=(--expect-arg "${2:?--expect-arg requires I:KEY=VALUE}"); shift 2 ;;
+    --reject-internal-speech) REJECT_INTERNAL_SPEECH+=(--reject-internal-speech); shift ;;
+    --reject-speech-pattern) REJECT_SPEECH_PATTERNS+=(--reject-speech-pattern "${2:?--reject-speech-pattern requires a regex}"); shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *)
       if [ -z "$TEXT" ]; then
@@ -124,6 +131,14 @@ if [ "$AUTO_CONFIRM" = "1" ]; then
 else
   args+=(--no-auto-confirm-sim)
 fi
-args+=("${EXPECT_ROUTE[@]}" "${EXPECT_NO_SKILLS[@]}" "${EXPECT_SKILL[@]}" "${EXPECT_ARGS[@]}" "$TEXT")
+args+=(
+  "${EXPECT_ROUTE[@]}"
+  "${EXPECT_NO_SKILLS[@]}"
+  "${EXPECT_SKILL[@]}"
+  "${EXPECT_ARGS[@]}"
+  "${REJECT_INTERNAL_SPEECH[@]}"
+  "${REJECT_SPEECH_PATTERNS[@]}"
+  "$TEXT"
+)
 
 "$PYTHON_BIN" scripts/interaction_text_mujoco_check.py "${args[@]}"

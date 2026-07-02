@@ -4,7 +4,9 @@ import unittest
 from typing import Any
 
 from agent.app.agents import AgentServices, DeepThinkingAgent
+from agent.app.interaction import InteractionDraft
 from agent.app.schema import AgentResult, AgentRunRequest
+from shared.chromie_contracts.task_proposal import TaskProposal
 
 
 class _CapturingOllama:
@@ -62,18 +64,31 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deepthinking_agent", result.handled_by)
         self.assertEqual(len(ollama.calls), 1)
         call = ollama.calls[0]
+        self.assertIn("Priority Rule 1", call["system"])
         self.assertIn("deepthinking agent", call["system"])
         self.assertIn("split complex requests", call["system"])
         self.assertIn("Generalization-first is a core principle", call["system"])
         self.assertIn("Do not turn examples into keyword rules", call["system"])
+        self.assertIn("Bad keyword-rule", call["system"])
+        self.assertIn("All spoken output must be in the target language", call["system"])
+        self.assertIn("Never output bullet points, labels, or numbered lists", call["system"])
+        self.assertIn("Speech is not a special final text channel", call["system"])
+        self.assertIn("Return compact JSON only with keys tasks and reason", call["system"])
+        self.assertIn("chromie.speak", call["system"])
         self.assertIn("human owner approval", call["system"])
         self.assertIn("Normally do not repeat, quote, or paraphrase", call["system"])
         self.assertIn("interpret it as a request to do it now", call["system"])
         self.assertIn("Do not answer only with ability, willingness, or readiness", call["system"])
         self.assertIn("Session working memory", call["prompt"])
+        self.assertIn("Extracted conversation context", call["prompt"])
+        self.assertIn("Output Contract:", call["prompt"])
+        self.assertIn("Top-level keys: tasks, reason only", call["prompt"])
+        self.assertIn("\"skill_id\":\"chromie.speak\"", call["prompt"])
+        self.assertIn("Do not output spoken_response, speech_tasks, action_tasks", call["prompt"])
         self.assertIn("Mind principles, long-term goals, and experience boundaries", call["prompt"])
         self.assertIn("owner-approved", call["prompt"])
         self.assertIn("design session memory", call["prompt"])
+        self.assertIn("Apply the Priority Rules strictly", call["prompt"])
         self.assertEqual(call["options"]["num_ctx"], 8192)
         self.assertEqual(call["options"]["num_predict"], 384)
 
@@ -142,13 +157,76 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(ollama.calls), 1)
         call = ollama.calls[0]
         self.assertIn("You are Chromie's deepthinking agent", call["system"])
-        self.assertIn("speak the final response in Chinese", call["system"])
-        self.assertIn("English is the main language for all internal thinking or action", call["system"])
+        self.assertIn("All spoken output must be in the target language", call["system"])
         self.assertNotIn("你是 Chromie 的 deepthinking agent", call["system"])
         self.assertIn("Target spoken language: zh-CN", call["prompt"])
-        self.assertIn("Recent conversation", call["prompt"])
-        self.assertIn("User:", call["prompt"])
+        self.assertIn("Extracted conversation context", call["prompt"])
+        self.assertNotIn("Recent conversation", call["prompt"])
+        self.assertNotIn("User:", call["prompt"])
+        self.assertNotIn("我们要减少提示词漂移", call["prompt"])
         self.assertNotIn("最近对话", call["prompt"])
+
+    async def test_deep_thought_uses_extracted_context_not_raw_history(self) -> None:
+        ollama = _CapturingOllama("Yes, the Moon is round.")
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-extracted-context-test",
+                "text": "Do you agree?",
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "I think the moon is round. Do you think so?",
+                    },
+                    {"role": "assistant", "text": "The moon is round."},
+                ],
+                "context": {
+                    "session_memory": {
+                        "kind": "short_term_session_memory",
+                        "conversation_id": "local_default",
+                        "recent_user_request": "I think the moon is round. Do you think so?",
+                        "recent_assistant_response": "The moon is round.",
+                        "current_task_context": {
+                            "task_id": "task-moon",
+                            "status": "open",
+                            "task_relation": "continue_task",
+                            "task_type": "conversation",
+                            "goal": "Discuss whether the Moon is round",
+                            "important_claims": ["The user thinks the Moon is round."],
+                            "entities": ["Moon"],
+                            "last_meaningful_user_turn": (
+                                "I think the moon is round. Do you think so?"
+                            ),
+                            "last_assistant_response": "The moon is round.",
+                        },
+                    }
+                },
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "deep_thought_low_confidence",
+                    "confidence": 0.55,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        await agent.run(request, AgentResult())
+
+        prompt = ollama.calls[0]["prompt"]
+        self.assertIn("Extracted conversation context", prompt)
+        self.assertIn("Discuss whether the Moon is round", prompt)
+        self.assertIn("The user thinks the Moon is round.", prompt)
+        self.assertNotIn("I think the moon is round. Do you think so?", prompt)
+        self.assertNotIn("The moon is round.", prompt)
+        self.assertNotIn("Recent conversation", prompt)
 
     async def test_completed_pending_tasks_are_not_fed_as_active_context(self) -> None:
         ollama = _CapturingOllama("Let's reason about the claim directly.")
@@ -190,6 +268,107 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         prompt = ollama.calls[0]["prompt"]
         self.assertIn("Pending tasks:\nNone", prompt)
         self.assertNotIn("soridormi.walk_forward", prompt)
+
+    async def test_structured_deep_thought_emits_unified_skill_tasks(self) -> None:
+        ollama = _CapturingOllama(
+            {
+                "tasks": [
+                    {
+                        "skill_id": "chromie.speak",
+                        "args": {
+                            "text": "Moving now.",
+                            "style": "brief",
+                            "priority": "normal",
+                        },
+                        "timing": "immediate",
+                        "reason": "Acknowledge the direct body request.",
+                    },
+                    {
+                        "skill_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 15, "speed": "quickly"},
+                        "timing": "sequential",
+                        "reason": "The user asked Chromie to walk forward.",
+                    }
+                ],
+                "reason": "Direct body action with supplied capability.",
+            }
+        )
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-structured-action-test",
+                "text": "Walk forward for 15 seconds, quickly.",
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "deep_thought_complex_reasoning",
+                    "confidence": 0.74,
+                    "language": "en-US",
+                    "source": "llm",
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "soridormi.walk_forward",
+                            "description": "Walk forward for a bounded duration.",
+                            "available": True,
+                            "interaction_executable": True,
+                            "requires_confirmation": True,
+                            "input_schema": {
+                                "type": "object",
+                                "properties": {
+                                    "duration_s": {
+                                        "type": "number",
+                                        "minimum": 0.1,
+                                        "maximum": 30,
+                                    },
+                                    "speed": {
+                                        "type": "string",
+                                        "enum": ["slow", "normal", "quick"],
+                                    },
+                                },
+                                "required": ["duration_s"],
+                                "additionalProperties": False,
+                            },
+                        }
+                    ],
+                },
+            }
+        )
+        draft = InteractionDraft()
+
+        result = await agent.run(request, draft)
+        response = result.to_response()
+
+        self.assertEqual(response.speech[0].text, "Moving now.")
+        self.assertEqual(len(response.skills), 1)
+        skill = response.skills[0]
+        self.assertEqual(skill.skill_id, "soridormi.walk_forward")
+        self.assertEqual(skill.args, {"duration_s": 15, "speed": "quick"})
+        self.assertEqual(skill.timing, "sequential")
+        self.assertTrue(skill.requires_confirmation)
+        self.assertEqual(skill.metadata["source"], "deepthinking_skill_task")
+        self.assertEqual(response.metadata["deepthinking_output_mode"], "skill_tasks")
+        self.assertEqual(response.metadata["deepthinking_proposed_task_count"], 2)
+        self.assertEqual(response.metadata["deepthinking_valid_task_count"], 2)
+        self.assertEqual(response.metadata["deepthinking_proposed_effect_task_count"], 1)
+        self.assertEqual(response.metadata["deepthinking_valid_effect_task_count"], 1)
+        self.assertEqual(response.metadata["deepthinking_proposed_action_count"], 1)
+        self.assertEqual(response.metadata["deepthinking_valid_action_count"], 1)
+        self.assertEqual(response.metadata["language"], "en-US")
+        proposals = [
+            TaskProposal.model_validate(item)
+            for item in response.metadata["deepthinking_task_proposals"]
+        ]
+        self.assertEqual([item.task_type for item in proposals], ["speech.speak", "task.execute_skill"])
+        self.assertEqual(proposals[0].state, "committed")
+        self.assertEqual(proposals[1].state, "advisory")
+        self.assertEqual(proposals[1].skill_id, "soridormi.walk_forward")
+        self.assertEqual(ollama.calls[0]["response_format"], "json")
 
     async def test_stock_model_disclaimer_is_retried_as_chromie(self) -> None:
         ollama = _CapturingOllama(

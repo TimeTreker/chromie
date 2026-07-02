@@ -202,6 +202,9 @@ class SkillRuntime:
             raise ValueError(f"duplicate skill provider: {provider.provider_id}")
         self._providers[provider.provider_id] = provider
 
+    def provider_ids(self) -> set[str]:
+        return set(self._providers)
+
     async def execute(
         self,
         response: InteractionResponse,

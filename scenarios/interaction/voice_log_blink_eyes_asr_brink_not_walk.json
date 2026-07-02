@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_blink_eyes_asr_brink_not_walk",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Voice-log regression: noisy ASR for a blink-eyes request over the per-call limit must batch blink skills, not become speech-only or walking.",
+  "tags": [
+    "voice-log",
+    "asr-noise",
+    "robot-action",
+    "blink",
+    "no-walk"
+  ],
+  "input": {
+    "text": "Brink your eyes for 15 times.",
+    "language": "en-US"
+  },
+  "stub": {
+    "host_prepare_response": true,
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.blink_eyes",
+        "description": "Blink the simulated social eyes visibly.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "effects": [
+          "visual_expression"
+        ],
+        "safety_class": "social_motion",
+        "interaction_executable": true,
+        "requires_confirmation": false,
+        "score": 0.91
+      },
+      {
+        "capability_id": "soridormi.walk_forward",
+        "description": "Walk the robot forward for a bounded duration.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 15.0
+            },
+            "speed": {
+              "type": "string",
+              "enum": [
+                "slow",
+                "normal",
+                "quick"
+              ]
+            }
+          },
+          "required": [
+            "duration_s"
+          ]
+        },
+        "effects": [
+          "physical_motion"
+        ],
+        "safety_class": "physical_motion",
+        "interaction_executable": true,
+        "requires_confirmation": true,
+        "score": 0.44
+      },
+      {
+        "capability_id": "soridormi.walk_velocity",
+        "description": "Bounded walking velocity.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "vx_mps": {
+              "type": "number"
+            },
+            "duration_s": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "vx_mps",
+            "duration_s"
+          ]
+        },
+        "effects": [
+          "physical_motion"
+        ],
+        "safety_class": "physical_motion",
+        "interaction_executable": true,
+        "requires_confirmation": true,
+        "score": 0.38
+      }
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "agents": [
+        "capability_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
+      "intent": "capability:soridormi.blink_eyes",
+      "confidence": 0.56,
+      "language": "en-US",
+      "source": "llm"
+    },
+    "ollama_reply": {
+      "decision": "clarify",
+      "speech": "I can blink my eyes, but I can only do it up to 6 times at a time.",
+      "skills": []
+    }
+  },
+  "expect": {
+    "speech_all": [
+      "blink",
+      "15"
+    ],
+    "forbidden_speech_any": [
+      "walk",
+      "forward",
+      "movement request"
+    ],
+    "skills": [
+      "soridormi.blink_eyes",
+      "soridormi.blink_eyes",
+      "soridormi.blink_eyes"
+    ],
+    "forbidden_skills": [
+      "soridormi.walk_forward",
+      "soridormi.walk_velocity"
+    ],
+    "skill_args": [
+      {
+        "count": 6
+      },
+      {
+        "count": 6
+      },
+      {
+        "count": 3
+      }
+    ],
+    "requires_confirmation": false,
+    "status": "ok",
+    "metadata_json_contains": [
+      "task_proposal_ledger",
+      "soridormi.blink_eyes",
+      "chromie.speak",
+      "preflight_validation",
+      "unknown_until_runtime",
+      "capability_batched_over_limit",
+      "exact_routed_count_batch_recovery"
+    ],
+    "metadata_json_forbid": [
+      "soridormi.walk_forward",
+      "soridormi.walk_velocity"
+    ]
+  }
+}

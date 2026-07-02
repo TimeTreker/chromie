@@ -24,13 +24,16 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 320)
+        self.assertEqual(len(all_cases), 338)
         self.assertEqual(len(router_cases), 8)
-        self.assertEqual(len(dialogue_cases), 301)
+        self.assertEqual(len(dialogue_cases), 316)
+        self.assertEqual(len(load_scenarios(suites={"interaction"})), 14)
         self.assertIn("dialogue/walk_then_followup_status", dialogue_keys)
         self.assertIn("dialogue/raw_joint_command_refusal", dialogue_keys)
         self.assertIn("dialogue/batch2_safety_117_walk_into_a_smoky_hallway", dialogue_keys)
         self.assertIn("dialogue/voice_log_20260630_planner_regression", dialogue_keys)
+        self.assertIn("dialogue/daily_child_nearby_motion_hold", dialogue_keys)
+        self.assertIn("dialogue/daily_power_cable_motion_hold", dialogue_keys)
         self.assertEqual([case.key for case in selected], ["router/normal_greeting"])
         for case in all_cases:
             self.assertEqual(case.path.stem, case.scenario_id)

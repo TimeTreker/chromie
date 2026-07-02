@@ -164,6 +164,30 @@ class _HeadGestureOutcome:
     }
 
 
+class _BlinkLimitOutcome:
+    status = "success"
+    error = None
+    output = {
+        "mode": "sim",
+        "skills": [
+            {
+                "skill_id": "blink_eyes",
+                "description": "Blink the robot eyes visibly.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 6}},
+                    "required": ["count"],
+                    "additionalProperties": False,
+                },
+                "effects": ["visual_expression"],
+                "safety_class": "low_risk_action",
+                "available": True,
+                "requires_confirmation": False,
+            }
+        ],
+    }
+
+
 class _WalkChoiceOutcome:
     status = "success"
     error = None
@@ -323,6 +347,13 @@ class _HeadGestureInvoker:
         return _HeadGestureOutcome()
 
 
+class _BlinkLimitInvoker:
+    async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _BlinkLimitOutcome:
+        del arguments, context
+        assert tool_name == "soridormi.skill.list"
+        return _BlinkLimitOutcome()
+
+
 class _WalkChoiceInvoker:
     async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _WalkChoiceOutcome:
         del arguments, context
@@ -388,6 +419,39 @@ class _InvalidWalkOllama:
                 {
                     "skill_id": "soridormi.walk_forward",
                     "args": {"duration_s": 5.0},
+                }
+            ],
+        }
+
+
+class _OverLimitBlinkClarifyOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Brink your eyes for 15 times." in prompt
+        assert "Router-selected exact skill_id: soridormi.blink_eyes" in prompt
+        assert "soridormi.blink_eyes" in prompt
+        assert '"maximum":6' in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "clarify",
+            "speech": "I can blink my eyes, but I can only do it up to 6 times at a time.",
+            "skills": [],
+        }
+
+
+class _OverLimitBlinkClampedExecuteOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Brink your eyes for 15 times." in prompt
+        assert "Router-selected exact skill_id: soridormi.blink_eyes" in prompt
+        assert "soridormi.blink_eyes" in prompt
+        assert '"maximum":6' in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "Okay, I'll blink my eyes 15 times for you!",
+            "skills": [
+                {
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 6},
                 }
             ],
         }
@@ -960,7 +1024,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 "route_decision": {
                     "route": "deep_thought",
                     "agents": ["deepthinking_agent", "speaker_agent"],
-                    "intent": "deep_thought",
+                    "intent": "deep_thought_complex_reasoning",
                     "confidence": 0.90,
                     "language": "en-US",
                     "source": "llm",
@@ -1080,6 +1144,106 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             response.metadata["invalid_capability_args"]["errors"],
             ["args has unknown fields: ['duration_s']"],
+        )
+
+    async def test_exact_blink_request_over_limit_batches_valid_visual_skills(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_OverLimitBlinkClarifyOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "blink-over-limit",
+                "text": "Brink your eyes for 15 times.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.blink_eyes",
+                    "confidence": 0.56,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(
+            [item.skill_id for item in response.skills],
+            [
+                "soridormi.blink_eyes",
+                "soridormi.blink_eyes",
+                "soridormi.blink_eyes",
+            ],
+        )
+        self.assertEqual(
+            [item.args for item in response.skills],
+            [{"count": 6}, {"count": 6}, {"count": 3}],
+        )
+        self.assertFalse(response.requires_confirmation)
+        self.assertIn("blink", response.speech[0].text.lower())
+        self.assertIn("15", response.speech[0].text)
+        self.assertEqual(response.metadata["capability_decision"], "execute")
+        self.assertEqual(
+            response.metadata["capability_batched_over_limit"],
+            {
+                "skill_id": "soridormi.blink_eyes",
+                "requested_count": 15,
+                "max_per_call": 6,
+                "batch_count": 3,
+                "batches": [6, 6, 3],
+                "source": "exact_routed_count_batch_recovery",
+            },
+        )
+
+    async def test_exact_blink_request_over_limit_batches_silently_clamped_plan(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_OverLimitBlinkClampedExecuteOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "blink-over-limit-clamped",
+                "text": "Brink your eyes for 15 times.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.blink_eyes",
+                    "confidence": 0.56,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(
+            [item.skill_id for item in response.skills],
+            [
+                "soridormi.blink_eyes",
+                "soridormi.blink_eyes",
+                "soridormi.blink_eyes",
+            ],
+        )
+        self.assertEqual(
+            [item.args for item in response.skills],
+            [{"count": 6}, {"count": 6}, {"count": 3}],
+        )
+        self.assertEqual(response.metadata["capability_decision"], "execute")
+        self.assertEqual(
+            response.metadata["capability_batched_over_limit"]["source"],
+            "exact_routed_count_batch_recovery",
         )
 
     async def test_capability_planner_failure_returns_clarification_not_exception(self) -> None:

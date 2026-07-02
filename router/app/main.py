@@ -371,7 +371,6 @@ def _deep_thought_action_recovery_allowed(decision: RouteDecision) -> bool:
     blocked_intent_terms = (
         "low_confidence",
         "planning",
-        "complex",
         "debug",
         "design",
         "strategy",
@@ -608,7 +607,7 @@ def _decision_summary(decision: RouteDecision) -> dict:
         "metadata": {
             key: value
             for key, value in (decision.metadata or {}).items()
-            if key not in {"route_stage_outputs", "task_list", "route_merge"}
+            if key not in {"route_stage_outputs", "task_list", "task_proposals", "route_merge"}
         },
     }
 

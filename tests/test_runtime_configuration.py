@@ -59,6 +59,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_CAPABILITY_REVIEW_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW"], "0")
         self.assertEqual(values["AGENT_EXPRESSIVE_BODY_CUES"], "off")
+        self.assertEqual(values["AGENT_CAPABILITY_MANIFESTS"], "")
+        self.assertEqual(values["SORIDORMI_MCP_URL"], "")
 
     def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
         values = _common_env()

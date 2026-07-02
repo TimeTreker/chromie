@@ -4,6 +4,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+try:
+    from chromie_contracts.task_proposal import TaskProposal
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.task_proposal import TaskProposal
+
 
 RouteName = Literal[
     "chat",
@@ -116,6 +121,60 @@ def _route_task_type(route: str) -> str:
         "interrupt": "task.cancel_current_action",
         "ignore": "state.ignore_input",
     }.get(route, "route.handle_request")
+
+
+def _is_effectful_task_type(task_type: str) -> bool:
+    return (
+        task_type in {
+            "body.stop_motion",
+            "task.cancel_current_action",
+            "task.execute_robot_action",
+            "task.execute_skill",
+            "task.execute_task_graph",
+            "task.use_tool",
+        }
+        or task_type.startswith("body.")
+        or task_type.startswith("task.execute")
+    )
+
+
+def _task_proposal_for_item(item: dict[str, Any]) -> dict[str, Any]:
+    task_type = str(item.get("task_type") or "unknown").strip() or "unknown"
+    source_stage = str(item.get("source_stage") or "router").strip() or "router"
+    capability_id = str(item.get("capability_id") or "").strip()
+    proposal = TaskProposal(
+        id=str(item.get("id") or f"{source_stage}:{task_type}"),
+        source=source_stage,
+        proposal_kind=str(item.get("kind") or "task"),
+        task_type=task_type,
+        state="advisory",
+        reason="router proposal awaiting Orchestrator merge and commit",
+        effectful=_is_effectful_task_type(task_type),
+        priority=str(item.get("priority") or "normal"),
+        sequence=_safe_int(item.get("merged_sequence"), _safe_int(item.get("sequence"), 0)),
+        skill_id=capability_id or None,
+        metadata={
+            "route": str(item.get("route") or ""),
+            "intent": str(item.get("intent") or ""),
+            "requires_validation": bool(item.get("requires_validation", True)),
+        },
+    )
+    return proposal.model_dump(mode="json", exclude_none=True)
+
+
+def _task_proposals_for_items(task_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [_task_proposal_for_item(item) for item in task_list if isinstance(item, dict)]
+
+
+def _safe_int(value: Any, default: int) -> int:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return default
 
 
 def _task_item(
@@ -256,6 +315,7 @@ def route_stage_output(
         "confidence": decision.confidence,
         "source": decision.source,
         "tasks": task_items,
+        "task_proposals": _task_proposals_for_items(task_items),
         "actions": [item for item in task_items if item.get("kind") == "action"],
     }
 
@@ -265,6 +325,7 @@ def passed_stage_output(stage: str) -> dict[str, Any]:
         "stage": stage,
         "status": "passed",
         "tasks": [],
+        "task_proposals": [],
         "actions": [],
     }
 
@@ -348,6 +409,7 @@ def _route_merge_summary(
         "selected_stage": selected_stage or _infer_selected_stage(decision, outputs),
         "proposal_count": len([item for item in outputs if isinstance(item, dict)]),
         "task_count": len(task_list),
+        "task_proposal_count": len(task_list),
         "stages": _stage_names(outputs),
         "task_source_stages": sorted(
             {
@@ -372,10 +434,12 @@ def annotate_stage_outputs(
     selected_stage: str | None = None,
 ) -> RouteDecision:
     task_list = merge_stage_task_list(outputs)
+    task_proposals = _task_proposals_for_items(task_list)
     decision.metadata = {
         **(decision.metadata or {}),
         "route_stage_outputs": outputs,
         "task_list": task_list,
+        "task_proposals": task_proposals,
         "route_merge": _route_merge_summary(
             decision,
             outputs,

@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "id": "look_out_warning_correction",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "A quick-route window-gaze proposal for 'Look out!' is corrected into warning speech without executing motion.",
+  "tags": [
+    "deep-thought",
+    "task-proposal",
+    "correction",
+    "safety",
+    "warning"
+  ],
+  "input": {
+    "text": "Look out!",
+    "language": "en-US"
+  },
+  "stub": {
+    "host_prepare_response": true,
+    "catalog_capabilities": [],
+    "route_decision": {
+      "route": "deep_thought",
+      "agents": ["deepthinking_agent", "speaker_agent"],
+      "intent": "warning",
+      "confidence": 0.66,
+      "language": "en-US",
+      "source": "llm",
+      "metadata": {
+        "task_proposals": [
+          {
+            "id": "quick_intent:0:task.execute_skill",
+            "source": "quick_intent",
+            "proposal_kind": "action",
+            "task_type": "task.execute_skill",
+            "state": "advisory",
+            "reason": "quick router misread warning as a window gaze request",
+            "effectful": true,
+            "priority": "high",
+            "sequence": 0,
+            "skill_id": "soridormi.look_at_window"
+          }
+        ],
+        "superseded_task_proposals": [
+          {
+            "id": "quick_intent:0:task.execute_skill:superseded",
+            "source": "quick_intent",
+            "proposal_kind": "action",
+            "task_type": "task.execute_skill",
+            "skill_id": "soridormi.look_at_window",
+            "reason": "deepthinking interpreted 'Look out!' as a warning instead of a gaze command",
+            "superseded_by": "deepthinking:0:speech.speak",
+            "effectful": true,
+            "priority": "high",
+            "sequence": 0
+          }
+        ],
+        "truth_reconciled": true,
+        "truth_reconciliation_reason": "quick_intent_misread_warning"
+      }
+    },
+    "ollama_reply": {
+      "tasks": [
+        {
+          "skill_id": "chromie.speak",
+          "args": {
+            "text": "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still.",
+            "style": "warning",
+            "priority": "high"
+          },
+          "timing": "immediate",
+          "timeout_ms": null,
+          "cancellable": true,
+          "requires_confirmation": null,
+          "reason": "Treat the utterance as a safety warning, not a window-gaze command."
+        },
+        {
+          "skill_id": "soridormi.look_at_window",
+          "args": {},
+          "timing": "sequential",
+          "timeout_ms": null,
+          "cancellable": true,
+          "requires_confirmation": null,
+          "reason": "Rejected earlier window-gaze interpretation."
+        }
+      ],
+      "reason": "Warning semantics supersede the quick window-gaze proposal."
+    }
+  },
+  "expect": {
+    "speech_all": ["Sorry", "Thanks for warning me", "hold still"],
+    "forbidden_speech_any": ["Looking out", "out of the window", "Moving now"],
+    "no_skills": true,
+    "forbidden_skills": ["soridormi.look_at_window"],
+    "requires_confirmation": false,
+    "status": "ok",
+    "metadata_true": ["truth_reconciled"],
+    "metadata_json_contains": [
+      "task_proposal_ledger",
+      "quick_intent_misread_warning",
+      "soridormi.look_at_window",
+      "not_committed",
+      "superseded",
+      "deepthinking_task_proposals",
+      "agent_task_proposals",
+      "chromie.speak"
+    ]
+  }
+}

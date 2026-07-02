@@ -38,9 +38,18 @@ class TranscriptionExecutor:
         )
 
     async def transcribe(self, backend: Any, audio: Any, **kwargs: Any) -> tuple[str, Any]:
-        loop = asyncio.get_running_loop()
         call = functools.partial(_transcribe_sync, self._gate, backend, audio, kwargs)
-        return await loop.run_in_executor(self._executor, call)
+        future = self._executor.submit(call)
+        try:
+            # Poll the concurrent future instead of relying on
+            # loop.run_in_executor's cross-thread wakeup, which can be
+            # unreliable in some embedded/sandboxed runtimes.
+            while not future.done():
+                await asyncio.sleep(0.01)
+            return future.result()
+        except asyncio.CancelledError:
+            future.cancel()
+            raise
 
     def close(self) -> None:
         if self._owns_executor:
