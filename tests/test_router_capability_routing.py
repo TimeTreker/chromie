@@ -9,12 +9,21 @@ from shared.chromie_contracts.task_proposal import TaskProposal
 
 
 class _Catalog:
-    def __init__(self, result: CapabilityCatalogResult) -> None:
+    def __init__(
+        self,
+        result: CapabilityCatalogResult,
+        *,
+        snapshot: dict | None = None,
+    ) -> None:
         self.result = result
+        self.snapshot_data = snapshot or {}
 
     async def search(self, **kwargs):
         del kwargs
         return self.result
+
+    async def snapshot(self):
+        return self.snapshot_data
 
 
 class _LlmRouter:
@@ -197,6 +206,98 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.blink_eyes",
         )
 
+    async def test_hybrid_llm_selects_skill_from_common_prompt_catalog_without_search_match(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="眨两小眼睛。",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=21,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_velocity",
+                    "agent_id": "soridormi.skill",
+                    "description": "Track a bounded body velocity command.",
+                    "score": 0.03,
+                    "available": True,
+                    "interaction_executable": True,
+                    "prompt_tier": "common",
+                }
+            ],
+        )
+        snapshot = {
+            "catalog_version": 21,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Blink the robot eyes visibly.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["visual_expression"],
+                    "safety_class": "low_risk_action",
+                    "requires_confirmation": False,
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "count": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 6,
+                                "default": 2,
+                            }
+                        },
+                    },
+                },
+                {
+                    "capability_id": "soridormi.motion.calibrate_floor",
+                    "agent_id": "soridormi.motion",
+                    "description": "Rare calibration workflow.",
+                    "route": "robot_action",
+                    "prompt_tier": "rare",
+                    "available": True,
+                    "interaction_executable": False,
+                },
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:soridormi.blink_eyes",
+                confidence=0.86,
+                language="zh-CN",
+                source="llm",
+                reason="selected from common catalog by meaning",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="眨两小眼睛。", language="zh-CN"))
+
+        assert llm_router.request is not None
+        self.assertIn("prompt_capabilities_common", llm_router.request.context)
+        self.assertEqual(
+            llm_router.request.context["prompt_capabilities_common"][0]["capability_id"],
+            "soridormi.blink_eyes",
+        )
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
+        self.assertEqual(
+            decision.metadata["task_list"][0]["capability_id"],
+            "soridormi.blink_eyes",
+        )
+        self.assertIn(
+            "soridormi.blink_eyes",
+            [item["capability_id"] for item in decision.candidate_capabilities],
+        )
+
     async def test_hybrid_wrong_low_score_robot_action_for_chinese_blink_is_corrected(self) -> None:
         from router.app import main
 
@@ -294,7 +395,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         assert llm_router.request is not None
         self.assertEqual(llm_router.request.context["candidate_capabilities"], [])
 
-    async def test_hybrid_mode_uses_catalog_candidates_after_llm_fallback(self) -> None:
+    async def test_hybrid_mode_delegates_catalog_robot_candidates_after_llm_fallback(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -332,18 +433,23 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision = await main.route(RouteRequest(text="What's your name?"))
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.source, "catalog")
-        self.assertEqual(decision.intent, "robot_action")
-        self.assertIn("capability_agent", decision.agents)
-        self.assertIn("conversation_agent", decision.agents)
+        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
+        self.assertNotIn("capability_agent", decision.agents)
+        self.assertNotIn("conversation_agent", decision.agents)
         self.assertIn("LLM router unavailable", decision.reason or "")
+        self.assertIn("delegating catalog-bounded robot request", decision.reason or "")
         self.assertEqual(
             decision.candidate_capabilities[0]["capability_id"],
             "soridormi.walk_velocity",
         )
+        self.assertNotIn(
+            "task.execute_skill",
+            [item["task_type"] for item in decision.metadata["task_list"]],
+        )
 
-    async def test_hybrid_llm_fallback_for_chinese_blink_uses_exact_catalog_skill(self) -> None:
+    async def test_hybrid_llm_fallback_for_chinese_blink_delegates_without_catalog_skill(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -390,13 +496,16 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.source, "catalog")
-        self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
         self.assertNotIn("conversation_agent", decision.agents)
-        self.assertIn("exact explicit robot action selected", decision.reason or "")
-        self.assertEqual(
-            decision.metadata["task_list"][0]["capability_id"],
-            "soridormi.blink_eyes",
+        self.assertIn("delegating catalog-bounded robot request", decision.reason or "")
+        task_types = [item["task_type"] for item in decision.metadata["task_list"]]
+        self.assertIn("cognition.deep_think", task_types)
+        self.assertNotIn("task.execute_skill", task_types)
+        self.assertNotIn(
+            "capability_id",
+            decision.metadata["task_list"][0],
         )
 
     async def test_rules_only_catalog_decision_ignores_weak_factual_word_overlap(self) -> None:
@@ -887,6 +996,52 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             [item["capability_id"] for item in decision.candidate_capabilities],
             ["soridormi.walk_velocity", "soridormi.nod_yes"],
         )
+
+    async def test_hybrid_low_confidence_handoff_uses_llm_speak_first_thinking_ack(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="figure out the safe way to help me with this setup",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=22,
+            matches=[],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="unknown",
+                confidence=0.44,
+                language="en-US",
+                source="llm",
+                speak_first="Give me a moment to think that through.",
+                reason="common catalog did not clearly fit",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="Figure out the safe way to help me with this setup.")
+            )
+
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_low_confidence")
+        self.assertEqual(decision.speak_first, "Give me a moment to think that through.")
+        self.assertTrue(decision.metadata["thinking_ack_allowed"])
+        self.assertEqual(decision.metadata["thinking_ack_source"], "quick_llm_speak_first")
+        self.assertEqual(
+            [item["task_type"] for item in decision.metadata["task_list"]],
+            ["cognition.delegate_deep_thought", "speech.thinking_ack", "cognition.deep_think"],
+        )
+        thinking_task = next(
+            item
+            for item in decision.metadata["task_list"]
+            if item["task_type"] == "speech.thinking_ack"
+        )
+        self.assertEqual(thinking_task["text"], "Give me a moment to think that through.")
 
     async def test_hybrid_router_keeps_llm_deep_thought_without_phrase_recovery(self) -> None:
         from router.app import main
@@ -1407,6 +1562,235 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision.candidate_capabilities[0]["capability_id"],
             "soridormi.walk_velocity",
         )
+
+    async def test_hybrid_router_accepts_llm_compound_common_actions_with_speech(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="walk forward, tell a joke, then blink",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=21,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "agent_id": "soridormi.skill",
+                    "description": "Walk forward for a bounded duration.",
+                    "score": 0.88,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+                {
+                    "capability_id": "chromie.speak",
+                    "agent_id": "chromie.speech",
+                    "description": "Speak a short message through TTS.",
+                    "score": 0.42,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Blink the simulated social eyes.",
+                    "score": 0.76,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="compound_common_catalog_task",
+                confidence=0.87,
+                language="en-US",
+                source="llm",
+                actions=[
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 20},
+                        "sequence": 0,
+                        "timing": "sequential",
+                        "confidence": 0.91,
+                    },
+                    {
+                        "capability_id": "chromie.speak",
+                        "args": {
+                            "text": "Why did the robot cross the room? To get to the charging side.",
+                            "style": "brief",
+                        },
+                        "sequence": 1,
+                        "timing": "parallel",
+                        "confidence": 0.86,
+                    },
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "args": {"count": 6},
+                        "sequence": 2,
+                        "timing": "sequential",
+                        "confidence": 0.88,
+                    },
+                ],
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(
+                    text=(
+                        "Please walk forward for 20 seconds, after that blink your "
+                        "little eyes 6 times, tell me a joke when you are walking."
+                    )
+                )
+            )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "compound_common_catalog_task")
+        self.assertEqual(
+            [item["capability_id"] for item in decision.actions],
+            ["soridormi.walk_forward", "chromie.speak", "soridormi.blink_eyes"],
+        )
+        self.assertEqual(decision.actions[1]["timing"], "parallel")
+        self.assertEqual(
+            [item["confidence"] for item in decision.actions],
+            [0.91, 0.86, 0.88],
+        )
+        self.assertEqual(decision.metadata["quick_router_action_count"], 3)
+        self.assertTrue(decision.metadata["quick_router_compound_tasks"])
+        self.assertEqual(decision.metadata["quick_router_action_min_confidence"], 0.86)
+        task_list = decision.metadata["task_list"]
+        self.assertEqual(
+            [item["task_type"] for item in task_list],
+            ["task.execute_skill", "speech.speak", "task.execute_skill"],
+        )
+        self.assertEqual(task_list[1]["capability_id"], "chromie.speak")
+        self.assertEqual(task_list[1]["confidence"], 0.86)
+        proposals = [
+            TaskProposal.model_validate(item)
+            for item in decision.metadata["task_proposals"]
+        ]
+        self.assertEqual(
+            [item.skill_id for item in proposals],
+            ["soridormi.walk_forward", "chromie.speak", "soridormi.blink_eyes"],
+        )
+        self.assertEqual(proposals[1].metadata["confidence"], 0.86)
+        self.assertFalse(proposals[1].effectful)
+
+    async def test_hybrid_router_delegates_low_confidence_action_in_compound_plan(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="walk forward, tell a joke, then blink",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=["capability_agent", "safety_agent", "speaker_agent"],
+            catalog_version=22,
+            matches=[
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "agent_id": "soridormi.skill",
+                    "description": "Walk forward for a bounded duration.",
+                    "score": 0.88,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+                {
+                    "capability_id": "chromie.speak",
+                    "agent_id": "chromie.speech",
+                    "description": "Speak a short message through TTS.",
+                    "score": 0.42,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Blink the simulated social eyes.",
+                    "score": 0.76,
+                    "available": True,
+                    "interaction_executable": True,
+                },
+            ],
+        )
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="compound_common_catalog_task",
+                confidence=0.87,
+                language="en-US",
+                source="llm",
+                actions=[
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 20},
+                        "sequence": 0,
+                        "timing": "sequential",
+                        "confidence": 0.89,
+                    },
+                    {
+                        "capability_id": "chromie.speak",
+                        "args": {
+                            "text": "I can try a joke while walking.",
+                            "style": "brief",
+                        },
+                        "sequence": 1,
+                        "timing": "parallel",
+                        "confidence": 0.31,
+                    },
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "args": {"count": 6},
+                        "sequence": 2,
+                        "timing": "sequential",
+                        "confidence": 0.84,
+                    },
+                ],
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(
+                    text=(
+                        "Please walk forward for 20 seconds, blink six times, "
+                        "and tell me a joke while walking."
+                    )
+                )
+            )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_low_confidence")
+        self.assertEqual(decision.speak_first, "Give me a moment to think that through.")
+        self.assertIn("action[1] confidence 0.31 below threshold", decision.reason or "")
+        self.assertTrue(decision.metadata["thinking_ack_allowed"])
+        self.assertEqual(
+            decision.metadata["thinking_ack_source"],
+            "quick_validator_default_speak_first",
+        )
+        review = decision.metadata["quick_router_review_request"]
+        self.assertEqual(review["execution_state"], "not_committed")
+        self.assertEqual(review["quick_route"], "robot_action")
+        self.assertEqual(review["quick_actions"][1]["confidence"], 0.31)
+        self.assertEqual(
+            [item["skill_id"] for item in review["quick_task_proposals"]],
+            ["soridormi.walk_forward", "chromie.speak", "soridormi.blink_eyes"],
+        )
+        task_types = [item["task_type"] for item in decision.metadata["task_list"]]
+        self.assertEqual(
+            task_types,
+            ["cognition.delegate_deep_thought", "speech.thinking_ack", "cognition.deep_think"],
+        )
+        self.assertNotIn("task.execute_skill", task_types)
+        self.assertNotIn("speech.speak", task_types)
 
 
 if __name__ == "__main__":

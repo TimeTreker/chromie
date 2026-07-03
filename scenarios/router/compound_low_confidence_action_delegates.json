@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "id": "compound_low_confidence_action_delegates",
+  "suite": "router",
+  "level": "module",
+  "description": "A compound quick-router plan must delegate to deepthinking when one required action is below per-action confidence threshold instead of executing the high-confidence subset.",
+  "tags": [
+    "router-agent-contract",
+    "compound",
+    "per-action-confidence",
+    "deep-thought-handoff",
+    "daily-life"
+  ],
+  "input": {
+    "text": "Please walk forward for 20 seconds, blink six times, and tell me a joke while walking.",
+    "language": "en-US"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": true,
+      "suggested_route": "robot_action",
+      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "catalog_version": 22,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.walk_forward",
+          "agent_id": "soridormi.skill",
+          "description": "Walk forward for a bounded duration.",
+          "score": 0.88,
+          "available": true,
+          "interaction_executable": true
+        },
+        {
+          "capability_id": "chromie.speak",
+          "agent_id": "chromie.speech",
+          "description": "Speak a short message through TTS.",
+          "score": 0.42,
+          "available": true,
+          "interaction_executable": true
+        },
+        {
+          "capability_id": "soridormi.blink_eyes",
+          "agent_id": "soridormi.skill",
+          "description": "Blink the simulated social eyes.",
+          "score": 0.76,
+          "available": true,
+          "interaction_executable": true
+        }
+      ]
+    },
+    "llm_decision": {
+      "route": "robot_action",
+      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "intent": "compound_common_catalog_task",
+      "confidence": 0.87,
+      "language": "en-US",
+      "source": "llm",
+      "actions": [
+        {
+          "capability_id": "soridormi.walk_forward",
+          "args": {"duration_s": 20},
+          "sequence": 0,
+          "timing": "sequential",
+          "confidence": 0.89
+        },
+        {
+          "capability_id": "chromie.speak",
+          "args": {
+            "text": "I can try a joke while walking.",
+            "style": "brief"
+          },
+          "sequence": 1,
+          "timing": "parallel",
+          "confidence": 0.31
+        },
+        {
+          "capability_id": "soridormi.blink_eyes",
+          "args": {"count": 6},
+          "sequence": 2,
+          "timing": "sequential",
+          "confidence": 0.84
+        }
+      ]
+    }
+  },
+  "expect": {
+    "route": "deep_thought",
+    "intent": "deep_thought_low_confidence",
+    "source": "llm",
+    "task_types_include": ["speech.thinking_ack", "cognition.deep_think"],
+    "task_types_forbid": ["task.execute_skill", "speech.speak"],
+    "metadata_true": ["thinking_ack_allowed"],
+    "metadata_json_contains": [
+      "quick_router_review_request",
+      "not_committed",
+      "quick_validator_default_speak_first",
+      "action[1] confidence 0.31 below threshold"
+    ],
+    "llm_calls": 1
+  }
+}

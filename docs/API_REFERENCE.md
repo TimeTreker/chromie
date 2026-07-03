@@ -51,7 +51,19 @@ task-lifecycle metadata:
 
 This metadata is advisory planning state. Concrete skill execution still uses
 validated `RouteDecision.actions`, Agent-selected `InteractionResponse.skills`,
-and Skill Runtime/provider authorization.
+and Skill Runtime/provider authorization. When the quick Router model can
+represent a compound request using common catalog skills, `RouteDecision.actions`
+may contain an ordered list of skill proposals. Each action uses an exact
+`capability_id`, schema-shaped `args`, optional `sequence`, and optional
+`timing`, plus a 0.0-1.0 `confidence` for that specific skill choice and
+arguments. Speech that belongs inside a physical task is represented as the
+`chromie.speak` skill with `args.text`, not as unstructured final text. If any
+required compound action is below the Router confidence threshold, the Router
+delegates the whole plan to `deep_thought` rather than executing only the
+high-confidence subset. The delegated `RouteDecision.metadata` includes
+`quick_router_review_request` with the quick actions, legacy task list, shared
+task proposals, and `execution_state=not_committed` so deepthinking can
+`accept`, `revise`, or `supersede` the quick plan.
 The host Orchestrator owns the final task context write, persistence policy,
 confirmation, cancellation, and safety state.
 
@@ -81,6 +93,12 @@ running.
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Router and normal InteractionRuntime. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog or query-specific LLM context. |
 
+Catalog entries include `prompt_tier=common|rare`. The Router uses `common`
+entries for the fast compact Qwen prompt; deepthinking may use the full catalog.
+`chromie.speak` is common and interaction-executable so mixed speech/body
+requests can stay in the same task proposal list. Search scores are relevance
+hints, not execution authorization.
+
 ### Conversation and interaction
 
 | Method | Path | Purpose |
@@ -97,6 +115,18 @@ Both endpoints currently accept the same request shape:
 - `context`
 - `history`
 
+The host context now includes compact prompt-memory fields:
+`session_memory.memory_summary`, `session_memory.extracted_memory`, and
+top-level `extracted_memory`. These are process-local session/task memory
+summaries, not durable user-profile memory and not authorization for side
+effects. Quick Router prompts sanitize raw `history` and `conversation` fields
+from their bounded context payload and rely on these compact memory fields
+instead.
+For explicit `memory` routes, `memory_agent` emits an `extracted_memory`
+`memory_updates` entry with a scoped compact statement plus the legacy
+`user_statement` compatibility entry. The Orchestrator consumes only the
+refined entry into prompt-facing session memory.
+
 `InteractionResponse` can contain speech items and named skill requests. Shared
 contracts reject unknown fields and recursively reject low-level motor, joint,
 torque, and actuator fields. Native mode is the Agent default. The response
@@ -110,8 +140,9 @@ Runtime validation rather than hidden phrase parsers. Plain walking requests
 use a normal safe forward speed of `0.18 m/s`;
 requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`
 are normalized back to the normal speed and surfaced through `speak_first`.
-Requests to sing while walking are represented as a `speak_first` utterance plus
-the walking skill, so the same motion safety normalization still applies. When
+Requests to sing or joke while walking may be represented as a `chromie.speak`
+skill plus the walking skill, so the same motion safety normalization still
+applies. When
 native speech metadata includes `wait_for_playback_start=true`, the host speech
 provider completes that speech request only after playback has started or the
 configured wait times out; this lets the following sequential body skill begin

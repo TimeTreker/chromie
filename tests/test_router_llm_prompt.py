@@ -34,7 +34,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("quick intent router", prompt)
         self.assertIn("Route Taxonomy", prompt)
         self.assertIn("deep_thought", prompt)
-        self.assertIn("multi-step task creation", prompt)
+        self.assertIn("multi-step", prompt)
+        self.assertIn("task creation", prompt)
+        self.assertIn("emit bounded task", prompt)
         self.assertIn("requests that need a separate task session", prompt)
         self.assertIn("ordinary single-turn facts", prompt)
         self.assertIn("Memory And Task Context", prompt)
@@ -47,10 +49,14 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("deep_thought", prompt)
         self.assertIn("robot_action", prompt)
         self.assertIn("placeholder capability IDs", prompt)
+        self.assertIn("ordered actions array", prompt)
+        self.assertIn("chromie.speak", prompt)
+        self.assertIn("confidence", prompt)
         self.assertIn("agreement/disagreement", prompt)
-        self.assertIn("Candidate capabilities are context, not authorization", prompt)
+        self.assertIn("Catalog entries are context, not authorization", prompt)
         self.assertIn("Return compact JSON only", prompt)
-        self.assertIn("Do not output", prompt)
+        self.assertIn("Do not", prompt)
+        self.assertIn("output chain-of-thought", prompt)
         self.assertIn("chain-of-thought", prompt)
         self.assertIn("progress text", prompt)
 
@@ -94,6 +100,29 @@ class RouterLlmPromptTests(unittest.TestCase):
                         "interaction_executable": True,
                     }
                 ],
+                "prompt_capabilities_common": [
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "description": "Blink the simulated social eyes.",
+                        "route": "robot_action",
+                        "prompt_tier": "common",
+                        "interaction_executable": True,
+                        "effects": ["visual_expression"],
+                        "safety_class": "low_risk_action",
+                        "requires_confirmation": False,
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "count": {
+                                    "type": "number",
+                                    "minimum": 1,
+                                    "maximum": 6,
+                                    "default": 2,
+                                }
+                            },
+                        },
+                    }
+                ],
                 "robot_state": {"position": {"x": 1.0, "y": 2.0}},
                 "memory": {"last_task": "walk"},
             },
@@ -123,7 +152,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("do not perform or reveal reasoning inside the router", prompt)
         self.assertIn("needs deeper thought, task-session creation, or task-session continuation", prompt)
         self.assertIn("Return calibrated low confidence", prompt)
-        self.assertIn("Available abilities / candidate_capabilities JSON", prompt)
+        self.assertIn("Common compact skill catalog JSON", prompt)
+        self.assertIn("Query-biased catalog hints JSON", prompt)
+        self.assertIn("not recommendations", prompt)
         self.assertIn("Factual agreement/disagreement is chat", prompt)
         self.assertIn("Moon, Sun, shape, temperature", prompt)
         self.assertIn("not deep_thought or robot_action", prompt)
@@ -139,20 +170,80 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Become a useful companion robot.", prompt)
         self.assertIn("owner-approved", prompt)
         self.assertIn("soridormi.walk_velocity", prompt)
+        self.assertIn("soridormi.blink_eyes", prompt)
+        self.assertIn("count", prompt)
+        self.assertIn("low_risk_action", prompt)
         self.assertIn("robot_state", prompt)
         self.assertIn("position", prompt)
         self.assertIn("last_task", prompt)
         self.assertIn("authorize side effects", prompt)
         self.assertIn("Speech-only conversation", prompt)
+        self.assertIn("treat the speech as a skill task", prompt)
         self.assertIn("Do not return interrupt or ignore", prompt)
         self.assertIn("polite ability-shaped request", prompt)
         self.assertIn("working memory, current task context, and recent action history", prompt)
         self.assertIn("Required keys: route, intent, confidence", prompt)
-        self.assertIn("Omit agents, actions, metadata", prompt)
+        self.assertIn("Omit agents, metadata", prompt)
+        self.assertIn("include actions as an ordered array", prompt)
+        self.assertIn("\"confidence\":0.0", prompt)
+        self.assertIn("Each proposed action has its own confidence", prompt)
         self.assertIn("chain-of-thought", prompt)
         self.assertIn("progress text", prompt)
         self.assertIn("placeholder intents", prompt)
+        self.assertIn("speak_first", prompt)
         self.assertIn("Return compact JSON only", prompt)
+
+    def test_user_prompt_uses_extracted_memory_not_raw_history(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="s1",
+            text="continue with that design",
+            language="en-US",
+            context={
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "RAW_TRANSCRIPT_SHOULD_NOT_REACH_ROUTER_PROMPT",
+                    }
+                ],
+                "conversation": {
+                    "history": [
+                        {
+                            "role": "assistant",
+                            "text": "RAW_CONVERSATION_SHOULD_NOT_REACH_ROUTER_PROMPT",
+                        }
+                    ]
+                },
+                "session_memory": {
+                    "kind": "short_term_session_memory",
+                    "conversation_id": "session",
+                    "recent_user_request": "RAW_RECENT_USER_SHOULD_NOT_REACH_ROUTER_PROMPT",
+                    "recent_assistant_response": "RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_ROUTER_PROMPT",
+                    "memory_summary": "- Current task: design extracted prompt memory",
+                    "extracted_memory": [
+                        {
+                            "scope": "task",
+                            "kind": "goal",
+                            "text": "Current task: design extracted prompt memory",
+                            "confidence": 0.9,
+                        }
+                    ],
+                },
+            },
+        )
+
+        prompt = router.build_user_prompt(request)
+
+        self.assertIn("Current task: design extracted prompt memory", prompt)
+        self.assertNotIn("RAW_TRANSCRIPT_SHOULD_NOT_REACH_ROUTER_PROMPT", prompt)
+        self.assertNotIn("RAW_CONVERSATION_SHOULD_NOT_REACH_ROUTER_PROMPT", prompt)
+        self.assertNotIn("RAW_RECENT_USER_SHOULD_NOT_REACH_ROUTER_PROMPT", prompt)
+        self.assertNotIn("RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_ROUTER_PROMPT", prompt)
 
     def test_intent_review_prompt_uses_semantic_generalization(self) -> None:
         router = OllamaLLMRouter(
@@ -317,6 +408,7 @@ class RouterLlmPromptTests(unittest.TestCase):
                     "content": (
                         '{"route":"robot_action","intent":"unknown",'
                         '"confidence":0.42,"reason":"not sure",'
+                        '"speak_first":"Give me a moment to think about that.",'
                         '"metadata":{"task_relation":"continue_task","target_task_id":"task-1"}}'
                     )
                 }
@@ -329,11 +421,14 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(handoff.route, "deep_thought")
         self.assertEqual(handoff.intent, "deep_thought_low_confidence")
         self.assertEqual(handoff.confidence, 0.42)
+        self.assertEqual(handoff.speak_first, "Give me a moment to think about that.")
         self.assertIn("quick router confidence", handoff.reason or "")
         self.assertIn("quick_route=robot_action", handoff.reason or "")
         self.assertIn("deepthinking_agent", handoff.agents)
         self.assertEqual(handoff.metadata["task_relation"], "continue_task")
         self.assertEqual(handoff.metadata["target_task_id"], "task-1")
+        self.assertTrue(handoff.metadata["thinking_ack_allowed"])
+        self.assertEqual(handoff.metadata["thinking_ack_source"], "quick_llm_speak_first")
 
 
 class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):

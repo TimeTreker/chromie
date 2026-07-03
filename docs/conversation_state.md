@@ -51,16 +51,22 @@ be treated as authoritative robot state, a durable user profile, or a database
 of completed side effects.
 
 The Orchestrator exposes a compact `session_memory` object to Router and Agent
-prompts. It summarizes the current task, recent user and assistant turns, active
-pending tasks, and the current forgetting policy. This is the prompt-facing
-working memory for the current session, not a permanent memory store.
+prompts. It summarizes the current task, active pending tasks, extracted memory
+entries, a compact `memory_summary`, and the current forgetting policy. This is
+the prompt-facing working memory for the current session, not a permanent
+memory store.
 The Router can hand complex requests to `deepthinking_agent`, which uses this
 same bounded memory to split tasks, plan, debug, and produce unified robot
 skill tasks without treating memory as authorization.
-Deep-thinking prompts should
-consume extracted task context, claims, entities, constraints, pending
-questions, and pending-task summaries rather than injecting raw conversation
-transcript turns.
+Deep-thinking prompts should consume extracted task context, claims, entities,
+constraints, pending questions, and pending-task summaries rather than
+injecting raw conversation transcript turns. The next memory architecture is
+defined in [`MEMORY_EXTRACTION.md`](MEMORY_EXTRACTION.md): raw turns are
+evidence/debug data, while model-facing memory should be compact extracted
+meaning selected by a prompt builder. The first deterministic slice is
+implemented for session/task memory, Router prompt sanitization, direct
+fallback context, ordinary conversation prompts, capability planning/review
+prompts, and deepthinking prompts.
 
 Each task context should preserve the information that later sessions need:
 
@@ -76,6 +82,17 @@ Each task context should preserve the information that later sessions need:
 Short ASR fragments such as "or" or "then, the" should not overwrite the latest
 meaningful task context. They may remain in trace logs, but prompt-facing task
 memory should privilege meaningful claims and goals over accidental fragments.
+The same rule applies to ordinary chat history: bounded raw turns may be
+retained for traceability, but they should not become the default memory block
+for future prompts.
+
+When a request routes to `memory`, `memory_agent` emits a refined
+`extracted_memory` update. The host records that entry in process-local
+`session_memory.memory_summary` and `session_memory.extracted_memory`; the
+legacy raw `user_statement` remains compatibility evidence only.
+Structured updates with the same `scope`, `kind`, and `key` replace the prior
+entry, which lets explicit corrections revise prompt memory without stacking
+stale statements.
 
 This is separate from the durable mind and experience layer documented in
 [`chromie_mind.md`](chromie_mind.md). Session memory tracks the current

@@ -12,10 +12,10 @@ or synthesis, invokes skills, or controls hardware.
 text + bounded context
   -> emergency filter: deterministic interrupt/noise safety rules
   -> optional post-interrupt semantic review after an interrupt is applied
-  -> shared Agent capability-catalog search for ability context
-  -> quick intent router: qwen-class semantic understanding with catalog bounds
+  -> shared Agent capability catalog snapshot/search for ability context
+  -> quick intent router: qwen-class semantic understanding with compact common catalog
   -> route validation guardrails for impossible/unsafe choices
-  -> deep_thought handoff when quick confidence is low or planning is needed
+  -> deep_thought handoff with full catalog when quick confidence is low or planning is needed
   -> schema finalization
   -> RouteDecision
 ```
@@ -33,11 +33,12 @@ Operational interruption/noise handling remains deterministic even when a
 conversational model is available. The hard filter lives in
 `router/app/rules.py` and is limited to `interrupt` and `ignore` outputs,
 including obvious repeated filler or acknowledgment ASR hallucinations. Normal
-language understanding is handled by the catalog-bounded Router model and later
+language understanding is handled by the catalog-aware Router model and later
 validators, not by phrase rules, regex action parsers, or hardcoded skill-alias
-tables. In `hybrid` and `llm_only`, catalog search supplies current ability
-descriptions and schemas to the model; it does not choose normal robot actions
-by itself. The Agent repeats the same catalog search inside native
+tables. In `hybrid` and `llm_only`, the quick Router prompt receives a compact
+common skill catalog, while query-biased catalog matches are only context hints.
+Catalog search scores do not choose normal robot actions by themselves. The
+Agent repeats catalog validation inside native
 InteractionRuntime, so Router unavailability cannot authorize or suppress
 execution by itself.
 
@@ -60,8 +61,8 @@ to determine a route:
 |---|---|---|
 | Emergency filter | Deterministic Router rules | Stop, cancel, emergency-style interruption, silence, unusable audio, repeated filler hallucinations, and obvious noise. |
 | Post-interrupt review | Review model after the interrupt has already been applied | Confirm the stop/cancel interpretation or propose a corrected non-interrupt task when ASR/wording was misheard. |
-| Quick intent | Catalog search plus small LLM router, normally `qwen3:0.6b` | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and select supported routes/capabilities. |
-| Deep thought | Agent `deepthinking_agent` using the larger Agent model | Split complex tasks, plan, debug, and answer using bounded session memory when the quick router is low confidence or explicitly chooses `deep_thought`. |
+| Quick intent | Common compact catalog plus small LLM router, normally `qwen3:0.6b` | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and propose one or more supported common routes/capability tasks by meaning. |
+| Deep thought | Agent `deepthinking_agent` using the larger Agent model and full catalog | Split complex tasks, plan, debug, revise/supersede quick proposals, and answer using bounded session memory when the quick router is low confidence or explicitly chooses `deep_thought`. |
 
 Deterministic route validation sits between those stages as a guardrail, not as
 another understanding layer. Validators may reject, repair, or clarify
@@ -69,9 +70,10 @@ impossible and unsafe model outputs, but they must not answer the user or select
 normal chat, tool, memory, or body intent by phrase matching.
 
 Each stage receives the context produced above it. The quick intent prompt gets
-the emergency-filter result, bounded session/world context, and catalog
-candidates. The deepthinking Agent receives the final `RouteDecision`, including
-quick-route source, confidence, intent, reason, and candidate capabilities.
+the emergency-filter result, bounded session/world context, the compact common
+skill catalog, and query-biased catalog hints. The deepthinking Agent receives
+the final `RouteDecision`, including quick-route source, confidence, intent,
+reason, and the full catalog context.
 
 Each stage can also produce task/action proposals. Router now writes those
 proposals through the shared `TaskProposal` schema while retaining the original
@@ -96,12 +98,19 @@ actual task-context write, persistence, confirmation, cancellation, and safety
 state.
 
 `RouteDecision.actions` remains the compatibility/execution hint for concrete
-capability actions, such as ordered Soridormi skill requests. The merged
-`task_proposals` surface is broader: it can include emergency cancellation,
-thinking acknowledgement, deepthinking work, speech, memory, tool, and
-skill-execution proposals. `task_list` remains present for older diagnostics.
-The Agent and Skill Runtime still validate every executable item against
-registered capabilities and safety policy.
+capability actions, such as ordered Soridormi skill requests or a `chromie.speak`
+speech skill embedded in a physical task. The quick Router may emit this array
+directly when a compound request is made from common catalog skills; that is why
+“quick” means small model plus compact common catalog, not “single task only.”
+Each action may carry its own 0.0-1.0 `confidence`; if any required compound
+action is below the Router threshold, the route delegates to `deep_thought`
+rather than executing the high-confidence subset. See
+[`docs/QUICK_ROUTER_TASK_PLANNING.md`](../docs/QUICK_ROUTER_TASK_PLANNING.md).
+The merged `task_proposals` surface is broader: it can include emergency
+cancellation, thinking acknowledgement, deepthinking work, speech, memory, tool,
+and skill-execution proposals. `task_list` remains present for older
+diagnostics. The Agent and Skill Runtime still validate every executable item
+against registered capabilities and safety policy.
 
 When the emergency filter triggers `interrupt`, the host may already have
 cancelled current output or motion before slower semantic review finishes. If
@@ -128,10 +137,12 @@ confirmation path.
 
 When LLM routing is enabled, the prompt tells the model to consider:
 
-- current candidate capabilities as Chromie's available ability list;
+- the compact common skill catalog as Chromie's fast-router ability menu;
+- query-biased candidate capabilities as hints, not recommendations;
 - bounded memory and context such as `session_memory`, pending tasks, robot
   state, position, and user preferences;
-- speech plus body intent, while still returning only a route decision;
+- speech plus body intent, with speech represented as `chromie.speak` when it is
+  part of a physical task;
 - safety boundaries: memory is not authorization, and the model must not invent
   capabilities or low-level robot controls.
 

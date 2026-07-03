@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from agent.app.capabilities.catalog import CapabilityCatalog
+from agent.app.capabilities.local import chromie_capability_bundle
 from agent.app.capabilities.models import (
     AgentManifest,
     CapabilityBundle,
@@ -183,6 +184,38 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertEqual(invoker.calls, 1)
+
+    async def test_prompt_tiers_mark_common_skills_for_fast_router(self) -> None:
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+
+        common = await catalog.prompt_entries(scope="common")
+        all_entries = await catalog.prompt_entries(scope="all")
+        snapshot = await catalog.snapshot()
+
+        common_ids = {item.capability_id for item in common}
+        all_ids = {item.capability_id for item in all_entries}
+
+        self.assertIn("soridormi.blink_eyes", common_ids)
+        self.assertIn("soridormi.walk_forward", common_ids)
+        self.assertIn("soridormi.skill.list", all_ids)
+        self.assertNotIn("soridormi.skill.list", common_ids)
+        blink = next(
+            item
+            for item in snapshot["capabilities"]
+            if item["capability_id"] == "soridormi.blink_eyes"
+        )
+        self.assertEqual(blink["prompt_tier"], "common")
+
+    async def test_chromie_speak_is_common_and_executable_for_router_tasks(self) -> None:
+        registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
+        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+
+        common = await catalog.prompt_entries(scope="common")
+        speak = next(item for item in common if item.capability_id == "chromie.speak")
+
+        self.assertEqual(speak.prompt_tier, "common")
+        self.assertTrue(speak.interaction_executable)
+        self.assertEqual(speak.route, "chat")
 
     async def test_physical_live_skill_requires_confirmation_despite_sim_exemption(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)

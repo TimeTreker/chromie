@@ -1292,10 +1292,15 @@ class VoiceAssistant:
         history = conversation.get("history")
         if not isinstance(history, list):
             history = []
+        session_memory = conversation.get("session_memory")
+        if not isinstance(session_memory, dict):
+            session_memory = {}
         payload = {
             "session_id": session_id,
             "conversation_id": conversation.get("conversation_id"),
-            "recent_history": history[-6:],
+            "memory_summary": session_memory.get("memory_summary"),
+            "extracted_memory": session_memory.get("extracted_memory") or [],
+            "recent_turn_fallback": history[-2:],
             "active_pending_tasks": conversation.get("active_pending_tasks") or [],
             "current_task_context": conversation.get("current_task_context"),
         }
@@ -1322,6 +1327,8 @@ class VoiceAssistant:
             "conversation_id": conversation.get("conversation_id"),
             "conversation": conversation,
             "session_memory": conversation.get("session_memory", {}),
+            "memory_summary": (conversation.get("session_memory") or {}).get("memory_summary"),
+            "extracted_memory": conversation.get("extracted_memory", []),
             "mind": mind_context,
             "core_principles": mind_context.get("core_principles", []),
             "long_term_goals": mind_context.get("long_term_goals", []),
@@ -1464,7 +1471,7 @@ class VoiceAssistant:
     def _deep_thought_prelude_allowed(self, decision: RouteDecision) -> bool:
         if decision.route != "deep_thought" or not decision.should_speak:
             return False
-        if decision.intent == "deep_thought_low_confidence":
+        if decision.intent == "deep_thought_low_confidence" and not decision.speak_first:
             return False
         if (decision.metadata or {}).get("thinking_ack_allowed") is False:
             return False

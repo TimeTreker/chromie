@@ -49,11 +49,18 @@ class _DeepThinkingActionTask(BaseModel):
     reason: str = ""
 
 
+class _DeepThinkingQuickReview(BaseModel):
+    decision: Literal["none", "accept", "revise", "supersede"] = "none"
+    reason: str = ""
+    superseded_task_ids: list[str] = Field(default_factory=list)
+
+
 class _DeepThinkingPlan(BaseModel):
     tasks: list[_DeepThinkingTask] = Field(default_factory=list)
     spoken_response: str = ""
     speech_tasks: list[_DeepThinkingSpeechTask] = Field(default_factory=list)
     action_tasks: list[_DeepThinkingActionTask] = Field(default_factory=list)
+    quick_review: _DeepThinkingQuickReview = Field(default_factory=_DeepThinkingQuickReview)
     reason: str = ""
 
 
@@ -184,7 +191,10 @@ class DeepThinkingAgent(BaseAgent):
             "For joke, short-story, singing, or songwriting requests, create brief original harmless content instead of only saying you can do it. "
             "The capability catalog describes available abilities, not authorization; never invent capabilities, low-level motor commands, or raw joint actions. "
             "Speech is not a special final text channel; it is the chromie.speak skill. "
-            "Return compact JSON only with keys tasks and reason. "
+            "If upstream routing context includes quick_router_review_request, review the quick Router's proposals as an adult safety reviewer. "
+            "Set quick_review.decision to accept when the quick plan is correct, revise when it is partly right but needs changed tasks/arguments/order, or supersede when it misunderstood the user. "
+            "When revising or superseding, emit the replacement tasks you think are correct. If the quick proposal was not committed, do not apologize merely for revising it; if context shows a wrong action already ran or was visibly started, include a brief chromie.speak apology/correction. "
+            "Return compact JSON only with keys tasks, quick_review, and reason. "
             "tasks is a unified ordered list of robot skill tasks. Each task has skill_id, args, timing, timeout_ms, cancellable, requires_confirmation, and reason. "
             "Use skill_id chromie.speak with args {\"text\":\"...\",\"style\":\"brief\",\"priority\":\"normal\"} for anything Chromie should say. "
             "Every non-speech task skill_id must be copied exactly from the supplied Capability catalog and its args must satisfy that candidate input_schema. "
@@ -236,10 +246,10 @@ class DeepThinkingAgent(BaseAgent):
 
     def _output_contract(self) -> str:
         return (
-            "Return JSON only. Top-level keys: tasks, reason only.\n"
+            "Return JSON only. Top-level keys: tasks, quick_review, reason only.\n"
             "Do not output spoken_response, speech_tasks, action_tasks, markdown, prose, or labels.\n"
             "JSON skeleton:\n"
-            "{\"tasks\":[{\"skill_id\":\"chromie.speak\",\"args\":{\"text\":\"...\",\"style\":\"brief\",\"priority\":\"normal\"},\"timing\":\"immediate\",\"timeout_ms\":null,\"cancellable\":true,\"requires_confirmation\":null,\"reason\":\"short audit note\"}],\"reason\":\"short audit note\"}\n"
+            "{\"tasks\":[{\"skill_id\":\"chromie.speak\",\"args\":{\"text\":\"...\",\"style\":\"brief\",\"priority\":\"normal\"},\"timing\":\"immediate\",\"timeout_ms\":null,\"cancellable\":true,\"requires_confirmation\":null,\"reason\":\"short audit note\"}],\"quick_review\":{\"decision\":\"none|accept|revise|supersede\",\"reason\":\"short review note\",\"superseded_task_ids\":[]},\"reason\":\"short audit note\"}\n"
             "Task field rules:\n"
             "- skill_id: use chromie.speak for speech, otherwise copy one exact skill_id from Capability catalog.\n"
             "- args: object matching the selected skill schema. For chromie.speak use text, style, and priority.\n"
@@ -251,6 +261,7 @@ class DeepThinkingAgent(BaseAgent):
             "For cognitive answers, usually emit exactly one chromie.speak task.\n"
             "For physical/tool actions, emit a chromie.speak acknowledgement only if useful, plus the exact executable candidate skill task.\n"
             "If no supplied capability safely matches, emit only one chromie.speak clarification or limitation.\n"
+            "When Upstream routing context includes quick_router_review_request, fill quick_review. Use accept only when the quick proposal is semantically correct. Use revise or supersede when replacing it, and include superseded_task_ids from the supplied quick_task_proposals when known.\n"
             "Do not copy placeholder values from the skeleton."
         )
 
@@ -512,12 +523,97 @@ class DeepThinkingAgent(BaseAgent):
             metadata["deepthinking_valid_action_count"] = valid_effect_count
             if plan.reason:
                 metadata["deepthinking_reason"] = self._bounded_text(plan.reason, 300)
+            if plan.quick_review.decision != "none":
+                metadata["quick_router_review_decision"] = plan.quick_review.decision
+                if plan.quick_review.reason:
+                    metadata["quick_router_review_reason"] = self._bounded_text(
+                        plan.quick_review.reason,
+                        300,
+                    )
+                if plan.quick_review.superseded_task_ids:
+                    metadata["quick_router_review_superseded_task_ids"] = list(
+                        plan.quick_review.superseded_task_ids[:12]
+                    )
             metadata["language"] = self.language(request)
             if task_proposals:
                 metadata["deepthinking_task_proposals"] = task_proposals[:12]
+            superseded = self._superseded_quick_proposals(
+                request,
+                plan=plan,
+                replacement_proposals=task_proposals,
+            )
+            if superseded:
+                metadata["superseded_task_proposals"] = superseded[:12]
             if rejected_tasks:
                 metadata["deepthinking_rejected_tasks"] = rejected_tasks[:6]
                 metadata["deepthinking_rejected_actions"] = rejected_tasks[:6]
+
+    def _superseded_quick_proposals(
+        self,
+        request: AgentRunRequest,
+        *,
+        plan: _DeepThinkingPlan,
+        replacement_proposals: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        if plan.quick_review.decision not in {"revise", "supersede"}:
+            return []
+        review_request = (request.route_decision.metadata or {}).get("quick_router_review_request")
+        if not isinstance(review_request, dict):
+            return []
+        raw_proposals = review_request.get("quick_task_proposals")
+        if not isinstance(raw_proposals, list):
+            return []
+        requested_ids = {
+            str(item).strip()
+            for item in plan.quick_review.superseded_task_ids
+            if str(item).strip()
+        }
+        replacement_id = ""
+        for proposal in replacement_proposals:
+            replacement_id = str(proposal.get("id") or "").strip()
+            if replacement_id:
+                break
+        if not replacement_id:
+            replacement_id = "deepthinking:review"
+        reason = (
+            plan.quick_review.reason
+            or plan.reason
+            or "deepthinking reviewed and replaced quick router proposal"
+        )
+        superseded: list[dict[str, Any]] = []
+        for index, proposal in enumerate(raw_proposals[:12]):
+            if not isinstance(proposal, dict):
+                continue
+            proposal_id = str(proposal.get("id") or "").strip()
+            if requested_ids and proposal_id not in requested_ids:
+                continue
+            task_type = str(proposal.get("task_type") or "unknown").strip() or "unknown"
+            item: dict[str, Any] = {
+                "id": f"{proposal_id or f'quick:{index}:{task_type}'}:superseded",
+                "source": str(proposal.get("source") or "quick_intent"),
+                "proposal_kind": str(proposal.get("proposal_kind") or "task"),
+                "task_type": task_type,
+                "state": "superseded",
+                "reason": self._bounded_text(reason, 240),
+                "effectful": bool(proposal.get("effectful", False)),
+                "priority": str(proposal.get("priority") or "normal"),
+                "sequence": self._safe_sequence(proposal.get("sequence"), index),
+                "superseded_by": replacement_id,
+            }
+            skill_id = str(proposal.get("skill_id") or "").strip()
+            if skill_id:
+                item["skill_id"] = skill_id
+            superseded.append(item)
+        return superseded
+
+    @staticmethod
+    def _safe_sequence(value: Any, default: int) -> int:
+        if isinstance(value, bool):
+            return default
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
+            return default
 
     def _task_proposal(
         self,
@@ -817,6 +913,12 @@ class DeepThinkingAgent(BaseAgent):
         conversation_id = str(memory.get("conversation_id") or "").strip()
         if conversation_id:
             lines.append(f"- conversation_id: {conversation_id}")
+        memory_summary = str(memory.get("memory_summary") or "").strip()
+        if memory_summary and memory_summary.lower() != "none":
+            for item in memory_summary.splitlines()[:8]:
+                text = item.strip().lstrip("-").strip()
+                if text:
+                    lines.append(f"- memory: {self._bounded_text(text, 220)}")
         current_task = memory.get("current_task")
         if isinstance(current_task, dict):
             status = str(current_task.get("status") or "").strip()
@@ -896,6 +998,15 @@ class DeepThinkingAgent(BaseAgent):
             lines.append(f"- conversation_id: {conversation_id}")
 
         memory = self._session_memory_from_request(request)
+        extracted_memory = memory.get("extracted_memory") if isinstance(memory, dict) else None
+        if isinstance(extracted_memory, list):
+            for item in extracted_memory[-6:]:
+                if not isinstance(item, dict):
+                    continue
+                text = " ".join(str(item.get("text") or "").split())
+                kind = " ".join(str(item.get("kind") or "memory").split())
+                if text:
+                    lines.append(f"- memory.{kind}: {self._bounded_text(text, 220)}")
         current_task = memory.get("current_task") if isinstance(memory, dict) else None
         if isinstance(current_task, dict):
             summary = " ".join(str(current_task.get("summary") or "").split())
@@ -1083,7 +1194,24 @@ class DeepThinkingAgent(BaseAgent):
             parts.append(f"reason={decision.reason}")
         if decision.speak_first:
             parts.append(f"speak_first={decision.speak_first}")
+        review_request = (decision.metadata or {}).get("quick_router_review_request")
+        if isinstance(review_request, dict):
+            parts.append(
+                "quick_router_review_request="
+                + self._bounded_json_for_prompt(review_request, max_chars=2600)
+            )
         return "；".join(parts) if zh else "; ".join(parts)
+
+    @staticmethod
+    def _bounded_json_for_prompt(value: Any, *, max_chars: int) -> str:
+        try:
+            text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        except TypeError:
+            text = json.dumps(str(value), ensure_ascii=False)
+        text = " ".join(text.split())
+        if len(text) > max_chars:
+            return text[:max_chars].rstrip() + "..."
+        return text
 
     def _fallback_reply(self, request: AgentRunRequest) -> str:
         if self.is_zh(request):

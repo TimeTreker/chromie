@@ -159,6 +159,9 @@ def _task_proposal_for_item(item: dict[str, Any]) -> dict[str, Any]:
             "requires_validation": bool(item.get("requires_validation", True)),
         },
     )
+    confidence = item.get("confidence")
+    if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
+        proposal.metadata["confidence"] = max(0.0, min(1.0, float(confidence)))
     return proposal.model_dump(mode="json", exclude_none=True)
 
 
@@ -244,24 +247,45 @@ def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[d
             capability_id = str(action.get("capability_id") or "").strip()
             action_type = str(action.get("type") or "").strip()
             args = action.get("args") if isinstance(action.get("args"), dict) else {}
-            extra: dict[str, Any] = {"sequence": index}
+            extra: dict[str, Any] = {
+                "sequence": _safe_int(action.get("sequence"), index)
+            }
             if capability_id:
                 extra["capability_id"] = capability_id
                 extra["args"] = args
+                timing = str(action.get("timing") or "").strip()
+                if timing:
+                    extra["timing"] = timing
+                reason = str(action.get("reason") or "").strip()
+                if reason:
+                    extra["reason"] = reason
             if action_type:
                 extra["action_type"] = action_type
                 params = action.get("params")
                 if isinstance(params, dict):
                     extra["params"] = params
+            confidence = action.get("confidence")
+            if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
+                extra["confidence"] = max(0.0, min(1.0, float(confidence)))
+            task_type = "task.execute_robot_action"
+            kind = "action"
+            requires_validation = True
+            if capability_id:
+                task_type = "speech.speak" if capability_id == "chromie.speak" else "task.execute_skill"
+                kind = "speech" if capability_id == "chromie.speak" else "action"
+                requires_validation = capability_id != "chromie.speak"
+            elif action_type:
+                task_type = action_type
             tasks.append(
                 _task_item(
                     source_stage=source_stage,
-                    kind="action",
-                    task_type="task.execute_skill" if capability_id else action_type or "task.execute_robot_action",
+                    kind=kind,
+                    task_type=task_type,
                     route=route,
                     intent=intent,
                     priority=priority,
                     index=index,
+                    requires_validation=requires_validation,
                     extra=extra,
                 )
             )
@@ -547,6 +571,7 @@ def annotate_pipeline_stage_outputs(
                     priority=decision.priority,
                     index=0,
                     requires_validation=False,
+                    extra={"text": decision.speak_first} if decision.speak_first else None,
                 ),
             )
         outputs.append(

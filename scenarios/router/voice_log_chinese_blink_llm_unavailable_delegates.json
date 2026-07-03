@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "id": "voice_log_chinese_blink_llm_unavailable_exact_skill",
+  "id": "voice_log_chinese_blink_llm_unavailable_delegates",
   "suite": "router",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live cold-start check: when the quick LLM is unavailable, explicit Chinese blink ASR must still emit the exact blink skill from catalog.",
+  "description": "Regression from the 2026-07-03 live cold-start check under catalog-aware routing: when the quick LLM is unavailable, explicit Chinese blink ASR must delegate instead of letting catalog scores execute a skill.",
   "tags": [
     "voice-log",
     "zh-CN",
@@ -54,12 +54,13 @@
     }
   },
   "expect": {
-    "route": "robot_action",
-    "intent": "capability:soridormi.blink_eyes",
+    "route": "deep_thought",
+    "intent": "deep_thought_router_unavailable",
     "source": "catalog",
-    "task_types_include": ["task.execute_skill"],
-    "metadata_json_contains": ["soridormi.blink_eyes"],
-    "metadata_json_forbid": ["\"task_type\": \"task.execute_robot_action\"", "\"capability_id\": \"soridormi.walk_velocity\""],
+    "task_types_include": ["cognition.deep_think"],
+    "task_types_forbid": ["task.execute_skill", "task.execute_robot_action"],
+    "metadata_json_contains": ["candidate_count", "delegating catalog-bounded robot request"],
+    "metadata_json_forbid": ["\"selected_stage\": \"quick_intent\"", "\"final_route\": \"robot_action\""],
     "llm_calls": 1
   }
 }

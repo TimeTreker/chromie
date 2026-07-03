@@ -78,10 +78,13 @@ principles, reflex policy, deliberation policy, and experience boundaries.
 Identity, age/persona wording, and core principles come from the owner-approved
 mind profile.
 
-`Session Context Group` contains bounded current-turn context: user/session
-memory, recent conversation, current task context, robot/runtime state, and
-other evidence supplied by the Orchestrator. This context helps interpretation,
-but it is not authorization.
+`Session Context Group` contains bounded current-turn context: extracted
+user/session memory, current task context, robot/runtime state, and other
+evidence supplied by the Orchestrator. This context helps interpretation, but
+it is not authorization. Raw recent conversation may be retained as evidence or
+used as a tiny fallback for immediate reference resolution; the preferred
+prompt path is the compact extracted-memory design in
+[`MEMORY_EXTRACTION.md`](MEMORY_EXTRACTION.md).
 
 `Current Job` states which role the model is performing now, such as quick
 router, capability planner, conversation agent, or deepthinking agent. It tells

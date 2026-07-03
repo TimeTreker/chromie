@@ -55,8 +55,9 @@ The first phrase must be a truthful state signal, not an execution claim:
 
 - chat: `I'm here.` / `我在。`
 - factual or non-small-talk chat: `I'll answer.` / `我来回答。`
-- robot action: no host fast-first phrase; the committed Agent `chromie.speak`
-  task owns the single spoken acknowledgement.
+- robot action: no host fast-first phrase; committed `chromie.speak` tasks own
+  any acknowledgement or requested spoken performance inside the robot-action
+  plan.
 - tool lookup: `I'll check that.` / `我查一下。`
 - memory request: `I'll note that.` / `我记一下。`
 - deep thought: `Okay, let me think about that.` / `好的，我想一下。`
@@ -79,11 +80,13 @@ User asks for complicated planning
 -> Chromie speaks the final answer
 ```
 
-Low-confidence routing handoffs do not automatically execute
+Low-confidence routing handoffs do not automatically execute a generic
 `speech.thinking_ack` or `social.thinking_pose`; Chromie should avoid saying
-“let me think” for short operational commands or ambiguous follow-ups. Stop,
-cancel, emergency, silence, and unusable-audio paths stay deterministic and
-bypass this loop.
+“let me think” for short operational commands or ambiguous follow-ups unless the
+quick Router model explicitly supplied a truthful `speak_first` prelude. That
+prelude is treated as a provisional speech task and must not claim physical
+execution, tool results, memory writes, or completion. Stop, cancel, emergency,
+silence, and unusable-audio paths stay deterministic and bypass this loop.
 
 `social.thinking_pose` resolves to `soridormi.express_attention` only when all
 simulator-safe gates are enabled:

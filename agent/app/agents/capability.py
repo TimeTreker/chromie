@@ -134,6 +134,16 @@ class CapabilityAgent(BaseAgent):
                     "catalog_version": search.catalog_version,
                     "sequence": int(action.get("sequence", len(selected_ids))),
                 }
+                action_confidence = action.get("confidence")
+                if isinstance(action_confidence, (int, float)) and not isinstance(action_confidence, bool):
+                    metadata["router_action_confidence"] = max(
+                        0.0,
+                        min(1.0, float(action_confidence)),
+                    )
+                timing = str(action.get("timing") or "").strip()
+                if timing not in {"parallel", "sequential"}:
+                    timing = "sequential"
+                metadata["router_action_timing"] = timing
                 score = self._catalog_score(match)
                 if score is not None:
                     metadata["catalog_score"] = score
@@ -143,7 +153,7 @@ class CapabilityAgent(BaseAgent):
                     SkillRequest(
                         skill_id=capability_id,
                         args=args,
-                        timing="sequential",
+                        timing=timing,  # type: ignore[arg-type]
                         requires_confirmation=match.requires_confirmation,
                         metadata=metadata,
                     )
@@ -152,7 +162,7 @@ class CapabilityAgent(BaseAgent):
             if selected_ids:
                 speech = (
                     ""
-                    if request.route_decision.speak_first
+                    if request.route_decision.speak_first or "chromie.speak" in selected_ids
                     else self._direct_action_ack_speech(request, len(selected_ids))
                 )
                 if speech:
@@ -371,7 +381,7 @@ class CapabilityAgent(BaseAgent):
         review_prompt = (
             "Session Context Group:\n"
             f"- Language: {self.language(request)}\n"
-            f"- Recent conversation:\n{self._bounded_text(self._format_history(request, zh=zh), 900)}\n"
+            f"- Extracted memory:\n{self._bounded_text(self._format_memory_context(request, zh=zh), 900)}\n"
             f"- Task context:\n{self._bounded_text(self._format_task_context(request, zh=zh), 900)}\n"
             f"- Router decision context JSON: {self._format_route_context(request)}\n\n"
             "Current Job:\n"
@@ -544,6 +554,15 @@ class CapabilityAgent(BaseAgent):
         context = dict(request.context or {})
         context.pop("mind", None)
         context.pop("candidate_capabilities", None)
+        context.pop("history", None)
+        context.pop("conversation", None)
+        memory = context.get("session_memory")
+        if isinstance(memory, dict):
+            context["session_memory"] = {
+                key: value
+                for key, value in memory.items()
+                if key not in {"recent_user_request", "recent_assistant_response"}
+            }
         return self._bounded_json(context, 1000)
 
     def _format_route_context(self, request: AgentRunRequest) -> str:
@@ -599,7 +618,7 @@ class CapabilityAgent(BaseAgent):
         session_context_block = self._format_session_context(request)
         route_context_block = self._format_route_context(request)
         task_context_block = self._format_task_context(request, zh=zh)
-        history_block = self._format_history(request, zh=zh)
+        memory_block = self._format_memory_context(request, zh=zh)
         candidate_payload = [self._capability_payload(match) for match in candidates]
         selected_id = ""
         intent = (request.route_decision.intent or "").strip()
@@ -628,7 +647,7 @@ class CapabilityAgent(BaseAgent):
             "Session Context Group:\n"
             f"- Language: {'zh-CN' if zh else 'en-US'}\n"
             f"- Session id: {request.sid or ''}\n"
-            f"- Recent conversation:\n{history_block}\n"
+            f"- Extracted memory:\n{memory_block}\n"
             f"- Task context:\n{task_context_block}\n"
             f"- Router decision context JSON: {route_context_block}\n"
             f"- Bounded session/runtime context JSON: {session_context_block}\n\n"
@@ -1527,6 +1546,51 @@ class CapabilityAgent(BaseAgent):
             compact = compact[:1200].rstrip() + "..."
         return compact
 
+    def _session_memory_from_request(self, request: AgentRunRequest) -> dict[str, Any]:
+        context = request.context or {}
+        memory = context.get("session_memory")
+        if isinstance(memory, dict):
+            return memory
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            memory = conversation.get("session_memory")
+            if isinstance(memory, dict):
+                return memory
+        return {}
+
+    def _format_memory_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        memory = self._session_memory_from_request(request)
+        if not memory:
+            return "无" if zh else "None"
+        lines: list[str] = []
+        summary = str(memory.get("memory_summary") or "").strip()
+        if summary and summary.lower() != "none":
+            for item in summary.splitlines()[:8]:
+                text = item.strip().lstrip("-").strip()
+                if text:
+                    lines.append(f"- {self._bounded_text(text, 220)}")
+        entries = memory.get("extracted_memory")
+        if isinstance(entries, list) and not lines:
+            for item in entries[-6:]:
+                if not isinstance(item, dict):
+                    continue
+                text = " ".join(str(item.get("text") or "").split())
+                if text:
+                    lines.append(f"- {self._bounded_text(text, 220)}")
+        current_task = memory.get("current_task")
+        if isinstance(current_task, dict):
+            status = " ".join(str(current_task.get("status") or "").split())
+            summary_text = " ".join(str(current_task.get("summary") or "").split())
+            parts = []
+            if status:
+                parts.append(f"status={status}")
+            if summary_text:
+                parts.append(f"summary={self._bounded_text(summary_text, 180)}")
+            if parts:
+                label = "当前任务" if zh else "current_task"
+                lines.append(f"- {label}: {'; '.join(parts)}")
+        return "\n".join(lines) if lines else ("无" if zh else "None")
+
     def _history_from_request(self, request: AgentRunRequest) -> list[dict[str, Any]]:
         if request.history:
             return [turn for turn in request.history if isinstance(turn, dict)]
@@ -1553,6 +1617,25 @@ class CapabilityAgent(BaseAgent):
                 continue
             if len(text) > 180:
                 text = text[:180].rstrip() + "..."
+            if zh:
+                label = "用户" if role == "user" else "Chromie" if role == "assistant" else role
+            else:
+                label = "User" if role == "user" else "Chromie" if role == "assistant" else role
+            lines.append(f"{label}: {text}")
+        return "\n".join(lines) if lines else ("无" if zh else "None")
+
+    def _format_recent_turn_fallback(self, request: AgentRunRequest, *, zh: bool) -> str:
+        history = self._history_from_request(request)
+        if not history:
+            return "无" if zh else "None"
+        lines: list[str] = []
+        for turn in history[-2:]:
+            role = str(turn.get("role") or "unknown").lower()
+            text = " ".join(str(turn.get("text") or "").split())
+            if not text:
+                continue
+            if len(text) > 160:
+                text = text[:160].rstrip() + "..."
             if zh:
                 label = "用户" if role == "user" else "Chromie" if role == "assistant" else role
             else:

@@ -269,6 +269,64 @@ class _WalkCatalog:
         )
 
 
+class _WalkSpeakCatalog:
+    async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
+        del text, kwargs
+        return CapabilitySearchResult(
+            query="walk and speak",
+            matched=True,
+            suggested_route="robot_action",
+            suggested_agents=[
+                "capability_agent",
+                "safety_agent",
+                "speaker_agent",
+            ],
+            catalog_version=16,
+            matches=[
+                CapabilityMatch(
+                    capability_id="soridormi.walk_velocity",
+                    agent_id="soridormi.skill",
+                    description="Track a bounded body velocity command.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "vx_mps": {"type": "number", "minimum": -0.2, "maximum": 0.2},
+                            "duration_s": {"type": "number", "minimum": 0.1, "maximum": 20.0},
+                        },
+                        "required": ["vx_mps", "duration_s"],
+                        "additionalProperties": False,
+                    },
+                    effects=["physical_motion"],
+                    safety_class="physical_motion",
+                    interaction_executable=True,
+                    requires_confirmation=True,
+                    route="robot_action",
+                    score=0.8,
+                    metadata={"mode": "sim"},
+                ),
+                CapabilityMatch(
+                    capability_id="chromie.speak",
+                    agent_id="chromie.speech",
+                    description="Speak text through Chromie's TTS path.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "text": {"type": "string", "minLength": 1},
+                            "style": {"type": "string"},
+                        },
+                        "required": ["text"],
+                    },
+                    effects=["user_interaction", "audio_output"],
+                    safety_class="low_risk_action",
+                    interaction_executable=True,
+                    requires_confirmation=False,
+                    route="chat",
+                    score=0.55,
+                ),
+            ],
+        )
+
+
 class _JokeWalkIdentityCatalog:
     async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
         del kwargs
@@ -670,6 +728,69 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("alignment", response.speech[0].metadata)
         self.assertNotIn("wait_for_playback_start", response.speech[0].metadata)
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_velocity")
+
+    async def test_router_compound_actions_keep_speech_as_skill(self) -> None:
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "native-interaction",
+                "text": "walk forward and tell me a joke",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "compound_common_catalog_task",
+                    "confidence": 0.92,
+                    "language": "en-US",
+                    "source": "llm",
+                    "actions": [
+                        {
+                            "capability_id": "soridormi.walk_velocity",
+                            "args": {"vx_mps": 0.15, "duration_s": 10.0},
+                            "sequence": 0,
+                            "timing": "sequential",
+                            "confidence": 0.9,
+                        },
+                        {
+                            "capability_id": "chromie.speak",
+                            "args": {
+                                "text": "Why did the robot bring a map? Because every good walk needs direction.",
+                                "style": "brief",
+                            },
+                            "sequence": 1,
+                            "timing": "parallel",
+                            "confidence": 0.87,
+                        },
+                    ],
+                },
+            }
+        )
+
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=None,
+                use_llm=False,
+                max_speak_chars=160,
+                capability_catalog=_WalkSpeakCatalog(),  # type: ignore[arg-type]
+            )
+        ).run(request)
+
+        self.assertEqual(response.speech, [])
+        self.assertEqual(
+            [skill.skill_id for skill in response.skills],
+            ["soridormi.walk_velocity", "chromie.speak"],
+        )
+        self.assertEqual(response.skills[1].args["text"], "Why did the robot bring a map? Because every good walk needs direction.")
+        self.assertEqual(response.skills[1].timing, "parallel")
+        self.assertEqual(response.skills[0].metadata["router_action_confidence"], 0.9)
+        self.assertEqual(response.skills[1].metadata["router_action_confidence"], 0.87)
+        proposals = [
+            TaskProposal.model_validate(item)
+            for item in response.metadata["agent_task_proposals"]
+        ]
+        self.assertEqual(
+            [item.skill_id for item in proposals],
+            ["soridormi.walk_velocity", "chromie.speak"],
+        )
+        self.assertFalse(proposals[1].effectful)
 
     async def test_affirmative_chat_adds_parallel_attention_cue(self) -> None:
         request = _request(

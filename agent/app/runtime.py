@@ -174,6 +174,7 @@ class InteractionRuntime(_AgentPipeline):
         )
         self._recover_deep_thought_capability_route(request, search)
         if request.route_decision.route == "deep_thought":
+            await self._attach_deep_thought_catalog(request)
             request.route_decision.agents = ["deepthinking_agent", "speaker_agent"]
             return
         if request.route_decision.actions:
@@ -276,6 +277,18 @@ class InteractionRuntime(_AgentPipeline):
             "catalog_version": getattr(search, "catalog_version", 0),
         }
         return True
+
+    async def _attach_deep_thought_catalog(self, request: AgentRunRequest) -> None:
+        catalog = self.services.capability_catalog
+        if catalog is None or not hasattr(catalog, "prompt_entries"):
+            return
+        entries = await catalog.prompt_entries(scope="all")
+        payload = [entry.model_dump(mode="json") for entry in entries]
+        if not payload:
+            return
+        request.route_decision.candidate_capabilities = payload
+        request.context["capability_candidates"] = list(payload)
+        request.context["capability_catalog_scope"] = "all"
 
     def _deep_thought_capability_recovery_allowed(self, decision: Any) -> bool:
         if decision.confidence < _DEEP_THOUGHT_CAPABILITY_RECOVERY_MIN_CONFIDENCE:

@@ -99,6 +99,10 @@ local `chromie.speak` skill. The final ledger is validated through the shared
 `shared/chromie_contracts/task_proposal.py` contract before being attached to
 metadata. This keeps the wire shape JSON-compatible while making proposal
 states, summaries, and preflight annotations common across services.
+When low-confidence quick Router proposals are delegated, the Router includes
+`quick_router_review_request` and deepthinking can record
+`quick_review.decision=accept|revise|supersede`; replaced quick proposals are
+represented through `superseded_task_proposals`.
 
 The first commit rule is intentionally conservative:
 
@@ -238,8 +242,11 @@ looked.
    `interaction_response:*` entries when native Agent metadata is present.
 8. Context summarization. Partially implemented for deepthinking and its
    spoken-response reviewer: the slow path uses extracted task/session context
-   instead of raw transcript turns. Extending this to all ordinary chat and
-   capability prompts remains open.
+   instead of raw transcript turns. The target extractor and prompt-builder
+   contract is documented in `docs/MEMORY_EXTRACTION.md`. Quick Router,
+   conversation, capability, direct fallback, and deepthinking prompts now have
+   the first deterministic extracted-memory path; durable and LLM-assisted
+   memory remain open.
 9. Preflight validation. Implemented as a non-authoritative validation layer for
    schemas, provider registration, versions, availability, confirmation, and
    safety-monitor requirements. Dynamic world feasibility remains unknown until

@@ -46,7 +46,7 @@ separate and default-off; enable it only with
 | `motion_planner_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
 | `safety_agent` | Rejects or clamps unsafe action proposals. |
 | `tool_agent` | Produces a validated TaskGraph when LLM TaskGraph planning is enabled; otherwise emits a compatibility `tool.*` action that this repository does not automatically execute. |
-| `memory_agent` | Produces memory updates and compatibility `memory.store` actions. Chromie's current conversation state is process-local and not a durable memory store. |
+| `memory_agent` | Produces refined `extracted_memory` updates plus compatibility `memory.store` actions. Chromie's current conversation state is process-local and not a durable memory store. |
 | `vision_agent` | Produces a compatibility `vision.query` proposal. No vision executor is included in this repository. |
 
 The native capability planner prompt follows the project-wide prompt context
@@ -67,6 +67,16 @@ Core endpoints:
 - `GET /capabilities/llm-context?language=en&text=...`
 - `POST /run`
 - `POST /interaction`
+
+Catalog entries include a `prompt_tier` field. `common` entries are compacted
+into the fast Router prompt; `rare` entries stay available to deepthinking and
+other full-catalog planning paths. `chromie.speak` is a common,
+interaction-executable catalog entry so the quick Router can keep spoken parts
+of physical requests as normal skill proposals instead of dropping them into
+unstructured reply text.
+When Router compound `actions[]` include per-action confidence, the native
+runtime preserves it in each emitted `SkillRequest.metadata` as
+`router_action_confidence` for trace and evidence review.
 
 TaskGraph endpoints:
 

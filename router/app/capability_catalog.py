@@ -47,3 +47,19 @@ class CapabilityCatalogClient:
                 query=text,
                 live_refresh_error=f"{type(exc).__name__}: {exc}",
             )
+
+    async def snapshot(self, *, refresh: bool = False) -> dict[str, Any]:
+        if not self.base_url:
+            return {}
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_s, trust_env=False) as client:
+                response = await client.get(
+                    f"{self.base_url}/capabilities/catalog",
+                    params={"refresh": "true" if refresh else "false"},
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data if isinstance(data, dict) else {}
+        except Exception as exc:
+            logger.warning("capability catalog snapshot request failed: %s", exc)
+            return {"live_refresh_error": f"{type(exc).__name__}: {exc}"}

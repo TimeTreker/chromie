@@ -44,6 +44,15 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                     "session_memory": {
                         "conversation_id": "local_default",
                         "current_task": {"summary": "design session memory"},
+                        "memory_summary": "- Current task: design extracted prompt memory",
+                        "extracted_memory": [
+                            {
+                                "scope": "task",
+                                "kind": "goal",
+                                "text": "Current task: design extracted prompt memory",
+                                "confidence": 0.9,
+                            }
+                        ],
                         "forgetting_policy": {"hard_idle_timeout_sec": 900},
                     }
                 },
@@ -73,7 +82,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("All spoken output must be in the target language", call["system"])
         self.assertIn("Never output bullet points, labels, or numbered lists", call["system"])
         self.assertIn("Speech is not a special final text channel", call["system"])
-        self.assertIn("Return compact JSON only with keys tasks and reason", call["system"])
+        self.assertIn("Return compact JSON only with keys tasks, quick_review, and reason", call["system"])
         self.assertIn("chromie.speak", call["system"])
         self.assertIn("human owner approval", call["system"])
         self.assertIn("Normally do not repeat, quote, or paraphrase", call["system"])
@@ -82,12 +91,13 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Session working memory", call["prompt"])
         self.assertIn("Extracted conversation context", call["prompt"])
         self.assertIn("Output Contract:", call["prompt"])
-        self.assertIn("Top-level keys: tasks, reason only", call["prompt"])
+        self.assertIn("Top-level keys: tasks, quick_review, reason only", call["prompt"])
         self.assertIn("\"skill_id\":\"chromie.speak\"", call["prompt"])
         self.assertIn("Do not output spoken_response, speech_tasks, action_tasks", call["prompt"])
         self.assertIn("Mind principles, long-term goals, and experience boundaries", call["prompt"])
         self.assertIn("owner-approved", call["prompt"])
         self.assertIn("design session memory", call["prompt"])
+        self.assertIn("memory.goal: Current task: design extracted prompt memory", call["prompt"])
         self.assertIn("Apply the Priority Rules strictly", call["prompt"])
         self.assertEqual(call["options"]["num_ctx"], 8192)
         self.assertEqual(call["options"]["num_predict"], 384)
@@ -369,6 +379,92 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(proposals[1].state, "advisory")
         self.assertEqual(proposals[1].skill_id, "soridormi.walk_forward")
         self.assertEqual(ollama.calls[0]["response_format"], "json")
+
+    async def test_quick_router_review_supersedes_route_proposals(self) -> None:
+        ollama = _CapturingOllama(
+            {
+                "tasks": [
+                    {
+                        "skill_id": "chromie.speak",
+                        "args": {
+                            "text": "Thanks for the warning. I will hold still.",
+                            "style": "warning",
+                            "priority": "normal",
+                        },
+                        "timing": "immediate",
+                        "reason": "Correct the quick window-gaze interpretation.",
+                    }
+                ],
+                "quick_review": {
+                    "decision": "supersede",
+                    "reason": "The quick router treated a warning as a gaze command.",
+                    "superseded_task_ids": ["quick_intent:0:task.execute_skill"],
+                },
+                "reason": "Warning semantics replace quick proposal.",
+            }
+        )
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-quick-review-test",
+                "text": "Look out!",
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "deep_thought_low_confidence",
+                    "confidence": 0.55,
+                    "language": "en-US",
+                    "source": "llm",
+                    "metadata": {
+                        "quick_router_review_request": {
+                            "schema_version": 1,
+                            "execution_state": "not_committed",
+                            "quick_route": "robot_action",
+                            "quick_intent": "compound_common_catalog_task",
+                            "quick_task_proposals": [
+                                {
+                                    "id": "quick_intent:0:task.execute_skill",
+                                    "source": "quick_intent",
+                                    "proposal_kind": "action",
+                                    "task_type": "task.execute_skill",
+                                    "state": "advisory",
+                                    "effectful": True,
+                                    "priority": "normal",
+                                    "sequence": 0,
+                                    "skill_id": "soridormi.look_at_window",
+                                }
+                            ],
+                        }
+                    },
+                },
+            }
+        )
+        draft = InteractionDraft()
+
+        result = await agent.run(request, draft)
+        response = result.to_response()
+
+        self.assertEqual(response.speech[0].text, "Thanks for the warning. I will hold still.")
+        self.assertEqual(response.metadata["quick_router_review_decision"], "supersede")
+        self.assertIn("quick_router_review_request", ollama.calls[0]["prompt"])
+        self.assertIn("soridormi.look_at_window", ollama.calls[0]["prompt"])
+        proposals = [
+            TaskProposal.model_validate(item)
+            for item in response.metadata["superseded_task_proposals"]
+        ]
+        self.assertEqual(len(proposals), 1)
+        self.assertEqual(proposals[0].state, "superseded")
+        self.assertEqual(proposals[0].skill_id, "soridormi.look_at_window")
+        self.assertEqual(
+            proposals[0].superseded_by,
+            "deepthinking:0:speech.speak",
+        )
 
     async def test_stock_model_disclaimer_is_retried_as_chromie(self) -> None:
         ollama = _CapturingOllama(

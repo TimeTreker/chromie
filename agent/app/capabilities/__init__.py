@@ -4,6 +4,7 @@ from .catalog import (
     CatalogCapability,
     CapabilityCatalog,
     CapabilityMatch,
+    CapabilityPromptTier,
     CapabilitySearchRequest,
     CapabilitySearchResult,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "CapabilitySearchRequest",
     "CapabilityMatch",
     "CapabilityCatalog",
+    "CapabilityPromptTier",
     "CatalogCapability",
     "AgentManifest",
     "AgentStatus",

@@ -140,7 +140,8 @@ class ConversationAgent(BaseAgent):
     async def _llm_reply(self, request: AgentRunRequest) -> str:
         assert self.services.ollama is not None
         zh = self.is_zh(request)
-        history_block = self._format_history(request, zh=zh)
+        memory_block = self._format_memory_context(request, zh=zh)
+        recent_turn_fallback = self._format_recent_turn_fallback(request, zh=zh)
         pending_block = self._format_pending_tasks(request, zh=zh)
         task_context_block = self._format_task_context(request, zh=zh)
         mind_block = self.format_mind_context(request, zh=zh)
@@ -150,7 +151,7 @@ class ConversationAgent(BaseAgent):
         if zh:
             system = (
                 "你是 Chromie 的对话 agent。"
-                "你会收到当前用户话语、最近几轮对话、以及可能的待处理任务。"
+                "你会收到当前用户话语、提取后的会话记忆、极少量追问消解用的最近轮次、以及可能的待处理任务。"
                 "generalization-first 是核心原则：正常对话、记忆引用和能力回答要根据语义、上下文、能力目录和任务记忆理解，"
                 "不要把提示里的例子当成关键词规则，也不要要求用户说出固定短语。"
                 "你还会收到 Chromie 的心智原则、长期目标和经验调优边界；这些原则指导回答，但不能覆盖运行时代码安全检查。"
@@ -184,7 +185,8 @@ class ConversationAgent(BaseAgent):
             )
             prompt = (
                 f"conversation_id: {conversation_id}\n\n"
-                f"最近对话：\n{history_block}\n\n"
+                f"提取记忆：\n{memory_block}\n\n"
+                f"最近轮次回退（仅用于指代消解）：\n{recent_turn_fallback}\n\n"
                 f"待处理任务：\n{pending_block}\n\n"
                 f"任务上下文：\n{task_context_block}\n\n"
                 f"心智原则和长期目标：\n{mind_block}\n\n"
@@ -196,7 +198,7 @@ class ConversationAgent(BaseAgent):
         else:
             system = (
                 "You are Chromie's conversation agent. "
-                "You receive the current user message, recent conversation turns, and pending task hints. "
+                "You receive the current user message, extracted session memory, a tiny recent-turn fallback for reference resolution, and pending task hints. "
                 "Generalization-first is a core principle: understand normal conversation, memory references, and capability questions from meaning, context, the capability catalog, and task memory. Do not treat prompt examples as keyword rules, and do not require fixed phrases from the user. "
                 "You also receive Chromie's mind principles, long-term goals, and experience-tuning boundaries; use them to guide replies, but do not treat them as a substitute for runtime safety checks. "
                 "If the user asks who you are, what you are, your name, age, or identity, answer from the owner-approved identity in the mind profile. "
@@ -227,7 +229,8 @@ class ConversationAgent(BaseAgent):
             )
             prompt = (
                 f"conversation_id: {conversation_id}\n\n"
-                f"Recent conversation:\n{history_block}\n\n"
+                f"Extracted memory:\n{memory_block}\n\n"
+                f"Recent turn fallback (reference resolution only):\n{recent_turn_fallback}\n\n"
                 f"Pending tasks:\n{pending_block}\n\n"
                 f"Task context:\n{task_context_block}\n\n"
                 f"Mind principles and long-term goals:\n{mind_block}\n\n"
@@ -430,6 +433,51 @@ class ConversationAgent(BaseAgent):
             compact = compact[:1200].rstrip() + "..."
         return compact
 
+    def _session_memory_from_request(self, request: AgentRunRequest) -> dict[str, Any]:
+        context = request.context or {}
+        memory = context.get("session_memory")
+        if isinstance(memory, dict):
+            return memory
+        conversation = context.get("conversation")
+        if isinstance(conversation, dict):
+            memory = conversation.get("session_memory")
+            if isinstance(memory, dict):
+                return memory
+        return {}
+
+    def _format_memory_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        memory = self._session_memory_from_request(request)
+        if not memory:
+            return "无" if zh else "None"
+        lines: list[str] = []
+        summary = str(memory.get("memory_summary") or "").strip()
+        if summary and summary.lower() != "none":
+            for item in summary.splitlines()[:8]:
+                text = item.strip().lstrip("-").strip()
+                if text:
+                    lines.append(f"- {text[:220]}")
+        entries = memory.get("extracted_memory")
+        if isinstance(entries, list) and not lines:
+            for item in entries[-6:]:
+                if not isinstance(item, dict):
+                    continue
+                text = " ".join(str(item.get("text") or "").split())
+                if text:
+                    lines.append(f"- {text[:220]}")
+        current_task = memory.get("current_task")
+        if isinstance(current_task, dict):
+            status = " ".join(str(current_task.get("status") or "").split())
+            task_summary = " ".join(str(current_task.get("summary") or "").split())
+            parts = []
+            if status:
+                parts.append(f"status={status}")
+            if task_summary:
+                parts.append(f"summary={task_summary[:180]}")
+            if parts:
+                label = "当前任务" if zh else "current_task"
+                lines.append(f"- {label}: {'; '.join(parts)}")
+        return "\n".join(lines) if lines else ("无" if zh else "None")
+
     def _format_history(self, request: AgentRunRequest, *, zh: bool) -> str:
         history = self._history_from_request(request)
         if not history:
@@ -449,6 +497,25 @@ class ConversationAgent(BaseAgent):
             intent = turn.get("intent")
             suffix = f" ({intent})" if intent and role == "user" else ""
             lines.append(f"{label}{suffix}: {text}")
+        return "\n".join(lines) if lines else ("无" if zh else "None")
+
+    def _format_recent_turn_fallback(self, request: AgentRunRequest, *, zh: bool) -> str:
+        history = self._history_from_request(request)
+        if not history:
+            return "无" if zh else "None"
+        lines: list[str] = []
+        for turn in history[-2:]:
+            role = str(turn.get("role") or "unknown").lower()
+            text = " ".join(str(turn.get("text") or "").split())
+            if not text:
+                continue
+            if len(text) > 180:
+                text = text[:180].rstrip() + "..."
+            if zh:
+                label = "用户" if role == "user" else "助手" if role == "assistant" else role
+            else:
+                label = "User" if role == "user" else "Assistant" if role == "assistant" else role.title()
+            lines.append(f"{label}: {text}")
         return "\n".join(lines) if lines else ("无" if zh else "None")
 
     def _format_pending_tasks(self, request: AgentRunRequest, *, zh: bool) -> str:

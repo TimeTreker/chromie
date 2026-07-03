@@ -39,10 +39,15 @@ PLACEHOLDER_CAPABILITY_INTENTS = {
 }
 _ROUTER_CONTEXT_OMIT_KEYS = {
     "candidate_capabilities",
+    "prompt_capabilities_common",
+    "prompt_capabilities_all",
+    "prompt_catalog_scope",
     "mind",
     "core_principles",
     "long_term_goals",
     "experience_tuning_policy",
+    "conversation",
+    "history",
 }
 
 
@@ -98,6 +103,51 @@ def _compact_candidate_capabilities(candidates: Any, *, limit: int = 8) -> list[
     return compact
 
 
+def _compact_prompt_capabilities(candidates: Any, *, limit: int = 48) -> list[dict[str, Any]]:
+    if not isinstance(candidates, list):
+        return []
+    compact: list[dict[str, Any]] = []
+    for item in candidates[:limit]:
+        if not isinstance(item, dict):
+            continue
+        capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+        if not capability_id:
+            continue
+        description = " ".join(str(item.get("description") or "").split())
+        if len(description) > 120:
+            description = description[:120].rstrip() + "..."
+        hints = item.get("hints") if isinstance(item.get("hints"), dict) else {}
+        use_when = " ".join(str(hints.get("when_to_use") or description).split())
+        if len(use_when) > 140:
+            use_when = use_when[:140].rstrip() + "..."
+        schema = item.get("input_schema") if isinstance(item.get("input_schema"), dict) else {}
+        args: dict[str, Any] = {}
+        properties = schema.get("properties") if isinstance(schema, dict) else {}
+        if isinstance(properties, dict):
+            for name, prop in list(properties.items())[:6]:
+                if not isinstance(prop, dict):
+                    continue
+                arg: dict[str, Any] = {}
+                for key in ("type", "enum", "minimum", "maximum", "default"):
+                    if key in prop:
+                        arg[key] = prop[key]
+                args[str(name)] = arg
+        compact.append(
+            {
+                "skill_id": capability_id,
+                "route": str(item.get("route") or ""),
+                "tier": str(item.get("prompt_tier") or "rare"),
+                "use_when": use_when,
+                "args": args,
+                "effects": list(item.get("effects") or [])[:4],
+                "safety": str(item.get("safety_class") or ""),
+                "confirmation": bool(item.get("requires_confirmation", False)),
+                "executable": bool(item.get("interaction_executable")),
+            }
+        )
+    return compact
+
+
 def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
     try:
         text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -114,6 +164,18 @@ def _context_without_prompt_globals(context: dict[str, Any]) -> dict[str, Any]:
         for key, value in (context or {}).items()
         if key not in _ROUTER_CONTEXT_OMIT_KEYS
     }
+
+
+def _router_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
+    prompt_context = _context_without_prompt_globals(context)
+    memory = prompt_context.get("session_memory")
+    if isinstance(memory, dict):
+        prompt_context["session_memory"] = {
+            key: value
+            for key, value in memory.items()
+            if key not in {"recent_user_request", "recent_assistant_response"}
+        }
+    return prompt_context
 
 
 def _router_global_context_section(mind: Any) -> str:
@@ -194,12 +256,19 @@ class OllamaLLMRouter:
 
     def build_user_prompt(self, request: RouteRequest) -> str:
         candidates = request.context.get("candidate_capabilities", [])
+        prompt_capabilities = request.context.get("prompt_capabilities_common", [])
+        if not prompt_capabilities:
+            prompt_capabilities = candidates
+        common_catalog_json = _bounded_json(
+            _compact_prompt_capabilities(prompt_capabilities),
+            max_chars=4200,
+        )
         candidates_json = _bounded_json(
             _compact_candidate_capabilities(candidates),
             max_chars=1100,
         )
         mind = request.context.get("mind", {})
-        session_context = _context_without_prompt_globals(request.context)
+        session_context = _router_prompt_context(request.context)
         context_json = _bounded_json(session_context, max_chars=800)
         return (
             "Global Context Group:\n"
@@ -208,7 +277,7 @@ class OllamaLLMRouter:
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON: {context_json}\n\n"
             "Current Job:\n"
-            "Act as Chromie's quick intent router. Decide route only; do not answer, execute, or authorize side effects. "
+            "Act as Chromie's quick intent router. Decide route and, when the request is made of common catalog skills, emit bounded task proposals; do not answer, execute, or authorize side effects. "
             "Choose route deep_thought for complex reasoning, design, debugging, or implementation planning. "
             "Choosing route=deep_thought is only delegation; do not perform or reveal reasoning inside the router. "
             "Do not choose deep_thought for ordinary single-turn facts, factual agreement/disagreement, greetings, jokes, songs, or simple chat. "
@@ -216,8 +285,12 @@ class OllamaLLMRouter:
             "Return calibrated low confidence when uncertain.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
-            f"Available abilities / candidate_capabilities JSON: {candidates_json}\n"
+            f"Common compact skill catalog JSON: {common_catalog_json}\n"
+            f"Query-biased catalog hints JSON: {candidates_json}\n"
+            "The common compact skill catalog is the normal fast-router skill menu. Choose by semantic meaning from this menu when the user asks Chromie to do something. "
+            "Query-biased hints may help with context, but they are not recommendations and must not override your semantic judgment. "
             "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
+            "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the common catalog; do not drop it into ordinary chat. "
             "Factual agreement/disagreement is chat: questions about the Moon, Sun, shape, temperature, or other world knowledge are not deep_thought or robot_action even if ability candidates share words such as round, turn, left, right, walk, or move. "
             "The quick router does not solve the fact; it routes common-fact questions to chat so the conversation Agent can answer. "
             "A polite ability-shaped request can be robot_action only when it asks Chromie to perform a listed body/head/pose/motion capability now. "
@@ -225,18 +298,28 @@ class OllamaLLMRouter:
             "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran.\n\n"
             "Cost Function:\n"
             "Prefer smallest safe downstream action surface; honest capability boundaries; chat for speech-only interaction and common factual claims; deep_thought only for complex multi-step reasoning or planning; clarify for ambiguity. "
-            "Prefer supported interaction-executable capability IDs over generic robot_action when a candidate clearly fits.\n\n"
+            "Prefer supported interaction-executable capability IDs over generic robot_action when a candidate clearly fits. "
+            "For simple common-skill requests, one capability intent is enough. For compound common-skill requests, preserve each requested skill in actions instead of collapsing to the first skill. "
+            "Each proposed action has its own confidence; if any required action is below confidence threshold, delegate the whole plan to deep_thought with a truthful speak_first instead of half-executing.\n\n"
             "Semantic Examples:\n"
             "- If the user asks whether you agree with a common factual claim about the Moon, Sun, shape, heat, or similar world knowledge, return {\"route\":\"chat\",\"intent\":\"factual_agreement\",\"confidence\":0.9}.\n"
             "- If the user asks Chromie to walk, turn, nod, shake her head, blink, or pose now and a matching interaction-executable candidate is listed, return robot_action with intent capability:<exact capability_id>.\n"
-            "- If candidates are planning-only or weak background context and the user is only chatting or asking a fact, ignore those candidates for routing.\n"
+            "- If the user asks for several common skills, such as walking, speaking, and blinking, return robot_action with actions ordered by the requested task sequence; use chromie.speak for the spoken part and include args.text.\n"
+            "- If no common skill fits clearly or you are not confident, return deep_thought with a brief speak_first that tells the user you need a moment. The speak_first must be truthful and must not claim execution.\n"
+            "- If catalog hints are planning-only or weak background context and the user is only chatting or asking a fact, ignore those hints for routing.\n"
             "Generalize these examples from meaning; do not make phrase rules.\n\n"
             "Output Contract:\n"
             "Return compact JSON only. Required keys: route, intent, confidence. Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
             "Minimal ordinary example: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9}. "
-            "Omit agents, actions, metadata, candidate_capabilities, and explanations unless they change downstream routing. "
+            "Omit agents, metadata, candidate_capabilities, and explanations unless they change downstream routing. "
             "Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object. "
-            "For selected robot_action use intent capability:<exact capability_id> from candidates. Never output placeholder intents such as capability or capability:<exact capability_id>. "
+            "For selected robot_action use intent capability:<exact skill_id> copied from the common compact skill catalog. Never output placeholder intents such as capability or capability:<exact capability_id>. "
+            "For compound or parameterized common-skill robot_action, include actions as an ordered array of objects: {\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential|parallel\",\"confidence\":0.0}. "
+            "Each action capability_id must be copied exactly from the common compact skill catalog. For chromie.speak, args must include a short natural text field. "
+            "Set action confidence from semantic fit and argument confidence, not from catalog search score alone. "
+            "If you include actions, use a semantic intent such as compound_common_catalog_task instead of a placeholder capability intent. "
+            "For uncertain deep_thought handoff, you may include speak_first with one short user-facing sentence in the user's language, such as a natural request for a moment to think. "
+            "Do not use speak_first to claim physical action, tool results, memory writes, or completion. "
             "For chat/clarify/interrupt/ignore, do not set capability intent. For deep_thought, use a short semantic intent such as deep_thought_complex_reasoning. "
             "Confidence is 0.0-1.0. Host task manager owns final writes and safety."
         )
@@ -266,7 +349,7 @@ class OllamaLLMRouter:
             separators=(",", ":"),
         )
         mind = request.context.get("mind", {})
-        session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=2400)
+        session_context = _bounded_json(_router_prompt_context(request.context), max_chars=2400)
         return {
             "model": self.review_model or self.model,
             "stream": False,
@@ -324,7 +407,7 @@ class OllamaLLMRouter:
             separators=(",", ":"),
         )
         mind = request.context.get("mind", {})
-        session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=2400)
+        session_context = _bounded_json(_router_prompt_context(request.context), max_chars=2400)
         return {
             "model": self.model,
             "stream": False,
@@ -727,12 +810,19 @@ class OllamaLLMRouter:
                 confidence=decision.confidence,
                 language=decision.language or request.language or "auto",
                 priority=decision.priority,
+                speak_first=decision.speak_first,
                 needs_agent=True,
                 should_speak=True,
                 candidate_capabilities=candidates,
                 reason="; ".join(reason_parts),
                 source="llm",
-                metadata=dict(decision.metadata or {}),
+                metadata={
+                    **dict(decision.metadata or {}),
+                    "thinking_ack_allowed": bool(decision.speak_first),
+                    "thinking_ack_source": (
+                        "quick_llm_speak_first" if decision.speak_first else "none"
+                    ),
+                },
             ),
             request,
             source="llm",

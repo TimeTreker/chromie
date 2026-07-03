@@ -111,6 +111,114 @@ class ConversationStateTests(unittest.TestCase):
             "weather lookup",
         )
 
+    def test_agent_result_extracted_memory_update_reaches_session_memory(self) -> None:
+        manager = ConversationStateManager()
+
+        manager.record_agent_result(
+            "s1",
+            {
+                "memory_updates": [
+                    {
+                        "type": "extracted_memory",
+                        "key": "preference",
+                        "value": {
+                            "scope": "session",
+                            "kind": "preference",
+                            "text": "User prefers jasmine tea without sugar.",
+                            "persistence_policy": "ephemeral",
+                        },
+                        "confidence": 0.9,
+                    }
+                ]
+            },
+        )
+
+        memory = manager.snapshot()["session_memory"]
+
+        self.assertIn("User prefers jasmine tea without sugar.", memory["memory_summary"])
+        self.assertEqual(memory["extracted_memory"][-1]["kind"], "preference")
+
+    def test_keyed_extracted_memory_update_revises_prior_entry(self) -> None:
+        manager = ConversationStateManager()
+
+        manager.record_agent_result(
+            "s1",
+            {
+                "memory_updates": [
+                    {
+                        "type": "extracted_memory",
+                        "value": {
+                            "scope": "session",
+                            "kind": "preference",
+                            "key": "tea_preference",
+                            "text": "User prefers jasmine tea without sugar.",
+                        },
+                    }
+                ]
+            },
+        )
+        manager.record_agent_result(
+            "s2",
+            {
+                "memory_updates": [
+                    {
+                        "type": "extracted_memory",
+                        "value": {
+                            "scope": "session",
+                            "kind": "preference",
+                            "key": "tea_preference",
+                            "text": "User corrected tea preference to green tea without sugar.",
+                        },
+                    }
+                ]
+            },
+        )
+
+        memory = manager.snapshot()["session_memory"]
+
+        self.assertIn("green tea without sugar", memory["memory_summary"])
+        self.assertNotIn("jasmine tea without sugar", memory["memory_summary"])
+        self.assertEqual(len(memory["extracted_memory"]), 1)
+
+    def test_hard_idle_boundary_clears_extracted_memory(self) -> None:
+        manager = ConversationStateManager(
+            base_conversation_id="session",
+            soft_idle_timeout_sec=5,
+            hard_idle_timeout_sec=5,
+        )
+        manager.record_agent_result(
+            "s1",
+            {
+                "memory_updates": [
+                    {
+                        "type": "extracted_memory",
+                        "value": {
+                            "scope": "session",
+                            "kind": "note",
+                            "text": "User wants this only in the current conversation.",
+                        },
+                    }
+                ]
+            },
+        )
+        manager.last_activity_ms -= 6_000
+
+        boundary = manager.prepare_for_user_text("tell me the weather", "s2")
+
+        self.assertTrue(boundary["started_new"])
+        self.assertEqual(manager.snapshot()["session_memory"]["memory_summary"], "None")
+        self.assertEqual(manager.snapshot()["extracted_memory"], [])
+
+    def test_agent_speech_alone_does_not_create_runtime_outcome_memory(self) -> None:
+        manager = ConversationStateManager()
+
+        manager.record_agent_result(
+            "s1",
+            InteractionResponse(speech=[{"text": "Done, I blinked."}]),
+        )
+
+        self.assertNotIn("Runtime confirmed", manager.snapshot()["session_memory"]["memory_summary"])
+
     def test_confirmation_pending_task_can_be_closed(self) -> None:
         manager = ConversationStateManager()
         manager.record_pending_task(
@@ -150,6 +258,67 @@ class ConversationStateTests(unittest.TestCase):
         self.assertTrue(boundary["started_new"])
         self.assertIsNone(manager.snapshot()["session_memory"]["current_task"])
         self.assertEqual(manager.get_history(), [])
+
+    def test_extracted_memory_uses_task_patch_not_raw_transcript_replay(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="session")
+        raw_turn = (
+            "I am saying this in a messy way, but please do not replay this raw "
+            "sentence in future prompts."
+        )
+
+        manager.record_user_turn(
+            "s1",
+            raw_turn,
+            route="deep_thought",
+            intent="memory_architecture_design",
+            metadata={
+                "task_relation": "new_task",
+                "task_context_patch": {
+                    "task_type": "design",
+                    "goal": "Design extracted prompt memory for Chromie",
+                    "important_claims": [
+                        "User wants refined memory extracted from chat history."
+                    ],
+                    "constraints": {
+                        "prompt_context": "do not inject raw original chat history"
+                    },
+                },
+            },
+        )
+
+        memory = manager.snapshot()["session_memory"]
+        summary = memory["memory_summary"]
+
+        self.assertIn("Current task: Design extracted prompt memory for Chromie", summary)
+        self.assertIn("User wants refined memory extracted from chat history.", summary)
+        self.assertIn("Constraint: prompt_context=do not inject raw original chat history", summary)
+        self.assertNotIn("messy way", summary)
+        self.assertNotIn("replay this raw sentence", str(memory["extracted_memory"]))
+
+    def test_extracted_memory_clears_on_reset(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="session")
+        manager.record_user_turn(
+            "s1",
+            "Please remember this only for the current session.",
+            route="memory",
+            intent="remember_session_note",
+            metadata={
+                "extracted_memory": [
+                    {
+                        "scope": "session",
+                        "kind": "preference",
+                        "text": "User wants this note kept only for the current session.",
+                    }
+                ]
+            },
+        )
+
+        self.assertIn("current session", manager.snapshot()["session_memory"]["memory_summary"])
+
+        manager.prepare_for_user_text("new session", "s2")
+
+        self.assertEqual(manager.snapshot()["session_memory"]["memory_summary"], "None")
+        self.assertEqual(manager.snapshot()["extracted_memory"], [])
 
     def test_task_context_keeps_meaningful_claim_across_sessions(self) -> None:
         manager = ConversationStateManager(base_conversation_id="session")
@@ -269,6 +438,10 @@ class ConversationStateTests(unittest.TestCase):
         self.assertTrue(updated)
         self.assertEqual(manager.snapshot()["active_pending_tasks"], [])
         self.assertEqual(manager.get_pending_tasks(), [])
+        self.assertIn(
+            "Runtime confirmed task completed: soridormi.nod_yes",
+            manager.snapshot()["session_memory"]["memory_summary"],
+        )
 
 
 if __name__ == "__main__":

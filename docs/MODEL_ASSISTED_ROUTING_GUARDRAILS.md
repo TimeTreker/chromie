@@ -11,9 +11,10 @@ expanding phrase lists. Prompt examples are teaching signals for the model;
 they must not become the implementation of normal conversation, tool, memory,
 robot-action, capability-selection, or deep-thought behavior.
 
-The Router model is a fast semantic helper. It may propose a route for normal
-requests, but it is not the authority for understanding, execution, safety, or
-physical behavior.
+The Router model is a fast semantic helper. It may propose a route and, for
+compound requests made from common catalog skills, an ordered `actions` task
+list. It is still not the authority for execution, safety, or physical
+behavior.
 
 Chromie must treat model-assisted routing as advisory control-plane data. A
 wrong model answer should be caught by deterministic controls, catalog
@@ -33,20 +34,27 @@ emergency filter
 ```
 
 The emergency filter is deterministic and fastest. The quick intent router is
-normally the small Router model (`qwen3:0.6b`) with catalog candidates and
-bounded context. Route validation is deterministic but does not answer the user:
-it only corrects capability-contract, availability, and safety impossibilities
-and must not become another intent-understanding stage. The deepthinking Agent
-uses the larger Agent model for low-confidence or explicitly complex requests.
+normally the small Router model (`qwen3:0.6b`) with bounded context and the
+compact common skill catalog. Query-biased catalog matches are hints only; they
+must not be treated as deterministic recommendations. Route validation is
+deterministic but does not answer the user: it only checks capability-contract,
+availability, schema, and safety impossibilities and must not become another
+intent-understanding stage. The deepthinking Agent uses the larger Agent model
+with the full catalog for low-confidence or explicitly complex requests.
 
 The ownership invariant is:
 
 - only the emergency filter may use rules or phrase patterns to determine a
   route;
-- quick intent for normal language belongs to the catalog-bounded small Router
-  model, not to regexes;
-- capability selection belongs to the Agent model interpreting the user request,
-  capability descriptions, and schemas, not to action phrase lists;
+- quick intent and common capability selection for normal language belong to the
+  catalog-aware small Router model, not to regexes or catalog-score action
+  rules;
+- quick intent may emit multiple common-catalog task proposals in
+  `RouteDecision.actions`; "quick" means small model plus compact catalog and
+  short latency, not "single task only";
+- deeper capability selection and revision belong to the Agent model
+  interpreting the user request, full catalog descriptions, and schemas, not to
+  action phrase lists;
 - deep reasoning, planning, and low-confidence correction belong to
   `deepthinking_agent`;
 - spoken response quality for normal conversation belongs to model-based
@@ -68,10 +76,22 @@ These fields are not authorization: they are the inspectable plan substrate
 that later validators, agents, Skill Runtime, and providers must accept before
 anything executes.
 
+For quick-router compound robot actions, `RouteDecision.actions[]` is the
+compatibility execution hint. Items must use exact common-catalog
+`capability_id` values, schema-shaped `args`, and per-action `confidence`.
+If any required action is below the Router threshold, the quick plan is
+delegated to `deep_thought` rather than partially executed. Spoken content
+inside a physical task is represented as `chromie.speak` with `args.text`, so
+speech and movement stay in the same task proposal substrate.
+Delegation preserves the quick plan in `quick_router_review_request`; the
+deepthinking output can then record `quick_review.decision=accept|revise|supersede`
+and mark replaced quick proposals as `superseded` in the shared ledger.
+
 The host can act on the first safe part of that substrate before every slower
-proposal has arrived. Today this is limited to `ORCH_FAST_FIRST_RESPONSE_ENABLED`
-speech: a short route-level phrase such as `I'll check if I can do that
-safely.` or `I'll answer.` after Router returns. It is provisional and
+proposal has arrived. Today this includes `ORCH_FAST_FIRST_RESPONSE_ENABLED`
+speech and model-provided `speak_first` for deep-thought handoff: a short
+route-level phrase such as `I'll check if I can do that safely.` or a natural
+request for a moment to think after Router returns. It is provisional and
 correctable. Later Agent or deep-thinking output can amend the turn, ask a
 clarification, or cancel/stop work, but the first phrase must never claim that a
 physical action or tool side effect has already happened.
@@ -95,8 +115,11 @@ validation, but it must not automatically resume interrupted physical work.
    phrase routing and regex action parsing must not become normal hybrid
    language understanding.
 2. The capability catalog bounds the model's choices.
-   The model may select from known routes, capabilities, or task types. It must
-   not invent skills, body controls, hardware state, or hidden provider support.
+   The fast Router receives the compact common catalog; deepthinking receives
+   the full catalog. The model may select from known routes, capabilities, or
+   task types. It must not invent skills, body controls, hardware state, or
+   hidden provider support. Catalog partitioning controls prompt budget; it is
+   not semantic action selection.
 3. Low confidence means delegate, clarify, or fail closed.
    Ambiguous or low-confidence quick routes should normally enter
    `deep_thought` so the larger model can reason with session memory.

@@ -538,6 +538,30 @@ class _SelectedWalkOllama:
         }
 
 
+class _ExtractedMemoryCapabilityOllama:
+    def __init__(self) -> None:
+        self.prompts: list[str] = []
+
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        self.prompts.append(prompt)
+        assert "Extracted memory" in prompt
+        assert "Current task: walk forward using extracted memory" in prompt
+        assert "RAW_HISTORY_SHOULD_NOT_REACH_CAPABILITY_PROMPT" not in prompt
+        assert "RAW_CONTEXT_HISTORY_SHOULD_NOT_REACH_CAPABILITY_PROMPT" not in prompt
+        assert "RAW_RECENT_USER_SHOULD_NOT_REACH_CAPABILITY_PROMPT" not in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "Walking forward.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0, "speed": "quick"},
+                }
+            ],
+        }
+
+
 class _SelectedVelocityBetterForwardOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "Router-selected exact skill_id: soridormi.walk_velocity" in prompt
@@ -1028,12 +1052,71 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(response.skills), 1)
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
         self.assertEqual(response.skills[0].args, {"duration_s": 3.0, "speed": "quick"})
+
+    async def test_capability_prompt_uses_extracted_memory_not_raw_history(self) -> None:
+        ollama = _ExtractedMemoryCapabilityOllama()
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "capability-memory-context",
+                "text": "Continue with that walking plan.",
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "RAW_HISTORY_SHOULD_NOT_REACH_CAPABILITY_PROMPT",
+                    }
+                ],
+                "context": {
+                    "history": [
+                        {
+                            "role": "assistant",
+                            "text": "RAW_CONTEXT_HISTORY_SHOULD_NOT_REACH_CAPABILITY_PROMPT",
+                        }
+                    ],
+                    "session_memory": {
+                        "kind": "short_term_session_memory",
+                        "conversation_id": "session",
+                        "recent_user_request": "RAW_RECENT_USER_SHOULD_NOT_REACH_CAPABILITY_PROMPT",
+                        "memory_summary": "- Current task: walk forward using extracted memory",
+                        "extracted_memory": [
+                            {
+                                "scope": "task",
+                                "kind": "goal",
+                                "text": "Current task: walk forward using extracted memory",
+                                "confidence": 0.9,
+                            }
+                        ],
+                    },
+                },
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.95,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(
             response.skills[0].metadata["source"],
             "capability_catalog",
         )
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
-        self.assertEqual(response.speech[0].text, "Walking forward for 3 seconds.")
+        self.assertEqual(response.speech[0].text, "Walking forward.")
 
     async def test_router_task_list_fast_path_executes_low_risk_blink_without_llm(self) -> None:
         runtime = InteractionRuntime(

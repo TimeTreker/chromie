@@ -8,6 +8,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Deque
 
+from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
+
 
 _DONE_TASK_STATUSES = {"done", "failed", "cancelled", "canceled", "expired"}
 _TASK_RELATIONS = {
@@ -156,6 +158,7 @@ class ConversationStateManager:
         turn_max_text_chars: int = 260,
         max_context_chars: int = 2200,
         max_pending_tasks: int = 8,
+        max_memory_entries: int = 24,
         completed_task_retention_sec: int = 180,
         task_store_enabled: bool = False,
         task_store_path: str | os.PathLike[str] | None = None,
@@ -171,6 +174,7 @@ class ConversationStateManager:
         self.turn_max_text_chars = max(20, int(turn_max_text_chars))
         self.max_context_chars = max(200, int(max_context_chars))
         self.max_pending_tasks = max(0, int(max_pending_tasks))
+        self.max_memory_entries = max(1, int(max_memory_entries))
         self.completed_task_retention_sec = max(0, int(completed_task_retention_sec))
         self.task_store_enabled = bool(task_store_enabled)
         self.task_store_path = self._resolve_task_store_path(task_store_path)
@@ -186,6 +190,9 @@ class ConversationStateManager:
         self._turns: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_turns * 2))
         self._pending_tasks: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_pending_tasks))
         self._task_contexts: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_pending_tasks))
+        self._memory_store = MemoryStore(max_entries=self.max_memory_entries)
+        self._memory_extractor = MemoryExtractor()
+        self._memory_prompt_builder = MemoryPromptBuilder()
         self.last_split_reason: str | None = None
         if self.task_store_enabled:
             self._restore_task_contexts()
@@ -209,6 +216,7 @@ class ConversationStateManager:
             max_pending_tasks=int(
                 os.getenv("ORCH_CONVERSATION_MAX_PENDING_TASKS", os.getenv("ORCH_CONTEXT_MAX_PENDING_TASKS", "8"))
             ),
+            max_memory_entries=int(os.getenv("ORCH_CONVERSATION_MAX_MEMORY_ENTRIES", "24")),
             completed_task_retention_sec=int(os.getenv("ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC", "180")),
             task_store_enabled=_env_bool("ORCH_ENABLE_TASK_CONTEXT_STORE", False),
             task_store_path=os.getenv("ORCH_TASK_CONTEXT_STORE_PATH", _DEFAULT_TASK_STORE_PATH),
@@ -331,7 +339,12 @@ class ConversationStateManager:
         return text
 
     def _has_any_context(self) -> bool:
-        return bool(self._turns or self._pending_tasks or self._task_contexts)
+        return bool(
+            self._turns
+            or self._pending_tasks
+            or self._task_contexts
+            or self._memory_store.prompt_entries(limit=1)
+        )
 
     def _active_pending_tasks(self) -> list[dict[str, Any]]:
         self._prune_completed_tasks()
@@ -607,6 +620,7 @@ class ConversationStateManager:
         self._turns.clear()
         self._pending_tasks.clear()
         self._task_contexts.clear()
+        self._memory_store.clear()
         self._persist_task_contexts_if_enabled()
         self.last_split_reason = reason
         return {
@@ -684,6 +698,7 @@ class ConversationStateManager:
         current_task_context = self._current_task_context()
         latest_user = self._latest_turn("user")
         latest_assistant = self._latest_turn("assistant")
+        extracted_memory = self._memory_prompt_builder.build(self._memory_store)
         summaries = [
             str(task.get("summary") or task.get("type") or "task")
             for task in active_tasks[-4:]
@@ -710,6 +725,8 @@ class ConversationStateManager:
             "current_task_context": current_task_context,
             "active_task_contexts": active_task_contexts[-4:],
             "active_pending_tasks": active_tasks[-4:],
+            "extracted_memory": extracted_memory["entries"],
+            "memory_summary": extracted_memory["summary"],
             "forgetting_policy": {
                 "explicit_reset_clears_history_and_tasks": True,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
@@ -733,6 +750,7 @@ class ConversationStateManager:
             "task_contexts": list(self._task_contexts),
             "active_task_contexts": self._active_task_contexts(),
             "current_task_context": self._current_task_context(),
+            "extracted_memory": self._memory_store.snapshot(),
             "session_memory": self.session_memory(),
             "task_store": {
                 "enabled": self.task_store_enabled,
@@ -744,6 +762,7 @@ class ConversationStateManager:
                 "max_context_chars": self.max_context_chars,
                 "soft_idle_timeout_sec": self.soft_idle_timeout_sec,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
+                "max_memory_entries": self.max_memory_entries,
                 "completed_task_retention_sec": self.completed_task_retention_sec,
             },
         }
@@ -783,6 +802,15 @@ class ConversationStateManager:
             route=route,
             intent=intent,
             metadata=metadata,
+        )
+        self._memory_store.add_many(
+            self._memory_extractor.extract_user_turn(
+                sid=sid,
+                text=compact,
+                route=route,
+                metadata=metadata,
+                task_context=self._current_task_context(),
+            )
         )
         self.last_activity_ms = _now_ms()
 
@@ -948,6 +976,14 @@ class ConversationStateManager:
                     context["updated_ms"] = task["updated_ms"]
                     self._persist_task_contexts_if_enabled()
                     break
+            self._memory_store.add_many(
+                self._memory_extractor.extract_task_outcome(
+                    sid=str(task.get("sid") or ""),
+                    summary=str(task.get("summary") or task.get("type") or "task"),
+                    status=str(task.get("status") or final_status),
+                    trusted=True,
+                )
+            )
             self.last_activity_ms = _now_ms()
             return True
         return False
@@ -1030,6 +1066,14 @@ class ConversationStateManager:
             if not isinstance(update, dict):
                 continue
             update_type = str(update.get("type") or "")
+            if update_type in {"extracted_memory", "memory_entry", "memory"}:
+                self._memory_store.add_many(
+                    self._memory_extractor.extract_explicit_entries(
+                        update.get("value"),
+                        sid=sid,
+                    )
+                )
+                continue
             if update_type not in {"pending_task", "task_status", "active_task"}:
                 continue
             value = update.get("value")

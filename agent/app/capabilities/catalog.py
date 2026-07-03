@@ -16,6 +16,22 @@ logger = logging.getLogger("chromie.agent.capability_catalog")
 
 CapabilityInvocationKind = Literal["mcp_tool", "named_skill"]
 CapabilityRoute = Literal["chat", "robot_action", "tool", "memory"]
+CapabilityPromptTier = Literal["common", "rare"]
+
+COMMON_NAMED_SKILL_IDS = {
+    "blink_eyes",
+    "express_attention",
+    "look_at_person",
+    "look_direction",
+    "nod_yes",
+    "shake_no",
+    "sidestep",
+    "stand_idle",
+    "stop",
+    "turn_in_place",
+    "walk_forward",
+    "walk_velocity",
+}
 
 _STOP_WORDS = {
     "a",
@@ -126,6 +142,7 @@ class CatalogCapability(BaseModel):
     source: str = "registry"
     invocation_kind: CapabilityInvocationKind = "mcp_tool"
     interaction_executable: bool = False
+    prompt_tier: CapabilityPromptTier = "rare"
     tags: list[str] = Field(default_factory=list)
     hints: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -215,6 +232,41 @@ class CapabilityCatalog:
             "capabilities": [item.model_dump(mode="json") for item in self.entries()],
             "live_refresh_error": self._last_refresh_error,
         }
+
+    async def prompt_entries(
+        self,
+        *,
+        scope: Literal["common", "all"] = "common",
+        refresh: bool = False,
+    ) -> list[CatalogCapability]:
+        await self.refresh_live_named_skills(force=refresh)
+        entries = [item for item in self.entries() if item.available]
+        if scope == "common":
+            entries = [item for item in entries if item.prompt_tier == "common"]
+        return sorted(
+            entries,
+            key=lambda item: (
+                item.prompt_tier != "common",
+                not item.interaction_executable,
+                item.route,
+                item.capability_id,
+            ),
+        )
+
+    async def get_capability(
+        self,
+        capability_id: str,
+        *,
+        refresh: bool = False,
+    ) -> CatalogCapability | None:
+        await self.refresh_live_named_skills(force=refresh)
+        target = (capability_id or "").strip()
+        if not target:
+            return None
+        for item in self.entries():
+            if item.capability_id == target:
+                return item
+        return None
 
     async def search(
         self,
@@ -417,6 +469,7 @@ class CapabilityCatalog:
                         source="soridormi.live_named_skills",
                         invocation_kind="named_skill",
                         interaction_executable=True,
+                        prompt_tier=self._prompt_tier_for_live_skill(upstream_id, item),
                         tags=["soridormi", "robot", "named_skill"],
                         hints={
                             "when_to_use": item.get("when_to_use"),
@@ -453,13 +506,38 @@ class CapabilityCatalog:
                     route=self._route_for_tool(tool),
                     source="registry",
                     invocation_kind="mcp_tool",
-                    interaction_executable=False,
+                    interaction_executable=self._interaction_executable_for_tool(tool),
+                    prompt_tier=self._prompt_tier_for_tool(tool),
                     tags=[*agent.tags],
                     hints=dict(tool.llm_hints),
                     metadata={"version": tool.version},
                 )
             )
         return entries
+
+    def _prompt_tier_for_live_skill(
+        self,
+        upstream_id: str,
+        item: dict[str, Any],
+    ) -> CapabilityPromptTier:
+        explicit = str(item.get("prompt_tier") or item.get("router_prompt_tier") or "").strip().lower()
+        if explicit in {"common", "rare"}:
+            return explicit  # type: ignore[return-value]
+        return "common" if upstream_id in COMMON_NAMED_SKILL_IDS else "rare"
+
+    def _prompt_tier_for_tool(self, tool: ToolCapability) -> CapabilityPromptTier:
+        explicit = str(tool.llm_hints.get("prompt_tier") or "").strip().lower()
+        if explicit in {"common", "rare"}:
+            return explicit  # type: ignore[return-value]
+        if tool.name == "chromie.speak":
+            return "common"
+        if tool.name in {"chromie.memory.remember", "chromie.memory.recall"}:
+            return "common"
+        return "rare"
+
+    @staticmethod
+    def _interaction_executable_for_tool(tool: ToolCapability) -> bool:
+        return tool.name == "chromie.speak"
 
     def _route_for_tool(self, tool: ToolCapability) -> CapabilityRoute:
         effects = set(tool.effects)

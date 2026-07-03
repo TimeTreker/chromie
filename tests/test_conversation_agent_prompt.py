@@ -959,7 +959,8 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.speak_immediate[0].text, "The Sun is extremely hot.")
         self.assertEqual(len(ollama.calls), 1)
-        self.assertIn("Recent conversation:", ollama.calls[0]["prompt"])
+        self.assertIn("Extracted memory:", ollama.calls[0]["prompt"])
+        self.assertIn("Recent turn fallback", ollama.calls[0]["prompt"])
         self.assertIn("The Sun is not cold.", ollama.calls[0]["prompt"])
 
     async def test_song_requests_are_left_to_llm_as_original_spoken_creativity(self) -> None:

@@ -181,6 +181,64 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             0,
         )
 
+    async def test_low_confidence_deep_thought_schedules_model_speak_first(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+        assistant.order_lock = asyncio.Lock()
+        assistant.synthesis_order = 0
+        assistant.playback_generation = 0
+        assistant.active_synthesis_tasks = set()
+        assistant.playback_start_waiters = {}
+        assistant.tts_text_chunking_enabled = True
+        assistant.tts_chunk_chars = 80
+        assistant.tts_min_chunk_chars = 40
+        assistant.tts_flush_chars = 160
+        seen: list[str] = []
+
+        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
+            self.sessions.log(sid, message, *args)
+
+        async def synthesize_one(
+            self: VoiceAssistant,
+            text: str,
+            order: int,
+            session_id: str | None,
+            generation: int,
+        ) -> None:
+            del order, session_id, generation
+            seen.append(text)
+
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant.synthesize_one = MethodType(synthesize_one, assistant)
+        decision = RouteDecision(
+            route="deep_thought",
+            agents=["deepthinking_agent", "speaker_agent"],
+            intent="deep_thought_low_confidence",
+            language="en-US",
+            speak_first="Give me a moment to think that through.",
+            metadata={
+                "thinking_ack_allowed": True,
+                "thinking_ack_source": "quick_llm_speak_first",
+            },
+        )
+
+        scheduled = await assistant._schedule_deep_thought_ack(
+            decision,
+            "Please figure this out.",
+            session_id,
+        )
+        pending = list(assistant.active_synthesis_tasks)
+        if pending:
+            await asyncio.gather(*pending)
+
+        self.assertTrue(scheduled)
+        self.assertEqual(seen, ["Give me a moment to think that through."])
+        self.assertEqual(
+            assistant.sessions.state[session_id]["scheduled_tts"],
+            1,
+        )
+
     def test_fast_first_response_text_is_route_truthful(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True

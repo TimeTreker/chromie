@@ -331,6 +331,7 @@ and Router validation.
 | `ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS` | `260`. |
 | `ORCH_CONVERSATION_MAX_CONTEXT_CHARS` | `2200`. |
 | `ORCH_CONVERSATION_MAX_PENDING_TASKS` | `8`. |
+| `ORCH_CONVERSATION_MAX_MEMORY_ENTRIES` | `24`; maximum process-local extracted memory entries retained in the current conversation. |
 | `ORCH_CONVERSATION_RESET_PHRASES` | Optional `|`-separated override. |
 | `ORCH_CONVERSATION_FOLLOWUP_PHRASES` | Optional `|`-separated override. |
 | `ORCH_CONVERSATION_NEW_TOPIC_STARTERS` | Optional `|`-separated override. |

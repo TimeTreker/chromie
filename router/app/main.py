@@ -5,7 +5,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
@@ -87,6 +87,8 @@ logger = logging.getLogger("chromie.router")
 CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE = 0.30
 CATALOG_DEEP_THOUGHT_ROBOT_ACTION_RECOVERY_MIN_SCORE = 0.30
 DEEP_THOUGHT_ACTION_RECOVERY_MIN_CONFIDENCE = 0.72
+PROMPT_CATALOG_COMMON_LIMIT = 48
+PROMPT_CATALOG_ALL_LIMIT = 96
 
 app = FastAPI(
     title="Chromie Router",
@@ -179,6 +181,53 @@ def _capability_id(item: dict) -> str:
     return str(item.get("capability_id") or "").strip()
 
 
+def _unique_capabilities(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    ordered: list[str] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        capability_id = _capability_id(item)
+        if not capability_id:
+            continue
+        if capability_id not in merged:
+            ordered.append(capability_id)
+            merged[capability_id] = dict(item)
+            continue
+        merged[capability_id] = {**merged[capability_id], **dict(item)}
+    return [merged[capability_id] for capability_id in ordered]
+
+
+def _prompt_catalog_capabilities(
+    snapshot: dict[str, Any],
+    *,
+    scope: Literal["common", "all"],
+) -> list[dict[str, Any]]:
+    raw = snapshot.get("capabilities") if isinstance(snapshot, dict) else None
+    if not isinstance(raw, list):
+        return []
+    items: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        if item.get("available") is False:
+            continue
+        tier = str(item.get("prompt_tier") or "rare")
+        if scope == "common" and tier != "common":
+            continue
+        items.append(dict(item))
+    items.sort(
+        key=lambda item: (
+            str(item.get("prompt_tier") or "rare") != "common",
+            item.get("interaction_executable") is not True,
+            str(item.get("route") or ""),
+            _capability_id(item),
+        )
+    )
+    limit = PROMPT_CATALOG_COMMON_LIMIT if scope == "common" else PROMPT_CATALOG_ALL_LIMIT
+    return items[:limit]
+
+
 def _intent_capability_id(intent: str) -> str:
     prefix = "capability:"
     normalized = (intent or "").strip()
@@ -193,6 +242,13 @@ def _capability_available(item: dict) -> bool:
 
 def _capability_executable(item: dict) -> bool:
     return _capability_available(item) and bool(item.get("interaction_executable"))
+
+
+def _capability_allowed_in_quick_action(item: dict) -> bool:
+    capability_id = _capability_id(item)
+    if capability_id == "chromie.speak":
+        return _capability_available(item)
+    return _capability_executable(item)
 
 
 def _interaction_executable_candidates(result: CapabilityCatalogResult) -> list[dict]:
@@ -214,6 +270,38 @@ def _top_scored_capability(items: list[dict]) -> tuple[dict | None, float]:
 
 def _normalized_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
+def _action_sequence(action: Any, fallback: int) -> int:
+    if not isinstance(action, dict):
+        return fallback
+    value = action.get("sequence")
+    if isinstance(value, bool):
+        return fallback
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _action_confidence(action: dict[str, Any], fallback: float) -> float | None:
+    value = action.get("confidence")
+    if value is None:
+        return max(0.0, min(1.0, float(fallback)))
+    if isinstance(value, bool):
+        return None
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _default_thinking_speak_first(language: str) -> str:
+    if (language or "").startswith("zh"):
+        return "给我一点时间想清楚。"
+    return "Give me a moment to think that through."
 
 
 def _looks_like_explicit_body_action(text: str) -> bool:
@@ -440,6 +528,51 @@ def _deep_thought_action_recovery_allowed(decision: RouteDecision) -> bool:
     return not any(term in reason for term in blocked_reason_terms)
 
 
+def _safe_thinking_speak_first(text: str | None, *, language: str) -> str | None:
+    cleaned = " ".join((text or "").strip().split())
+    if not cleaned:
+        return None
+    if len(cleaned) > 120:
+        cleaned = cleaned[:120].rstrip()
+    normalized = cleaned.casefold()
+    action_claim_terms = (
+        "done",
+        "completed",
+        "executing",
+        "moving",
+        "walking",
+        "turning",
+        "blinking",
+        "nodding",
+        "i did",
+        "i will do it",
+        "doing it now",
+        "已",
+        "已经",
+        "完成",
+        "执行",
+        "正在",
+        "开始",
+        "走",
+        "移动",
+        "眨",
+        "点头",
+        "转",
+    )
+    if any(term in normalized for term in action_claim_terms):
+        return None
+    return cleaned
+
+
+def _thinking_ack_allowed_from_decision(decision: RouteDecision) -> bool:
+    return bool(
+        _safe_thinking_speak_first(
+            decision.speak_first,
+            language=decision.language or "auto",
+        )
+    )
+
+
 def _clarify_capability_decision(
     request: RouteRequest,
     result: CapabilityCatalogResult,
@@ -476,7 +609,10 @@ def _validate_llm_capability_decision(
     decision: RouteDecision,
     result: CapabilityCatalogResult,
 ) -> RouteDecision:
-    candidates = list(result.matches or [])
+    prompt_capabilities = request.context.get("prompt_capabilities_common")
+    if not isinstance(prompt_capabilities, list):
+        prompt_capabilities = []
+    candidates = _unique_capabilities([*list(result.matches or []), *prompt_capabilities])
     decision.candidate_capabilities = candidates
     by_id = {_capability_id(item): item for item in candidates if _capability_id(item)}
     selected_id = _intent_capability_id(decision.intent)
@@ -489,6 +625,97 @@ def _validate_llm_capability_decision(
         ) + "validator normalized exact capability intent"
 
     if decision.route == "robot_action":
+        if decision.actions:
+            normalized_actions: list[dict[str, Any]] = []
+            invalid_reasons: list[str] = []
+            low_confidence_reasons: list[str] = []
+            ordered_actions = sorted(
+                enumerate(decision.actions),
+                key=lambda pair: (_action_sequence(pair[1], pair[0]), pair[0]),
+            )
+            for normalized_index, (index, action) in enumerate(ordered_actions):
+                if not isinstance(action, dict):
+                    invalid_reasons.append(f"action[{index}] is not an object")
+                    continue
+                capability_id = str(action.get("capability_id") or "").strip()
+                if not capability_id:
+                    invalid_reasons.append(f"action[{index}] missing capability_id")
+                    continue
+                selected = by_id.get(capability_id)
+                if selected is None:
+                    invalid_reasons.append(f"action[{index}] unknown capability_id {capability_id!r}")
+                    continue
+                if not _capability_allowed_in_quick_action(selected):
+                    invalid_reasons.append(f"action[{index}] capability is unavailable or not quick-action executable")
+                    continue
+                args = action.get("args") if isinstance(action.get("args"), dict) else {}
+                if capability_id == "chromie.speak" and not str(args.get("text") or "").strip():
+                    invalid_reasons.append(f"action[{index}] chromie.speak missing args.text")
+                    continue
+                action_confidence = _action_confidence(action, decision.confidence)
+                if action_confidence is None:
+                    invalid_reasons.append(f"action[{index}] has invalid confidence")
+                    continue
+                if action_confidence < settings.confidence_threshold:
+                    low_confidence_reasons.append(
+                        f"action[{index}] confidence {action_confidence:.2f} "
+                        f"below threshold {settings.confidence_threshold:.2f}"
+                    )
+                    continue
+                timing = str(action.get("timing") or "").strip()
+                normalized: dict[str, Any] = {
+                    "capability_id": capability_id,
+                    "args": args,
+                    "sequence": normalized_index,
+                    "confidence": round(action_confidence, 4),
+                }
+                if timing in {"parallel", "sequential"}:
+                    normalized["timing"] = timing
+                reason = str(action.get("reason") or "").strip()
+                if reason:
+                    normalized["reason"] = reason[:160]
+                normalized_actions.append(normalized)
+            if invalid_reasons or low_confidence_reasons or not normalized_actions:
+                if low_confidence_reasons and not _safe_thinking_speak_first(
+                    decision.speak_first,
+                    language=decision.language or request.language or "auto",
+                ):
+                    decision.speak_first = _default_thinking_speak_first(
+                        decision.language or request.language or "auto"
+                    )
+                    decision.metadata = {
+                        **(decision.metadata or {}),
+                        "validator_default_thinking_ack": True,
+                    }
+                return _deep_thought_from_low_confidence(
+                    request,
+                    decision,
+                    reason_prefix=(
+                        "quick router compound action list needs deep_thought review: "
+                        + "; ".join([*invalid_reasons, *low_confidence_reasons][:4])
+                    ),
+                )
+            decision.actions = normalized_actions
+            if not decision.intent or decision.intent in {"unknown", "robot_action"} or _is_placeholder_capability_intent(raw_intent):
+                decision.intent = "compound_common_catalog_task"
+                if _is_placeholder_capability_intent(raw_intent):
+                    decision.reason = (
+                        f"{decision.reason}; " if decision.reason else ""
+                    ) + "validator normalized placeholder intent for valid compound actions"
+            decision.metadata = {
+                **(decision.metadata or {}),
+                "quick_router_action_count": len(normalized_actions),
+                "quick_router_compound_tasks": len(normalized_actions) > 1,
+                "quick_router_action_min_confidence": min(
+                    float(item["confidence"]) for item in normalized_actions
+                ),
+            }
+            required_agents = ["capability_agent", "safety_agent"]
+            if decision.should_speak:
+                required_agents.append("speaker_agent")
+            decision.agents = list(dict.fromkeys([*decision.agents, *required_agents]))
+            return finalize_decision(decision, request, source="llm")
+
         if _is_placeholder_capability_intent(raw_intent):
             return fallback_decision(
                 request,
@@ -554,9 +781,15 @@ def _validate_llm_capability_decision(
         return finalize_decision(decision, request, source="llm")
 
     if decision.route == "deep_thought":
+        safe_speak_first = _safe_thinking_speak_first(
+            decision.speak_first,
+            language=decision.language or request.language or "auto",
+        )
+        decision.speak_first = safe_speak_first
         decision.metadata = {
             **(decision.metadata or {}),
-            "thinking_ack_allowed": False,
+            "thinking_ack_allowed": bool(safe_speak_first),
+            "thinking_ack_source": "quick_llm_speak_first" if safe_speak_first else "none",
         }
 
     if selected_id:
@@ -590,6 +823,30 @@ def _deep_thought_from_low_confidence(
     ]
     if decision.reason:
         reason_parts.append(f"quick_reason={decision.reason}")
+    thinking_ack_allowed = _thinking_ack_allowed_from_decision(decision)
+    if (decision.metadata or {}).get("validator_default_thinking_ack") is True:
+        thinking_ack_source = "quick_validator_default_speak_first"
+    elif thinking_ack_allowed:
+        thinking_ack_source = "quick_llm_speak_first"
+    else:
+        thinking_ack_source = "none"
+    quick_stage = route_stage_output(
+        decision,
+        stage="quick_intent",
+        status="needs_deep_review",
+    )
+    quick_review_request = {
+        "schema_version": 1,
+        "review_status": "needs_review",
+        "execution_state": "not_committed",
+        "reason": reason_parts[0],
+        "quick_route": decision.route,
+        "quick_intent": decision.intent,
+        "quick_confidence": decision.confidence,
+        "quick_actions": list(decision.actions),
+        "quick_task_list": quick_stage.get("tasks", []),
+        "quick_task_proposals": quick_stage.get("task_proposals", []),
+    }
     return finalize_decision(
         RouteDecision(
             route="deep_thought",
@@ -598,6 +855,10 @@ def _deep_thought_from_low_confidence(
             confidence=decision.confidence,
             language=decision.language or request.language or "auto",
             priority=decision.priority,
+            speak_first=_safe_thinking_speak_first(
+                decision.speak_first,
+                language=decision.language or request.language or "auto",
+            ),
             needs_agent=True,
             should_speak=True,
             candidate_capabilities=candidates,
@@ -605,7 +866,9 @@ def _deep_thought_from_low_confidence(
             source="llm",
             metadata={
                 **(decision.metadata or {}),
-                "thinking_ack_allowed": False,
+                "thinking_ack_allowed": thinking_ack_allowed,
+                "thinking_ack_source": thinking_ack_source,
+                "quick_router_review_request": quick_review_request,
             },
         ),
         request,
@@ -633,6 +896,8 @@ def _attach_stage_context(
     *,
     emergency_matched: bool,
     catalog_result: CapabilityCatalogResult,
+    prompt_capabilities_common: list[dict[str, Any]] | None = None,
+    prompt_capabilities_all: list[dict[str, Any]] | None = None,
 ) -> None:
     previous = request.context.get("router_stage_context")
     # Preserve low-score context-fill candidates for semantic recovery. A
@@ -640,9 +905,14 @@ def _attach_stage_context(
     # multilingual or ASR-noisy requests; only catalog-owned fallback execution
     # is gated on ``matched``.
     candidate_capabilities = list(catalog_result.matches or [])
+    common = _unique_capabilities(list(prompt_capabilities_common or []))
+    full = _unique_capabilities(list(prompt_capabilities_all or []))
     request.context = {
         **request.context,
         "candidate_capabilities": candidate_capabilities,
+        "prompt_capabilities_common": common,
+        "prompt_capabilities_all": full,
+        "prompt_catalog_scope": "common",
         "capability_catalog_version": catalog_result.catalog_version,
         "router_stage_context": {
             **(previous if isinstance(previous, dict) else {}),
@@ -885,6 +1155,12 @@ def _catalog_planner_fallback_decision(
     *,
     llm_decision: RouteDecision,
 ) -> RouteDecision | None:
+    if _looks_like_explicit_deep_thought_text(request.text):
+        return _semantic_deep_thought_decision(
+            request,
+            result,
+            reason="LLM router unavailable; explicit deep-thought request delegated",
+        )
     if result.suggested_route != "robot_action":
         return _catalog_decision(request, result)
     if _looks_like_speech_only_social_text(request.text):
@@ -902,54 +1178,22 @@ def _catalog_planner_fallback_decision(
     top, top_score = _top_scored_capability(executable)
     if top_score < CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE:
         return None
-    if _looks_like_explicit_body_action(request.text):
-        selected_id = _capability_id(top or {})
-        if selected_id:
-            reason_parts = [
-                "LLM router unavailable; exact explicit robot action selected from catalog",
-                f"catalog_version={result.catalog_version}",
-                f"catalog_score={top_score:.2f}",
-            ]
-            if llm_decision.reason:
-                reason_parts.append(f"llm_fallback_reason={llm_decision.reason}")
-            return finalize_decision(
-                RouteDecision(
-                    route="robot_action",
-                    agents=[
-                        "capability_agent",
-                        "safety_agent",
-                        "speaker_agent",
-                    ],
-                    intent=f"capability:{selected_id}",
-                    confidence=max(0.56, min(0.95, top_score)),
-                    language=request.language or "auto",
-                    priority="normal",
-                    needs_agent=True,
-                    should_speak=True,
-                    candidate_capabilities=result.matches,
-                    reason="; ".join(reason_parts),
-                    source="catalog",
-                ),
-                request,
-                source="catalog",
-            )
     reason_parts = [
-        "LLM router unavailable; preserving catalog candidates for capability planner",
+        "LLM router unavailable; delegating catalog-bounded robot request to deep_thought",
         f"catalog_version={result.catalog_version}",
+        f"catalog_score={top_score:.2f}",
     ]
     if llm_decision.reason:
         reason_parts.append(f"llm_fallback_reason={llm_decision.reason}")
     return finalize_decision(
         RouteDecision(
-            route="robot_action",
+            route="deep_thought",
             agents=[
-                "capability_agent",
-                "conversation_agent",
-                "safety_agent",
+                "deepthinking_agent",
                 "speaker_agent",
             ],
-            intent="robot_action",
-            confidence=max(0.50, min(0.72, top_score)),
+            intent="deep_thought_router_unavailable",
+            confidence=0.50,
             language=request.language or "auto",
             priority="normal",
             needs_agent=True,
@@ -957,6 +1201,7 @@ def _catalog_planner_fallback_decision(
             candidate_capabilities=result.matches,
             reason="; ".join(reason_parts),
             source="catalog",
+            metadata={"thinking_ack_allowed": False},
         ),
         request,
         source="catalog",
@@ -980,10 +1225,28 @@ async def route(request: RouteRequest) -> RouteDecision:
             text=request.text,
             language=request.language,
         )
+        snapshot_method = getattr(capability_catalog, "snapshot", None)
+        catalog_snapshot = await snapshot_method() if callable(snapshot_method) else {}
+        prompt_capabilities_common = _prompt_catalog_capabilities(
+            catalog_snapshot,
+            scope="common",
+        )
+        prompt_capabilities_all = _prompt_catalog_capabilities(
+            catalog_snapshot,
+            scope="all",
+        )
+        if not prompt_capabilities_common:
+            prompt_capabilities_common = list(catalog_result.matches or [])
+        if not prompt_capabilities_all:
+            prompt_capabilities_all = _unique_capabilities(
+                [*prompt_capabilities_common, *list(catalog_result.matches or [])]
+            )
         _attach_stage_context(
             request,
             emergency_matched=False,
             catalog_result=catalog_result,
+            prompt_capabilities_common=prompt_capabilities_common,
+            prompt_capabilities_all=prompt_capabilities_all,
         )
 
         if settings.mode in ("llm_only", "hybrid"):
