@@ -188,6 +188,54 @@ class _BlinkLimitOutcome:
     }
 
 
+class _BlinkDefaultOutcome:
+    status = "success"
+    error = None
+    output = {
+        "mode": "sim",
+        "skills": [
+            {
+                "skill_id": "blink_eyes",
+                "description": "Blink the robot eyes visibly.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {
+                        "closed_duration_s": {
+                            "type": "number",
+                            "minimum": 0.05,
+                            "maximum": 0.5,
+                            "default": 0.12,
+                        },
+                        "count": {
+                            "type": "number",
+                            "minimum": 1,
+                            "maximum": 6,
+                            "default": 2,
+                        },
+                        "intensity": {
+                            "type": "number",
+                            "minimum": 0.0,
+                            "maximum": 1.0,
+                            "default": 1.0,
+                        },
+                        "open_duration_s": {
+                            "type": "number",
+                            "minimum": 0.05,
+                            "maximum": 1.0,
+                            "default": 0.18,
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+                "effects": ["visual_expression"],
+                "safety_class": "low_risk_action",
+                "available": True,
+                "requires_confirmation": False,
+            }
+        ],
+    }
+
+
 class _WalkChoiceOutcome:
     status = "success"
     error = None
@@ -354,6 +402,13 @@ class _BlinkLimitInvoker:
         return _BlinkLimitOutcome()
 
 
+class _BlinkDefaultInvoker:
+    async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _BlinkDefaultOutcome:
+        del arguments, context
+        assert tool_name == "soridormi.skill.list"
+        return _BlinkDefaultOutcome()
+
+
 class _WalkChoiceInvoker:
     async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _WalkChoiceOutcome:
         del arguments, context
@@ -455,6 +510,12 @@ class _OverLimitBlinkClampedExecuteOllama:
                 }
             ],
         }
+
+
+class _FailIfCalledOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        del prompt, kwargs
+        raise AssertionError("capability planner should not be called")
 
 
 class _SelectedWalkOllama:
@@ -973,6 +1034,232 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
         self.assertEqual(response.speech[0].text, "Walking forward for 3 seconds.")
+
+    async def test_router_task_list_fast_path_executes_low_risk_blink_without_llm(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "router-fast-blink",
+                "text": "Please blink your eyes 5 times.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.blink_eyes",
+                    "confidence": 0.62,
+                    "language": "en-US",
+                    "source": "llm",
+                    "metadata": {
+                        "task_list": [
+                            {
+                                "id": "quick_intent:0:task.execute_skill",
+                                "source_stage": "quick_intent",
+                                "kind": "action",
+                                "task_type": "task.execute_skill",
+                                "route": "robot_action",
+                                "intent": "capability:soridormi.blink_eyes",
+                                "priority": "normal",
+                                "status": "proposed",
+                                "requires_validation": True,
+                                "capability_id": "soridormi.blink_eyes",
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
+        self.assertEqual(response.skills[0].args, {"count": 5})
+        self.assertEqual(
+            response.skills[0].metadata["source"],
+            "router_task_list_fast_path",
+        )
+        self.assertEqual(response.metadata["capability_decision"], "execute")
+        self.assertEqual(response.metadata["capability_selected"], ["soridormi.blink_eyes"])
+        self.assertEqual(
+            response.metadata["capability_fast_path"]["source"],
+            "router_task_list_fast_path",
+        )
+        self.assertEqual(response.speech[0].text, "Okay, I'll blink my eyes 5 times.")
+
+    async def test_router_task_list_fast_path_allows_optional_defaulted_blink_fields(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_BlinkDefaultInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "router-fast-blink-default-fields",
+                "text": "Please blink your eyes 5 times.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.blink_eyes",
+                    "confidence": 0.62,
+                    "language": "en-US",
+                    "source": "llm",
+                    "metadata": {
+                        "task_list": [
+                            {
+                                "id": "quick_intent:0:task.execute_skill",
+                                "source_stage": "quick_intent",
+                                "kind": "action",
+                                "task_type": "task.execute_skill",
+                                "route": "robot_action",
+                                "intent": "capability:soridormi.blink_eyes",
+                                "priority": "normal",
+                                "status": "proposed",
+                                "requires_validation": True,
+                                "capability_id": "soridormi.blink_eyes",
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
+        self.assertEqual(response.skills[0].args, {"count": 5})
+        self.assertEqual(
+            response.skills[0].metadata["source"],
+            "router_task_list_fast_path",
+        )
+        self.assertEqual(
+            response.metadata["capability_fast_path"]["source"],
+            "router_task_list_fast_path",
+        )
+
+    async def test_router_task_list_fast_path_batches_over_limit_blink_without_llm(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "router-fast-blink-over-limit",
+                "text": "Please blink your eyes 15 times.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.blink_eyes",
+                    "confidence": 0.62,
+                    "language": "en-US",
+                    "source": "llm",
+                    "metadata": {
+                        "task_list": [
+                            {
+                                "id": "quick_intent:0:task.execute_skill",
+                                "source_stage": "quick_intent",
+                                "kind": "action",
+                                "task_type": "task.execute_skill",
+                                "route": "robot_action",
+                                "intent": "capability:soridormi.blink_eyes",
+                                "priority": "normal",
+                                "status": "proposed",
+                                "requires_validation": True,
+                                "capability_id": "soridormi.blink_eyes",
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(
+            [item.skill_id for item in response.skills],
+            [
+                "soridormi.blink_eyes",
+                "soridormi.blink_eyes",
+                "soridormi.blink_eyes",
+            ],
+        )
+        self.assertEqual(
+            [item.args for item in response.skills],
+            [{"count": 6}, {"count": 6}, {"count": 3}],
+        )
+        self.assertEqual(
+            response.metadata["capability_fast_path"]["source"],
+            "exact_routed_count_batch_recovery",
+        )
+        self.assertEqual(
+            response.metadata["capability_batched_over_limit"]["source"],
+            "exact_routed_count_batch_recovery",
+        )
+        self.assertIn("15", response.speech[0].text)
+
+    async def test_router_task_list_does_not_fast_path_confirmed_physical_motion(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_SelectedWalkOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "router-task-list-walk-no-fast-path",
+                "text": "Walk forward quickly for 3 seconds.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.95,
+                    "language": "en-US",
+                    "source": "llm",
+                    "metadata": {
+                        "task_list": [
+                            {
+                                "id": "quick_intent:0:task.execute_skill",
+                                "source_stage": "quick_intent",
+                                "kind": "action",
+                                "task_type": "task.execute_skill",
+                                "route": "robot_action",
+                                "intent": "capability:soridormi.walk_forward",
+                                "priority": "normal",
+                                "status": "proposed",
+                                "requires_validation": True,
+                                "capability_id": "soridormi.walk_forward",
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(
+            response.skills[0].metadata["source"],
+            "capability_catalog",
+        )
+        self.assertNotIn("capability_fast_path", response.metadata)
 
     async def test_router_selected_capability_does_not_hide_better_candidate(self) -> None:
         runtime = InteractionRuntime(

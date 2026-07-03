@@ -187,21 +187,39 @@ class CapabilityAgent(BaseAgent):
             self.trace(result, "no interaction-executable capability matched")
             return result
 
-        if not self.services.use_llm or self.services.ollama is None:
-            self.trace(result, "capability match found but LLM selection is unavailable")
-            return result
-
-        plan = await self._plan(request, executable)
-        plan = await self._review_plan(request, plan, executable)
-        plan = self._normalize_plan_for_routed_surface(request, plan, executable)
         batched_count_metadata: dict[str, Any] | None = None
-        batched_recovery = self._recover_batched_over_limit_count_plan(
-            request,
-            plan,
-            executable,
-        )
-        if batched_recovery is not None:
-            plan, batched_count_metadata = batched_recovery
+        fast_path_metadata: dict[str, Any] | None = None
+        fast_path = self._fast_router_task_plan(request, executable)
+        if fast_path is not None:
+            plan, fast_path_metadata = fast_path
+            if fast_path_metadata.get("source") == "exact_routed_count_batch_recovery":
+                batched_count_metadata = {
+                    key: fast_path_metadata[key]
+                    for key in (
+                        "skill_id",
+                        "requested_count",
+                        "max_per_call",
+                        "batch_count",
+                        "batches",
+                        "source",
+                    )
+                    if key in fast_path_metadata
+                }
+        else:
+            if not self.services.use_llm or self.services.ollama is None:
+                self.trace(result, "capability match found but LLM selection is unavailable")
+                return result
+
+            plan = await self._plan(request, executable)
+            plan = await self._review_plan(request, plan, executable)
+            plan = self._normalize_plan_for_routed_surface(request, plan, executable)
+            batched_recovery = self._recover_batched_over_limit_count_plan(
+                request,
+                plan,
+                executable,
+            )
+            if batched_recovery is not None:
+                plan, batched_count_metadata = batched_recovery
         allowed = {match.capability_id: match for match in executable}
         if plan.decision != "execute":
             speech = self._natural_plan_speech(plan.speech)
@@ -256,6 +274,19 @@ class CapabilityAgent(BaseAgent):
                 "source": "capability_catalog",
                 "catalog_version": search.catalog_version,
             }
+            if fast_path_metadata is not None:
+                metadata["source"] = str(
+                    fast_path_metadata.get("source") or "router_task_list_fast_path"
+                )
+                for key in (
+                    "route_task_id",
+                    "route_task_source_stage",
+                    "route_confidence",
+                    "router_source",
+                    "fast_path_reason",
+                ):
+                    if key in fast_path_metadata:
+                        metadata[key] = fast_path_metadata[key]
             score = self._catalog_score(match)
             if score is not None:
                 metadata["catalog_score"] = score
@@ -297,6 +328,8 @@ class CapabilityAgent(BaseAgent):
         ]
         if batched_count_metadata is not None:
             result.metadata["capability_batched_over_limit"] = batched_count_metadata
+        if fast_path_metadata is not None:
+            result.metadata["capability_fast_path"] = fast_path_metadata
         self.trace(result, f"selected {selected} catalog capability request(s)")
         return result
 
@@ -789,6 +822,299 @@ class CapabilityAgent(BaseAgent):
         if isinstance(maximum, (int, float)) and not isinstance(maximum, bool):
             value = min(float(maximum), value)
         return value
+
+    def _fast_router_task_plan(
+        self,
+        request: AgentRunRequest,
+        candidates: list[Any],
+    ) -> tuple[_CapabilityPlan, dict[str, Any]] | None:
+        if request.route_decision.route != "robot_action":
+            return None
+        selected_id = self._router_selected_capability_id(request)
+        if not selected_id:
+            return None
+        route_task = self._route_task_list_item_for_skill(request, selected_id)
+        if route_task is None:
+            return None
+        if request.route_decision.confidence < self._fast_tasklist_confidence_threshold():
+            return None
+        target = next(
+            (
+                match
+                for match in candidates
+                if str(getattr(match, "capability_id", "") or "") == selected_id
+            ),
+            None,
+        )
+        if target is None or not self._can_fast_execute_router_skill(target):
+            return None
+
+        over_limit = self._fast_over_limit_count_plan(request, target, route_task)
+        if over_limit is not None:
+            return over_limit
+
+        args = self._fast_router_args(request, target)
+        if args is None:
+            return None
+        args, _normalized = normalize_args_for_schema(args, getattr(target, "input_schema", {}) or {})
+        if validate_args_for_schema(args, getattr(target, "input_schema", {}) or {}):
+            return None
+        speech = self._fast_router_speech(request, target, args)
+        try:
+            plan = _CapabilityPlan(
+                decision="execute",
+                speech=speech,
+                skills=[_PlannedSkill(skill_id=selected_id, args=args)],
+            )
+        except ValidationError:
+            return None
+        return plan, self._route_task_metadata(
+            request,
+            route_task,
+            selected_id,
+            source="router_task_list_fast_path",
+            fast_path_reason="exact low-risk router task with deterministic schema args",
+        )
+
+    def _fast_over_limit_count_plan(
+        self,
+        request: AgentRunRequest,
+        target: Any,
+        route_task: dict[str, Any],
+    ) -> tuple[_CapabilityPlan, dict[str, Any]] | None:
+        if not self._can_batch_over_limit_count_skill(target):
+            return None
+        selected_id = str(getattr(target, "capability_id", "") or "")
+        schema = getattr(target, "input_schema", {}) or {}
+        properties = schema.get("properties") if isinstance(schema, dict) else {}
+        count_schema = properties.get("count") if isinstance(properties, dict) else None
+        if not isinstance(count_schema, dict):
+            return None
+        maximum = count_schema.get("maximum")
+        if not isinstance(maximum, (int, float)) or isinstance(maximum, bool):
+            return None
+        max_count = int(maximum)
+        if max_count <= 0:
+            return None
+        requested_count = self._extract_requested_count(request.text)
+        if requested_count is None or requested_count <= max_count:
+            return None
+        minimum = count_schema.get("minimum")
+        min_count = (
+            int(minimum)
+            if isinstance(minimum, (int, float)) and not isinstance(minimum, bool)
+            else 1
+        )
+        if min_count <= 0:
+            min_count = 1
+        chunks = self._split_count_into_schema_batches(
+            requested_count,
+            min_count=min_count,
+            max_count=max_count,
+        )
+        if chunks is None:
+            return None
+        speech = self._batched_count_speech(
+            request,
+            target,
+            requested_count=requested_count,
+            max_count=max_count,
+            batch_count=len(chunks),
+        )
+        try:
+            plan = _CapabilityPlan(
+                decision="execute",
+                speech=speech,
+                skills=[
+                    _PlannedSkill(skill_id=selected_id, args={"count": chunk})
+                    for chunk in chunks
+                ],
+            )
+        except ValidationError:
+            return None
+        metadata = self._route_task_metadata(
+            request,
+            route_task,
+            selected_id,
+            source="exact_routed_count_batch_recovery",
+            fast_path_reason="exact router task count exceeds schema maximum and is batchable",
+        )
+        metadata.update(
+            {
+                "requested_count": requested_count,
+                "max_per_call": max_count,
+                "batch_count": len(chunks),
+                "batches": chunks,
+            }
+        )
+        return plan, metadata
+
+    def _fast_router_args(self, request: AgentRunRequest, target: Any) -> dict[str, Any] | None:
+        schema = getattr(target, "input_schema", {}) or {}
+        if not isinstance(schema, dict):
+            return None
+        properties = schema.get("properties")
+        if not isinstance(properties, dict):
+            properties = {}
+        required = schema.get("required")
+        required_fields = {str(item) for item in required} if isinstance(required, list) else set()
+        if not required_fields.issubset({"count"}):
+            return None
+        if not self._optional_fast_fields_are_omittable(properties, required_fields):
+            return None
+        count_schema = properties.get("count")
+        if not isinstance(count_schema, dict):
+            return {} if not required_fields else None
+        requested_count = self._extract_requested_count(request.text)
+        if requested_count is None:
+            default_count = self._positive_int(count_schema.get("default"))
+            requested_count = default_count
+        if requested_count is None:
+            return None if "count" in required_fields else {}
+        minimum = count_schema.get("minimum")
+        if isinstance(minimum, (int, float)) and not isinstance(minimum, bool):
+            if requested_count < int(minimum):
+                return None
+        maximum = count_schema.get("maximum")
+        if isinstance(maximum, (int, float)) and not isinstance(maximum, bool):
+            if requested_count > int(maximum):
+                return None
+        return {"count": requested_count}
+
+    def _can_fast_execute_router_skill(self, match: Any) -> bool:
+        if bool(getattr(match, "requires_confirmation", False)):
+            return False
+        safety_class = str(getattr(match, "safety_class", "") or "").lower()
+        if safety_class in {"physical_motion", "safety_critical", "restricted"}:
+            return False
+        effects = {
+            str(item).strip().lower()
+            for item in (getattr(match, "effects", []) or [])
+            if str(item).strip()
+        }
+        if effects.intersection(
+            {
+                "physical_motion",
+                "safety_control",
+                "tool_write",
+                "external_side_effect",
+                "memory_write",
+            }
+        ):
+            return False
+        schema = getattr(match, "input_schema", {}) or {}
+        if not isinstance(schema, dict):
+            return False
+        properties = schema.get("properties")
+        if not isinstance(properties, dict):
+            properties = {}
+        required = schema.get("required")
+        required_fields = {str(item) for item in required} if isinstance(required, list) else set()
+        if not required_fields.issubset({"count"}):
+            return False
+        if not self._optional_fast_fields_are_omittable(properties, required_fields):
+            return False
+        capability_id = str(getattr(match, "capability_id", "") or "").lower()
+        description = str(getattr(match, "description", "") or "").lower()
+        gesture_terms = ("blink", "nod", "shake")
+        return any(term in capability_id or term in description for term in gesture_terms)
+
+    @staticmethod
+    def _optional_fast_fields_are_omittable(
+        properties: dict[str, Any],
+        required_fields: set[str],
+    ) -> bool:
+        for name, prop in properties.items():
+            field = str(name)
+            if field == "count":
+                continue
+            if field in required_fields:
+                return False
+            if not isinstance(prop, dict) or "default" not in prop:
+                return False
+        return True
+
+    def _route_task_list_item_for_skill(
+        self,
+        request: AgentRunRequest,
+        capability_id: str,
+    ) -> dict[str, Any] | None:
+        tasks = request.route_decision.metadata.get("task_list")
+        if not isinstance(tasks, list):
+            return None
+        for item in tasks:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("task_type") or "") != "task.execute_skill":
+                continue
+            if str(item.get("capability_id") or "").strip() != capability_id:
+                continue
+            if str(item.get("status") or "proposed") not in {"proposed", "validated"}:
+                continue
+            return item
+        return None
+
+    def _route_task_metadata(
+        self,
+        request: AgentRunRequest,
+        route_task: dict[str, Any],
+        skill_id: str,
+        *,
+        source: str,
+        fast_path_reason: str,
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "source": source,
+            "skill_id": skill_id,
+            "route_confidence": request.route_decision.confidence,
+            "router_source": request.route_decision.source,
+            "fast_path_reason": fast_path_reason,
+        }
+        task_id = str(route_task.get("id") or "").strip()
+        if task_id:
+            metadata["route_task_id"] = task_id
+        source_stage = str(route_task.get("source_stage") or "").strip()
+        if source_stage:
+            metadata["route_task_source_stage"] = source_stage
+        return metadata
+
+    def _fast_router_speech(
+        self,
+        request: AgentRunRequest,
+        match: Any,
+        args: dict[str, Any],
+    ) -> str:
+        capability_id = str(getattr(match, "capability_id", "") or "").lower()
+        description = str(getattr(match, "description", "") or "").lower()
+        count = self._positive_int(args.get("count"))
+        if self.is_zh(request):
+            if "blink" in capability_id or "blink" in description:
+                return f"好的，我会眨眼{count}次。" if count else "好的，我会眨眼。"
+            if "nod" in capability_id or "nod" in description:
+                return f"好的，我会点头{count}次。" if count else "好的，我会点头。"
+            if "shake" in capability_id or "shake" in description:
+                return f"好的，我会摇头{count}次。" if count else "好的，我会摇头。"
+            return "好的，我会执行这个动作。"
+        if "blink" in capability_id or "blink" in description:
+            return f"Okay, I'll blink my eyes {count} times." if count else "Okay, I'll blink my eyes."
+        if "nod" in capability_id or "nod" in description:
+            return f"Okay, I'll nod {count} times." if count else "Okay, I'll nod."
+        if "shake" in capability_id or "shake" in description:
+            return (
+                f"Okay, I'll shake my head {count} times."
+                if count
+                else "Okay, I'll shake my head."
+            )
+        return "Okay, I'll do that."
+
+    @staticmethod
+    def _fast_tasklist_confidence_threshold() -> float:
+        raw = os.getenv("AGENT_CAPABILITY_FAST_TASKLIST_MIN_CONFIDENCE", "0.55")
+        try:
+            value = float(raw)
+        except ValueError:
+            return 0.55
+        return max(0.0, min(1.0, value))
 
     def _recover_batched_over_limit_count_plan(
         self,
