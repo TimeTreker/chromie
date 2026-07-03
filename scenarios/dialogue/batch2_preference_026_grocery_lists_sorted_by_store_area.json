@@ -73,7 +73,7 @@
           "grocery lists sorted by store area"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "grocery lists sorted by store area"
         ]
       }

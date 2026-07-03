@@ -77,7 +77,7 @@
           "refill the bottle"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "empty the lunch box",
           "wash the fork",
           "refill the bottle"

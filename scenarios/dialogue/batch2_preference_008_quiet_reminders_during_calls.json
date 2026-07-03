@@ -73,7 +73,7 @@
           "quiet reminders during calls"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "quiet reminders during calls"
         ]
       }

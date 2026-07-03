@@ -77,7 +77,7 @@
           "send the agenda"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "review the slides",
           "export the PDF",
           "send the agenda"

@@ -77,7 +77,7 @@
           "return it to the drawer"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "label the cable",
           "coil the adapter",
           "return it to the drawer"

@@ -52,7 +52,7 @@
       },
       "expect": {
         "speech_any": ["3 PM"],
-        "session_memory_contains": ["design review", "3 PM"],
+        "extracted_memory_contains": ["design review", "3 PM"],
         "no_skills": true
       }
     }

@@ -77,7 +77,7 @@
           "set the chair back"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "check the lights",
           "close the blinds",
           "set the chair back"

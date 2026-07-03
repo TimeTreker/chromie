@@ -73,7 +73,7 @@
           "calling the workshop table bench one"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "calling the workshop table bench one"
         ]
       }

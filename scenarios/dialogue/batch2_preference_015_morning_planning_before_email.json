@@ -73,7 +73,7 @@
           "morning planning before email"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "morning planning before email"
         ]
       }

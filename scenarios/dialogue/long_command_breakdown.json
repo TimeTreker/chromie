@@ -31,7 +31,14 @@
       "expect": {
         "speech_any": ["wash your hands", "charge the laptop", "rice cooker"],
         "no_skills": true,
-        "current_task_context_contains": ["wash hands", "charge laptop", "check rice cooker"]
+        "current_task_context_contains": ["wash hands", "charge laptop", "check rice cooker"],
+        "post_extracted_memory_contains": [
+          "Current task: Remember home arrival checklist in conversation",
+          "Salient entity: wash hands",
+          "Salient entity: charge laptop",
+          "Salient entity: check rice cooker"
+        ],
+        "post_memory_summary_contains": ["Remember home arrival checklist"]
       }
     },
     {
@@ -51,7 +58,13 @@
       },
       "expect": {
         "speech_any": ["Wash your hands", "laptop", "rice cooker"],
-        "session_memory_contains": ["wash hands", "charge laptop", "check rice cooker"],
+        "extracted_memory_contains": [
+          "Current task: Remember home arrival checklist in conversation",
+          "Salient entity: wash hands",
+          "Salient entity: charge laptop",
+          "Salient entity: check rice cooker"
+        ],
+        "memory_summary_contains": ["Remember home arrival checklist"],
         "no_skills": true
       }
     }

@@ -73,7 +73,7 @@
           "mild spice for recipes"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "mild spice for recipes"
         ]
       }

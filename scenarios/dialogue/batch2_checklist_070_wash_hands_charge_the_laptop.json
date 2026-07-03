@@ -77,7 +77,7 @@
           "check the rice cooker"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "wash hands",
           "charge the laptop",
           "check the rice cooker"

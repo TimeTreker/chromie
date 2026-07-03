@@ -653,6 +653,20 @@ def _evaluate_context_expectations(
     post_history_text = _json_text(post_snapshot.get("history") or [])
     session_memory_text = _json_text(pre_snapshot.get("session_memory") or {})
     post_session_memory_text = _json_text(post_snapshot.get("session_memory") or {})
+    pre_session_memory = pre_snapshot.get("session_memory") or {}
+    post_session_memory = post_snapshot.get("session_memory") or {}
+    extracted_memory_text = _json_text(
+        pre_session_memory.get("extracted_memory") if isinstance(pre_session_memory, dict) else []
+    )
+    post_extracted_memory_text = _json_text(
+        post_session_memory.get("extracted_memory") if isinstance(post_session_memory, dict) else []
+    )
+    memory_summary_text = str(
+        pre_session_memory.get("memory_summary") if isinstance(pre_session_memory, dict) else ""
+    )
+    post_memory_summary_text = str(
+        post_session_memory.get("memory_summary") if isinstance(post_session_memory, dict) else ""
+    )
     current_task = post_snapshot.get("current_task_context") or {}
     current_task_text = _json_text(current_task)
 
@@ -680,6 +694,26 @@ def _evaluate_context_expectations(
     if post_session_contains and not _text_contains_all(post_session_memory_text, post_session_contains):
         errors.append(
             f"post-turn session memory missing phrases {list(post_session_contains)!r}: {post_session_memory_text!r}"
+        )
+    extracted_contains = _tuple_of_strings(expect.get("extracted_memory_contains"))
+    if extracted_contains and not _text_contains_all(extracted_memory_text, extracted_contains):
+        errors.append(
+            f"pre-turn extracted memory missing phrases {list(extracted_contains)!r}: {extracted_memory_text!r}"
+        )
+    post_extracted_contains = _tuple_of_strings(expect.get("post_extracted_memory_contains"))
+    if post_extracted_contains and not _text_contains_all(post_extracted_memory_text, post_extracted_contains):
+        errors.append(
+            f"post-turn extracted memory missing phrases {list(post_extracted_contains)!r}: {post_extracted_memory_text!r}"
+        )
+    memory_summary_contains = _tuple_of_strings(expect.get("memory_summary_contains"))
+    if memory_summary_contains and not _text_contains_all(memory_summary_text, memory_summary_contains):
+        errors.append(
+            f"pre-turn memory summary missing phrases {list(memory_summary_contains)!r}: {memory_summary_text!r}"
+        )
+    post_memory_summary_contains = _tuple_of_strings(expect.get("post_memory_summary_contains"))
+    if post_memory_summary_contains and not _text_contains_all(post_memory_summary_text, post_memory_summary_contains):
+        errors.append(
+            f"post-turn memory summary missing phrases {list(post_memory_summary_contains)!r}: {post_memory_summary_text!r}"
         )
     task_contains = _tuple_of_strings(expect.get("current_task_context_contains"))
     if task_contains and not _text_contains_all(current_task_text, task_contains):

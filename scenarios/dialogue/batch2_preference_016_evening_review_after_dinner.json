@@ -73,7 +73,7 @@
           "evening review after dinner"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "evening review after dinner"
         ]
       }

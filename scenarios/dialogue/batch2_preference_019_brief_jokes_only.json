@@ -73,7 +73,7 @@
           "brief jokes only"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "brief jokes only"
         ]
       }

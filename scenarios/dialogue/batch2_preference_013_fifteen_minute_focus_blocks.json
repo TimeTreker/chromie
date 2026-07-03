@@ -73,7 +73,7 @@
           "fifteen minute focus blocks"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "fifteen minute focus blocks"
         ]
       }

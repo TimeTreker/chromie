@@ -198,8 +198,11 @@ def _scenario_schema_summary(suite: str) -> str:
             "and expect fields. Expect speech_any/speech_all, forbidden_speech_any, "
             "skills, forbidden_skills, no_skills, requires_confirmation, status, "
             "skill_args, history_contains, session_memory_contains, "
-            "post_history_contains, post_session_memory_contains, and "
-            "current_task_context_contains."
+            "post_history_contains, post_session_memory_contains, "
+            "extracted_memory_contains, post_extracted_memory_contains, "
+            "memory_summary_contains, post_memory_summary_contains, and "
+            "current_task_context_contains. Prefer extracted_memory_contains "
+            "when checking refined memory rather than raw transcript context."
         )
     return (
         "Interaction scenarios must set stub.route_decision and optional "

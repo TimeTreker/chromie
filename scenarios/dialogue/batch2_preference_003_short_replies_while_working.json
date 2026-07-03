@@ -73,7 +73,7 @@
           "short replies while working"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "short replies while working"
         ]
       }

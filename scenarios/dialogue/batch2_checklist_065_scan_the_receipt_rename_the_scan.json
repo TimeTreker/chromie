@@ -77,7 +77,7 @@
           "upload it to the folder"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "scan the receipt",
           "rename the scan",
           "upload it to the folder"

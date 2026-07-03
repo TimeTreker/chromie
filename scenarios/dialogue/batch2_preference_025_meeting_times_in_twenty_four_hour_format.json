@@ -73,7 +73,7 @@
           "meeting times in twenty four hour format"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "meeting times in twenty four hour format"
         ]
       }

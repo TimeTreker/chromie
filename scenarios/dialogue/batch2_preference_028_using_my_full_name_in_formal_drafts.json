@@ -73,7 +73,7 @@
           "using my full name in formal drafts"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "using my full name in formal drafts"
         ]
       }

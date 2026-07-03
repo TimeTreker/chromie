@@ -77,7 +77,7 @@
           "set out the badge"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "backup the notes",
           "charge the phone",
           "set out the badge"

@@ -77,7 +77,7 @@
           "drop it at reception"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "print the form",
           "sign the envelope",
           "drop it at reception"

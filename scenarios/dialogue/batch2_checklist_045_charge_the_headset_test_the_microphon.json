@@ -77,7 +77,7 @@
           "open the meeting link"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "charge the headset",
           "test the microphone",
           "open the meeting link"

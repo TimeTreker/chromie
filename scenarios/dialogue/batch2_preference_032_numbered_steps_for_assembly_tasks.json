@@ -73,7 +73,7 @@
           "numbered steps for assembly tasks"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "numbered steps for assembly tasks"
         ]
       }

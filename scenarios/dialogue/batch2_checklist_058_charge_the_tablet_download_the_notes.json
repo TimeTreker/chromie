@@ -77,7 +77,7 @@
           "bring the stylus"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "charge the tablet",
           "download the notes",
           "bring the stylus"

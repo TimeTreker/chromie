@@ -73,7 +73,7 @@
           "jasmine tea after lunch"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "jasmine tea after lunch"
         ]
       }

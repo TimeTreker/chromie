@@ -31,7 +31,12 @@
       "expect": {
         "speech_any": ["keep it short"],
         "no_skills": true,
-        "current_task_context_contains": ["Keep replies short", "sleeping nearby"]
+        "current_task_context_contains": ["Keep replies short", "sleeping nearby"],
+        "post_extracted_memory_contains": [
+          "Current task: Keep replies short because someone is sleeping nearby",
+          "Constraint: verbosity=short"
+        ],
+        "post_memory_summary_contains": ["Keep replies short because someone is sleeping nearby"]
       }
     },
     {
@@ -51,7 +56,11 @@
       },
       "expect": {
         "speech_any": ["listening"],
-        "session_memory_contains": ["Keep replies short", "sleeping nearby"],
+        "extracted_memory_contains": [
+          "Current task: Keep replies short because someone is sleeping nearby",
+          "Constraint: verbosity=short"
+        ],
+        "memory_summary_contains": ["Keep replies short because someone is sleeping nearby"],
         "no_skills": true
       }
     }

@@ -110,6 +110,22 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertIn("Walk forward slowly.", str(turns[1]["pre_context"]["history"]))
         self.assertIn("soridormi.walk_velocity", str(turns[1]["pre_context"]["session_memory"]))
 
+    def test_dialogue_scenario_checks_extracted_memory_context(self) -> None:
+        scenarios = load_scenarios(only={"dialogue/remember_tea_preference"})
+
+        report = run_scenarios_sync(scenarios)
+        turns = report["cases"][0]["actual"]["turns"]
+
+        self.assertTrue(report["ok"], report["cases"][0]["errors"])
+        self.assertIn(
+            "Current task: Remember the user's tea preference",
+            str(turns[1]["pre_context"]["session_memory"]["extracted_memory"]),
+        )
+        self.assertIn(
+            "Remember the user's tea preference",
+            turns[1]["pre_context"]["session_memory"]["memory_summary"],
+        )
+
     def test_write_report_uses_timestamped_summary_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = write_report({"ok": True, "cases": []}, report_dir=Path(temp_dir))

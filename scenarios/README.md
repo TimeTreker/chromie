@@ -76,8 +76,12 @@ Each turn can use `ask` plus a deterministic `stub` and `expect` block:
 Dialogue expectations can check the same speech, skill, confirmation, status,
 and metadata fields as interaction scenarios. They can also check
 `history_contains`, `history_any`, `session_memory_contains`,
-`post_history_contains`, `post_session_memory_contains`, and
-`current_task_context_contains`.
+`post_history_contains`, `post_session_memory_contains`,
+`extracted_memory_contains`, `post_extracted_memory_contains`,
+`memory_summary_contains`, `post_memory_summary_contains`, and
+`current_task_context_contains`. Prefer the extracted-memory fields when the
+scenario is proving that refined memory, not raw transcript history, survives
+into the next turn.
 
 Interaction scenarios may set `stub.host_prepare_response=true` when they need
 to exercise the host `InteractionRuntimeCoordinator.prepare_response()` layer.

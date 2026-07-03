@@ -73,7 +73,7 @@
           "direct feedback on drafts"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "direct feedback on drafts"
         ]
       }

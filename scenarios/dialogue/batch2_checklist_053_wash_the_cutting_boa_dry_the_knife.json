@@ -77,7 +77,7 @@
           "clear the table"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "wash the cutting board",
           "dry the knife",
           "clear the table"

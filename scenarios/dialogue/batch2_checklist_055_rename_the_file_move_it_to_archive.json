@@ -77,7 +77,7 @@
           "note the version"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "rename the file",
           "move it to archive",
           "note the version"

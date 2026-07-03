@@ -73,7 +73,7 @@
           "saving math explanations for later review"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "saving math explanations for later review"
         ]
       }

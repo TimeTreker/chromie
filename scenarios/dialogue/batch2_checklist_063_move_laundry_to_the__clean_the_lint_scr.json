@@ -77,7 +77,7 @@
           "fold shirts"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "move laundry to the dryer",
           "clean the lint screen",
           "fold shirts"

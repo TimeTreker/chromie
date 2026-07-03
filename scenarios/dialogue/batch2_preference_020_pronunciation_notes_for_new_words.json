@@ -73,7 +73,7 @@
           "pronunciation notes for new words"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "pronunciation notes for new words"
         ]
       }

@@ -77,7 +77,7 @@
           "zip the front pocket"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "check the backpack",
           "add the notebook",
           "zip the front pocket"

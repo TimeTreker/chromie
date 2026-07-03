@@ -31,7 +31,13 @@
       "expect": {
         "speech_any": ["jasmine tea without sugar"],
         "no_skills": true,
-        "current_task_context_contains": ["tea preference", "jasmine tea", "without sugar"]
+        "current_task_context_contains": ["tea preference", "jasmine tea", "without sugar"],
+        "post_extracted_memory_contains": [
+          "Current task: Remember the user's tea preference",
+          "Salient entity: jasmine tea",
+          "Salient entity: without sugar"
+        ],
+        "post_memory_summary_contains": ["Remember the user's tea preference"]
       }
     },
     {
@@ -52,7 +58,12 @@
       "expect": {
         "speech_any": ["jasmine tea without sugar"],
         "history_contains": ["jasmine tea without sugar"],
-        "session_memory_contains": ["jasmine tea", "without sugar"],
+        "extracted_memory_contains": [
+          "Current task: Remember the user's tea preference",
+          "Salient entity: jasmine tea",
+          "Salient entity: without sugar"
+        ],
+        "memory_summary_contains": ["Remember the user's tea preference"],
         "no_skills": true
       }
     }

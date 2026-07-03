@@ -73,7 +73,7 @@
           "gentle wake-up phrases"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "gentle wake-up phrases"
         ]
       }

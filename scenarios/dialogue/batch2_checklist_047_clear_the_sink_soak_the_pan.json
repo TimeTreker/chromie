@@ -77,7 +77,7 @@
           "wipe the stove area"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "clear the sink",
           "soak the pan",
           "wipe the stove area"

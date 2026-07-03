@@ -73,7 +73,7 @@
           "a reusable bottle reminder"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "a reusable bottle reminder"
         ]
       }

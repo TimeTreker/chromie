@@ -77,7 +77,7 @@
           "bring the notebook"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "save the document",
           "close the laptop",
           "bring the notebook"

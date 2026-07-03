@@ -77,7 +77,7 @@
           "join five minutes early"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "check the calendar",
           "prepare questions",
           "join five minutes early"

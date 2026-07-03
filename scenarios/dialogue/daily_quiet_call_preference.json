@@ -52,7 +52,7 @@
       "expect": {
         "speech_any": ["briefly and quietly"],
         "history_contains": ["brief and quiet"],
-        "session_memory_contains": ["work call", "quiet replies"],
+        "extracted_memory_contains": ["work call", "quiet replies"],
         "no_skills": true
       }
     }

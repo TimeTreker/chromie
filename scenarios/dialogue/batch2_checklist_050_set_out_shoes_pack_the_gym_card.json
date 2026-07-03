@@ -77,7 +77,7 @@
           "fill the water bottle"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "set out shoes",
           "pack the gym card",
           "fill the water bottle"

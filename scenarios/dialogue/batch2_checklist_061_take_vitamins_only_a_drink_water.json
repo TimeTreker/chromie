@@ -77,7 +77,7 @@
           "log breakfast"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "take vitamins only as directed",
           "drink water",
           "log breakfast"

@@ -77,7 +77,7 @@
           "send the summary"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "update the checklist",
           "assign owners",
           "send the summary"

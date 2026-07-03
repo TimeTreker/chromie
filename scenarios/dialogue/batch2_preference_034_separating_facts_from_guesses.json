@@ -73,7 +73,7 @@
           "separating facts from guesses"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "separating facts from guesses"
         ]
       }

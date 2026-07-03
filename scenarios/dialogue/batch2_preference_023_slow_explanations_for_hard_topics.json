@@ -73,7 +73,7 @@
           "slow explanations for hard topics"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "slow explanations for hard topics"
         ]
       }

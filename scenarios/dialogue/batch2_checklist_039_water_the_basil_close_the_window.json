@@ -77,7 +77,7 @@
           "turn off the desk lamp"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "water the basil",
           "close the window",
           "turn off the desk lamp"

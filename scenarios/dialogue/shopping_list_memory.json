@@ -31,7 +31,14 @@
       "expect": {
         "speech_any": ["milk", "rice", "batteries"],
         "no_skills": true,
-        "current_task_context_contains": ["milk", "rice", "batteries"]
+        "current_task_context_contains": ["milk", "rice", "batteries"],
+        "post_extracted_memory_contains": [
+          "Current task: Remember store items",
+          "Salient entity: milk",
+          "Salient entity: rice",
+          "Salient entity: batteries"
+        ],
+        "post_memory_summary_contains": ["Remember store items"]
       }
     },
     {
@@ -51,7 +58,13 @@
       },
       "expect": {
         "speech_any": ["milk", "rice", "batteries"],
-        "session_memory_contains": ["milk", "rice", "batteries"],
+        "extracted_memory_contains": [
+          "Current task: Remember store items",
+          "Salient entity: milk",
+          "Salient entity: rice",
+          "Salient entity: batteries"
+        ],
+        "memory_summary_contains": ["Remember store items"],
         "no_skills": true
       }
     }

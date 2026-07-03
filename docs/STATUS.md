@@ -210,7 +210,7 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **593** current `unittest` cases under `tests/`;
+- **625** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -250,8 +250,8 @@ focused
 interaction/catalog task-agent tests, focused host Skill Runtime graph dispatch
 tests, focused Soridormi acceptance tests, focused robot-candidate verifier
 tests, and dependency-complete Orchestrator AgentClient coverage. The latest
-local `./scripts/run_tests.sh` attempt on 2026-07-02 passed
-`python scripts/check_docs.py`, ran 593 current `unittest` cases with `OK`, and
+local `./scripts/run_tests.sh` attempt on 2026-07-03 passed
+`python scripts/check_docs.py`, ran 625 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions.
 
 The tests alone do not prove GPU performance, microphone quality, speaker

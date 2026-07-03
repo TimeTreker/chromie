@@ -77,7 +77,7 @@
           "throw away duplicates"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "collect sticky notes",
           "group action items",
           "throw away duplicates"

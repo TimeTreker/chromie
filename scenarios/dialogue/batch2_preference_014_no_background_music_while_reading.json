@@ -73,7 +73,7 @@
           "no background music while reading"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "no background music while reading"
         ]
       }

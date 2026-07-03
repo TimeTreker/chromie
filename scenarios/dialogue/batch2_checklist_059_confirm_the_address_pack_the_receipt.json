@@ -77,7 +77,7 @@
           "leave ten minutes early"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "confirm the address",
           "pack the receipt",
           "leave ten minutes early"

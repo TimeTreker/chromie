@@ -77,7 +77,7 @@
           "put soap on the list"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "fold the towels",
           "clear the dryer lint",
           "put soap on the list"

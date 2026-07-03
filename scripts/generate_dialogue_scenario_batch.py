@@ -180,7 +180,7 @@ def _preference_cases(start: int) -> list[dict[str, Any]]:
                         intent="recall_preference",
                         expect_phrase=preference,
                         metadata={"task_relation": "continue_task"},
-                        extra_expect={"session_memory_contains": [preference]},
+                        extra_expect={"extracted_memory_contains": [preference]},
                     ),
                 ],
             )
@@ -261,7 +261,7 @@ def _checklist_cases(start: int) -> list[dict[str, Any]]:
                         intent="recall_list",
                         expect_phrase=third,
                         metadata={"task_relation": "continue_task"},
-                        extra_expect={"session_memory_contains": items},
+                        extra_expect={"extracted_memory_contains": items},
                     ),
                 ],
             )

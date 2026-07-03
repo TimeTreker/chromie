@@ -77,7 +77,7 @@
           "close the window"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "open the window briefly",
           "dust the shelf",
           "close the window"

@@ -73,7 +73,7 @@
           "task lists grouped by room"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "task lists grouped by room"
         ]
       }

@@ -77,7 +77,7 @@
           "check the address"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "bring the umbrella",
           "take the transit card",
           "check the address"

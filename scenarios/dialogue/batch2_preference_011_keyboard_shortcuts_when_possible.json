@@ -73,7 +73,7 @@
           "keyboard shortcuts when possible"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "keyboard shortcuts when possible"
         ]
       }

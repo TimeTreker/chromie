@@ -77,7 +77,7 @@
           "start the display"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "verify the meeting room",
           "bring the adapter",
           "start the display"

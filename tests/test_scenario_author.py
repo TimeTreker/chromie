@@ -193,6 +193,7 @@ class ScenarioAuthorTests(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("turns[]", text)
         self.assertIn("history_contains", text)
+        self.assertIn("extracted_memory_contains", text)
         self.assertIn("scenarios/dialogue/<id>.json", text)
 
 

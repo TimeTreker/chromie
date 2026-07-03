@@ -77,7 +77,7 @@
           "file the folder"
         ],
         "no_skills": true,
-        "session_memory_contains": [
+        "extracted_memory_contains": [
           "sort receipts",
           "photograph totals",
           "file the folder"
