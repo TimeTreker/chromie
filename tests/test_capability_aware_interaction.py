@@ -1092,6 +1092,57 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.speech[0].text, "Okay, I'll blink my eyes 5 times.")
 
+    async def test_router_task_list_fast_path_extracts_chinese_blink_count(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "router-fast-chinese-blink",
+                "text": "请眨两小眼睛。",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.blink_eyes",
+                    "confidence": 0.87,
+                    "language": "zh-CN",
+                    "source": "catalog",
+                    "metadata": {
+                        "task_list": [
+                            {
+                                "id": "quick_intent:0:task.execute_skill",
+                                "source_stage": "quick_intent",
+                                "kind": "action",
+                                "task_type": "task.execute_skill",
+                                "route": "robot_action",
+                                "intent": "capability:soridormi.blink_eyes",
+                                "priority": "normal",
+                                "status": "proposed",
+                                "requires_validation": True,
+                                "capability_id": "soridormi.blink_eyes",
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
+        self.assertEqual(response.skills[0].args, {"count": 2})
+        self.assertEqual(
+            response.metadata["capability_fast_path"]["source"],
+            "router_task_list_fast_path",
+        )
+        self.assertEqual(response.speech[0].text, "好的，我会眨眼2次。")
+
     async def test_router_task_list_fast_path_allows_optional_defaulted_blink_fields(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(

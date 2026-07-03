@@ -20,7 +20,7 @@ class BehaviorTruthSuiteTests(unittest.IsolatedAsyncioTestCase):
         report = await run_scenarios(scenarios)
 
         self.assertTrue(report["ok"], _format_failures(report))
-        self.assertEqual(report["case_count"], 8)
+        self.assertEqual(report["case_count"], 11)
 
     async def test_interaction_behavior_scenario_files(self) -> None:
         scenarios = load_scenarios(suites={"interaction"})
@@ -28,7 +28,7 @@ class BehaviorTruthSuiteTests(unittest.IsolatedAsyncioTestCase):
         report = await run_scenarios(scenarios)
 
         self.assertTrue(report["ok"], _format_failures(report))
-        self.assertEqual(report["case_count"], 14)
+        self.assertEqual(report["case_count"], 15)
 
     async def test_dialogue_behavior_scenario_files(self) -> None:
         scenarios = load_scenarios(suites={"dialogue"})

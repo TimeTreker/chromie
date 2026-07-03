@@ -362,6 +362,13 @@ def _evaluate_router_expectations(
     for key in _tuple_of_strings(expect.get("metadata_true")):
         if decision.metadata.get(key) is not True:
             errors.append(f"metadata {key!r}={decision.metadata.get(key)!r}, expected True")
+    metadata_json = json.dumps(decision.metadata, ensure_ascii=False, sort_keys=True, default=str)
+    for phrase in _tuple_of_strings(expect.get("metadata_json_contains")):
+        if phrase not in metadata_json:
+            errors.append(f"metadata JSON missing phrase {phrase!r}: {metadata_json!r}")
+    for phrase in _tuple_of_strings(expect.get("metadata_json_forbid")):
+        if phrase in metadata_json:
+            errors.append(f"metadata JSON contained forbidden phrase {phrase!r}")
     return errors
 
 

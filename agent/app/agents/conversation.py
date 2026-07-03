@@ -15,6 +15,22 @@ logger = logging.getLogger("chromie.agent.conversation")
 
 class ConversationAgent(BaseAgent):
     name = "conversation_agent"
+    _ACTION_REQUEST_RE = re.compile(
+        r"\b(?:walk|move|turn|nod|shake|blink|bow|wave|dance|stand|sit|look\s+(?:at|toward|left|right|up|down)|raise|lower)\b"
+        r"|(?:走|移动|转|点头|摇头|眨眼|眨.{0,6}眼|鞠躬|挥手|看向|站|坐)",
+        re.IGNORECASE,
+    )
+    _ACTION_CLAIM_RE = re.compile(
+        r"[\(（][^()（）]{0,80}(?:blink|nod|shake|walk|turn|move|wave|眨|点头|摇头|走|移动|转|挥手|看向)[^()（）]{0,80}[\)）]"
+        r"|\b(?:blinked|nodded|walked|turned|moved|waved)\b"
+        r"|\b(?:i(?:'ll| will)\s+(?:now\s+)?(?:blink|nod|shake|walk|turn|move|wave|execute|perform))\b"
+        r"|\b(?:i(?:'m| am)\s+(?:now\s+)?(?:blinking|nodding|walking|turning|moving|waving|executing|performing))\b"
+        r"|\b(?:i(?:'ve| have)\s+(?:blinked|nodded|walked|turned|moved|waved))\b"
+        r"|(?:眨了眨眼|点了点头|摇了摇头|走了|移动了|转了|挥了挥手)"
+        r"|(?:(?:这就|马上|立即|现在).{0,12}(?:眨|点头|摇头|走|移动|转|挥手|看向|执行))"
+        r"|(?:(?:正在|已经|刚刚).{0,8}(?:眨|点头|摇头|走|移动|转|挥手|看向|执行))",
+        re.IGNORECASE,
+    )
 
     async def run(self, request: AgentRunRequest, result: AgentResult) -> AgentResult:
         started = time.perf_counter()
@@ -244,6 +260,15 @@ class ConversationAgent(BaseAgent):
         )
         response = self._clean_response(response, zh=zh)
         response = self._ensure_factual_subject_anchor(request, response, zh=zh)
+        guarded = self._guard_unrouted_physical_action_response(request, response, zh=zh)
+        if guarded != response:
+            logger.warning(
+                "conversation_agent_blocked_unrouted_physical_action_claim sid=%s route=%s response=%r",
+                request.sid,
+                request.route_decision.route,
+                response,
+            )
+            response = guarded
         if not self.is_playable_spoken_response(response, zh=zh):
             logger.warning(
                 "conversation_agent_invalid_spoken_response sid=%s response=%r",
@@ -256,6 +281,53 @@ class ConversationAgent(BaseAgent):
     def _add_spoken_response(self, result: AgentResult, response: str) -> None:
         for chunk in self._split_spoken_response(response):
             result.add_speak_immediate(chunk, style="brief")
+
+    def _guard_unrouted_physical_action_response(
+        self,
+        request: AgentRunRequest,
+        response: str,
+        *,
+        zh: bool,
+    ) -> str:
+        if request.route_decision.route not in {"chat", "clarify"}:
+            return response
+        if self._route_has_executable_skill_task(request):
+            return response
+        if not self._looks_like_physical_action_request(request.text):
+            return response
+        if not self._speech_claims_physical_action(response):
+            return response
+        if zh:
+            return "我听起来像是听到了动作请求，但这次没有生成可执行动作，所以我不会假装已经做了。请再说一次。"
+        return (
+            "I heard that as an action request, but no executable action was produced, "
+            "so I will not pretend I did it. Please say it again."
+        )
+
+    def _route_has_executable_skill_task(self, request: AgentRunRequest) -> bool:
+        if request.route_decision.actions:
+            return True
+        metadata = request.route_decision.metadata or {}
+        task_list = metadata.get("task_list")
+        if isinstance(task_list, list):
+            for item in task_list:
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get("task_type") or "") == "task.execute_skill":
+                    return True
+                if str(item.get("capability_id") or item.get("skill_id") or "").strip():
+                    return True
+        return False
+
+    @classmethod
+    def _looks_like_physical_action_request(cls, text: str) -> bool:
+        normalized = " ".join((text or "").strip().lower().split())
+        return bool(cls._ACTION_REQUEST_RE.search(normalized))
+
+    @classmethod
+    def _speech_claims_physical_action(cls, response: str) -> bool:
+        normalized = " ".join((response or "").strip().split())
+        return bool(cls._ACTION_CLAIM_RE.search(normalized))
 
     def _split_spoken_response(self, response: str) -> list[str]:
         text = " ".join((response or "").strip().split())

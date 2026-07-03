@@ -1331,6 +1331,11 @@ class CapabilityAgent(BaseAgent):
         if match:
             number = int(match.group(1))
             return number if number > 0 else None
+        chinese_match = re.search(r"([一二两三四五六七八九十]{1,3})\s*(?:下|次|遍|回|个)?", text or "")
+        if chinese_match:
+            number = cls._chinese_number_to_int(chinese_match.group(1))
+            if number is not None and number > 0:
+                return number
         words = re.findall(r"[a-zA-Z]+", (text or "").lower())
         for index, word in enumerate(words):
             if word in {"once", "a"}:
@@ -1346,6 +1351,39 @@ class CapabilityAgent(BaseAgent):
                     if number >= 20 and next_number is not None and 0 < next_number < 10:
                         number += next_number
                 return number if number > 0 else None
+        return None
+
+    @staticmethod
+    def _chinese_number_to_int(value: str) -> int | None:
+        digits = {
+            "零": 0,
+            "一": 1,
+            "二": 2,
+            "两": 2,
+            "三": 3,
+            "四": 4,
+            "五": 5,
+            "六": 6,
+            "七": 7,
+            "八": 8,
+            "九": 9,
+        }
+        value = (value or "").strip()
+        if not value:
+            return None
+        if value in digits:
+            return digits[value]
+        if value == "十":
+            return 10
+        if "十" in value:
+            left, _, right = value.partition("十")
+            tens = 1 if not left else digits.get(left)
+            ones = 0 if not right else digits.get(right)
+            if tens is None or ones is None:
+                return None
+            return tens * 10 + ones
+        if len(value) == 2 and all(ch in digits for ch in value):
+            return digits[value[0]] * 10 + digits[value[1]]
         return None
 
     @staticmethod

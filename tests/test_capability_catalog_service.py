@@ -77,6 +77,21 @@ class _Invoker:
                         },
                         "available": True,
                         "requires_confirmation": True,
+                    },
+                    {
+                        "skill_id": "blink_eyes",
+                        "version": "1.0.0",
+                        "description": "Blink the simulated social eyes.",
+                        "parameters_schema": {
+                            "type": "object",
+                            "properties": {
+                                "count": {"type": "number", "minimum": 1, "maximum": 6, "default": 2},
+                            },
+                        },
+                        "available": True,
+                        "effects": ["visual_expression"],
+                        "safety_class": "low_risk_action",
+                        "requires_confirmation": False,
                     }
                 ],
             }
@@ -201,6 +216,20 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
+    async def test_chinese_blink_query_ranks_live_blink_skill_first(self) -> None:
+        catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
+
+        result = await catalog.search(
+            "眨两小眼睛。",
+            language="zh-CN",
+            prefer_interaction_executable=True,
+        )
+
+        self.assertTrue(result.matched)
+        self.assertEqual(result.suggested_route, "robot_action")
+        self.assertEqual(result.matches[0].capability_id, "soridormi.blink_eyes")
+        self.assertGreaterEqual(result.matches[0].score, 0.80)
+        self.assertFalse(result.matches[0].requires_confirmation)
 
     async def test_prefers_relevant_executable_skill_over_planning_only_tool(self) -> None:
         catalog = CapabilityCatalog(

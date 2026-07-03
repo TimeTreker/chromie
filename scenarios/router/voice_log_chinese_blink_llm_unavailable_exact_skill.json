@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_chinese_blink_llm_unavailable_exact_skill",
+  "suite": "router",
+  "level": "module",
+  "description": "Regression from the 2026-07-03 live cold-start check: when the quick LLM is unavailable, explicit Chinese blink ASR must still emit the exact blink skill from catalog.",
+  "tags": [
+    "voice-log",
+    "zh-CN",
+    "router-agent-contract",
+    "robot-action",
+    "blink",
+    "llm-fallback",
+    "latency"
+  ],
+  "input": {
+    "text": "眨两小眼睛。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": true,
+      "suggested_route": "robot_action",
+      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "catalog_version": 15,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.blink_eyes",
+          "agent_id": "soridormi.skill",
+          "description": "Blink the robot eyes visibly.",
+          "score": 0.86,
+          "available": true,
+          "interaction_executable": true
+        },
+        {
+          "capability_id": "soridormi.walk_velocity",
+          "agent_id": "soridormi.skill",
+          "description": "Track a bounded body velocity command.",
+          "score": 0.03,
+          "available": true,
+          "interaction_executable": true
+        }
+      ]
+    },
+    "llm_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "general_conversation",
+      "confidence": 0.45,
+      "language": "zh-CN",
+      "source": "fallback",
+      "reason": "llm unavailable"
+    }
+  },
+  "expect": {
+    "route": "robot_action",
+    "intent": "capability:soridormi.blink_eyes",
+    "source": "catalog",
+    "task_types_include": ["task.execute_skill"],
+    "metadata_json_contains": ["soridormi.blink_eyes"],
+    "metadata_json_forbid": ["\"task_type\": \"task.execute_robot_action\"", "\"capability_id\": \"soridormi.walk_velocity\""],
+    "llm_calls": 1
+  }
+}

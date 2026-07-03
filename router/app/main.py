@@ -223,7 +223,7 @@ def _looks_like_explicit_body_action(text: str) -> bool:
             r"\b(?:walk|move|turn|nod|shake|blink|bow|wave|dance|stand|sit|look\s+(?:at|toward|left|right|up|down)|raise|lower)\b",
             normalized,
         )
-        or re.search(r"(走|移动|转|点头|摇头|眨眼|鞠躬|挥手|看向|站|坐)", normalized)
+        or re.search(r"(走|移动|转|点头|摇头|眨眼|眨.{0,6}眼|鞠躬|挥手|看向|站|坐)", normalized)
     )
 
 
@@ -363,6 +363,57 @@ def _recover_deep_thought_catalog_action(
     )
 
 
+def _recover_chat_catalog_action(
+    request: RouteRequest,
+    result: CapabilityCatalogResult,
+    *,
+    llm_decision: RouteDecision,
+) -> RouteDecision | None:
+    if llm_decision.route != "chat":
+        return None
+    if result.suggested_route != "robot_action" or not result.matched:
+        return None
+    if _looks_like_speech_only_social_text(request.text):
+        return None
+    if not _looks_like_explicit_body_action(request.text):
+        return None
+    top, top_score = _top_scored_capability(_interaction_executable_candidates(result))
+    if top is None or top_score < CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE:
+        return None
+    selected_id = _capability_id(top)
+    if not selected_id:
+        return None
+    reason_parts = [
+        "Catalog recovered explicit robot action from quick chat route",
+        f"catalog_version={result.catalog_version}",
+        f"catalog_score={top_score:.2f}",
+    ]
+    if llm_decision.reason:
+        reason_parts.append(f"llm_reason={llm_decision.reason}")
+    return finalize_decision(
+        RouteDecision(
+            route="robot_action",
+            agents=["capability_agent", "safety_agent", "speaker_agent"],
+            intent=f"capability:{selected_id}",
+            confidence=max(0.56, min(0.95, top_score)),
+            language=request.language or llm_decision.language or "auto",
+            priority=llm_decision.priority,
+            needs_agent=True,
+            should_speak=True,
+            candidate_capabilities=list(result.matches),
+            reason="; ".join(reason_parts),
+            source="catalog",
+            metadata={
+                **(llm_decision.metadata or {}),
+                "recovered_from_route": llm_decision.route,
+                "recovered_from_intent": llm_decision.intent,
+            },
+        ),
+        request,
+        source="catalog",
+    )
+
+
 def _deep_thought_action_recovery_allowed(decision: RouteDecision) -> bool:
     if decision.confidence < DEEP_THOUGHT_ACTION_RECOVERY_MIN_CONFIDENCE:
         return False
@@ -447,6 +498,25 @@ def _validate_llm_capability_decision(
                 ),
             )
         selected = by_id.get(selected_id)
+        if selected_id and selected is not None and _looks_like_explicit_body_action(request.text):
+            top, top_score = _top_scored_capability(_interaction_executable_candidates(result))
+            top_id = _capability_id(top or {})
+            selected_score = selected.get("score")
+            if not isinstance(selected_score, (int, float)) or isinstance(selected_score, bool):
+                selected_score = 0.0
+            if (
+                top is not None
+                and top_id
+                and top_id != selected_id
+                and top_score >= CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE
+                and float(selected_score) < max(0.12, top_score - 0.25)
+            ):
+                selected_id = top_id
+                selected = top
+                decision.intent = f"capability:{selected_id}"
+                decision.reason = (
+                    f"{decision.reason}; " if decision.reason else ""
+                ) + "validator corrected low-score capability selection to stronger catalog match"
         if selected_id and (selected is None or not _capability_executable(selected)):
             executable = _interaction_executable_candidates(result)
             if not executable:
@@ -829,16 +899,40 @@ def _catalog_planner_fallback_decision(
     executable = _interaction_executable_candidates(result)
     if not result.matched or not executable:
         return None
-    top_score = max(
-        (
-            float(item.get("score") or 0.0)
-            for item in executable
-            if isinstance(item.get("score"), (int, float))
-        ),
-        default=0.0,
-    )
+    top, top_score = _top_scored_capability(executable)
     if top_score < CATALOG_DIRECT_ROBOT_ACTION_MIN_SCORE:
         return None
+    if _looks_like_explicit_body_action(request.text):
+        selected_id = _capability_id(top or {})
+        if selected_id:
+            reason_parts = [
+                "LLM router unavailable; exact explicit robot action selected from catalog",
+                f"catalog_version={result.catalog_version}",
+                f"catalog_score={top_score:.2f}",
+            ]
+            if llm_decision.reason:
+                reason_parts.append(f"llm_fallback_reason={llm_decision.reason}")
+            return finalize_decision(
+                RouteDecision(
+                    route="robot_action",
+                    agents=[
+                        "capability_agent",
+                        "safety_agent",
+                        "speaker_agent",
+                    ],
+                    intent=f"capability:{selected_id}",
+                    confidence=max(0.56, min(0.95, top_score)),
+                    language=request.language or "auto",
+                    priority="normal",
+                    needs_agent=True,
+                    should_speak=True,
+                    candidate_capabilities=result.matches,
+                    reason="; ".join(reason_parts),
+                    source="catalog",
+                ),
+                request,
+                source="catalog",
+            )
     reason_parts = [
         "LLM router unavailable; preserving catalog candidates for capability planner",
         f"catalog_version={result.catalog_version}",
@@ -908,6 +1002,18 @@ async def route(request: RouteRequest) -> RouteDecision:
                     decision = _deep_thought_from_low_confidence(request, llm_decision)
                 elif llm_decision.route == "deep_thought":
                     decision = _recover_deep_thought_catalog_action(
+                        request,
+                        catalog_result,
+                        llm_decision=llm_decision,
+                    )
+                    if decision is None:
+                        decision = _validate_llm_capability_decision(
+                            request,
+                            llm_decision,
+                            catalog_result,
+                        )
+                elif llm_decision.route == "chat":
+                    decision = _recover_chat_catalog_action(
                         request,
                         catalog_result,
                         llm_decision=llm_decision,

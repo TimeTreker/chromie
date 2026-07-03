@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_chinese_blink_chat_must_not_roleplay",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Regression from the 2026-07-03 live voice log: if a Chinese blink request reaches chat, speech must not roleplay blinking without a skill.",
+  "tags": [
+    "voice-log",
+    "zh-CN",
+    "router-agent-contract",
+    "robot-action",
+    "blink",
+    "fail-closed"
+  ],
+  "input": {
+    "text": "眨两小眼睛。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "general_conversation",
+      "confidence": 0.9,
+      "language": "zh-CN",
+      "source": "llm"
+    },
+    "ollama_reply": "好的，没问题！(眨了眨眼睛) 👁️👁️"
+  },
+  "expect": {
+    "speech_all": ["没有生成可执行动作", "不会假装"],
+    "forbidden_speech_any": ["眨了眨眼睛", "👁️", "好的，没问题"],
+    "no_skills": true,
+    "forbidden_skills": ["soridormi.blink_eyes"],
+    "requires_confirmation": false
+  }
+}
