@@ -259,17 +259,23 @@ class OllamaLLMRouter:
         prompt_capabilities = request.context.get("prompt_capabilities_common", [])
         if not prompt_capabilities:
             prompt_capabilities = candidates
+        compact_prompt_capabilities = _compact_prompt_capabilities(prompt_capabilities)
+        common_skill_ids = [
+            item["skill_id"]
+            for item in compact_prompt_capabilities
+            if item.get("skill_id")
+        ]
         common_catalog_json = _bounded_json(
-            _compact_prompt_capabilities(prompt_capabilities),
-            max_chars=4200,
+            compact_prompt_capabilities,
+            max_chars=3600,
         )
         candidates_json = _bounded_json(
             _compact_candidate_capabilities(candidates),
-            max_chars=1100,
+            max_chars=800,
         )
         mind = request.context.get("mind", {})
         session_context = _router_prompt_context(request.context)
-        context_json = _bounded_json(session_context, max_chars=800)
+        context_json = _bounded_json(session_context, max_chars=500)
         return (
             "Global Context Group:\n"
             f"{_router_global_context_section(mind)}\n\n"
@@ -277,41 +283,35 @@ class OllamaLLMRouter:
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON: {context_json}\n\n"
             "Current Job:\n"
-            "Act as Chromie's quick intent router. Decide route and, when the request is made of common catalog skills, emit bounded task proposals; do not answer, execute, or authorize side effects. "
-            "Understand the user's intent broadly before checking the common catalog; the catalog constrains executable actions, not meaning. "
-            "Choose route deep_thought for complex reasoning, design, debugging, or implementation planning. "
+            "Act as Chromie's quick intent router. Decide one route and optionally emit common-skill task proposals; do not answer, execute, or authorize side effects. "
+            "Understand intent broadly before checking the catalog; the catalog constrains executable actions, not meaning. "
+            "Choose route deep_thought for complex reasoning, design, debugging, implementation planning, or when the request needs deeper thought, task-session creation, or task-session continuation. "
             "Choosing route=deep_thought is only delegation; do not perform or reveal reasoning inside the router. "
-            "Do not choose deep_thought for ordinary single-turn facts, factual agreement/disagreement, greetings, jokes, songs, or simple chat. "
-            "Also decide whether the request is a fast single-turn response or needs deeper thought, task-session creation, or task-session continuation. "
             "Return calibrated low confidence when uncertain.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
+            f"Common skill IDs: {_bounded_json(common_skill_ids, max_chars=900)}\n"
             f"Common compact skill catalog JSON: {common_catalog_json}\n"
             f"Query-biased catalog hints JSON: {candidates_json}\n"
-            "The common compact skill catalog is the normal fast-router skill menu. Choose by semantic meaning from this menu when the user asks Chromie to do something. "
-            "Query-biased hints may help with context, but they are not recommendations and must not override your semantic judgment. "
-            "If you understand a desired human-like ability but no listed common skill safely matches it, do not force a wrong action. Delegate to deep_thought or clarify, and include metadata.desired_abilities with status missing_ability when useful. "
+            "Decision checks: use semantic meaning, not phrase rules. If the user asks Chromie to physically perform a listed body/head/pose/gaze/motion/expression skill now, return robot_action using that exact skill. "
+            "A polite ability-shaped request is still robot_action when it asks for a listed physical skill now. "
             "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
-            "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the common catalog; do not drop it into ordinary chat. "
-            "Factual agreement/disagreement is chat: questions about the Moon, Sun, shape, temperature, or other world knowledge are not deep_thought or robot_action even if ability candidates share words such as round, turn, left, right, walk, or move. "
-            "The quick router does not solve the fact; it routes common-fact questions to chat so the conversation Agent can answer. "
-            "A polite ability-shaped request can be robot_action only when it asks Chromie to perform a listed body/head/pose/motion capability now. "
-            "Use bounded working memory, current task context, and recent action history to resolve follow-ups, but do not let memory authorize an action by itself. "
-            "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran.\n\n"
+            "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the common catalog. "
+            "Factual agreement/disagreement is chat: questions about the Moon, Sun, shape, temperature, or other world knowledge are not deep_thought or robot_action even if ability candidates share words such as round, turn, left, right, walk, or move; the quick router routes common-fact questions to chat. "
+            "Query-biased hints are context, not recommendations. Use working memory, current task context, and recent action history for follow-ups, but never as authorization for side effects. "
+            "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran. "
+            "If no common skill fits clearly, choose deep_thought or clarify and include metadata.desired_abilities with status missing_ability when useful.\n\n"
             "Cost Function:\n"
-            "Prefer smallest safe downstream action surface; honest capability boundaries; chat for speech-only interaction and common factual claims; deep_thought only for complex multi-step reasoning or planning; clarify for ambiguity. "
-            "Prefer supported interaction-executable capability IDs over generic robot_action when a candidate clearly fits. "
-            "Preserve unsupported desired abilities as proposals instead of pretending they are executable. "
-            "For simple common-skill requests, one capability intent is enough. For compound common-skill requests, preserve each requested skill in actions instead of collapsing to the first skill. "
-            "Each proposed action has its own confidence; if any required action is below confidence threshold, delegate the whole plan to deep_thought with a truthful speak_first instead of half-executing.\n\n"
+            "Prefer the smallest safe downstream action surface, honest capability boundaries, chat for speech-only/factual claims, deep_thought only for complex planning, and clarify for ambiguity. "
+            "Prefer supported interaction-executable capability IDs over generic robot_action. Preserve unsupported desired abilities as non-executable proposals. "
+            "For compound common-skill requests, preserve each requested skill in actions instead of collapsing to the first skill. Each proposed action has its own confidence; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful speak_first.\n\n"
             "Semantic Examples:\n"
             "- If the user asks whether you agree with a common factual claim about the Moon, Sun, shape, heat, or similar world knowledge, return {\"route\":\"chat\",\"intent\":\"factual_agreement\",\"confidence\":0.9}.\n"
             "- If the user asks Chromie to walk, turn, nod, shake her head, blink, or pose now and a matching interaction-executable candidate is listed, return robot_action with intent capability:<exact capability_id>.\n"
             "- If the user asks for several common skills, such as walking, speaking, and blinking, return robot_action with actions ordered by the requested task sequence; use chromie.speak for the spoken part and include args.text.\n"
             "- If the user asks for a physical/social ability you understand but it is not in the common catalog, return deep_thought or clarify and include metadata.desired_abilities, for example {\"ability_id\":\"social.blink_eyes\",\"intent\":\"blink eyes\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"no executable blink skill is in the common catalog\"}.\n"
             "- If no common skill fits clearly or you are not confident, return deep_thought with a brief speak_first that tells the user you need a moment. The speak_first must be truthful and must not claim execution.\n"
-            "- If catalog hints are planning-only or weak background context and the user is only chatting or asking a fact, ignore those hints for routing.\n"
-            "Generalize these examples from meaning; do not make phrase rules.\n\n"
+            "- If catalog hints are planning-only or weak background context and the user is only chatting or asking a fact, ignore those hints for routing. Generalize these examples from meaning; do not make phrase rules.\n\n"
             "Output Contract:\n"
             "Return compact JSON only. Required keys: route, intent, confidence. Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
             "Minimal ordinary example: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9}. "
@@ -326,8 +326,7 @@ class OllamaLLMRouter:
             "If you include actions, use a semantic intent such as compound_common_catalog_task instead of a placeholder capability intent. "
             "For uncertain deep_thought handoff, you may include speak_first with one short user-facing sentence in the user's language, such as a natural request for a moment to think. "
             "Do not use speak_first to claim physical action, tool results, memory writes, or completion. "
-            "For chat/clarify/interrupt/ignore, do not set capability intent. For deep_thought, use a short semantic intent such as deep_thought_complex_reasoning. "
-            "Confidence is 0.0-1.0. Host task manager owns final writes and safety."
+            "For chat/clarify/interrupt/ignore, do not set capability intent. For deep_thought, use a short semantic intent such as deep_thought_complex_reasoning. Confidence is 0.0-1.0."
         )
 
     def build_payload(self, request: RouteRequest, *, relaxed_json: bool = False) -> dict[str, Any]:
@@ -587,7 +586,7 @@ class OllamaLLMRouter:
         timeout_s = self.timeout_s
         if self.review_model and str(payload.get("model") or "") == self.review_model:
             timeout_s = self.review_timeout_s
-        async with httpx.AsyncClient(timeout=timeout_s) as client:
+        async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
             response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
             return response.json()
@@ -840,7 +839,7 @@ class OllamaLLMRouter:
         try:
             data = await self._chat(payload)
         except Exception as exc:
-            logger.warning("Ollama router request failed: %s", exc)
+            logger.warning("Ollama router request failed: %s: %s", type(exc).__name__, exc)
             if self.slow_review_recovery_enabled and self.review_model:
                 try:
                     reviewed = await self._chat(self.build_intent_review_payload(request))

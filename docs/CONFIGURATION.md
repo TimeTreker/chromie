@@ -155,13 +155,14 @@ configuration.
 | `ROUTER_MODEL` | `qwen3:0.6b` in common configuration. |
 | `ROUTER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; used only when an optional review path is enabled. |
 | `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
-| `ROUTER_TIMEOUT_MS` | `800` in common low-latency configuration. |
-| `ROUTER_LLM_TIMEOUT_MS` | `800` in common configuration for the fast quick-router model path. |
+| `ROUTER_TIMEOUT_MS` | `2200` in common low-latency configuration. |
+| `ROUTER_LLM_TIMEOUT_MS` | `2200` in common configuration for the fast quick-router model path. |
 | `ROUTER_LLM_NUM_PREDICT` | `192`; compact JSON output budget for the fast quick-router model. |
-| `ROUTER_REVIEW_TIMEOUT_MS` | `1200` in common configuration for optional reviewer paths. |
+| `ROUTER_REVIEW_TIMEOUT_MS` | `800` in common configuration for optional reviewer paths. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
+| `ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Router-side cache for the prompt catalog snapshot. Search still runs per utterance, and execution is revalidated downstream. |
 | `ROUTER_CAPABILITY_MATCH_LIMIT` | Maximum ranked candidates attached to one route; default `8`. |
 | `ROUTER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
 | `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `0` in common low-latency runtime; enables slower semantic review/repair passes after malformed or timed-out quick-router outputs. |
@@ -280,7 +281,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_ROUTER_TIMEOUT_MS` | `3000` in common low-latency configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_ROUTER_TIMEOUT_MS` | `4000` in common low-latency configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |

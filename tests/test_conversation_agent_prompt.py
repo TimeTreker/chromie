@@ -532,6 +532,36 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Original system prompt", ollama.calls[1]["prompt"])
         self.assertNotIn("Original task prompt", ollama.calls[1]["prompt"])
 
+    async def test_empty_model_joke_response_uses_creative_fallback(self) -> None:
+        ollama = _CapturingOllama("")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "joke-empty-model-response-test",
+                "text": "Tell me a short joke.",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "factual_agreement",
+                    "confidence": 0.90,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertIn("Chromie", result.speak_immediate[0].text)
+        self.assertNotIn("I did not catch", result.speak_immediate[0].text)
+        self.assertEqual(len(ollama.calls), 1)
+
     async def test_false_missing_body_ability_is_retried_from_capability_context(self) -> None:
         ollama = _CapturingOllama(
             [

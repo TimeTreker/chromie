@@ -97,6 +97,13 @@ Model output is never trusted as registry truth. Graph identity is replaced by
 the service, capability references are resolved again, arguments are validated,
 and execution is separately gated.
 
+When the quick Router emits an exact catalog skill task with enough confidence,
+the native Agent path may skip a second LLM planning call and build a
+schema-validated `SkillRequest` directly from the Router task plus simple
+catalog arguments. This is an execution-latency optimization only: catalog
+availability, schema validation, confirmation, Skill Runtime policy, and
+provider execution checks still apply unchanged.
+
 ## Agent registry versus Skill Registry
 
 The two registries solve different problems:

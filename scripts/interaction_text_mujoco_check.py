@@ -389,14 +389,18 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
 
     assistant = VoiceAssistant()
     errors: list[str] = []
+    timings_ms: dict[str, float] = {}
+    total_start = time.perf_counter()
     execution_payload: dict[str, Any] | None = None
     status_before: dict[str, Any] | None = None
     status_after: dict[str, Any] | None = None
 
     try:
+        health_start = time.perf_counter()
         session = await assistant.get_http_session()
         router_health = await assistant.router_client.health(session)
         agent_health = await assistant.agent_client.health(session)
+        timings_ms["health_ms"] = (time.perf_counter() - health_start) * 1000.0
         _write_json(evidence_dir / "router_health.json", router_health)
         _write_json(evidence_dir / "agent_health.json", agent_health)
 
@@ -410,7 +414,11 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         if invoker is None:
             raise RuntimeError("Soridormi Skill Runtime invoker is not configured")
 
+        status_before_start = time.perf_counter()
         status_before = await _invoke_soridormi_status(invoker)
+        timings_ms["status_before_ms"] = (
+            time.perf_counter() - status_before_start
+        ) * 1000.0
         _write_json(evidence_dir / "status_before.json", status_before)
         if not args.allow_non_sim and status_before.get("mode") != "sim":
             errors.append(
@@ -432,6 +440,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         )
         context["robot_state"] = robot_state
 
+        route_start = time.perf_counter()
         route = await assistant.router_client.route(
             session,
             text=args.text,
@@ -439,16 +448,20 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             language=args.language,
             context=context,
         )
+        route_ms = (time.perf_counter() - route_start) * 1000.0
+        timings_ms["route_ms"] = route_ms
         _write_json(evidence_dir / "route.json", route.model_dump(mode="json"))
         assistant.session_log(
             sid,
-            "text_check_route_done: route=%s intent=%s source=%s actions=%s",
+            "text_check_route_done: route=%s intent=%s source=%s actions=%s route_ms=%.1f",
             route.route,
             route.intent,
             route.source,
             len(route.actions),
+            route_ms,
         )
 
+        agent_start = time.perf_counter()
         response = await assistant.agent_client.run_interaction(
             session,
             text=args.text,
@@ -457,6 +470,8 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             context=context,
             history=context.get("history", []),
         )
+        agent_ms = (time.perf_counter() - agent_start) * 1000.0
+        timings_ms["agent_ms"] = agent_ms
         response = response.model_copy(
             deep=True,
             update={
@@ -473,11 +488,12 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         )
         assistant.session_log(
             sid,
-            "text_check_interaction_done: status=%s speech=%s skills=%s confirmation=%s",
+            "text_check_interaction_done: status=%s speech=%s skills=%s confirmation=%s agent_ms=%.1f",
             response.status,
             len(response.speech),
             len(response.skills),
             response.requires_confirmation,
+            agent_ms,
         )
 
         errors.extend(
@@ -503,7 +519,11 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             )
 
         if not errors and not args.preview_only:
+            execution_start = time.perf_counter()
             execution = await assistant.execute_interaction_response(response, sid)
+            timings_ms["execution_ms"] = (
+                time.perf_counter() - execution_start
+            ) * 1000.0
             if execution is None:
                 raise RuntimeError("Interaction execution returned no result")
             execution_payload = execution.model_dump(mode="json")
@@ -527,6 +547,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                 errors.append(f"session completion wait failed: {_exception_text(exc)}")
 
             try:
+                status_after_start = time.perf_counter()
                 status_after = await _invoke_soridormi_status(invoker)
             except Exception as exc:
                 errors.append(f"post-run Soridormi status probe failed: {_exception_text(exc)}")
@@ -535,6 +556,9 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                     {"error": _exception_text(exc)},
                 )
             else:
+                timings_ms["status_after_ms"] = (
+                    time.perf_counter() - status_after_start
+                ) * 1000.0
                 _write_json(evidence_dir / "status_after.json", status_after)
                 errors.extend(safe_idle_errors(status_after))
 
@@ -561,6 +585,10 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             "preview_only": args.preview_only,
             "skill_timeout_s": args.skill_timeout_s,
             "evidence_dir": str(evidence_dir),
+            "timings_ms": {
+                **{name: round(value, 1) for name, value in timings_ms.items()},
+                "total_ms": round((time.perf_counter() - total_start) * 1000.0, 1),
+            },
             "debug_summary": debug_summary,
             "errors": errors,
             "route": route.model_dump(mode="json"),

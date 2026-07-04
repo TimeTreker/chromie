@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -39,15 +40,12 @@ class Settings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("ROUTER_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("ROUTER_MODEL", "qwen3:0.6b"))
     review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:e2b"))
-    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "800")))
-    llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "800"))))
+    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "2200")))
+    llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "2200"))))
     llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "192")))
     review_timeout_ms: int = Field(
         default_factory=lambda: int(
-            os.getenv(
-                "ROUTER_REVIEW_TIMEOUT_MS",
-                os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "800")),
-            )
+            os.getenv("ROUTER_REVIEW_TIMEOUT_MS", "800")
         )
     )
     confidence_threshold: float = Field(
@@ -61,6 +59,9 @@ class Settings(BaseModel):
     )
     capability_catalog_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS", "600"))
+    )
+    capability_catalog_cache_ttl_ms: int = Field(
+        default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS", "5000"))
     )
     capability_match_limit: int = Field(
         default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_MATCH_LIMIT", "8"))
@@ -96,6 +97,7 @@ capability_catalog = CapabilityCatalogClient(
     settings.capability_catalog_url,
     timeout_ms=settings.capability_catalog_timeout_ms,
     limit=settings.capability_match_limit,
+    snapshot_cache_ttl_ms=settings.capability_catalog_cache_ttl_ms,
 )
 
 
@@ -230,6 +232,22 @@ def _intent_capability_id(intent: str) -> str:
     if not normalized.startswith(prefix):
         return ""
     return normalized[len(prefix) :].strip()
+
+
+def _unique_capability_suffix_match(raw_intent: str, by_id: dict[str, dict[str, Any]]) -> str:
+    normalized = (raw_intent or "").strip()
+    if not normalized:
+        return ""
+    aliases = {
+        normalized.casefold(),
+        normalized.casefold().replace(" ", "_").replace("-", "_"),
+    }
+    matches = [
+        capability_id
+        for capability_id in by_id
+        if capability_id.rsplit(".", 1)[-1].casefold() in aliases
+    ]
+    return matches[0] if len(matches) == 1 else ""
 
 
 def _capability_available(item: dict) -> bool:
@@ -372,12 +390,18 @@ def _validate_llm_capability_decision(
     by_id = {_capability_id(item): item for item in candidates if _capability_id(item)}
     selected_id = _intent_capability_id(decision.intent)
     raw_intent = (decision.intent or "").strip()
-    if not selected_id and raw_intent in by_id:
-        selected_id = raw_intent
+    normalized_reason = "validator normalized catalog capability intent"
+    if not selected_id:
+        if raw_intent in by_id:
+            selected_id = raw_intent
+            normalized_reason = "validator normalized exact capability intent"
+        else:
+            selected_id = _unique_capability_suffix_match(raw_intent, by_id)
+    if selected_id and raw_intent != f"capability:{selected_id}":
         decision.intent = f"capability:{selected_id}"
         decision.reason = (
             f"{decision.reason}; " if decision.reason else ""
-        ) + "validator normalized exact capability intent"
+        ) + normalized_reason
 
     if decision.route == "robot_action":
         if decision.actions:
@@ -859,12 +883,23 @@ async def route(request: RouteRequest) -> RouteDecision:
         emergency_matched = True
 
     if decision is None:
-        catalog_result = await capability_catalog.search(
+        catalog_result_task = asyncio.create_task(capability_catalog.search(
             text=request.text,
             language=request.language,
-        )
+        ))
         snapshot_method = getattr(capability_catalog, "snapshot", None)
-        catalog_snapshot = await snapshot_method() if callable(snapshot_method) else {}
+        catalog_snapshot_task = (
+            asyncio.create_task(snapshot_method()) if callable(snapshot_method) else None
+        )
+        catalog_result = await catalog_result_task
+        if catalog_snapshot_task is not None:
+            try:
+                catalog_snapshot = await catalog_snapshot_task
+            except Exception as exc:
+                logger.warning("capability catalog prompt snapshot failed: %s", exc)
+                catalog_snapshot = {}
+        else:
+            catalog_snapshot = {}
         prompt_capabilities_common = _prompt_catalog_capabilities(
             catalog_snapshot,
             scope="common",

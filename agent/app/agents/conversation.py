@@ -253,6 +253,15 @@ class ConversationAgent(BaseAgent):
             options=options,
         )
         response = cast(str, raw)
+        if not " ".join((response or "").strip().split()):
+            creative_fallback = self._creative_request_fallback(request, zh=zh)
+            if creative_fallback:
+                logger.warning(
+                    "conversation_agent_empty_creative_response_fallback sid=%s text=%r",
+                    request.sid,
+                    request.text,
+                )
+                return creative_fallback
         response = await self.review_spoken_response(
             request,
             prompt=prompt,
@@ -280,6 +289,33 @@ class ConversationAgent(BaseAgent):
             )
             return self.invalid_spoken_response_fallback(zh=zh)
         return response
+
+    def _creative_request_fallback(self, request: AgentRunRequest, *, zh: bool) -> str:
+        text = " ".join((request.text or "").casefold().split())
+        history_text = " ".join(
+            " ".join(str(turn.get("text") or "").casefold().split())
+            for turn in self._history_from_request(request)[-2:]
+        )
+        combined = f"{history_text} {text}".strip()
+        if zh:
+            if any(item in combined for item in ("笑话", "讲个笑", "讲笑")):
+                return "当然。为什么机器人喜欢讲冷笑话？因为散热比较好。"
+            if "故事" in combined:
+                return "当然。有个小机器人点亮了一盏灯，然后发现房间也把它的心情照亮了。"
+            if "诗" in combined:
+                return "当然。小小的灯在夜里醒来，把安静的路照成温柔的未来。"
+            if any(item in combined for item in ("唱歌", "歌曲", "唱一")):
+                return "当然。我轻轻唱：今天的光，落在肩上，我们慢慢向前方。"
+            return ""
+        if "joke" in combined:
+            return "Here is one: why did Chromie bring a spare battery? To keep the conversation charged."
+        if "story" in combined:
+            return "Here is a tiny story: Chromie found a blinking light, followed it home, and learned it was a friendly idea."
+        if "poem" in combined:
+            return "Here is a tiny poem: a little light wakes in the room, and turns the quiet into bloom."
+        if any(item in combined for item in ("song", "sing")):
+            return "Here is a little original line: bright little circuits, steady and true, I hum through the room and listen to you."
+        return ""
 
     def _add_spoken_response(self, result: AgentResult, response: str) -> None:
         for chunk in self._split_spoken_response(response):

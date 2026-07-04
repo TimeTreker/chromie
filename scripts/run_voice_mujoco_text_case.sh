@@ -17,6 +17,7 @@ EXPECT_SKILL=()
 EXPECT_ARGS=()
 REJECT_INTERNAL_SPEECH=()
 REJECT_SPEECH_PATTERNS=()
+EVIDENCE_DIR=""
 TEXT=""
 
 usage() {
@@ -41,6 +42,7 @@ Options:
   --preview-only             Route and validate without executing Soridormi skills
   --no-auto-confirm-sim      Do not auto-confirm simulator skills
   --skill-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
+  --evidence-dir DIR         Write evidence to a specific directory
   --expect-route ROUTE       Post-run assertion for Router route: chat, deep_thought,
                              robot_action, tool, memory, clarify, interrupt,
                              or ignore
@@ -62,6 +64,7 @@ while [ "$#" -gt 0 ]; do
     --preview-only) PREVIEW_ONLY=1; shift ;;
     --no-auto-confirm-sim) AUTO_CONFIRM=0; shift ;;
     --skill-timeout-s) SKILL_TIMEOUT_S="${2:?--skill-timeout-s requires seconds}"; shift 2 ;;
+    --evidence-dir) EVIDENCE_DIR="${2:?--evidence-dir requires a directory}"; shift 2 ;;
     --expect-route) EXPECT_ROUTE+=(--expect-route "${2:?--expect-route requires a route}"); shift 2 ;;
     --expect-no-skills) EXPECT_NO_SKILLS+=(--expect-no-skills); shift ;;
     --expect-skill) EXPECT_SKILL+=(--expect-skill "${2:?--expect-skill requires a skill id}"); shift 2 ;;
@@ -131,6 +134,7 @@ if [ "$AUTO_CONFIRM" = "1" ]; then
 else
   args+=(--no-auto-confirm-sim)
 fi
+if [ -n "$EVIDENCE_DIR" ]; then args+=(--evidence-dir "$EVIDENCE_DIR"); fi
 args+=(
   "${EXPECT_ROUTE[@]}"
   "${EXPECT_NO_SKILLS[@]}"

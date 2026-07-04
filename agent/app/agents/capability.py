@@ -13,7 +13,11 @@ try:
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import SkillRequest
 
-from ..capabilities.validator import normalize_args_for_schema, validate_args_for_schema
+from ..capabilities.validator import (
+    normalize_args_for_schema,
+    normalize_enum_string,
+    validate_args_for_schema,
+)
 from ..schema import AgentResult, AgentRunRequest
 from .base import BaseAgent
 
@@ -872,7 +876,7 @@ class CapabilityAgent(BaseAgent):
         if over_limit is not None:
             return over_limit
 
-        args = self._fast_router_args(request, target)
+        args = self._fast_router_args(request, target, route_task)
         if args is None:
             return None
         args, _normalized = normalize_args_for_schema(args, getattr(target, "input_schema", {}) or {})
@@ -892,7 +896,7 @@ class CapabilityAgent(BaseAgent):
             route_task,
             selected_id,
             source="router_task_list_fast_path",
-            fast_path_reason="exact low-risk router task with deterministic schema args",
+            fast_path_reason="exact router task with deterministic schema args",
         )
 
     def _fast_over_limit_count_plan(
@@ -968,7 +972,12 @@ class CapabilityAgent(BaseAgent):
         )
         return plan, metadata
 
-    def _fast_router_args(self, request: AgentRunRequest, target: Any) -> dict[str, Any] | None:
+    def _fast_router_args(
+        self,
+        request: AgentRunRequest,
+        target: Any,
+        route_task: dict[str, Any],
+    ) -> dict[str, Any] | None:
         schema = getattr(target, "input_schema", {}) or {}
         if not isinstance(schema, dict):
             return None
@@ -977,6 +986,42 @@ class CapabilityAgent(BaseAgent):
             properties = {}
         required = schema.get("required")
         required_fields = {str(item) for item in required} if isinstance(required, list) else set()
+
+        route_args = route_task.get("args")
+        if not isinstance(route_args, dict):
+            route_args = {}
+        args: dict[str, Any] = {
+            str(key): value
+            for key, value in route_args.items()
+            if str(key) in properties
+        }
+
+        count_schema = properties.get("count")
+        if isinstance(count_schema, dict):
+            return self._fast_count_args(
+                request,
+                properties,
+                required_fields,
+                args,
+            )
+
+        if "duration_s" in properties or "speed" in properties:
+            return self._fast_duration_speed_args(
+                request,
+                properties,
+                required_fields,
+                args,
+            )
+
+        return args if not properties and not required_fields else None
+
+    def _fast_count_args(
+        self,
+        request: AgentRunRequest,
+        properties: dict[str, Any],
+        required_fields: set[str],
+        args: dict[str, Any],
+    ) -> dict[str, Any] | None:
         if not required_fields.issubset({"count"}):
             return None
         if not self._optional_fast_fields_are_omittable(properties, required_fields):
@@ -984,7 +1029,9 @@ class CapabilityAgent(BaseAgent):
         count_schema = properties.get("count")
         if not isinstance(count_schema, dict):
             return {} if not required_fields else None
-        requested_count = self._extract_requested_count(request.text)
+        requested_count = self._positive_int(args.get("count"))
+        if requested_count is None and "count" not in args:
+            requested_count = self._extract_requested_count(request.text)
         if requested_count is None:
             default_count = self._positive_int(count_schema.get("default"))
             requested_count = default_count
@@ -1000,11 +1047,51 @@ class CapabilityAgent(BaseAgent):
                 return None
         return {"count": requested_count}
 
+    def _fast_duration_speed_args(
+        self,
+        request: AgentRunRequest,
+        properties: dict[str, Any],
+        required_fields: set[str],
+        args: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        if not set(properties).issubset({"duration_s", "speed"}):
+            return None
+        if not required_fields.issubset({"duration_s", "speed"}):
+            return None
+
+        out: dict[str, Any] = {}
+        duration_schema = properties.get("duration_s")
+        if "duration_s" in properties:
+            duration = self._positive_number(args.get("duration_s"))
+            if duration is None:
+                duration = self._extract_requested_duration_s(request.text)
+            if duration is None and isinstance(duration_schema, dict):
+                duration = self._positive_number(duration_schema.get("default"))
+            if duration is None:
+                if "duration_s" in required_fields:
+                    return None
+            else:
+                out["duration_s"] = duration
+
+        speed_schema = properties.get("speed")
+        if "speed" in properties:
+            speed = args.get("speed")
+            if not isinstance(speed, str) or not speed.strip():
+                speed = self._extract_requested_speed(request.text, speed_schema)
+            if (not isinstance(speed, str) or not speed.strip()) and isinstance(speed_schema, dict):
+                default_speed = speed_schema.get("default")
+                if isinstance(default_speed, str) and default_speed.strip():
+                    speed = default_speed.strip()
+            if isinstance(speed, str) and speed.strip():
+                out["speed"] = speed.strip()
+            elif "speed" in required_fields:
+                return None
+
+        return out
+
     def _can_fast_execute_router_skill(self, match: Any) -> bool:
-        if bool(getattr(match, "requires_confirmation", False)):
-            return False
         safety_class = str(getattr(match, "safety_class", "") or "").lower()
-        if safety_class in {"physical_motion", "safety_critical", "restricted"}:
+        if safety_class in {"safety_critical", "restricted"}:
             return False
         effects = {
             str(item).strip().lower()
@@ -1013,7 +1100,6 @@ class CapabilityAgent(BaseAgent):
         }
         if effects.intersection(
             {
-                "physical_motion",
                 "safety_control",
                 "tool_write",
                 "external_side_effect",
@@ -1029,14 +1115,23 @@ class CapabilityAgent(BaseAgent):
             properties = {}
         required = schema.get("required")
         required_fields = {str(item) for item in required} if isinstance(required, list) else set()
-        if not required_fields.issubset({"count"}):
+        if "count" in properties:
+            if not required_fields.issubset({"count"}):
+                return False
+            if not self._optional_fast_fields_are_omittable(properties, required_fields):
+                return False
+            if bool(getattr(match, "requires_confirmation", False)):
+                return False
+        elif "duration_s" in properties or "speed" in properties:
+            if not set(properties).issubset({"duration_s", "speed"}):
+                return False
+            if not required_fields.issubset({"duration_s", "speed"}):
+                return False
+            if "physical_motion" in effects and not bool(getattr(match, "requires_confirmation", False)):
+                return False
+        elif properties:
             return False
-        if not self._optional_fast_fields_are_omittable(properties, required_fields):
-            return False
-        capability_id = str(getattr(match, "capability_id", "") or "").lower()
-        description = str(getattr(match, "description", "") or "").lower()
-        gesture_terms = ("blink", "nod", "shake")
-        return any(term in capability_id or term in description for term in gesture_terms)
+        return True
 
     @staticmethod
     def _optional_fast_fields_are_omittable(
@@ -1342,6 +1437,106 @@ class CapabilityAgent(BaseAgent):
         if isinstance(value, str) and re.fullmatch(r"\s*\d{1,4}\s*", value):
             number = int(value.strip())
             return number if number > 0 else None
+        return None
+
+    @staticmethod
+    def _positive_number(value: Any) -> float | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            number = float(value)
+            return number if number > 0 else None
+        if isinstance(value, str) and re.fullmatch(r"\s*\d{1,4}(?:\.\d{1,3})?\s*", value):
+            number = float(value.strip())
+            return number if number > 0 else None
+        return None
+
+    @classmethod
+    def _extract_requested_duration_s(cls, text: str) -> float | None:
+        raw = text or ""
+        numeric_match = re.search(
+            r"(?<![\d.])(\d{1,4}(?:\.\d{1,3})?)\s*"
+            r"(seconds?|secs?|sec|s)\b",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if numeric_match:
+            return float(numeric_match.group(1))
+        minute_match = re.search(
+            r"(?<![\d.])(\d{1,4}(?:\.\d{1,3})?)\s*"
+            r"(minutes?|mins?|min)\b",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        if minute_match:
+            return float(minute_match.group(1)) * 60.0
+        chinese_match = re.search(
+            r"(\d{1,4}(?:\.\d{1,3})?|[一二两三四五六七八九十]{1,3})\s*(秒|分钟)",
+            raw,
+        )
+        if chinese_match:
+            value = cls._positive_number(chinese_match.group(1))
+            if value is None:
+                chinese_value = cls._chinese_number_to_int(chinese_match.group(1))
+                value = float(chinese_value) if chinese_value is not None else None
+            if value is not None:
+                return value * (60.0 if chinese_match.group(2) == "分钟" else 1.0)
+
+        words = re.findall(r"[a-zA-Z]+", raw.lower())
+        time_units = {"second", "seconds", "sec", "secs", "minute", "minutes", "min", "mins"}
+        for index, word in enumerate(words):
+            if word not in time_units or index == 0:
+                continue
+            previous = words[index - 1]
+            if previous in {"a", "an"}:
+                number = 1
+            else:
+                number = cls._number_word_to_int(previous)
+            if number is None or number <= 0:
+                continue
+            seconds = float(number)
+            if word in {"minute", "minutes", "min", "mins"}:
+                seconds *= 60.0
+            return seconds
+        return None
+
+    @staticmethod
+    def _extract_requested_speed(text: str, schema: Any) -> str | None:
+        if not isinstance(schema, dict):
+            return None
+        allowed = schema.get("enum")
+        if not isinstance(allowed, list):
+            return None
+        allowed_strings = [item for item in allowed if isinstance(item, str)]
+        if not allowed_strings:
+            return None
+        candidates = (
+            "quickly",
+            "rapidly",
+            "swiftly",
+            "faster",
+            "fast",
+            "slowly",
+            "slow",
+            "normally",
+            "normal speed",
+            "normal",
+            "medium speed",
+            "medium",
+            "quick",
+        )
+        raw = text or ""
+        for candidate in candidates:
+            pattern = r"(?<![A-Za-z])" + re.escape(candidate) + r"(?![A-Za-z])"
+            if not re.search(pattern, raw, flags=re.IGNORECASE):
+                continue
+            normalized = normalize_enum_string(candidate, allowed_strings)
+            if normalized in allowed_strings:
+                return candidate
+        for candidate in allowed_strings:
+            pattern = r"(?<![A-Za-z])" + re.escape(candidate) + r"(?![A-Za-z])"
+            if re.search(pattern, raw, flags=re.IGNORECASE):
+                return candidate
         return None
 
     @classmethod

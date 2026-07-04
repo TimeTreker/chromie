@@ -286,6 +286,61 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             [item["capability_id"] for item in decision.candidate_capabilities],
         )
 
+    async def test_hybrid_llm_normalizes_unique_catalog_skill_suffix(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="Please blink your eyes twice.",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=22,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 22,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "description": "Blink the robot eyes visibly.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["visual_expression"],
+                    "safety_class": "low_risk_action",
+                    "requires_confirmation": False,
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {"count": {"type": "number", "default": 2}},
+                    },
+                }
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="blink eyes",
+                confidence=0.9,
+                language="en-US",
+                source="llm",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main,
+            "capability_catalog",
+            _Catalog(result, snapshot=snapshot),
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="Please blink your eyes twice.", language="en-US")
+            )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
+        self.assertIn("validator normalized catalog capability intent", decision.reason or "")
+
     async def test_hybrid_wrong_low_score_robot_action_is_not_catalog_corrected(self) -> None:
         from router.app import main
 

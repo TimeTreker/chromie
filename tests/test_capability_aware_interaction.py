@@ -1349,10 +1349,10 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("15", response.speech[0].text)
 
-    async def test_router_task_list_does_not_fast_path_confirmed_physical_motion(self) -> None:
+    async def test_router_task_list_fast_path_preserves_physical_confirmation(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
-                ollama=_SelectedWalkOllama(),  # type: ignore[arg-type]
+                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_catalog(),
@@ -1361,7 +1361,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = AgentRunRequest.model_validate(
             {
-                "sid": "router-task-list-walk-no-fast-path",
+                "sid": "router-task-list-walk-fast-path",
                 "text": "Walk forward quickly for 3 seconds.",
                 "route_decision": {
                     "route": "robot_action",
@@ -1393,11 +1393,17 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
+        self.assertEqual(response.skills[0].args, {"duration_s": 3.0, "speed": "quick"})
+        self.assertTrue(response.skills[0].requires_confirmation)
+        self.assertTrue(response.requires_confirmation)
         self.assertEqual(
             response.skills[0].metadata["source"],
-            "capability_catalog",
+            "router_task_list_fast_path",
         )
-        self.assertNotIn("capability_fast_path", response.metadata)
+        self.assertEqual(
+            response.metadata["capability_fast_path"]["source"],
+            "router_task_list_fast_path",
+        )
 
     async def test_router_selected_capability_does_not_hide_better_candidate(self) -> None:
         runtime = InteractionRuntime(

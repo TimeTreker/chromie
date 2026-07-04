@@ -39,9 +39,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ROUTER_USE_LLM"], "1")
         self.assertEqual(values["ROUTER_MODEL"], "qwen3:0.6b")
         self.assertEqual(values["ROUTER_REVIEW_MODEL"], "gemma4:e2b")
-        self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "800")
+        self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "2200")
         self.assertEqual(values["ROUTER_LLM_NUM_PREDICT"], "192")
-        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "1200")
+        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "800")
+        self.assertEqual(values["ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
         self.assertEqual(values["ROUTER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
         self.assertEqual(values["ROUTER_SLOW_REVIEW_RECOVERY_ENABLED"], "0")
 
