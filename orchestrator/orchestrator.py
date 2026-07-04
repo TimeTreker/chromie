@@ -111,6 +111,7 @@ class VoiceAssistant:
         self.min_rms = float(os.getenv("ORCH_MIN_RMS", "120"))
         self.barge_in_min_rms = float(os.getenv("ORCH_BARGE_IN_MIN_RMS", "350"))
         self.min_audio_ms = int(os.getenv("ORCH_MIN_AUDIO_MS", "1200"))
+        self.input_gain = max(0.0, float(os.getenv("ORCH_INPUT_GAIN", "1.0")))
         self.tts_flush_chars = int(os.getenv("TTS_FLUSH_CHARS", "160"))
         self.tts_max_text_chars = max(20, int(os.getenv("TTS_MAX_TEXT_CHARS", "220")))
         self.tts_text_chunking_enabled = env_bool("ORCH_TTS_TEXT_CHUNKING", True)
@@ -235,7 +236,7 @@ class VoiceAssistant:
         self.output_latency = self.output_params["latency"]
 
         logger.info(
-            "Input device name=%s index=%s rate=%sHz channels=%s blocksize=%s block_ms=%s latency=%s min_rms=%s barge_in_min_rms=%s",
+            "Input device name=%s index=%s rate=%sHz channels=%s blocksize=%s block_ms=%s latency=%s min_rms=%s barge_in_min_rms=%s input_gain=%.2f",
             self.input_params["name"],
             self.input_device,
             self.input_rate,
@@ -245,6 +246,7 @@ class VoiceAssistant:
             self.input_latency,
             self.min_rms,
             self.barge_in_min_rms,
+            self.input_gain,
         )
         logger.info(
             "Output device name=%s index=%s rate=%sHz channels=%s blocksize=%s block_ms=%s latency=%s",
@@ -709,6 +711,8 @@ class VoiceAssistant:
             arr = arr[:, 0]
         if arr.dtype != np.float32:
             arr = arr.astype(np.float32)
+        if self.input_gain != 1.0:
+            arr = arr * self.input_gain
         arr = np.clip(arr, -1.0, 1.0)
         pcm = (arr * 32767.0).astype(np.int16).tobytes()
         return self.resample_int16_bytes(pcm, self.input_rate, self.target_asr_rate)

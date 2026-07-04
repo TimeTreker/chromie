@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -191,6 +192,39 @@ class M13AcceptanceTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
             self.assertFalse(evidence_root.exists())
+
+    def test_supervised_override_records_audio_tuning_env(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "acceptance-overrides.env"
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "ORCH_INPUT_DEVICE": "15",
+                    "ORCH_OUTPUT_DEVICE": "14",
+                    "ORCH_INPUT_GAIN": "20",
+                    "ORCH_MIN_RMS": "5",
+                    "ORCH_BARGE_IN_MIN_RMS": "10",
+                    "ORCH_VAD_MODE": "0",
+                },
+                clear=False,
+            ):
+                write_override_file(
+                    path,
+                    event_path=Path(temp_dir) / "events.jsonl",
+                    recordings_dir=Path(temp_dir) / "recordings",
+                    soridormi_mcp_url="http://127.0.0.1:8000/mcp",
+                    enable_soridormi=True,
+                    mode="supervised",
+                )
+
+            text = path.read_text()
+            self.assertIn("ORCH_AUDIO_INPUT_MODE=device", text)
+            self.assertIn("ORCH_INPUT_DEVICE=15", text)
+            self.assertIn("ORCH_OUTPUT_DEVICE=14", text)
+            self.assertIn("ORCH_INPUT_GAIN=20", text)
+            self.assertIn("ORCH_MIN_RMS=5", text)
+            self.assertIn("ORCH_BARGE_IN_MIN_RMS=10", text)
+            self.assertIn("ORCH_VAD_MODE=0", text)
 
     def test_audio_injection_packet_round_trip(self) -> None:
         payload = (b"\x01\x00" * 320)

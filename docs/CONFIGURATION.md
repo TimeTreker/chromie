@@ -303,6 +303,7 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_INPUT_BLOCK_MS`, `ORCH_OUTPUT_BLOCK_MS` | `30`, `30`. |
 | `ORCH_INPUT_BLOCKSIZE`, `ORCH_OUTPUT_BLOCKSIZE` | Calculated/driver default when `0`. |
 | `ORCH_INPUT_LATENCY`, `ORCH_OUTPUT_LATENCY` | `low`. |
+| `ORCH_INPUT_GAIN` | `1.0`; software gain applied to captured microphone audio before VAD and ASR conversion. Use only to compensate for a quiet host source, and prefer fixing OS mixer gain first. |
 | `ORCH_VAD_MODE` | `3`. |
 | `ORCH_VAD_SILENCE_MS` | `650`. |
 | `ORCH_MIN_AUDIO_MS` | `1200`. |

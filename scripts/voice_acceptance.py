@@ -1498,6 +1498,23 @@ def write_override_file(
                 "ORCH_AUDIO_OUTPUT_MODE": "device",
             }
         )
+        for key in (
+            "ORCH_INPUT_DEVICE",
+            "ORCH_OUTPUT_DEVICE",
+            "ORCH_INPUT_RATE",
+            "ORCH_OUTPUT_RATE",
+            "ORCH_INPUT_CHANNELS",
+            "ORCH_OUTPUT_CHANNELS",
+            "ORCH_INPUT_GAIN",
+            "ORCH_MIN_AUDIO_MS",
+            "ORCH_MIN_RMS",
+            "ORCH_BARGE_IN_MIN_RMS",
+            "ORCH_VAD_MODE",
+            "ORCH_VAD_SILENCE_MS",
+        ):
+            value = os.getenv(key)
+            if value not in {None, ""}:
+                values[key] = value
     else:
         raise ValueError(f"Unsupported acceptance mode: {mode}")
     if soridormi_mcp_url:
