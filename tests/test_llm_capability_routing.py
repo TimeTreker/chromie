@@ -3,7 +3,8 @@ from __future__ import annotations
 import unittest
 
 from router.app.capability_catalog import CapabilityCatalogResult
-from router.app.main import _catalog_decision, _validate_llm_capability_decision
+from router.app.fallback import fallback_decision
+from router.app.main import _validate_llm_capability_decision
 from router.app.schema import RouteDecision, RouteRequest
 
 
@@ -119,14 +120,14 @@ class ConstrainedLlmCapabilityRoutingTests(unittest.TestCase):
         self.assertEqual(result.intent, "robot_action")
         self.assertIn("cleared invalid capability selection", result.reason or "")
 
-    def test_catalog_fallback_never_routes_planning_tool_as_robot_action(self) -> None:
+    def test_fallback_never_routes_catalog_planning_tool_as_robot_action(self) -> None:
         request = RouteRequest(text="Walk forward.")
 
-        result = _catalog_decision(request, catalog_result())
+        result = fallback_decision(request, reason="catalog_and_rules_no_match")
 
-        self.assertIsNotNone(result)
-        assert result is not None
-        self.assertEqual(result.intent, "capability:soridormi.walk_velocity")
+        self.assertEqual(result.route, "chat")
+        self.assertEqual(result.intent, "general_conversation")
+        self.assertEqual(result.source, "fallback")
 
 
 if __name__ == "__main__":

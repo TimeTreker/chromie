@@ -1,16 +1,15 @@
 {
   "schema_version": 1,
-  "id": "voice_log_chinese_blink_chat_recovered_to_robot_action",
+  "id": "voice_log_chinese_blink_chat_not_catalog_recovered",
   "suite": "router",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live voice log: noisy Chinese ASR for blink eyes must recover from a quick chat route to an executable blink skill.",
+  "description": "Regression from the 2026-07-03 live voice log: if the quick Router LLM treats noisy Chinese blink ASR as chat, catalog search must not recover it into an executable blink skill.",
   "tags": [
     "voice-log",
     "zh-CN",
     "router-agent-contract",
-    "robot-action",
     "blink",
-    "catalog-recovery"
+    "model-authority"
   ],
   "input": {
     "text": "眨两小眼睛。",
@@ -45,11 +44,12 @@
     }
   },
   "expect": {
-    "route": "robot_action",
-    "intent": "capability:soridormi.blink_eyes",
-    "source": "catalog",
-    "task_types_include": ["task.execute_skill"],
-    "metadata_json_contains": ["soridormi.blink_eyes", "\"recovered_from_route\": \"chat\""],
+    "route": "chat",
+    "intent": "general_conversation",
+    "source": "llm",
+    "task_types_include": ["speech.answer"],
+    "task_types_forbid": ["task.execute_skill"],
+    "metadata_json_forbid": ["\"recovered_from_route\": \"chat\"", "\"task_type\": \"task.execute_skill\""],
     "llm_calls": 1
   }
 }

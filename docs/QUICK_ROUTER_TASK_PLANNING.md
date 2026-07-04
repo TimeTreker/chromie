@@ -55,6 +55,33 @@ For a compound common-skill request, the Router may return:
 Each action confidence is the model's confidence in that specific skill choice
 and its arguments. It is separate from the whole-route confidence.
 
+For a desired human-like ability that the model understands but cannot represent
+with the common executable catalog, the Router must not invent an action. It
+should delegate or clarify and may preserve the desired ability as
+non-executable metadata:
+
+```json
+{
+  "route": "deep_thought",
+  "intent": "deep_thought_missing_common_skill",
+  "confidence": 0.72,
+  "metadata": {
+    "desired_abilities": [
+      {
+        "ability_id": "manipulation.pick_up_object",
+        "intent": "pick up the bottle",
+        "status": "missing_ability",
+        "confidence": 0.93,
+        "reason": "No executable grasping skill is in the common catalog."
+      }
+    ]
+  }
+}
+```
+
+`metadata.desired_abilities` is a review and learning signal only. It is not an
+execution surface.
+
 ## Speech Is A Skill
 
 Chromie should not treat speech and body action as fundamentally different
@@ -75,6 +102,8 @@ the task proposals before they can enter the executable task surface:
 - `chromie.speak` includes non-empty `args.text`;
 - each action confidence is valid and above the Router threshold;
 - no placeholder skill ID or raw low-level robot command is accepted.
+- missing, planned, or unsupported abilities are absent from `actions[]` and
+  may appear only as non-executable desired-ability proposals.
 
 When accepted, the Router copies action confidence into `metadata.task_list[]`
 and `metadata.task_proposals[]`. The Agent also copies it into each emitted

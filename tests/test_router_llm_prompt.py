@@ -32,6 +32,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("emergency/noise controls", prompt)
         self.assertIn("phrase/pattern rules", prompt)
         self.assertIn("quick intent router", prompt)
+        self.assertIn("Understand the user's intent broadly", prompt)
         self.assertIn("Route Taxonomy", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("multi-step", prompt)
@@ -54,6 +55,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("confidence", prompt)
         self.assertIn("agreement/disagreement", prompt)
         self.assertIn("Catalog entries are context, not authorization", prompt)
+        self.assertIn("metadata.desired_abilities", prompt)
+        self.assertIn("status=missing_ability", prompt)
         self.assertIn("Return compact JSON only", prompt)
         self.assertIn("Do not", prompt)
         self.assertIn("output chain-of-thought", prompt)
@@ -148,6 +151,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("not phrase rules", prompt)
         self.assertIn("deterministic emergency/noise filter", prompt)
         self.assertIn("quick intent router", prompt)
+        self.assertIn("the catalog constrains executable actions, not meaning", prompt)
         self.assertIn("Choose route deep_thought", prompt)
         self.assertIn("do not perform or reveal reasoning inside the router", prompt)
         self.assertIn("needs deeper thought, task-session creation, or task-session continuation", prompt)
@@ -155,6 +159,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Common compact skill catalog JSON", prompt)
         self.assertIn("Query-biased catalog hints JSON", prompt)
         self.assertIn("not recommendations", prompt)
+        self.assertIn("metadata.desired_abilities", prompt)
+        self.assertIn("no executable blink skill is in the common catalog", prompt)
         self.assertIn("Factual agreement/disagreement is chat", prompt)
         self.assertIn("Moon, Sun, shape, temperature", prompt)
         self.assertIn("not deep_thought or robot_action", prompt)
@@ -184,6 +190,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("working memory, current task context, and recent action history", prompt)
         self.assertIn("Required keys: route, intent, confidence", prompt)
         self.assertIn("Omit agents, metadata", prompt)
+        self.assertIn("non-executable ability proposals", prompt)
         self.assertIn("include actions as an ordered array", prompt)
         self.assertIn("\"confidence\":0.0", prompt)
         self.assertIn("Each proposed action has its own confidence", prompt)
@@ -192,6 +199,44 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("placeholder intents", prompt)
         self.assertIn("speak_first", prompt)
         self.assertIn("Return compact JSON only", prompt)
+
+    def test_route_stage_preserves_missing_desired_ability_proposal(self) -> None:
+        decision = RouteDecision(
+            route="deep_thought",
+            agents=["deepthinking_agent", "speaker_agent"],
+            intent="deep_thought_missing_common_skill",
+            confidence=0.61,
+            language="en-US",
+            source="llm",
+            metadata={
+                "desired_abilities": [
+                    {
+                        "ability_id": "social.blink_eyes",
+                        "intent": "blink eyes",
+                        "status": "missing_ability",
+                        "confidence": 0.91,
+                        "reason": "No executable blink skill is in the common catalog.",
+                    }
+                ]
+            },
+        )
+
+        finalized = RouteDecision.model_validate(decision.model_dump())
+        from router.app.schema import annotate_default_stage_output
+
+        annotated = annotate_default_stage_output(finalized)
+        proposals = [
+            item for item in annotated.metadata["task_proposals"]
+            if item.get("proposal_kind") == "ability"
+        ]
+
+        self.assertEqual(len(proposals), 1)
+        proposal = proposals[0]
+        self.assertEqual(proposal["state"], "missing_ability")
+        self.assertEqual(proposal["ability_id"], "social.blink_eyes")
+        self.assertEqual(proposal["metadata"]["confidence"], 0.91)
+        self.assertFalse(proposal["effectful"])
+        self.assertNotIn("social.blink_eyes", annotated.actions)
 
     def test_user_prompt_uses_extracted_memory_not_raw_history(self) -> None:
         router = OllamaLLMRouter(

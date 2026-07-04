@@ -39,8 +39,6 @@ _EXPRESSIVE_ATTENTION_ARGS = {
 _EXPRESSIVE_CUE_CAPABILITY_IDS = (
     "soridormi.express_attention",
 )
-_DEEP_THOUGHT_CAPABILITY_RECOVERY_MIN_SCORE = 0.30
-_DEEP_THOUGHT_CAPABILITY_RECOVERY_MIN_CONFIDENCE = 0.72
 
 
 def _catalog_item(
@@ -172,7 +170,6 @@ class InteractionRuntime(_AgentPipeline):
         request.context["capability_candidates"] = list(
             request.route_decision.candidate_capabilities
         )
-        self._recover_deep_thought_capability_route(request, search)
         if request.route_decision.route == "deep_thought":
             await self._attach_deep_thought_catalog(request)
             request.route_decision.agents = ["deepthinking_agent", "speaker_agent"]
@@ -219,65 +216,6 @@ class InteractionRuntime(_AgentPipeline):
             )
             return
 
-    def _recover_deep_thought_capability_route(
-        self,
-        request: AgentRunRequest,
-        search: Any,
-    ) -> bool:
-        decision = request.route_decision
-        if decision.route != "deep_thought":
-            return False
-        if not self._deep_thought_capability_recovery_allowed(decision):
-            return False
-        if getattr(search, "suggested_route", "") != "robot_action":
-            return False
-        if not bool(getattr(search, "matched", False)):
-            return False
-        candidates = [
-            match
-            for match in getattr(search, "matches", []) or []
-            if getattr(match, "available", True) is not False
-            and bool(getattr(match, "interaction_executable", False))
-        ]
-        top = self._top_scored_capability(candidates)
-        if top is None:
-            return False
-        top_score = self._capability_score(top)
-        if top_score < _DEEP_THOUGHT_CAPABILITY_RECOVERY_MIN_SCORE:
-            return False
-        capability_id = str(getattr(top, "capability_id", "") or "").strip()
-        if not capability_id:
-            return False
-
-        original_route = decision.route
-        original_intent = decision.intent
-        decision.route = "robot_action"
-        decision.agents = [
-            "capability_agent",
-            "safety_agent",
-            "speaker_agent",
-        ]
-        decision.intent = f"capability:{capability_id}"
-        decision.confidence = max(0.56, min(0.95, top_score))
-        decision.source = "catalog"
-        reason = (
-            "Agent recovered direct robot action from deep_thought route "
-            f"using catalog v{getattr(search, 'catalog_version', 0)} "
-            f"score={top_score:.2f}"
-        )
-        decision.reason = f"{decision.reason}; {reason}" if decision.reason else reason
-        decision.metadata = {
-            **(decision.metadata or {}),
-            "recovered_from_route": original_route,
-            "recovered_from_intent": original_intent,
-        }
-        request.context["route_recovered_from_deep_thought"] = {
-            "capability_id": capability_id,
-            "score": top_score,
-            "catalog_version": getattr(search, "catalog_version", 0),
-        }
-        return True
-
     async def _attach_deep_thought_catalog(self, request: AgentRunRequest) -> None:
         catalog = self.services.capability_catalog
         if catalog is None or not hasattr(catalog, "prompt_entries"):
@@ -289,48 +227,6 @@ class InteractionRuntime(_AgentPipeline):
         request.route_decision.candidate_capabilities = payload
         request.context["capability_candidates"] = list(payload)
         request.context["capability_catalog_scope"] = "all"
-
-    def _deep_thought_capability_recovery_allowed(self, decision: Any) -> bool:
-        if decision.confidence < _DEEP_THOUGHT_CAPABILITY_RECOVERY_MIN_CONFIDENCE:
-            return False
-        intent = str(decision.intent or "").casefold()
-        reason = str(decision.reason or "").casefold()
-        blocked_intent_terms = (
-            "low_confidence",
-            "planning",
-            "debug",
-            "design",
-            "strategy",
-            "architecture",
-            "implementation",
-        )
-        if any(term in intent for term in blocked_intent_terms):
-            return False
-        blocked_reason_terms = (
-            "explicit planning",
-            "make a plan",
-            "user asked for a plan",
-            "uncertain",
-            "low confidence",
-        )
-        return not any(term in reason for term in blocked_reason_terms)
-
-    def _top_scored_capability(self, candidates: list[Any]) -> Any | None:
-        top: Any | None = None
-        top_score = 0.0
-        for candidate in candidates:
-            score = self._capability_score(candidate)
-            if top is None or score > top_score:
-                top = candidate
-                top_score = score
-        return top
-
-    @staticmethod
-    def _capability_score(candidate: Any) -> float:
-        score = getattr(candidate, "score", 0.0)
-        if isinstance(score, bool) or not isinstance(score, (int, float)):
-            return 0.0
-        return float(score)
 
     async def _ensure_expressive_body_cue_candidates(
         self,

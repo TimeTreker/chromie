@@ -60,12 +60,14 @@ proposed -> committed -> running -> failed/refused/timed_out/cancelled
 proposed -> not_committed
 proposed -> rejected
 proposed -> superseded
+understood desired ability -> missing_ability
 ```
 
 Current implementation records `advisory`, `committed`, `not_committed`,
-`rejected`, and `superseded`. Later-stage corrections can now be represented
-through `revised_task_proposals`, which records a replacement proposal and a
-schema-validated `superseded` marker for the earlier proposal.
+`missing_ability`, `rejected`, and `superseded`. Later-stage corrections can
+now be represented through `revised_task_proposals`, which records a
+replacement proposal and a schema-validated `superseded` marker for the earlier
+proposal.
 
 ## Current Implementation Slice
 
@@ -76,6 +78,9 @@ The host now builds an internal proposal ledger from:
 - `route_task_proposals` copied from Router
   `RouteDecision.metadata.task_proposals`, when present;
 - `route_task_list` copied from Router `RouteDecision.metadata.task_list`;
+- non-executable desired ability proposals copied from Router
+  `RouteDecision.metadata.desired_abilities` through the shared
+  `task_proposals` surface;
 - `deepthinking_task_proposals` emitted by the Agent deepthinking path;
 - `agent_task_proposals` emitted for final Agent speech and skills;
 - `revised_task_proposals` or `task_proposal_revisions` emitted by a merge or
@@ -92,8 +97,8 @@ does not execute anything by itself.
 Router now emits shared-schema `task_proposals` alongside the legacy
 `task_list`. The Orchestrator prefers those shared proposals and keeps the
 legacy list as a fallback during migration. The Agent deepthinking path also
-emits shared-schema `deepthinking_task_proposals` for its speech, skill, and
-rejected candidate tasks. The final Agent response now emits shared-schema
+emits shared-schema `deepthinking_task_proposals` for its speech, skill,
+missing-ability, and rejected candidate tasks. The final Agent response now emits shared-schema
 `agent_task_proposals` for committed speech and skills, including speech as the
 local `chromie.speak` skill. The final ledger is validated through the shared
 `shared/chromie_contracts/task_proposal.py` contract before being attached to
@@ -115,6 +120,9 @@ The first commit rule is intentionally conservative:
   Runtime validation, confirmation, provider availability, timeout, and
   cancellation policy.
 - `InteractionResponse.speech` is a committed local speech task.
+- Desired abilities with no executable skill are recorded as
+  `state=missing_ability`, `proposal_kind=ability`, and optional `ability_id`.
+  They are never forwarded to the Skill Runtime.
 - Static preflight status is attached to committed skill proposals when the
   host can check registry, provider, schema, availability, confirmation, or
   safety-monitor requirements before execution.
@@ -171,6 +179,7 @@ The deep reconciler should receive:
 - quick intent proposals;
 - current conversation and task context;
 - capability catalog summaries;
+- broad but non-executable desired ability proposals;
 - recent execution evidence.
 
 It should emit a corrected `InteractionResponse` or future shared

@@ -3,7 +3,7 @@
   "id": "voice_log_chinese_blink_llm_unavailable_delegates",
   "suite": "router",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live cold-start check under catalog-aware routing: when the quick LLM is unavailable, explicit Chinese blink ASR must delegate instead of letting catalog scores execute a skill.",
+  "description": "Regression from the 2026-07-03 live cold-start check under catalog-aware routing: when the quick LLM is unavailable, the Router must delegate to deep_thought instead of letting catalog scores execute or select a skill.",
   "tags": [
     "voice-log",
     "zh-CN",
@@ -56,10 +56,10 @@
   "expect": {
     "route": "deep_thought",
     "intent": "deep_thought_router_unavailable",
-    "source": "catalog",
+    "source": "fallback",
     "task_types_include": ["cognition.deep_think"],
     "task_types_forbid": ["task.execute_skill", "task.execute_robot_action"],
-    "metadata_json_contains": ["candidate_count", "delegating catalog-bounded robot request"],
+    "metadata_json_contains": ["candidate_count", "delegating to deep_thought"],
     "metadata_json_forbid": ["\"selected_stage\": \"quick_intent\"", "\"final_route\": \"robot_action\""],
     "llm_calls": 1
   }

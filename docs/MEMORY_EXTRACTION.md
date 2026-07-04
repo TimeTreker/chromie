@@ -207,8 +207,11 @@ Memory is interpretive context, not authority.
    reset and hard-idle expiry, keyed correction updates, explicit memory-route
    updates, trusted outcome memory, Router prompt sanitization,
    conversation/capability prompt migration, and deepthinking memory visibility.
-8. Later, connect reviewed experience summaries to memory selection without
-   turning raw experience logs into prompts.
+8. Implemented first offline-review slice: episode evaluation can write compact
+   reviewed experience notes in `offline_reviews.jsonl` without injecting raw
+   experience logs into prompts. Later, connect owner-approved experience notes
+   to durable memory selection through the future
+   [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md) path.
 
 ## Acceptance Criteria
 

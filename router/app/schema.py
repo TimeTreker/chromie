@@ -169,6 +169,73 @@ def _task_proposals_for_items(task_list: list[dict[str, Any]]) -> list[dict[str,
     return [_task_proposal_for_item(item) for item in task_list if isinstance(item, dict)]
 
 
+def _desired_ability_items(decision: RouteDecision) -> list[dict[str, Any]]:
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    raw = metadata.get("desired_abilities")
+    if raw is None:
+        raw = metadata.get("ability_proposals")
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def _state_for_desired_ability_status(status: str) -> str:
+    normalized = "_".join(status.strip().lower().split())
+    if normalized in {"missing_ability", "known_missing", "not_executable", "unsupported"}:
+        return "missing_ability"
+    if normalized in {"forbidden", "unsafe", "refused"}:
+        return "refused"
+    return "advisory"
+
+
+def _desired_ability_proposals(
+    decision: RouteDecision,
+    *,
+    source_stage: str,
+) -> list[dict[str, Any]]:
+    proposals: list[dict[str, Any]] = []
+    for index, item in enumerate(_desired_ability_items(decision)):
+        ability_id = str(
+            item.get("ability_id")
+            or item.get("desired_ability")
+            or item.get("intent")
+            or ""
+        ).strip()
+        if not ability_id:
+            continue
+        status = str(item.get("status") or "missing_ability")
+        confidence = item.get("confidence")
+        metadata: dict[str, Any] = {
+            "route": decision.route,
+            "intent": str(item.get("intent") or decision.intent or ""),
+            "status": status,
+        }
+        matched_skill_id = str(item.get("matched_skill_id") or item.get("skill_id") or "").strip()
+        if matched_skill_id:
+            metadata["matched_skill_id"] = matched_skill_id
+        if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
+            metadata["confidence"] = max(0.0, min(1.0, float(confidence)))
+        proposal = TaskProposal(
+            id=str(item.get("id") or f"{source_stage}:ability:{index}:{ability_id}"),
+            source=source_stage,
+            proposal_kind="ability",
+            task_type=str(item.get("task_type") or "ability.requested"),
+            state=_state_for_desired_ability_status(status),  # type: ignore[arg-type]
+            reason=str(
+                item.get("reason")
+                or "desired ability is understood but not executable from the current catalog"
+            ),
+            effectful=False,
+            priority=str(item.get("priority") or decision.priority or "normal"),
+            sequence=_safe_int(item.get("sequence"), index),
+            ability_id=ability_id,
+            skill_id=matched_skill_id or None,
+            metadata=metadata,
+        )
+        proposals.append(proposal.model_dump(mode="json", exclude_none=True))
+    return proposals
+
+
 def _safe_int(value: Any, default: int) -> int:
     if isinstance(value, bool):
         return default
@@ -329,8 +396,12 @@ def route_stage_output(
     stage: str,
     status: str = "proposed",
     tasks: list[dict[str, Any]] | None = None,
+    include_desired_abilities: bool = False,
 ) -> dict[str, Any]:
     task_items = tasks if tasks is not None else _tasks_for_decision(decision, source_stage=stage)
+    task_proposals = _task_proposals_for_items(task_items)
+    if tasks is None or include_desired_abilities:
+        task_proposals.extend(_desired_ability_proposals(decision, source_stage=stage))
     return {
         "stage": stage,
         "status": status,
@@ -339,7 +410,7 @@ def route_stage_output(
         "confidence": decision.confidence,
         "source": decision.source,
         "tasks": task_items,
-        "task_proposals": _task_proposals_for_items(task_items),
+        "task_proposals": task_proposals,
         "actions": [item for item in task_items if item.get("kind") == "action"],
     }
 
@@ -419,6 +490,7 @@ def _route_merge_summary(
     decision: RouteDecision,
     outputs: list[dict[str, Any]],
     task_list: list[dict[str, Any]],
+    task_proposals: list[dict[str, Any]],
     *,
     strategy: str,
     selected_stage: str | None = None,
@@ -433,7 +505,7 @@ def _route_merge_summary(
         "selected_stage": selected_stage or _infer_selected_stage(decision, outputs),
         "proposal_count": len([item for item in outputs if isinstance(item, dict)]),
         "task_count": len(task_list),
-        "task_proposal_count": len(task_list),
+        "task_proposal_count": len(task_proposals),
         "stages": _stage_names(outputs),
         "task_source_stages": sorted(
             {
@@ -449,6 +521,33 @@ def _route_merge_summary(
     return summary
 
 
+def _additional_stage_task_proposals(
+    outputs: list[dict[str, Any]],
+    generated_task_proposals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    existing_ids = {
+        str(item.get("id") or "").strip()
+        for item in generated_task_proposals
+        if isinstance(item, dict)
+    }
+    additional: list[dict[str, Any]] = []
+    for stage_output in outputs:
+        if not isinstance(stage_output, dict):
+            continue
+        raw = stage_output.get("task_proposals")
+        if not isinstance(raw, list):
+            continue
+        for proposal in raw:
+            if not isinstance(proposal, dict):
+                continue
+            proposal_id = str(proposal.get("id") or "").strip()
+            if not proposal_id or proposal_id in existing_ids:
+                continue
+            additional.append(proposal)
+            existing_ids.add(proposal_id)
+    return additional
+
+
 def annotate_stage_outputs(
     decision: RouteDecision,
     outputs: list[dict[str, Any]],
@@ -459,6 +558,7 @@ def annotate_stage_outputs(
 ) -> RouteDecision:
     task_list = merge_stage_task_list(outputs)
     task_proposals = _task_proposals_for_items(task_list)
+    task_proposals.extend(_additional_stage_task_proposals(outputs, task_proposals))
     decision.metadata = {
         **(decision.metadata or {}),
         "route_stage_outputs": outputs,
@@ -468,6 +568,7 @@ def annotate_stage_outputs(
             decision,
             outputs,
             task_list,
+            task_proposals,
             strategy=merge_strategy,
             selected_stage=selected_stage,
             reason=merge_reason,
@@ -602,6 +703,7 @@ def annotate_pipeline_stage_outputs(
                 stage="deep_thought",
                 status="proposed",
                 tasks=deep_thought_tasks,
+                include_desired_abilities=True,
             )
         )
     else:

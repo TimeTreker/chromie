@@ -15,7 +15,10 @@ The registry is implemented in `orchestrator/runtime/abilities.py`.
 | `available` | The ability can be fulfilled in the current host runtime. |
 | `sim_only` | The ability is fulfilled only in the simulator-safe path. |
 | `hardware_only` | The ability is reserved for a hardware-only implementation. |
-| `stub` | The ability is known but not implemented yet. |
+| `stub` | Placeholder entry without a reviewed roadmap decision. |
+| `planned` | A reviewed roadmap ability, not executable yet. |
+| `known_missing` | Chromie understands the ability, but no trusted implementation exists now. |
+| `forbidden` | The ability should not be implemented or offered for safety/policy reasons. |
 | `disabled` | The ability has an implementation but is disabled by runtime flags. |
 
 Optional social abilities may be skipped silently when unavailable. If the user
@@ -34,15 +37,29 @@ The registry currently names normal human-like ability families:
 | Cognition | `cognition.quick_route`, `cognition.deep_think`, `cognition.plan_task`, `cognition.split_task` |
 | Speech | `speech.thinking_ack`, `speech.answer`, `speech.confirm`, `speech.report_progress` |
 | Memory | `memory.remember_session_context`, `memory.recall_session_context`, `memory.forget_current_task` |
-| Social | `social.look_at_user`, `social.listen_pose`, `social.thinking_pose`, `social.micro_nod`, `social.nod_yes` |
+| Social | `social.blink_eyes`, `social.look_at_user`, `social.listen_pose`, `social.thinking_pose`, `social.micro_nod`, `social.nod_yes` |
 | Body | `body.walk_forward`, `body.turn_left`, `body.stop_motion`, `body.recover_balance` |
+| Manipulation | `manipulation.pick_up_object`, `manipulation.place_object` |
+| Navigation | `navigation.follow_user`, `navigation.go_to_location` |
+| Environment | `environment.open_door`, `environment.turn_on_light`, `environment.clean_surface` |
 | Task | `task.execute_skill`, `task.confirm_before_action`, `task.cancel_current_action`, `task.monitor_action` |
 | Safety | `safety.check_capability`, `safety.check_motion_allowed`, `safety.refuse_unsafe_request` |
 | State | `state.report_robot_status`, `state.report_sim_or_hardware_mode`, `state.report_missing_ability` |
 
-Most abilities are deliberately `stub` until a trusted implementation exists.
-This lets Chromie be honest about missing abilities while preserving stable
-names for future implementation.
+Many human-like abilities are deliberately `known_missing` or `planned` until a
+trusted implementation exists. This lets Chromie understand broad requests,
+answer honestly when the ability is missing, and preserve stable names for
+future implementation.
+
+The registry is not an execution catalog. A `known_missing`, `planned`, or
+`stub` ability may appear in a task-proposal ledger as `state=missing_ability`,
+but it must not be sent to the Skill Runtime. Executable work still requires an
+exact skill from the current executable catalog plus the normal Agent,
+Orchestrator, Skill Runtime, and provider gates.
+
+See [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md) for the
+router/deepthinking contract that separates broad understanding from honest
+execution.
 
 ## Fast-First Speech Loop
 

@@ -87,33 +87,21 @@ class RouterCoreTests(unittest.TestCase):
         self.assertEqual(decision.source, "fallback")
         self.assertTrue(decision.needs_agent)
 
-    def test_fallback_preserves_semantic_non_chat_lanes(self) -> None:
+    def test_fallback_does_not_semantically_route_non_chat_lanes(self) -> None:
         cases = (
-            (
-                "Remember that my favorite color is blue.",
-                "memory",
-                "remember_user_preference",
-            ),
-            (
-                "Can you check whether it will rain today?",
-                "tool",
-                "weather_query",
-            ),
-            (
-                "Please think carefully and split the work to add long-term memory to Chromie.",
-                "deep_thought",
-                "deep_thought_planning",
-            ),
+            "Remember that my favorite color is blue.",
+            "Can you check whether it will rain today?",
+            "Please think carefully and split the work to add long-term memory to Chromie.",
         )
-        for text, route, intent in cases:
+        for text in cases:
             with self.subTest(text=text):
                 decision = fallback_decision(
                     RouteRequest(sid="fallback-semantic", text=text),
                     reason="llm_router_error:ReadTimeout",
                 )
 
-                self.assertEqual(decision.route, route)
-                self.assertEqual(decision.intent, intent)
+                self.assertEqual(decision.route, "chat")
+                self.assertEqual(decision.intent, "general_conversation")
                 self.assertEqual(decision.source, "fallback")
                 self.assertTrue(decision.needs_agent)
 

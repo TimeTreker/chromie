@@ -27,6 +27,7 @@ PROPOSAL_STATES = {
     "completed",
     "failed",
     "refused",
+    "missing_ability",
     "timed_out",
     "cancelled",
     "not_committed",

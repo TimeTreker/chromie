@@ -67,8 +67,10 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 - [Interaction Agent and Skill Runtime](interaction_agent_skill_runtime.md)
 - [Chromie High-Level Ability Registry](chromie_ability_registry.md)
+- [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md)
 - [Chromie Mind, Principles, and Experience](chromie_mind.md)
 - [Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md)
+- [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md)
 - [Memory Extraction and Prompt Context](MEMORY_EXTRACTION.md)
 - [Agent Capability Registry](agent_capability_registry.md)
 - [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md)

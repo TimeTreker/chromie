@@ -82,7 +82,9 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("All spoken output must be in the target language", call["system"])
         self.assertIn("Never output bullet points, labels, or numbered lists", call["system"])
         self.assertIn("Speech is not a special final text channel", call["system"])
-        self.assertIn("Return compact JSON only with keys tasks, quick_review, and reason", call["system"])
+        self.assertIn("Return compact JSON only with keys tasks, task_proposals, quick_review, and reason", call["system"])
+        self.assertIn("catalog constrains executable tasks, not meaning", call["system"])
+        self.assertIn("status missing_ability", call["system"])
         self.assertIn("chromie.speak", call["system"])
         self.assertIn("human owner approval", call["system"])
         self.assertIn("Normally do not repeat, quote, or paraphrase", call["system"])
@@ -91,8 +93,9 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Session working memory", call["prompt"])
         self.assertIn("Extracted conversation context", call["prompt"])
         self.assertIn("Output Contract:", call["prompt"])
-        self.assertIn("Top-level keys: tasks, quick_review, reason only", call["prompt"])
+        self.assertIn("Top-level keys: tasks, task_proposals, quick_review, reason only", call["prompt"])
         self.assertIn("\"skill_id\":\"chromie.speak\"", call["prompt"])
+        self.assertIn("\"status\":\"missing_ability\"", call["prompt"])
         self.assertIn("Do not output spoken_response, speech_tasks, action_tasks", call["prompt"])
         self.assertIn("Mind principles, long-term goals, and experience boundaries", call["prompt"])
         self.assertIn("owner-approved", call["prompt"])
@@ -379,6 +382,84 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(proposals[1].state, "advisory")
         self.assertEqual(proposals[1].skill_id, "soridormi.walk_forward")
         self.assertEqual(ollama.calls[0]["response_format"], "json")
+
+    async def test_missing_desired_ability_is_proposed_but_not_executed(self) -> None:
+        ollama = _CapturingOllama(
+            {
+                "tasks": [
+                    {
+                        "skill_id": "chromie.speak",
+                        "args": {
+                            "text": "I understand you want me to pick up the bottle, but I do not have a trusted grasping ability yet.",
+                            "style": "brief",
+                            "priority": "normal",
+                        },
+                        "timing": "immediate",
+                        "reason": "Explain the missing manipulation ability.",
+                    }
+                ],
+                "task_proposals": [
+                    {
+                        "ability_id": "manipulation.pick_up_object",
+                        "intent": "pick up the bottle",
+                        "status": "missing_ability",
+                        "matched_skill_id": None,
+                        "confidence": 0.93,
+                        "reason": "No executable manipulation skill was supplied.",
+                    }
+                ],
+                "reason": "The desired ability is understood but unavailable.",
+            }
+        )
+        agent = DeepThinkingAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "deep-missing-ability-test",
+                "text": "Please pick up the bottle.",
+                "route_decision": {
+                    "route": "deep_thought",
+                    "agents": ["deepthinking_agent", "speaker_agent"],
+                    "intent": "deep_thought_low_confidence",
+                    "confidence": 0.55,
+                    "language": "en-US",
+                    "source": "llm",
+                    "candidate_capabilities": [
+                        {
+                            "capability_id": "chromie.speak",
+                            "description": "Speak through TTS.",
+                            "available": True,
+                            "interaction_executable": True,
+                        }
+                    ],
+                },
+            }
+        )
+        draft = InteractionDraft()
+
+        result = await agent.run(request, draft)
+        response = result.to_response()
+
+        self.assertEqual(len(response.skills), 0)
+        self.assertEqual(
+            response.speech[0].text,
+            "I understand you want me to pick up the bottle, but I do not have a trusted grasping ability yet.",
+        )
+        self.assertEqual(response.metadata["deepthinking_desired_ability_proposal_count"], 1)
+        proposals = [
+            TaskProposal.model_validate(item)
+            for item in response.metadata["deepthinking_task_proposals"]
+        ]
+        missing = [item for item in proposals if item.state == "missing_ability"]
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(missing[0].ability_id, "manipulation.pick_up_object")
+        self.assertEqual(missing[0].metadata["intent"], "pick up the bottle")
+        self.assertEqual(missing[0].metadata["confidence"], 0.93)
 
     async def test_quick_router_review_supersedes_route_proposals(self) -> None:
         ollama = _CapturingOllama(

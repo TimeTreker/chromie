@@ -12,6 +12,12 @@ The evaluator is not the final test oracle. It helps discover failures and draft
 scenario candidates. Committed scenario files must keep deterministic
 expectations so regression runs can pass or fail without asking an LLM.
 
+The larger future learning loop is documented separately in
+[Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md). That future
+stage turns reviewed daily cases into scenario, training, preference, missing
+ability, and simulator-curriculum artifacts rather than only retrieving similar
+cases into prompts.
+
 ## Problem This Solves
 
 Manual checking is too slow and too lossy. A human operator currently has to run
@@ -168,6 +174,48 @@ The evaluator output should be structured JSON:
 }
 ```
 
+## Offline Review Journal
+
+After scoring, the offline evaluator writes a compact review record for each
+episode when `--review-output` is supplied. This review is the durable good/bad
+case layer. It is intentionally smaller and more action-oriented than the raw
+episode: it classifies the case, keeps the root cause, records reviewed memory
+notes, and says which learning actions are appropriate.
+
+Example shape:
+
+```json
+{
+  "schema_version": 1,
+  "review_id": "review_3d2b8a91f1a4",
+  "episode_id": "episode_20260703T114513Z_local_default",
+  "evaluation_id": "eval_b84dd0391c12",
+  "case_quality": "bad_case",
+  "overall_score": 40,
+  "severity": "major",
+  "summary": "The user asked for eye blinking, but no eye/blink skill was selected.",
+  "root_cause": "The robot spoke as if a body action was happening, but no matching runtime skill was selected.",
+  "failure_tags": ["missing_eye_skill", "claimed_action_without_skill"],
+  "learning_actions": [
+    "draft_or_promote_regression_scenario",
+    "owner_review_strategy_prompt_or_skill_selection_update"
+  ],
+  "compact_memory_notes": [
+    "Experience correction: do not describe a physical action as done unless a matching runtime skill was selected and executed."
+  ],
+  "requires_owner_approval": true,
+  "auto_apply": false
+}
+```
+
+The compact memory notes are not raw chat history. They are reviewed,
+experience-scope statements that can later be selected into prompt context only
+through an explicit owner-reviewed memory policy.
+
+When `--proposal-output` is supplied, bad or uncertain reviews also produce
+`MindUpdateProposal` records. Those proposals always keep
+`requires_owner_approval=true` and `auto_apply=false`.
+
 ### Scoring Rubric
 
 Use a 0 to 100 score per axis:
@@ -304,13 +352,17 @@ Behavior:
 
 ### Phase 2: Deepthinking evaluator
 
-Status: implemented as an offline evaluator CLI. Realtime background evaluation
-can come after the behavior is stable.
+Status: implemented as an offline evaluator CLI with deterministic contract
+precheck, optional deepthinking scoring, an offline review journal, and
+owner-review-only proposal output. Realtime background evaluation can come after
+the behavior is stable.
 
 ```bash
 python scripts/evaluate_experience_episodes.py \
   --episodes .chromie/experience/episodes.jsonl \
-  --output .chromie/experience/evaluations.jsonl
+  --output .chromie/experience/evaluations.jsonl \
+  --review-output .chromie/experience/offline_reviews.jsonl \
+  --proposal-output .chromie/experience/offline_review_proposals.jsonl
 ```
 
 Behavior:
@@ -320,6 +372,9 @@ Behavior:
 - include a deterministic schema validator for evaluator output;
 - never fail if Ollama is unavailable unless `--require-llm` is set;
 - write one evaluation record per episode.
+- classify each episode as `good_case`, `bad_case`, or `needs_review`;
+- write compact reviewed memory notes and owner-review-only update proposals
+  without injecting raw episode logs into prompts.
 
 ### Phase 3: Scenario candidate generation
 
@@ -329,6 +384,8 @@ Status: implemented in the evaluator CLI with `--candidate-dir`.
 python scripts/evaluate_experience_episodes.py \
   --episodes .chromie/experience/episodes.jsonl \
   --output .chromie/experience/evaluations.jsonl \
+  --review-output .chromie/experience/offline_reviews.jsonl \
+  --proposal-output .chromie/experience/offline_review_proposals.jsonl \
   --candidate-dir .chromie/scenario_candidates
 ```
 
@@ -381,6 +438,8 @@ The first useful implementation is complete when:
 
 - one real or synthetic multi-turn episode writes an episode record;
 - the evaluator produces a validated JSON score;
+- the offline reviewer writes a good/bad/needs-review case record;
+- bad or uncertain case records can create owner-review-only update proposals;
 - a low-scoring episode creates a candidate scenario under
   `.chromie/scenario_candidates/`;
 - the candidate can be manually promoted and passes `scenario_author.py

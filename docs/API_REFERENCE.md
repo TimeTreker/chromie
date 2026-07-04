@@ -31,9 +31,13 @@ Router also attaches staged task metadata:
 - `metadata.route_stage_outputs`: one entry per route stage that contributed or
   passed, each with legacy proposed `tasks`/`actions` and shared
   `task_proposals`;
+- `metadata.desired_abilities`: optional non-executable ability proposals when
+  the Router understands a broad human-like ability that is not safely
+  represented by the current common executable catalog;
 - `metadata.task_list`: the legacy merged priority/stage ordered task list;
 - `metadata.task_proposals`: the preferred shared-schema merged task proposal
-  list;
+  list, including `state=missing_ability` entries derived from desired
+  abilities;
 - `metadata.route_merge`: the concise merge ledger, including merge strategy,
   final route/intent/source, selected stage, proposal count, task count,
   task-proposal count, and task source stages.
@@ -64,6 +68,10 @@ high-confidence subset. The delegated `RouteDecision.metadata` includes
 `quick_router_review_request` with the quick actions, legacy task list, shared
 task proposals, and `execution_state=not_committed` so deepthinking can
 `accept`, `revise`, or `supersede` the quick plan.
+If the quick Router understands an unsupported body/social/manipulation goal,
+it must not put that goal in `RouteDecision.actions`. It should delegate or
+clarify and may record `metadata.desired_abilities[]` with `ability_id`,
+`intent`, `status=missing_ability`, `confidence`, and `reason`.
 The host Orchestrator owns the final task context write, persistence policy,
 confirmation, cancellation, and safety state.
 

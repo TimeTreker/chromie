@@ -184,16 +184,18 @@ The hard filter implementation is intentionally narrow in `router/app/rules.py`.
 It is the only Router stage allowed to use phrase patterns to determine a route,
 and it can only produce `interrupt` or `ignore`, including repeated filler or
 acknowledgment ASR hallucinations. Normal robot, tool, memory, conversation, and
-deep-thought intent must come from catalog-bounded model routing or fallback
-behavior; validators only enforce capability, schema, availability, and safety
-contracts.
+deep-thought intent must come from catalog-bounded model routing or a deeper
+model handoff; deterministic fallback may only fail closed or return safe
+conversation. Validators only enforce capability, schema, availability, and
+safety contracts.
 
 The capability catalog is an ability source, not the normal intent brain. In
 `hybrid` and `llm_only`, catalog search ranks and exposes current ability
 descriptions, schemas, and executable IDs to the LLM and validators. It must not
 contain hardcoded per-skill synonym tables that decide body actions in place of
-model understanding. Catalog-only route selection exists only in explicit
-`rules_only` compatibility mode.
+model understanding. Catalog-only route selection is disabled even in explicit
+`rules_only` compatibility mode; without model routing, normal intent fails
+closed to safe conversation.
 
 ## Mind, Principles, and Experience
 
@@ -224,8 +226,15 @@ Episode snapshots can be scored and mined offline:
 python scripts/evaluate_experience_episodes.py \
   --episodes .chromie/experience/episodes.jsonl \
   --output .chromie/experience/evaluations.jsonl \
+  --review-output .chromie/experience/offline_reviews.jsonl \
+  --proposal-output .chromie/experience/offline_review_proposals.jsonl \
   --candidate-dir .chromie/scenario_candidates
 ```
+
+`offline_reviews.jsonl` is the compact good/bad/needs-review case journal.
+`offline_review_proposals.jsonl` contains owner-review-only proposals derived
+from those reviews; it does not auto-apply prompt, memory, safety, or policy
+changes.
 
 ## Agent and TaskGraph
 

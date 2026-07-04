@@ -281,6 +281,46 @@ class TaskProposalLedgerTests(unittest.TestCase):
         self.assertEqual(ledger["summary"]["states"]["rejected"], 1)
         self.assertEqual(ledger["summary"]["sources"]["deepthinking"], 2)
 
+    def test_missing_ability_proposal_is_audited_without_execution(self) -> None:
+        response = InteractionResponse(
+            speech=[{"text": "I understand that, but I cannot do it yet."}],
+            metadata={
+                "deepthinking_task_proposals": [
+                    {
+                        "id": "deepthinking:1:ability.requested",
+                        "source": "deepthinking",
+                        "proposal_kind": "ability",
+                        "task_type": "ability.requested",
+                        "state": "missing_ability",
+                        "reason": "No executable grasp skill is available.",
+                        "effectful": False,
+                        "priority": "normal",
+                        "sequence": 1,
+                        "ability_id": "manipulation.pick_up_object",
+                        "metadata": {
+                            "intent": "pick up the bottle",
+                            "confidence": 0.93,
+                        },
+                    }
+                ]
+            },
+        )
+
+        annotated = annotate_task_proposal_ledger(response)
+        ledger = TaskProposalLedger.model_validate(
+            annotated.metadata["task_proposal_ledger"]
+        )
+        missing = [
+            proposal for proposal in ledger.proposals
+            if proposal.state == "missing_ability"
+        ]
+
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(missing[0].ability_id, "manipulation.pick_up_object")
+        self.assertEqual(missing[0].metadata["intent"], "pick up the bottle")
+        self.assertEqual(ledger.summary.states["missing_ability"], 1)
+        self.assertEqual(ledger.summary.effectful_proposal_count, 0)
+
     def test_superseded_task_proposals_are_schema_validated(self) -> None:
         response = InteractionResponse(
             speech=[{"text": "I will hold still."}],

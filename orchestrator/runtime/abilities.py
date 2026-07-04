@@ -4,7 +4,16 @@ from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Any, Literal, Mapping
 
-AbilityStatus = Literal["available", "stub", "disabled", "sim_only", "hardware_only"]
+AbilityStatus = Literal[
+    "available",
+    "sim_only",
+    "hardware_only",
+    "stub",
+    "planned",
+    "known_missing",
+    "forbidden",
+    "disabled",
+]
 
 DEFAULT_UNAVAILABLE_EN = "Sorry, I don't have that ability yet."
 DEFAULT_UNAVAILABLE_ZH = "抱歉，我现在还没有这个能力。"
@@ -322,9 +331,20 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             implementation="conversation_state",
         ),
         AbilitySpec(
+            "social.blink_eyes",
+            "social",
+            "Blink Chromie's visible eyes as a social expression.",
+            status="known_missing",
+            implementation="missing_skill",
+            unavailable_en="I understand blinking, but I don't have an executable eye-blink skill available right now.",
+            unavailable_zh="我理解你想让我眨眼，但我现在没有可执行的眨眼技能。",
+        ),
+        AbilitySpec(
             "social.look_at_user",
             "social",
             "Orient attention toward the user.",
+            status="known_missing",
+            implementation="missing_skill",
             optional_by_default=True,
         ),
         AbilitySpec(
@@ -354,6 +374,8 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "social.shake_head_no",
             "social",
             "Shake head no.",
+            status="known_missing",
+            implementation="missing_skill",
         ),
         AbilitySpec(
             "social.idle_alive",
@@ -365,6 +387,8 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "social.turn_toward_sound",
             "social",
             "Orient toward a detected speaker or sound source.",
+            status="known_missing",
+            implementation="missing_skill",
         ),
         AbilitySpec(
             "social.greet",
@@ -390,11 +414,15 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "body.stand_ready",
             "body",
             "Stand in a ready posture.",
+            status="planned",
+            implementation="planned_skill",
         ),
         AbilitySpec(
             "body.relax",
             "body",
             "Relax out of a ready posture.",
+            status="planned",
+            implementation="planned_skill",
         ),
         AbilitySpec(
             "body.walk_forward",
@@ -425,6 +453,59 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "body.recover_balance",
             "body",
             "Recover balance after a disturbance.",
+            status="planned",
+            implementation="planned_skill",
+        ),
+        AbilitySpec(
+            "manipulation.pick_up_object",
+            "manipulation",
+            "Pick up a small object with a trusted manipulation skill.",
+            status="known_missing",
+            implementation="missing_skill",
+            unavailable_en="I understand picking things up, but I do not have a trusted grasping ability yet.",
+            unavailable_zh="我理解你想让我拿东西，但我现在还没有可信的抓取能力。",
+        ),
+        AbilitySpec(
+            "manipulation.place_object",
+            "manipulation",
+            "Place an object at a requested target location.",
+            status="known_missing",
+            implementation="missing_skill",
+        ),
+        AbilitySpec(
+            "navigation.follow_user",
+            "navigation",
+            "Follow the user while maintaining a safe distance.",
+            status="known_missing",
+            implementation="missing_skill",
+        ),
+        AbilitySpec(
+            "navigation.go_to_location",
+            "navigation",
+            "Navigate to a named or pointed location.",
+            status="known_missing",
+            implementation="missing_skill",
+        ),
+        AbilitySpec(
+            "environment.open_door",
+            "environment",
+            "Open a door through a trusted manipulation or building-control skill.",
+            status="known_missing",
+            implementation="missing_skill",
+        ),
+        AbilitySpec(
+            "environment.turn_on_light",
+            "environment",
+            "Turn on a light through a trusted physical or smart-home skill.",
+            status="known_missing",
+            implementation="missing_skill",
+        ),
+        AbilitySpec(
+            "environment.clean_surface",
+            "environment",
+            "Clean or wipe a small surface.",
+            status="known_missing",
+            implementation="missing_skill",
         ),
         AbilitySpec(
             "task.execute_skill",

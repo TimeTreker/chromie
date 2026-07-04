@@ -11,7 +11,9 @@ contracts. The first version provides:
 - long-term goals that can be tuned by reviewed experience;
 - prompt-safe context for Router, conversation, and deepthinking;
 - an append-only experience journal;
-- human-review-only update proposals.
+- human-review-only update proposals;
+- offline good/bad/needs-review episode reviews for scenario and strategy
+  refinement.
 
 This is not autonomous self-modification. Experience can create proposals, but
 no proposal is applied automatically.
@@ -151,6 +153,22 @@ Proposals are intentionally conservative:
 
 This gives Chromie memory of what happened and a path to improve, while keeping
 the robot's spine under human ownership.
+
+Finished dialogue/task episodes can also be reviewed offline with:
+
+```bash
+python scripts/evaluate_experience_episodes.py \
+  --episodes .chromie/experience/episodes.jsonl \
+  --output .chromie/experience/evaluations.jsonl \
+  --review-output .chromie/experience/offline_reviews.jsonl \
+  --proposal-output .chromie/experience/offline_review_proposals.jsonl \
+  --candidate-dir .chromie/scenario_candidates
+```
+
+The offline review records classify each episode as `good_case`, `bad_case`,
+or `needs_review`, preserve compact reviewed memory notes, and can draft
+owner-review-only proposals. They do not inject raw episode logs into prompts
+or apply any update automatically.
 
 ## Configuration
 

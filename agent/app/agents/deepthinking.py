@@ -55,8 +55,18 @@ class _DeepThinkingQuickReview(BaseModel):
     superseded_task_ids: list[str] = Field(default_factory=list)
 
 
+class _DeepThinkingTaskProposal(BaseModel):
+    ability_id: str
+    intent: str = ""
+    status: Literal["missing_ability", "known_missing", "not_executable", "planned", "forbidden", "advisory"] = "missing_ability"
+    matched_skill_id: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    reason: str = ""
+
+
 class _DeepThinkingPlan(BaseModel):
     tasks: list[_DeepThinkingTask] = Field(default_factory=list)
+    task_proposals: list[_DeepThinkingTaskProposal] = Field(default_factory=list)
     spoken_response: str = ""
     speech_tasks: list[_DeepThinkingSpeechTask] = Field(default_factory=list)
     action_tasks: list[_DeepThinkingActionTask] = Field(default_factory=list)
@@ -189,13 +199,16 @@ class DeepThinkingAgent(BaseAgent):
             "When a greeting and a request appear together, acknowledge the greeting briefly and still complete the request in the same reply. "
             "If recent context shows Chromie already promised a joke, story, song, poem, or other creative content and the user says they are waiting, asks you to continue, says go ahead, or asks again, deliver the promised content now. "
             "For joke, short-story, singing, or songwriting requests, create brief original harmless content instead of only saying you can do it. "
-            "The capability catalog describes available abilities, not authorization; never invent capabilities, low-level motor commands, or raw joint actions. "
+            "Understand the user's intent broadly before applying the current capability catalog. The catalog constrains executable tasks, not meaning. "
+            "The capability catalog describes executable abilities and schemas, not authorization; never invent executable capabilities, low-level motor commands, or raw joint actions. "
+            "If you understand a desired human-like ability but no supplied executable skill safely matches it, emit a task_proposals item with status missing_ability and emit only truthful chromie.speak text; do not fake the action. "
             "Speech is not a special final text channel; it is the chromie.speak skill. "
             "If upstream routing context includes quick_router_review_request, review the quick Router's proposals as an adult safety reviewer. "
             "Set quick_review.decision to accept when the quick plan is correct, revise when it is partly right but needs changed tasks/arguments/order, or supersede when it misunderstood the user. "
             "When revising or superseding, emit the replacement tasks you think are correct. If the quick proposal was not committed, do not apologize merely for revising it; if context shows a wrong action already ran or was visibly started, include a brief chromie.speak apology/correction. "
-            "Return compact JSON only with keys tasks, quick_review, and reason. "
+            "Return compact JSON only with keys tasks, task_proposals, quick_review, and reason. "
             "tasks is a unified ordered list of robot skill tasks. Each task has skill_id, args, timing, timeout_ms, cancellable, requires_confirmation, and reason. "
+            "task_proposals is an optional ordered list of understood desired abilities that are not executable now; each item has ability_id, intent, status, matched_skill_id, confidence, and reason. "
             "Use skill_id chromie.speak with args {\"text\":\"...\",\"style\":\"brief\",\"priority\":\"normal\"} for anything Chromie should say. "
             "Every non-speech task skill_id must be copied exactly from the supplied Capability catalog and its args must satisfy that candidate input_schema. "
             "Never output raw joint, motor, actuator, controller-array, position-array, or torque fields anywhere. "
@@ -214,10 +227,11 @@ class DeepThinkingAgent(BaseAgent):
             f"Output Contract:\n{output_contract}\n\n"
             f"Current user said: {request.text}\n"
             f"Current intent: {request.route_decision.intent}\n"
-            "Apply the Priority Rules strictly. Emit only the tasks Chromie should perform. "
+            "Apply the Priority Rules strictly. First understand the user's desired ability broadly, then compare it with the supplied executable catalog. "
+            "Emit only the tasks Chromie should perform now. "
             "For cognitive tasks, this is usually one chromie.speak task with a concise natural-spoken plan. "
             "For physical actions, include a short chromie.speak acknowledgement only if useful, and include candidate executable skill tasks for the actual work. "
-            "If no supplied capability safely matches, emit only a brief chromie.speak clarification or limitation. "
+            "If no supplied capability safely matches, emit only a brief chromie.speak clarification or limitation plus a task_proposals missing_ability item. "
             "Output the JSON contract and nothing else."
         )
 
@@ -246,10 +260,10 @@ class DeepThinkingAgent(BaseAgent):
 
     def _output_contract(self) -> str:
         return (
-            "Return JSON only. Top-level keys: tasks, quick_review, reason only.\n"
+            "Return JSON only. Top-level keys: tasks, task_proposals, quick_review, reason only.\n"
             "Do not output spoken_response, speech_tasks, action_tasks, markdown, prose, or labels.\n"
             "JSON skeleton:\n"
-            "{\"tasks\":[{\"skill_id\":\"chromie.speak\",\"args\":{\"text\":\"...\",\"style\":\"brief\",\"priority\":\"normal\"},\"timing\":\"immediate\",\"timeout_ms\":null,\"cancellable\":true,\"requires_confirmation\":null,\"reason\":\"short audit note\"}],\"quick_review\":{\"decision\":\"none|accept|revise|supersede\",\"reason\":\"short review note\",\"superseded_task_ids\":[]},\"reason\":\"short audit note\"}\n"
+            "{\"tasks\":[{\"skill_id\":\"chromie.speak\",\"args\":{\"text\":\"...\",\"style\":\"brief\",\"priority\":\"normal\"},\"timing\":\"immediate\",\"timeout_ms\":null,\"cancellable\":true,\"requires_confirmation\":null,\"reason\":\"short audit note\"}],\"task_proposals\":[{\"ability_id\":\"social.blink_eyes\",\"intent\":\"blink eyes\",\"status\":\"missing_ability\",\"matched_skill_id\":null,\"confidence\":0.9,\"reason\":\"no executable eye-blink skill was supplied\"}],\"quick_review\":{\"decision\":\"none|accept|revise|supersede\",\"reason\":\"short review note\",\"superseded_task_ids\":[]},\"reason\":\"short audit note\"}\n"
             "Task field rules:\n"
             "- skill_id: use chromie.speak for speech, otherwise copy one exact skill_id from Capability catalog.\n"
             "- args: object matching the selected skill schema. For chromie.speak use text, style, and priority.\n"
@@ -258,9 +272,14 @@ class DeepThinkingAgent(BaseAgent):
             "- cancellable: boolean.\n"
             "- requires_confirmation: boolean or null; null means defer to the candidate capability definition.\n"
             "- reason: short audit note, not hidden chain-of-thought.\n"
+            "Task proposal rules:\n"
+            "- Use task_proposals for desired human-like abilities that you understand but cannot execute with the supplied catalog.\n"
+            "- status should be missing_ability when no executable skill is supplied, forbidden when the request is unsafe, or planned/advisory only for non-executing roadmap notes.\n"
+            "- matched_skill_id is null unless a supplied catalog skill is relevant but not executable.\n"
+            "- task_proposals never execute; executable work must appear in tasks with exact catalog skill_ids.\n"
             "For cognitive answers, usually emit exactly one chromie.speak task.\n"
             "For physical/tool actions, emit a chromie.speak acknowledgement only if useful, plus the exact executable candidate skill task.\n"
-            "If no supplied capability safely matches, emit only one chromie.speak clarification or limitation.\n"
+            "If no supplied capability safely matches, emit one chromie.speak clarification or limitation plus a task_proposals missing_ability item.\n"
             "When Upstream routing context includes quick_router_review_request, fill quick_review. Use accept only when the quick proposal is semantically correct. Use revise or supersede when replacing it, and include superseded_task_ids from the supplied quick_task_proposals when known.\n"
             "Do not copy placeholder values from the skeleton."
         )
@@ -513,9 +532,20 @@ class DeepThinkingAgent(BaseAgent):
                 }
             )
 
+        proposal_offset = len(task_proposals)
+        for index, proposal in enumerate(plan.task_proposals):
+            task_proposals.append(
+                self._desired_ability_task_proposal(
+                    proposal,
+                    index=proposal_offset + index,
+                    fallback_reason=plan.reason,
+                )
+            )
+
         if isinstance(metadata, dict):
             metadata["deepthinking_output_mode"] = "skill_tasks"
             metadata["deepthinking_proposed_task_count"] = len(tasks)
+            metadata["deepthinking_desired_ability_proposal_count"] = len(plan.task_proposals)
             metadata["deepthinking_valid_task_count"] = valid_task_count
             metadata["deepthinking_proposed_effect_task_count"] = proposed_effect_count
             metadata["deepthinking_valid_effect_task_count"] = valid_effect_count
@@ -648,6 +678,48 @@ class DeepThinkingAgent(BaseAgent):
             },
         )
         return proposal.model_dump(mode="json", exclude_none=True)
+
+    def _desired_ability_task_proposal(
+        self,
+        proposal: _DeepThinkingTaskProposal,
+        *,
+        index: int,
+        fallback_reason: str,
+    ) -> dict[str, Any]:
+        status = "_".join(proposal.status.strip().lower().split())
+        state = "missing_ability"
+        if status == "forbidden":
+            state = "refused"
+        elif status in {"planned", "advisory"}:
+            state = "advisory"
+        metadata: dict[str, Any] = {
+            "intent": self._bounded_text(proposal.intent, 160),
+            "status": proposal.status,
+        }
+        if proposal.matched_skill_id:
+            metadata["matched_skill_id"] = proposal.matched_skill_id
+        if proposal.confidence is not None:
+            metadata["confidence"] = proposal.confidence
+        item = TaskProposal(
+            id=f"deepthinking:{index}:ability.requested",
+            source="deepthinking",
+            proposal_kind="ability",
+            task_type="ability.requested",
+            state=state,  # type: ignore[arg-type]
+            reason=self._bounded_text(
+                proposal.reason
+                or fallback_reason
+                or "desired ability is not executable from the supplied catalog",
+                240,
+            ),
+            effectful=False,
+            priority="normal",
+            sequence=index,
+            ability_id=proposal.ability_id,
+            skill_id=proposal.matched_skill_id,
+            metadata=metadata,
+        )
+        return item.model_dump(mode="json", exclude_none=True)
 
     @staticmethod
     def _task_type_for_skill(skill_id: str) -> str:

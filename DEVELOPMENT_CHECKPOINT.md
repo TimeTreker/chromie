@@ -51,8 +51,13 @@ The alpha implementation is present:
   emit shared `metadata.agent_task_proposals`, including speech as the local
   `chromie.speak` skill;
 - host ability registry entries for cognition, speech, memory, social, body,
-  task, safety, and state abilities, including honest stubs for unavailable
-  human-like behaviors;
+  manipulation, navigation, environment, task, safety, and state abilities,
+  including `known_missing` and `planned` entries for unavailable human-like
+  behaviors;
+- dream-broadly/execute-honestly proposal contract: quick Router and
+  deepthinking may record understood but non-executable desired abilities as
+  `missing_ability` task proposals, while executable work still requires exact
+  catalog skill IDs and trusted runtime validation;
 - simulator-bounded expressive body cues and safe defaults for underspecified
   walking requests;
 - ordered TTS playback with bounded chunked generation through configured
@@ -151,8 +156,9 @@ Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
 Full Level A baseline:
-593 current unittest cases and 20 legacy Agent tests passed on 2026-07-02 with
-`./scripts/run_tests.sh`.
+627 current unittest cases and 20 legacy Agent tests passed on 2026-07-04 with
+`./scripts/run_tests.sh`. The behavior scenario runner also passed 344/344
+Router, interaction, and dialogue scenario files with `--no-write`.
 ```
 
 The focused refresh above is not target evidence and does not replace the full

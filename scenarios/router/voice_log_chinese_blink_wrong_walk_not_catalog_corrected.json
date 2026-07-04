@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "id": "voice_log_chinese_blink_wrong_walk_corrected",
+  "id": "voice_log_chinese_blink_wrong_walk_not_catalog_corrected",
   "suite": "router",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live text check: a quick walk_velocity task for Chinese blink ASR must be corrected to blink_eyes when catalog evidence is stronger.",
+  "description": "Regression from the 2026-07-03 live text check: if the quick Router LLM wrongly selects walking for Chinese blink ASR with high confidence, deterministic catalog scoring must not rewrite it to blink_eyes.",
   "tags": [
     "voice-log",
     "zh-CN",
     "router-agent-contract",
     "robot-action",
     "blink",
-    "task-revision"
+    "model-authority"
   ],
   "input": {
     "text": "眨两小眼睛。",
@@ -54,11 +54,11 @@
   },
   "expect": {
     "route": "robot_action",
-    "intent": "capability:soridormi.blink_eyes",
+    "intent": "capability:soridormi.walk_velocity",
     "source": "llm",
     "task_types_include": ["task.execute_skill"],
-    "metadata_json_contains": ["soridormi.blink_eyes"],
-    "metadata_json_forbid": ["\"capability_id\": \"soridormi.walk_velocity\""],
+    "metadata_json_contains": ["soridormi.walk_velocity"],
+    "metadata_json_forbid": ["\"capability_id\": \"soridormi.blink_eyes\"", "corrected low-score capability selection"],
     "llm_calls": 1
   }
 }

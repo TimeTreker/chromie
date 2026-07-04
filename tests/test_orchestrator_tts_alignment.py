@@ -420,7 +420,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.speech[0].text, "抱歉，我现在还没有这个能力。")
         self.assertEqual(response.metadata["ability_id"], "social.look_at_user")
-        self.assertEqual(response.metadata["ability_status"], "stub")
+        self.assertEqual(response.metadata["ability_status"], "known_missing")
 
     def test_router_exception_on_embodied_text_fails_closed(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

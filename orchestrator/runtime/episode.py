@@ -117,6 +117,7 @@ class EpisodeRecord(BaseModel):
 
 
 EvaluationSeverity = Literal["pass", "minor", "major", "critical"]
+EpisodeCaseQuality = Literal["good_case", "bad_case", "needs_review"]
 
 
 class EpisodeEvaluation(BaseModel):
@@ -140,6 +141,49 @@ class EpisodeEvaluation(BaseModel):
     @classmethod
     def compact_summary(cls, value: str) -> str:
         return _compact_text(value, limit=1000)
+
+
+class EpisodeOfflineReview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = 1
+    review_id: str = Field(default_factory=lambda: f"review_{uuid4().hex[:12]}")
+    created_at: str = Field(default_factory=_now_iso)
+    episode_id: str
+    conversation_id: str | None = None
+    evaluation_id: str
+    case_quality: EpisodeCaseQuality
+    overall_score: int = Field(ge=0, le=100)
+    severity: EvaluationSeverity
+    summary: str
+    root_cause: str
+    strengths: list[str] = Field(default_factory=list)
+    failure_tags: list[str] = Field(default_factory=list)
+    learning_actions: list[str] = Field(default_factory=list)
+    should_create_scenario: bool = False
+    should_create_mind_update: bool = False
+    compact_memory_notes: list[str] = Field(default_factory=list)
+    training_signal: dict[str, Any] = Field(default_factory=dict)
+    requires_owner_approval: bool = True
+    auto_apply: bool = False
+    reviewer: str = "offline_review"
+
+    @field_validator("summary", "root_cause")
+    @classmethod
+    def compact_review_text(cls, value: str) -> str:
+        return _compact_text(value, limit=1000)
+
+    @field_validator("strengths", "failure_tags", "learning_actions", "compact_memory_notes")
+    @classmethod
+    def compact_review_lists(cls, value: list[str]) -> list[str]:
+        return [_compact_text(item, limit=300) for item in value if item.strip()]
+
+    @field_validator("auto_apply")
+    @classmethod
+    def forbid_auto_apply(cls, value: bool) -> bool:
+        if value:
+            raise ValueError("offline review updates must never auto-apply")
+        return value
 
 
 class EpisodeRecorder:

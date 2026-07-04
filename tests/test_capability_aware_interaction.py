@@ -582,18 +582,22 @@ class _SelectedVelocityBetterForwardOllama:
 
 class _RecoveredDeepThoughtWalkOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert "Router-selected exact skill_id: soridormi." in prompt
-        assert "Task Split, Key Risk, Next Step" in prompt
+        assert "soridormi.walk_forward" in prompt
         assert kwargs["response_format"] == "json"
         return {
-            "decision": "execute",
-            "speech": "Walking forward quickly for 15 seconds.",
-            "skills": [
+            "tasks": [
+                {
+                    "skill_id": "chromie.speak",
+                    "args": {"text": "Walking forward quickly for 15 seconds."},
+                    "timing": "immediate",
+                },
                 {
                     "skill_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0, "speed": "quick"},
+                    "timing": "sequential",
                 }
             ],
+            "reason": "Deepthinking planned the direct motion from catalog context.",
         }
 
 
@@ -1428,7 +1432,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
         self.assertEqual(response.speech[0].text, "Walking forward quickly for 15 seconds.")
 
-    async def test_deep_thought_direct_motion_recovers_to_capability_planner(self) -> None:
+    async def test_deep_thought_direct_motion_plans_with_catalog_context(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
                 ollama=_RecoveredDeepThoughtWalkOllama(),  # type: ignore[arg-type]
@@ -1461,10 +1465,8 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             response.skills[0].args,
             {"duration_s": 15.0, "speed": "quick"},
         )
-        self.assertEqual(
-            response.metadata["capability_selected"],
-            ["soridormi.walk_forward"],
-        )
+        self.assertEqual(response.metadata["deepthinking_output_mode"], "skill_tasks")
+        self.assertEqual(response.metadata["deepthinking_valid_effect_task_count"], 1)
         self.assertEqual(response.speech[0].text, "Walking forward quickly for 15 seconds.")
         spoken = " ".join(item.text for item in response.speech)
         self.assertNotIn("Task Split", spoken)

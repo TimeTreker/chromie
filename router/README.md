@@ -22,7 +22,7 @@ text + bounded context
 
 Supported modes:
 
-- `rules_only` — hard interrupt/noise rules, capability-catalog routing, then a deterministic fallback;
+- `rules_only` — hard interrupt/noise rules, then a deterministic safe fallback; it is compatibility-only and does not choose normal catalog actions;
 - `hybrid` — hard interrupt/noise rules first, then Ollama quick routing for normal intent, with deterministic validators afterward;
 - `llm_only` — send routing decisions directly to Ollama.
 
@@ -83,6 +83,7 @@ legacy task-list surface for compatibility:
 metadata.route_stage_outputs[]  # emergency_filter / quick_intent / post_interrupt_review / deep_thought
   -> tasks[] and actions[]      # legacy proposed high-level work from that stage
   -> task_proposals[]           # shared-schema proposals from that stage
+metadata.desired_abilities[]    # optional non-executable broad ability proposals
 metadata.task_list[]            # legacy merged, priority/stage ordered task list
 metadata.task_proposals[]       # preferred shared-schema merged proposals
 metadata.route_merge            # merge strategy, final route, selected stage
@@ -102,15 +103,19 @@ capability actions, such as ordered Soridormi skill requests or a `chromie.speak
 speech skill embedded in a physical task. The quick Router may emit this array
 directly when a compound request is made from common catalog skills; that is why
 “quick” means small model plus compact common catalog, not “single task only.”
+Missing, planned, or unsupported human-like abilities must not appear in
+`actions`; the Router may preserve them in `metadata.desired_abilities` and
+delegate or clarify.
 Each action may carry its own 0.0-1.0 `confidence`; if any required compound
 action is below the Router threshold, the route delegates to `deep_thought`
 rather than executing the high-confidence subset. See
 [`docs/QUICK_ROUTER_TASK_PLANNING.md`](../docs/QUICK_ROUTER_TASK_PLANNING.md).
 The merged `task_proposals` surface is broader: it can include emergency
 cancellation, thinking acknowledgement, deepthinking work, speech, memory, tool,
-and skill-execution proposals. `task_list` remains present for older
-diagnostics. The Agent and Skill Runtime still validate every executable item
-against registered capabilities and safety policy.
+skill-execution proposals, and `state=missing_ability` ability proposals.
+`task_list` remains present for older diagnostics. The Agent and Skill Runtime
+still validate every executable item against registered capabilities and safety
+policy.
 
 When the emergency filter triggers `interrupt`, the host may already have
 cancelled current output or motion before slower semantic review finishes. If

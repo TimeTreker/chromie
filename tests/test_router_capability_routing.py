@@ -57,7 +57,7 @@ class _LlmRouter:
 
 
 class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
-    async def test_catalog_match_routes_to_capability_agent(self) -> None:
+    async def test_rules_only_catalog_match_does_not_route_to_capability_agent(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -81,39 +81,27 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         ):
             decision = await main.route(RouteRequest(text="Move forward."))
 
-        self.assertEqual(decision.source, "catalog")
-        self.assertEqual(decision.route, "robot_action")
-        self.assertIn("capability_agent", decision.agents)
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.route, "chat")
+        self.assertNotIn("capability_agent", decision.agents)
         self.assertEqual(
             [item["stage"] for item in decision.metadata["route_stage_outputs"]],
             ["emergency_filter", "quick_intent"],
         )
         self.assertEqual(
             decision.metadata["task_list"][0]["task_type"],
-            "task.execute_skill",
+            "speech.answer",
         )
-        self.assertEqual(
-            decision.metadata["task_list"][0]["capability_id"],
-            "soridormi.walk_forward",
-        )
-        proposal = TaskProposal.model_validate(decision.metadata["task_proposals"][0])
-        self.assertEqual(proposal.skill_id, "soridormi.walk_forward")
-        self.assertEqual(proposal.state, "advisory")
-        self.assertTrue(proposal.effectful)
         self.assertEqual(
             decision.metadata["route_merge"]["strategy"],
             "safety_filter_then_quick_intent",
         )
         self.assertEqual(decision.metadata["route_merge"]["task_proposal_count"], 1)
-        self.assertEqual(decision.metadata["route_merge"]["final_route"], "robot_action")
+        self.assertEqual(decision.metadata["route_merge"]["final_route"], "chat")
         self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "quick_intent")
         self.assertEqual(decision.metadata["route_merge"]["task_count"], 1)
-        self.assertEqual(
-            decision.candidate_capabilities[0]["capability_id"],
-            "soridormi.walk_forward",
-        )
 
-    async def test_hybrid_deep_thought_for_direct_motion_recovers_to_catalog_robot_action(self) -> None:
+    async def test_hybrid_deep_thought_for_direct_motion_keeps_model_route(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -152,14 +140,14 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.source, "catalog")
-        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
-        self.assertIn("capability_agent", decision.agents)
-        self.assertIn("safety_agent", decision.agents)
-        self.assertEqual(decision.metadata["recovered_from_route"], "deep_thought")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.intent, "deep_thought")
+        self.assertIn("deepthinking_agent", decision.agents)
+        self.assertNotIn("capability_agent", decision.agents)
+        self.assertNotIn("recovered_from_route", decision.metadata)
 
-    async def test_hybrid_chat_for_chinese_blink_asr_recovers_to_catalog_robot_action(self) -> None:
+    async def test_hybrid_chat_for_chinese_blink_asr_keeps_model_route(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -197,13 +185,13 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision = await main.route(RouteRequest(text="眨两小眼睛。", language="zh-CN"))
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.source, "catalog")
-        self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
-        self.assertEqual(decision.metadata["recovered_from_route"], "chat")
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertNotIn("recovered_from_route", decision.metadata)
         self.assertEqual(
-            decision.metadata["task_list"][0]["capability_id"],
-            "soridormi.blink_eyes",
+            [item["task_type"] for item in decision.metadata["task_list"]],
+            ["speech.answer"],
         )
 
     async def test_hybrid_llm_selects_skill_from_common_prompt_catalog_without_search_match(self) -> None:
@@ -298,7 +286,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             [item["capability_id"] for item in decision.candidate_capabilities],
         )
 
-    async def test_hybrid_wrong_low_score_robot_action_for_chinese_blink_is_corrected(self) -> None:
+    async def test_hybrid_wrong_low_score_robot_action_is_not_catalog_corrected(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -346,11 +334,11 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
-        self.assertIn("corrected low-score capability selection", decision.reason or "")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_velocity")
+        self.assertNotIn("corrected low-score capability selection", decision.reason or "")
         self.assertEqual(
             decision.metadata["task_list"][0]["capability_id"],
-            "soridormi.blink_eyes",
+            "soridormi.walk_velocity",
         )
 
     async def test_catalog_miss_does_not_use_legacy_robot_phrase_rule_by_default(self) -> None:
@@ -389,9 +377,9 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision = await main.route(RouteRequest(text="turn left"))
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.intent, "general_conversation")
+        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
         assert llm_router.request is not None
         self.assertEqual(llm_router.request.context["candidate_capabilities"], [])
 
@@ -434,12 +422,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.intent, "deep_thought_router_unavailable")
         self.assertNotIn("capability_agent", decision.agents)
         self.assertNotIn("conversation_agent", decision.agents)
         self.assertIn("LLM router unavailable", decision.reason or "")
-        self.assertIn("delegating catalog-bounded robot request", decision.reason or "")
+        self.assertIn("delegating to deep_thought", decision.reason or "")
         self.assertEqual(
             decision.candidate_capabilities[0]["capability_id"],
             "soridormi.walk_velocity",
@@ -495,11 +483,11 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision = await main.route(RouteRequest(text="眨两小眼睛。", language="zh-CN"))
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.source, "catalog")
+        self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_router_unavailable")
         self.assertNotIn("conversation_agent", decision.agents)
-        self.assertIn("delegating catalog-bounded robot request", decision.reason or "")
+        self.assertIn("delegating to deep_thought", decision.reason or "")
         task_types = [item["task_type"] for item in decision.metadata["task_list"]]
         self.assertIn("cognition.deep_think", task_types)
         self.assertNotIn("task.execute_skill", task_types)
@@ -508,7 +496,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision.metadata["task_list"][0],
         )
 
-    async def test_rules_only_catalog_decision_ignores_weak_factual_word_overlap(self) -> None:
+    async def test_rules_only_fallback_ignores_weak_factual_word_overlap(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -587,9 +575,9 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.intent, "general_conversation")
+        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
 
     async def test_main_validator_does_not_phrase_override_llm_robot_action(self) -> None:
         from router.app import main
@@ -1097,7 +1085,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             [item["task_type"] for item in decision.metadata["task_list"]],
         )
 
-    async def test_hybrid_router_recovers_complex_deep_thought_direct_motion(self) -> None:
+    async def test_hybrid_router_keeps_complex_deep_thought_direct_motion(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -1135,15 +1123,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision = await main.route(RouteRequest(text="Wal forward for 15 seconds, quickly."))
 
         self.assertEqual(llm_router.calls, 1)
-        self.assertEqual(decision.source, "catalog")
-        self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
-        self.assertIn("capability_agent", decision.agents)
-        self.assertEqual(decision.metadata["recovered_from_route"], "deep_thought")
-        self.assertEqual(
-            decision.metadata["recovered_from_intent"],
-            "deep_thought_complex_reasoning",
-        )
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_complex_reasoning")
+        self.assertIn("deepthinking_agent", decision.agents)
+        self.assertNotIn("capability_agent", decision.agents)
+        self.assertNotIn("recovered_from_route", decision.metadata)
 
     async def test_hybrid_router_keeps_planning_text_in_deep_thought(self) -> None:
         from router.app import main
@@ -1414,7 +1399,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             ["speech.answer"],
         )
 
-    async def test_llm_fallback_does_not_use_catalog_motion_for_social_compliment(self) -> None:
+    async def test_llm_fallback_delegates_social_compliment_without_catalog_motion(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -1451,16 +1436,16 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(main, "llm_router", llm_router):
             decision = await main.route(RouteRequest(text="You look beautiful, don't you?"))
 
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "general_conversation")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
         self.assertEqual(decision.source, "fallback")
-        self.assertIn("speech-only social", decision.reason or "")
+        self.assertIn("delegating to deep_thought", decision.reason or "")
         self.assertEqual(
             [item["task_type"] for item in decision.metadata["task_list"]],
-            ["speech.answer"],
+            ["cognition.delegate_deep_thought", "cognition.deep_think"],
         )
 
-    async def test_catalog_chat_does_not_swallow_explicit_deep_thought_request(self) -> None:
+    async def test_quick_router_fallback_delegates_to_deep_thought_without_phrase_rules(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -1502,7 +1487,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_planning")
+        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
         self.assertEqual(decision.source, "fallback")
         self.assertFalse(decision.metadata.get("thinking_ack_allowed", True))
 

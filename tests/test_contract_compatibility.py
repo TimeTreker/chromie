@@ -140,6 +140,18 @@ class ContractCompatibilityTests(unittest.TestCase):
         parsed = TaskProposalLedger.model_validate(ledger.model_dump(mode="json"))
         self.assertEqual(parsed.proposals[0].state, "committed")
 
+        missing = TaskProposal(
+            id="proposal-missing-ability",
+            source="deepthinking",
+            proposal_kind="ability",
+            task_type="ability.requested",
+            state="missing_ability",
+            ability_id="manipulation.pick_up_object",
+            reason="No trusted grasping skill is available.",
+        )
+        self.assertEqual(missing.state, "missing_ability")
+        self.assertEqual(missing.ability_id, "manipulation.pick_up_object")
+
         with self.assertRaisesRegex(ValueError, "forbidden low-level field"):
             TaskProposal(
                 id="bad-proposal",

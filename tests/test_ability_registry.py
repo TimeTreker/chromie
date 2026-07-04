@@ -25,6 +25,9 @@ class AbilityRegistryTests(unittest.TestCase):
                 "task",
                 "safety",
                 "state",
+                "manipulation",
+                "navigation",
+                "environment",
             }.issubset(categories)
         )
 
@@ -80,6 +83,15 @@ class AbilityRegistryTests(unittest.TestCase):
         self.assertEqual(ability.status, "stub")
         self.assertFalse(ability.can_execute)
         self.assertIsNone(ability.soridormi_skill_id)
+
+    def test_known_missing_human_like_ability_is_not_executable(self) -> None:
+        registry = build_default_ability_registry()
+        ability = registry.get("social.blink_eyes")
+
+        self.assertEqual(ability.status, "known_missing")
+        self.assertFalse(ability.can_execute)
+        self.assertIsNone(ability.soridormi_skill_id)
+        self.assertIn("don't have an executable eye-blink skill", ability.unavailable_en)
 
     def test_unavailable_message_is_language_matched(self) -> None:
         registry = build_default_ability_registry()

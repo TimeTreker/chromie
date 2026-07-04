@@ -14,6 +14,7 @@ ProposalState = Literal[
     "completed",
     "failed",
     "refused",
+    "missing_ability",
     "timed_out",
     "cancelled",
     "not_committed",
@@ -42,6 +43,7 @@ class TaskProposal(BaseModel):
     effectful: bool = False
     priority: str = "normal"
     sequence: int = Field(default=0, ge=0)
+    ability_id: str | None = None
     skill_id: str | None = None
     request_id: str | None = None
     speech_id: str | None = None
@@ -60,6 +62,7 @@ class TaskProposal(BaseModel):
         "task_type",
         "reason",
         "priority",
+        "ability_id",
         "skill_id",
         "request_id",
         "speech_id",

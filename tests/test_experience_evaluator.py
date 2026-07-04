@@ -8,8 +8,12 @@ from pathlib import Path
 from orchestrator.runtime.episode import EpisodeRecord, EpisodeTurnRecord
 from scripts.evaluate_experience_episodes import (
     evaluate_episode_contract_precheck,
+    mind_update_proposal_from_review,
+    offline_review_from_episode,
     scenario_candidate_from_episode,
     write_candidate_scenarios,
+    write_mind_update_proposals_from_reviews,
+    write_offline_reviews,
 )
 
 
@@ -113,6 +117,96 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
             payload = json.loads(paths[0].read_text(encoding="utf-8"))
             self.assertTrue(payload["review"]["requires_human_review"])
             self.assertTrue(paths[0].parent.name.endswith("Z"))
+
+    def test_contract_precheck_flags_blink_speech_without_skill(self) -> None:
+        episode = EpisodeRecord(
+            episode_id="episode_fakeblink",
+            conversation_id="conv-blink",
+            turns=[
+                EpisodeTurnRecord(
+                    sid="sid-blink",
+                    turn_index=1,
+                    user_text="Please blink your eyes 5 times.",
+                    router={
+                        "route": "chat",
+                        "intent": "general_conversation",
+                        "source": "llm",
+                        "confidence": 0.82,
+                    },
+                    agent={
+                        "status": "ok",
+                        "speech": ["Okay, I blinked my eyes."],
+                        "selected_skills": [],
+                        "requires_confirmation": False,
+                    },
+                    execution={"status": "completed", "skill_results": []},
+                )
+            ],
+        )
+
+        evaluation = evaluate_episode_contract_precheck(episode)
+
+        self.assertLessEqual(evaluation.overall_score, 40)
+        self.assertFalse(evaluation.passed)
+        self.assertIn("missing_eye_skill", evaluation.failure_tags)
+        self.assertIn("action_request_as_chat", evaluation.failure_tags)
+        self.assertIn("claimed_action_without_skill", evaluation.failure_tags)
+        self.assertTrue(evaluation.candidate_scenario["recommended"])
+        candidate = scenario_candidate_from_episode(episode, evaluation)
+        expect = candidate["turns"][0]["expect"]
+        self.assertTrue(expect["no_skills"])
+        self.assertIn("眨了", expect["forbidden_speech_any"])
+
+    def test_offline_review_writes_owner_review_proposal_for_bad_case(self) -> None:
+        episode = EpisodeRecord(
+            episode_id="episode_fakeblink",
+            conversation_id="conv-blink",
+            turns=[
+                EpisodeTurnRecord(
+                    sid="sid-blink",
+                    turn_index=1,
+                    user_text="Please blink your eyes 5 times.",
+                    router={"route": "chat", "intent": "general_conversation"},
+                    agent={
+                        "status": "ok",
+                        "speech": ["Okay, I blinked my eyes."],
+                        "selected_skills": [],
+                    },
+                    execution={"status": "completed"},
+                )
+            ],
+        )
+        evaluation = evaluate_episode_contract_precheck(episode)
+
+        review = offline_review_from_episode(episode, evaluation)
+
+        self.assertEqual(review.case_quality, "bad_case")
+        self.assertTrue(review.should_create_scenario)
+        self.assertTrue(review.should_create_mind_update)
+        self.assertIn("claimed_action_without_skill", review.failure_tags)
+        self.assertIn("negative_case", review.training_signal["recommended_use"])
+        self.assertTrue(any("runtime skill" in note for note in review.compact_memory_notes))
+        proposal = mind_update_proposal_from_review(review)
+        self.assertIsNotNone(proposal)
+        assert proposal is not None
+        self.assertTrue(proposal.requires_owner_approval)
+        self.assertFalse(proposal.auto_apply)
+        self.assertIn(review.review_id, proposal.evidence_ids)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            review_path = root / "offline_reviews.jsonl"
+            proposal_path = root / "offline_review_proposals.jsonl"
+
+            write_offline_reviews(review_path, [review])
+            proposals = write_mind_update_proposals_from_reviews(proposal_path, [review])
+
+            review_payload = json.loads(review_path.read_text(encoding="utf-8"))
+            proposal_payload = json.loads(proposal_path.read_text(encoding="utf-8"))
+            self.assertEqual(review_payload["case_quality"], "bad_case")
+            self.assertEqual(len(proposals), 1)
+            self.assertTrue(proposal_payload["requires_owner_approval"])
+            self.assertFalse(proposal_payload["auto_apply"])
 
 
 if __name__ == "__main__":

@@ -5,13 +5,17 @@ Router model and the deepthinking path.
 
 ## Principle
 
-The skill catalog is a bounded menu of possible abilities. It is not the normal
-intent-understanding brain.
+The skill catalog is a bounded menu of executable abilities. It is not the
+normal intent-understanding brain.
 
 For ordinary language, the Router should let the model infer meaning from the
 user text, bounded context, and compact skill descriptions. Deterministic code
 may partition, validate, reject, clarify, or fail closed, but it must not grow
 into a rule table that chooses normal activities by phrase matching.
+
+The model may understand broader human-like desired abilities before execution
+exists. That broad understanding belongs in non-executable proposals, not in
+`actions[]`. See [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md).
 
 The exception is the deterministic emergency/noise layer. Stop, cancel,
 emergency, silence, unusable audio, and obvious repeated filler stay rule-based
@@ -60,6 +64,12 @@ schema-shaped `args`, `sequence`, `timing`, a short `reason`, and a 0.0-1.0
 physical task uses `chromie.speak` with `args.text`; it should not be dropped as
 ordinary chat or a separate unstructured final answer.
 
+When the quick Router understands a desired ability but no common executable
+skill safely matches it, it should choose `deep_thought` or `clarify` and may
+include `metadata.desired_abilities[]` with `ability_id`, `intent`,
+`status=missing_ability`, `confidence`, and `reason`. These entries become
+shared task-proposal ledger records, but they never execute.
+
 When delegating to `deep_thought`, the quick Router may include `speak_first`.
 That text is a model-chosen speech task/prelude, such as a natural request for a
 moment to think. It must not claim that a physical action, tool result, memory
@@ -73,10 +83,14 @@ Deepthinking sees the full catalog and the quick Router output. It may:
 - revise or supersede it;
 - emit speech through `chromie.speak`;
 - emit exact catalog skill tasks;
+- emit non-executable `task_proposals[]` for understood desired abilities that
+  are missing from the executable catalog;
 - clarify or refuse when no safe supported capability exists.
 
 Deepthinking still cannot invent skills or raw body controls. Every non-speech
 task must use an exact supplied catalog skill ID and schema-valid arguments.
+Missing or planned abilities must stay in task proposals and truthful speech,
+not executable tasks.
 
 ## Validation Contract
 
@@ -90,6 +104,8 @@ Validators may check:
 - safety class and confirmation gates;
 - no raw motor, joint, torque, actuator, or controller-array fields are exposed;
 - speech preludes do not claim completed/executing physical work.
+- missing-ability proposals carry `state=missing_ability` and do not enter the
+  executable task list.
 
 Validators should not decide that a normal phrase means a normal skill. That
 meaning decision belongs to the LLM stage that saw the catalog.
