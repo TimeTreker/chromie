@@ -6,10 +6,10 @@ All notable user-visible changes should be recorded here.
 
 - No changes yet.
 
-## sim-0.0.1 - 2026-07-04
+## 0.0.1 - 2026-07-04
 
-- Prepared the first simulator-scoped release metadata, compatibility
-  declaration, and release notes.
+- Prepared the first `0.0.1` release metadata, compatibility declaration, and
+  release notes.
 - Narrowed the release claim to generated-speech voice regression, structured
   text/speech interaction, and MuJoCo `sim` execution through the pinned
   Soridormi contract.
@@ -72,16 +72,16 @@ All notable user-visible changes should be recorded here.
 - Strict evidence verifier for native mode, clean revisions, all cases,
   correlated sessions, and separation of automated from release-closing
   supervised evidence.
-- `sim-0.0.1` version, compatibility declaration, release notes,
+- `0.0.1` version, compatibility declaration, release notes,
   source archive generation, manifest, tests log, and checksums.
 
 ### Documentation refresh
 
 - Reclassified the project from stale historical milestone documentation to the
-  current simulator release delivery.
+  current MuJoCo-executor release delivery.
 - Added a stable project charter and a focused three-milestone delivery
-  sequence: simulator release, robust/provider-ready simulation, and a physical
-  reference pilot.
+  sequence: `0.0.1` with Soridormi MuJoCo execution, robust/provider-ready
+  simulation, and a physical reference pilot.
 - Consolidated duplicated setup, status, and handoff prose into their owning
   documents; removed redundant `CLAUDE.md` and `LLM_CONTEXT.md` copies.
 - Reduced the Chinese guide to a maintained project overview and navigation
@@ -110,4 +110,4 @@ All notable user-visible changes should be recorded here.
 - Physical microphone/speaker and supervised recovery evidence for
   voice-device support.
 - A future release must declare physical voice-device compatibility separately;
-  `sim-0.0.1` intentionally does not include that claim.
+  `0.0.1` intentionally does not include that claim.

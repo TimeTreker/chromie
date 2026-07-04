@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
   "chromie": {
-    "version": "sim-0.0.1",
-    "release_tag": "sim-0.0.1",
+    "version": "0.0.1",
+    "release_tag": "0.0.1",
     "supported_branch": "main",
     "runtime_modes": [
       "structured-text",
       "generated-speech-voice",
       "structured-speech",
-      "mujoco-sim"
+      "soridormi-mujoco-sim"
     ],
-    "release_scope": "simulator"
+    "release_scope": "chromie-host-control-plane-with-soridormi-mujoco-executor"
   },
   "soridormi": {
     "repository": "https://github.com/TimeTreker/soridormi.git",
@@ -33,7 +33,7 @@
       "acoustic"
     ],
     "human_supervised_voice_device_claim": false,
-    "simulator_required": true
+    "soridormi_mujoco_sim_executor_required": true
   },
   "release_gate_blockers": []
 }

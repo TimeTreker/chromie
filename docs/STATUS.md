@@ -1,13 +1,15 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Current release-prep base:** `sim-0.0.1` simulator release scope; retained
-target evidence below records the exact revision that produced each bundle
+**Current release-prep base:** `0.0.1` scope with Soridormi MuJoCo `sim`
+execution; retained target evidence below records the exact revision that
+produced each bundle
 **Status refresh date:** 2026-07-04
-**Current focus:** **Freeze the `sim-0.0.1` simulator release across the
-Chromie/Soridormi boundary; physical pilot preparation and human voice-device
-validation remain separate release-support tracks**
-**Version:** `sim-0.0.1` (simulator scope, not yet published)
+**Current focus:** **Freeze the `0.0.1` release across the Chromie/Soridormi
+boundary, with Soridormi executing robot work through MuJoCo `sim`; physical
+pilot preparation and human voice-device validation remain separate
+release-support tracks**
+**Version:** `0.0.1` (MuJoCo-executor scope, not yet published)
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
@@ -16,9 +18,9 @@ readiness.
 
 The temporary `demo-sim-2026-06-27` tag was withdrawn during the paired
 Chromie/Soridormi documentation and evidence audit. Do not recreate that demo
-tag; the next release tag is `sim-0.0.1`, and it must come only from a revision
-whose docs, automated checks, and retained simulator evidence match the release
-claim.
+tag; the next release tag is `0.0.1`, and it must come only from a revision
+whose docs, automated checks, and retained Soridormi MuJoCo evidence match the
+release claim.
 
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
@@ -161,7 +163,7 @@ TTS prompt cases passed through host output, configured host input capture,
 VAD, ASR, Router, Agent, trusted Skill Runtime, TTS scheduling, and Soridormi
 `sim` behavior. This bundle passes `verify_voice_evidence.py
 --allow-automated --require-clean` and is valid for the narrowed
-`sim-0.0.1` generated-speech/simulator claim. It remains
+`0.0.1` generated-speech and Soridormi MuJoCo-executor claim. It remains
 `release_eligible=false` for a human-supervised physical voice-device claim.
 
 ## Status vocabulary
@@ -210,7 +212,7 @@ Target validation or Release readiness.
 | Shared bounded scheduling and resource arbitration | Implemented | Agent and Orchestrator concurrency tests | MuJoCo interaction path exercises the policy | Parallel flags off |
 | Hardware profile detection and generated `.env.runtime` | Implemented | Profile-detection tests | RTX 5090 profile and CUDA arch 120 validated; Jetson packaging evidence is incomplete | Automatic |
 | Host hardware daemon | Legacy mock compatibility implementation | Hardware/control-plane tests | No production hardware claim | Optional; mock driver only |
-| Simulator release packaging | `sim-0.0.1` version, release notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests and full suite | M13 text scope is closed; acoustic generated-speech evidence supports the narrowed simulator claim; human voice-device scope still requires supervised physical audio evidence | Release prep |
+| Release packaging | `0.0.1` version, release notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests and full suite | M13 text scope is closed; acoustic generated-speech evidence supports the narrowed Soridormi MuJoCo-executor claim; human voice-device scope still requires supervised physical audio evidence | Release prep |
 
 ## Verified automated evidence
 
@@ -328,8 +330,8 @@ These legacy evidence tracks do not define the current delivery:
 
 - The default structured interaction feature flags are off.
 - Native interaction output is the Agent default, but the host structured
-  rollout remains default-off unless the operator selects the simulator release
-  profile.
+  rollout remains default-off unless the operator selects the `0.0.1` release
+  configuration.
 - `AGENT_NATIVE_INTERACTION_FALLBACK` is default-off so malformed native output
   fails closed unless an operator explicitly enables adapter fallback.
 - The checked-in Soridormi manifest is a pinned contract snapshot; the live
@@ -353,10 +355,11 @@ These legacy evidence tracks do not define the current delivery:
   exclusivity remains Soridormi’s responsibility.
 - Release notes, compatibility metadata, archive generation, and checksums
   exist, but there is no published GitHub release or support promise until the
-  `sim-0.0.1` tag and release artifacts are created.
+  `0.0.1` tag and release artifacts are created.
 
 ## Release classification
 
-Treat this revision as the **`sim-0.0.1` simulator release-prep snapshot** until
-it is tagged and published. It is not a production release, physical-robot
-release, or human voice-device release. See [Release and Packaging](RELEASE.md).
+Treat this revision as the **`0.0.1` release-prep snapshot** until it is tagged
+and published. It is not a production release, physical-robot release, or human
+voice-device release. Robot execution evidence for this release is limited to
+Soridormi MuJoCo `sim`. See [Release and Packaging](RELEASE.md).

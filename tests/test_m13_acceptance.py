@@ -841,7 +841,7 @@ class M13AcceptanceTests(unittest.TestCase):
                 "event_count": 40,
                 "acceptance_id": "test",
                 "runner": {"dry_run": False, "mode": "supervised"},
-                "chromie": {"revision": "abc123", "version": "sim-0.0.1", "dirty": False},
+                "chromie": {"revision": "abc123", "version": "0.0.1", "dirty": False},
                 "soridormi_manifest": {"upstream_commit": "def456"},
                 "soridormi_mcp_url": "http://127.0.0.1:8000/mcp",
             }
@@ -881,7 +881,7 @@ class M13AcceptanceTests(unittest.TestCase):
                 "runner": {"dry_run": False, "mode": "synthetic"},
                 "chromie": {
                     "revision": "abc123",
-                    "version": "sim-0.0.1",
+                    "version": "0.0.1",
                     "dirty": False,
                 },
                 "soridormi_manifest": {"upstream_commit": "def456"},
@@ -933,12 +933,12 @@ class M13AcceptanceTests(unittest.TestCase):
             evidence.mkdir()
 
             (repo / "release").mkdir()
-            (repo / "VERSION").write_text("sim-0.0.1\n")
-            (repo / "release" / "sim-0.0.1.md").write_text("# Notes\n")
+            (repo / "VERSION").write_text("0.0.1\n")
+            (repo / "release" / "0.0.1.md").write_text("# Notes\n")
             (repo / "release" / "compatibility.json").write_text(
                 json.dumps(
                     {
-                        "chromie": {"version": "sim-0.0.1", "release_tag": "sim-0.0.1"},
+                        "chromie": {"version": "0.0.1", "release_tag": "0.0.1"},
                         "release_gate_blockers": ["confirmation pending"],
                     }
                 )
@@ -962,7 +962,7 @@ class M13AcceptanceTests(unittest.TestCase):
                             "revision": subprocess.check_output(
                                 ["git", "rev-parse", "HEAD"], cwd=repo, text=True
                             ).strip(),
-                            "version": "sim-0.0.1",
+                            "version": "0.0.1",
                             "dirty": False,
                         },
                         "soridormi_manifest": {"upstream_commit": "soridormi-fixture"},
@@ -1008,7 +1008,7 @@ class M13AcceptanceTests(unittest.TestCase):
 
             manifest = json.loads((bundle / "manifest.json").read_text())
             self.assertFalse(manifest["publishable"])
-            self.assertTrue((bundle / "chromie-sim-0.0.1.tar.gz").is_file())
+            self.assertTrue((bundle / "chromie-0.0.1.tar.gz").is_file())
             self.assertTrue((bundle / "build-provenance.json").is_file())
             self.assertEqual(
                 manifest["artifacts"]["build_provenance"],

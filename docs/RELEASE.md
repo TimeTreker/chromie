@@ -2,20 +2,20 @@
 
 ## Current Position
 
-The repository declares `sim-0.0.1` in `VERSION` and includes tracked simulator
-release notes, compatibility metadata, an evidence verifier, source-archive
-generation, a release manifest, and checksums. No official GitHub release has
-been published yet.
+The repository declares `0.0.1` in `VERSION` and includes tracked release
+notes, compatibility metadata, an evidence verifier, source-archive generation,
+a release manifest, and checksums. No official GitHub release has been
+published yet.
 
 Treat `main` as a development branch. The historical M13 text-to-MuJoCo
 interaction scope is closed with retained text evidence. Clean synthetic,
 virtual-microphone, and acoustic generated-speech evidence can support this
-simulator release only when the release claim remains narrowed to generated
-speech and MuJoCo `sim`. Physical microphone/speaker evidence is still required
-for any release that claims human voice-device support. See
+release only when the release claim remains narrowed to generated speech and
+Soridormi MuJoCo `sim` execution. Physical microphone/speaker evidence is still
+required for any release that claims human voice-device support. See
 [Current Implementation Status](STATUS.md).
 
-## sim-0.0.1 Scope
+## 0.0.1 Scope
 
 The supported scope is:
 
@@ -25,14 +25,14 @@ The supported scope is:
 - structured text/speech interaction through the host Orchestrator, Router,
   Agent, trusted Skill Runtime, and pinned Soridormi capability contract;
 - MuJoCo-backed named skills in Soridormi `sim` mode;
-- deterministic stop, cancellation, timeout, and simulator safe-idle recovery;
+- deterministic stop, cancellation, timeout, and MuJoCo safe-idle recovery;
 - no production real-hardware, Jetson distribution, unattended deployment, or
   human voice-device support claim.
 
 ## Prepare the Release Bundle
 
-For the simulator release, verify a clean automated evidence bundle. The
-current low-cost generated-speech device path is:
+For `0.0.1`, verify a clean automated evidence bundle. The current low-cost
+generated-speech device path is:
 
 ```bash
 python scripts/voice_acceptance.py \
@@ -47,7 +47,7 @@ python scripts/verify_voice_evidence.py --allow-automated --require-clean \
 
 The retained M13 text-to-MuJoCo interaction scope is evidenced by
 `.chromie/acceptance/text-mujoco/20260617T081411Z`. Before tagging, rerun the
-current simulator or scenario gates documented in
+current MuJoCo or scenario gates documented in
 [Acceptance and Evidence](ACCEPTANCE.md) from the intended revision.
 
 Create a non-publishable packaging rehearsal when runtime provenance is not
@@ -87,7 +87,7 @@ configured Ollama model/digest is absent.
 
 ## Required Release Artifacts
 
-- annotated or signed Git tag `sim-0.0.1` and GitHub release notes;
+- annotated or signed Git tag `0.0.1` and GitHub release notes;
 - source archive;
 - exact supported Chromie revision;
 - compatible Soridormi revision and contract-schema version;
@@ -105,7 +105,7 @@ Every release should publish a table like:
 
 | Chromie | Soridormi capability revision | Runtime mode | Support state |
 |---|---|---|---|
-| `sim-0.0.1` | pinned commit and schema | MuJoCo `sim` | Supported simulator scope |
+| `0.0.1` | pinned commit and schema | Soridormi MuJoCo `sim` | Supported `0.0.1` scope |
 | `main` | current checked-in manifest | Development | No compatibility promise |
 | Physical hardware | device-specific | `hardware` | Experimental until commissioned |
 
@@ -147,8 +147,8 @@ The release process must also probe the live endpoint and retain the result.
 - Native `InteractionResponse` generation is enabled and validated;
   compatibility rollback is documented.
 - Request-bound confirmation dialogue is verified and request-bound.
-- Automated voice evidence is accepted only for this narrowed simulator and
-  generated-speech claim.
+- Automated voice evidence is accepted only for this narrowed generated-speech
+  and Soridormi MuJoCo-executor claim.
 - Barge-in and body cancellation leave no stale speech or orphaned motion.
 - Stop/emergency exercises include recovery confirmation when the live simulator
   path is used.
@@ -183,8 +183,8 @@ synthetic, virtual-mic, or acoustic generated-speech evidence.
 
 ## Versioning Guidance
 
-`sim-0.0.1` names a simulator-scoped pre-1.0 release line. Public production
-releases should use semantic versions. Before `1.0`, a minor version may change
+`0.0.1` names a pre-1.0 semantic release. Public production releases should
+continue to use semantic versions. Before `1.0`, a minor version may change
 experimental APIs, but release notes must call out contract changes. Capability
 schema changes should update their schema version and compatibility table
 rather than relying only on repository commit hashes.
@@ -194,7 +194,7 @@ rather than relying only on repository commit hashes.
 - [`VERSION`](../VERSION)
 - [`release/compatibility.json`](../release/compatibility.json)
 - [`release/model-lock.json`](../release/model-lock.json)
-- [`release/sim-0.0.1.md`](../release/sim-0.0.1.md)
+- [`release/0.0.1.md`](../release/0.0.1.md)
 
 ## Changelog
 

@@ -11,9 +11,11 @@ The long-term goal and ownership boundaries are defined in the
 > **Current state:** the historical M13 text-to-MuJoCo interaction milestone is
 > closed. Retained RTX 5090 GPU smoke, synthetic, virtual-microphone, acoustic
 > generated-speech, and text-to-MuJoCo evidence pass on the reference host.
-> The next intended release tag is `sim-0.0.1`, limited to simulator support.
+> The next intended release tag is `0.0.1`. Chromie is the real host control
+> plane; this release is limited to generated-speech and structured interaction
+> evidence with Soridormi executing robot work through its MuJoCo `sim` mode.
 > Real microphone/speaker validation remains a separate track before making a
-> physical voice-device release claim. See
+> human voice-device support claim. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
