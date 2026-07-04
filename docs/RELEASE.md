@@ -14,8 +14,9 @@ Physical microphone/speaker evidence is still required only for a release that
 claims real voice-device support. The checked-in compatibility declaration still
 contains that voice-device blocker, so the release generator refuses a
 publishable bundle until either the supervised evidence passes or the supported
-release scope is deliberately narrowed. See [Current Implementation
-Status](STATUS.md).
+release scope is deliberately narrowed, for example to automated acoustic
+host-output/input evidence using generated speech. See
+[Current Implementation Status](STATUS.md).
 
 ## Recommended first release scope
 

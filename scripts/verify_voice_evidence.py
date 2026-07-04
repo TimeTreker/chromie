@@ -76,12 +76,13 @@ def verify_bundle(
         errors.append(f"Acceptance status is not passed: {metadata.get('status')!r}")
     runner = metadata.get("runner") or {}
     mode = str(runner.get("mode") or "supervised")
-    if mode not in {"synthetic", "virtual-mic", "supervised"}:
+    if mode not in {"synthetic", "virtual-mic", "acoustic", "supervised"}:
         errors.append(f"Unknown acceptance mode: {mode!r}")
     if mode != "supervised" and not allow_automated:
         errors.append(
-            f"Acceptance mode {mode!r} is automated evidence and cannot close the alpha release gate; "
-            "run --mode supervised for release-closing evidence"
+            f"Acceptance mode {mode!r} is automated evidence and cannot close a "
+            "human-supervised voice-device release gate; run --mode supervised "
+            "for human release-closing evidence or narrow the release claim"
         )
     if runner.get("dry_run"):
         errors.append("Dry-run evidence cannot close the alpha release gate")
@@ -182,7 +183,7 @@ def verify_bundle(
         if value not in override_text:
             errors.append(f"Acceptance override is missing: {value}")
 
-    if mode in {"synthetic", "virtual-mic"}:
+    if mode in {"synthetic", "virtual-mic", "acoustic"}:
         generated_dir = evidence_dir / "generated-input"
         manifest_path = generated_dir / "manifest.json"
         if not manifest_path.is_file():
@@ -213,7 +214,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--allow-automated",
         action="store_true",
-        help="Validate synthetic/virtual-mic evidence without treating it as release-closing.",
+        help="Validate automated evidence without treating it as release-closing.",
     )
     parser.add_argument("--write-report", type=Path)
     return parser

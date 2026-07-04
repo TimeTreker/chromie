@@ -553,7 +553,7 @@ remain inside the evidence root, requires the provider manifest's
 `metadata.upstream_commit` to match `revisions.soridormi`, and requires
 calibration artifact SHA-256 values to match.
 
-`scripts/voice_acceptance.py` has three explicit modes. All three retain
+`scripts/voice_acceptance.py` has four explicit modes. All four retain
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.
 
@@ -561,12 +561,16 @@ captured audio, Orchestrator logs, and per-case checks.
 |---|---|---|---|---:|
 | `synthetic` (default) | Chromie TTS WAV -> framed Orchestrator stdin -> VAD -> ASR | None | Reproducible speech/control-plane/Skill Runtime regression | No |
 | `virtual-mic` | Chromie TTS WAV -> Pulse/PipeWire null sink monitor -> normal host capture -> VAD -> ASR | None | Host audio-device capture plus the automated control path | No |
+| `acoustic` | Chromie TTS WAV -> host output -> configured host input device -> VAD -> ASR | None | Repeatable host audio-device path for generated speech; physical evidence when bound to a real speaker/microphone pair | No, unless the release claim is explicitly narrowed to automated acoustic evidence |
 | `supervised` | Real microphone -> normal host capture -> VAD -> ASR | Audible/visual verdict after machine checks pass | Reference-host microphone, speaker, pronunciation, and observed simulator behavior | Yes, for physical voice-device release claims |
 
-The automatic modes intentionally use response playback `discard` mode. Audio
-is paced in real time, so `playback_start`, barge-in, cancellation, and stale
-playback checks still execute without requiring a physical speaker or risking
-speaker-to-microphone feedback.
+The `synthetic` and `virtual-mic` modes intentionally use response playback
+`discard` mode. Audio is paced in real time, so `playback_start`, barge-in,
+cancellation, and stale playback checks still execute without requiring a
+physical speaker or risking speaker-to-microphone feedback. The `acoustic`
+mode uses host playback and configured input-device capture, so it is useful
+for low-cost microphone/speaker regression when bound to real devices, but it
+proves generated speech rather than arbitrary human pronunciation.
 
 Use `scripts/interaction_text_mujoco_check.py` when the goal is to skip both
 microphone and ASR but still hear Chromie through the speaker. Use
@@ -657,6 +661,31 @@ speaker.
 The retained PipeWire run is `20260614T133155Z`; all seven cases passed at
 Chromie revision `f0e22ba`.
 
+### Automatic acoustic acceptance
+
+Use `acoustic` mode when the goal is to test the reference host's configured
+speaker/input-device loop without requiring a human to speak all seven cases:
+
+```bash
+ORCH_INPUT_DEVICE=0 ORCH_OUTPUT_DEVICE=16 ORCH_INPUT_GAIN=80 \
+python scripts/voice_acceptance.py \
+  --mode acoustic \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
+```
+
+The runner generates each prompt with Chromie TTS, plays it through the
+host audio player, and waits for the normal Orchestrator microphone path to
+capture and recognize it. The default player is `auto`, which prefers
+`pw-play`, then `paplay`, then `aplay`, and falls back to `sounddevice`.
+Tune `ORCH_INPUT_DEVICE`, `ORCH_OUTPUT_DEVICE`, `ORCH_INPUT_GAIN`,
+`--acoustic-playback-gain`, `--acoustic-player`, and
+`--acoustic-output-target` for the host room and device levels. This is target
+audio-path evidence for generated speech, not a human pronunciation or
+operator-observation claim; treat it as physical microphone evidence only when
+the recorded `ORCH_INPUT_DEVICE` is known to be the real microphone path.
+
 ### Physical audio supervised acceptance
 
 Commit the candidate revision first, then run:
@@ -675,8 +704,8 @@ session's Router, interaction, skill, playback, cancellation, and completion
 events. It asks for an audible/visual operator verdict only after all machine
 checks pass. Missing ASR or required runtime events automatically fail the case.
 
-Only a clean, passing `supervised` bundle can satisfy the voice-device release
-verifier:
+Only a clean, passing `supervised` bundle can satisfy a human-supervised
+voice-device release verifier:
 
 ```bash
 python scripts/verify_voice_evidence.py --require-clean \

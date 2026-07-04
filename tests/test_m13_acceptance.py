@@ -37,7 +37,7 @@ from scripts.voice_acceptance import (
     write_override_file,
 )
 from orchestrator.audio_injection import encode_audio_packet, read_audio_packet
-from scripts.acceptance_audio import AudioFixture, PulseVirtualMicrophone
+from scripts.acceptance_audio import AudioFixture, HostSpeakerPlayer, PulseVirtualMicrophone
 from scripts.verify_voice_evidence import REQUIRED_FILES, verify_bundle
 import scripts.prepare_alpha_release as release_module
 
@@ -83,6 +83,81 @@ class M13AcceptanceTests(unittest.TestCase):
         ])
         self.assertEqual(command[-3:], ["--mode", "synthetic", "--allow-dirty"])
         self.assertEqual(environment["CHROMIE_VOICE_ACCEPTANCE_RUNTIME_REEXEC"], "1")
+
+    def test_acoustic_mode_reexecs_in_managed_runtime_when_needed(self) -> None:
+        with (
+            mock.patch(
+                "scripts.voice_acceptance.importlib.util.find_spec",
+                return_value=None,
+            ),
+            mock.patch(
+                "scripts.voice_acceptance.shutil.which",
+                return_value="/usr/bin/conda",
+            ),
+            mock.patch(
+                "scripts.voice_acceptance.os.execvpe",
+            ) as execvpe,
+            mock.patch.dict("os.environ", {}, clear=True),
+        ):
+            ensure_acceptance_runtime(["--mode", "acoustic", "--allow-dirty"])
+
+        command = execvpe.call_args.args[1]
+        self.assertEqual(command[-3:], ["--mode", "acoustic", "--allow-dirty"])
+
+    def test_acoustic_mode_reexecs_when_playback_dependency_is_missing(self) -> None:
+        def find_spec(name: str) -> object | None:
+            return object() if name == "websockets" else None
+
+        def which(name: str) -> str | None:
+            return "/usr/bin/conda" if name == "conda" else None
+
+        with (
+            mock.patch(
+                "scripts.voice_acceptance.importlib.util.find_spec",
+                side_effect=find_spec,
+            ),
+            mock.patch(
+                "scripts.voice_acceptance.shutil.which",
+                side_effect=which,
+            ),
+            mock.patch(
+                "scripts.voice_acceptance.os.execvpe",
+            ) as execvpe,
+            mock.patch.dict("os.environ", {}, clear=True),
+        ):
+            ensure_acceptance_runtime(["--mode", "acoustic", "--allow-dirty"])
+
+        command = execvpe.call_args.args[1]
+        self.assertEqual(command[-3:], ["--mode", "acoustic", "--allow-dirty"])
+
+    def test_acoustic_mode_uses_host_player_without_reexec(self) -> None:
+        def find_spec(name: str) -> object | None:
+            return object() if name == "websockets" else None
+
+        def which(name: str) -> str | None:
+            if name == "pw-play":
+                return "/usr/bin/pw-play"
+            if name == "conda":
+                return "/usr/bin/conda"
+            return None
+
+        with (
+            mock.patch(
+                "scripts.voice_acceptance.importlib.util.find_spec",
+                side_effect=find_spec,
+            ),
+            mock.patch(
+                "scripts.voice_acceptance.shutil.which",
+                side_effect=which,
+            ),
+            mock.patch(
+                "scripts.voice_acceptance.os.execvpe",
+            ) as execvpe,
+            mock.patch.dict("os.environ", {}, clear=True),
+        ):
+            ensure_acceptance_runtime(["--mode", "acoustic", "--allow-dirty"])
+
+        execvpe.assert_not_called()
 
     def test_preflight_does_not_reexec_managed_runtime(self) -> None:
         with (
@@ -225,6 +300,63 @@ class M13AcceptanceTests(unittest.TestCase):
             self.assertIn("ORCH_MIN_RMS=5", text)
             self.assertIn("ORCH_BARGE_IN_MIN_RMS=10", text)
             self.assertIn("ORCH_VAD_MODE=0", text)
+
+    def test_acoustic_override_uses_host_audio_devices(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "acceptance-overrides.env"
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "ORCH_INPUT_DEVICE": "0",
+                    "ORCH_OUTPUT_DEVICE": "16",
+                    "ORCH_INPUT_GAIN": "80",
+                },
+                clear=False,
+            ):
+                write_override_file(
+                    path,
+                    event_path=Path(temp_dir) / "events.jsonl",
+                    recordings_dir=Path(temp_dir) / "recordings",
+                    soridormi_mcp_url=None,
+                    enable_soridormi=False,
+                    mode="acoustic",
+                )
+
+            text = path.read_text()
+            self.assertIn("ORCH_AUDIO_INPUT_MODE=device", text)
+            self.assertIn("ORCH_AUDIO_OUTPUT_MODE=device", text)
+            self.assertIn("ORCH_INPUT_DEVICE=0", text)
+            self.assertIn("ORCH_OUTPUT_DEVICE=16", text)
+            self.assertIn("ORCH_INPUT_GAIN=80", text)
+
+    def test_host_speaker_player_uses_pw_play_when_available(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "fixture.wav"
+            path.write_bytes(b"RIFFfixture")
+            fixture = AudioFixture(
+                text="hello",
+                pcm16=b"\x00\x00" * 10,
+                sample_rate=44100,
+                channels=1,
+                path=path,
+            )
+
+            def which(name: str) -> str | None:
+                return "/usr/bin/pw-play" if name == "pw-play" else None
+
+            with (
+                mock.patch("scripts.acceptance_audio.shutil.which", side_effect=which),
+                mock.patch("scripts.acceptance_audio.subprocess.run") as run,
+            ):
+                run.return_value = SimpleNamespace(
+                    returncode=0,
+                    stdout="",
+                    stderr="",
+                )
+                HostSpeakerPlayer(player="auto").play(fixture, timeout_s=3)
+
+            command = run.call_args.args[0]
+            self.assertEqual(command, ["/usr/bin/pw-play", str(path)])
 
     def test_audio_injection_packet_round_trip(self) -> None:
         payload = (b"\x01\x00" * 320)
@@ -764,7 +896,10 @@ class M13AcceptanceTests(unittest.TestCase):
             release_report = verify_bundle(root)
             self.assertFalse(release_report["passed"])
             self.assertTrue(
-                any("cannot close the alpha" in item for item in release_report["errors"])
+                any(
+                    "cannot close a human-supervised voice-device release gate" in item
+                    for item in release_report["errors"]
+                )
             )
             automated_report = verify_bundle(root, allow_automated=True)
             self.assertTrue(automated_report["passed"], automated_report)

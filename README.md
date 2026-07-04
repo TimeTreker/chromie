@@ -53,8 +53,8 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 - Soridormi named-skill discovery and MuJoCo execution;
 - TaskGraph validation and gated read, planning, guarded, and physical-policy
   paths;
-- text-to-MuJoCo, synthetic, virtual-microphone, supervised, GPU, simulator, and release
-  acceptance tooling.
+- text-to-MuJoCo, synthetic, virtual-microphone, acoustic, supervised, GPU,
+  simulator, and release acceptance tooling.
 
 Physical microphone/speaker evidence, a reviewed voice-device release bundle,
 verified Jetson packaging, and physical robot support remain open.

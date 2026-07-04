@@ -123,11 +123,22 @@ configuration unless you are intentionally building a test harness.
 | `ORCH_AUDIO_OUTPUT_MODE` | `device` (default), `discard` | Select physical playback or headless paced playback. |
 | `ORCH_DISCARD_PLAYBACK_REALTIME` | `1` | Preserve audio duration and interruption timing when output is discarded. |
 | `PULSE_SOURCE` | Pulse/PipeWire source name | Used by `virtual-mic` mode to select the temporary null-sink monitor. |
+| `ACCEPTANCE_ACOUSTIC_PLAYBACK_GAIN` | Float, default `1.0` | Software gain for generated prompt playback in `voice_acceptance.py --mode acoustic`. |
+| `ACCEPTANCE_ACOUSTIC_PLAYER` | `auto` (default), `pw-play`, `paplay`, `aplay`, `sounddevice` | Select the host playback backend for generated prompt WAV files in `acoustic` mode. |
+| `ACCEPTANCE_ACOUSTIC_OUTPUT_TARGET` | PipeWire/Pulse target name or node | Optional host player target for generated prompt WAV playback in `acoustic` mode. |
 
 The stdin packet protocol is local to the parent/child process relationship and
 does not expose an HTTP or socket injection endpoint. It carries PCM16 sample
 rate, channel count, and payload length; injected audio still passes through
 VAD and ASR.
+
+`acoustic` acceptance mode does not use the stdin packet protocol. It plays
+generated prompt WAV files through a host playback backend, defaulting to
+`pw-play`/`paplay`/`aplay` when available, and requires the selected physical
+input device or host input bridge to capture them. `ORCH_OUTPUT_DEVICE` still
+controls Chromie's own response playback; set
+`ACCEPTANCE_ACOUSTIC_OUTPUT_TARGET` or the system default sink when the
+generated prompts must use a specific speaker.
 
 ## Service endpoints
 

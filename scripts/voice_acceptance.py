@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Voice-to-MuJoCo acceptance and evidence capture.
 
-Three modes are available:
+Four modes are available:
 
 * ``synthetic`` generates prompt audio with Chromie TTS and injects framed PCM16
   into the Orchestrator stdin path. It is fully automatic and reproducible.
 * ``virtual-mic`` generates the same fixtures and plays them into a temporary
   PulseAudio/PipeWire monitor source, exercising host audio-device capture.
+* ``acoustic`` generates fixtures and plays them through the configured host
+  output so Chromie hears them through the configured host input device.
 * ``supervised`` uses the real microphone and asks an operator to confirm
   audible and visual behavior. Only supervised evidence is release-closing.
 """
@@ -41,12 +43,14 @@ if str(ROOT) not in sys.path:
 from orchestrator.audio_injection import encode_audio_packet
 from scripts.acceptance_audio import (
     AudioFixture,
+    HostSpeakerPlayer,
     PulseVirtualMicrophone,
     generate_tts_fixtures,
 )
 
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "voice"
-ACCEPTANCE_MODES = ("synthetic", "virtual-mic", "supervised")
+AUTOMATIC_MODES = {"synthetic", "virtual-mic", "acoustic"}
+ACCEPTANCE_MODES = ("synthetic", "virtual-mic", "acoustic", "supervised")
 FULL_CASE_ORDER = (
     "speech-only",
     "speech-skill",
@@ -62,6 +66,17 @@ HOST_LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
 RUNTIME_REEXEC_ENV = "CHROMIE_VOICE_ACCEPTANCE_RUNTIME_REEXEC"
 
 
+def _missing_automatic_runtime_packages(mode: str) -> list[str]:
+    packages = ["websockets"]
+    if mode == "acoustic" and HostSpeakerPlayer.available_backend() is None:
+        packages.extend(["numpy", "sounddevice"])
+    return [
+        package
+        for package in packages
+        if importlib.util.find_spec(package) is None
+    ]
+
+
 def ensure_acceptance_runtime(argv: Sequence[str]) -> None:
     """Re-exec automatic modes in the managed host environment when needed."""
 
@@ -72,18 +87,22 @@ def ensure_acceptance_runtime(argv: Sequence[str]) -> None:
         mode_index = argv.index("--mode") + 1
         if mode_index < len(argv):
             mode = argv[mode_index]
-    if mode not in {"synthetic", "virtual-mic"}:
+    if mode not in AUTOMATIC_MODES:
         return
-    if importlib.util.find_spec("websockets") is not None:
+    missing_packages = _missing_automatic_runtime_packages(mode)
+    if not missing_packages:
         return
     if os.getenv(RUNTIME_REEXEC_ENV) == "1":
         raise RuntimeError(
-            "The managed acceptance runtime does not provide the websockets package"
+            "The managed acceptance runtime does not provide required package(s): "
+            + ", ".join(missing_packages)
         )
     conda = shutil.which("conda")
     if conda is None:
         raise RuntimeError(
-            "Automatic voice acceptance requires websockets or a managed conda runtime"
+            "Automatic voice acceptance requires package(s) "
+            + ", ".join(missing_packages)
+            + " or a managed conda runtime"
         )
     environment = os.environ.copy()
     environment[RUNTIME_REEXEC_ENV] = "1"
@@ -477,20 +496,21 @@ def acceptance_readiness(
                 )
             )
 
-    if args.mode in {"synthetic", "virtual-mic"}:
-        websockets_available = importlib.util.find_spec("websockets") is not None
+    if args.mode in AUTOMATIC_MODES:
+        missing_runtime_packages = _missing_automatic_runtime_packages(args.mode)
         managed_conda = shutil.which("conda")
         checks.append(
             CheckResult(
                 "automatic acceptance runtime",
-                websockets_available or managed_conda is not None,
+                not missing_runtime_packages or managed_conda is not None,
                 (
-                    "websockets is importable"
-                    if websockets_available
+                    "required Python packages are importable"
+                    if not missing_runtime_packages
                     else (
                         f"managed runtime is available through {managed_conda}"
                         if managed_conda
-                        else "neither websockets nor a managed conda runtime is available"
+                        else "missing Python package(s): "
+                        + ", ".join(missing_runtime_packages)
                     )
                 ),
             )
@@ -513,6 +533,34 @@ def acceptance_readiness(
                 "virtual microphone backend",
                 backend is not None,
                 backend or "neither PulseAudio nor PipeWire tools are available",
+            )
+        )
+    if args.mode == "acoustic":
+        host_player = HostSpeakerPlayer.available_backend()
+        missing_playback_packages = [
+            package
+            for package in ("numpy", "sounddevice")
+            if importlib.util.find_spec(package) is None
+        ]
+        managed_conda = shutil.which("conda")
+        checks.append(
+            CheckResult(
+                "acoustic playback runtime",
+                host_player is not None
+                or not missing_playback_packages
+                or managed_conda is not None,
+                (
+                    f"{host_player} is available"
+                    if host_player is not None
+                    else "sounddevice and numpy are importable"
+                    if not missing_playback_packages
+                    else (
+                        f"managed runtime is available through {managed_conda}"
+                        if managed_conda
+                        else "missing Python package(s): "
+                        + ", ".join(missing_playback_packages)
+                    )
+                ),
             )
         )
 
@@ -571,6 +619,7 @@ class AcceptanceAudioDriver:
     fixtures: dict[str, AudioFixture]
     orchestrator_process: subprocess.Popen[Any] | None = None
     virtual_microphone: PulseVirtualMicrophone | None = None
+    speaker_player: HostSpeakerPlayer | None = None
 
     def deliver(self, prompt: str) -> AudioFixture:
         fixture = self.fixtures[prompt]
@@ -590,6 +639,10 @@ class AcceptanceAudioDriver:
             if self.virtual_microphone is None:
                 raise RuntimeError("virtual-mic mode is not initialized")
             self.virtual_microphone.play(fixture)
+        elif self.mode == "acoustic":
+            if self.speaker_player is None:
+                raise RuntimeError("acoustic mode requires a speaker player")
+            self.speaker_player.play(fixture)
         else:
             raise RuntimeError(f"Audio delivery is not used in mode {self.mode!r}")
         return fixture
@@ -1435,6 +1488,13 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
             "virtual_mic_sink": (
                 args.virtual_mic_sink if args.mode == "virtual-mic" else None
             ),
+            "acoustic_playback_gain": (
+                args.acoustic_playback_gain if args.mode == "acoustic" else None
+            ),
+            "acoustic_player": args.acoustic_player if args.mode == "acoustic" else None,
+            "acoustic_output_target": (
+                args.acoustic_output_target if args.mode == "acoustic" else None
+            ),
         },
     }
 
@@ -1491,7 +1551,7 @@ def write_override_file(
                 "ORCH_BARGE_IN_MIN_RMS": "40",
             }
         )
-    elif mode == "supervised":
+    elif mode in {"acoustic", "supervised"}:
         values.update(
             {
                 "ORCH_AUDIO_INPUT_MODE": "device",
@@ -1731,7 +1791,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 check=True,
                 timeout=60,
             )
-        if args.mode in {"synthetic", "virtual-mic"}:
+        if args.mode in AUTOMATIC_MODES:
             prompts = [
                 step.prompt
                 for case_id in selected
@@ -1766,6 +1826,17 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 mode=args.mode,
                 fixtures=fixtures,
                 virtual_microphone=virtual_microphone,
+                speaker_player=(
+                    HostSpeakerPlayer(
+                        device=os.getenv("ORCH_OUTPUT_DEVICE"),
+                        channels=int(os.getenv("ORCH_OUTPUT_CHANNELS", "2")),
+                        playback_gain=args.acoustic_playback_gain,
+                        player=args.acoustic_player,
+                        target=args.acoustic_output_target,
+                    )
+                    if args.mode == "acoustic"
+                    else None
+                ),
             )
 
         environment = os.environ.copy()
@@ -1804,6 +1875,12 @@ def run_acceptance(args: argparse.Namespace) -> int:
         print("The runner is recording structured session events and audio captures.")
         if args.mode == "supervised":
             print("Use only a supervised MuJoCo endpoint for body-skill cases.\n")
+        elif args.mode == "acoustic":
+            print(
+                "Generated test speech will be played through the configured host "
+                "output and captured through the configured host input device; no "
+                "human speech or operator verdict is required.\n"
+            )
         else:
             print(
                 "Generated test speech will be supplied automatically; no operator "
@@ -1977,8 +2054,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="synthetic",
         help=(
             "synthetic: TTS -> framed Orchestrator input (default); virtual-mic: "
-            "TTS -> Pulse/PipeWire monitor source; supervised: real microphone "
-            "with operator confirmation."
+            "TTS -> Pulse/PipeWire monitor source; acoustic: TTS -> host output "
+            "-> host input device; supervised: real microphone with operator "
+            "confirmation."
         ),
     )
     parser.add_argument(
@@ -2023,6 +2101,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--virtual-mic-sink",
         default="chromie_voice_test",
         help="Temporary PulseAudio/PipeWire null-sink name for virtual-mic mode.",
+    )
+    parser.add_argument(
+        "--acoustic-playback-gain",
+        type=float,
+        default=float(os.getenv("ACCEPTANCE_ACOUSTIC_PLAYBACK_GAIN", "1.0")),
+        help="Software gain for generated prompt playback in acoustic mode.",
+    )
+    parser.add_argument(
+        "--acoustic-player",
+        choices=("auto", "pw-play", "paplay", "aplay", "sounddevice"),
+        default=os.getenv("ACCEPTANCE_ACOUSTIC_PLAYER", "auto"),
+        help="Host playback backend for acoustic mode.",
+    )
+    parser.add_argument(
+        "--acoustic-output-target",
+        default=os.getenv("ACCEPTANCE_ACOUSTIC_OUTPUT_TARGET"),
+        help="Optional host audio target name or node for acoustic playback.",
     )
     parser.add_argument(
         "--probe-runtime",
