@@ -681,8 +681,12 @@ capture and recognize it. The default player is `auto`, which prefers
 `pw-play`, then `paplay`, then `aplay`, and falls back to `sounddevice`.
 Tune `ORCH_INPUT_DEVICE`, `ORCH_OUTPUT_DEVICE`, `ORCH_INPUT_GAIN`,
 `--acoustic-playback-gain`, `--acoustic-player`, and
-`--acoustic-output-target` for the host room and device levels. This is target
-audio-path evidence for generated speech, not a human pronunciation or
+`--acoustic-output-target` for the host room and device levels. Chromie's own
+responses use paced discard playback by default to avoid echoing confirmation
+prompts back through host input bridges; use
+`--acoustic-response-output-mode device` only when the selected input is a real
+microphone path that tolerates response playback. This is target audio-path
+evidence for generated speech, not a human pronunciation or
 operator-observation claim; treat it as physical microphone evidence only when
 the recorded `ORCH_INPUT_DEVICE` is known to be the real microphone path.
 

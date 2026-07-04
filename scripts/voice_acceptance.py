@@ -1495,6 +1495,9 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
             "acoustic_output_target": (
                 args.acoustic_output_target if args.mode == "acoustic" else None
             ),
+            "acoustic_response_output_mode": (
+                args.acoustic_response_output_mode if args.mode == "acoustic" else None
+            ),
         },
     }
 
@@ -1508,6 +1511,7 @@ def write_override_file(
     enable_soridormi: bool,
     mode: str = "supervised",
     virtual_mic_source: str | None = None,
+    acoustic_response_output_mode: str = "discard",
 ) -> None:
     values = {
         "ORCH_ENABLE_ROUTER": "1",
@@ -1551,7 +1555,37 @@ def write_override_file(
                 "ORCH_BARGE_IN_MIN_RMS": "40",
             }
         )
-    elif mode in {"acoustic", "supervised"}:
+    elif mode == "acoustic":
+        output_mode = (
+            acoustic_response_output_mode
+            if acoustic_response_output_mode in {"discard", "device"}
+            else "discard"
+        )
+        values.update(
+            {
+                "ORCH_AUDIO_INPUT_MODE": "device",
+                "ORCH_AUDIO_OUTPUT_MODE": output_mode,
+                "ORCH_DISCARD_PLAYBACK_REALTIME": "1",
+            }
+        )
+        for key in (
+            "ORCH_INPUT_DEVICE",
+            "ORCH_OUTPUT_DEVICE",
+            "ORCH_INPUT_RATE",
+            "ORCH_OUTPUT_RATE",
+            "ORCH_INPUT_CHANNELS",
+            "ORCH_OUTPUT_CHANNELS",
+            "ORCH_INPUT_GAIN",
+            "ORCH_MIN_AUDIO_MS",
+            "ORCH_MIN_RMS",
+            "ORCH_BARGE_IN_MIN_RMS",
+            "ORCH_VAD_MODE",
+            "ORCH_VAD_SILENCE_MS",
+        ):
+            value = os.getenv(key)
+            if value not in {None, ""}:
+                values[key] = value
+    elif mode == "supervised":
         values.update(
             {
                 "ORCH_AUDIO_INPUT_MODE": "device",
@@ -1682,6 +1716,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
         virtual_mic_source=(
             virtual_microphone.source_name if virtual_microphone else None
         ),
+        acoustic_response_output_mode=args.acoustic_response_output_mode,
     )
     service_overrides = service_runtime_overrides(
         soridormi_mcp_url=args.soridormi_mcp_url,
@@ -2118,6 +2153,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--acoustic-output-target",
         default=os.getenv("ACCEPTANCE_ACOUSTIC_OUTPUT_TARGET"),
         help="Optional host audio target name or node for acoustic playback.",
+    )
+    parser.add_argument(
+        "--acoustic-response-output-mode",
+        choices=("discard", "device"),
+        default=os.getenv("ACCEPTANCE_ACOUSTIC_RESPONSE_OUTPUT_MODE", "discard"),
+        help=(
+            "Orchestrator response playback mode during acoustic acceptance. "
+            "Generated test prompts still play through the host audio player."
+        ),
     )
     parser.add_argument(
         "--probe-runtime",

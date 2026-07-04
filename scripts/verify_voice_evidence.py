@@ -172,6 +172,12 @@ def verify_bundle(
                 "PULSE_SOURCE=",
             }
         )
+    elif mode == "acoustic":
+        required_overrides.update(
+            {
+                "ORCH_AUDIO_INPUT_MODE=device",
+            }
+        )
     else:
         required_overrides.update(
             {
@@ -182,6 +188,14 @@ def verify_bundle(
     for value in sorted(required_overrides):
         if value not in override_text:
             errors.append(f"Acceptance override is missing: {value}")
+    if mode == "acoustic" and not (
+        "ORCH_AUDIO_OUTPUT_MODE=discard" in override_text
+        or "ORCH_AUDIO_OUTPUT_MODE=device" in override_text
+    ):
+        errors.append(
+            "Acceptance override is missing acoustic output mode: "
+            "ORCH_AUDIO_OUTPUT_MODE=discard or ORCH_AUDIO_OUTPUT_MODE=device"
+        )
 
     if mode in {"synthetic", "virtual-mic", "acoustic"}:
         generated_dir = evidence_dir / "generated-input"

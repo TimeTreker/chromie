@@ -324,10 +324,28 @@ class M13AcceptanceTests(unittest.TestCase):
 
             text = path.read_text()
             self.assertIn("ORCH_AUDIO_INPUT_MODE=device", text)
-            self.assertIn("ORCH_AUDIO_OUTPUT_MODE=device", text)
+            self.assertIn("ORCH_AUDIO_OUTPUT_MODE=discard", text)
+            self.assertIn("ORCH_DISCARD_PLAYBACK_REALTIME=1", text)
             self.assertIn("ORCH_INPUT_DEVICE=0", text)
             self.assertIn("ORCH_OUTPUT_DEVICE=16", text)
             self.assertIn("ORCH_INPUT_GAIN=80", text)
+
+    def test_acoustic_override_can_use_device_response_playback(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "acceptance-overrides.env"
+            write_override_file(
+                path,
+                event_path=Path(temp_dir) / "events.jsonl",
+                recordings_dir=Path(temp_dir) / "recordings",
+                soridormi_mcp_url=None,
+                enable_soridormi=False,
+                mode="acoustic",
+                acoustic_response_output_mode="device",
+            )
+
+            text = path.read_text()
+            self.assertIn("ORCH_AUDIO_INPUT_MODE=device", text)
+            self.assertIn("ORCH_AUDIO_OUTPUT_MODE=device", text)
 
     def test_host_speaker_player_uses_pw_play_when_available(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
