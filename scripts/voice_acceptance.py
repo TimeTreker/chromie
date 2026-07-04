@@ -596,7 +596,7 @@ def acceptance_readiness(
 
 
 def print_readiness(checks: Sequence[CheckResult]) -> bool:
-    print("Voice-to-MuJoCo Alpha acceptance readiness")
+    print("Voice-to-MuJoCo voice acceptance readiness")
     for check in checks:
         marker = "PASS" if check.passed else "FAIL"
         print(f"[{marker}] {check.name}: {check.detail}")

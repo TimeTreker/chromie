@@ -101,7 +101,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Reference Robot Candidate Files](../commissioning/README.md)
 - [Release and Packaging](RELEASE.md)
 - [Release Assets](../release/README.md)
-- [Alpha Candidate Notes](../release/v0.1.0-alpha.1.md)
+- [sim-0.0.1 Release Notes](../release/sim-0.0.1.md)
 
 ## Governance
 

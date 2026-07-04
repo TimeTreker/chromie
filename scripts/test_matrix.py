@@ -138,8 +138,8 @@ GROUPS: dict[str, TestGroup] = {
             ),
         ),
     ),
-    "voice-alpha": TestGroup(
-        "Voice-to-MuJoCo alpha acceptance tooling and text-path regression coverage.",
+    "voice-acceptance": TestGroup(
+        "Voice-to-MuJoCo acceptance tooling and text-path regression coverage.",
         (
             _unittest(
                 "tests.test_interaction_text_acceptance",
@@ -198,11 +198,11 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "skill-runtime",
         "taskgraph",
         "soridormi",
-        "voice-alpha",
+        "voice-acceptance",
         "release",
         "legacy-agent",
     ),
-    "voice-mujoco-alpha": (
+    "voice-mujoco-sim": (
         "docs",
         "asr",
         "tts",
@@ -212,7 +212,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "skill-runtime",
         "taskgraph",
         "soridormi",
-        "voice-alpha",
+        "voice-acceptance",
         "release",
     ),
     "embodiment": ("agent", "skill-runtime", "taskgraph", "soridormi"),

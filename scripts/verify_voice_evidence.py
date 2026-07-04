@@ -85,7 +85,7 @@ def verify_bundle(
             "for human release-closing evidence or narrow the release claim"
         )
     if runner.get("dry_run"):
-        errors.append("Dry-run evidence cannot close the alpha release gate")
+        errors.append("Dry-run evidence cannot close a release gate")
     if int(metadata.get("event_count") or 0) <= 0:
         errors.append("metadata.json reports no structured session events")
 

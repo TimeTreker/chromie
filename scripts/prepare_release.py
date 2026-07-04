@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a reproducible Chromie alpha release bundle after voice acceptance."""
+"""Prepare a reproducible Chromie release bundle after acceptance evidence."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from typing import Any, Sequence
 try:
     from release_provenance import collect_provenance
     from verify_voice_evidence import verify_bundle
-except ImportError:  # imported as scripts.prepare_alpha_release in tests/tools
+except ImportError:  # imported as scripts.prepare_release in tests/tools
     from scripts.release_provenance import collect_provenance
     from scripts.verify_voice_evidence import verify_bundle
 
@@ -95,20 +95,42 @@ def create_source_archive(revision: str, version: str, destination: Path) -> Non
             raise RuntimeError("Generated source archive is empty")
 
 
+def release_tag(version: str, compatibility: dict[str, Any]) -> str:
+    configured = compatibility.get("chromie", {}).get("release_tag")
+    if configured:
+        return str(configured)
+    if version.startswith(("v", "sim-")):
+        return version
+    return f"v{version}"
+
+
+def release_notes_path(version: str, tag: str) -> Path:
+    candidates = [
+        ROOT / "release" / f"{tag}.md",
+        ROOT / "release" / f"{version}.md",
+        ROOT / "release" / f"v{version}.md",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        "Missing release notes. Tried: "
+        + ", ".join(str(path.relative_to(ROOT)) for path in candidates)
+    )
+
+
 def prepare_release(args: argparse.Namespace) -> Path:
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     if not version:
         raise ValueError("VERSION is empty")
-    notes_path = ROOT / "release" / f"v{version}.md"
-    if not notes_path.is_file():
-        raise FileNotFoundError(f"Missing release notes: {notes_path}")
-
     compatibility = read_json(ROOT / "release" / "compatibility.json")
     declared_version = compatibility.get("chromie", {}).get("version")
     if declared_version != version:
         raise ValueError(
             f"Compatibility version {declared_version!r} does not match VERSION {version!r}"
         )
+    tag = release_tag(version, compatibility)
+    notes_path = release_notes_path(version, tag)
     blockers = compatibility.get("release_gate_blockers") or []
     if blockers and not args.preview:
         raise RuntimeError(
@@ -122,12 +144,30 @@ def prepare_release(args: argparse.Namespace) -> Path:
         raise ValueError("--skip-runtime-provenance is allowed only with --preview")
 
     evidence_dir = Path(args.evidence_dir).expanduser().resolve()
-    evidence_report = verify_bundle(evidence_dir, require_clean=args.require_clean_evidence)
+    allow_automated_evidence = bool(getattr(args, "allow_automated_evidence", False))
+    evidence_report = verify_bundle(
+        evidence_dir,
+        require_clean=args.require_clean_evidence,
+        allow_automated=allow_automated_evidence,
+    )
     if not evidence_report["passed"] and not args.preview:
         raise RuntimeError(
-            "Alpha evidence verification failed:\n- "
+            "Acceptance evidence verification failed:\n- "
             + "\n- ".join(evidence_report["errors"])
         )
+    if allow_automated_evidence:
+        evidence_policy = compatibility.get("evidence_policy") or {}
+        if evidence_policy.get("human_supervised_voice_device_claim") is not False:
+            raise RuntimeError(
+                "--allow-automated-evidence requires release/compatibility.json "
+                "to declare evidence_policy.human_supervised_voice_device_claim=false"
+            )
+        accepted_modes = evidence_policy.get("accepted_voice_modes") or []
+        mode = evidence_report.get("mode")
+        if accepted_modes and mode not in accepted_modes:
+            raise RuntimeError(
+                f"Evidence mode {mode!r} is not accepted by release/compatibility.json"
+            )
 
     revision = git_output("rev-parse", "HEAD")
     short_revision = revision[:12]
@@ -139,7 +179,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
             "or use --preview for a non-publishable bundle."
         )
 
-    output_dir = Path(args.output_root).expanduser() / f"v{version}" / short_revision
+    output_dir = Path(args.output_root).expanduser() / tag / short_revision
     if output_dir.exists() and any(output_dir.iterdir()) and not args.overwrite:
         raise FileExistsError(f"Release output already exists: {output_dir}")
     if output_dir.exists() and args.overwrite:
@@ -187,7 +227,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
         "schema_version": 2,
         "generated_utc": utc_now(),
         "version": version,
-        "tag": f"v{version}",
+        "tag": tag,
         "publishable": publishable,
         "preview": bool(args.preview),
         "chromie": {
@@ -198,6 +238,9 @@ def prepare_release(args: argparse.Namespace) -> Path:
         },
         "compatibility": compatibility,
         "voice_evidence": evidence_report,
+        "evidence_policy": {
+            "allow_automated_voice_evidence": allow_automated_evidence,
+        },
         "build_provenance": {
             "complete": provenance["complete"],
             "source_error_count": len(provenance["source_errors"]),
@@ -213,8 +256,8 @@ def prepare_release(args: argparse.Namespace) -> Path:
             "tests_log": None if args.skip_tests else "tests.log",
         },
         "publication_steps": [
-            f"git tag -s v{version} {revision}",
-            f"git push origin v{version}",
+            f"git tag -s {tag} {revision}",
+            f"git push origin {tag}",
             "Create a GitHub prerelease and attach the generated artifacts.",
         ],
     }
@@ -249,6 +292,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-tests", action="store_true")
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--require-clean-evidence", action="store_true")
+    parser.add_argument(
+        "--allow-automated-evidence",
+        action="store_true",
+        help=(
+            "Allow synthetic, virtual-mic, or acoustic voice evidence for a "
+            "release whose compatibility declaration explicitly narrows the claim."
+        ),
+    )
     parser.add_argument("--preview", action="store_true")
     parser.add_argument(
         "--skip-runtime-provenance",

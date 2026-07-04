@@ -4,14 +4,16 @@ This directory contains tracked release policy and human-written release notes.
 Generated evidence bundles, source archives, manifests, and checksums belong
 under `.chromie/releases/` and are intentionally not committed.
 
-- [`v0.1.0-alpha.1.md`](v0.1.0-alpha.1.md) — candidate scope, limitations, and operator checklist.
-- [`compatibility.json`](compatibility.json) — declared cross-project compatibility for the candidate.
+- [`sim-0.0.1.md`](sim-0.0.1.md) — simulator release scope, limitations, and operator checklist.
+- [`compatibility.json`](compatibility.json) — declared cross-project compatibility for the release.
 - [`model-lock.json`](model-lock.json) — immutable ASR/TTS source revisions and expected Ollama model names.
 
-Prepare a release bundle only after a complete alpha evidence bundle passes:
+Prepare a release bundle only after the selected evidence bundle passes:
 
 ```bash
-python scripts/prepare_alpha_release.py \
+python scripts/prepare_release.py \
+  --allow-automated-evidence \
+  --require-clean-evidence \
   --evidence-dir .chromie/acceptance/voice/<acceptance-id>
 ```
 

@@ -1,0 +1,70 @@
+# Chromie sim-0.0.1 Release Notes
+
+> **Scope:** simulator release. This release supports the Chromie control
+> plane, generated-speech voice regression, structured text interaction, and
+> MuJoCo `sim` execution through the pinned Soridormi contract. It does not
+> claim human physical microphone/speaker support or physical robot support.
+
+## Supported Surface
+
+- realtime host audio loop, VAD, ASR coordination, TTS generation, ordered
+  playback, and deterministic interruption paths;
+- native strict `InteractionResponse` output with explicit compatibility
+  rollback;
+- trusted host Skill Runtime scheduling, request-bound confirmation,
+  cancellation, timeout, and trace evidence;
+- generated-speech voice acceptance through `synthetic`, `virtual-mic`, and
+  `acoustic` modes;
+- text-to-MuJoCo and structured speech/text routing into Soridormi named
+  skills using the pinned capability contract;
+- TaskGraph validation and gated read, planning, guarded, and physical-policy
+  execution paths, with physical execution gates remaining off.
+
+## Explicit Limitations
+
+- This is not a production physical-robot release.
+- This is not a human voice-device support release. The acoustic runner can
+  exercise a configured speaker/input path with generated speech, but human
+  pronunciation, room noise, operator observation, and physical audio-device
+  support still require a clean `supervised` evidence bundle.
+- The host hardware daemon remains a mock compatibility path.
+- Jetson profiles are configuration profiles, not a verified Jetson
+  distribution.
+- Structured host rollout remains opt-in until the operator chooses that mode.
+
+## Required Publication Evidence
+
+- `./scripts/run_tests.sh` passes from the tagged revision.
+- `python scripts/check_docs.py` passes.
+- The behavior scenario suite passes with `--no-write`.
+- Automated voice evidence passes `scripts/verify_voice_evidence.py
+  --allow-automated --require-clean`.
+- Text-to-MuJoCo or retained simulator evidence records exact Chromie and
+  Soridormi revisions, ordered Soridormi skill execution, and safe idle.
+- Release artifacts declare exact Chromie and Soridormi revisions and contain
+  no secrets, execution tokens, or private environment values.
+
+## Upgrade and Rollback
+
+For this first simulator release, upgrade means checking out the exact
+`sim-0.0.1` tag, rebuilding the runtime environment, and rebuilding/restarting
+services. Roll back by checking out the previous known revision and restoring
+generated runtime configuration from source files.
+
+The structured Agent path can be rolled back without changing `/run` callers:
+
+```env
+AGENT_INTERACTION_OUTPUT_MODE=legacy-adapter
+AGENT_NATIVE_INTERACTION_FALLBACK=0
+```
+
+Do not enable validation fallback as a permanent compatibility mode; use the
+explicit adapter mode when rollback is intentional.
+
+## Reproducible Build Provenance
+
+The release uses versioned container references, exact direct dependency pins,
+and `release/model-lock.json` for immutable ASR/TTS snapshots. A publishable
+bundle must include complete `build-provenance.json` evidence with resolved
+Docker image IDs or repository digests, transitive Python dependencies, and
+installed Ollama model digests.

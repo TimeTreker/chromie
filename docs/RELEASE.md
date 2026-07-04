@@ -1,77 +1,74 @@
 # Release and Packaging
 
-## Current position
+## Current Position
 
-The repository now declares `0.1.0-alpha.1` in `VERSION` and includes tracked
-candidate notes, compatibility metadata, an evidence verifier, source-archive
+The repository declares `sim-0.0.1` in `VERSION` and includes tracked simulator
+release notes, compatibility metadata, an evidence verifier, source-archive
 generation, a release manifest, and checksums. No official GitHub release has
-been published.
+been published yet.
 
 Treat `main` as a development branch. The historical M13 text-to-MuJoCo
-interaction scope is closed with retained text evidence. Clean synthetic and
-virtual-microphone evidence is also retained on the RTX 5090 reference host.
-Physical microphone/speaker evidence is still required only for a release that
-claims real voice-device support. The checked-in compatibility declaration still
-contains that voice-device blocker, so the release generator refuses a
-publishable bundle until either the supervised evidence passes or the supported
-release scope is deliberately narrowed, for example to automated acoustic
-host-output/input evidence using generated speech. See
+interaction scope is closed with retained text evidence. Clean synthetic,
+virtual-microphone, and acoustic generated-speech evidence can support this
+simulator release only when the release claim remains narrowed to generated
+speech and MuJoCo `sim`. Physical microphone/speaker evidence is still required
+for any release that claims human voice-device support. See
 [Current Implementation Status](STATUS.md).
 
-## Recommended first release scope
+## sim-0.0.1 Scope
 
-The prepared first version is:
+The supported scope is:
 
-```text
-v0.1.0-alpha.1
-```
+- one documented Linux x86_64 NVIDIA reference host profile;
+- generated-speech voice regression through `synthetic`, `virtual-mic`, or
+  `acoustic` evidence;
+- structured text/speech interaction through the host Orchestrator, Router,
+  Agent, trusted Skill Runtime, and pinned Soridormi capability contract;
+- MuJoCo-backed named skills in Soridormi `sim` mode;
+- deterministic stop, cancellation, timeout, and simulator safe-idle recovery;
+- no production real-hardware, Jetson distribution, unattended deployment, or
+  human voice-device support claim.
 
-Recommended supported scope for a voice-device alpha:
+## Prepare the Release Bundle
 
-- one documented Linux x86_64 NVIDIA reference host;
-- speech-only mode;
-- structured speech-only mode;
-- MuJoCo-backed named social/attention skills with a pinned Soridormi contract;
-- deterministic stop, cancellation, and simulation recovery;
-- no production real-hardware support claim.
-
-Jetson and physical hardware should remain experimental until separate target
-matrices are complete.
-
-
-## Prepare the candidate bundle
-
-For a release that claims real microphone/speaker operation, first complete and
-verify the guided supervised reference-host run:
+For the simulator release, verify a clean automated evidence bundle. The
+current low-cost generated-speech device path is:
 
 ```bash
 python scripts/voice_acceptance.py \
-  --mode supervised \
+  --mode acoustic \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --soridormi-repo ../soridormi
+  --soridormi-repo ../soridormi \
+  --start-services
 
-python scripts/verify_voice_evidence.py --require-clean \
+python scripts/verify_voice_evidence.py --allow-automated --require-clean \
   .chromie/acceptance/voice/<acceptance-id>
 ```
 
-The M13 text-to-MuJoCo interaction scope is already evidenced by
-`.chromie/acceptance/text-mujoco/20260617T081411Z`. A packaging rehearsal can be
-created before all blockers close:
+The retained M13 text-to-MuJoCo interaction scope is evidenced by
+`.chromie/acceptance/text-mujoco/20260617T081411Z`. Before tagging, rerun the
+current simulator or scenario gates documented in
+[Acceptance and Evidence](ACCEPTANCE.md) from the intended revision.
+
+Create a non-publishable packaging rehearsal when runtime provenance is not
+available:
 
 ```bash
-python scripts/prepare_alpha_release.py --preview \
+python scripts/prepare_release.py --preview --skip-runtime-provenance \
+  --allow-automated-evidence \
+  --require-clean-evidence \
   --evidence-dir .chromie/acceptance/voice/<acceptance-id>
 ```
 
-A narrowed simulator/text release must update `release/compatibility.json`
-instead of treating supervised microphone/speaker evidence as present.
-
 A publishable preparation omits `--preview`. It requires a clean committed
 revision, passing evidence, no tracked closure blockers in
-`release/compatibility.json`, and a successful full test run:
+`release/compatibility.json`, complete runtime provenance, and a successful
+full test run:
 
 ```bash
-python scripts/prepare_alpha_release.py --require-clean-evidence \
+python scripts/prepare_release.py \
+  --allow-automated-evidence \
+  --require-clean-evidence \
   --evidence-dir .chromie/acceptance/voice/<acceptance-id>
 ```
 
@@ -88,14 +85,9 @@ pin is missing, an image reference uses a mutable tag, Docker images cannot be
 inspected, a built image cannot report its resolved Python environment, or a
 configured Ollama model/digest is absent.
 
-A preview remains useful on a development host without Docker or Ollama. Such a
-bundle is explicitly non-publishable and its provenance file lists the missing
-runtime evidence. To avoid even attempting runtime collection during an
-offline preview, add `--skip-runtime-provenance`.
+## Required Release Artifacts
 
-## Required release artifacts
-
-- signed or annotated Git tag and GitHub prerelease notes;
+- annotated or signed Git tag `sim-0.0.1` and GitHub release notes;
 - source archive;
 - exact supported Chromie revision;
 - compatible Soridormi revision and contract-schema version;
@@ -103,23 +95,24 @@ offline preview, add `--skip-runtime-provenance`.
 - installation and upgrade instructions;
 - known limitations and default-off gates;
 - test summary and retained target evidence references;
-- `model-lock.json` plus complete `build-provenance.json` with image, dependency, and Ollama digests;
+- `model-lock.json` plus complete `build-provenance.json` with image,
+  dependency, and Ollama digests;
 - security and support policy links.
 
-## Compatibility declaration
+## Compatibility Declaration
 
 Every release should publish a table like:
 
 | Chromie | Soridormi capability revision | Runtime mode | Support state |
 |---|---|---|---|
-| `0.1.x-alpha` | pinned commit and schema | MuJoCo `sim` | Supported alpha scope |
+| `sim-0.0.1` | pinned commit and schema | MuJoCo `sim` | Supported simulator scope |
 | `main` | current checked-in manifest | Development | No compatibility promise |
 | Physical hardware | device-specific | `hardware` | Experimental until commissioned |
 
 The checked-in manifest’s `upstream_commit` is necessary but not sufficient.
 The release process must also probe the live endpoint and retain the result.
 
-## Release gate checklist
+## Release Gate Checklist
 
 ### Documentation
 
@@ -133,27 +126,36 @@ The release process must also probe the live endpoint and retain the result.
 ### Engineering
 
 - `./scripts/run_tests.sh` passes.
-- Docker images build from a clean checkout using versioned base/runtime references.
-- All direct Python dependencies are exact `==` pins and the release provenance captures resolved transitive dependencies.
-- `release/model-lock.json` matches every maintained ASR profile and the configured TTS snapshot.
-- `build-provenance.json` is complete, including Docker image and Ollama model digests.
-- `START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh` passes on the reference host.
+- `python scripts/scenario_runner.py --suite router --suite interaction
+  --suite dialogue --no-write` passes.
+- Docker images build from a clean checkout using versioned base/runtime
+  references.
+- All direct Python dependencies are exact `==` pins and the release provenance
+  captures resolved transitive dependencies.
+- `release/model-lock.json` matches every maintained ASR profile and the
+  configured TTS snapshot.
+- `build-provenance.json` is complete, including Docker image and Ollama model
+  digests.
+- `START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh` passes on
+  the reference host when the release claims target GPU performance.
 - The selected Ollama, ASR, and TTS models are documented and obtainable.
-- Structured interaction and Soridormi compatibility are probed against the pinned revision.
+- Structured interaction and Soridormi compatibility are probed against the
+  pinned revision.
 
-### Alpha acceptance
+### Simulator Acceptance
 
-- Native `InteractionResponse` generation is enabled and validated; compatibility rollback is documented.
-- Non-skippable spoken confirmation dialogue is verified and request-bound.
-- For a release that claims real microphone/speaker operation, all seven guided
-  cases in `ACCEPTANCE.md` are retained with correlated JSONL events.
-- For a release that claims real microphone/speaker operation,
-  `scripts/verify_voice_evidence.py --require-clean` passes.
+- Native `InteractionResponse` generation is enabled and validated;
+  compatibility rollback is documented.
+- Request-bound confirmation dialogue is verified and request-bound.
+- Automated voice evidence is accepted only for this narrowed simulator and
+  generated-speech claim.
 - Barge-in and body cancellation leave no stale speech or orphaned motion.
-- Stop/emergency exercises include operator recovery confirmation.
-- Evidence is reviewed for private speech, secrets, and unsafe state before publication.
+- Stop/emergency exercises include recovery confirmation when the live simulator
+  path is used.
+- Evidence is reviewed for private speech, secrets, and unsafe state before
+  publication.
 
-### Packaging and operations
+### Packaging and Operations
 
 - Secrets are absent from source, logs, images, and evidence bundles.
 - Upgrade and rollback instructions are tested.
@@ -161,20 +163,38 @@ The release process must also probe the live endpoint and retain the result.
 - An operator can diagnose the active hardware profile, service health, loaded
   capabilities, and scheduler state using documented commands.
 
-## Versioning guidance
+## Human Voice-Device Releases
 
-Use semantic versions for public releases. Before `1.0`, a minor version may
-change experimental APIs, but release notes must call out contract changes.
-Capability schema changes should update their schema version and compatibility
-table rather than relying only on repository commit hashes.
+A later release that claims real microphone/speaker operation must first
+complete and verify the guided supervised reference-host run:
 
-## Tracked candidate files
+```bash
+python scripts/voice_acceptance.py \
+  --mode supervised \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
+
+python scripts/verify_voice_evidence.py --require-clean \
+  .chromie/acceptance/voice/<acceptance-id>
+```
+
+Do not clear a physical voice-device blocker by pointing to text-input,
+synthetic, virtual-mic, or acoustic generated-speech evidence.
+
+## Versioning Guidance
+
+`sim-0.0.1` names a simulator-scoped pre-1.0 release line. Public production
+releases should use semantic versions. Before `1.0`, a minor version may change
+experimental APIs, but release notes must call out contract changes. Capability
+schema changes should update their schema version and compatibility table
+rather than relying only on repository commit hashes.
+
+## Tracked Release Files
 
 - [`VERSION`](../VERSION)
 - [`release/compatibility.json`](../release/compatibility.json)
 - [`release/model-lock.json`](../release/model-lock.json)
-- [`release/v0.1.0-alpha.1.md`](../release/v0.1.0-alpha.1.md)
-- [`release/README.md`](../release/README.md)
+- [`release/sim-0.0.1.md`](../release/sim-0.0.1.md)
 
 ## Changelog
 

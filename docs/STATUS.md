@@ -1,13 +1,13 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Current committed base revision:** `53bd882`; retained target evidence below
-records the exact revision that produced each bundle
-**Status refresh date:** 2026-07-02
-**Current focus:** **Simulation-demo release audit across the
-Chromie/Soridormi boundary; physical pilot preparation and physical audio
+**Current release-prep base:** `sim-0.0.1` simulator release scope; retained
+target evidence below records the exact revision that produced each bundle
+**Status refresh date:** 2026-07-04
+**Current focus:** **Freeze the `sim-0.0.1` simulator release across the
+Chromie/Soridormi boundary; physical pilot preparation and human voice-device
 validation remain separate release-support tracks**
-**Version candidate:** `0.1.0-alpha.1` (prepared, not published)
+**Version:** `sim-0.0.1` (simulator scope, not yet published)
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
@@ -15,9 +15,10 @@ current implementation, automated evidence, target evidence, and release
 readiness.
 
 The temporary `demo-sim-2026-06-27` tag was withdrawn during the paired
-Chromie/Soridormi documentation and evidence audit. Recreate any demo tag only
-from a revision whose docs, automated checks, and retained simulator evidence
-match the release claim.
+Chromie/Soridormi documentation and evidence audit. Do not recreate that demo
+tag; the next release tag is `sim-0.0.1`, and it must come only from a revision
+whose docs, automated checks, and retained simulator evidence match the release
+claim.
 
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
@@ -154,6 +155,15 @@ That text-to-MuJoCo evidence closes the historical M13 text interaction scope.
 It intentionally skips microphone and ASR. Physical microphone/speaker
 validation remains open only for future voice-device release claims.
 
+On July 4, 2026, the same development line retained automated acoustic voice
+evidence `20260704T114654Z` at Chromie revision `842a334`: all seven generated
+TTS prompt cases passed through host output, configured host input capture,
+VAD, ASR, Router, Agent, trusted Skill Runtime, TTS scheduling, and Soridormi
+`sim` behavior. This bundle passes `verify_voice_evidence.py
+--allow-automated --require-clean` and is valid for the narrowed
+`sim-0.0.1` generated-speech/simulator claim. It remains
+`release_eligible=false` for a human-supervised physical voice-device claim.
+
 ## Status vocabulary
 
 Chromie tracks four independent states. Do not collapse them into one word such
@@ -187,7 +197,7 @@ Target validation or Release readiness.
 | Provider conformance | Shared versioned checks and replayable high-level traces for simulator, recommendation-only hardware shadow, and no-motion hardware dry-run profiles, plus manifest preflight and strict retained-evidence verification | Local three-profile parity, trace-drift detection, opaque-identity normalization, profile-specific no-motion proofs, unsafe-output rejection, manifest preflight, and complete/unsafe bundle tests | Live no-motion `sim`, `hardware_shadow`, and `hardware_dry_run` profiles passed with parity; real hardware mode remains refused | Test tooling; real hardware mode refused |
 | Conversation state across VAD utterances | Implemented in host memory with optional local recoverable task-context store; first deterministic extracted-memory/prompt-builder slice implemented for session/task memory, explicit memory-route updates, trusted runtime outcomes, Router prompt sanitization, direct fallback context, ordinary conversation prompts, capability planning/review prompts, and deepthinking prompts | Boundary, follow-up, task-context, restart-restore, extracted-memory, memory-agent, Router prompt-sanitization, conversation prompt, capability prompt, and deepthinking prompt tests | Available in the host Orchestrator | Conversation state enabled by `.env.common`; task-context store opt-in; durable personal memory and LLM-assisted extraction remain open |
 | High-level Chromie ability self-model | Implemented as a host ability registry above concrete skills plus owner-approved mind identity for self-description questions, with stable cognition, speech, memory, social, body, manipulation, navigation, environment, task, safety, and state ability IDs; broad human-like missing abilities can be recorded as `known_missing`/`planned` and surfaced as `missing_ability` proposals while deep-thinking acknowledgement and simulator-only thinking pose resolve through this registry | Ability-registry, mind-profile, conversation-identity, Router prompt/proposal, deepthinking proposal, task-ledger, and Orchestrator TTS-alignment tests | No broad target-validation claim; only existing text/simulator interaction paths exercise fulfilled abilities | Registry enabled in host Orchestrator; most body, social, manipulation, navigation, and environment abilities remain honest non-executable roadmap entries |
-| Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and three explicit voice modes implemented; text-MuJoCo evidence writes route, interaction, execution, status, events, and summary artifacts | Preflight, synthetic/virtual-mic framing, isolation, text-MuJoCo, and bundle-verification tests | Clean synthetic, virtual-mic, and text-MuJoCo evidence retained; physical supervised mode remains optional release-support evidence for real audio claims | Acceptance-only |
+| Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and four explicit voice modes implemented; text-MuJoCo evidence writes route, interaction, execution, status, events, and summary artifacts | Preflight, synthetic/virtual-mic/acoustic framing, isolation, text-MuJoCo, and bundle-verification tests | Clean synthetic, virtual-mic, acoustic, and text-MuJoCo evidence retained; physical supervised mode remains optional release-support evidence for human voice-device claims | Acceptance-only |
 | Developer usability CLI | `python -m tools.chromie_cli` implements `status`, `config show`, `config validate`, `doctor`, `capability check`, `trace view`, and `evidence bundle` with plain/JSON output; `trace explain` remains future work | CLI command, output, validation, doctor, manifest-safety, retained-trace, and evidence-preflight unit tests plus full Level A gate | Local doctor can report service reachability, trace view can summarize retained local artifacts, and evidence preflight can label retained bundle pointers, but none create target evidence or release readiness | Tooling |
 | Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
@@ -200,7 +210,7 @@ Target validation or Release readiness.
 | Shared bounded scheduling and resource arbitration | Implemented | Agent and Orchestrator concurrency tests | MuJoCo interaction path exercises the policy | Parallel flags off |
 | Hardware profile detection and generated `.env.runtime` | Implemented | Profile-detection tests | RTX 5090 profile and CUDA arch 120 validated; Jetson packaging evidence is incomplete | Automatic |
 | Host hardware daemon | Legacy mock compatibility implementation | Hardware/control-plane tests | No production hardware claim | Optional; mock driver only |
-| Alpha release packaging | Candidate version, notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests and full suite | M13 text scope is closed; publishable voice-device scope still requires its declared physical audio evidence or a narrowed compatibility claim | Candidate only |
+| Simulator release packaging | `sim-0.0.1` version, release notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests and full suite | M13 text scope is closed; acoustic generated-speech evidence supports the narrowed simulator claim; human voice-device scope still requires supervised physical audio evidence | Release prep |
 
 ## Verified automated evidence
 
@@ -217,7 +227,7 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **627** current `unittest` cases under `tests/`;
+- **640** current `unittest` cases under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -258,7 +268,7 @@ interaction/catalog task-agent tests, focused host Skill Runtime graph dispatch
 tests, focused Soridormi acceptance tests, focused robot-candidate verifier
 tests, and dependency-complete Orchestrator AgentClient coverage. The latest
 local `./scripts/run_tests.sh` attempt on 2026-07-04 passed
-`python scripts/check_docs.py`, ran 627 current `unittest` cases with `OK`, and
+`python scripts/check_docs.py`, ran 640 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions. The behavior
 scenario runner also passed 344/344 Router, interaction, and dialogue scenario
 files with `--no-write`.
@@ -287,15 +297,15 @@ run with `--execute` against a supervised simulator endpoint.
 
 ## Open release-support gates
 
-M13 text interaction is closed. A release that continues to claim physical
-voice-device support is not publishable until all of the following are complete:
+A release that claims human physical voice-device support is not publishable
+until all of the following are complete:
 
 1. Run `scripts/voice_acceptance.py --mode supervised` on the reference
    host for all seven cases and ensure
    `scripts/verify_voice_evidence.py --require-clean` passes.
 2. The retained bundle is reviewed for audible quality, simulator safe idle,
    cancellation/recovery behavior, correlated IDs, and absence of secrets.
-3. The candidate compatibility file has no remaining release blockers and
+3. The release compatibility file has no remaining voice-device blockers and
    a clean release bundle is generated from the accepted revision.
 
 ## Open target-evidence tracks
@@ -307,9 +317,9 @@ These legacy evidence tracks do not define the current delivery:
 - **Combined target runner:** run
   `scripts/run_supervised_target_acceptance.sh` with a supervised, runtime-backed Soridormi
   endpoint and complete the documented recovery step.
-- **Audio:** automatic synthetic and virtual-microphone modes passed; real
-  microphone/speaker device information, timing logs, and pass/fail notes are
-  still needed only for a physical voice-device release claim.
+- **Audio:** automatic synthetic, virtual-microphone, and acoustic modes passed;
+  human microphone/speaker device information, timing logs, and pass/fail notes
+  are still needed only for a physical voice-device release claim.
 - **Hardware:** real motion remains experimental until Soridormi commissioning,
   confirmation, monitor, cancellation, stop, and recovery evidence are all
   retained for the exact hardware configuration.
@@ -318,7 +328,8 @@ These legacy evidence tracks do not define the current delivery:
 
 - The default structured interaction feature flags are off.
 - Native interaction output is the Agent default, but the host structured
-  rollout remains default-off until alpha acceptance evidence is retained.
+  rollout remains default-off unless the operator selects the simulator release
+  profile.
 - `AGENT_NATIVE_INTERACTION_FALLBACK` is default-off so malformed native output
   fails closed unless an operator explicitly enables adapter fallback.
 - The checked-in Soridormi manifest is a pinned contract snapshot; the live
@@ -340,14 +351,12 @@ These legacy evidence tracks do not define the current delivery:
   hardware backend.
 - TaskGraph and Skill Runtime schedulers are process-local. Cross-process robot
   exclusivity remains Soridormi’s responsibility.
-- Candidate release notes, compatibility metadata, archive generation, and
-  checksums exist, but there is no published GitHub release or support promise
-  in this snapshot.
+- Release notes, compatibility metadata, archive generation, and checksums
+  exist, but there is no published GitHub release or support promise until the
+  `sim-0.0.1` tag and release artifacts are created.
 
 ## Release classification
 
-Treat this revision as a **completed M13 text-to-MuJoCo candidate, a
-simulation-demo candidate, and a prepared voice alpha candidate**, not as a
-published or production release. The release generator refuses a publishable
-voice-device bundle while tracked release blockers remain. See
-[Release and Packaging](RELEASE.md).
+Treat this revision as the **`sim-0.0.1` simulator release-prep snapshot** until
+it is tagged and published. It is not a production release, physical-robot
+release, or human voice-device release. See [Release and Packaging](RELEASE.md).

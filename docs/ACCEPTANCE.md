@@ -73,7 +73,7 @@ python scripts/test_matrix.py router
 python scripts/test_matrix.py behavior
 python scripts/test_matrix.py asr tts router
 python scripts/test_matrix.py local-modules
-python scripts/test_matrix.py voice-mujoco-alpha
+python scripts/test_matrix.py voice-mujoco-sim
 ```
 
 This runner is a Level A convenience layer over existing tests. It lets modules
@@ -786,7 +786,7 @@ text and operator-visible context may contain private speech.
 
 - Do not count a dry run as simulator or hardware evidence.
 - Do not count a simulator exemption as hardware confirmation.
-- Do not publish the alpha from text-input acceptance alone.
+- Do not publish a simulator release from text-input acceptance alone.
 - Do not publish logs containing execution tokens or private environment data.
 - Record failure evidence as well as successful reruns; otherwise regressions are
   difficult to diagnose.

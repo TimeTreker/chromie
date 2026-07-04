@@ -1,11 +1,11 @@
 # Development Checkpoint
 
-**Current committed Chromie base:** `53bd882`
+**Current release-prep base:** `sim-0.0.1`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-06-27
-**Current focus:** Simulation-demo release audit through the
-Chromie/Soridormi boundary; physical pilot preparation and physical audio
-validation remain separate tracks
+**Status refresh date:** 2026-07-04
+**Current focus:** Freeze `sim-0.0.1` through the Chromie/Soridormi simulator
+boundary; physical pilot preparation and human voice-device validation remain
+separate tracks
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -13,14 +13,15 @@ milestone intent.
 
 ## Resume point
 
-The alpha implementation is present:
+The simulator-release implementation is present:
 
 - native strict structured interaction;
 - trusted host Skill Runtime and Soridormi named skills;
 - request-bound spoken confirmation;
 - deterministic interruption and cancellation;
-- seven-case synthetic, virtual-microphone, and supervised acceptance tooling;
-- evidence verification and alpha packaging;
+- seven-case synthetic, virtual-microphone, acoustic, and supervised acceptance
+  tooling;
+- evidence verification and release packaging;
 - small-model quick Router classification for normal semantic routing while
   stop/cancel/ignore controls remain deterministic;
 - model-assisted routing guardrails that treat `qwen3:0.6b` as a proposer, not
@@ -78,15 +79,19 @@ The M13 text interaction scope is closed. Linux RTX 5090 GPU smoke passed
 21/21; clean seven-case synthetic and PipeWire virtual-mic bundles passed; and
 text-to-MuJoCo evidence `20260617T081411Z` passed at Chromie revision `857c15f`
 with ordered walk, nod, and turn execution in MuJoCo plus safe idle. Physical
-real-microphone/speaker evidence remains open only as a separate voice-device
-release-support track. The robust-simulation and provider-readiness milestone is
-complete with live no-motion MCP conformance, three-profile parity, and 16/16
-Soridormi-owned fault-injection scenarios.
+real-microphone/speaker evidence remains open only as a separate human
+voice-device release-support track. Automated acoustic generated-speech
+evidence `20260704T114654Z` also passed all seven cases at Chromie revision
+`842a334`, which supports the narrowed `sim-0.0.1` simulator claim but not a
+human voice-device claim. The robust-simulation and provider-readiness
+milestone is complete with live no-motion MCP conformance, three-profile
+parity, and 16/16 Soridormi-owned fault-injection scenarios.
 
 The temporary `demo-sim-2026-06-27` tag was withdrawn on 2026-06-27 before
 publication because the paired repositories needed a documentation/code
-consistency audit. Do not publish or recreate a demo tag until both Chromie and
-Soridormi validation gates pass from the intended revisions.
+consistency audit. Do not publish or recreate that demo tag. The intended
+replacement tag is `sim-0.0.1`, after the Chromie and Soridormi validation
+gates pass from the intended revisions.
 
 ## Next sequence
 
@@ -126,10 +131,10 @@ Soridormi validation gates pass from the intended revisions.
    operation, run the full seven-case `supervised` matrix on the reference host,
    review audible output and MuJoCo safe-idle/recovery behavior, verify the
    bundle with `--require-clean`, then clear the compatibility blocker.
-10. Before publishing a simulation-demo tag, record the paired Chromie and
-   Soridormi revisions, rerun the Chromie documentation/test gate, rerun the
-   Soridormi task-agent and locomotion-readiness gates, and keep the tag claim
-   limited to simulator evidence.
+10. Before publishing `sim-0.0.1`, record the paired Chromie and Soridormi
+    revisions, rerun the Chromie documentation/test/scenario gates, rerun the
+    Soridormi task-agent and locomotion-readiness gates, and keep the tag claim
+    limited to simulator evidence.
 
 Do not start physical motion until the first reference robot satisfies the
 commissioning checklist and Soridormi has retained simulator/physical evidence
@@ -156,7 +161,7 @@ Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
 Full Level A baseline:
-627 current unittest cases and 20 legacy Agent tests passed on 2026-07-04 with
+640 current unittest cases and 20 legacy Agent tests passed on 2026-07-04 with
 `./scripts/run_tests.sh`. The behavior scenario runner also passed 344/344
 Router, interaction, and dialogue scenario files with `--no-write`.
 ```
@@ -205,4 +210,5 @@ First-reference-robot selection requirements are maintained in
 - Keep physical work default-off and sequential.
 - Do not expose low-level robot controls to model-facing contracts.
 - Do not report automated or dry-run output as target evidence.
-- Do not publish the alpha or remove release blockers without retained evidence.
+- Do not publish `sim-0.0.1` or remove release blockers without retained
+  evidence for the exact supported scope.

@@ -1,13 +1,16 @@
 {
   "schema_version": 1,
   "chromie": {
-    "version": "0.1.0-alpha.1",
+    "version": "sim-0.0.1",
+    "release_tag": "sim-0.0.1",
     "supported_branch": "main",
     "runtime_modes": [
-      "voice",
+      "structured-text",
+      "generated-speech-voice",
       "structured-speech",
       "mujoco-sim"
-    ]
+    ],
+    "release_scope": "simulator"
   },
   "soridormi": {
     "repository": "https://github.com/TimeTreker/soridormi.git",
@@ -16,13 +19,21 @@
     "supported_mode": "sim"
   },
   "unsupported_release_claims": [
+    "human physical voice-device support",
     "production physical robot support",
     "verified Jetson packaging",
     "cross-process scheduling guarantees outside Soridormi",
     "unattended deployment"
   ],
-  "release_state": "candidate",
-  "release_gate_blockers": [
-    "clean reviewed supervised real-microphone/speaker evidence is not yet retained for a physical voice-device release claim"
-  ]
+  "release_state": "release",
+  "evidence_policy": {
+    "accepted_voice_modes": [
+      "synthetic",
+      "virtual-mic",
+      "acoustic"
+    ],
+    "human_supervised_voice_device_claim": false,
+    "simulator_required": true
+  },
+  "release_gate_blockers": []
 }

@@ -1,9 +1,25 @@
 # Changelog
 
-All notable user-visible changes should be recorded here. This project has not
-yet published an official release.
+All notable user-visible changes should be recorded here.
 
 ## Unreleased
+
+- No changes yet.
+
+## sim-0.0.1 - 2026-07-04
+
+- Prepared the first simulator-scoped release metadata, compatibility
+  declaration, and release notes.
+- Narrowed the release claim to generated-speech voice regression, structured
+  text/speech interaction, and MuJoCo `sim` execution through the pinned
+  Soridormi contract.
+- Added automated acoustic acceptance, which generates TTS prompt audio, plays
+  it through the host output, and captures it through the configured host input
+  without requiring a human speaker for every regression run.
+- Kept human microphone/speaker support, verified Jetson packaging, unattended
+  deployment, and physical robot support outside the release claim.
+
+### Implemented in the current release snapshot
 
 - Hardened release reproducibility with versioned container references, exact
   direct dependency pins, immutable ASR/TTS model revisions, runtime image and
@@ -32,8 +48,6 @@ yet published an official release.
   default and scoped supervised audio blockers to physical voice-device release
   claims.
 
-### Implemented in the current development snapshot
-
 - Structured `InteractionResponse` contracts with recursive low-level-field
   rejection.
 - Trusted host Skill Runtime with bounded scheduling, confirmation, timeout,
@@ -52,21 +66,21 @@ yet published an official release.
 - Hardware-aware generated runtime configuration and multiple NVIDIA profiles.
 - GPU, Soridormi, text-interaction, and supervised target acceptance tooling.
 - Correlated JSONL session-event evidence that cannot break the realtime loop.
-- Three-mode seven-case voice/MuJoCo runner: automatic TTS-generated stdin
-  injection, PulseAudio/PipeWire virtual microphone capture, and final
-  supervised real-microphone evidence.
-- Strict alpha evidence verifier for native mode, clean revisions, all cases,
+- Four-mode seven-case voice/MuJoCo runner: automatic TTS-generated stdin
+  injection, PulseAudio/PipeWire virtual microphone capture, acoustic
+  host-output/input capture, and final supervised real-microphone evidence.
+- Strict evidence verifier for native mode, clean revisions, all cases,
   correlated sessions, and separation of automated from release-closing
   supervised evidence.
-- `0.1.0-alpha.1` candidate version, compatibility declaration, release notes,
+- `sim-0.0.1` version, compatibility declaration, release notes,
   source archive generation, manifest, tests log, and checksums.
 
 ### Documentation refresh
 
 - Reclassified the project from stale historical milestone documentation to the
-  current alpha delivery.
+  current simulator release delivery.
 - Added a stable project charter and a focused three-milestone delivery
-  sequence: alpha closure, robust/provider-ready simulation, and a physical
+  sequence: simulator release, robust/provider-ready simulation, and a physical
   reference pilot.
 - Consolidated duplicated setup, status, and handoff prose into their owning
   documents; removed redundant `CLAUDE.md` and `LLM_CONTEXT.md` copies.
@@ -87,15 +101,13 @@ yet published an official release.
 - Kept `/run` unchanged for compatibility and switched the named-skill
   integration test to the native path.
 
-### Still open before a voice-device alpha release
+### Still open before a human voice-device release
 
-- Reviewed reference-host microphone/MuJoCo alpha evidence bundle for a
-  physical voice-device claim.
+- Reviewed reference-host microphone/MuJoCo evidence bundle for a physical
+  voice-device claim.
 - Clean reviewed supervised spoken approval/denial evidence for real
   microphone/speaker support.
 - Physical microphone/speaker and supervised recovery evidence for
   voice-device support.
-- Published GitHub prerelease; candidate artifacts and compatibility declaration
-  are prepared, but the current voice-device compatibility declaration remains
-  intentionally blocked until supervised evidence exists or the release scope is
-  narrowed.
+- A future release must declare physical voice-device compatibility separately;
+  `sim-0.0.1` intentionally does not include that claim.

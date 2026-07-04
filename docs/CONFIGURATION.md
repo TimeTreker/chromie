@@ -113,7 +113,7 @@ limitations.
 
 ## Host audio modes
 
-Normal operation uses physical devices. The alpha runner supplies temporary
+Normal operation uses physical devices. The acceptance runner supplies temporary
 late-bound values for automatic acceptance; do not persist them in production
 configuration unless you are intentionally building a test harness.
 
@@ -496,21 +496,22 @@ variables are not a supported production-selection mechanism in this revision.
   `TTS_SMOKE_SPEAKER`.
 - Supervised target acceptance: `SUPERVISED_ACCEPTANCE=1`, `TARGET_ACCEPTANCE_DRY_RUN`,
   `TARGET_ACCEPTANCE_EVIDENCE_ROOT`, `TARGET_ACCEPTANCE_ID`, `TARGET_ACCEPTANCE_EVIDENCE_DIR`.
-- Alpha voice acceptance uses CLI flags on `scripts/voice_acceptance.py`.
+- Voice acceptance uses CLI flags on `scripts/voice_acceptance.py`.
   `--mode synthetic` is the fully automatic default; `--mode virtual-mic`
-  exercises a PulseAudio/PipeWire monitor source; `--mode supervised` uses the
-  real microphone and speaker. Automated modes also accept `--tts-url`,
-  `--tts-speaker-id`, and `--virtual-mic-sink`. The runner generates a temporary
-  `ORCH_RUNTIME_OVERRIDE_FILE`, enables `ORCH_EVENT_LOG_PATH`, and writes below
-  `.chromie/acceptance/voice/`. Use `--preflight-only` to check Docker, the
-  automatic runtime, audio backend, and required endpoints without starting
-  services or creating evidence. Its capability probe defaults to
+  exercises a PulseAudio/PipeWire monitor source; `--mode acoustic` plays
+  generated speech through the host output and captures it through the
+  configured input; `--mode supervised` uses the real microphone and speaker
+  with operator verdicts. Automated modes also accept `--tts-url`,
+  `--tts-speaker-id`, and `--virtual-mic-sink`. The runner generates a
+  temporary `ORCH_RUNTIME_OVERRIDE_FILE`, enables `ORCH_EVENT_LOG_PATH`, and
+  writes below `.chromie/acceptance/voice/`. Use `--preflight-only` to check
+  Docker, the automatic runtime, audio backend, and required endpoints without
+  starting services or creating evidence. Its capability probe defaults to
   `--probe-runtime container`, executing inside `chromie-agent`. Host-loopback
   Soridormi URLs are translated to `host.docker.internal`; the Compose service
   supplies the Linux `host-gateway` mapping. `--probe-runtime host` is an
   explicit development fallback and requires `agent/requirements.txt`.
-- Alpha release preparation uses CLI flags on
-  `scripts/prepare_alpha_release.py`; generated bundles live below
-  `.chromie/releases/`.
+- Release preparation uses CLI flags on `scripts/prepare_release.py`;
+  generated bundles live below `.chromie/releases/`.
 - Host dependency installation: `ORCH_AUTO_INSTALL_DEPS`,
   `ORCH_FORCE_INSTALL_DEPS`, `ORCH_PIP_CHECK`, `ORCH_REQUIREMENTS_FILE`.

@@ -43,22 +43,25 @@ Soridormi 负责：
 
 ## 当前状态
 
-当前重点是 **M13 文本到 MuJoCo 交互闭环已关闭，继续实体试点准备**。
+当前重点是 **M13 文本到 MuJoCo 交互闭环已关闭，准备冻结
+`sim-0.0.1` 仿真版本**，同时继续实体试点准备。
 
-已完成的 M13/Alpha 基础包括：
+已完成的仿真版本基础包括：
 
 - 原生严格 `/interaction`；
 - 请求绑定的口头确认与拒绝；
 - Soridormi 命名技能；
 - 打断、取消、停止与恢复；
-- synthetic、virtual-mic 七场景验收，以及文本到 MuJoCo 验收；
-- 证据校验与 `0.1.0-alpha.1` 打包工具。
+- synthetic、virtual-mic、acoustic 七场景验收，以及文本到 MuJoCo 验收；
+- 证据校验与 `sim-0.0.1` 发布打包工具。
 
 RTX 5090 参考主机上的 GPU smoke、synthetic 七场景和 PipeWire virtual-mic
 七场景均已通过并保留证据。文本输入经 Router、Agent `/interaction`、可信
 Skill Runtime、Soridormi MCP 到 MuJoCo 的 walk/nod/turn 链路也已通过并保留证据。
-真实麦克风、扬声器和人工审核不再阻塞 M13 文本交互闭环，但如果要发布“真实语音设备”
-支持声明，仍需要单独完成 supervised 验收。现阶段不能宣称实体机器人支持。
+acoustic 模式使用 TTS 生成语音，通过主机扬声器播放并由配置的输入设备采集，
+可以降低人工语音测试成本。真实人声、真实麦克风/扬声器支持声明和人工审核
+不再阻塞 M13 文本交互闭环，但如果要发布“真实语音设备”支持声明，仍需要单独
+完成 supervised 验收。现阶段不能宣称实体机器人支持。
 
 ## 开发主线
 
@@ -72,8 +75,8 @@ Skill Runtime、Soridormi MCP 到 MuJoCo 的 walk/nod/turn 链路也已通过并
 原 M0-M12 只是历史开发增量，现在合并为“实时交互基础”和“结构化具身基础”
 两项已完成能力，不再作为独立规划单位。新的语音验收使用功能化脚本名和
 `.chromie/acceptance/voice/` 证据目录；旧 M13 只作为历史文本证据名称保留。
-这条顺序的核心是：先关闭当前 Alpha，
-再同时证明鲁棒仿真和 Provider 可替换性，最后接入实体机器人。
+这条顺序的核心是：先发布受限的 `sim-0.0.1` 仿真版本，再继续证明实体试点
+所需的安全、设备和 Provider 可替换性，最后接入实体机器人。
 
 ## 快速开始
 

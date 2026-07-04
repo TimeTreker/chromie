@@ -3,10 +3,10 @@
 ## Status
 
 Implemented as part of the structured embodiment foundation and used by the
-current alpha
-platform. Validation, dry-run, read-only execution, planning execution, guarded
-execution, confirmation grants, cancellation, bounded concurrency, traces, and
-scheduler inspection are present and automatically tested.
+current simulator platform. Validation, dry-run, read-only execution, planning
+execution, guarded execution, confirmation grants, cancellation, bounded
+concurrency, traces, and scheduler inspection are present and automatically
+tested.
 
 TaskGraph support does not mean every graph may execute. Execution classes are
 separately gated, and target-machine or hardware acceptance remains separate

@@ -39,7 +39,7 @@ from scripts.voice_acceptance import (
 from orchestrator.audio_injection import encode_audio_packet, read_audio_packet
 from scripts.acceptance_audio import AudioFixture, HostSpeakerPlayer, PulseVirtualMicrophone
 from scripts.verify_voice_evidence import REQUIRED_FILES, verify_bundle
-import scripts.prepare_alpha_release as release_module
+import scripts.prepare_release as release_module
 
 
 def event(name: str, message: str, sid: str = "sid-1") -> dict[str, object]:
@@ -841,7 +841,7 @@ class M13AcceptanceTests(unittest.TestCase):
                 "event_count": 40,
                 "acceptance_id": "test",
                 "runner": {"dry_run": False, "mode": "supervised"},
-                "chromie": {"revision": "abc123", "version": "0.1.0-alpha.1", "dirty": False},
+                "chromie": {"revision": "abc123", "version": "sim-0.0.1", "dirty": False},
                 "soridormi_manifest": {"upstream_commit": "def456"},
                 "soridormi_mcp_url": "http://127.0.0.1:8000/mcp",
             }
@@ -881,7 +881,7 @@ class M13AcceptanceTests(unittest.TestCase):
                 "runner": {"dry_run": False, "mode": "synthetic"},
                 "chromie": {
                     "revision": "abc123",
-                    "version": "0.1.0-alpha.1",
+                    "version": "sim-0.0.1",
                     "dirty": False,
                 },
                 "soridormi_manifest": {"upstream_commit": "def456"},
@@ -933,12 +933,12 @@ class M13AcceptanceTests(unittest.TestCase):
             evidence.mkdir()
 
             (repo / "release").mkdir()
-            (repo / "VERSION").write_text("0.1.0-alpha.1\n")
-            (repo / "release" / "v0.1.0-alpha.1.md").write_text("# Notes\n")
+            (repo / "VERSION").write_text("sim-0.0.1\n")
+            (repo / "release" / "sim-0.0.1.md").write_text("# Notes\n")
             (repo / "release" / "compatibility.json").write_text(
                 json.dumps(
                     {
-                        "chromie": {"version": "0.1.0-alpha.1"},
+                        "chromie": {"version": "sim-0.0.1", "release_tag": "sim-0.0.1"},
                         "release_gate_blockers": ["confirmation pending"],
                     }
                 )
@@ -962,7 +962,7 @@ class M13AcceptanceTests(unittest.TestCase):
                             "revision": subprocess.check_output(
                                 ["git", "rev-parse", "HEAD"], cwd=repo, text=True
                             ).strip(),
-                            "version": "0.1.0-alpha.1",
+                            "version": "sim-0.0.1",
                             "dirty": False,
                         },
                         "soridormi_manifest": {"upstream_commit": "soridormi-fixture"},
@@ -999,6 +999,7 @@ class M13AcceptanceTests(unittest.TestCase):
                 skip_tests=True,
                 allow_dirty=False,
                 require_clean_evidence=True,
+                allow_automated_evidence=False,
                 preview=True,
                 overwrite=False,
             )
@@ -1007,7 +1008,7 @@ class M13AcceptanceTests(unittest.TestCase):
 
             manifest = json.loads((bundle / "manifest.json").read_text())
             self.assertFalse(manifest["publishable"])
-            self.assertTrue((bundle / "chromie-0.1.0-alpha.1.tar.gz").is_file())
+            self.assertTrue((bundle / "chromie-sim-0.0.1.tar.gz").is_file())
             self.assertTrue((bundle / "build-provenance.json").is_file())
             self.assertEqual(
                 manifest["artifacts"]["build_provenance"],

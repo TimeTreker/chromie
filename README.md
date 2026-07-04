@@ -9,8 +9,9 @@ The long-term goal and ownership boundaries are defined in the
 [Project Charter](docs/PROJECT_CHARTER.md).
 
 > **Current state:** the historical M13 text-to-MuJoCo interaction milestone is
-> closed. Retained RTX 5090 GPU smoke, synthetic, virtual-microphone, and
-> text-to-MuJoCo evidence pass on the reference host.
+> closed. Retained RTX 5090 GPU smoke, synthetic, virtual-microphone, acoustic
+> generated-speech, and text-to-MuJoCo evidence pass on the reference host.
+> The next intended release tag is `sim-0.0.1`, limited to simulator support.
 > Real microphone/speaker validation remains a separate track before making a
 > physical voice-device release claim. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
@@ -124,8 +125,8 @@ This runs the dependency-light automated suite and documentation checks. It does
 not prove GPU, microphone, speaker, simulator, or hardware behavior.
 
 Higher-level evidence commands and claim rules are in
-[Acceptance and Evidence](docs/ACCEPTANCE.md). Current alpha operational commands
-are in the [Runbook](CHROMIE_RUNBOOK.md).
+[Acceptance and Evidence](docs/ACCEPTANCE.md). Current simulator operational
+commands are in the [Runbook](CHROMIE_RUNBOOK.md).
 
 ## Safety rules
 

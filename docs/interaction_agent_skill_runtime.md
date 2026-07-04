@@ -3,7 +3,8 @@
 ## Current status
 
 The structured interaction architecture is part of the completed structured
-embodiment foundation and is exercised by the current alpha acceptance work.
+embodiment foundation and is exercised by the current simulator acceptance
+work.
 
 Implemented now:
 
