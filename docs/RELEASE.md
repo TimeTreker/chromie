@@ -41,10 +41,11 @@ matrices are complete.
 ## Prepare the candidate bundle
 
 For a release that claims real microphone/speaker operation, first complete and
-verify the guided reference-host run:
+verify the guided supervised reference-host run:
 
 ```bash
 python scripts/voice_acceptance.py \
+  --mode supervised \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi
 
@@ -60,6 +61,9 @@ created before all blockers close:
 python scripts/prepare_alpha_release.py --preview \
   --evidence-dir .chromie/acceptance/voice/<acceptance-id>
 ```
+
+A narrowed simulator/text release must update `release/compatibility.json`
+instead of treating supervised microphone/speaker evidence as present.
 
 A publishable preparation omits `--preview`. It requires a clean committed
 revision, passing evidence, no tracked closure blockers in
@@ -140,8 +144,10 @@ The release process must also probe the live endpoint and retain the result.
 
 - Native `InteractionResponse` generation is enabled and validated; compatibility rollback is documented.
 - Non-skippable spoken confirmation dialogue is verified and request-bound.
-- All seven guided cases in `ACCEPTANCE.md` are retained with correlated JSONL events.
-- `scripts/verify_voice_evidence.py --require-clean` passes.
+- For a release that claims real microphone/speaker operation, all seven guided
+  cases in `ACCEPTANCE.md` are retained with correlated JSONL events.
+- For a release that claims real microphone/speaker operation,
+  `scripts/verify_voice_evidence.py --require-clean` passes.
 - Barge-in and body cancellation leave no stale speech or orphaned motion.
 - Stop/emergency exercises include operator recovery confirmation.
 - Evidence is reviewed for private speech, secrets, and unsafe state before publication.

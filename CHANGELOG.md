@@ -28,6 +28,9 @@ yet published an official release.
   the trusted Compose network.
 - Retained passing RTX 5090 GPU smoke plus complete synthetic and PipeWire
   virtual-microphone M13 evidence; supervised physical audio remains open.
+- Aligned release and roadmap wording with sherpa-onnx as the maintained ASR
+  default and scoped supervised audio blockers to physical voice-device release
+  claims.
 
 ### Implemented in the current development snapshot
 
@@ -84,10 +87,15 @@ yet published an official release.
 - Kept `/run` unchanged for compatibility and switched the named-skill
   integration test to the native path.
 
-### Still open before the first alpha release
+### Still open before a voice-device alpha release
 
-- Reviewed reference-host microphone/MuJoCo alpha evidence bundle.
-- Clean reviewed supervised spoken approval/denial evidence.
-- Physical microphone/speaker and supervised recovery evidence.
+- Reviewed reference-host microphone/MuJoCo alpha evidence bundle for a
+  physical voice-device claim.
+- Clean reviewed supervised spoken approval/denial evidence for real
+  microphone/speaker support.
+- Physical microphone/speaker and supervised recovery evidence for
+  voice-device support.
 - Published GitHub prerelease; candidate artifacts and compatibility declaration
-  are prepared but intentionally blocked.
+  are prepared, but the current voice-device compatibility declaration remains
+  intentionally blocked until supervised evidence exists or the release scope is
+  narrowed.

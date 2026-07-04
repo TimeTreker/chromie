@@ -37,8 +37,9 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 ## What works
 
 - realtime microphone, VAD, ASR, routing, TTS, playback, and barge-in;
-- ASR backend boundary with Faster-Whisper as the supported final-utterance
-  default and sherpa-onnx tracked as planned evaluation work;
+- ASR backend boundary with sherpa-onnx SenseVoice as the supported
+  final-utterance default and Faster-Whisper retained as a selectable fallback
+  and comparison path;
 - deterministic stop, cancel, emergency, ignore, and silence handling;
 - three-stage route flow: emergency filter, Qwen quick intent routing, and
   larger-model deepthought handoff when quick confidence is low or planning is

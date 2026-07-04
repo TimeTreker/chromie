@@ -73,25 +73,27 @@ release evidence that cover microphone choice, room noise, ASR recognition,
 audible output, barge-in, request-bound approval and denial, cancellation, stop,
 and simulator recovery.
 
-## Open architecture track - ASR backend migration
+## Open evidence track - ASR backend hardening
 
-The current supported ASR path remains Faster-Whisper final-utterance
-transcription. Chromie now has an explicit ASR backend boundary so that
-sherpa-onnx can be evaluated without changing the current WebSocket protocol,
-Orchestrator VAD ownership, or release claims.
+The current supported ASR path is sherpa-onnx SenseVoice final-utterance
+transcription with `ASR_BACKEND=sherpa_onnx` and `ASR_MODE=final`.
+Faster-Whisper remains installed and selectable as a fallback and comparison
+path. The explicit ASR backend boundary preserves the current WebSocket
+protocol, Orchestrator VAD ownership, and release-claim separation.
 
-The objective is better local realtime speech operation for Chromie, not a
-hard replacement of a working release path. The staged plan is maintained in
+The objective is better local realtime speech operation for Chromie, not
+unbounded ASR scope growth. The staged plan is maintained in
 [ASR Backend Migration Plan](docs/ASR_BACKEND_MIGRATION.md).
 
-Exit criteria before changing the default backend:
+Exit criteria before widening voice-device or profile support:
 
-- `ASR_BACKEND=sherpa_onnx` is implemented behind a feature flag and passes the
-  same final-utterance protocol tests as `ASR_BACKEND=faster_whisper`;
+- `ASR_BACKEND=sherpa_onnx` continues to pass the same final-utterance protocol
+  tests as `ASR_BACKEND=faster_whisper`;
 - selected sherpa-onnx dependencies and models have immutable provenance and
   maintained-profile coverage;
-- English, Chinese, and mixed-command benchmarks show equal or better
-  recognition quality and latency for the intended deployment profile;
+- English, Chinese, mixed-command, noisy-room, and physical-microphone
+  benchmarks show acceptable recognition quality and latency for the intended
+  deployment profile;
 - stop, cancel, emergency, silence, unusable-audio, confirmation, timeout,
   fallback, and barge-in semantics remain unchanged;
 - retained evidence uses the four-axis status vocabulary and does not turn a
