@@ -316,7 +316,7 @@ CASES: dict[str, AcceptanceCase] = {
         "body-cancel",
         "Cancellation during a simulated body skill",
         (
-            "Start the named look-at-person skill, which is long enough to interrupt.",
+            "Start a long named nod skill, which is long enough to interrupt.",
             "Approve the exact request when Chromie asks for confirmation.",
             "During the skill, say: Stop talking.",
             "Observe the simulator and verify safe idle afterward.",
@@ -328,8 +328,8 @@ CASES: dict[str, AcceptanceCase] = {
         ),
         (
             SpokenStep(
-                "Please look at me for three seconds.",
-                (("look",), ("me",)),
+                "Please perform a nodding gesture eight times.",
+                (("nod", "nodding"), ("eight", "8")),
             ),
             SpokenStep(
                 "Yes.",
@@ -341,7 +341,7 @@ CASES: dict[str, AcceptanceCase] = {
                 "Stop talking.",
                 (("stop",),),
                 wait_before_events=("confirmation_authorized",),
-                wait_before_label="the look-at-person skill to be authorized",
+                wait_before_label="the long nod skill to be authorized",
                 countdown_s=0,
             ),
         ),
