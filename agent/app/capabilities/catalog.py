@@ -6,6 +6,8 @@ import logging
 import math
 import re
 import time
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
@@ -17,20 +19,27 @@ logger = logging.getLogger("chromie.agent.capability_catalog")
 CapabilityInvocationKind = Literal["mcp_tool", "named_skill"]
 CapabilityRoute = Literal["chat", "robot_action", "tool", "memory"]
 CapabilityPromptTier = Literal["common", "rare"]
+DEFAULT_PROMPT_TIER_PRESET_PATH = (
+    Path(__file__).resolve().parents[3] / "capabilities" / "prompt_tiers.json"
+)
 
-COMMON_NAMED_SKILL_IDS = {
-    "blink_eyes",
-    "express_attention",
-    "look_at_person",
-    "look_direction",
-    "nod_yes",
-    "shake_no",
-    "sidestep",
-    "stand_idle",
-    "stop",
-    "turn_in_place",
-    "walk_forward",
-    "walk_velocity",
+SAFETY_LOCKED_PROMPT_TIER_SAFETY_CLASSES = {
+    "guarded_operation",
+    "high_risk_action",
+    "restricted",
+    "safety_critical",
+}
+SAFETY_LOCKED_PROMPT_TIER_EFFECTS = {
+    "commissioning_no_motion",
+    "emergency_stop",
+    "safety_control",
+}
+SAFETY_LOCKED_PROMPT_TIER_TAGS = {
+    "calibration",
+    "commissioning",
+    "safety-critical",
+    "safety_critical",
+    "safety_sensitive",
 }
 
 _STOP_WORDS = {
@@ -143,6 +152,9 @@ class CatalogCapability(BaseModel):
     invocation_kind: CapabilityInvocationKind = "mcp_tool"
     interaction_executable: bool = False
     prompt_tier: CapabilityPromptTier = "rare"
+    prompt_tier_locked: bool = False
+    prompt_tier_source: str = "preset"
+    prompt_tier_reason: str | None = None
     tags: list[str] = Field(default_factory=list)
     hints: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -203,11 +215,17 @@ class CapabilityCatalog:
         live_invoker: CapabilityInvoker | None = None,
         refresh_ttl_s: float = 30.0,
         min_score: float = 0.16,
+        prompt_tier_preset: Mapping[str, Any] | None = None,
+        prompt_tier_overrides: Mapping[str, Any] | None = None,
     ) -> None:
         self.registry = registry
         self.live_invoker = live_invoker
         self.refresh_ttl_s = max(1.0, float(refresh_ttl_s))
         self.min_score = max(0.0, min(1.0, float(min_score)))
+        if prompt_tier_preset is None:
+            prompt_tier_preset = self.load_prompt_tier_preset(None)
+        self.prompt_tier_presets = self._normalize_prompt_tier_entries(prompt_tier_preset)
+        self.prompt_tier_overrides = self._normalize_prompt_tier_overrides(prompt_tier_overrides)
         self._static = self._static_entries(registry)
         self._live: dict[str, CatalogCapability] = {}
         self._refresh_lock = asyncio.Lock()
@@ -242,11 +260,16 @@ class CapabilityCatalog:
         await self.refresh_live_named_skills(force=refresh)
         entries = [item for item in self.entries() if item.available]
         if scope == "common":
-            entries = [item for item in entries if item.prompt_tier == "common"]
+            entries = [
+                item
+                for item in entries
+                if item.prompt_tier == "common" and not item.prompt_tier_locked
+            ]
         return sorted(
             entries,
             key=lambda item: (
                 item.prompt_tier != "common",
+                item.prompt_tier_locked,
                 not item.interaction_executable,
                 item.route,
                 item.capability_id,
@@ -456,7 +479,7 @@ class CapabilityCatalog:
                         or safety_class in {"physical_motion", "safety_critical"}
                         or "physical_motion" in effects
                     )
-                    live[capability_id] = CatalogCapability(
+                    capability = CatalogCapability(
                         capability_id=capability_id,
                         agent_id="soridormi.skill",
                         description=str(item.get("description") or item.get("summary") or ""),
@@ -469,11 +492,16 @@ class CapabilityCatalog:
                         source="soridormi.live_named_skills",
                         invocation_kind="named_skill",
                         interaction_executable=True,
-                        prompt_tier=self._prompt_tier_for_live_skill(upstream_id, item),
+                        prompt_tier=self._prompt_tier_for_live_skill(capability_id, item),
+                        prompt_tier_locked=self._prompt_tier_lock_flag(item),
+                        prompt_tier_source=self._prompt_tier_source_for_live_skill(capability_id, item),
+                        prompt_tier_reason=self._prompt_tier_reason_from(item)
+                        or self._preset_prompt_tier_reason(capability_id),
                         tags=["soridormi", "robot", "named_skill"],
                         hints={
                             "when_to_use": item.get("when_to_use"),
                             "examples": item.get("examples"),
+                            "safety_sensitive": item.get("safety_sensitive"),
                         },
                         metadata={
                             "upstream_skill_id": upstream_id,
@@ -481,6 +509,7 @@ class CapabilityCatalog:
                             "version": item.get("version"),
                         },
                     )
+                    live[capability_id] = self._apply_prompt_tier_policy(capability)
                 if live != self._live:
                     self._live = live
                     self._version += 1
@@ -493,47 +522,224 @@ class CapabilityCatalog:
         entries: list[CatalogCapability] = []
         for tool in registry.tools_for_llm():
             agent = registry.get_agent(tool.agent_id)
-            entries.append(
-                CatalogCapability(
-                    capability_id=tool.name,
-                    agent_id=tool.agent_id,
-                    description=tool.description,
-                    input_schema=tool.input_schema,
-                    effects=list(tool.effects),
-                    safety_class=tool.safety_class,
-                    requires_confirmation=tool.confirmation.required,
-                    available=tool.availability.available and agent.status.available,
-                    route=self._route_for_tool(tool),
-                    source="registry",
-                    invocation_kind="mcp_tool",
-                    interaction_executable=self._interaction_executable_for_tool(tool),
-                    prompt_tier=self._prompt_tier_for_tool(tool),
-                    tags=[*agent.tags],
-                    hints=dict(tool.llm_hints),
-                    metadata={"version": tool.version},
-                )
+            capability = CatalogCapability(
+                capability_id=tool.name,
+                agent_id=tool.agent_id,
+                description=tool.description,
+                input_schema=tool.input_schema,
+                effects=list(tool.effects),
+                safety_class=tool.safety_class,
+                requires_confirmation=tool.confirmation.required,
+                available=tool.availability.available and agent.status.available,
+                route=self._route_for_tool(tool),
+                source="registry",
+                invocation_kind="mcp_tool",
+                interaction_executable=self._interaction_executable_for_tool(tool),
+                prompt_tier=self._prompt_tier_for_tool(tool),
+                prompt_tier_locked=self._prompt_tier_lock_flag(tool.llm_hints),
+                prompt_tier_source=self._prompt_tier_source_for_tool(tool),
+                prompt_tier_reason=self._prompt_tier_reason_from(tool.llm_hints),
+                tags=[*agent.tags],
+                hints=dict(tool.llm_hints),
+                metadata={"version": tool.version},
             )
+            entries.append(self._apply_prompt_tier_policy(capability))
         return entries
 
     def _prompt_tier_for_live_skill(
         self,
-        upstream_id: str,
+        capability_id: str,
         item: dict[str, Any],
     ) -> CapabilityPromptTier:
         explicit = str(item.get("prompt_tier") or item.get("router_prompt_tier") or "").strip().lower()
         if explicit in {"common", "rare"}:
             return explicit  # type: ignore[return-value]
-        return "common" if upstream_id in COMMON_NAMED_SKILL_IDS else "rare"
+        preset = self.prompt_tier_presets.get(capability_id)
+        if preset:
+            return preset["prompt_tier"]  # type: ignore[return-value]
+        return "rare"
+
+    def _prompt_tier_source_for_live_skill(self, capability_id: str, item: dict[str, Any]) -> str:
+        explicit = str(item.get("prompt_tier") or item.get("router_prompt_tier") or "").strip()
+        if explicit:
+            return "provider"
+        preset = self.prompt_tier_presets.get(capability_id)
+        return str(preset.get("prompt_tier_source") or "preset") if preset else "preset"
 
     def _prompt_tier_for_tool(self, tool: ToolCapability) -> CapabilityPromptTier:
         explicit = str(tool.llm_hints.get("prompt_tier") or "").strip().lower()
         if explicit in {"common", "rare"}:
             return explicit  # type: ignore[return-value]
-        if tool.name == "chromie.speak":
-            return "common"
-        if tool.name in {"chromie.memory.remember", "chromie.memory.recall"}:
-            return "common"
+        preset = self.prompt_tier_presets.get(tool.name)
+        if preset:
+            return preset["prompt_tier"]  # type: ignore[return-value]
         return "rare"
+
+    def _prompt_tier_source_for_tool(self, tool: ToolCapability) -> str:
+        explicit = str(tool.llm_hints.get("prompt_tier") or "").strip()
+        if explicit:
+            return "provider"
+        preset = self.prompt_tier_presets.get(tool.name)
+        return str(preset.get("prompt_tier_source") or "preset") if preset else "preset"
+
+    @classmethod
+    def load_prompt_tier_preset(cls, path: str | Path | None) -> dict[str, Any]:
+        raw = str(path or "").strip()
+        source = Path(raw).expanduser() if raw else DEFAULT_PROMPT_TIER_PRESET_PATH
+        if not source.exists():
+            if raw:
+                raise FileNotFoundError(f"prompt tier preset file does not exist: {source}")
+            logger.warning("default prompt tier preset not found: %s", source)
+            return {}
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("prompt tier preset file must contain a JSON object")
+        return payload
+
+    @classmethod
+    def load_prompt_tier_overrides(cls, path: str | Path | None) -> dict[str, dict[str, Any]]:
+        if not path:
+            return {}
+        payload = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("prompt tier override file must contain a JSON object")
+        return cls._normalize_prompt_tier_overrides(payload)
+
+    @classmethod
+    def _normalize_prompt_tier_entries(
+        cls,
+        payload: Mapping[str, Any] | None,
+    ) -> dict[str, dict[str, Any]]:
+        if not payload:
+            return {}
+        return cls._normalize_prompt_tier_overrides(
+            {
+                "prompt_tiers": payload.get("prompt_tiers")
+                if isinstance(payload.get("prompt_tiers"), Mapping)
+                else payload
+            },
+            default_source="preset",
+        )
+
+    @staticmethod
+    def _normalize_prompt_tier_overrides(
+        overrides: Mapping[str, Any] | None,
+        *,
+        default_source: str = "experience",
+    ) -> dict[str, dict[str, Any]]:
+        if not overrides:
+            return {}
+        raw: Any = overrides
+        if isinstance(overrides.get("prompt_tiers"), Mapping):
+            raw = overrides["prompt_tiers"]
+        normalized: dict[str, dict[str, Any]] = {}
+        if not isinstance(raw, Mapping):
+            return normalized
+        for capability_id, value in raw.items():
+            if not isinstance(capability_id, str) or not capability_id.strip():
+                continue
+            if isinstance(value, str):
+                payload: dict[str, Any] = {"prompt_tier": value}
+            elif isinstance(value, Mapping):
+                payload = dict(value)
+            else:
+                continue
+            tier = str(payload.get("prompt_tier") or payload.get("tier") or "").strip().lower()
+            if tier not in {"common", "rare"}:
+                continue
+            normalized[capability_id.strip()] = {
+                "prompt_tier": tier,
+                "prompt_tier_source": str(
+                    payload.get("prompt_tier_source")
+                    or payload.get("source")
+                    or default_source
+                ).strip()
+                or default_source,
+                "prompt_tier_reason": str(
+                    payload.get("prompt_tier_reason")
+                    or payload.get("reason")
+                    or ""
+                ).strip()
+                or None,
+            }
+        return normalized
+
+    def _preset_prompt_tier_reason(self, capability_id: str) -> str | None:
+        preset = self.prompt_tier_presets.get(capability_id)
+        if not preset:
+            return None
+        return str(preset.get("prompt_tier_reason") or "").strip() or None
+
+    def _apply_prompt_tier_policy(self, capability: CatalogCapability) -> CatalogCapability:
+        locked, reason = self._safety_prompt_tier_lock(capability)
+        if locked:
+            return capability.model_copy(
+                update={
+                    "prompt_tier": "rare",
+                    "prompt_tier_locked": True,
+                    "prompt_tier_source": "safety_lock",
+                    "prompt_tier_reason": reason,
+                }
+            )
+        override = self.prompt_tier_overrides.get(capability.capability_id)
+        if not override:
+            return capability
+        return capability.model_copy(
+            update={
+                "prompt_tier": override["prompt_tier"],
+                "prompt_tier_source": override.get("prompt_tier_source") or "experience",
+                "prompt_tier_reason": override.get("prompt_tier_reason"),
+            }
+        )
+
+    @classmethod
+    def _safety_prompt_tier_lock(cls, capability: CatalogCapability) -> tuple[bool, str | None]:
+        if capability.prompt_tier_locked:
+            return True, capability.prompt_tier_reason or "provider marked capability prompt tier as locked"
+        safety_class = str(capability.safety_class or "").strip().lower()
+        if safety_class in SAFETY_LOCKED_PROMPT_TIER_SAFETY_CLASSES:
+            return True, f"safety_class={safety_class} is safety-sensitive"
+        effects = {str(effect).strip().lower() for effect in capability.effects}
+        locked_effects = sorted(effects & SAFETY_LOCKED_PROMPT_TIER_EFFECTS)
+        if locked_effects:
+            return True, f"effect={locked_effects[0]} is safety-sensitive"
+        tags = {str(tag).strip().lower() for tag in capability.tags}
+        locked_tags = sorted(tags & SAFETY_LOCKED_PROMPT_TIER_TAGS)
+        if locked_tags:
+            return True, f"tag={locked_tags[0]} is safety-sensitive"
+        if cls._truthy(capability.hints.get("safety_sensitive")):
+            return True, "hint safety_sensitive=true"
+        if cls._truthy(capability.metadata.get("safety_sensitive")):
+            return True, "metadata safety_sensitive=true"
+        return False, None
+
+    @classmethod
+    def _prompt_tier_lock_flag(cls, payload: Mapping[str, Any]) -> bool:
+        return any(
+            cls._truthy(payload.get(key))
+            for key in (
+                "prompt_tier_locked",
+                "router_prompt_tier_locked",
+                "safety_sensitive",
+            )
+        )
+
+    @staticmethod
+    def _prompt_tier_reason_from(payload: Mapping[str, Any]) -> str | None:
+        reason = str(
+            payload.get("prompt_tier_reason")
+            or payload.get("router_prompt_tier_reason")
+            or ""
+        ).strip()
+        return reason or None
+
+    @staticmethod
+    def _truthy(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        return str(value).strip().lower() in {"1", "true", "yes", "on", "locked"}
 
     @staticmethod
     def _interaction_executable_for_tool(tool: ToolCapability) -> bool:

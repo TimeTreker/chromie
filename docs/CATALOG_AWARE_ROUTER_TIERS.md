@@ -30,11 +30,35 @@ Catalog entries carry a `prompt_tier`:
 | `common` | Second Router / `qwen3:0.6b` | Usually used daily skills that should fit in the fast prompt. |
 | `rare` | Deepthinking / larger Agent model | Seldom-used, operational, planning, commissioning, or specialized skills. |
 
-The fast Router receives the compact common catalog. Deepthinking receives the
-full compact catalog, including both common and rare entries.
+Catalog entries also carry:
 
-This partition is owner-curated prompt budgeting. It is not semantic action
-selection. The model still chooses the route and exact skill from meaning.
+- `prompt_tier_locked`: when true, the entry is safety-locked out of the fast
+  common prompt even if a provider or experience overlay labels it `common`;
+- `prompt_tier_source`: `preset`, `provider`, `experience`, or `safety_lock`;
+- `prompt_tier_reason`: short audit text explaining the source decision.
+
+The fast Router receives only unlocked `common` entries as
+`common_ability_catalog`. Deepthinking receives the full compact catalog,
+including common, rare, and safety-locked entries.
+
+This partition starts as owner/provider-curated prompt budgeting in
+`capabilities/prompt_tiers.json`, then may be updated by reviewed experience
+through an auditable overlay. It is not semantic action selection. The model
+still chooses the route and exact skill from meaning.
+
+Experience tuning may move ordinary unlocked skills between `common` and
+`rare`, with audit records. Safety-sensitive skills are the exception: entries
+marked `prompt_tier_locked`, or classified as safety-critical/restricted/
+guarded/commissioning/safety-control, are forced to `rare` with
+`prompt_tier_source=safety_lock`. Experience cannot promote them into the fast
+Qwen prompt; the full-catalog/deepthinking path can still reason about them
+under normal confirmation and provider policy.
+
+The offline helper `scripts/tune_capability_prompt_tiers.py` can build
+`.chromie/experience/capability_prompt_tier_overrides.json` from the experience
+journal and append candidate/skip events to
+`.chromie/experience/capability_prompt_tier_audit.jsonl`. The Agent can load
+that overlay with `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`.
 
 ## Second Router Contract
 
@@ -42,33 +66,37 @@ The quick Router sees:
 
 - latest ASR text;
 - bounded session, memory, task, and robot/world context;
-- the common compact skill catalog;
-- query-biased catalog hints as optional context only.
+- `common_ability_catalog` and `common_ability_ids`, containing the compact
+  commonly used, unlocked ability menu for the small Qwen-class model.
 
 It outputs one `RouteDecision`. That decision may contain one selected intent
 or an ordered `actions` array when the request is a compound task made from
-common catalog skills:
+unlocked common catalog skills:
 
-- `robot_action` with `intent=capability:<exact skill_id>` when a common skill
-  clearly satisfies the request;
+- `robot_action` with `intent=capability:<exact skill_id>` when an unlocked
+  common skill clearly satisfies the request;
 - `robot_action` with `intent=compound_common_catalog_task` and `actions[]`
-  when multiple common skills should be proposed together;
+  when multiple unlocked common skills should be proposed together;
 - `chat`, `tool`, `memory`, or `clarify` for non-body or ambiguous requests;
-- `deep_thought` when no common skill clearly fits, confidence is low, or the
-  request needs careful reasoning.
+- `deep_thought` when no unlocked common skill clearly fits, confidence is low,
+  or the request needs careful reasoning.
 
 `actions[]` is a task proposal surface, not execution authorization. Each item
-must copy `capability_id` exactly from the common catalog and may include
-schema-shaped `args`, `sequence`, `timing`, a short `reason`, and a 0.0-1.0
-`confidence` for that specific skill choice and arguments. Speech inside a
-physical task uses `chromie.speak` with `args.text`; it should not be dropped as
-ordinary chat or a separate unstructured final answer.
+must copy `capability_id` exactly from the unlocked common catalog and may
+include schema-shaped `args`, `sequence`, `timing`, a short `reason`, and a
+0.0-1.0 `confidence` for that specific skill choice and arguments. Speech
+inside a physical task uses `chromie.speak` with `args.text`; it should not be
+dropped as ordinary chat or a separate unstructured final answer.
+If a fast Router output selects a capability outside `common_ability_ids` while
+the unlocked common catalog is available, validation delegates to `deep_thought`
+instead of treating that rare, locked, or full-catalog ability as an immediate
+fast-lane action.
 
-When the quick Router understands a desired ability but no common executable
-skill safely matches it, it should choose `deep_thought` or `clarify` and may
-include `metadata.desired_abilities[]` with `ability_id`, `intent`,
-`status=missing_ability`, `confidence`, and `reason`. These entries become
-shared task-proposal ledger records, but they never execute.
+When the quick Router understands a desired ability but no unlocked common
+executable skill safely matches it, it should choose `deep_thought` or
+`clarify` and may include `metadata.desired_abilities[]` with `ability_id`,
+`intent`, `status=missing_ability`, `confidence`, and `reason`. These entries
+become shared task-proposal ledger records, but they never execute.
 
 When delegating to `deep_thought`, the quick Router may include `speak_first`.
 That text is a model-chosen speech task/prelude, such as a natural request for a
@@ -121,8 +149,8 @@ Chromie should stay silent or use the existing fail-closed fallback for that
 path.
 
 If the fast Router is unavailable, deterministic code may preserve context,
-delegate, or fail closed, but should not treat catalog search scores as the
-normal semantic chooser.
+delegate, or fail closed, but should not replace the model with per-query
+catalog matching as the normal semantic chooser.
 
 See [Quick Router Task Planning](QUICK_ROUTER_TASK_PLANNING.md) for the
 per-action confidence contract and low-confidence handoff plan.

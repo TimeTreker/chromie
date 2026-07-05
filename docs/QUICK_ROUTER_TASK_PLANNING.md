@@ -10,14 +10,21 @@ The second Router is both a router and a bounded fast planner.
 It uses the latest ASR text, compact session context, and the listed skill
 catalog to decide:
 
-- which route should handle the request;
+- which compatibility route should summarize the request for older callers;
+- which independent route items should handle each part of the request;
 - whether the request can be represented by listed skills immediately;
 - which exact listed skill tasks to propose;
+- which prompt/context profile each item needs;
+- whether simple speech can go straight to the host TTS lane;
+- whether an item needs full-mind deepthinking;
 - how confident it is in each proposed task.
 
 This is why the stage is called quick: it uses a small model and a compact
-catalog snapshot. The final `RouteDecision.route` is still singular; compound
-work is represented by `actions[]`, not by returning multiple routes.
+catalog snapshot. `RouteDecision.route` remains a singular compatibility
+primary route, but the preferred surface for mixed utterances is
+`RouteDecision.routes[]` plus mirrored `metadata.route_items[]`.
+`actions[]` remains only the ordered listed-skill surface inside a
+`robot_action` route item.
 
 ## Output Contract
 
@@ -26,6 +33,84 @@ For greeting, fact, or speech-only conversation, the Router should return:
 ```json
 {"route":"chat","intent":"general_conversation","confidence":0.9}
 ```
+
+For a simple greeting or acknowledgement that can be spoken immediately without
+Agent reasoning, the Router may include a direct speech lane:
+
+```json
+{
+  "route": "chat",
+  "intent": "greeting",
+  "confidence": 0.9,
+  "routes": [
+    {
+      "route": "chat",
+      "intent": "greeting",
+      "confidence": 0.9,
+      "lane": "immediate_speech",
+      "context_profile": "fast_minimal",
+      "direct_to_tts": true,
+      "text": "Hi, I'm here."
+    }
+  ]
+}
+```
+
+The host Orchestrator can schedule this text through the existing fast-first
+TTS path while other route items continue through their own policy lanes.
+Direct speech is only for short safe greetings, acknowledgements, and thinking
+preludes. It must not claim memory writes, tool results, identity/value
+answers, physical motion, or completion.
+
+For a mixed utterance, the Router should split the work:
+
+```json
+{
+  "route": "deep_thought",
+  "intent": "mixed_request",
+  "confidence": 0.82,
+  "routes": [
+    {
+      "route": "chat",
+      "intent": "greeting",
+      "confidence": 0.95,
+      "lane": "immediate_speech",
+      "context_profile": "fast_minimal",
+      "direct_to_tts": true,
+      "text": "Hi, I'm here."
+    },
+    {
+      "route": "memory",
+      "intent": "remember_user_preference",
+      "confidence": 0.86,
+      "lane": "post_turn",
+      "context_profile": "session_compact"
+    },
+    {
+      "route": "deep_thought",
+      "intent": "plan_tomorrow",
+      "confidence": 0.78,
+      "lane": "deepthought",
+      "context_profile": "full_mind",
+      "requires_mind": true
+    }
+  ]
+}
+```
+
+Supported route-item lanes are `immediate_speech`, `conversation`,
+`post_turn`, `deepthought`, `skill_runtime`, `tool`,
+`deterministic_control`, and `none`.
+
+Supported context profiles are:
+
+| Context profile | Use |
+|---|---|
+| `none` | Deterministic controls or ignored input. |
+| `fast_minimal` | Greetings and safe immediate speech. |
+| `session_compact` | Ordinary chat, memory, and tool work using bounded session context. |
+| `capability_safety` | Robot/action tasks that need capability and safety contracts. |
+| `full_mind` | Identity, worldview, lifeview, valueview, principles, risk judgment, long-horizon goals, or complex planning. |
 
 For a single clear listed skill, the Router may return:
 
@@ -100,16 +185,26 @@ In mixed requests, use `chromie.speak` with `args.text`. Do not hide that speech
 inside unstructured chat text, and do not emit a fake spoken acknowledgement that
 claims a body action happened.
 
+Speech that is not part of a physical/tool task may be a chat route item. Only
+safe, short, low-risk chat route items may set `direct_to_tts=true`; all other
+chat should go through the normal conversation or deepthinking path.
+
 ## Validation
 
 Deterministic validation does not choose the normal activity. It only checks
 the task proposals before they can enter the executable task surface:
 
-- every `capability_id` exists in the supplied listed catalog;
+- every `capability_id` exists in the supplied fast unlocked common ability
+  catalog when that catalog is available;
+- rare, full-catalog, or safety-locked capabilities selected by the fast Router
+  delegate to `deep_thought` rather than entering the immediate action surface;
 - every non-speech action is available and interaction-executable;
 - `chromie.speak` includes non-empty `args.text`;
 - each action confidence is valid and above the Router threshold;
 - no placeholder skill ID or raw low-level robot command is accepted.
+- each route item is mirrored into `metadata.route_items[]`;
+- each route item becomes a task-list entry and shared task proposal with
+  `lane`, `context_profile`, `requires_mind`, and `direct_to_tts` metadata;
 - missing, planned, or unsupported abilities are absent from `actions[]` and
   may appear only as non-executable desired-ability proposals.
 
@@ -179,6 +274,9 @@ authorization.
 The merge policy is:
 
 - deterministic emergency tasks have priority and can be applied immediately;
+- safe `immediate_speech` chat route items may be scheduled through host
+  fast-first TTS without waiting for the slower Agent path;
+- memory, tool, deepthought, and skill route items follow separate policy lanes;
 - quick Router common-skill tasks are accepted only after validation;
 - low-confidence, invalid, rare, or complex proposals are delegated to
   deepthinking;
@@ -206,8 +304,9 @@ contract.
 
 ## Plan
 
-1. Keep the common/rare catalog split owner-curated.
-2. Keep all common skills compact enough for the quick Router prompt.
+1. Keep the common/rare catalog split preset first, experience-tunable through
+   an audited overlay, and safety-locked for sensitive skills.
+2. Keep all unlocked common skills compact enough for the quick Router prompt.
 3. Require `actions[].confidence` for compound quick plans.
 4. Reject or delegate malformed and low-confidence action proposals before they
    reach Agent execution.

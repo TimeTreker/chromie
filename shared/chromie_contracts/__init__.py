@@ -1,4 +1,4 @@
-from .route import RouteDecision, RouteRequest
+from .route import RouteDecision, RouteItem, RouteRequest
 from .agent import AgentRequest, AgentResult, SpeechItem
 from .action import ActionCommand, ActionResult
 from .interaction import (
@@ -29,6 +29,7 @@ from .session import SessionContext
 __all__ = [
     "RouteRequest",
     "RouteDecision",
+    "RouteItem",
     "AgentRequest",
     "AgentResult",
     "SpeechItem",

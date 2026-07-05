@@ -252,6 +252,36 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             assistant._fast_first_response_text(
+                RouteDecision(
+                    route="deep_thought",
+                    intent="mixed_request",
+                    language="en-US",
+                    routes=[
+                        {
+                            "route": "chat",
+                            "intent": "greeting",
+                            "confidence": 0.95,
+                            "lane": "immediate_speech",
+                            "context_profile": "fast_minimal",
+                            "direct_to_tts": True,
+                            "text": "Hi, I'm here.",
+                        },
+                        {
+                            "route": "deep_thought",
+                            "intent": "plan_task",
+                            "confidence": 0.8,
+                            "lane": "deepthought",
+                            "context_profile": "full_mind",
+                            "requires_mind": True,
+                        },
+                    ],
+                ),
+                "Hi, think about tomorrow.",
+            ),
+            "Hi, I'm here.",
+        )
+        self.assertEqual(
+            assistant._fast_first_response_text(
                 RouteDecision(route="chat", intent="fact_question", language="en-US"),
                 "What is 2 plus 2?",
             ),

@@ -75,6 +75,10 @@ Implemented in `orchestrator/runtime/task_proposals.py`.
 
 The host now builds an internal proposal ledger from:
 
+- route items copied from Router `RouteDecision.routes[]` and
+  `RouteDecision.metadata.route_items[]`, which split one utterance into
+  separately governed lanes such as immediate speech, memory, deepthought,
+  tool, and Skill Runtime work;
 - `route_task_proposals` copied from Router
   `RouteDecision.metadata.task_proposals`, when present;
 - `route_task_list` copied from Router `RouteDecision.metadata.task_list`;
@@ -95,9 +99,11 @@ inside the Orchestrator runtime before execution. It is an audit surface; it
 does not execute anything by itself.
 
 Router now emits shared-schema `task_proposals` alongside the legacy
-`task_list`. The Orchestrator prefers those shared proposals and keeps the
-legacy list as a fallback during migration. The Agent deepthinking path also
-emits shared-schema `deepthinking_task_proposals` for its speech, skill,
+`task_list`, and mirrors the preferred multi-route split in
+`metadata.route_items`. The Orchestrator prefers shared proposals and route-item
+metadata, and keeps the legacy list as a fallback during migration. The Agent
+deepthinking path also emits shared-schema `deepthinking_task_proposals` for
+its speech, skill,
 missing-ability, and rejected candidate tasks. The final Agent response now emits shared-schema
 `agent_task_proposals` for committed speech and skills, including speech as the
 local `chromie.speak` skill. The final ledger is validated through the shared
@@ -112,6 +118,11 @@ represented through `superseded_task_proposals`.
 The first commit rule is intentionally conservative:
 
 - Router tasks are recorded as proposals.
+- Safe `immediate_speech` chat route items may schedule host fast-first TTS
+  when they contain short validated text and `direct_to_tts=true`; this is
+  local speech feedback only and cannot claim memory writes, tool results,
+  physical completion, or authorization.
+- Memory, tool, deepthought, and skill route items remain separate policy lanes.
 - Effectful router tasks without a matching `InteractionResponse.skill` become
   `not_committed`.
 - A matching `InteractionResponse.skill` marks the router proposal as

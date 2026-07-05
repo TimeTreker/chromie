@@ -19,6 +19,23 @@ Priority = Literal["low", "normal", "high", "urgent"]
 DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 
 
+class RouteItem(BaseModel):
+    route: RouteName
+    intent: str = "unknown"
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    priority: Priority = "normal"
+    lane: str = "agent"
+    context_profile: str = "session_compact"
+    requires_mind: bool = False
+    direct_to_tts: bool = False
+    text: str | None = None
+    skill_id: str | None = None
+    args: dict[str, Any] = Field(default_factory=dict)
+    actions: list[dict[str, Any]] = Field(default_factory=list)
+    reason: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class RouteRequest(BaseModel):
     sid: str | None = None
     text: str
@@ -28,6 +45,7 @@ class RouteRequest(BaseModel):
 
 class RouteDecision(BaseModel):
     route: RouteName
+    routes: list[RouteItem] = Field(default_factory=list)
     agents: list[str] = Field(default_factory=list)
     intent: str = "unknown"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

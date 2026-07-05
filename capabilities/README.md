@@ -1,7 +1,8 @@
 # External Capability Manifests
 
-This directory contains trusted capability snapshots consumed by
-`chromie-agent`. Docker mounts it read-only at `/app/capabilities`.
+This directory contains trusted capability snapshots and owner-editable catalog
+policy inputs consumed by `chromie-agent`. Docker mounts it read-only at
+`/app/capabilities`.
 
 The manifests are policy inputs, not informal tool descriptions. They define
 agent identities, tool schemas, side-effect classes, confirmation requirements,
@@ -61,6 +62,19 @@ registry.
 
 Multiple manifest paths or directories may be separated by commas. Duplicate
 agent or tool identifiers fail registry construction.
+
+## Prompt-tier preset
+
+[`prompt_tiers.json`](prompt_tiers.json) is the owner-editable initial
+common/rare prompt-tier preset. This is where daily/common skills belong; do
+not add a Python skill list for that purpose. The Agent loads it with
+`AGENT_CAPABILITY_PROMPT_TIER_PRESET`, and Docker Compose defaults that path to
+`/app/capabilities/prompt_tiers.json`.
+
+Experience-derived overlays are separate and mutable. They can be generated
+under `.chromie/experience/` and loaded with
+`AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`. The safety locker still wins after
+both files are merged.
 
 ## Verify a live capability server
 

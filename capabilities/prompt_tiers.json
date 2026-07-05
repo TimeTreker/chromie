@@ -1,0 +1,67 @@
+{
+  "schema_version": "0.1",
+  "source": "chromie-owner-preset",
+  "description": "Owner-editable initial prompt-tier presets. Experience overlays may change unlocked entries later; safety-locked entries remain rare.",
+  "prompt_tiers": {
+    "chromie.speak": {
+      "prompt_tier": "common",
+      "reason": "Speech is a normal fast-lane ability for mixed chat and body tasks."
+    },
+    "chromie.memory.remember": {
+      "prompt_tier": "common",
+      "reason": "Remembering user preferences is a common conversation lane when the memory tool exists."
+    },
+    "chromie.memory.recall": {
+      "prompt_tier": "common",
+      "reason": "Recalling user preferences is a common conversation lane when the memory tool exists."
+    },
+    "soridormi.blink_eyes": {
+      "prompt_tier": "common",
+      "reason": "Simple social expression commonly requested in conversation."
+    },
+    "soridormi.express_attention": {
+      "prompt_tier": "common",
+      "reason": "Simple attention expression commonly requested in conversation."
+    },
+    "soridormi.look_at_person": {
+      "prompt_tier": "common",
+      "reason": "Simple gaze behavior commonly requested in conversation."
+    },
+    "soridormi.look_direction": {
+      "prompt_tier": "common",
+      "reason": "Simple gaze behavior commonly requested in conversation."
+    },
+    "soridormi.nod_yes": {
+      "prompt_tier": "common",
+      "reason": "Simple acknowledgement gesture commonly requested in conversation."
+    },
+    "soridormi.shake_no": {
+      "prompt_tier": "common",
+      "reason": "Simple refusal gesture commonly requested in conversation."
+    },
+    "soridormi.sidestep": {
+      "prompt_tier": "common",
+      "reason": "Bounded locomotion primitive commonly requested in conversation."
+    },
+    "soridormi.stand_idle": {
+      "prompt_tier": "common",
+      "reason": "Safe idle posture is a common body-control request."
+    },
+    "soridormi.stop": {
+      "prompt_tier": "common",
+      "reason": "Stop is common in the skill list, while emergency interruption remains deterministic."
+    },
+    "soridormi.turn_in_place": {
+      "prompt_tier": "common",
+      "reason": "Bounded orientation primitive commonly requested in conversation."
+    },
+    "soridormi.walk_forward": {
+      "prompt_tier": "common",
+      "reason": "Bounded forward locomotion primitive commonly requested in conversation."
+    },
+    "soridormi.walk_velocity": {
+      "prompt_tier": "common",
+      "reason": "Bounded velocity primitive commonly requested in conversation."
+    }
+  }
+}

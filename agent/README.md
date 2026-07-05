@@ -68,9 +68,15 @@ Core endpoints:
 - `POST /run`
 - `POST /interaction`
 
-Catalog entries include a `prompt_tier` field. `common` entries are compacted
-into the fast Router prompt; `rare` entries stay available to deepthinking and
-other full-catalog planning paths. `chromie.speak` is a common,
+Catalog entries include `prompt_tier`, `prompt_tier_locked`,
+`prompt_tier_source`, and `prompt_tier_reason`. Unlocked `common` entries are
+compacted into the fast Router prompt; `rare` and safety-locked entries stay
+available to deepthinking and other full-catalog planning paths. The initial
+common/rare preset lives in `capabilities/prompt_tiers.json`, loaded by
+`AGENT_CAPABILITY_PROMPT_TIER_PRESET`; it should be edited as data rather than
+as Python code. Experience can change ordinary prompt tiers through an overlay
+loaded by `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`, but safety-locked entries
+cannot be promoted into the fast common catalog. `chromie.speak` is a common,
 interaction-executable catalog entry so the quick Router can keep spoken parts
 of physical requests as normal skill proposals instead of dropping them into
 unstructured reply text.

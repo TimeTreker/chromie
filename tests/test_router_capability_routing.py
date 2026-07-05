@@ -237,8 +237,18 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         assert llm_router.request is not None
         self.assertEqual(catalog.snapshot_calls, 1)
         self.assertEqual(catalog.search_calls, 0)
+        self.assertIn("common_ability_catalog", llm_router.request.context)
+        self.assertIn("common_ability_ids", llm_router.request.context)
         self.assertIn("prompt_capabilities_common", llm_router.request.context)
         self.assertIn("prompt_capabilities_all", llm_router.request.context)
+        self.assertEqual(
+            llm_router.request.context["common_ability_catalog"][0]["capability_id"],
+            "soridormi.blink_eyes",
+        )
+        self.assertEqual(
+            llm_router.request.context["common_ability_ids"],
+            ["soridormi.blink_eyes"],
+        )
         self.assertEqual(
             llm_router.request.context["prompt_capabilities_common"][0]["capability_id"],
             "soridormi.blink_eyes",
@@ -307,6 +317,148 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("capability_agent", decision.agents)
         self.assertIn("validator normalized catalog capability intent", decision.reason or "")
 
+    async def test_hybrid_llm_delegates_rare_catalog_skill_from_fast_router(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="Run floor calibration.",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=23,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 23,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "description": "Blink the robot eyes visibly.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["visual_expression"],
+                    "safety_class": "low_risk_action",
+                    "requires_confirmation": False,
+                },
+                {
+                    "capability_id": "soridormi.motion.calibrate_floor",
+                    "description": "Rare floor calibration workflow.",
+                    "route": "robot_action",
+                    "prompt_tier": "rare",
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["physical_motion"],
+                    "safety_class": "guarded_operation",
+                    "requires_confirmation": True,
+                },
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:soridormi.motion.calibrate_floor",
+                confidence=0.91,
+                language="en-US",
+                source="llm",
+            )
+        )
+
+        catalog = _Catalog(result, snapshot=snapshot)
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main,
+            "capability_catalog",
+            catalog,
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="Run floor calibration.", language="en-US")
+            )
+
+        assert llm_router.request is not None
+        self.assertEqual(catalog.search_calls, 0)
+        self.assertEqual(
+            llm_router.request.context["common_ability_ids"],
+            ["soridormi.blink_eyes"],
+        )
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(decision.intent, "deep_thought_low_confidence")
+        self.assertIn("outside the fast common ability catalog", decision.reason or "")
+        self.assertNotIn("capability_agent", decision.agents)
+
+    async def test_hybrid_llm_excludes_locked_common_catalog_skill_from_fast_router(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="Run floor calibration.",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=24,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 24,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "description": "Blink the robot eyes visibly.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["visual_expression"],
+                    "safety_class": "low_risk_action",
+                    "requires_confirmation": False,
+                },
+                {
+                    "capability_id": "soridormi.motion.calibrate_floor",
+                    "description": "Locked safety-sensitive calibration workflow.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "prompt_tier_locked": True,
+                    "prompt_tier_source": "safety_lock",
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["commissioning_no_motion"],
+                    "safety_class": "guarded_operation",
+                    "requires_confirmation": True,
+                },
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:soridormi.motion.calibrate_floor",
+                confidence=0.91,
+                language="en-US",
+                source="llm",
+            )
+        )
+
+        catalog = _Catalog(result, snapshot=snapshot)
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main,
+            "capability_catalog",
+            catalog,
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="Run floor calibration.", language="en-US")
+            )
+
+        assert llm_router.request is not None
+        self.assertEqual(
+            llm_router.request.context["common_ability_ids"],
+            ["soridormi.blink_eyes"],
+        )
+        self.assertEqual(
+            llm_router.request.context["full_ability_catalog"][1]["capability_id"],
+            "soridormi.motion.calibrate_floor",
+        )
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertIn("outside the fast common ability catalog", decision.reason or "")
+
     async def test_catalog_miss_does_not_use_legacy_robot_phrase_rule_by_default(self) -> None:
         from router.app import main
 
@@ -349,7 +501,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         assert llm_router.request is not None
         self.assertEqual(llm_router.request.context["candidate_capabilities"], [])
 
-    async def test_hybrid_mode_delegates_catalog_robot_candidates_after_llm_fallback(self) -> None:
+    async def test_hybrid_mode_ignores_query_matches_after_llm_fallback(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -394,10 +546,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("conversation_agent", decision.agents)
         self.assertIn("LLM router unavailable", decision.reason or "")
         self.assertIn("delegating to deep_thought", decision.reason or "")
-        self.assertEqual(
-            decision.candidate_capabilities[0]["capability_id"],
-            "soridormi.walk_velocity",
-        )
+        self.assertEqual(decision.candidate_capabilities, [])
         self.assertNotIn(
             "task.execute_skill",
             [item["task_type"] for item in decision.metadata["task_list"]],
@@ -572,8 +721,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Sorry", correction["speak_first"])
         self.assertEqual(
             [item["task_type"] for item in decision.metadata["task_list"]],
-            ["task.cancel_current_action", "body.stop_motion", "speech.answer"],
+            ["task.cancel_current_action", "body.stop_motion", "speech.fast_reply"],
         )
+        self.assertTrue(decision.metadata["task_list"][2]["direct_to_tts"])
+        self.assertEqual(decision.metadata["task_list"][2]["context_profile"], "fast_minimal")
         self.assertEqual(
             [item["source_stage"] for item in decision.metadata["task_list"]],
             ["emergency_filter", "emergency_filter", "post_interrupt_review"],
@@ -639,7 +790,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(decision.intent, "capability:chromie.speak")
         self.assertIn("conversation_agent", decision.agents)
 
-    async def test_hybrid_router_preserves_low_score_candidates_for_semantic_recovery(self) -> None:
+    async def test_hybrid_router_uses_common_catalog_snapshot_for_semantic_recovery(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -648,19 +799,23 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             suggested_route="chat",
             suggested_agents=[],
             catalog_version=10,
-            matches=[
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 10,
+            "capabilities": [
                 {
                     "capability_id": "soridormi.walk_forward",
                     "agent_id": "soridormi.skill",
                     "description": "Human-facing wrapper for natural walking requests.",
-                    "score": 0.0,
                     "available": True,
                     "interaction_executable": True,
                     "effects": ["physical_motion"],
                     "route": "robot_action",
+                    "prompt_tier": "common",
                 }
             ],
-        )
+        }
         llm_router = _LlmRouter(
             RouteDecision(
                 route="robot_action",
@@ -674,16 +829,17 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
-            main, "capability_catalog", _Catalog(result)
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
             decision = await main.route(RouteRequest(text="往前走个15秒。", language="zh-CN"))
 
         self.assertEqual(llm_router.calls, 1)
         assert llm_router.request is not None
         self.assertEqual(
-            llm_router.request.context["candidate_capabilities"][0]["capability_id"],
+            llm_router.request.context["common_ability_catalog"][0]["capability_id"],
             "soridormi.walk_forward",
         )
+        self.assertEqual(llm_router.request.context["candidate_capabilities"], [])
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
@@ -722,6 +878,29 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
+        snapshot = {
+            "catalog_version": 8,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.walk_velocity",
+                    "agent_id": "soridormi.skill",
+                    "description": "Track a bounded body velocity command.",
+                    "available": True,
+                    "interaction_executable": True,
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                },
+                {
+                    "capability_id": "soridormi.nod_yes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Nod the head yes.",
+                    "available": True,
+                    "interaction_executable": True,
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                },
+            ],
+        }
         llm_router = _LlmRouter(
             RouteDecision(
                 route="robot_action",
@@ -735,7 +914,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
-            main, "capability_catalog", _Catalog(result)
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
             decision = await main.route(
                 RouteRequest(text="Walking forward quickly until I tell you stop.")
@@ -757,7 +936,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             [item["task_type"] for item in decision.metadata["task_list"]],
             ["cognition.delegate_deep_thought", "cognition.deep_think"],
         )
-        self.assertEqual(
+        self.assertCountEqual(
             [item["capability_id"] for item in decision.candidate_capabilities],
             ["soridormi.walk_velocity", "soridormi.nod_yes"],
         )
@@ -1555,6 +1734,29 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
+        snapshot = {
+            "catalog_version": 8,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.walk_velocity",
+                    "agent_id": "soridormi.skill",
+                    "description": "Track a bounded body velocity command.",
+                    "available": True,
+                    "interaction_executable": True,
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                },
+                {
+                    "capability_id": "soridormi.nod_yes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Nod the head yes.",
+                    "available": True,
+                    "interaction_executable": True,
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                },
+            ],
+        }
         llm_router = _LlmRouter(
             RouteDecision(
                 route="robot_action",
@@ -1568,7 +1770,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
-            main, "capability_catalog", _Catalog(result)
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(
             main, "llm_router", llm_router
         ):
@@ -1579,9 +1781,9 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "capability:soridormi.walk_velocity")
         self.assertEqual(decision.actions, [])
-        self.assertEqual(
-            decision.candidate_capabilities[0]["capability_id"],
+        self.assertIn(
             "soridormi.walk_velocity",
+            [item["capability_id"] for item in decision.candidate_capabilities],
         )
 
 

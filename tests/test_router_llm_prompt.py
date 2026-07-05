@@ -32,13 +32,18 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("emergency/noise controls", prompt)
         self.assertIn("phrase/pattern rules", prompt)
         self.assertIn("quick intent router", prompt)
-        self.assertIn("Understand the user's intent broadly", prompt)
+        self.assertIn("fast lane splitter", prompt)
+        self.assertIn("intent broadly", prompt)
         self.assertIn("Route Taxonomy", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("multi-step", prompt)
         self.assertIn("task creation", prompt)
-        self.assertIn("emit bounded task", prompt)
-        self.assertIn("requests that need a separate task session", prompt)
+        self.assertIn("Return one compatibility", prompt)
+        self.assertIn("each item can follow its own policy", prompt)
+        self.assertIn("separate task session", prompt)
+        self.assertIn("worldview, lifeview, valueview", prompt)
+        self.assertIn("context_profile=full_mind", prompt)
+        self.assertIn("routes[]", prompt)
         self.assertIn("ordinary single-turn facts", prompt)
         self.assertIn("Memory And Task Context", prompt)
         self.assertIn("Working memory, task context, and recent action history", prompt)
@@ -58,8 +63,11 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("metadata.desired_abilities", prompt)
         self.assertIn("status=missing_ability", prompt)
         self.assertIn("Return one compact JSON object", prompt)
-        self.assertIn("final route is singular", prompt)
-        self.assertIn("never a routes[] array", prompt)
+        self.assertIn("compatibility keys are route, intent, and confidence", prompt)
+        self.assertIn("Fast greeting/direct speech template", prompt)
+        self.assertIn("Mixed route template", prompt)
+        self.assertIn("direct_to_tts", prompt)
+        self.assertIn("full_mind", prompt)
         self.assertIn("human-like social warmth", prompt)
         self.assertIn("not a program, programme", prompt)
         self.assertIn("Chat/fact/greeting template", prompt)
@@ -141,10 +149,12 @@ class RouterLlmPromptTests(unittest.TestCase):
         prompt = router.build_user_prompt(request)
 
         self.assertIn("Global Context Group", prompt)
-        self.assertIn("Robot Identity", prompt)
-        self.assertIn("Worldview", prompt)
-        self.assertIn("Lifeview", prompt)
-        self.assertIn("Valueview", prompt)
+        self.assertIn("Fast Router Context", prompt)
+        self.assertIn("full owner-approved mind profile", prompt)
+        self.assertIn("context_profile", prompt)
+        self.assertIn("fast_minimal", prompt)
+        self.assertIn("capability_safety", prompt)
+        self.assertIn("full_mind", prompt)
         self.assertIn("Session Context Group", prompt)
         self.assertIn("Current Job", prompt)
         self.assertIn("Task Context Group", prompt)
@@ -158,19 +168,21 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("not phrase rules", prompt)
         self.assertIn("deterministic emergency/noise filter", prompt)
         self.assertIn("quick intent router", prompt)
+        self.assertIn("fast lane splitter", prompt)
         self.assertIn("the catalog constrains executable actions, not meaning", prompt)
         self.assertIn("Choose route deep_thought", prompt)
         self.assertIn("do not perform or reveal reasoning inside the router", prompt)
         self.assertIn("needs deeper thought, task-session creation, or task-session continuation", prompt)
         self.assertIn("Return calibrated low confidence", prompt)
         self.assertIn("Output Template Preview", prompt)
-        self.assertIn("The final route is singular", prompt)
-        self.assertIn("use actions for multiple skills, never routes[]", prompt)
+        self.assertIn("compatibility primary route", prompt)
+        self.assertIn("Use routes[] for multiple independent policy lanes", prompt)
         self.assertIn("Single listed skill", prompt)
         self.assertIn("Multiple listed skills", prompt)
-        self.assertIn("Compact skill catalog JSON", prompt)
-        self.assertIn("Query-biased catalog hints JSON", prompt)
-        self.assertIn("not recommendations", prompt)
+        self.assertIn("Mixed chat/memory/deepthought", prompt)
+        self.assertIn("Common ability IDs", prompt)
+        self.assertIn("Common Ability Catalog JSON", prompt)
+        self.assertNotIn("not " + "recommendations", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
         self.assertIn("no executable blink skill is in the compact skill catalog", prompt)
         self.assertIn("Factual agreement/disagreement is chat", prompt)
@@ -179,15 +191,13 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("routes common-fact questions to chat", prompt)
         self.assertIn("Semantic Examples", prompt)
         self.assertIn("factual_agreement", prompt)
-        self.assertIn("planning-only or weak background context", prompt)
         self.assertIn("Bounded session, memory, task, and robot/world context JSON", prompt)
         self.assertIn("chromie_default_mind", prompt)
         self.assertIn("Chromie", prompt)
-        self.assertIn("6 years old in robot identity terms", prompt)
-        self.assertIn("Protect humans first.", prompt)
-        self.assertIn("Become a useful companion robot.", prompt)
-        self.assertIn("owner-approved", prompt)
-        self.assertIn("soridormi.walk_velocity", prompt)
+        self.assertNotIn("6 years old in robot identity terms", prompt)
+        self.assertNotIn("Protect humans first.", prompt)
+        self.assertNotIn("Become a useful companion robot.", prompt)
+        self.assertNotIn("soridormi.walk_velocity", prompt)
         self.assertIn("soridormi.blink_eyes", prompt)
         self.assertIn("count", prompt)
         self.assertIn("low_risk_action", prompt)
@@ -197,10 +207,14 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("authorize side effects", prompt)
         self.assertIn("Speech-only conversation", prompt)
         self.assertIn("treat the speech as a skill task", prompt)
+        self.assertIn("Only put direct_to_tts=true", prompt)
         self.assertIn("Do not return interrupt or ignore", prompt)
         self.assertIn("polite ability-shaped request", prompt)
         self.assertIn("working memory, current task context, and recent action history", prompt)
-        self.assertIn("Required keys: route, intent, confidence", prompt)
+        self.assertIn("Required compatibility keys: route, intent, confidence", prompt)
+        self.assertIn("routes[] item", prompt)
+        self.assertIn("Allowed lanes", prompt)
+        self.assertIn("Allowed context_profile values", prompt)
         self.assertIn("Omit agents, metadata", prompt)
         self.assertIn("non-executable ability proposals", prompt)
         self.assertIn("include actions as an ordered array", prompt)
@@ -213,7 +227,89 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("human-like social warmth", prompt)
         self.assertIn("not a program, programme", prompt)
         self.assertIn("Return one compact JSON object matching one of the templates", prompt)
-        self.assertIn("never output a routes array", prompt)
+
+    def test_fast_router_prompt_uses_common_ability_catalog_not_full_catalog(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Please blink twice.",
+            language="en-US",
+            context={
+                "common_ability_catalog": [
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "description": "Blink the robot eyes visibly.",
+                        "route": "robot_action",
+                        "prompt_tier": "common",
+                        "interaction_executable": True,
+                    }
+                ],
+                "full_ability_catalog": [
+                    {
+                        "capability_id": "soridormi.motion.calibrate_floor",
+                        "description": "Rare floor calibration workflow.",
+                        "route": "robot_action",
+                        "prompt_tier": "rare",
+                        "interaction_executable": True,
+                    }
+                ],
+                "prompt_capabilities_all": [
+                    {
+                        "capability_id": "soridormi.motion.calibrate_floor",
+                        "description": "Rare floor calibration workflow.",
+                        "route": "robot_action",
+                        "prompt_tier": "rare",
+                        "interaction_executable": True,
+                    }
+                ],
+            },
+        )
+
+        prompt = router.build_user_prompt(request)
+
+        self.assertIn("Common Ability Catalog JSON", prompt)
+        self.assertIn("soridormi.blink_eyes", prompt)
+        self.assertNotIn("soridormi.motion.calibrate_floor", prompt)
+
+    def test_fast_router_prompt_excludes_locked_common_catalog_entries(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Run floor calibration.",
+            language="en-US",
+            context={
+                "common_ability_catalog": [
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "description": "Blink the robot eyes visibly.",
+                        "route": "robot_action",
+                        "prompt_tier": "common",
+                        "interaction_executable": True,
+                    },
+                    {
+                        "capability_id": "soridormi.motion.calibrate_floor",
+                        "description": "Locked safety-sensitive calibration workflow.",
+                        "route": "robot_action",
+                        "prompt_tier": "common",
+                        "prompt_tier_locked": True,
+                        "interaction_executable": True,
+                    },
+                ],
+            },
+        )
+
+        prompt = router.build_user_prompt(request)
+
+        self.assertIn("soridormi.blink_eyes", prompt)
+        self.assertNotIn("soridormi.motion.calibrate_floor", prompt)
 
     def test_route_stage_preserves_missing_desired_ability_proposal(self) -> None:
         decision = RouteDecision(
@@ -318,7 +414,7 @@ class RouterLlmPromptTests(unittest.TestCase):
                 text="你能摇头吗",
                 language="zh-CN",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.shake_no",
                             "interaction_executable": True,
@@ -343,7 +439,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("multi-step task-session work", system)
         self.assertIn("chain-of-thought", system)
         self.assertIn("progress text", system)
-        self.assertIn("Candidate capabilities JSON", user)
+        self.assertIn("Common ability catalog JSON", user)
         self.assertIn("soridormi.shake_no", user)
         self.assertIn("capability:<exact capability_id>", system)
 
@@ -361,7 +457,7 @@ class RouterLlmPromptTests(unittest.TestCase):
                 text="Stop by the table means what?",
                 language="en-US",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.walk_forward",
                             "interaction_executable": True,
@@ -453,6 +549,72 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("speaker_agent", decision.agents)
         self.assertTrue(decision.needs_agent)
 
+    def test_llm_router_accepts_mixed_route_items_and_builds_task_proposals(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(text="Hi, remember I like tea, and think through tomorrow.")
+
+        decision = router._decision_from_response(
+            request,
+            {
+                "message": {
+                    "content": (
+                        '{"route":"chat","intent":"mixed_request","confidence":0.82,'
+                        '"routes":['
+                        '{"route":"chat","intent":"greeting","confidence":0.95,'
+                        '"lane":"immediate_speech","context_profile":"fast_minimal",'
+                        '"direct_to_tts":true,"text":"Hi, I am here."},'
+                        '{"route":"memory","intent":"remember_user_preference",'
+                        '"confidence":0.86,"lane":"post_turn",'
+                        '"context_profile":"session_compact"},'
+                        '{"route":"deep_thought","intent":"plan_tomorrow",'
+                        '"confidence":0.78,"lane":"deepthought",'
+                        '"context_profile":"full_mind","requires_mind":true}'
+                        ']}'
+                    )
+                }
+            },
+        )
+
+        self.assertEqual(decision.route, "deep_thought")
+        self.assertEqual(len(decision.routes), 3)
+        self.assertEqual(decision.metadata["route_item_count"], 3)
+        self.assertIn("dominant compatibility route", decision.reason or "")
+        from router.app.schema import annotate_pipeline_stage_outputs
+
+        annotated = annotate_pipeline_stage_outputs(decision)
+
+        self.assertEqual(
+            [item["task_type"] for item in annotated.metadata["task_list"]],
+            [
+                "speech.fast_reply",
+                "memory.remember_session_context",
+                "cognition.delegate_deep_thought",
+                "cognition.deep_think",
+            ],
+        )
+        proposals = annotated.metadata["task_proposals"]
+        self.assertTrue(
+            any(
+                item["task_type"] == "speech.fast_reply"
+                and item["metadata"]["direct_to_tts"] is True
+                and item["metadata"]["context_profile"] == "fast_minimal"
+                for item in proposals
+            )
+        )
+        self.assertTrue(
+            any(
+                item["task_type"] == "cognition.deep_think"
+                and item["metadata"]["requires_mind"] is True
+                and item["metadata"]["context_profile"] == "full_mind"
+                for item in proposals
+            )
+        )
+
     def test_low_confidence_decision_becomes_deep_thought_handoff(self) -> None:
         router = OllamaLLMRouter(
             ollama_url="http://example.invalid",
@@ -541,7 +703,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         request = RouteRequest(
             text="please walk forward for 10 seconds",
             context={
-                "candidate_capabilities": [
+                "common_ability_catalog": [
                     {
                         "capability_id": "soridormi.walk_velocity",
                         "interaction_executable": True,
@@ -657,7 +819,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 text="你能摇头吗",
                 language="zh-CN",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.shake_no",
                             "interaction_executable": True,
@@ -710,7 +872,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             text="Okay, please walk ahead for a few seconds. Please. Quickly.",
             language="en-US",
             context={
-                "candidate_capabilities": [
+                "common_ability_catalog": [
                     {
                         "capability_id": "soridormi.walk_forward",
                         "description": "Human-facing wrapper for natural requests like walk forward, walk slowly, and walk quickly.",
@@ -770,7 +932,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 text="你能摇头吗",
                 language="zh-CN",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.shake_no",
                             "interaction_executable": True,
@@ -830,7 +992,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 text="Okay, please walk forward for 15 seconds, quickly, please.",
                 language="en-US",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.walk_forward",
                             "description": "Human-facing wrapper for natural walking requests.",
@@ -886,7 +1048,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             RouteRequest(
                 text="Please walk ahead for 15 seconds.",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.walk_forward",
                             "interaction_executable": True,
@@ -958,7 +1120,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 text="Okay, please walk forward for 15 seconds, quickly, please.",
                 language="en-US",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.walk_forward",
                             "description": "Human-facing wrapper for natural walking requests.",
@@ -1147,7 +1309,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             RouteRequest(
                 text="Hello, how are you.",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.walk_forward",
                             "interaction_executable": True,
@@ -1203,7 +1365,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 text="往前走个15秒。",
                 language="zh-CN",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.walk_forward",
                             "description": "Human-facing wrapper for natural walking requests.",
@@ -1293,7 +1455,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             RouteRequest(
                 text="Hello, how are you.",
                 context={
-                    "candidate_capabilities": [
+                    "common_ability_catalog": [
                         {
                             "capability_id": "soridormi.walk_forward",
                             "interaction_executable": True,

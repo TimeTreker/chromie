@@ -55,6 +55,11 @@ also refreshes `soridormi.skill.list` through the trusted MCP transport and keep
 the last known-good named-skill snapshot. `GET /capabilities/catalog` exposes
 that merged routing/execution view.
 
+Prompt-tier presets are data, not Python skill lists. The owner-editable initial
+common/rare split lives in `capabilities/prompt_tiers.json` and is loaded by
+`AGENT_CAPABILITY_PROMPT_TIER_PRESET`. Experience-derived overlays are loaded
+separately by `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`.
+
 ## Capability policy represented
 
 Each tool can declare information such as:
@@ -63,6 +68,9 @@ Each tool can declare information such as:
 - side-effect class (`safe_read`, `planning_only`, guarded effects, physical);
 - confirmation requirement;
 - safety monitor and emergency fallback relationships;
+- prompt-tier metadata (`prompt_tier`, `prompt_tier_locked`,
+  `prompt_tier_source`, and `prompt_tier_reason`) for fast Router prompt
+  budgeting;
 - whether parallel execution is permitted;
 - an `exclusive_group` for resource serialization;
 - transport-neutral invocation metadata.

@@ -57,11 +57,11 @@ present.
 
 ## Router Contract
 
-The quick Router receives the common compact skill catalog. It should:
+The quick Router receives the unlocked common compact skill catalog. It should:
 
 - infer the user's desired ability from meaning, context, memory, and catalog
   descriptions;
-- use `actions[]` only for exact common catalog skill IDs;
+- use `actions[]` only for exact unlocked common catalog skill IDs;
 - never put missing or planned abilities in `actions[]`;
 - when useful, put understood but non-executable abilities in
   `metadata.desired_abilities`;

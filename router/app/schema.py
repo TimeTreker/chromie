@@ -51,10 +51,35 @@ class RouteRequest(BaseModel):
         return (value or "").strip()
 
 
+class RouteItem(BaseModel):
+    """One semantic route item inside a multi-route decision.
+
+    The top-level RouteDecision.route remains for compatibility. Route items
+    let the quick Router split one utterance into independently governed lanes:
+    immediate speech, memory, deep thought, tools, or embodied skills.
+    """
+
+    route: RouteName
+    intent: str = "unknown"
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    priority: Priority = "normal"
+    lane: str = "agent"
+    context_profile: str = "session_compact"
+    requires_mind: bool = False
+    direct_to_tts: bool = False
+    text: str | None = None
+    skill_id: str | None = None
+    args: dict[str, Any] = Field(default_factory=dict)
+    actions: list[dict[str, Any]] = Field(default_factory=list)
+    reason: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class RouteDecision(BaseModel):
     """Structured decision consumed by host orchestrator."""
 
     route: RouteName
+    routes: list[RouteItem] = Field(default_factory=list)
     agents: list[str] = Field(default_factory=list)
     intent: str = "unknown"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -159,6 +184,16 @@ def _task_proposal_for_item(item: dict[str, Any]) -> dict[str, Any]:
             "requires_validation": bool(item.get("requires_validation", True)),
         },
     )
+    for key in (
+        "route_item_id",
+        "route_item_sequence",
+        "lane",
+        "context_profile",
+        "requires_mind",
+        "direct_to_tts",
+    ):
+        if key in item:
+            proposal.metadata[key] = item[key]
     confidence = item.get("confidence")
     if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
         proposal.metadata["confidence"] = max(0.0, min(1.0, float(confidence)))
@@ -236,6 +271,131 @@ def _desired_ability_proposals(
     return proposals
 
 
+_ROUTE_ITEM_PRIMARY_RANK: dict[str, int] = {
+    "interrupt": 0,
+    "robot_action": 1,
+    "deep_thought": 2,
+    "tool": 3,
+    "memory": 4,
+    "clarify": 5,
+    "chat": 6,
+    "ignore": 7,
+}
+
+
+def _route_item_id(index: int, route: str, intent: str) -> str:
+    normalized_intent = "_".join((intent or "unknown").strip().split())[:48] or "unknown"
+    return f"route_item:{index}:{route}:{normalized_intent}"
+
+
+def _route_items_from_metadata(decision: RouteDecision) -> list[RouteItem]:
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    raw = metadata.get("route_items")
+    if raw is None:
+        raw = metadata.get("routes")
+    if not isinstance(raw, list):
+        return []
+    items: list[RouteItem] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            items.append(RouteItem.model_validate(item))
+        except Exception:
+            continue
+    return items
+
+
+def _default_route_item(decision: RouteDecision) -> RouteItem:
+    lane = "agent"
+    context_profile = "session_compact"
+    requires_mind = False
+    direct_to_tts = False
+    if decision.route == "chat":
+        lane = "immediate_speech" if decision.speak_first else "conversation"
+        context_profile = "fast_minimal"
+        direct_to_tts = bool(decision.speak_first)
+    elif decision.route == "deep_thought":
+        lane = "deepthought"
+        context_profile = "full_mind"
+        requires_mind = True
+    elif decision.route == "robot_action":
+        lane = "skill_runtime"
+        context_profile = "capability_safety"
+    elif decision.route == "memory":
+        lane = "post_turn"
+        context_profile = "session_compact"
+    elif decision.route == "tool":
+        lane = "tool"
+        context_profile = "session_compact"
+    elif decision.route == "interrupt":
+        lane = "deterministic_control"
+        context_profile = "none"
+    elif decision.route == "ignore":
+        lane = "none"
+        context_profile = "none"
+    return RouteItem(
+        route=decision.route,
+        intent=decision.intent,
+        confidence=decision.confidence,
+        priority=decision.priority,
+        lane=lane,
+        context_profile=context_profile,
+        requires_mind=requires_mind,
+        direct_to_tts=direct_to_tts,
+        text=decision.speak_first if direct_to_tts else None,
+        actions=list(decision.actions or []),
+        reason=decision.reason,
+    )
+
+
+def _normalized_route_items(decision: RouteDecision) -> list[RouteItem]:
+    items = list(decision.routes or [])
+    if not items:
+        items = _route_items_from_metadata(decision)
+    if not items:
+        items = [_default_route_item(decision)]
+
+    normalized: list[RouteItem] = []
+    for index, item in enumerate(items):
+        metadata = dict(item.metadata or {})
+        metadata.setdefault("route_item_id", _route_item_id(index, item.route, item.intent))
+        if item.route == "deep_thought" and not item.requires_mind:
+            item = item.model_copy(update={"requires_mind": item.context_profile == "full_mind"})
+        normalized.append(item.model_copy(update={"metadata": metadata}))
+    return normalized
+
+
+def _dominant_route(route_items: list[RouteItem], fallback: str) -> str:
+    if not route_items:
+        return fallback
+    return min(
+        [item.route for item in route_items],
+        key=lambda route: _ROUTE_ITEM_PRIMARY_RANK.get(route, 99),
+    )
+
+
+def normalize_route_items(decision: RouteDecision) -> RouteDecision:
+    route_items = _normalized_route_items(decision)
+    dominant = _dominant_route(route_items, decision.route)
+    if dominant != decision.route:
+        decision.route = dominant  # type: ignore[assignment]
+        decision.reason = (
+            f"{decision.reason}; " if decision.reason else ""
+        ) + "validator selected dominant compatibility route from route_items"
+    route_item_dicts = [
+        item.model_dump(mode="json", exclude_none=True)
+        for item in route_items
+    ]
+    decision.routes = route_items
+    decision.metadata = {
+        **(decision.metadata or {}),
+        "route_items": route_item_dicts,
+        "route_item_count": len(route_item_dicts),
+    }
+    return decision
+
+
 def _safe_int(value: Any, default: int) -> int:
     if isinstance(value, bool):
         return default
@@ -276,10 +436,37 @@ def _task_item(
     return item
 
 
-def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[dict[str, Any]]:
-    route = decision.route
-    priority = decision.priority
-    intent = decision.intent
+def _route_item_extra(item: RouteItem, index: int) -> dict[str, Any]:
+    route_item_id = str(item.metadata.get("route_item_id") or _route_item_id(index, item.route, item.intent))
+    extra: dict[str, Any] = {
+        "route_item_id": route_item_id,
+        "lane": item.lane,
+        "context_profile": item.context_profile,
+        "requires_mind": item.requires_mind,
+        "direct_to_tts": item.direct_to_tts,
+    }
+    if item.text:
+        extra["text"] = item.text
+    if item.skill_id:
+        extra["capability_id"] = item.skill_id
+        extra["args"] = item.args
+    if item.reason:
+        extra["reason"] = item.reason
+    if item.metadata:
+        extra["route_item_metadata"] = item.metadata
+    return extra
+
+
+def _task_items_for_route_item(
+    item: RouteItem,
+    *,
+    source_stage: str,
+    index: int,
+) -> list[dict[str, Any]]:
+    route = item.route
+    priority = item.priority
+    intent = item.intent
+    base_extra = _route_item_extra(item, index)
     tasks: list[dict[str, Any]] = []
 
     if route == "interrupt":
@@ -293,6 +480,7 @@ def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[d
                 priority="urgent",
                 index=0,
                 requires_validation=False,
+                extra=base_extra,
             )
         )
         tasks.append(
@@ -305,17 +493,30 @@ def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[d
                 priority="urgent",
                 index=1,
                 requires_validation=True,
+                extra=base_extra,
             )
         )
         return tasks
 
-    if route == "robot_action" and decision.actions:
-        for index, action in enumerate(decision.actions):
+    actions = list(item.actions or [])
+    if not actions and item.skill_id:
+        actions = [
+            {
+                "capability_id": item.skill_id,
+                "args": item.args,
+                "sequence": index,
+                "confidence": item.confidence,
+            }
+        ]
+
+    if route == "robot_action" and actions:
+        for action_index, action in enumerate(actions):
             capability_id = str(action.get("capability_id") or "").strip()
             action_type = str(action.get("type") or "").strip()
             args = action.get("args") if isinstance(action.get("args"), dict) else {}
             extra: dict[str, Any] = {
-                "sequence": _safe_int(action.get("sequence"), index)
+                **base_extra,
+                "sequence": _safe_int(action.get("sequence"), action_index),
             }
             if capability_id:
                 extra["capability_id"] = capability_id
@@ -351,7 +552,7 @@ def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[d
                     route=route,
                     intent=intent,
                     priority=priority,
-                    index=index,
+                    index=action_index,
                     requires_validation=requires_validation,
                     extra=extra,
                 )
@@ -370,7 +571,26 @@ def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[d
                 intent=intent,
                 priority=priority,
                 index=0,
-                extra={"capability_id": capability_id} if capability_id else None,
+                extra={
+                    **base_extra,
+                    **({"capability_id": capability_id} if capability_id else {}),
+                },
+            )
+        )
+        return tasks
+
+    if route == "chat" and item.lane in {"immediate_speech", "fast_tts"} and item.text:
+        tasks.append(
+            _task_item(
+                source_stage=source_stage,
+                kind="speech",
+                task_type="speech.fast_reply",
+                route=route,
+                intent=intent,
+                priority=priority,
+                index=index,
+                requires_validation=False,
+                extra=base_extra,
             )
         )
         return tasks
@@ -385,9 +605,34 @@ def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[d
             priority=priority,
             index=0,
             requires_validation=route not in {"ignore"},
+            extra=base_extra,
         )
     )
     return tasks
+
+
+def _tasks_for_route_items(
+    route_items: list[RouteItem],
+    *,
+    source_stage: str,
+) -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    for index, item in enumerate(route_items):
+        for task in _task_items_for_route_item(
+            item,
+            source_stage=source_stage,
+            index=index,
+        ):
+            task["route_item_sequence"] = index
+            tasks.append(task)
+    return tasks
+
+
+def _tasks_for_decision(decision: RouteDecision, *, source_stage: str) -> list[dict[str, Any]]:
+    return _tasks_for_route_items(
+        _normalized_route_items(decision),
+        source_stage=source_stage,
+    )
 
 
 def route_stage_output(
@@ -402,6 +647,10 @@ def route_stage_output(
     task_proposals = _task_proposals_for_items(task_items)
     if tasks is None or include_desired_abilities:
         task_proposals.extend(_desired_ability_proposals(decision, source_stage=stage))
+    route_items = [
+        item.model_dump(mode="json", exclude_none=True)
+        for item in _normalized_route_items(decision)
+    ]
     return {
         "stage": stage,
         "status": status,
@@ -409,6 +658,7 @@ def route_stage_output(
         "intent": decision.intent,
         "confidence": decision.confidence,
         "source": decision.source,
+        "route_items": route_items,
         "tasks": task_items,
         "task_proposals": task_proposals,
         "actions": [item for item in task_items if item.get("kind") == "action"],
@@ -647,18 +897,50 @@ def annotate_pipeline_stage_outputs(
 
     outputs: list[dict[str, Any]] = [passed_stage_output("emergency_filter")]
     if decision.route == "deep_thought":
-        thinking_ack_allowed = (decision.metadata or {}).get("thinking_ack_allowed") is not False
-        deep_thought_tasks = [
+        route_items = _normalized_route_items(decision)
+        quick_route_items = [item for item in route_items if item.route != "deep_thought"]
+        deep_route_items = [item for item in route_items if item.route == "deep_thought"]
+        has_immediate_speech = any(
+            item.route == "chat"
+            and item.lane in {"immediate_speech", "fast_tts"}
+            and item.direct_to_tts
+            and bool(item.text)
+            for item in quick_route_items
+        )
+        thinking_ack_allowed = (
+            (decision.metadata or {}).get("thinking_ack_allowed") is not False
+            and not has_immediate_speech
+        )
+        if not deep_route_items:
+            deep_route_items = [_default_route_item(decision)]
+        quick_tasks = _tasks_for_route_items(
+            quick_route_items,
+            source_stage="quick_intent",
+        )
+        quick_tasks.append(
             _task_item(
-                source_stage="deep_thought",
+                source_stage="quick_intent",
                 kind="task",
-                task_type="cognition.deep_think",
+                task_type="cognition.delegate_deep_thought",
                 route=decision.route,
                 intent=decision.intent,
                 priority=decision.priority,
-                index=1 if thinking_ack_allowed else 0,
-                extra={"candidate_count": len(decision.candidate_capabilities)},
-            ),
+                index=len(quick_tasks),
+                extra={
+                    "quick_confidence": decision.confidence,
+                    "reason": decision.reason,
+                },
+            )
+        )
+        deep_thought_tasks = [
+            {
+                **task,
+                "candidate_count": len(decision.candidate_capabilities),
+            }
+            for task in _tasks_for_route_items(
+                deep_route_items,
+                source_stage="deep_thought",
+            )
         ]
         if thinking_ack_allowed:
             deep_thought_tasks.insert(
@@ -680,21 +962,7 @@ def annotate_pipeline_stage_outputs(
                 decision,
                 stage="quick_intent",
                 status="delegated",
-                tasks=[
-                    _task_item(
-                        source_stage="quick_intent",
-                        kind="task",
-                        task_type="cognition.delegate_deep_thought",
-                        route=decision.route,
-                        intent=decision.intent,
-                        priority=decision.priority,
-                        index=0,
-                        extra={
-                            "quick_confidence": decision.confidence,
-                            "reason": decision.reason,
-                        },
-                    )
-                ],
+                tasks=quick_tasks,
             )
         )
         outputs.append(
@@ -732,6 +1000,8 @@ def finalize_decision(
 
     if request is not None and decision.language in ("", "auto", "unknown"):
         decision.language = request.language or detect_language(request.text)
+
+    decision = normalize_route_items(decision)
 
     if not decision.agents:
         decision.agents = default_agents_for_route(decision.route)

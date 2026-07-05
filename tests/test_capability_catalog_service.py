@@ -99,6 +99,35 @@ class _Invoker:
         )
 
 
+class _SafetyLockedInvoker:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def invoke(self, tool_name: str, arguments: dict, *, context=None):
+        del arguments, context
+        self.calls += 1
+        if tool_name != "soridormi.skill.list":
+            raise AssertionError(tool_name)
+        return _Outcome(
+            output={
+                "mode": "sim",
+                "skills": [
+                    {
+                        "skill_id": "calibrate_floor",
+                        "version": "1.0.0",
+                        "description": "Run a guarded calibration workflow.",
+                        "parameters_schema": {"type": "object", "properties": {}},
+                        "available": True,
+                        "effects": ["commissioning_no_motion"],
+                        "safety_class": "guarded_operation",
+                        "requires_confirmation": True,
+                        "prompt_tier": "common",
+                    }
+                ],
+            }
+        )
+
+
 def _registry() -> CapabilityRegistry:
     return CapabilityRegistry.from_bundles(
         [
@@ -205,6 +234,104 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             if item["capability_id"] == "soridormi.blink_eyes"
         )
         self.assertEqual(blink["prompt_tier"], "common")
+        self.assertFalse(blink["prompt_tier_locked"])
+        self.assertEqual(blink["prompt_tier_source"], "preset")
+
+    async def test_prompt_tiers_are_loaded_from_preset_data(self) -> None:
+        catalog = CapabilityCatalog(
+            _registry(),
+            live_invoker=_Invoker(),
+            min_score=0.10,
+            prompt_tier_preset={
+                "prompt_tiers": {
+                    "soridormi.blink_eyes": {
+                        "prompt_tier": "common",
+                        "reason": "test preset only promotes blink",
+                    }
+                }
+            },
+        )
+
+        common = await catalog.prompt_entries(scope="common")
+        common_ids = {item.capability_id for item in common}
+        blink = next(item for item in common if item.capability_id == "soridormi.blink_eyes")
+
+        self.assertIn("soridormi.blink_eyes", common_ids)
+        self.assertNotIn("soridormi.walk_forward", common_ids)
+        self.assertEqual(blink.prompt_tier_source, "preset")
+        self.assertEqual(blink.prompt_tier_reason, "test preset only promotes blink")
+
+    async def test_prompt_tier_overrides_can_change_unlocked_entries(self) -> None:
+        catalog = CapabilityCatalog(
+            _registry(),
+            live_invoker=_Invoker(),
+            min_score=0.10,
+            prompt_tier_overrides={
+                "prompt_tiers": {
+                    "soridormi.walk_forward": {
+                        "prompt_tier": "rare",
+                        "source": "experience",
+                        "reason": "recent usage below common threshold",
+                    },
+                    "soridormi.skill.list": {
+                        "prompt_tier": "common",
+                        "source": "experience",
+                        "reason": "used often in diagnostics",
+                    },
+                }
+            },
+        )
+
+        common = await catalog.prompt_entries(scope="common")
+        snapshot = await catalog.snapshot()
+        common_ids = {item.capability_id for item in common}
+        walk = next(
+            item
+            for item in snapshot["capabilities"]
+            if item["capability_id"] == "soridormi.walk_forward"
+        )
+        skill_list = next(
+            item
+            for item in snapshot["capabilities"]
+            if item["capability_id"] == "soridormi.skill.list"
+        )
+
+        self.assertNotIn("soridormi.walk_forward", common_ids)
+        self.assertIn("soridormi.skill.list", common_ids)
+        self.assertEqual(walk["prompt_tier"], "rare")
+        self.assertEqual(walk["prompt_tier_source"], "experience")
+        self.assertEqual(skill_list["prompt_tier"], "common")
+        self.assertFalse(skill_list["prompt_tier_locked"])
+
+    async def test_safety_locked_prompt_tier_cannot_be_promoted_to_fast_common(self) -> None:
+        catalog = CapabilityCatalog(
+            _registry(),
+            live_invoker=_SafetyLockedInvoker(),
+            min_score=0.10,
+            prompt_tier_overrides={
+                "prompt_tiers": {
+                    "soridormi.calibrate_floor": {
+                        "prompt_tier": "common",
+                        "source": "experience",
+                    }
+                }
+            },
+        )
+
+        common = await catalog.prompt_entries(scope="common")
+        snapshot = await catalog.snapshot()
+        common_ids = {item.capability_id for item in common}
+        calibrate = next(
+            item
+            for item in snapshot["capabilities"]
+            if item["capability_id"] == "soridormi.calibrate_floor"
+        )
+
+        self.assertNotIn("soridormi.calibrate_floor", common_ids)
+        self.assertEqual(calibrate["prompt_tier"], "rare")
+        self.assertTrue(calibrate["prompt_tier_locked"])
+        self.assertEqual(calibrate["prompt_tier_source"], "safety_lock")
+        self.assertIn("safety-sensitive", calibrate["prompt_tier_reason"])
 
     async def test_chromie_speak_is_common_and_executable_for_router_tasks(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])

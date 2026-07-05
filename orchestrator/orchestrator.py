@@ -1500,6 +1500,80 @@ class VoiceAssistant:
             user_text=user_text,
         )
 
+    def _route_item_dicts(self, decision: RouteDecision) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for item in getattr(decision, "routes", []) or []:
+            if hasattr(item, "model_dump"):
+                dumped = item.model_dump(mode="json", exclude_none=True)
+                if isinstance(dumped, dict):
+                    items.append(dumped)
+            elif isinstance(item, dict):
+                items.append(item)
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        raw = metadata.get("route_items")
+        if isinstance(raw, list):
+            for item in raw:
+                if isinstance(item, dict):
+                    items.append(item)
+        seen: set[str] = set()
+        unique: list[dict[str, Any]] = []
+        for index, item in enumerate(items):
+            key = str(
+                item.get("id")
+                or item.get("route_item_id")
+                or (item.get("metadata") or {}).get("route_item_id")
+                or f"{index}:{item.get('route')}:{item.get('intent')}:{item.get('text')}"
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(item)
+        return unique
+
+    @staticmethod
+    def _safe_immediate_route_speech(text: str | None) -> str | None:
+        cleaned = " ".join((text or "").strip().split())
+        if not cleaned or len(cleaned) > 120:
+            return None
+        lowered = cleaned.casefold()
+        blocked_terms = (
+            "soridormi.",
+            "chromie.",
+            "task split",
+            "key risk",
+            "next step",
+            "done",
+            "completed",
+            "executing",
+            "moving",
+            "walking",
+            "turning",
+            "tool result",
+            "i remembered",
+            "i have remembered",
+            "我记住了",
+            "已经",
+            "完成",
+            "执行",
+            "正在",
+        )
+        if any(term in lowered for term in blocked_terms):
+            return None
+        return cleaned
+
+    def _immediate_route_speech_text(self, decision: RouteDecision) -> str | None:
+        for item in self._route_item_dicts(decision):
+            if str(item.get("route") or "") != "chat":
+                continue
+            if str(item.get("lane") or "") not in {"immediate_speech", "fast_tts"}:
+                continue
+            if item.get("direct_to_tts") is not True:
+                continue
+            text = self._safe_immediate_route_speech(str(item.get("text") or ""))
+            if text:
+                return text
+        return None
+
     async def _schedule_deep_thought_ack(
         self,
         decision: RouteDecision,
@@ -1541,6 +1615,9 @@ class VoiceAssistant:
     ) -> str | None:
         if not self.fast_first_response_enabled:
             return None
+        immediate_route_text = self._immediate_route_speech_text(decision)
+        if immediate_route_text:
+            return immediate_route_text
         if not decision.should_speak or decision.route in {"interrupt", "ignore", "clarify"}:
             return None
         if decision.route == "deep_thought":
@@ -1571,7 +1648,8 @@ class VoiceAssistant:
         user_text: str,
         session_id: str,
     ) -> bool:
-        if decision.route == "deep_thought":
+        route_item_text = self._immediate_route_speech_text(decision)
+        if decision.route == "deep_thought" and not route_item_text:
             return await self._schedule_deep_thought_ack(
                 decision,
                 user_text,
@@ -2438,6 +2516,9 @@ class VoiceAssistant:
         route_stage_outputs = metadata.get("route_stage_outputs")
         if isinstance(route_stage_outputs, list):
             out["route_stage_outputs"] = route_stage_outputs
+        route_items = metadata.get("route_items")
+        if isinstance(route_items, list):
+            out["route_items"] = route_items
         task_proposals = metadata.get("task_proposals")
         if isinstance(task_proposals, list):
             out["route_task_proposals"] = task_proposals

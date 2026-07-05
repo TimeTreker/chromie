@@ -175,9 +175,9 @@ configuration.
 | `ROUTER_REVIEW_TIMEOUT_MS` | `1600` in common configuration for reviewer repair paths. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
-| `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
-| `ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Router-side cache for the prompt catalog snapshot. Search still runs per utterance, and execution is revalidated downstream. |
-| `ROUTER_CAPABILITY_MATCH_LIMIT` | Maximum ranked candidates attached to one route; default `8`. |
+| `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog snapshot or compatibility search request; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
+| `ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Router-side cache for the prompt catalog snapshot. The fast Router path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
+| `ROUTER_CAPABILITY_MATCH_LIMIT` | Compatibility search-client limit for catalog inspection/fallback surfaces; default `8`. It is not the fast Router prompt size. |
 | `ROUTER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
 | `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables semantic review/repair after malformed or timed-out quick-router outputs, including underspecified `robot_action` results. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
@@ -205,12 +205,15 @@ conversation. Validators only enforce capability, schema, availability, and
 safety contracts.
 
 The capability catalog is an ability source, not the normal intent brain. In
-`hybrid` and `llm_only`, catalog search ranks and exposes current ability
-descriptions, schemas, and executable IDs to the LLM and validators. It must not
-contain hardcoded per-skill synonym tables that decide body actions in place of
-model understanding. Catalog-only route selection is disabled even in explicit
-`rules_only` compatibility mode; without model routing, normal intent fails
-closed to safe conversation.
+`hybrid` and `llm_only`, the fast Router receives the catalog snapshot's
+unlocked `common` prompt-tier entries as `common_ability_catalog`. Catalog
+search still ranks and exposes current ability descriptions, schemas, and
+executable IDs for inspection and Agent-side retrieval, but it is not the fast
+Router decision surface. The catalog must not contain hardcoded per-skill
+synonym tables that decide body actions in place of model understanding.
+Catalog-only route selection is disabled even in explicit `rules_only`
+compatibility mode; without model routing, normal intent fails closed to safe
+conversation.
 
 ## Mind, Principles, and Experience
 
@@ -273,7 +276,9 @@ changes.
 | `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Common low-latency default `0`; set to `1` for stricter review where executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If the Router selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
-| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for marking retrieval candidates as matched; default `0.16`. In normal LLM modes this affects context/validation, not deterministic action selection. |
+| `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
+| `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
+| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for Agent-side catalog search endpoints and native interaction retrieval; default `0.16`. The fast Router uses the common catalog snapshot instead of per-query catalog matching. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
 | `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |

@@ -135,6 +135,14 @@ class ComposeConfigurationTests(unittest.TestCase):
             agent_block,
         )
         self.assertIn(
+            "AGENT_CAPABILITY_PROMPT_TIER_PRESET: ${AGENT_CAPABILITY_PROMPT_TIER_PRESET:-/app/capabilities/prompt_tiers.json}",
+            agent_block,
+        )
+        self.assertIn(
+            "AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES: ${AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES:-}",
+            agent_block,
+        )
+        self.assertIn(
             "SORIDORMI_MCP_URL: ${SORIDORMI_MCP_URL:-http://host.docker.internal:8000/mcp}",
             agent_block,
         )

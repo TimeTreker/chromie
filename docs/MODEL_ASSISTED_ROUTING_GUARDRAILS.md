@@ -12,9 +12,9 @@ they must not become the implementation of normal conversation, tool, memory,
 robot-action, capability-selection, or deep-thought behavior.
 
 The Router model is a fast semantic helper. It may propose a route and, for
-compound requests made from common catalog skills, an ordered `actions` task
-list. It is still not the authority for execution, safety, or physical
-behavior.
+compound requests made from unlocked common catalog skills, an ordered
+`actions` task list. It is still not the authority for execution, safety, or
+physical behavior.
 
 Chromie must treat model-assisted routing as advisory control-plane data. A
 wrong model answer should be caught by deterministic controls, catalog
@@ -35,7 +35,11 @@ emergency filter
 
 The emergency filter is deterministic and fastest. The quick intent router is
 normally the small Router model (`qwen3:0.6b`) with bounded context and the
-compact common skill catalog. Query-biased catalog matches are hints only; they
+compact unlocked common skill catalog. Safety-locked catalog entries
+(`prompt_tier_locked=true` or safety-critical/restricted/guarded/commissioning
+classes) stay out of that fast prompt and are available only through the
+full-catalog/deepthinking path. Per-query catalog matches are not part of the
+fast Router decision surface; they
 must not be treated as deterministic recommendations. Route validation is
 deterministic but does not answer the user: it only checks capability-contract,
 availability, schema, and safety impossibilities and must not become another
@@ -49,7 +53,7 @@ The ownership invariant is:
 - quick intent and common capability selection for normal language belong to the
   catalog-aware small Router model, not to regexes or catalog-score action
   rules;
-- quick intent may emit multiple common-catalog task proposals in
+- quick intent may emit multiple unlocked common-catalog task proposals in
   `RouteDecision.actions`; "quick" means small model plus compact catalog and
   short latency, not "single task only";
 - deeper capability selection and revision belong to the Agent model
@@ -77,7 +81,7 @@ that later validators, agents, Skill Runtime, and providers must accept before
 anything executes.
 
 For quick-router compound robot actions, `RouteDecision.actions[]` is the
-compatibility execution hint. Items must use exact common-catalog
+compatibility execution hint. Items must use exact unlocked common-catalog
 `capability_id` values, schema-shaped `args`, and per-action `confidence`.
 If any required action is below the Router threshold, the quick plan is
 delegated to `deep_thought` rather than partially executed. Spoken content
@@ -115,11 +119,11 @@ validation, but it must not automatically resume interrupted physical work.
    phrase routing and regex action parsing must not become normal hybrid
    language understanding.
 2. The capability catalog bounds the model's choices.
-   The fast Router receives the compact common catalog; deepthinking receives
-   the full catalog. The model may select from known routes, capabilities, or
-   task types. It must not invent skills, body controls, hardware state, or
-   hidden provider support. Catalog partitioning controls prompt budget; it is
-   not semantic action selection.
+   The fast Router receives the compact unlocked common catalog; deepthinking
+   receives the full catalog. The model may select from known routes,
+   capabilities, or task types. It must not invent skills, body controls,
+   hardware state, or hidden provider support. Catalog partitioning controls
+   prompt budget; it is not semantic action selection.
 3. Low confidence means delegate, clarify, or fail closed.
    Ambiguous or low-confidence quick routes should normally enter
    `deep_thought` so the larger model can reason with session memory.

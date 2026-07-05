@@ -47,8 +47,11 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 - three-stage route flow: emergency filter, Qwen quick intent routing, and
   larger-model deepthought handoff when quick confidence is low or planning is
   needed;
+- multi-route quick-router output that keeps the top-level `route` as a
+  compatibility primary route while splitting independent chat, memory,
+  deepthought, tool, and skill work into route items with separate policies;
 - staged task/action proposals merged into `RouteDecision.metadata.task_list`
-  before Agent and Skill Runtime validation;
+  and shared task proposals before Agent and Skill Runtime validation;
 - native strict `POST /interaction` plus explicit compatibility rollback;
 - trusted Skill Runtime with validation, confirmation, timeout, cancellation,
   bounded scheduling, and traces;
@@ -155,7 +158,7 @@ commands are in the [Runbook](CHROMIE_RUNBOOK.md).
 | `agent/` | Native interaction, capabilities, and TaskGraph APIs |
 | `asr/`, `tts/` | Speech services |
 | `shared/` | Shared contracts and scheduling primitives |
-| `capabilities/` | Pinned external capability manifests |
+| `capabilities/` | Pinned external capability manifests and prompt-tier presets |
 | `hardware/` | Legacy mock compatibility daemon |
 | `scripts/` | Startup, validation, evidence, and release tooling |
 | `docs/` | Project authority, interfaces, configuration, and decisions |

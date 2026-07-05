@@ -137,6 +137,23 @@ async def health() -> HealthResponse:
 async def routes() -> dict:
     return {
         "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
+        "route_item_lanes": [
+            "immediate_speech",
+            "conversation",
+            "post_turn",
+            "deepthought",
+            "skill_runtime",
+            "tool",
+            "deterministic_control",
+            "none",
+        ],
+        "context_profiles": [
+            "none",
+            "fast_minimal",
+            "session_compact",
+            "capability_safety",
+            "full_mind",
+        ],
         "lanes": [
             {
                 "id": "emergency_filter",
@@ -219,12 +236,15 @@ def _prompt_catalog_capabilities(
         if item.get("available") is False:
             continue
         tier = str(item.get("prompt_tier") or "rare")
-        if scope == "common" and tier != "common":
-            continue
+        locked = item.get("prompt_tier_locked") is True
+        if scope == "common":
+            if tier != "common" or locked:
+                continue
         items.append(dict(item))
     items.sort(
         key=lambda item: (
             str(item.get("prompt_tier") or "rare") != "common",
+            item.get("prompt_tier_locked") is True,
             item.get("interaction_executable") is not True,
             str(item.get("route") or ""),
             _capability_id(item),
@@ -290,6 +310,19 @@ def _capability_allowed_in_quick_action(item: dict) -> bool:
     if capability_id == "chromie.speak":
         return _capability_available(item)
     return _capability_executable(item)
+
+
+def _quick_common_ability_ids(request: RouteRequest) -> set[str]:
+    items = request.context.get("common_ability_catalog")
+    if not isinstance(items, list):
+        items = request.context.get("prompt_capabilities_common")
+    if not isinstance(items, list):
+        return set()
+    return {
+        capability_id
+        for capability_id in (_capability_id(item) for item in items if isinstance(item, dict))
+        if capability_id
+    }
 
 
 def _interaction_executable_candidates(result: CapabilityCatalogResult) -> list[dict]:
@@ -415,10 +448,19 @@ def _validate_llm_capability_decision(
     prompt_capabilities_all = request.context.get("prompt_capabilities_all")
     if not isinstance(prompt_capabilities_all, list):
         prompt_capabilities_all = []
+    common_ability_catalog = request.context.get("common_ability_catalog")
+    if not isinstance(common_ability_catalog, list):
+        common_ability_catalog = prompt_capabilities
+    full_ability_catalog = request.context.get("full_ability_catalog")
+    if not isinstance(full_ability_catalog, list):
+        full_ability_catalog = prompt_capabilities_all
+    common_ability_ids = _quick_common_ability_ids(request)
     candidates = _unique_capabilities(
         [
             *list(result.matches or []),
+            *common_ability_catalog,
             *prompt_capabilities,
+            *full_ability_catalog,
             *prompt_capabilities_all,
         ]
     )
@@ -459,6 +501,11 @@ def _validate_llm_capability_decision(
                 selected = by_id.get(capability_id)
                 if selected is None:
                     invalid_reasons.append(f"action[{index}] unknown capability_id {capability_id!r}")
+                    continue
+                if common_ability_ids and capability_id not in common_ability_ids:
+                    invalid_reasons.append(
+                        f"action[{index}] capability is outside the fast common ability catalog"
+                    )
                     continue
                 if not _capability_allowed_in_quick_action(selected):
                     invalid_reasons.append(f"action[{index}] capability is unavailable or not quick-action executable")
@@ -566,6 +613,15 @@ def _validate_llm_capability_decision(
                 ),
             )
         selected = by_id.get(selected_id)
+        if selected_id and common_ability_ids and selected_id not in common_ability_ids:
+            return _deep_thought_from_low_confidence(
+                request,
+                decision,
+                reason_prefix=(
+                    "quick router selected a capability outside the fast common "
+                    f"ability catalog: {selected_id}"
+                ),
+            )
         if selected_id and (selected is None or not _capability_executable(selected)):
             executable = _interaction_executable_candidates(result)
             if not executable:
@@ -640,7 +696,13 @@ def _deep_thought_from_low_confidence(
 ) -> RouteDecision:
     candidates = decision.candidate_capabilities
     if not candidates:
-        raw_candidates = request.context.get("candidate_capabilities", [])
+        raw_candidates = request.context.get("common_ability_catalog", [])
+        if not raw_candidates:
+            raw_candidates = request.context.get("prompt_capabilities_common", [])
+        if not raw_candidates:
+            raw_candidates = request.context.get("full_ability_catalog", [])
+        if not raw_candidates:
+            raw_candidates = request.context.get("prompt_capabilities_all", [])
         candidates = raw_candidates if isinstance(raw_candidates, list) else []
     reason_parts = [
         reason_prefix
@@ -674,6 +736,19 @@ def _deep_thought_from_low_confidence(
         "quick_task_list": quick_stage.get("tasks", []),
         "quick_task_proposals": quick_stage.get("task_proposals", []),
     }
+    inherited_metadata = {
+        key: value
+        for key, value in (decision.metadata or {}).items()
+        if key
+        not in {
+            "route_items",
+            "route_item_count",
+            "route_stage_outputs",
+            "task_list",
+            "task_proposals",
+            "route_merge",
+        }
+    }
     return finalize_decision(
         RouteDecision(
             route="deep_thought",
@@ -692,7 +767,7 @@ def _deep_thought_from_low_confidence(
             reason="; ".join(reason_parts),
             source="llm",
             metadata={
-                **(decision.metadata or {}),
+                **inherited_metadata,
                 "thinking_ack_allowed": thinking_ack_allowed,
                 "thinking_ack_source": thinking_ack_source,
                 "quick_router_review_request": quick_review_request,
@@ -772,9 +847,17 @@ def _attach_stage_context(
     candidate_capabilities = list(catalog_result.matches or [])
     common = _unique_capabilities(list(prompt_capabilities_common or []))
     full = _unique_capabilities(list(prompt_capabilities_all or []))
+    common_ids = [
+        capability_id
+        for capability_id in (_capability_id(item) for item in common)
+        if capability_id
+    ]
     request.context = {
         **request.context,
         "candidate_capabilities": candidate_capabilities,
+        "common_ability_catalog": common,
+        "common_ability_ids": common_ids,
+        "full_ability_catalog": full,
         "prompt_capabilities_common": common,
         "prompt_capabilities_all": full,
         "prompt_catalog_scope": "common",
@@ -788,9 +871,11 @@ def _attach_stage_context(
             "quick_intent": {
                 "model": settings.model,
                 "confidence_threshold": settings.confidence_threshold,
-                "capability_source": "compact_snapshot_catalog"
-                if full
-                else "query_biased_search_fallback",
+                "common_ability_count": len(common),
+                "catalog_match_count": len(candidate_capabilities),
+                "capability_source": "common_snapshot_catalog"
+                if common
+                else "common_catalog_unavailable",
             },
         },
     }
@@ -885,26 +970,30 @@ async def _review_priority_interrupt(
     if interrupt_decision.route != "interrupt":
         return interrupt_decision
 
+    snapshot_method = getattr(capability_catalog, "snapshot", None)
     try:
-        catalog_result = await capability_catalog.search(
-            text=request.text,
-            language=request.language,
-        )
+        catalog_snapshot = await snapshot_method() if callable(snapshot_method) else {}
     except Exception as exc:
-        logger.warning("post-interrupt catalog context failed: %s", exc)
-        return _attach_post_interrupt_review(
-            interrupt_decision,
-            None,
-            status="unavailable",
-            reason=f"catalog_error:{type(exc).__name__}",
-        )
+        logger.warning("post-interrupt catalog snapshot failed: %s", exc)
+        catalog_snapshot = {"live_refresh_error": f"{type(exc).__name__}: {exc}"}
+    prompt_capabilities_all = _prompt_catalog_capabilities(
+        catalog_snapshot,
+        scope="all",
+    )
+    prompt_capabilities_common = _prompt_catalog_capabilities(
+        catalog_snapshot,
+        scope="common",
+    )
+    catalog_result = _catalog_result_from_snapshot(request, catalog_snapshot)
 
     _attach_stage_context(
         request,
         emergency_matched=True,
         catalog_result=catalog_result,
+        prompt_capabilities_common=prompt_capabilities_common,
+        prompt_capabilities_all=prompt_capabilities_all,
     )
-    interrupt_decision.candidate_capabilities = list(catalog_result.matches or [])
+    interrupt_decision.candidate_capabilities = list(prompt_capabilities_common)
 
     try:
         advisory = await llm_router.review_after_priority_interrupt(
@@ -1011,20 +1100,10 @@ async def route(request: RouteRequest) -> RouteDecision:
             catalog_snapshot,
             scope="common",
         )
-        if prompt_capabilities_all:
-            catalog_result = _catalog_result_from_snapshot(
-                request,
-                catalog_snapshot,
-            )
-        else:
-            catalog_result = await capability_catalog.search(
-                text=request.text,
-                language=request.language,
-            )
-            prompt_capabilities_common = list(catalog_result.matches or [])
-            prompt_capabilities_all = _unique_capabilities(
-                [*prompt_capabilities_common, *list(catalog_result.matches or [])]
-            )
+        catalog_result = _catalog_result_from_snapshot(
+            request,
+            catalog_snapshot,
+        )
         _attach_stage_context(
             request,
             emergency_matched=False,

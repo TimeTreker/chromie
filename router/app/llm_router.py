@@ -28,6 +28,16 @@ ROUTE_NAMES = {
 }
 
 DETERMINISTIC_ONLY_ROUTES = {"interrupt", "ignore"}
+ROUTE_ITEM_PRIMARY_RANK = {
+    "interrupt": 0,
+    "robot_action": 1,
+    "deep_thought": 2,
+    "tool": 3,
+    "memory": 4,
+    "clarify": 5,
+    "chat": 6,
+    "ignore": 7,
+}
 PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability",
     "capability:",
@@ -41,6 +51,9 @@ PLACEHOLDER_CAPABILITY_INTENTS = {
 }
 _ROUTER_CONTEXT_OMIT_KEYS = {
     "candidate_capabilities",
+    "common_ability_catalog",
+    "common_ability_ids",
+    "full_ability_catalog",
     "prompt_capabilities_common",
     "prompt_capabilities_all",
     "prompt_catalog_scope",
@@ -107,9 +120,10 @@ def _compact_candidate_capabilities(candidates: Any, *, limit: int = 8) -> list[
 
 def _review_capabilities_from_request(request: RouteRequest) -> list[dict[str, Any]]:
     for key in (
-        "candidate_capabilities",
-        "prompt_capabilities_all",
+        "common_ability_catalog",
         "prompt_capabilities_common",
+        "full_ability_catalog",
+        "prompt_capabilities_all",
     ):
         value = request.context.get(key, [])
         if isinstance(value, list) and value:
@@ -120,9 +134,10 @@ def _review_capabilities_from_request(request: RouteRequest) -> list[dict[str, A
 def _capability_ids_from_request(request: RouteRequest) -> set[str]:
     capability_ids: set[str] = set()
     for key in (
-        "candidate_capabilities",
-        "prompt_capabilities_all",
+        "common_ability_catalog",
         "prompt_capabilities_common",
+        "full_ability_catalog",
+        "prompt_capabilities_all",
     ):
         value = request.context.get(key, [])
         if not isinstance(value, list):
@@ -166,6 +181,8 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[di
     compact: list[dict[str, Any]] = []
     for item in candidates[:limit]:
         if not isinstance(item, dict):
+            continue
+        if item.get("prompt_tier_locked") is True:
             continue
         capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
         if not capability_id:
@@ -229,6 +246,39 @@ def _router_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
     return prompt_context
 
 
+def _router_fast_context_section(mind: Any) -> str:
+    """Minimal context for the quick Router.
+
+    The quick Router should decide whether a task needs the full mind profile;
+    it should not always pay for worldview/lifeview/valueview tokens itself.
+    Deepthinking and capability prompts still receive richer mind context.
+    """
+
+    identity = {}
+    if isinstance(mind, dict) and isinstance(mind.get("identity"), dict):
+        raw_identity = mind["identity"]
+        identity = {
+            "profile_id": mind.get("profile_id"),
+            "version": mind.get("version"),
+            "name": raw_identity.get("name"),
+            "pronouns": raw_identity.get("pronouns"),
+            "role": raw_identity.get("role") or raw_identity.get("description"),
+        }
+    return (
+        "Fast Router Context:\n"
+        f"{_bounded_json(identity or {'name': 'Chromie'}, max_chars=260)}\n"
+        "The full owner-approved mind profile, worldview, lifeview, valueview, "
+        "long-term goals, and core principles are available only to downstream "
+        "full_mind/deepthought prompts. Do not reproduce or infer those details here.\n"
+        "Your job is to mark each route item with the lightest safe context_profile:\n"
+        "- fast_minimal for greetings, simple acknowledgements, and safe immediate speech.\n"
+        "- session_compact for ordinary chat, tools, or memory that need bounded session context.\n"
+        "- capability_safety for robot_action and other Skill Runtime work.\n"
+        "- full_mind for identity, values, principles, risk judgment, self-description, long-horizon goals, or complex planning.\n"
+        "If an item needs worldview/lifeview/valueview or long deliberation, route that item to deep_thought with context_profile=full_mind."
+    )
+
+
 def _router_global_context_section(mind: Any) -> str:
     if not isinstance(mind, dict) or not mind:
         mind = {}
@@ -262,6 +312,37 @@ def _router_global_context_section(mind: Any) -> str:
         "Owner-Approved Mind Summary:\n"
         f"{summary or 'not supplied'}"
     )
+
+
+def _route_items_from_parsed(parsed: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = parsed.get("routes")
+    if raw is None:
+        metadata = parsed.get("metadata")
+        if isinstance(metadata, dict):
+            raw = metadata.get("route_items") or metadata.get("routes")
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def _dominant_route_from_items(items: list[dict[str, Any]]) -> str:
+    routes = [
+        str(item.get("route") or "").strip()
+        for item in items
+        if str(item.get("route") or "").strip() in ROUTE_NAMES
+    ]
+    if not routes:
+        return ""
+    return min(routes, key=lambda route: ROUTE_ITEM_PRIMARY_RANK.get(route, 99))
+
+
+def _first_route_item_intent(items: list[dict[str, Any]], route: str) -> str:
+    for item in items:
+        if str(item.get("route") or "").strip() == route:
+            intent = str(item.get("intent") or "").strip()
+            if intent:
+                return intent
+    return ""
 
 
 def _is_placeholder_capability_intent(intent: str) -> bool:
@@ -306,59 +387,56 @@ class OllamaLLMRouter:
             )
 
     def build_user_prompt(self, request: RouteRequest) -> str:
-        candidates = request.context.get("candidate_capabilities", [])
-        prompt_capabilities = request.context.get("prompt_capabilities_all", [])
+        prompt_capabilities = request.context.get("common_ability_catalog", [])
         if not prompt_capabilities:
             prompt_capabilities = request.context.get("prompt_capabilities_common", [])
-        if not prompt_capabilities:
-            prompt_capabilities = candidates
         compact_prompt_capabilities = _compact_prompt_capabilities(prompt_capabilities)
-        common_skill_ids = [
+        common_ability_ids = [
             item["skill_id"]
             for item in compact_prompt_capabilities
             if item.get("skill_id")
         ]
-        common_catalog_json = _bounded_json(
+        common_ability_catalog_json = _bounded_json(
             compact_prompt_capabilities,
             max_chars=7200,
-        )
-        candidates_json = _bounded_json(
-            _compact_candidate_capabilities(candidates),
-            max_chars=800,
         )
         mind = request.context.get("mind", {})
         session_context = _router_prompt_context(request.context)
         context_json = _bounded_json(session_context, max_chars=500)
         return (
             "Global Context Group:\n"
-            f"{_router_global_context_section(mind)}\n\n"
+            f"{_router_fast_context_section(mind)}\n\n"
             "Session Context Group:\n"
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON: {context_json}\n\n"
             "Current Job:\n"
-            "Act as Chromie's quick intent router. Decide one route and optionally emit listed-skill task proposals; do not answer, execute, or authorize side effects. "
-            "Understand intent broadly before checking the catalog; the catalog constrains executable actions, not meaning. "
+            "Act as Chromie's quick intent router and fast lane splitter. Return one compatibility route plus optional routes[] items; do not answer, execute, or authorize side effects. "
+            "Infer from meaning/context/abilities/schemas and understand intent broadly before checking the catalog; the catalog constrains executable actions, not meaning. "
             "Choose route deep_thought for complex reasoning, design, debugging, implementation planning, or when the request needs deeper thought, task-session creation, or task-session continuation. "
             "Choosing route=deep_thought is only delegation; do not perform or reveal reasoning inside the router. "
+            "For mixed utterances, split independent work into routes[] items so chat, memory, deep_thought, tools, and robot_action can follow separate policies. "
+            "Use context_profile on each item to decide whether the downstream task needs no mind context, compact session context, capability safety context, or full mind/worldview/lifeview/valueview context. "
             "Return calibrated low confidence when uncertain.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             "Output Template Preview:\n"
             "- Chat/fact/greeting: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9}\n"
+            "- Fast greeting with direct speech: {\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.9,\"routes\":[{\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.9,\"lane\":\"immediate_speech\",\"context_profile\":\"fast_minimal\",\"direct_to_tts\":true,\"text\":\"Hi, I'm here.\"}]}\n"
+            "- Mixed chat/memory/deepthought: {\"route\":\"deep_thought\",\"intent\":\"mixed_request\",\"confidence\":0.82,\"routes\":[{\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.95,\"lane\":\"immediate_speech\",\"context_profile\":\"fast_minimal\",\"direct_to_tts\":true,\"text\":\"Hi, I'm here.\"},{\"route\":\"memory\",\"intent\":\"remember_user_preference\",\"confidence\":0.86,\"lane\":\"post_turn\",\"context_profile\":\"session_compact\"},{\"route\":\"deep_thought\",\"intent\":\"plan_complex_task\",\"confidence\":0.78,\"lane\":\"deepthought\",\"context_profile\":\"full_mind\",\"requires_mind\":true}]}\n"
             "- Single listed skill: {\"route\":\"robot_action\",\"intent\":\"capability:<exact skill_id>\",\"confidence\":0.9}\n"
             "- Multiple listed skills: {\"route\":\"robot_action\",\"intent\":\"compound_common_catalog_task\",\"confidence\":0.9,\"actions\":[{\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential\",\"confidence\":0.9}]}\n"
             "- Missing ability: {\"route\":\"deep_thought\",\"intent\":\"missing_or_unsupported_ability\",\"confidence\":0.6,\"metadata\":{\"desired_abilities\":[{\"ability_id\":\"...\",\"intent\":\"...\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"...\"}]}}\n"
             "- Clarify: {\"route\":\"clarify\",\"intent\":\"clarify_target_or_skill\",\"confidence\":0.7}\n"
-            "The final route is singular; use actions for multiple skills, never routes[].\n"
-            f"Available skill IDs: {_bounded_json(common_skill_ids, max_chars=1400)}\n"
-            f"Compact skill catalog JSON: {common_catalog_json}\n"
-            f"Query-biased catalog hints JSON: {candidates_json}\n"
+            "The top-level route is a compatibility primary route. Use routes[] for multiple independent policy lanes; use actions[] only for ordered listed skills inside a robot_action route item.\n"
+            f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=1400)}\n"
+            f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Decision checks: use semantic meaning, not phrase rules. If the user asks Chromie to physically perform a listed body/head/gaze/motion/expression skill now, return robot_action using that exact skill. "
             "A polite ability-shaped request is still robot_action when it asks for a listed physical skill now. "
             "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
+            "Only put direct_to_tts=true on a chat route item when the text is a safe short greeting, acknowledgement, or thinking prelude; do not use it for facts, advice, identity, values, memory writes, tool results, or action completion claims. "
             "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the compact skill catalog. "
             "Factual agreement/disagreement is chat: questions about the Moon, Sun, shape, temperature, or other world knowledge are not deep_thought or robot_action even if ability candidates share words such as round, turn, left, right, walk, or move; the quick router routes common-fact questions to chat. "
-            "Query-biased hints are context, not recommendations. Use working memory, current task context, and recent action history for follow-ups, but never as authorization for side effects. "
+            "Use working memory, current task context, and recent action history for follow-ups, but never as authorization for side effects. "
             "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran. "
             "If no listed skill fits clearly, choose deep_thought or clarify and include metadata.desired_abilities with status missing_ability when useful.\n\n"
             "Cost Function:\n"
@@ -366,23 +444,29 @@ class OllamaLLMRouter:
             "Prefer supported interaction-executable skill IDs over generic robot_action. Preserve unsupported desired abilities as non-executable proposals. "
             "For compound listed-skill requests, preserve each requested skill in actions instead of collapsing to the first skill. Each proposed action has its own confidence; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful speak_first.\n\n"
             "Semantic Examples:\n"
+            "- If the user says hello or simple small talk, return chat with a routes[] item using lane=immediate_speech, context_profile=fast_minimal, direct_to_tts=true, and a short safe text.\n"
+            "- If the utterance contains a greeting plus a memory update plus a complex planning request, return top-level route=deep_thought and three routes[] items: immediate chat, post_turn memory, and deepthought full_mind.\n"
+            "- If the task needs identity, values, principles, safety judgment, worldview/lifeview/valueview, or long-term goal reasoning, route that item to deep_thought with context_profile=full_mind and requires_mind=true.\n"
             "- If the user asks whether you agree with a common factual claim about the Moon, Sun, shape, heat, or similar world knowledge, return {\"route\":\"chat\",\"intent\":\"factual_agreement\",\"confidence\":0.9}.\n"
             "- If the user asks Chromie to walk, turn, nod, shake her head, blink, or perform another listed physical/expression skill now, return robot_action with intent capability:<exact skill_id>.\n"
             "- If the user asks for several listed skills, such as walking, speaking, and blinking, return robot_action with actions ordered by the requested task sequence; use chromie.speak for the spoken part and include args.text.\n"
             "- If the user asks for a physical/social ability you understand but it is not in the compact skill catalog, return deep_thought or clarify and include metadata.desired_abilities, for example {\"ability_id\":\"social.blink_eyes\",\"intent\":\"blink eyes\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"no executable blink skill is in the compact skill catalog\"}.\n"
             "- If no listed skill fits clearly or you are not confident, return deep_thought with a brief speak_first that tells the user you need a moment. The speak_first must be truthful and must not claim execution.\n"
-            "- If catalog hints are planning-only or weak background context and the user is only chatting or asking a fact, ignore those hints for routing. Generalize these examples from meaning; do not make phrase rules.\n\n"
+            "- Generalize these examples from meaning; do not make phrase rules.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object matching one of the templates above. Required keys: route, intent, confidence. The final route is singular; never output a routes array. "
+            "Return one compact JSON object matching one of the templates above. Required compatibility keys: route, intent, confidence. You may also output routes[] for independent route items. "
             "Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
             "Omit agents, metadata, candidate_capabilities, and explanations unless they change downstream routing. "
+            "Each routes[] item may include route, intent, confidence, lane, context_profile, requires_mind, direct_to_tts, text, skill_id, args, actions, reason, and metadata. "
+            "Allowed lanes: immediate_speech, conversation, post_turn, deepthought, skill_runtime, tool, deterministic_control, none. "
+            "Allowed context_profile values: none, fast_minimal, session_compact, capability_safety, full_mind. "
             "metadata.desired_abilities may contain understood but non-executable ability proposals; these are not executable actions. "
             "Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object. "
             "For selected robot_action use intent capability:<exact skill_id> copied from the compact skill catalog. Never output placeholder intents such as capability or capability:<exact capability_id>. "
             "For compound or parameterized listed-skill robot_action, include actions as an ordered array of objects: {\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential|parallel\",\"confidence\":0.0}. "
             "Each action capability_id must be copied exactly from the compact skill catalog. For chromie.speak, args must include a short natural text field. "
             "Never put missing or planned abilities in actions; put them in metadata.desired_abilities and choose deep_thought or clarify. "
-            "Set action confidence from semantic fit and argument confidence, not from catalog search score alone. "
+            "Set action confidence from semantic fit and argument confidence. "
             "If you include actions, use a semantic intent such as compound_common_catalog_task instead of a placeholder capability intent. "
             "For uncertain deep_thought handoff, you may include speak_first with one short user-facing sentence in the user's language, such as a natural request for a moment to think. "
             "Speak_first must sound like Chromie herself: an embodied robot with natural, human-like social warmth, not a program, programme, backend, software process, or language model. "
@@ -409,7 +493,7 @@ class OllamaLLMRouter:
         return payload
 
     def build_intent_review_payload(self, request: RouteRequest) -> dict[str, Any]:
-        candidates_json = json.dumps(
+        abilities_json = json.dumps(
             _compact_candidate_capabilities(
                 _review_capabilities_from_request(request),
                 limit=16,
@@ -435,12 +519,12 @@ class OllamaLLMRouter:
                         f"- Bounded session context JSON: {session_context}\n\n"
                         "Current Job:\n"
                         "- You are now acting as Chromie's semantic route reviewer.\n"
-                        "- Use semantic generalization from meaning, session context, and supplied candidate capability descriptions.\n"
+                        "- Use semantic generalization from meaning, session context, and supplied common ability descriptions.\n"
                         "- Do not use phrase rules, and do not turn prompt wording into keyword rules.\n"
                         "- The deterministic emergency/noise filter already passed before this review.\n\n"
                         "Task Context Group:\n"
                         "- Review the latest user input and decide whether the quick route should be chat, deep_thought, robot_action, tool, memory, clarify, interrupt, or ignore.\n"
-                        "- Body/head/gaze/motion/expression requests are robot_action when an available interaction_executable candidate can satisfy them.\n"
+                        "- Body/head/gaze/motion/expression requests are robot_action when an available interaction_executable common ability can satisfy them.\n"
                         "- Capability questions can be polite requests; if the user is pragmatically asking Chromie to perform a listed physical action now, choose robot_action.\n"
                         "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless physical motion is explicitly requested.\n\n"
                         "- Use working memory, task context, and recent action history for follow-up resolution, but not as authorization for side effects.\n"
@@ -450,7 +534,7 @@ class OllamaLLMRouter:
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not choose interrupt or ignore unless the text is plainly stop, cancel, silence, empty, or unusable audio.\n"
-                        "- If selecting a known candidate, set intent to capability:<exact capability_id>; otherwise use a short semantic intent such as robot_action."
+                        "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short semantic intent such as robot_action."
                     ),
                 },
                 {
@@ -458,7 +542,7 @@ class OllamaLLMRouter:
                     "content": (
                         "Task Context Group:\n"
                         f"- Latest user input: {request.text}\n"
-                        f"- Candidate capabilities JSON: {candidates_json}"
+                        f"- Common ability catalog JSON: {abilities_json}"
                     ),
                 },
             ],
@@ -470,8 +554,8 @@ class OllamaLLMRouter:
         }
 
     def build_deterministic_route_repair_payload(self, request: RouteRequest) -> dict[str, Any]:
-        candidates_json = json.dumps(
-            _compact_candidate_capabilities(request.context.get("candidate_capabilities", [])),
+        abilities_json = json.dumps(
+            _compact_candidate_capabilities(_review_capabilities_from_request(request)),
             ensure_ascii=False,
             separators=(",", ":"),
         )
@@ -493,8 +577,8 @@ class OllamaLLMRouter:
                         f"- Bounded session context JSON: {session_context}\n\n"
                         "Current Job:\n"
                         "- Repair a realtime robot route after the deterministic emergency/noise filter already passed.\n"
-                        "- The quick router incorrectly returned a deterministic-only route; choose the best non-deterministic route from semantic meaning, context, and candidates.\n"
-                        "- Decide from meaning and candidate capability descriptions, not phrase rules.\n\n"
+                        "- The quick router incorrectly returned a deterministic-only route; choose the best non-deterministic route from semantic meaning, context, and common abilities.\n"
+                        "- Decide from meaning and common ability descriptions, not phrase rules.\n\n"
                         "Task Context Group:\n"
                         "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
                         "- Speech-only requests are chat.\n"
@@ -506,7 +590,7 @@ class OllamaLLMRouter:
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not use interrupt or ignore.\n"
                         "- For a selected capability, set intent to capability:<exact capability_id>.\n"
-                        "- Confidence is semantic routing confidence, not the catalog score; use at least 0.72 when the request clearly maps to a candidate."
+                        "- Confidence is semantic routing confidence; use at least 0.72 when the request clearly maps to a common ability."
                     ),
                 },
                 {
@@ -514,7 +598,7 @@ class OllamaLLMRouter:
                     "content": (
                         "Task Context Group:\n"
                         f"- Latest user input: {request.text}\n"
-                        f"- Candidate capabilities JSON: {candidates_json}"
+                        f"- Common ability catalog JSON: {abilities_json}"
                     ),
                 },
             ],
@@ -526,8 +610,8 @@ class OllamaLLMRouter:
         }
 
     def build_placeholder_capability_repair_payload(self, request: RouteRequest) -> dict[str, Any]:
-        candidates_json = _bounded_json(
-            _compact_candidate_capabilities(request.context.get("candidate_capabilities", [])),
+        abilities_json = _bounded_json(
+            _compact_candidate_capabilities(_review_capabilities_from_request(request)),
             max_chars=1800,
         )
         session_context = _bounded_json(_context_without_prompt_globals(request.context), max_chars=1400)
@@ -543,7 +627,7 @@ class OllamaLLMRouter:
                         "Current Job:\n"
                         "- Repair a malformed route for Chromie after the emergency/noise filter already passed.\n"
                         "- The quick router returned robot_action with a placeholder capability intent instead of a real capability ID.\n"
-                        "- Decide from semantic meaning, bounded context, and candidates, not phrase rules.\n\n"
+                        "- Decide from semantic meaning, bounded context, and common abilities, not phrase rules.\n\n"
                         "Task Context Group:\n"
                         "- Speech-only, greeting, identity/status, factual, joke, story, song, and spoken performance requests are chat unless physical/tool action is explicitly requested.\n"
                         "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
@@ -553,9 +637,9 @@ class OllamaLLMRouter:
                         "- Return compact JSON only with keys route, intent, and confidence.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
-                        "- For robot_action with a selected skill, set intent to capability:<exact capability_id> from candidates.\n"
+                        "- For robot_action with a selected skill, set intent to capability:<exact capability_id> from the common ability catalog.\n"
                         "- Never return placeholder intents such as capability or capability:<exact capability_id>.\n"
-                        "- Confidence is semantic routing confidence, not the catalog score."
+                        "- Confidence is semantic routing confidence."
                     ),
                 },
                 {
@@ -564,7 +648,7 @@ class OllamaLLMRouter:
                         f"Latest user input: {request.text}\n"
                         f"Language hint: {request.language or 'auto'}\n"
                         f"Bounded session context JSON: {session_context}\n"
-                        f"Candidate capabilities JSON: {candidates_json}"
+                        f"Common ability catalog JSON: {abilities_json}"
                     ),
                 },
             ],
@@ -580,8 +664,8 @@ class OllamaLLMRouter:
         request: RouteRequest,
         interrupt_decision: RouteDecision,
     ) -> dict[str, Any]:
-        candidates_json = _bounded_json(
-            _compact_candidate_capabilities(request.context.get("candidate_capabilities", [])),
+        abilities_json = _bounded_json(
+            _compact_candidate_capabilities(_review_capabilities_from_request(request)),
             max_chars=1800,
         )
         mind = request.context.get("mind", {})
@@ -619,7 +703,7 @@ class OllamaLLMRouter:
                         "Task Context Group:\n"
                         "- Choose interrupt when the user truly asked to stop, cancel, pause, be quiet, or halt current work.\n"
                         "- Choose a non-interrupt route when the text merely mentions stop, uses stop in another meaning, or asks for a different chat/tool/memory/body task.\n"
-                        "- If correcting to robot_action, use intent capability:<exact capability_id> when a supplied candidate clearly fits.\n"
+                        "- If correcting to robot_action, use intent capability:<exact capability_id> when a supplied common ability clearly fits.\n"
                         "- Physical actions are still only proposals; downstream Agent and Skill Runtime must validate and confirm them.\n\n"
                         "Output Contract:\n"
                         "- Return one compact RouteDecision JSON object.\n"
@@ -635,7 +719,7 @@ class OllamaLLMRouter:
                     "content": (
                         "Task Context Group:\n"
                         f"- Latest user input: {request.text}\n"
-                        f"- Candidate capabilities JSON: {candidates_json}"
+                        f"- Common ability catalog JSON: {abilities_json}"
                     ),
                 },
             ],
@@ -658,6 +742,22 @@ class OllamaLLMRouter:
     def _decision_from_response(self, request: RouteRequest, data: dict[str, Any]) -> RouteDecision:
         content = data.get("message", {}).get("content", "")
         parsed = _extract_json_object(content)
+        route_items = _route_items_from_parsed(parsed)
+        dominant_route = _dominant_route_from_items(route_items)
+        if "route" not in parsed and dominant_route:
+            parsed["route"] = dominant_route
+            item_intent = _first_route_item_intent(route_items, dominant_route)
+            if item_intent and "intent" not in parsed:
+                parsed["intent"] = item_intent
+            parsed["reason"] = (
+                f"{parsed.get('reason')}; " if parsed.get("reason") else ""
+            ) + "LLM returned route_items; router selected compatibility route"
+        if route_items:
+            metadata = parsed.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            metadata.setdefault("route_items", route_items)
+            parsed["metadata"] = metadata
         route_from_intent = str(parsed.get("intent") or "").strip()
         supplied_capability_ids = _capability_ids_from_request(request)
         route_value = str(parsed.get("route") or "").strip()
@@ -904,7 +1004,13 @@ class OllamaLLMRouter:
     ) -> RouteDecision:
         candidates = decision.candidate_capabilities
         if not candidates:
-            raw_candidates = request.context.get("candidate_capabilities", [])
+            raw_candidates = request.context.get("common_ability_catalog", [])
+            if not raw_candidates:
+                raw_candidates = request.context.get("prompt_capabilities_common", [])
+            if not raw_candidates:
+                raw_candidates = request.context.get("full_ability_catalog", [])
+            if not raw_candidates:
+                raw_candidates = request.context.get("prompt_capabilities_all", [])
             candidates = raw_candidates if isinstance(raw_candidates, list) else []
         reason_parts = [
             reason_prefix
@@ -914,6 +1020,19 @@ class OllamaLLMRouter:
         ]
         if decision.reason:
             reason_parts.append(f"quick_reason={decision.reason}")
+        inherited_metadata = {
+            key: value
+            for key, value in (decision.metadata or {}).items()
+            if key
+            not in {
+                "route_items",
+                "route_item_count",
+                "route_stage_outputs",
+                "task_list",
+                "task_proposals",
+                "route_merge",
+            }
+        }
         return finalize_decision(
             RouteDecision(
                 route="deep_thought",
@@ -929,7 +1048,7 @@ class OllamaLLMRouter:
                 reason="; ".join(reason_parts),
                 source="llm",
                 metadata={
-                    **dict(decision.metadata or {}),
+                    **inherited_metadata,
                     "thinking_ack_allowed": bool(decision.speak_first),
                     "thinking_ack_source": (
                         "quick_llm_speak_first" if decision.speak_first else "none"

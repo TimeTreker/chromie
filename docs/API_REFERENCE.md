@@ -19,15 +19,22 @@ here. Current revision and verification status are maintained in
 
 Interrupt and ignore decisions are normalized deterministically: they do not
 require the Agent and they do not speak. For other input, Router queries the
-Agent-owned shared capability catalog, sends bounded context and candidates to
-the quick intent Router model when enabled, and delegates low-confidence or
-explicitly complex quick routes to `deep_thought`. Normal robot, tool, memory,
-conversation, and deep-thought intent is not selected by phrase rules.
-`RouteDecision.candidate_capabilities` preserves the ranked evidence for the
-native interaction path.
+Agent-owned shared capability catalog snapshot, sends bounded context and the
+unlocked common ability catalog to the quick intent Router model when enabled,
+and delegates low-confidence or explicitly complex quick routes to
+`deep_thought`. Normal robot, tool, memory, conversation, and deep-thought
+intent is not selected by phrase rules.
+Per-query catalog search matches are not part of the fast Router decision
+surface.
 
 Router also attaches staged task metadata:
 
+- `routes`: optional preferred multi-route items for one utterance; each item
+  has its own `route`, `intent`, `confidence`, `lane`, `context_profile`,
+  optional `requires_mind`, optional `direct_to_tts`, and optional `text`,
+  `skill_id`, `args`, or `actions`;
+- `metadata.route_items`: JSON mirror of `routes[]` for older callers and
+  trace tools;
 - `metadata.route_stage_outputs`: one entry per route stage that contributed or
   passed, each with legacy proposed `tasks`/`actions` and shared
   `task_proposals`;
@@ -56,15 +63,29 @@ task-lifecycle metadata:
 This metadata is advisory planning state. Concrete skill execution still uses
 validated `RouteDecision.actions`, Agent-selected `InteractionResponse.skills`,
 and Skill Runtime/provider authorization. When the quick Router model can
-represent a compound request using common catalog skills, `RouteDecision.actions`
-may contain an ordered list of skill proposals. Each action uses an exact
-`capability_id`, schema-shaped `args`, optional `sequence`, and optional
-`timing`, plus a 0.0-1.0 `confidence` for that specific skill choice and
-arguments. Speech that belongs inside a physical task is represented as the
-`chromie.speak` skill with `args.text`, not as unstructured final text. If any
-required compound action is below the Router confidence threshold, the Router
-delegates the whole plan to `deep_thought` rather than executing only the
-high-confidence subset. The delegated `RouteDecision.metadata` includes
+represent a mixed utterance, `RouteDecision.routes[]` is the preferred
+multi-route surface. Route-item lanes include `immediate_speech`,
+`conversation`, `post_turn`, `deepthought`, `skill_runtime`, `tool`,
+`deterministic_control`, and `none`. Context profiles include `none`,
+`fast_minimal`, `session_compact`, `capability_safety`, and `full_mind`.
+Only short safe chat items may set `direct_to_tts=true`; those can be scheduled
+through the Orchestrator fast-first TTS lane while other items continue through
+Agent, memory, deepthought, tool, or Skill Runtime policy.
+
+For ordered listed-skill work inside a robot-action route item,
+`RouteDecision.actions` may still contain an ordered list of skill proposals.
+The fast Router receives `common_ability_catalog` and `common_ability_ids` as
+the small-model executable menu.
+Each action uses an exact `capability_id` from that common menu,
+schema-shaped `args`, optional `sequence`, and optional `timing`, plus a
+0.0-1.0 `confidence` for that specific skill choice and arguments. Speech that
+belongs inside a physical task is represented as the `chromie.speak` skill with
+`args.text`, not as unstructured final text. If any required compound action is
+below the Router confidence threshold, or if the fast Router selects a
+rare/full-catalog skill outside `common_ability_ids`, the Router delegates the
+whole plan to `deep_thought` rather than executing only the high-confidence or
+rare subset. The delegated
+`RouteDecision.metadata` includes
 `quick_router_review_request` with the quick actions, legacy task list, shared
 task proposals, and `execution_state=not_committed` so deepthinking can
 `accept`, `revise`, or `supersede` the quick plan.
@@ -101,11 +122,16 @@ running.
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Router and normal InteractionRuntime. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog or query-specific LLM context. |
 
-Catalog entries include `prompt_tier=common|rare`. The Router uses `common`
-entries for the fast compact Qwen prompt; deepthinking may use the full catalog.
+Catalog entries include `prompt_tier=common|rare`, plus
+`prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
+Router uses unlocked `common` entries for the fast compact Qwen prompt as
+`common_ability_catalog`; deepthinking may use the full catalog. Safety-locked
+entries remain visible in the full catalog but are excluded from the fast
+common prompt even when an experience overlay requests `common`. The initial
+preset is data in `capabilities/prompt_tiers.json`, not a Python skill list.
 `chromie.speak` is common and interaction-executable so mixed speech/body
 requests can stay in the same task proposal list. Search scores are relevance
-hints, not execution authorization.
+signals for catalog inspection endpoints, not Router execution authorization.
 
 ### Conversation and interaction
 

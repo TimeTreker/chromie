@@ -164,6 +164,12 @@ class Settings(BaseModel):
         ge=1,
         le=32,
     )
+    capability_prompt_tier_preset: str = Field(
+        default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_PRESET", "")
+    )
+    capability_prompt_tier_overrides: str = Field(
+        default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES", "")
+    )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     mode: Literal["runtime"] = "runtime"
 
@@ -199,6 +205,12 @@ capability_catalog = CapabilityCatalog(
     live_invoker=capability_catalog_invoker,
     refresh_ttl_s=settings.capability_catalog_refresh_sec,
     min_score=settings.capability_match_min_score,
+    prompt_tier_preset=CapabilityCatalog.load_prompt_tier_preset(
+        settings.capability_prompt_tier_preset
+    ),
+    prompt_tier_overrides=CapabilityCatalog.load_prompt_tier_overrides(
+        settings.capability_prompt_tier_overrides
+    ),
 )
 task_graph_planner = (
     TaskGraphPlanner(capability_registry, ollama_client)
