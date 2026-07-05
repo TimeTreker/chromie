@@ -7,26 +7,34 @@ model and the deterministic validation layer around it.
 
 The second Router is both a router and a bounded fast planner.
 
-It uses the latest ASR text, compact session context, and the common skill
+It uses the latest ASR text, compact session context, and the listed skill
 catalog to decide:
 
 - which route should handle the request;
-- whether the request can be represented by common skills immediately;
-- which exact common skill tasks to propose;
+- whether the request can be represented by listed skills immediately;
+- which exact listed skill tasks to propose;
 - how confident it is in each proposed task.
 
 This is why the stage is called quick: it uses a small model and a compact
-common catalog. It is not limited to one task.
+catalog snapshot. The final `RouteDecision.route` is still singular; compound
+work is represented by `actions[]`, not by returning multiple routes.
 
 ## Output Contract
 
-For a single clear common skill, the Router may return:
+For greeting, fact, or speech-only conversation, the Router should return:
+
+```json
+{"route":"chat","intent":"general_conversation","confidence":0.9}
+```
+
+For a single clear listed skill, the Router may return:
 
 ```json
 {"route":"robot_action","intent":"capability:soridormi.blink_eyes","confidence":0.91}
 ```
 
-For a compound common-skill request, the Router may return:
+For a compound listed-skill request, the Router may return one route with
+ordered actions:
 
 ```json
 {
@@ -56,7 +64,7 @@ Each action confidence is the model's confidence in that specific skill choice
 and its arguments. It is separate from the whole-route confidence.
 
 For a desired human-like ability that the model understands but cannot represent
-with the common executable catalog, the Router must not invent an action. It
+with the listed executable catalog, the Router must not invent an action. It
 should delegate or clarify and may preserve the desired ability as
 non-executable metadata:
 
@@ -72,7 +80,7 @@ non-executable metadata:
         "intent": "pick up the bottle",
         "status": "missing_ability",
         "confidence": 0.93,
-        "reason": "No executable grasping skill is in the common catalog."
+        "reason": "No executable grasping skill is in the listed catalog."
       }
     ]
   }
@@ -97,7 +105,7 @@ claims a body action happened.
 Deterministic validation does not choose the normal activity. It only checks
 the task proposals before they can enter the executable task surface:
 
-- every `capability_id` exists in the supplied common catalog;
+- every `capability_id` exists in the supplied listed catalog;
 - every non-speech action is available and interaction-executable;
 - `chromie.speak` includes non-empty `args.text`;
 - each action confidence is valid and above the Router threshold;

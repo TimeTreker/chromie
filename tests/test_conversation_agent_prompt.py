@@ -63,6 +63,8 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("model identity boundary", ollama.calls[0]["prompt"])
         self.assertIn("not as a large language model", ollama.calls[0]["prompt"])
         self.assertIn("never say you are a large language model", ollama.calls[0]["system"])
+        self.assertIn("human-like social warmth", ollama.calls[0]["system"])
+        self.assertIn("never describe Chromie as a program", ollama.calls[0]["system"])
         self.assertIn("trained by Google", ollama.calls[0]["system"])
         self.assertEqual(ollama.calls[0]["options"]["num_ctx"], 4096)
         self.assertEqual(ollama.calls[0]["options"]["num_predict"], 128)
@@ -163,6 +165,36 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(ollama.calls), 1)
         self.assertIn("Generalization-first is a core principle", ollama.calls[0]["system"])
         self.assertIn("Do not treat prompt examples as keyword rules", ollama.calls[0]["system"])
+        self.assertIn("Target spoken language: en-US", ollama.calls[0]["prompt"])
+
+    async def test_social_checkin_prompt_does_not_rewrite_model_reply(self) -> None:
+        ollama = _CapturingOllama("Hello.")
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "hello-repair-test",
+                "text": "Helello, how are you.",
+                "route_decision": {
+                    "route": "chat",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "general_conversation",
+                    "confidence": 0.45,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "Hello.")
+        self.assertIn("do not reply with only hello", ollama.calls[0]["system"])
 
     async def test_obvious_sun_claim_goes_through_llm_with_factual_prompt(self) -> None:
         ollama = _CapturingOllama("No. The Sun is extremely hot, not cold.")
@@ -232,7 +264,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
                 "Hello! I'm doing great, thanks for asking.",
                 {
                     "decision": "revise",
-                    "reason": "Should not be called for low-risk greeting.",
+                    "reason": "Should not be called for speech-only greeting.",
                     "spoken_response": "Unexpected reviewer rewrite.",
                 },
             ]
@@ -269,14 +301,56 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(ollama.calls), 1)
 
-    async def test_stock_model_disclaimer_is_retried_as_chromie(self) -> None:
+    async def test_response_review_auto_reviews_robot_action_context(self) -> None:
+        ollama = _CapturingOllama(
+            [
+                "I am checking that action.",
+                {
+                    "decision": "accept",
+                    "reason": "Physical action context should be audited.",
+                    "spoken_response": "",
+                },
+            ]
+        )
+        agent = ConversationAgent(
+            AgentServices(
+                ollama=ollama,  # type: ignore[arg-type]
+                response_reviewer=ollama,  # type: ignore[arg-type]
+                response_review_mode="auto",
+                use_llm=True,
+                max_speak_chars=220,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "review-auto-robot-action-test",
+                "text": "Walk forward.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["conversation_agent", "speaker_agent"],
+                    "intent": "robot_action",
+                    "confidence": 0.80,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(result.speak_immediate[0].text, "I am checking that action.")
+        self.assertEqual(len(ollama.calls), 2)
+        self.assertIn("semantic spoken-response reviewer", ollama.calls[1]["system"])
+        self.assertIn("program, programme, software, code", ollama.calls[1]["system"])
+
+    async def test_response_review_auto_skips_speech_only_model_disclaimer(self) -> None:
         ollama = _CapturingOllama(
             [
                 "I do not have personal opinions on whether the sun is hot.",
                 {
                     "decision": "revise",
-                    "reason": "Model-style non-answer to an objective fact.",
-                    "spoken_response": "Yes. The Sun is extremely hot.",
+                    "reason": "Should not be called for speech-only content.",
+                    "spoken_response": "Unexpected reviewer rewrite.",
                 },
             ]
         )
@@ -306,14 +380,12 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         result = await agent.run(request, AgentResult())
 
-        self.assertEqual(result.speak_immediate[0].text, "Yes. The Sun is extremely hot.")
-        self.assertEqual(len(ollama.calls), 2)
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "I do not have personal opinions on whether the sun is hot.",
+        )
+        self.assertEqual(len(ollama.calls), 1)
         self.assertIn("Chromie's first-person robot persona", ollama.calls[0]["system"])
-        self.assertIn("Candidate spoken response", ollama.calls[1]["prompt"])
-        self.assertIn("Judge meaning, not keyword rules", ollama.calls[1]["system"])
-        self.assertIn("generalization-first principle", ollama.calls[1]["system"])
-        self.assertEqual(ollama.calls[1]["response_format"], "json")
-        self.assertEqual(ollama.calls[1]["options"]["temperature"], 0)
 
     async def test_chat_route_action_promise_is_revised_to_safe_action_clarification(self) -> None:
         ollama = _CapturingOllama(
@@ -528,11 +600,11 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Do not answer only with ability, willingness, or readiness", ollama.calls[0]["system"])
         self.assertIn("When a greeting and a request appear together", ollama.calls[0]["system"])
         self.assertIn("Hey, can you tell me a joke?", ollama.calls[1]["prompt"])
-        self.assertIn("candidate says 'I can tell you a joke.' => revise", ollama.calls[1]["prompt"])
+        self.assertIn("rather than only promising readiness or ability", ollama.calls[1]["prompt"])
         self.assertNotIn("Original system prompt", ollama.calls[1]["prompt"])
         self.assertNotIn("Original task prompt", ollama.calls[1]["prompt"])
 
-    async def test_empty_model_joke_response_uses_creative_fallback(self) -> None:
+    async def test_empty_model_response_uses_honest_fallback(self) -> None:
         ollama = _CapturingOllama("")
         agent = ConversationAgent(
             AgentServices(
@@ -558,8 +630,10 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         result = await agent.run(request, AgentResult())
 
-        self.assertIn("Chromie", result.speak_immediate[0].text)
-        self.assertNotIn("I did not catch", result.speak_immediate[0].text)
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "I got stuck forming that answer. Please say it again.",
+        )
         self.assertEqual(len(ollama.calls), 1)
 
     async def test_false_missing_body_ability_is_retried_from_capability_context(self) -> None:
@@ -608,8 +682,11 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.speak_immediate[0].text, "可以，我能摇头。")
         self.assertEqual(len(ollama.calls), 2)
-        self.assertIn("能力目录", ollama.calls[0]["prompt"])
-        self.assertIn("不要说没有这个能力", ollama.calls[0]["system"])
+        self.assertIn("Target spoken language: zh-CN", ollama.calls[0]["prompt"])
+        self.assertIn("Capability catalog", ollama.calls[0]["prompt"])
+        self.assertIn("Current user said: 你能摇头吗？", ollama.calls[0]["prompt"])
+        self.assertIn("The user text and context may be multilingual", ollama.calls[0]["system"])
+        self.assertIn("do not claim she lacks that ability", ollama.calls[0]["system"])
         self.assertIn("Capability context", ollama.calls[1]["prompt"])
         self.assertIn("soridormi.shake_no", ollama.calls[1]["prompt"])
         self.assertIn("falsely says Chromie cannot perform", ollama.calls[1]["system"])
@@ -621,7 +698,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "decision": "revise",
                     "reason": "The candidate only promises a joke instead of telling one.",
-                    "spoken_response": "当然。为什么机器人喜欢讲冷笑话？因为散热比较好。",
+                    "spoken_response": "审核器提供了实际内容。",
                 },
             ]
         )
@@ -652,7 +729,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             result.speak_immediate[0].text,
-            "当然。为什么机器人喜欢讲冷笑话？因为散热比较好。",
+            "审核器提供了实际内容。",
         )
         self.assertEqual(len(ollama.calls), 2)
         self.assertIn("single reviewer prompt is multilingual", ollama.calls[1]["system"])
@@ -668,7 +745,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "decision": "revise",
                     "reason": "The user is following up on a joke request and the candidate only promises.",
-                    "spoken_response": "Why did Chromie polish her shoes? She wanted to reboot with a little sparkle.",
+                    "spoken_response": "Reviewer supplied actual creative content.",
                 },
             ]
         )
@@ -703,7 +780,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             result.speak_immediate[0].text,
-            "Why did Chromie polish her shoes? She wanted to reboot with a little sparkle.",
+            "Reviewer supplied actual creative content.",
         )
         self.assertEqual(len(ollama.calls), 2)
         self.assertIn("If recent context shows Chromie already promised", ollama.calls[0]["system"])

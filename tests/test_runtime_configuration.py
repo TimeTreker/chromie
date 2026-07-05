@@ -41,10 +41,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ROUTER_REVIEW_MODEL"], "gemma4:e2b")
         self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "2200")
         self.assertEqual(values["ROUTER_LLM_NUM_PREDICT"], "192")
-        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "800")
+        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "1600")
         self.assertEqual(values["ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
         self.assertEqual(values["ROUTER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
-        self.assertEqual(values["ROUTER_SLOW_REVIEW_RECOVERY_ENABLED"], "0")
+        self.assertEqual(values["ROUTER_SLOW_REVIEW_RECOVERY_ENABLED"], "1")
 
     def test_ollama_keeps_router_and_agent_models_loaded_without_extra_parallelism(self) -> None:
         values = _common_env()
@@ -87,7 +87,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")', source)
         self.assertIn('AGENT_RESPONSE_REVIEW_MODEL:-gemma4:e2b', source)
         self.assertIn('WARM_MODELS=("${ROUTER_MODEL:-qwen3:0.6b}" "${WARM_MODELS[@]}")', source)
-        self.assertIn('ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-0', source)
+        self.assertIn('ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-1', source)
         self.assertIn('WARM_MODELS+=("${ROUTER_REVIEW_MODEL}")', source)
         self.assertIn('./scripts/warm_ollama.sh "${WARM_MODELS[@]}"', source)
 

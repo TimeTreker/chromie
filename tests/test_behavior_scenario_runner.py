@@ -19,15 +19,17 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
     def test_loads_one_file_per_scenario_and_filters_by_suite_or_key(self) -> None:
         all_cases = load_scenarios()
         router_cases = load_scenarios(suites={"router"})
+        adapter_cases = load_scenarios(suites={"adapter"})
         dialogue_cases = load_scenarios(suites={"dialogue"})
         selected = load_scenarios(only={"router/normal_greeting"})
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 344)
-        self.assertEqual(len(router_cases), 13)
+        self.assertEqual(len(all_cases), 353)
+        self.assertEqual(len(adapter_cases), 4)
+        self.assertEqual(len(router_cases), 17)
         self.assertEqual(len(dialogue_cases), 316)
-        self.assertEqual(len(load_scenarios(suites={"interaction"})), 15)
+        self.assertEqual(len(load_scenarios(suites={"interaction"})), 16)
         self.assertIn("dialogue/walk_then_followup_status", dialogue_keys)
         self.assertIn("dialogue/raw_joint_command_refusal", dialogue_keys)
         self.assertIn("dialogue/batch2_safety_117_walk_into_a_smoky_hallway", dialogue_keys)

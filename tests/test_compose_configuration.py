@@ -70,7 +70,7 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("ROUTER_REVIEW_MODEL: ${ROUTER_REVIEW_MODEL:-gemma4:e2b}", router_block)
         self.assertIn("ROUTER_LLM_TIMEOUT_MS: ${ROUTER_LLM_TIMEOUT_MS:-2200}", router_block)
         self.assertIn("ROUTER_LLM_NUM_PREDICT: ${ROUTER_LLM_NUM_PREDICT:-192}", router_block)
-        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-800}", router_block)
+        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-1600}", router_block)
         self.assertIn(
             "ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS: ${ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS:-5000}",
             router_block,
@@ -80,7 +80,7 @@ class ComposeConfigurationTests(unittest.TestCase):
             router_block,
         )
         self.assertIn(
-            "ROUTER_SLOW_REVIEW_RECOVERY_ENABLED: ${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-0}",
+            "ROUTER_SLOW_REVIEW_RECOVERY_ENABLED: ${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-1}",
             router_block,
         )
 

@@ -123,7 +123,7 @@ contract evidence only; it does not prove physical execution.
 The latest full host `./scripts/run_tests.sh` attempt on 2026-07-04 passed
 `python scripts/check_docs.py`, ran 627 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions. The behavior
-scenario runner also passed 344/344 Router, interaction, and dialogue scenario
+scenario runner also passed 353/353 adapter, Router, interaction, and dialogue scenario
 files with `--no-write`.
 
 Focused local slices also passed 46/46 after the simulation-demo documentation

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "single_nod_promotes_to_visible_two_cycles",
+  "suite": "adapter",
+  "level": "module",
+  "description": "A legacy single nod is promoted to two visible nod cycles for robot readability.",
+  "tags": ["legacy-adapter", "skill-mapping", "nod"],
+  "input": {
+    "text": "adapter single nod"
+  },
+  "stub": {
+    "actions": [
+      {
+        "target": "robot_pose_controller",
+        "type": "head.nod",
+        "params": {
+          "times": 1
+        }
+      }
+    ]
+  },
+  "expect": {
+    "skills": ["soridormi.nod_yes"],
+    "skill_args": [
+      {
+        "count": 2
+      }
+    ]
+  }
+}

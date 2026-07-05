@@ -34,8 +34,10 @@ PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability_id",
     "<capability_id>",
     "<exact capability_id>",
+    "<exact skill_id>",
     "capability:<capability_id>",
     "capability:<exact capability_id>",
+    "capability:<exact skill_id>",
 }
 _ROUTER_CONTEXT_OMIT_KEYS = {
     "candidate_capabilities",
@@ -103,7 +105,62 @@ def _compact_candidate_capabilities(candidates: Any, *, limit: int = 8) -> list[
     return compact
 
 
-def _compact_prompt_capabilities(candidates: Any, *, limit: int = 48) -> list[dict[str, Any]]:
+def _review_capabilities_from_request(request: RouteRequest) -> list[dict[str, Any]]:
+    for key in (
+        "candidate_capabilities",
+        "prompt_capabilities_all",
+        "prompt_capabilities_common",
+    ):
+        value = request.context.get(key, [])
+        if isinstance(value, list) and value:
+            return value
+    return []
+
+
+def _capability_ids_from_request(request: RouteRequest) -> set[str]:
+    capability_ids: set[str] = set()
+    for key in (
+        "candidate_capabilities",
+        "prompt_capabilities_all",
+        "prompt_capabilities_common",
+    ):
+        value = request.context.get(key, [])
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            if capability_id:
+                capability_ids.add(capability_id)
+    return capability_ids
+
+
+def _known_capability_id(text: Any, capability_ids: set[str]) -> str:
+    value = str(text or "").strip()
+    if not value:
+        return ""
+    if value.startswith("capability:"):
+        value = value.split(":", 1)[1].strip()
+    return value if value in capability_ids else ""
+
+
+def _capability_contract(item: dict[str, Any]) -> str:
+    explicit = str(item.get("contract") or "").strip()
+    if explicit:
+        return explicit
+    route = str(item.get("route") or "tool").strip() or "tool"
+    effects = [str(effect) for effect in list(item.get("effects") or [])[:3] if effect]
+    safety = str(item.get("safety_class") or "").strip()
+    parts = [route]
+    if effects:
+        parts.append("+".join(effects))
+    if safety:
+        parts.append(safety)
+    return ".".join(parts)
+
+
+def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[dict[str, Any]]:
     if not isinstance(candidates, list):
         return []
     compact: list[dict[str, Any]] = []
@@ -114,12 +171,8 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 48) -> list[di
         if not capability_id:
             continue
         description = " ".join(str(item.get("description") or "").split())
-        if len(description) > 120:
-            description = description[:120].rstrip() + "..."
-        hints = item.get("hints") if isinstance(item.get("hints"), dict) else {}
-        use_when = " ".join(str(hints.get("when_to_use") or description).split())
-        if len(use_when) > 140:
-            use_when = use_when[:140].rstrip() + "..."
+        if len(description) > 180:
+            description = description[:180].rstrip() + "..."
         schema = item.get("input_schema") if isinstance(item.get("input_schema"), dict) else {}
         args: dict[str, Any] = {}
         properties = schema.get("properties") if isinstance(schema, dict) else {}
@@ -135,14 +188,12 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 48) -> list[di
         compact.append(
             {
                 "skill_id": capability_id,
-                "route": str(item.get("route") or ""),
-                "tier": str(item.get("prompt_tier") or "rare"),
-                "use_when": use_when,
-                "args": args,
-                "effects": list(item.get("effects") or [])[:4],
+                "contract": _capability_contract(item),
+                "description": description,
                 "safety": str(item.get("safety_class") or ""),
                 "confirmation": bool(item.get("requires_confirmation", False)),
                 "executable": bool(item.get("interaction_executable")),
+                "args": args,
             }
         )
     return compact
@@ -256,7 +307,9 @@ class OllamaLLMRouter:
 
     def build_user_prompt(self, request: RouteRequest) -> str:
         candidates = request.context.get("candidate_capabilities", [])
-        prompt_capabilities = request.context.get("prompt_capabilities_common", [])
+        prompt_capabilities = request.context.get("prompt_capabilities_all", [])
+        if not prompt_capabilities:
+            prompt_capabilities = request.context.get("prompt_capabilities_common", [])
         if not prompt_capabilities:
             prompt_capabilities = candidates
         compact_prompt_capabilities = _compact_prompt_capabilities(prompt_capabilities)
@@ -267,7 +320,7 @@ class OllamaLLMRouter:
         ]
         common_catalog_json = _bounded_json(
             compact_prompt_capabilities,
-            max_chars=3600,
+            max_chars=7200,
         )
         candidates_json = _bounded_json(
             _compact_candidate_capabilities(candidates),
@@ -283,48 +336,56 @@ class OllamaLLMRouter:
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON: {context_json}\n\n"
             "Current Job:\n"
-            "Act as Chromie's quick intent router. Decide one route and optionally emit common-skill task proposals; do not answer, execute, or authorize side effects. "
+            "Act as Chromie's quick intent router. Decide one route and optionally emit listed-skill task proposals; do not answer, execute, or authorize side effects. "
             "Understand intent broadly before checking the catalog; the catalog constrains executable actions, not meaning. "
             "Choose route deep_thought for complex reasoning, design, debugging, implementation planning, or when the request needs deeper thought, task-session creation, or task-session continuation. "
             "Choosing route=deep_thought is only delegation; do not perform or reveal reasoning inside the router. "
             "Return calibrated low confidence when uncertain.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
-            f"Common skill IDs: {_bounded_json(common_skill_ids, max_chars=900)}\n"
-            f"Common compact skill catalog JSON: {common_catalog_json}\n"
+            "Output Template Preview:\n"
+            "- Chat/fact/greeting: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9}\n"
+            "- Single listed skill: {\"route\":\"robot_action\",\"intent\":\"capability:<exact skill_id>\",\"confidence\":0.9}\n"
+            "- Multiple listed skills: {\"route\":\"robot_action\",\"intent\":\"compound_common_catalog_task\",\"confidence\":0.9,\"actions\":[{\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential\",\"confidence\":0.9}]}\n"
+            "- Missing ability: {\"route\":\"deep_thought\",\"intent\":\"missing_or_unsupported_ability\",\"confidence\":0.6,\"metadata\":{\"desired_abilities\":[{\"ability_id\":\"...\",\"intent\":\"...\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"...\"}]}}\n"
+            "- Clarify: {\"route\":\"clarify\",\"intent\":\"clarify_target_or_skill\",\"confidence\":0.7}\n"
+            "The final route is singular; use actions for multiple skills, never routes[].\n"
+            f"Available skill IDs: {_bounded_json(common_skill_ids, max_chars=1400)}\n"
+            f"Compact skill catalog JSON: {common_catalog_json}\n"
             f"Query-biased catalog hints JSON: {candidates_json}\n"
-            "Decision checks: use semantic meaning, not phrase rules. If the user asks Chromie to physically perform a listed body/head/pose/gaze/motion/expression skill now, return robot_action using that exact skill. "
+            "Decision checks: use semantic meaning, not phrase rules. If the user asks Chromie to physically perform a listed body/head/gaze/motion/expression skill now, return robot_action using that exact skill. "
             "A polite ability-shaped request is still robot_action when it asks for a listed physical skill now. "
             "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
-            "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the common catalog. "
+            "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the compact skill catalog. "
             "Factual agreement/disagreement is chat: questions about the Moon, Sun, shape, temperature, or other world knowledge are not deep_thought or robot_action even if ability candidates share words such as round, turn, left, right, walk, or move; the quick router routes common-fact questions to chat. "
             "Query-biased hints are context, not recommendations. Use working memory, current task context, and recent action history for follow-ups, but never as authorization for side effects. "
             "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran. "
-            "If no common skill fits clearly, choose deep_thought or clarify and include metadata.desired_abilities with status missing_ability when useful.\n\n"
+            "If no listed skill fits clearly, choose deep_thought or clarify and include metadata.desired_abilities with status missing_ability when useful.\n\n"
             "Cost Function:\n"
             "Prefer the smallest safe downstream action surface, honest capability boundaries, chat for speech-only/factual claims, deep_thought only for complex planning, and clarify for ambiguity. "
-            "Prefer supported interaction-executable capability IDs over generic robot_action. Preserve unsupported desired abilities as non-executable proposals. "
-            "For compound common-skill requests, preserve each requested skill in actions instead of collapsing to the first skill. Each proposed action has its own confidence; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful speak_first.\n\n"
+            "Prefer supported interaction-executable skill IDs over generic robot_action. Preserve unsupported desired abilities as non-executable proposals. "
+            "For compound listed-skill requests, preserve each requested skill in actions instead of collapsing to the first skill. Each proposed action has its own confidence; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful speak_first.\n\n"
             "Semantic Examples:\n"
             "- If the user asks whether you agree with a common factual claim about the Moon, Sun, shape, heat, or similar world knowledge, return {\"route\":\"chat\",\"intent\":\"factual_agreement\",\"confidence\":0.9}.\n"
-            "- If the user asks Chromie to walk, turn, nod, shake her head, blink, or pose now and a matching interaction-executable candidate is listed, return robot_action with intent capability:<exact capability_id>.\n"
-            "- If the user asks for several common skills, such as walking, speaking, and blinking, return robot_action with actions ordered by the requested task sequence; use chromie.speak for the spoken part and include args.text.\n"
-            "- If the user asks for a physical/social ability you understand but it is not in the common catalog, return deep_thought or clarify and include metadata.desired_abilities, for example {\"ability_id\":\"social.blink_eyes\",\"intent\":\"blink eyes\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"no executable blink skill is in the common catalog\"}.\n"
-            "- If no common skill fits clearly or you are not confident, return deep_thought with a brief speak_first that tells the user you need a moment. The speak_first must be truthful and must not claim execution.\n"
+            "- If the user asks Chromie to walk, turn, nod, shake her head, blink, or perform another listed physical/expression skill now, return robot_action with intent capability:<exact skill_id>.\n"
+            "- If the user asks for several listed skills, such as walking, speaking, and blinking, return robot_action with actions ordered by the requested task sequence; use chromie.speak for the spoken part and include args.text.\n"
+            "- If the user asks for a physical/social ability you understand but it is not in the compact skill catalog, return deep_thought or clarify and include metadata.desired_abilities, for example {\"ability_id\":\"social.blink_eyes\",\"intent\":\"blink eyes\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"no executable blink skill is in the compact skill catalog\"}.\n"
+            "- If no listed skill fits clearly or you are not confident, return deep_thought with a brief speak_first that tells the user you need a moment. The speak_first must be truthful and must not claim execution.\n"
             "- If catalog hints are planning-only or weak background context and the user is only chatting or asking a fact, ignore those hints for routing. Generalize these examples from meaning; do not make phrase rules.\n\n"
             "Output Contract:\n"
-            "Return compact JSON only. Required keys: route, intent, confidence. Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
-            "Minimal ordinary example: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9}. "
+            "Return one compact JSON object matching one of the templates above. Required keys: route, intent, confidence. The final route is singular; never output a routes array. "
+            "Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
             "Omit agents, metadata, candidate_capabilities, and explanations unless they change downstream routing. "
             "metadata.desired_abilities may contain understood but non-executable ability proposals; these are not executable actions. "
             "Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object. "
-            "For selected robot_action use intent capability:<exact skill_id> copied from the common compact skill catalog. Never output placeholder intents such as capability or capability:<exact capability_id>. "
-            "For compound or parameterized common-skill robot_action, include actions as an ordered array of objects: {\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential|parallel\",\"confidence\":0.0}. "
-            "Each action capability_id must be copied exactly from the common compact skill catalog. For chromie.speak, args must include a short natural text field. "
+            "For selected robot_action use intent capability:<exact skill_id> copied from the compact skill catalog. Never output placeholder intents such as capability or capability:<exact capability_id>. "
+            "For compound or parameterized listed-skill robot_action, include actions as an ordered array of objects: {\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential|parallel\",\"confidence\":0.0}. "
+            "Each action capability_id must be copied exactly from the compact skill catalog. For chromie.speak, args must include a short natural text field. "
             "Never put missing or planned abilities in actions; put them in metadata.desired_abilities and choose deep_thought or clarify. "
             "Set action confidence from semantic fit and argument confidence, not from catalog search score alone. "
             "If you include actions, use a semantic intent such as compound_common_catalog_task instead of a placeholder capability intent. "
             "For uncertain deep_thought handoff, you may include speak_first with one short user-facing sentence in the user's language, such as a natural request for a moment to think. "
+            "Speak_first must sound like Chromie herself: an embodied robot with natural, human-like social warmth, not a program, programme, backend, software process, or language model. "
             "Do not use speak_first to claim physical action, tool results, memory writes, or completion. "
             "For chat/clarify/interrupt/ignore, do not set capability intent. For deep_thought, use a short semantic intent such as deep_thought_complex_reasoning. Confidence is 0.0-1.0."
         )
@@ -349,7 +410,10 @@ class OllamaLLMRouter:
 
     def build_intent_review_payload(self, request: RouteRequest) -> dict[str, Any]:
         candidates_json = json.dumps(
-            _compact_candidate_capabilities(request.context.get("candidate_capabilities", [])),
+            _compact_candidate_capabilities(
+                _review_capabilities_from_request(request),
+                limit=16,
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         )
@@ -376,7 +440,7 @@ class OllamaLLMRouter:
                         "- The deterministic emergency/noise filter already passed before this review.\n\n"
                         "Task Context Group:\n"
                         "- Review the latest user input and decide whether the quick route should be chat, deep_thought, robot_action, tool, memory, clarify, interrupt, or ignore.\n"
-                        "- Body/head/pose/motion requests are robot_action when an available interaction_executable candidate can satisfy them.\n"
+                        "- Body/head/gaze/motion/expression requests are robot_action when an available interaction_executable candidate can satisfy them.\n"
                         "- Capability questions can be polite requests; if the user is pragmatically asking Chromie to perform a listed physical action now, choose robot_action.\n"
                         "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless physical motion is explicitly requested.\n\n"
                         "- Use working memory, task context, and recent action history for follow-up resolution, but not as authorization for side effects.\n"
@@ -595,11 +659,30 @@ class OllamaLLMRouter:
         content = data.get("message", {}).get("content", "")
         parsed = _extract_json_object(content)
         route_from_intent = str(parsed.get("intent") or "").strip()
+        supplied_capability_ids = _capability_ids_from_request(request)
+        route_value = str(parsed.get("route") or "").strip()
+        routed_capability_id = _known_capability_id(route_value, supplied_capability_ids)
+        intent_capability_id = _known_capability_id(route_from_intent, supplied_capability_ids)
         if "route" not in parsed and route_from_intent in ROUTE_NAMES:
             parsed["route"] = route_from_intent
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
             ) + "LLM returned intent-only route JSON; router normalized route"
+        elif "route" not in parsed and intent_capability_id:
+            parsed["route"] = "robot_action"
+            parsed["intent"] = f"capability:{intent_capability_id}"
+            parsed["reason"] = (
+                f"{parsed.get('reason')}; " if parsed.get("reason") else ""
+            ) + "LLM returned intent-only skill JSON; router normalized skill route"
+        elif route_value and route_value not in ROUTE_NAMES and (
+            routed_capability_id or intent_capability_id
+        ):
+            selected_capability_id = routed_capability_id or intent_capability_id
+            parsed["route"] = "robot_action"
+            parsed["intent"] = f"capability:{selected_capability_id}"
+            parsed["reason"] = (
+                f"{parsed.get('reason')}; " if parsed.get("reason") else ""
+            ) + "LLM returned skill id in route field; router normalized skill route"
         if "confidence" not in parsed and parsed.get("route") not in {"interrupt", "ignore"}:
             parsed["confidence"] = max(0.72, self.confidence_threshold)
             parsed["reason"] = (
@@ -622,7 +705,14 @@ class OllamaLLMRouter:
             reviewed = await self._chat(self.build_intent_review_payload(request))
             reviewed_decision = self._decision_from_response(request, reviewed)
         except Exception as exc:
-            logger.warning("LLM review model intent check failed: %s", exc)
+            raw_content = ""
+            if isinstance(locals().get("reviewed"), dict):
+                raw_content = str(reviewed.get("message", {}).get("content") or "")
+            logger.warning(
+                "LLM review model intent check failed: %s raw=%r",
+                exc,
+                raw_content[:240],
+            )
             return decision
 
         if reviewed_decision.route != "robot_action":
@@ -632,6 +722,23 @@ class OllamaLLMRouter:
             logger.info(
                 "LLM review model changed underspecified robot_action to %s",
                 reviewed_decision.route,
+            )
+            return reviewed_decision
+        if (
+            reviewed_decision.intent.startswith("capability:")
+            or reviewed_decision.actions
+            or (
+                reviewed_decision.intent
+                and reviewed_decision.intent not in {"unknown", "robot_action"}
+                and not _is_placeholder_capability_intent(reviewed_decision.intent)
+            )
+        ):
+            reviewed_decision.reason = (
+                f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
+            ) + f"review_model:{self.review_model} selected exact skill for underspecified robot_action"
+            logger.info(
+                "LLM review model completed underspecified robot_action as %s",
+                reviewed_decision.intent,
             )
             return reviewed_decision
         return decision

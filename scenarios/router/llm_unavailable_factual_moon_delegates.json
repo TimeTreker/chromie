@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "llm_unavailable_factual_moon_delegates",
+  "suite": "router",
+  "level": "module",
+  "description": "When the quick LLM is unavailable, factual moon wording with weak motion overlap delegates to deep thought instead of executing a catalog motion.",
+  "tags": ["factual", "llm-unavailable", "no-motion"],
+  "input": {
+    "text": "I think the moon is not round. Do you agree with me?",
+    "language": "en-US"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": true,
+      "suggested_route": "robot_action",
+      "suggested_agents": ["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
+      "catalog_version": 4,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.turn_in_place",
+          "agent_id": "soridormi.skill",
+          "description": "Rotate left or right with near-zero forward velocity.",
+          "score": 0.165,
+          "available": true,
+          "interaction_executable": true
+        }
+      ]
+    },
+    "llm_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "general_conversation",
+      "confidence": 0.45,
+      "language": "en-US",
+      "source": "fallback",
+      "reason": "invalid_llm_router_response: no JSON object in model response"
+    }
+  },
+  "expect": {
+    "route": "deep_thought",
+    "intent": "deep_thought_router_unavailable",
+    "source": "fallback",
+    "task_types_include": ["cognition.deep_think"],
+    "task_types_forbid": ["task.execute_skill"],
+    "metadata_json_contains": ["LLM router unavailable", "delegating to deep_thought"],
+    "llm_calls": 1
+  }
+}

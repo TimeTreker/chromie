@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "look_at_user_uses_named_skill_without_low_level_fields",
+  "suite": "adapter",
+  "level": "module",
+  "description": "Legacy look-at-user actions become the named person-looking skill without leaking raw joint fields.",
+  "tags": ["legacy-adapter", "skill-mapping", "low-level-field-guard"],
+  "input": {
+    "text": "adapter look at user"
+  },
+  "stub": {
+    "actions": [
+      {
+        "target": "robot_pose_controller",
+        "type": "head.look_at_user",
+        "params": {
+          "duration_ms": 3000
+        }
+      }
+    ]
+  },
+  "expect": {
+    "skills": ["soridormi.look_at_person"],
+    "skill_args": [
+      {
+        "duration_s": 3.0
+      }
+    ],
+    "metadata_json_forbid": ["joint_targets"],
+    "skill_metadata_json_forbid": ["joint_targets"]
+  }
+}

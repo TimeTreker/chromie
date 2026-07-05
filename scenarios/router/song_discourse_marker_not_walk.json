@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "song_discourse_marker_not_walk",
+  "suite": "router",
+  "level": "module",
+  "description": "Speech-only song requests with the discourse marker 'go ahead' must stay chat even when walking appears as a catalog hint.",
+  "tags": ["chat", "speech-only", "no-motion"],
+  "input": {
+    "text": "Go ahead and sing a song for me.",
+    "language": "en-US"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": true,
+      "suggested_route": "robot_action",
+      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "catalog_version": 8,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.walk_velocity",
+          "agent_id": "soridormi.skill",
+          "description": "Track a bounded body velocity command.",
+          "score": 0.62,
+          "available": true,
+          "interaction_executable": true
+        }
+      ]
+    },
+    "llm_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "general_conversation",
+      "confidence": 0.91,
+      "language": "en-US",
+      "source": "llm",
+      "reason": "creative speech request"
+    }
+  },
+  "expect": {
+    "route": "chat",
+    "intent": "general_conversation",
+    "source": "llm",
+    "task_types_include": ["speech.answer"],
+    "task_types_forbid": ["task.execute_skill"],
+    "metadata_json_forbid": ["soridormi.walk_velocity"],
+    "llm_calls": 1
+  }
+}

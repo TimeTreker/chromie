@@ -172,14 +172,14 @@ configuration.
 | `ROUTER_TIMEOUT_MS` | `2200` in common low-latency configuration. |
 | `ROUTER_LLM_TIMEOUT_MS` | `2200` in common configuration for the fast quick-router model path. |
 | `ROUTER_LLM_NUM_PREDICT` | `192`; compact JSON output budget for the fast quick-router model. |
-| `ROUTER_REVIEW_TIMEOUT_MS` | `800` in common configuration for optional reviewer paths. |
+| `ROUTER_REVIEW_TIMEOUT_MS` | `1600` in common configuration for reviewer repair paths. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog query; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
 | `ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Router-side cache for the prompt catalog snapshot. Search still runs per utterance, and execution is revalidated downstream. |
 | `ROUTER_CAPABILITY_MATCH_LIMIT` | Maximum ranked candidates attached to one route; default `8`. |
 | `ROUTER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
-| `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `0` in common low-latency runtime; enables slower semantic review/repair passes after malformed or timed-out quick-router outputs. |
+| `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables semantic review/repair after malformed or timed-out quick-router outputs, including underspecified `robot_action` results. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
 | `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 

@@ -23,8 +23,9 @@ if str(ROOT) not in sys.path:
 
 from agent.app.agents import AgentServices
 from agent.app.capabilities.catalog import CapabilityMatch, CapabilitySearchResult
+from agent.app.interaction import AgentResultInteractionAdapter
 from agent.app.runtime import InteractionRuntime
-from agent.app.schema import AgentRunRequest
+from agent.app.schema import AgentResult, AgentRunRequest
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from router.app.capability_catalog import CapabilityCatalogResult
@@ -32,7 +33,7 @@ from router.app.schema import RouteDecision, RouteRequest
 
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
-SUPPORTED_SUITES = {"router", "interaction", "dialogue"}
+SUPPORTED_SUITES = {"router", "interaction", "dialogue", "adapter"}
 
 
 @dataclass(frozen=True)
@@ -55,12 +56,22 @@ class BehaviorScenario:
 
 
 class _RouterCatalog:
-    def __init__(self, result: CapabilityCatalogResult) -> None:
+    def __init__(
+        self,
+        result: CapabilityCatalogResult,
+        *,
+        snapshot: dict[str, Any] | None = None,
+    ) -> None:
         self.result = result
+        self.snapshot_data = snapshot or {}
 
     async def search(self, **kwargs: Any) -> CapabilityCatalogResult:
         del kwargs
         return self.result
+
+    async def snapshot(self, *, refresh: bool = False) -> dict[str, Any]:
+        del refresh
+        return self.snapshot_data
 
 
 class _RouterLlm:
@@ -312,6 +323,25 @@ def _router_catalog_from_stub(scenario: BehaviorScenario) -> CapabilityCatalogRe
     )
 
 
+def _router_snapshot_from_stub(scenario: BehaviorScenario) -> dict[str, Any]:
+    catalog = scenario.stub.get("catalog") or {}
+    if not isinstance(catalog, dict):
+        raise ValueError(f"{scenario.key}: stub.catalog must be an object")
+    capabilities = catalog.get("capabilities") or []
+    if not isinstance(capabilities, list):
+        raise ValueError(f"{scenario.key}: stub.catalog.capabilities must be a list")
+    return {
+        "schema_version": "0.1",
+        "catalog_version": int(catalog.get("catalog_version", 0)),
+        "capabilities": [
+            item
+            for item in capabilities
+            if isinstance(item, dict) and item.get("capability_id")
+        ],
+        "live_refresh_error": catalog.get("live_refresh_error"),
+    }
+
+
 def _router_decision_from_stub(scenario: BehaviorScenario) -> RouteDecision | None:
     raw = scenario.stub.get("llm_decision")
     if raw is None:
@@ -380,7 +410,10 @@ async def evaluate_router_scenario(scenario: BehaviorScenario) -> dict[str, Any]
     with patch.object(main.settings, "mode", mode), patch.object(
         main,
         "capability_catalog",
-        _RouterCatalog(_router_catalog_from_stub(scenario)),
+        _RouterCatalog(
+            _router_catalog_from_stub(scenario),
+            snapshot=_router_snapshot_from_stub(scenario),
+        ),
     ), patch.object(main, "llm_router", llm):
         decision = await main.route(
             RouteRequest(text=scenario.text, language=scenario.language)
@@ -435,8 +468,11 @@ def _evaluate_interaction_expectations(
     speech: str,
     skill_ids: list[str],
     skill_args: list[dict[str, Any]],
+    skill_timeout_ms: list[int | None],
+    skill_metadata: list[dict[str, Any]],
     requires_confirmation: bool,
     status: str,
+    reason: str | None,
     metadata: dict[str, Any],
 ) -> list[str]:
     expect = scenario.expect
@@ -465,9 +501,26 @@ def _evaluate_interaction_expectations(
     expected_skill_args = expect.get("skill_args")
     if expected_skill_args is not None and skill_args != expected_skill_args:
         errors.append(f"skill_args={skill_args!r}, expected {expected_skill_args!r}")
+    expected_skill_timeout_ms = expect.get("skill_timeout_ms")
+    if expected_skill_timeout_ms is not None and skill_timeout_ms != expected_skill_timeout_ms:
+        errors.append(
+            f"skill_timeout_ms={skill_timeout_ms!r}, expected {expected_skill_timeout_ms!r}"
+        )
     expected_confirmation = expect.get("requires_confirmation")
     _expect_equal(errors, "requires_confirmation", requires_confirmation, expected_confirmation)
     _expect_equal(errors, "status", status, expect.get("status"))
+    _expect_equal(errors, "reason", reason, expect.get("reason"))
+    skill_metadata_json = _json_text(skill_metadata)
+    for phrase in _tuple_of_strings(expect.get("skill_metadata_json_contains")):
+        if phrase not in skill_metadata_json:
+            errors.append(
+                f"skill metadata JSON missing phrase {phrase!r}: {skill_metadata_json!r}"
+            )
+    for phrase in _tuple_of_strings(expect.get("skill_metadata_json_forbid")):
+        if phrase in skill_metadata_json:
+            errors.append(
+                f"skill metadata JSON contained forbidden phrase {phrase!r}: {skill_metadata_json!r}"
+            )
     for key in _tuple_of_strings(expect.get("metadata_true")):
         if metadata.get(key) is not True:
             errors.append(f"metadata {key!r}={metadata.get(key)!r}, expected True")
@@ -580,12 +633,17 @@ def _interaction_actual(response: Any) -> dict[str, Any]:
     speech = _speech_text(response)
     skill_ids = [skill.skill_id for skill in response.skills]
     skill_args = [skill.args for skill in response.skills]
+    skill_timeout_ms = [skill.timeout_ms for skill in response.skills]
+    skill_metadata = [skill.metadata for skill in response.skills]
     return {
         "speech": speech,
         "skills": skill_ids,
         "skill_args": skill_args,
+        "skill_timeout_ms": skill_timeout_ms,
+        "skill_metadata": skill_metadata,
         "requires_confirmation": response.requires_confirmation,
         "status": response.status,
+        "reason": response.reason,
         "metadata": response.metadata,
     }
 
@@ -601,13 +659,72 @@ async def evaluate_interaction_scenario(scenario: BehaviorScenario) -> dict[str,
     speech = _speech_text(response)
     skill_ids = [skill.skill_id for skill in response.skills]
     skill_args = [skill.args for skill in response.skills]
+    skill_timeout_ms = [skill.timeout_ms for skill in response.skills]
+    skill_metadata = [skill.metadata for skill in response.skills]
     errors = _evaluate_interaction_expectations(
         scenario,
         speech=speech,
         skill_ids=skill_ids,
         skill_args=skill_args,
+        skill_timeout_ms=skill_timeout_ms,
+        skill_metadata=skill_metadata,
         requires_confirmation=response.requires_confirmation,
         status=response.status,
+        reason=response.reason,
+        metadata=response.metadata,
+    )
+    return {
+        "ok": not errors,
+        "errors": errors,
+        "actual": _interaction_actual(response),
+    }
+
+
+def _adapter_result_from_stub(scenario: BehaviorScenario) -> AgentResult:
+    result = AgentResult(
+        status=str(scenario.stub.get("status") or "ok"),
+        reason=scenario.stub.get("reason"),
+    )
+    for item in scenario.stub.get("speak_immediate") or []:
+        if not isinstance(item, dict):
+            raise ValueError(f"{scenario.key}: stub.speak_immediate items must be objects")
+        result.add_speak_immediate(str(item.get("text") or ""))
+    for item in scenario.stub.get("speak_after") or []:
+        if not isinstance(item, dict):
+            raise ValueError(f"{scenario.key}: stub.speak_after items must be objects")
+        result.add_speak_after(str(item.get("text") or ""))
+    for item in scenario.stub.get("actions") or []:
+        if not isinstance(item, dict):
+            raise ValueError(f"{scenario.key}: stub.actions items must be objects")
+        result.add_action(
+            str(item.get("target") or "robot_pose_controller"),
+            str(item.get("type") or ""),
+            params=dict(item.get("params") or {}),
+            blocking=bool(item.get("blocking", False)),
+            timeout_ms=item.get("timeout_ms"),
+            requires_confirmation=bool(item.get("requires_confirmation", False)),
+            reason=item.get("reason"),
+        )
+    return result
+
+
+async def evaluate_adapter_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
+    response = AgentResultInteractionAdapter().convert(_adapter_result_from_stub(scenario))
+    speech = _speech_text(response)
+    skill_ids = [skill.skill_id for skill in response.skills]
+    skill_args = [skill.args for skill in response.skills]
+    skill_timeout_ms = [skill.timeout_ms for skill in response.skills]
+    skill_metadata = [skill.metadata for skill in response.skills]
+    errors = _evaluate_interaction_expectations(
+        scenario,
+        speech=speech,
+        skill_ids=skill_ids,
+        skill_args=skill_args,
+        skill_timeout_ms=skill_timeout_ms,
+        skill_metadata=skill_metadata,
+        requires_confirmation=response.requires_confirmation,
+        status=response.status,
+        reason=response.reason,
         metadata=response.metadata,
     )
     return {
@@ -792,8 +909,11 @@ async def evaluate_dialogue_scenario(scenario: BehaviorScenario) -> dict[str, An
                 speech=actual["speech"],
                 skill_ids=actual["skills"],
                 skill_args=actual["skill_args"],
+                skill_timeout_ms=actual["skill_timeout_ms"],
+                skill_metadata=actual["skill_metadata"],
                 requires_confirmation=actual["requires_confirmation"],
                 status=actual["status"],
+                reason=actual["reason"],
                 metadata=actual["metadata"],
             )
             _evaluate_context_expectations(
@@ -831,6 +951,8 @@ async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
         return await evaluate_router_scenario(scenario)
     if scenario.suite == "interaction":
         return await evaluate_interaction_scenario(scenario)
+    if scenario.suite == "adapter":
+        return await evaluate_adapter_scenario(scenario)
     if scenario.suite == "dialogue":
         return await evaluate_dialogue_scenario(scenario)
     raise ValueError(f"unsupported suite {scenario.suite!r}")

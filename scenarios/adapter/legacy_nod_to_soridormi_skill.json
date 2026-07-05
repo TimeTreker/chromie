@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "id": "legacy_nod_to_soridormi_skill",
+  "suite": "adapter",
+  "level": "module",
+  "description": "Legacy head.nod actions are translated to the named Soridormi nod skill while preserving legacy metadata.",
+  "tags": ["legacy-adapter", "skill-mapping", "nod"],
+  "input": {
+    "text": "adapter legacy nod"
+  },
+  "stub": {
+    "speak_immediate": [
+      {
+        "text": "Okay."
+      }
+    ],
+    "actions": [
+      {
+        "target": "robot_pose_controller",
+        "type": "head.nod",
+        "params": {
+          "times": 2,
+          "duration_ms": 800
+        },
+        "timeout_ms": 1000
+      }
+    ]
+  },
+  "expect": {
+    "speech_all": ["Okay."],
+    "skills": ["soridormi.nod_yes"],
+    "skill_args": [
+      {
+        "count": 2
+      }
+    ],
+    "skill_timeout_ms": [null],
+    "skill_metadata_json_contains": [
+      "\"legacy_action_type\": \"head.nod\"",
+      "\"legacy_timeout_ms\": 1000"
+    ],
+    "metadata_json_contains": ["legacy-adapter"]
+  }
+}

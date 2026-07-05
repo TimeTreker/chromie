@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "id": "factual_sun_round_rules_only_no_motion",
+  "suite": "router",
+  "level": "module",
+  "description": "Rules-only fallback must not treat weak factual word overlap such as round/hot as a physical turn action.",
+  "tags": ["factual", "rules-only", "no-motion"],
+  "input": {
+    "text": "I think the sun is hot and round, do you agree with me?",
+    "language": "en-US"
+  },
+  "stub": {
+    "router_mode": "rules_only",
+    "catalog": {
+      "matched": true,
+      "suggested_route": "robot_action",
+      "suggested_agents": ["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
+      "catalog_version": 4,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.turn_in_place",
+          "agent_id": "soridormi.skill",
+          "description": "Rotate left or right with near-zero forward velocity.",
+          "score": 0.165,
+          "available": true,
+          "interaction_executable": true
+        }
+      ]
+    }
+  },
+  "expect": {
+    "route": "chat",
+    "intent": "general_conversation",
+    "source": "fallback",
+    "task_types_include": ["speech.answer"],
+    "task_types_forbid": ["task.execute_skill"],
+    "llm_calls": 0
+  }
+}

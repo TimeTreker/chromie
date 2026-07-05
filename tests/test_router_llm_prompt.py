@@ -57,7 +57,14 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Catalog entries are context, not authorization", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
         self.assertIn("status=missing_ability", prompt)
-        self.assertIn("Return compact JSON only", prompt)
+        self.assertIn("Return one compact JSON object", prompt)
+        self.assertIn("final route is singular", prompt)
+        self.assertIn("never a routes[] array", prompt)
+        self.assertIn("human-like social warmth", prompt)
+        self.assertIn("not a program, programme", prompt)
+        self.assertIn("Chat/fact/greeting template", prompt)
+        self.assertIn("Single listed skill template", prompt)
+        self.assertIn("Compound listed skill template", prompt)
         self.assertIn("Do not", prompt)
         self.assertIn("output chain-of-thought", prompt)
         self.assertIn("chain-of-thought", prompt)
@@ -156,11 +163,16 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("do not perform or reveal reasoning inside the router", prompt)
         self.assertIn("needs deeper thought, task-session creation, or task-session continuation", prompt)
         self.assertIn("Return calibrated low confidence", prompt)
-        self.assertIn("Common compact skill catalog JSON", prompt)
+        self.assertIn("Output Template Preview", prompt)
+        self.assertIn("The final route is singular", prompt)
+        self.assertIn("use actions for multiple skills, never routes[]", prompt)
+        self.assertIn("Single listed skill", prompt)
+        self.assertIn("Multiple listed skills", prompt)
+        self.assertIn("Compact skill catalog JSON", prompt)
         self.assertIn("Query-biased catalog hints JSON", prompt)
         self.assertIn("not recommendations", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
-        self.assertIn("no executable blink skill is in the common catalog", prompt)
+        self.assertIn("no executable blink skill is in the compact skill catalog", prompt)
         self.assertIn("Factual agreement/disagreement is chat", prompt)
         self.assertIn("Moon, Sun, shape, temperature", prompt)
         self.assertIn("not deep_thought or robot_action", prompt)
@@ -198,7 +210,10 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("progress text", prompt)
         self.assertIn("placeholder intents", prompt)
         self.assertIn("speak_first", prompt)
-        self.assertIn("Return compact JSON only", prompt)
+        self.assertIn("human-like social warmth", prompt)
+        self.assertIn("not a program, programme", prompt)
+        self.assertIn("Return one compact JSON object matching one of the templates", prompt)
+        self.assertIn("never output a routes array", prompt)
 
     def test_route_stage_preserves_missing_desired_ability_proposal(self) -> None:
         decision = RouteDecision(
@@ -995,6 +1010,114 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("review_model:review-model", decision.reason or "")
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
         self.assertTrue(all(payload["think"] is False for payload in router.payloads))
+
+    async def test_review_model_completes_underspecified_robot_action_with_exact_skill(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"robot_action",'
+                                '"intent":"soridormi.walk_forward",'
+                                '"confidence":0.92}'
+                            )
+                        }
+                    }
+                return {"message": {"content": '{"route":"robot_action","intent":"robot_action"}'}}
+
+        router = ReviewRouter()
+        request = RouteRequest(
+            text="Walk forward for 15 seconds, please.",
+            language="en-US",
+            context={
+                "prompt_capabilities_all": [
+                    {
+                        "capability_id": "soridormi.walk_forward",
+                        "description": "Human-facing wrapper for natural walking requests.",
+                        "interaction_executable": True,
+                        "available": True,
+                        "route": "robot_action",
+                        "effects": ["physical_motion"],
+                    }
+                ]
+            },
+        )
+
+        decision = await router.route(request)
+        review_user = router.payloads[1]["messages"][1]["content"]
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "soridormi.walk_forward")
+        self.assertIn("selected exact skill for underspecified robot_action", decision.reason or "")
+        self.assertIn("soridormi.walk_forward", review_user)
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+
+    async def test_review_model_skill_id_route_is_normalized_to_robot_action(self) -> None:
+        class ReviewRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                    slow_review_recovery_enabled=True,
+                )
+                self.payloads: list[dict] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.payloads.append(payload)
+                if payload["model"] == "review-model":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"route":"soridormi.blink_eyes",'
+                                '"intent":"soridormi.blink_eyes",'
+                                '"confidence":1.0}'
+                            )
+                        }
+                    }
+                return {"message": {"content": '{"route":"robot_action","intent":"robot_action"}'}}
+
+        router = ReviewRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="眨两下眼睛。",
+                language="zh-CN",
+                context={
+                    "prompt_capabilities_all": [
+                        {
+                            "capability_id": "soridormi.blink_eyes",
+                            "description": "Blink the simulated social eyes.",
+                            "interaction_executable": True,
+                            "available": True,
+                            "route": "robot_action",
+                            "effects": ["visual_expression"],
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
+        self.assertIn("skill id in route field", decision.reason or "")
+        self.assertIn("selected exact skill for underspecified robot_action", decision.reason or "")
+        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
 
     async def test_ambiguous_deep_thought_tries_review_before_fallback(self) -> None:
         class ReviewRouter(OllamaLLMRouter):

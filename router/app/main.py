@@ -45,7 +45,7 @@ class Settings(BaseModel):
     llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "192")))
     review_timeout_ms: int = Field(
         default_factory=lambda: int(
-            os.getenv("ROUTER_REVIEW_TIMEOUT_MS", "800")
+            os.getenv("ROUTER_REVIEW_TIMEOUT_MS", "1600")
         )
     )
     confidence_threshold: float = Field(
@@ -71,7 +71,7 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     slow_review_recovery_enabled: bool = Field(
-        default_factory=lambda: os.getenv("ROUTER_SLOW_REVIEW_RECOVERY_ENABLED", "0").strip().lower()
+        default_factory=lambda: os.getenv("ROUTER_SLOW_REVIEW_RECOVERY_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     log_level: str = Field(default_factory=lambda: os.getenv("ROUTER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
@@ -99,6 +99,14 @@ capability_catalog = CapabilityCatalogClient(
     limit=settings.capability_match_limit,
     snapshot_cache_ttl_ms=settings.capability_catalog_cache_ttl_ms,
 )
+
+
+@app.on_event("startup")
+async def warm_capability_catalog_snapshot() -> None:
+    try:
+        await capability_catalog.snapshot(refresh=True)
+    except Exception as exc:
+        logger.warning("capability catalog startup snapshot failed: %s", exc)
 
 
 llm_router = OllamaLLMRouter(
@@ -224,6 +232,25 @@ def _prompt_catalog_capabilities(
     )
     limit = PROMPT_CATALOG_COMMON_LIMIT if scope == "common" else PROMPT_CATALOG_ALL_LIMIT
     return items[:limit]
+
+
+def _catalog_result_from_snapshot(
+    request: RouteRequest,
+    snapshot: dict[str, Any],
+) -> CapabilityCatalogResult:
+    return CapabilityCatalogResult(
+        query=request.text,
+        matched=False,
+        suggested_route="chat",
+        suggested_agents=[],
+        matches=[],
+        catalog_version=int(snapshot.get("catalog_version") or 0)
+        if isinstance(snapshot, dict)
+        else 0,
+        live_refresh_error=str(snapshot.get("live_refresh_error") or "")
+        if isinstance(snapshot, dict) and snapshot.get("live_refresh_error")
+        else None,
+    )
 
 
 def _intent_capability_id(intent: str) -> str:
@@ -385,7 +412,16 @@ def _validate_llm_capability_decision(
     prompt_capabilities = request.context.get("prompt_capabilities_common")
     if not isinstance(prompt_capabilities, list):
         prompt_capabilities = []
-    candidates = _unique_capabilities([*list(result.matches or []), *prompt_capabilities])
+    prompt_capabilities_all = request.context.get("prompt_capabilities_all")
+    if not isinstance(prompt_capabilities_all, list):
+        prompt_capabilities_all = []
+    candidates = _unique_capabilities(
+        [
+            *list(result.matches or []),
+            *prompt_capabilities,
+            *prompt_capabilities_all,
+        ]
+    )
     decision.candidate_capabilities = candidates
     by_id = {_capability_id(item): item for item in candidates if _capability_id(item)}
     selected_id = _intent_capability_id(decision.intent)
@@ -503,14 +539,22 @@ def _validate_llm_capability_decision(
                     f"{raw_intent or '<empty>'}"
                 ),
             )
+        if not selected_id and raw_intent in {"", "unknown", "robot_action"}:
+            return fallback_decision(
+                request,
+                reason=(
+                    "llm_robot_action_missing_catalog_skill: "
+                    f"{raw_intent or '<empty>'}"
+                ),
+            )
         selected = by_id.get(selected_id)
         if selected_id and (selected is None or not _capability_executable(selected)):
             executable = _interaction_executable_candidates(result)
             if not executable:
-                return _clarify_capability_decision(
+                return _fallback_unmatched_robot_action(
                     request,
-                    result,
-                    reason="no interaction-executable capability is available",
+                    raw_intent=raw_intent,
+                    reason="llm_robot_action_invalid_catalog_skill",
                 )
             decision.intent = "robot_action"
             decision.reason = (
@@ -520,10 +564,10 @@ def _validate_llm_capability_decision(
         elif not selected_id:
             executable = _interaction_executable_candidates(result)
             if not executable:
-                return _clarify_capability_decision(
+                return _fallback_unmatched_robot_action(
                     request,
-                    result,
-                    reason="no interaction-executable capability is available",
+                    raw_intent=raw_intent,
+                    reason="llm_robot_action_missing_catalog_skill",
                 )
             if not decision.intent or decision.intent in {"unknown", "interrupt", "ignore"}:
                 decision.intent = "robot_action"
@@ -535,7 +579,12 @@ def _validate_llm_capability_decision(
         return finalize_decision(decision, request, source="llm")
 
     if decision.route == "chat":
-        if not decision.intent or decision.intent == "unknown":
+        if selected_id == "chromie.speak":
+            decision.intent = "general_conversation"
+            decision.reason = (
+                f"{decision.reason}; " if decision.reason else ""
+            ) + "validator treated chromie.speak as chat output channel"
+        elif not decision.intent or decision.intent == "unknown":
             decision.intent = "general_conversation"
         decision.agents = list(dict.fromkeys([*decision.agents, "conversation_agent", "speaker_agent"]))
         return finalize_decision(decision, request, source="llm")
@@ -651,6 +700,48 @@ def _recover_invalid_operational_llm_decision(
     )
 
 
+def _is_unmatched_capability_clarification(
+    decision: RouteDecision,
+    result: CapabilityCatalogResult,
+) -> bool:
+    return (
+        decision.route == "clarify"
+        and decision.intent == "clarify_capability_selection"
+        and not decision.actions
+        and not list(result.matches or [])
+    )
+
+
+def _recover_unmatched_capability_clarification(
+    request: RouteRequest,
+    decision: RouteDecision,
+    result: CapabilityCatalogResult,
+) -> RouteDecision:
+    del result
+    return fallback_decision(
+        request,
+        reason=(
+            "quick router asked for capability clarification without a "
+            f"query-matched capability; quick_intent={decision.intent}"
+        ),
+    )
+
+
+def _fallback_unmatched_robot_action(
+    request: RouteRequest,
+    *,
+    raw_intent: str,
+    reason: str,
+) -> RouteDecision:
+    return fallback_decision(
+        request,
+        reason=(
+            f"{reason}: no query-matched capability can support quick "
+            f"robot_action intent {raw_intent or '<empty>'!r}"
+        ),
+    )
+
+
 def _attach_stage_context(
     request: RouteRequest,
     *,
@@ -660,10 +751,6 @@ def _attach_stage_context(
     prompt_capabilities_all: list[dict[str, Any]] | None = None,
 ) -> None:
     previous = request.context.get("router_stage_context")
-    # Preserve low-score context-fill candidates for semantic recovery. A
-    # lexical catalog miss can still provide the correct ability surface for
-    # multilingual or ASR-noisy requests; only catalog-owned fallback execution
-    # is gated on ``matched``.
     candidate_capabilities = list(catalog_result.matches or [])
     common = _unique_capabilities(list(prompt_capabilities_common or []))
     full = _unique_capabilities(list(prompt_capabilities_all or []))
@@ -683,6 +770,9 @@ def _attach_stage_context(
             "quick_intent": {
                 "model": settings.model,
                 "confidence_threshold": settings.confidence_threshold,
+                "capability_source": "compact_snapshot_catalog"
+                if full
+                else "query_biased_search_fallback",
             },
         },
     }
@@ -883,15 +973,10 @@ async def route(request: RouteRequest) -> RouteDecision:
         emergency_matched = True
 
     if decision is None:
-        catalog_result_task = asyncio.create_task(capability_catalog.search(
-            text=request.text,
-            language=request.language,
-        ))
         snapshot_method = getattr(capability_catalog, "snapshot", None)
         catalog_snapshot_task = (
             asyncio.create_task(snapshot_method()) if callable(snapshot_method) else None
         )
-        catalog_result = await catalog_result_task
         if catalog_snapshot_task is not None:
             try:
                 catalog_snapshot = await catalog_snapshot_task
@@ -900,17 +985,25 @@ async def route(request: RouteRequest) -> RouteDecision:
                 catalog_snapshot = {}
         else:
             catalog_snapshot = {}
-        prompt_capabilities_common = _prompt_catalog_capabilities(
-            catalog_snapshot,
-            scope="common",
-        )
         prompt_capabilities_all = _prompt_catalog_capabilities(
             catalog_snapshot,
             scope="all",
         )
-        if not prompt_capabilities_common:
+        prompt_capabilities_common = _prompt_catalog_capabilities(
+            catalog_snapshot,
+            scope="common",
+        )
+        if prompt_capabilities_all:
+            catalog_result = _catalog_result_from_snapshot(
+                request,
+                catalog_snapshot,
+            )
+        else:
+            catalog_result = await capability_catalog.search(
+                text=request.text,
+                language=request.language,
+            )
             prompt_capabilities_common = list(catalog_result.matches or [])
-        if not prompt_capabilities_all:
             prompt_capabilities_all = _unique_capabilities(
                 [*prompt_capabilities_common, *list(catalog_result.matches or [])]
             )
@@ -927,6 +1020,15 @@ async def route(request: RouteRequest) -> RouteDecision:
             if llm_decision.source == "llm":
                 if llm_decision.route in {"interrupt", "ignore"}:
                     decision = _recover_invalid_operational_llm_decision(
+                        request,
+                        llm_decision,
+                        catalog_result,
+                    )
+                elif _is_unmatched_capability_clarification(
+                    llm_decision,
+                    catalog_result,
+                ):
+                    decision = _recover_unmatched_capability_clarification(
                         request,
                         llm_decision,
                         catalog_result,

@@ -272,7 +272,7 @@ tests, and dependency-complete Orchestrator AgentClient coverage. The latest
 local `./scripts/run_tests.sh` attempt on 2026-07-04 passed
 `python scripts/check_docs.py`, ran 640 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions. The behavior
-scenario runner also passed 344/344 Router, interaction, and dialogue scenario
+scenario runner also passed 353/353 adapter, Router, interaction, and dialogue scenario
 files with `--no-write`.
 
 The tests alone do not prove GPU performance, microphone quality, speaker

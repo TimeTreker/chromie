@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "blocked_agent_result_becomes_refusal",
+  "suite": "adapter",
+  "level": "module",
+  "description": "Blocked legacy AgentResult values are exposed as refused InteractionResponse values with the reason preserved.",
+  "tags": ["legacy-adapter", "status"],
+  "input": {
+    "text": "adapter blocked result"
+  },
+  "stub": {
+    "status": "blocked",
+    "reason": "unsafe"
+  },
+  "expect": {
+    "status": "refused",
+    "reason": "unsafe",
+    "no_skills": true
+  }
+}

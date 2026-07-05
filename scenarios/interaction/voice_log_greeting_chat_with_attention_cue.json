@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_greeting_chat_with_attention_cue",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "A plain greeting should stay chat speech and may attach a simulator-only expressive attention cue after routing, instead of becoming a robot_action.",
+  "tags": [
+    "voice-log",
+    "greeting",
+    "expressive-cue",
+    "router-agent-contract"
+  ],
+  "input": {
+    "text": "Hello, how are you.",
+    "language": "en-US"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "general_conversation",
+      "confidence": 0.9,
+      "language": "en-US",
+      "source": "llm"
+    },
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.express_attention",
+        "agent_id": "soridormi.skill",
+        "description": "Small head-only attention/listening gesture using a bounded neutral-home MuJoCo trajectory.",
+        "effects": ["physical_motion"],
+        "safety_class": "physical_motion",
+        "requires_confirmation": true,
+        "available": true,
+        "interaction_executable": true,
+        "route": "robot_action",
+        "score": 0.5,
+        "metadata": {
+          "mode": "sim"
+        }
+      }
+    ],
+    "expressive_body_cues": "sim_only",
+    "ollama_reply": "Hello. I am functioning correctly."
+  },
+  "expect": {
+    "speech_any": ["Hello", "functioning correctly"],
+    "skills": ["soridormi.express_attention"],
+    "skill_args": [
+      {
+        "style": "neutral",
+        "duration_s": 2.4,
+        "hold_fraction": 0.35
+      }
+    ],
+    "skill_metadata_json_contains": ["expressive_body_cue", "chat_attention"],
+    "metadata_json_contains": ["expressive_body_cue", "soridormi.express_attention"],
+    "requires_confirmation": true
+  }
+}

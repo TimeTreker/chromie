@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_greeting_not_capability_clarify",
+  "suite": "router",
+  "level": "module",
+  "description": "Regression from the 2026-07-05 live voice log: a plain greeting must not become a capability clarification just because the prompt catalog contains robot motion skills.",
+  "tags": [
+    "voice-log",
+    "greeting",
+    "router-agent-contract",
+    "capability-hallucination"
+  ],
+  "input": {
+    "text": "Hello, how are you."
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": false,
+      "suggested_route": "chat",
+      "suggested_agents": [],
+      "catalog_version": 24,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.walk_forward",
+          "agent_id": "soridormi.skill",
+          "description": "Walk forward for a bounded duration.",
+          "route": "robot_action",
+          "prompt_tier": "common",
+          "score": 0.0,
+          "available": true,
+          "interaction_executable": true,
+          "effects": ["physical_motion"],
+          "safety_class": "low_risk_motion"
+        },
+        {
+          "capability_id": "soridormi.blink_eyes",
+          "agent_id": "soridormi.skill",
+          "description": "Blink the robot eyes visibly.",
+          "route": "robot_action",
+          "prompt_tier": "common",
+          "score": 0.0,
+          "available": true,
+          "interaction_executable": true,
+          "effects": ["visual_expression"],
+          "safety_class": "low_risk_action"
+        }
+      ]
+    },
+    "llm_decision": {
+      "route": "robot_action",
+      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "intent": "motion_plan",
+      "confidence": 0.86,
+      "language": "en-US",
+      "source": "llm",
+      "reason": "bad quick-router motion-plan interpretation on greeting"
+    }
+  },
+  "expect": {
+    "route": "chat",
+    "intent": "general_conversation",
+    "source": "fallback",
+    "task_types_include": ["speech.answer"],
+    "task_types_forbid": ["task.execute_skill", "cognition.deep_think"],
+    "metadata_json_forbid": ["clarify_capability_selection", "execute the motion", "motion plan"],
+    "llm_calls": 1
+  }
+}

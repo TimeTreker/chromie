@@ -133,7 +133,7 @@ confirmation path.
 |---|---|
 | `chat` | Normal conversation and questions that do not need tools. |
 | `deep_thought` | Complex reasoning or planning delegated to `deepthinking_agent` with session working memory. |
-| `robot_action` | High-level body, head, pose, or motion request selected from available capabilities. |
+| `robot_action` | Listed body, head, gaze, motion, or expression skill selected from available capabilities. |
 | `tool` | External information or planning tools, such as web/weather/API work. |
 | `memory` | User asks Chromie to remember or update a preference/fact. |
 | `clarify` | The request is ambiguous or outside current bounded abilities. |
@@ -142,7 +142,7 @@ confirmation path.
 
 When LLM routing is enabled, the prompt tells the model to consider:
 
-- the compact common skill catalog as Chromie's fast-router ability menu;
+- the compact listed skill catalog as Chromie's fast-router ability menu;
 - query-biased candidate capabilities as hints, not recommendations;
 - bounded memory and context such as `session_memory`, pending tasks, robot
   state, position, and user preferences;
@@ -193,14 +193,14 @@ ROUTER_REVIEW_MODEL=gemma4:e2b
 ROUTER_TIMEOUT_MS=2200
 ROUTER_LLM_TIMEOUT_MS=2200
 ROUTER_LLM_NUM_PREDICT=192
-ROUTER_REVIEW_TIMEOUT_MS=800
+ROUTER_REVIEW_TIMEOUT_MS=1600
 ROUTER_CONFIDENCE_THRESHOLD=0.55
 ROUTER_CAPABILITY_CATALOG_URL=http://chromie-agent:8092
 ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=400
 ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS=5000
 ROUTER_CAPABILITY_MATCH_LIMIT=8
 ROUTER_POST_INTERRUPT_REVIEW_ENABLED=0
-ROUTER_SLOW_REVIEW_RECOVERY_ENABLED=0
+ROUTER_SLOW_REVIEW_RECOVERY_ENABLED=1
 ROUTER_LOG_LEVEL=INFO
 ```
 

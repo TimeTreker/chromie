@@ -164,102 +164,83 @@ class BaseAgent(ABC):
     ) -> bool:
         if not self.is_playable_spoken_response(response, zh=zh):
             return True
-        route = request.route_decision.route
-        if route not in {"chat", "clarify"}:
-            return True
-        if request.route_decision.actions:
-            return True
-        if request.route_decision.candidate_capabilities:
-            return True
-        context = request.context or {}
-        if context.get("capability_candidates"):
-            return True
-        if self._task_context_from_request(request):
-            return True
-        if self._history_from_request(request):
-            return True
+        return self._has_effectful_robot_context(request)
 
-        response_key = self._review_signal_text(response)
-        request_key = self._review_signal_text(request.text)
-        if len(response_key) < 12:
+    def _has_effectful_robot_context(self, request: AgentRunRequest) -> bool:
+        decision = request.route_decision
+        if decision.route == "robot_action":
             return True
-        if request_key and request_key in response_key:
+        if any(self._is_effectful_action(item) for item in decision.actions):
             return True
-
-        reviewer_signal_needles = (
-            "as an ai",
-            "large language model",
-            "language model",
-            "trained by",
-            "i do not have personal",
-            "i don't have personal",
-            "i cannot",
-            "i can't",
-            "i do not have the ability",
-            "i don't have the ability",
-            "i have no ability",
-            "i can tell you",
-            "i can do that",
-            "i am ready",
-            "i will now",
-            "i'll now",
-            "i am going to",
-            "i'm going to",
-            "i will execute",
-            "i will perform",
-            "i will move",
-            "i will walk",
-            "let me move",
-            "let me walk",
-            "我不能",
-            "我无法",
-            "我没有",
-            "没有能力",
-            "我可以讲",
-            "我可以做",
-            "我准备好了",
-            "这就",
-            "马上",
-            "立即",
-            "开始执行",
-            "执行这个动作",
-            "往前走",
-            "向前走",
-        )
-        if any(needle in response_key for needle in reviewer_signal_needles):
-            return True
-
-        creative_request_needles = (
-            "joke",
-            "story",
-            "poem",
-            "song",
-            "sing",
-            "tell me",
-            "讲笑话",
-            "笑话",
-            "故事",
-            "诗",
-            "唱歌",
-        )
-        empty_promise_needles = (
-            "i can",
-            "sure",
-            "of course",
-            "当然",
-            "可以",
-            "我会",
-        )
-        if any(needle in request_key for needle in creative_request_needles) and any(
-            needle in response_key for needle in empty_promise_needles
+        if any(
+            self._is_effectful_capability(item)
+            for item in decision.candidate_capabilities
         ):
             return True
 
+        context = request.context or {}
+        candidates = context.get("capability_candidates")
+        if isinstance(candidates, list) and any(
+            self._is_effectful_capability(item) for item in candidates
+        ):
+            return True
+
+        metadata = decision.metadata or {}
+        for key in ("task_list", "task_proposals", "agent_task_proposals"):
+            items = metadata.get(key)
+            if isinstance(items, list) and any(
+                self._is_effectful_task_item(item) for item in items
+            ):
+                return True
         return False
 
     @staticmethod
-    def _review_signal_text(value: str) -> str:
-        return " ".join((value or "").casefold().split())
+    def _is_speech_skill_id(value: Any) -> bool:
+        return str(value or "").strip() == "chromie.speak"
+
+    def _is_effectful_action(self, item: Any) -> bool:
+        if not isinstance(item, dict):
+            return False
+        skill_id = item.get("skill_id") or item.get("capability_id")
+        if self._is_speech_skill_id(skill_id):
+            return False
+        return bool(skill_id or item.get("type") or item.get("target"))
+
+    def _is_effectful_capability(self, item: Any) -> bool:
+        if not isinstance(item, dict):
+            return False
+        capability_id = item.get("capability_id") or item.get("skill_id")
+        if self._is_speech_skill_id(capability_id):
+            return False
+        effects = item.get("effects")
+        if isinstance(effects, list) and any(
+            str(effect or "").strip()
+            not in {"", "user_interaction", "audio_output"}
+            for effect in effects
+        ):
+            return True
+        safety_class = str(item.get("safety_class") or "").strip()
+        if safety_class and safety_class not in {"low_risk_action", "speech"}:
+            return True
+        route = str(item.get("route") or "").strip()
+        return route == "robot_action"
+
+    def _is_effectful_task_item(self, item: Any) -> bool:
+        if not isinstance(item, dict):
+            return False
+        skill_id = item.get("skill_id") or item.get("capability_id")
+        if self._is_speech_skill_id(skill_id):
+            return False
+        task_type = str(item.get("task_type") or item.get("type") or "").strip()
+        if task_type in {"", "speech.answer", "chromie.speak"}:
+            return False
+        if task_type in {
+            "task.execute_skill",
+            "task.execute_robot_action",
+            "robot_action",
+        }:
+            return True
+        return str(item.get("route") or "").strip() == "robot_action"
 
     def _response_review_prompt(
         self,
@@ -307,8 +288,7 @@ class BaseAgent(ABC):
             "Decide whether the candidate can be spoken now. "
             "A one-word fragment such as only 'I' is not speakable and must be revised. "
             "If the current user input or extracted context asks for a joke, story, song, poem, or other creative content, "
-            "including capability-style wording such as whether Chromie can, could, or would do it, the candidate must include the actual content. Example: user asks for a joke and candidate says "
-            "'I can tell you a joke.' => revise with a brief original joke. "
+            "including capability-style wording such as whether Chromie can, could, or would do it, the candidate must include the actual content rather than only promising readiness or ability. "
             "If Chromie already promised the content according to the extracted context and the user says they are waiting, says 'go ahead', 'continue', 'tell me', or 'I know you can', the candidate must deliver it now. "
             "If the candidate says Chromie lacks a body/tool ability that appears available in Capability context or the original prompt excerpt, revise it to acknowledge the available ability instead of falsely refusing. "
             "If Route context is chat or clarify and the candidate promises, confirms, or implies that Chromie will now execute a physical body action, movement, or tool side effect, revise it to a safe clarification that the action must be routed through the robot action planner before execution. "
@@ -330,14 +310,14 @@ class BaseAgent(ABC):
             "or too fragmentary to play as speech. "
             "Revise the candidate when it is an empty promise, fails to actually perform a harmless requested "
             "creative response, ignores available context, describes Chromie as a backend/model/provider, "
+            "program, programme, software, code, or model process, "
             "uses a model-style refusal where Chromie should answer normally, or mainly repeats, quotes, "
             "or paraphrases the user's current words instead of directly answering. "
             "Revise the candidate when it falsely says Chromie cannot perform a body/tool ability that the supplied capability context shows as available. "
             "Revise the candidate when it claims Chromie will now execute movement, body action, or a tool side effect while Route context is chat or clarify and no executable action route is present. "
             "In that case, ask for safe action routing or clarification instead of promising execution. "
             "If the user asks for a joke, story, song, poem, or follows up after Chromie promised one, even when the request is phrased as whether Chromie can, could, would, 能不能, 可不可以, or 会不会 do it, "
-            "the candidate must contain the actual creative content. A candidate that only says "
-            "'I can tell you a joke', 'I can do that', 'Sure', 'I am ready', 'I will', '我可以讲笑话', '当然可以', or '我准备好了' is incomplete and must be revised. "
+            "the candidate must contain the actual creative content. A candidate that only promises readiness, willingness, or ability is incomplete and must be revised. "
             "If the context shows Chromie already promised creative content and the user says they are waiting, asks to continue, says go ahead, or asks again, the candidate must deliver the content now. "
             "Repeating the user's words is acceptable only when confirmation, clarification, or an explicit read-back is needed. "
             "When revising, write spoken_response in the requested output language from the prompt. "

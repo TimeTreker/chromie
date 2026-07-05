@@ -81,7 +81,7 @@ if [ "${WARM_OLLAMA_BEFORE_ORCH:-1}" = "1" ]; then
     WARM_MODELS=("${ROUTER_MODEL:-qwen3:0.6b}" "${WARM_MODELS[@]}")
     if [ -n "${ROUTER_REVIEW_MODEL:-}" ] && {
       [[ "${ROUTER_POST_INTERRUPT_REVIEW_ENABLED:-0}" =~ ^(1|true|yes|on)$ ]] ||
-        [[ "${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-0}" =~ ^(1|true|yes|on)$ ]]
+        [[ "${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-1}" =~ ^(1|true|yes|on)$ ]]
     }; then
       WARM_MODELS+=("${ROUTER_REVIEW_MODEL}")
     fi
