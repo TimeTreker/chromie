@@ -216,9 +216,14 @@ python scripts/interaction_text_mujoco_check.py --no-speaker
 
 Session timing logs can be enabled with `ORCH_SESSION_TIMING_LOGS=1`. Set
 `ORCH_EVENT_LOG_PATH` to append correlated JSONL records containing UTC time,
-SID, elapsed milliseconds, event name, and rendered details. Evidence writing
-is best-effort and never authorizes or changes execution. Finished sessions
-also write `session_workflow` and `session_workflow_graph` evidence covering
+SID, elapsed milliseconds, event name, rendered details, and severity. Evidence
+writing is best-effort and never authorizes or changes execution. Suspicious
+nodes such as speech-only `robot_action` routing or action-refusal speech are
+logged as warnings; failed skill, runtime, or TTS nodes are logged as errors.
+The operator CLI colors warning lines yellow and error lines red when attached
+to a color-capable terminal. Set `ORCH_CLI_COLOR=1` to force color or
+`ORCH_CLI_COLOR=0` to disable it. Finished sessions also write
+`session_workflow` and `session_workflow_graph` evidence covering
 VAD, ASR, Router, Agent, Skill Runtime, TTS, playback, per-stage deltas, and
 final timing. The operator console keeps only a compact
 `session_workflow_summary` line with the slowest steps.

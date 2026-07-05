@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from orchestrator.runtime.session import SessionTracker
 
@@ -107,6 +109,72 @@ class SessionEvidenceTests(unittest.TestCase):
                 sid = tracker.create()
                 tracker.log(sid, "safe_event")
             self.assertIn(sid, tracker.state)
+
+    def test_bad_session_nodes_are_logged_above_info_and_recorded_with_severity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "events.jsonl"
+            tracker = SessionTracker(event_log_path=path)
+            sid = tracker.create()
+
+            with self.assertLogs("orchestrator.runtime.session", level="WARNING") as warning_logs:
+                tracker.log(
+                    sid,
+                    "router_done: route=%s agents=%s intent=%s confidence=%.2f",
+                    "robot_action",
+                    "capability_agent,speaker_agent",
+                    "capability:chromie.speak",
+                    1.0,
+                )
+            self.assertTrue(any("WARNING" in line for line in warning_logs.output))
+
+            with self.assertLogs("orchestrator.runtime.session", level="ERROR") as error_logs:
+                tracker.log(
+                    sid,
+                    "skill_result: request_id=%s skill_id=%s status=%s reason=%s message=%s",
+                    "move-1",
+                    "soridormi.walk_forward",
+                    "failed",
+                    "provider_error",
+                    "provider disconnected",
+                )
+            self.assertTrue(any("ERROR" in line for line in error_logs.output))
+
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+            router_records = [record for record in records if record["event"] == "router_done"]
+            skill_records = [record for record in records if record["event"] == "skill_result"]
+            self.assertEqual(router_records[-1]["severity"], "warning")
+            self.assertEqual(skill_records[-1]["severity"], "error")
+
+    def test_failure_speech_can_be_colored_yellow_in_cli(self) -> None:
+        tracker = SessionTracker(event_log_path=None)
+        sid = tracker.create()
+        with patch.dict(os.environ, {"ORCH_CLI_COLOR": "1"}, clear=False):
+            with self.assertLogs("orchestrator.runtime.session", level="WARNING") as warning_logs:
+                tracker.log(
+                    sid,
+                    "tts_schedule: order=%s chars=%s scheduled_tts=%s generation=%s text=%r",
+                    0,
+                    29,
+                    1,
+                    12,
+                    "I cannot perform that action.",
+                )
+        self.assertTrue(any("\033[33m" in line for line in warning_logs.output))
+
+    def test_failed_nodes_can_be_colored_red_in_cli(self) -> None:
+        tracker = SessionTracker(event_log_path=None)
+        sid = tracker.create()
+        with patch.dict(os.environ, {"ORCH_CLI_COLOR": "1"}, clear=False):
+            with self.assertLogs("orchestrator.runtime.session", level="ERROR") as error_logs:
+                tracker.log(
+                    sid,
+                    "skill_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
+                    "failed",
+                    0,
+                    1,
+                    10.0,
+                )
+        self.assertTrue(any("\033[31m" in line for line in error_logs.output))
 
 
 if __name__ == "__main__":

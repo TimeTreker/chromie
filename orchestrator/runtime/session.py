@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import sys
 import threading
 import time
 import uuid
@@ -142,17 +144,18 @@ class SessionTracker:
         sid = sid or "unknown"
         elapsed = self.elapsed_ms(sid)
         rendered = self._render_message(message, args)
-        self._remember_workflow_event(sid, rendered)
+        level = self._event_log_level(rendered)
+        severity = logging.getLevelName(level).lower()
+        self._remember_workflow_event(sid, rendered, severity=severity)
         self.event_writer.write(
             sid=sid,
             elapsed_ms=elapsed,
             message=message,
             args=args,
+            extra={"severity": severity},
         )
-        if args:
-            logger.info("[SID:%s +%.1fms] " + message, sid, elapsed, *args)
-        else:
-            logger.info("[SID:%s +%.1fms] %s", sid, elapsed, message)
+        line = self._colorize_for_cli(f"[SID:{sid} +{elapsed:.1f}ms] {rendered}", level)
+        logger.log(level, "%s", line)
 
     def maybe_done(self, sid: str | None) -> None:
         if not sid:
@@ -198,7 +201,7 @@ class SessionTracker:
         except Exception:
             return f"{message} args={args!r}"
 
-    def _remember_workflow_event(self, sid: str, rendered: str) -> None:
+    def _remember_workflow_event(self, sid: str, rendered: str, *, severity: str) -> None:
         if rendered.startswith("session_workflow"):
             return
         state = self.state.get(sid)
@@ -216,8 +219,108 @@ class SessionTracker:
                 "event": event_name,
                 "elapsed_ms": round(self.elapsed_ms(sid), 3),
                 "message": self._compact_workflow_message(rendered),
+                "severity": severity,
             }
         )
+
+    def _event_log_level(self, rendered: str) -> int:
+        event_name = rendered.split(":", 1)[0].strip()
+        lowered = rendered.casefold()
+
+        if event_name in {"tts_stream_failed"}:
+            return logging.ERROR
+        if any(token in lowered for token in ("exception", "traceback", " error=", " error_type=")):
+            return logging.ERROR
+        if any(token in event_name for token in ("failed", "failure", "error")):
+            return logging.ERROR
+
+        if event_name == "skill_result":
+            status = self._field_value(rendered, "status").casefold()
+            if status and status not in {"completed", "ok", "success"}:
+                if status in {"cancelled", "canceled", "skipped", "ignored"}:
+                    return logging.WARNING
+                return logging.ERROR
+
+        if event_name == "skill_runtime_done":
+            status = self._field_value(rendered, "status").casefold()
+            if status and status not in {"completed", "ok", "success"}:
+                if status in {"cancelled", "canceled", "interrupted"}:
+                    return logging.WARNING
+                return logging.ERROR
+
+        if event_name == "session_done":
+            if self._int_field_value(rendered, "failed_tts") > 0:
+                return logging.ERROR
+            if self._int_field_value(rendered, "skipped_tts") > 0:
+                return logging.WARNING
+            if (
+                self._int_field_value(rendered, "scheduled_tts") == 0
+                and self._int_field_value(rendered, "response_chars") == 0
+            ):
+                return logging.WARNING
+
+        if event_name == "tts_playback_start_waiter_resolved" and self._field_value(rendered, "started").casefold() == "false":
+            return logging.WARNING
+
+        if event_name == "router_done":
+            route = self._field_value(rendered, "route").casefold()
+            intent = self._field_value(rendered, "intent").casefold()
+            if route == "robot_action" and intent == "capability:chromie.speak":
+                return logging.WARNING
+
+        if event_name == "tts_schedule" and self._looks_like_failure_speech(rendered):
+            return logging.WARNING
+
+        if any(token in lowered for token in ("status=blocked", "status=rejected", "status=timeout")):
+            return logging.WARNING
+        return logging.INFO
+
+    @staticmethod
+    def _field_value(rendered: str, key: str) -> str:
+        match = re.search(rf"(?:^|\s){re.escape(key)}=([^\s]+)", rendered)
+        if not match:
+            return ""
+        return match.group(1).strip().strip("'\"")
+
+    @classmethod
+    def _int_field_value(cls, rendered: str, key: str) -> int:
+        try:
+            return int(float(cls._field_value(rendered, key)))
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    def _looks_like_failure_speech(rendered: str) -> bool:
+        lowered = rendered.casefold()
+        return any(
+            phrase in lowered
+            for phrase in (
+                "i cannot perform that action",
+                "i can't perform that action",
+                "cannot perform that action",
+                "can't perform that action",
+                "no executable action was produced",
+                "will not pretend i did it",
+                "i am not able to perform",
+            )
+        )
+
+    @staticmethod
+    def _colorize_for_cli(line: str, level: int) -> str:
+        color_mode = os.getenv("ORCH_CLI_COLOR", "auto").strip().lower()
+        if color_mode in {"0", "false", "no", "off", "never"}:
+            return line
+        color_forced = color_mode in {"1", "true", "yes", "on", "always"}
+        if not color_forced and os.getenv("NO_COLOR"):
+            return line
+        if not color_forced:
+            if not sys.stderr.isatty() or os.getenv("TERM", "").lower() == "dumb":
+                return line
+        if level >= logging.ERROR:
+            return f"\033[31m{line}\033[0m"
+        if level >= logging.WARNING:
+            return f"\033[33m{line}\033[0m"
+        return line
 
     def _compact_workflow_message(self, rendered: str, *, limit: int = 320) -> str:
         text = " ".join(rendered.split())
@@ -261,6 +364,7 @@ class SessionTracker:
                     "elapsed_ms": round(elapsed_ms, 3),
                     "delta_from_previous_ms": round(max(0.0, elapsed_ms - previous_elapsed), 3),
                     "message": str(item.get("message") or ""),
+                    "severity": str(item.get("severity") or "info"),
                 }
             )
         edges = [

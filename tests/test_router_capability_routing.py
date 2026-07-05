@@ -1066,6 +1066,59 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("conversation_agent", decision.agents)
         self.assertNotIn("capability_agent", decision.agents)
 
+    async def test_hybrid_router_treats_robot_action_speak_skill_as_chat(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="How are you.",
+            matched=False,
+            suggested_route="chat",
+            suggested_agents=[],
+            catalog_version=25,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 25,
+            "capabilities": [
+                {
+                    "capability_id": "chromie.speak",
+                    "agent_id": "chromie.speech",
+                    "description": "Speak a short message to the user through TTS.",
+                    "route": "chat",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["user_interaction", "audio_output"],
+                    "safety_class": "low_risk_action",
+                }
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:chromie.speak",
+                confidence=1.0,
+                language="en-US",
+                source="llm",
+                reason="bad quick-router speech skill route",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="How are you.", language="en-US"))
+
+        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
+        self.assertEqual(decision.actions, [])
+        self.assertIn("chromie.speak as chat output channel", decision.reason or "")
+        self.assertIn("conversation_agent", decision.agents)
+        self.assertNotIn("capability_agent", decision.agents)
+
     async def test_hybrid_router_corrects_generic_robot_action_when_catalog_says_chat(self) -> None:
         from router.app import main
 

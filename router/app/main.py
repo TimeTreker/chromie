@@ -510,6 +510,15 @@ def _validate_llm_capability_decision(
                         + "; ".join([*invalid_reasons, *low_confidence_reasons][:4])
                     ),
                 )
+            if all(item.get("capability_id") == "chromie.speak" for item in normalized_actions):
+                decision.route = "chat"
+                decision.intent = "general_conversation"
+                decision.actions = []
+                decision.agents = ["conversation_agent", "speaker_agent"]
+                decision.reason = (
+                    f"{decision.reason}; " if decision.reason else ""
+                ) + "validator treated chromie.speak as chat output channel"
+                return finalize_decision(decision, request, source="llm")
             decision.actions = normalized_actions
             if not decision.intent or decision.intent in {"unknown", "robot_action"} or _is_placeholder_capability_intent(raw_intent):
                 decision.intent = "compound_common_catalog_task"
@@ -539,6 +548,15 @@ def _validate_llm_capability_decision(
                     f"{raw_intent or '<empty>'}"
                 ),
             )
+        if selected_id == "chromie.speak":
+            decision.route = "chat"
+            decision.intent = "general_conversation"
+            decision.actions = []
+            decision.agents = ["conversation_agent", "speaker_agent"]
+            decision.reason = (
+                f"{decision.reason}; " if decision.reason else ""
+            ) + "validator treated chromie.speak as chat output channel"
+            return finalize_decision(decision, request, source="llm")
         if not selected_id and raw_intent in {"", "unknown", "robot_action"}:
             return fallback_decision(
                 request,

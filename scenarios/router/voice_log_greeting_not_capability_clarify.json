@@ -22,6 +22,18 @@
       "catalog_version": 24,
       "capabilities": [
         {
+          "capability_id": "chromie.speak",
+          "agent_id": "chromie.speech",
+          "description": "Speak a short message to the user through Chromie's TTS/output layer.",
+          "route": "chat",
+          "prompt_tier": "common",
+          "score": 0.0,
+          "available": true,
+          "interaction_executable": true,
+          "effects": ["user_interaction", "audio_output"],
+          "safety_class": "low_risk_action"
+        },
+        {
           "capability_id": "soridormi.walk_forward",
           "agent_id": "soridormi.skill",
           "description": "Walk forward for a bounded duration.",
@@ -50,17 +62,17 @@
     "llm_decision": {
       "route": "robot_action",
       "agents": ["capability_agent", "safety_agent", "speaker_agent"],
-      "intent": "motion_plan",
+      "intent": "capability:chromie.speak",
       "confidence": 0.86,
       "language": "en-US",
       "source": "llm",
-      "reason": "bad quick-router motion-plan interpretation on greeting"
+      "reason": "bad quick-router speech skill interpretation on greeting"
     }
   },
   "expect": {
     "route": "chat",
     "intent": "general_conversation",
-    "source": "fallback",
+    "source": "llm",
     "task_types_include": ["speech.answer"],
     "task_types_forbid": ["task.execute_skill", "cognition.deep_think"],
     "metadata_json_forbid": ["clarify_capability_selection", "execute the motion", "motion plan"],
