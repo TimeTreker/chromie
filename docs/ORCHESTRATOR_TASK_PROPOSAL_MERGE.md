@@ -167,6 +167,12 @@ It does not know whether a cup is reachable, a path is clear, or a person is in
 the way. Those facts remain the authority of Skill Runtime, Soridormi preview,
 provider submit, monitor events, cancellation, and retained execution evidence.
 
+When execution includes `soridormi.*` skills, the Orchestrator refreshes the
+Soridormi named-skill catalog before preflight if the cached catalog is stale or
+if the requested skill is not known locally. This keeps Agent-side live skill
+discovery and Orchestrator-side execution validation from drifting apart while
+still using `SkillRuntime` as the final schema, confirmation, and provider gate.
+
 ## Target Architecture
 
 The intended architecture is:

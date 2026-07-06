@@ -89,6 +89,67 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(registry.get("soridormi.nod_yes").requires_confirmation)
 
+    async def test_soridormi_import_upserts_catalog_entries(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "nod_yes",
+                    "description": "Old nod.",
+                    "parameters_schema": {"type": "object", "properties": {}},
+                    "available": True,
+                    "timeout_s": 1.0,
+                }
+            ],
+            requires_confirmation=False,
+        )
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "nod_yes",
+                    "description": "Updated nod.",
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {"count": {"type": "integer"}},
+                    },
+                    "available": False,
+                    "unavailable_reason": "calibrating",
+                    "timeout_s": 2.0,
+                }
+            ],
+            requires_confirmation=False,
+        )
+
+        definition = registry.get("soridormi.nod_yes")
+        self.assertEqual(definition.description, "Updated nod.")
+        self.assertFalse(definition.available)
+        self.assertEqual(definition.unavailable_reason, "calibrating")
+        self.assertEqual(definition.timeout_ms, 2000)
+        self.assertIn("count", definition.input_schema["properties"])
+
+    async def test_soridormi_import_marks_absent_live_skills_unavailable(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {"skill_id": "nod_yes", "available": True},
+                {"skill_id": "wave_hand", "available": True},
+            ],
+            requires_confirmation=False,
+        )
+        registry.import_soridormi_catalog(
+            [{"skill_id": "wave_hand", "available": True}],
+            requires_confirmation=False,
+        )
+
+        removed = registry.get("soridormi.nod_yes")
+        self.assertFalse(removed.available)
+        self.assertEqual(
+            removed.unavailable_reason,
+            "not present in latest Soridormi catalog",
+        )
+        self.assertTrue(removed.metadata["catalog_absent"])
+        self.assertTrue(registry.get("soridormi.wave_hand").available)
+
     async def test_speech_only_request_completes(self) -> None:
         spoken: list[str] = []
         registry = SkillRegistry()

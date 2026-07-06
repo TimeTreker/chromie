@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Protocol
+from typing import Any, Protocol
 
 from agent.app.tool_invocation import (
     AsyncToolInvoker,
@@ -37,7 +37,16 @@ class SoridormiMcpSkillProvider:
         )
         planned = await self.invoker.invoke(
             "soridormi.skill.create_plan",
-            {"skill_id": upstream_skill_id, "parameters": request.args},
+            {
+                "skill_id": upstream_skill_id,
+                "parameters": request.args,
+                "chromie_intent": self._chromie_intent_payload(
+                    request,
+                    definition,
+                    context,
+                    upstream_skill_id=upstream_skill_id,
+                ),
+            },
         )
         failure = self._failure_result(request, definition, planned, stage="plan")
         if failure:
@@ -124,6 +133,51 @@ class SoridormiMcpSkillProvider:
                 else "Soridormi did not explicitly report skill completion"
             ),
         )
+
+    def _chromie_intent_payload(
+        self,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        context: SkillExecutionContext,
+        *,
+        upstream_skill_id: str,
+    ) -> dict[str, Any]:
+        """Return traceable proposal semantics for Soridormi planning.
+
+        Chromie never sends body commands. Even for named skills, the payload
+        passed to Soridormi is a proposal-derived intent that must be planned,
+        validated, monitored, and possibly refused by Soridormi before any
+        embodied execution occurs.
+        """
+
+        payload: dict[str, Any] = {
+            "execution_mode": "proposed",
+            "execution_semantics": "proposal_from_chromie",
+            "requires_runtime_validation": True,
+            "interaction_id": context.interaction_id,
+            "request_id": request.request_id,
+            "skill_id": request.skill_id,
+            "upstream_skill_id": upstream_skill_id,
+            "skill_version": request.skill_version or definition.version,
+            "provider_id": self.provider_id,
+            "trace_id": context.trace.trace_id,
+            "source_component": str(
+                request.metadata.get("source_component")
+                or request.metadata.get("source")
+                or "interaction_response"
+            ),
+        }
+        for source_key, target_key in (
+            ("route_source", "route_source"),
+            ("route_stage", "route_stage"),
+            ("route_task_source_stage", "route_task_source_stage"),
+            ("route_confidence", "route_confidence"),
+            ("router_source", "router_source"),
+        ):
+            value = request.metadata.get(source_key)
+            if value is not None:
+                payload[target_key] = value
+        return payload
 
     async def cancel(
         self,

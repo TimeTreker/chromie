@@ -104,15 +104,46 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(execution.status, "completed")
+        create_plan_args = invoker.calls[0][1]
         self.assertEqual(
-            invoker.calls[0][0:2],
-            (
-                "soridormi.skill.create_plan",
-                {
-                    "skill_id": "nod_yes",
-                    "parameters": {"count": 2, "amplitude": "small"},
-                },
-            ),
+            invoker.calls[0][0],
+            "soridormi.skill.create_plan",
+        )
+        self.assertEqual(
+            create_plan_args["skill_id"],
+            "nod_yes",
+        )
+        self.assertEqual(
+            create_plan_args["parameters"],
+            {"count": 2, "amplitude": "small"},
+        )
+        self.assertEqual(
+            create_plan_args["chromie_intent"]["execution_mode"],
+            "proposed",
+        )
+        self.assertEqual(
+            create_plan_args["chromie_intent"]["execution_semantics"],
+            "proposal_from_chromie",
+        )
+        self.assertTrue(
+            create_plan_args["chromie_intent"]["requires_runtime_validation"]
+        )
+        self.assertEqual(
+            create_plan_args["chromie_intent"]["interaction_id"],
+            execution.interaction_id,
+        )
+        self.assertEqual(create_plan_args["chromie_intent"]["request_id"], "nod-1")
+        self.assertEqual(
+            create_plan_args["chromie_intent"]["skill_id"],
+            "soridormi.nod_yes",
+        )
+        self.assertEqual(
+            create_plan_args["chromie_intent"]["upstream_skill_id"],
+            "nod_yes",
+        )
+        self.assertEqual(
+            create_plan_args["chromie_intent"]["source_component"],
+            "interaction_response",
         )
         self.assertEqual(
             invoker.calls[1][0:2],
@@ -127,6 +158,45 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(invoker.calls[2][2].confirmed)
         self.assertTrue(invoker.calls[2][2].safety_monitor_active)
+
+    async def test_named_skill_propagates_route_trace_metadata_to_plan(self) -> None:
+        invoker = _RecordingInvoker()
+        execution = await self._runtime(invoker).execute(
+            InteractionResponse(
+                interaction_id="interaction-route-trace",
+                skills=[
+                    {
+                        "request_id": "nod-1",
+                        "skill_id": "soridormi.nod_yes",
+                        "args": {"count": 1, "amplitude": "small"},
+                        "metadata": {
+                            "source": "agent.capability",
+                            "route_source": "llm",
+                            "route_stage": "quick_intent",
+                            "route_task_source_stage": "capability_catalog",
+                            "route_confidence": 0.92,
+                            "router_source": "router.v2",
+                        },
+                    }
+                ],
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids={"nod-1"},
+                safety_monitor_active=True,
+            ),
+        )
+
+        self.assertEqual(execution.status, "completed")
+        chromie_intent = invoker.calls[0][1]["chromie_intent"]
+        self.assertEqual(chromie_intent["source_component"], "agent.capability")
+        self.assertEqual(chromie_intent["route_source"], "llm")
+        self.assertEqual(chromie_intent["route_stage"], "quick_intent")
+        self.assertEqual(
+            chromie_intent["route_task_source_stage"],
+            "capability_catalog",
+        )
+        self.assertEqual(chromie_intent["route_confidence"], 0.92)
+        self.assertEqual(chromie_intent["router_source"], "router.v2")
 
     async def test_catalog_preserves_unavailable_skill_reason(self) -> None:
         registry = SkillRegistry()

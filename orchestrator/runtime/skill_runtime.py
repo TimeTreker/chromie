@@ -58,6 +58,9 @@ class SkillRegistry:
             raise ValueError(f"duplicate skill_id: {definition.skill_id}")
         self._skills[definition.skill_id] = definition
 
+    def upsert(self, definition: SkillDefinition) -> None:
+        self._skills[definition.skill_id] = definition
+
     def get(self, skill_id: str) -> SkillDefinition:
         try:
             return self._skills[skill_id]
@@ -74,7 +77,9 @@ class SkillRegistry:
         provider_id: str = "soridormi.mcp",
         version: str = "0.1.0",
         requires_confirmation: bool = True,
+        mark_absent_unavailable: bool = True,
     ) -> None:
+        seen_skill_ids: set[str] = set()
         for item in skills:
             upstream_id = str(item.get("skill_id", "")).strip()
             if not upstream_id:
@@ -94,9 +99,11 @@ class SkillRegistry:
                     )
                 )
             )
-            self.register(
+            skill_id = f"soridormi.{upstream_id}"
+            seen_skill_ids.add(skill_id)
+            self.upsert(
                 SkillDefinition(
-                    skill_id=f"soridormi.{upstream_id}",
+                    skill_id=skill_id,
                     version=str(item.get("version") or version),
                     provider_id=provider_id,
                     description=str(item.get("description") or ""),
@@ -122,6 +129,25 @@ class SkillRegistry:
                     },
                 )
             )
+        if mark_absent_unavailable:
+            for skill_id, definition in list(self._skills.items()):
+                if (
+                    definition.provider_id == provider_id
+                    and skill_id.startswith("soridormi.")
+                    and skill_id not in seen_skill_ids
+                ):
+                    self._skills[skill_id] = definition.model_copy(
+                        update={
+                            "available": False,
+                            "unavailable_reason": (
+                                "not present in latest Soridormi catalog"
+                            ),
+                            "metadata": {
+                                **definition.metadata,
+                                "catalog_absent": True,
+                            },
+                        }
+                    )
 
 
 class SkillExecutionContext(BaseModel):

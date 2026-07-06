@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-from collections.abc import Awaitable, Callable
+import time
+from collections.abc import Awaitable, Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,17 @@ from .task_proposals import annotate_task_proposal_ledger
 
 SpeechScheduler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
 _TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
+
+
+def _float_env(name: str, default: float, *, minimum: float = 0.0) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return max(minimum, value)
 
 
 class InteractionRuntimeCoordinator:
@@ -65,6 +77,11 @@ class InteractionRuntimeCoordinator:
         self.auto_confirm_sim = auto_confirm_sim
         self.soridormi_mode: str | None = None
         self._catalog_loaded = False
+        self._catalog_last_loaded_at: float | None = None
+        self._catalog_refresh_ttl_s = _float_env(
+            "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S",
+            30.0,
+        )
         self._catalog_lock = asyncio.Lock()
 
     async def execute(
@@ -74,6 +91,47 @@ class InteractionRuntimeCoordinator:
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
     ) -> SkillRuntimeResult:
+        raw_body_requests = [
+            request
+            for request in response.skills
+            if request.skill_id.startswith("soridormi.")
+        ]
+        optional_body_cue = bool(response.metadata.get("optional_body_cue"))
+        if raw_body_requests:
+            if self.soridormi_invoker is None:
+                try:
+                    await self._ensure_soridormi_catalog(
+                        required_skill_ids=(
+                            request.skill_id for request in raw_body_requests
+                        ),
+                    )
+                except RuntimeError as exc:
+                    if optional_body_cue:
+                        return await self._body_setup_failure(
+                            response,
+                            raw_body_requests,
+                            session_id=session_id,
+                            reason_code="provider_disabled",
+                            message=str(exc),
+                            suppress_speech=True,
+                        )
+                    raise
+            try:
+                await self._ensure_soridormi_catalog(
+                    required_skill_ids=(
+                        request.skill_id for request in raw_body_requests
+                    ),
+                )
+            except RuntimeError as exc:
+                return await self._body_setup_failure(
+                    response,
+                    raw_body_requests,
+                    session_id=session_id,
+                    reason_code="catalog_unavailable",
+                    message=str(exc),
+                    suppress_speech=optional_body_cue,
+                )
+
         prepared = self.prepare_response(
             response,
             session_id=session_id,
@@ -103,31 +161,6 @@ class InteractionRuntimeCoordinator:
                 ),
             )
         if body_requests:
-            if self.soridormi_invoker is None:
-                try:
-                    await self._ensure_soridormi_catalog()
-                except RuntimeError as exc:
-                    if optional_body_cue:
-                        return await self._body_setup_failure(
-                            prepared,
-                            body_requests,
-                            session_id=session_id,
-                            reason_code="provider_disabled",
-                            message=str(exc),
-                            suppress_speech=True,
-                        )
-                    raise
-            try:
-                await self._ensure_soridormi_catalog()
-            except RuntimeError as exc:
-                return await self._body_setup_failure(
-                    prepared,
-                    body_requests,
-                    session_id=session_id,
-                    reason_code="catalog_unavailable",
-                    message=str(exc),
-                    suppress_speech=optional_body_cue,
-                )
             unavailable = [
                 request
                 for request in body_requests
@@ -409,7 +442,9 @@ class InteractionRuntimeCoordinator:
             if request.skill_id.startswith("soridormi.")
         ]
         if body_requests:
-            await self._ensure_soridormi_catalog()
+            await self._ensure_soridormi_catalog(
+                required_skill_ids=(request.skill_id for request in body_requests),
+            )
 
         required = {
             request.request_id
@@ -439,7 +474,9 @@ class InteractionRuntimeCoordinator:
         ]
         if not body_requests:
             return set()
-        await self._ensure_soridormi_catalog()
+        await self._ensure_soridormi_catalog(
+            required_skill_ids=(request.skill_id for request in body_requests),
+        )
         if not (
             self.soridormi_mode == "sim"
             and self.auto_confirm_sim
@@ -455,16 +492,31 @@ class InteractionRuntimeCoordinator:
     async def cancel_all(self) -> None:
         await self.runtime.cancel_all()
 
-    async def _ensure_soridormi_catalog(self) -> None:
-        if self._catalog_loaded:
-            return
+    async def refresh_soridormi_catalog(self, *, force: bool = True) -> None:
+        await self._ensure_soridormi_catalog(force=force)
+
+    async def _ensure_soridormi_catalog(
+        self,
+        *,
+        force: bool = False,
+        required_skill_ids: Iterable[str] | None = None,
+    ) -> None:
+        required = set(required_skill_ids or ())
         if self.soridormi_invoker is None:
             raise RuntimeError(
                 "InteractionResponse requested a Soridormi skill, but "
                 "ORCH_ENABLE_SORIDORMI_SKILLS is disabled"
             )
+        if not self._should_refresh_soridormi_catalog(
+            force=force,
+            required_skill_ids=required,
+        ):
+            return
         async with self._catalog_lock:
-            if self._catalog_loaded:
+            if not self._should_refresh_soridormi_catalog(
+                force=force,
+                required_skill_ids=required,
+            ):
                 return
             outcome = await self.soridormi_invoker.invoke(
                 "soridormi.skill.list",
@@ -486,10 +538,63 @@ class InteractionRuntimeCoordinator:
                     self.soridormi_mode == "sim" and self.auto_confirm_sim
                 ),
             )
-            self.runtime.register_provider(
-                SoridormiMcpSkillProvider(self.soridormi_invoker)
-            )
+            if "soridormi.mcp" not in self.runtime.provider_ids():
+                self.runtime.register_provider(
+                    SoridormiMcpSkillProvider(self.soridormi_invoker)
+                )
             self._catalog_loaded = True
+            self._catalog_last_loaded_at = time.monotonic()
+
+            missing = self._missing_soridormi_skill_ids(required)
+            if missing:
+                raise RuntimeError(
+                    "Soridormi named-skill catalog did not include requested "
+                    f"skills: {', '.join(sorted(missing))}"
+                )
+
+    def _should_refresh_soridormi_catalog(
+        self,
+        *,
+        force: bool,
+        required_skill_ids: set[str],
+    ) -> bool:
+        if force or not self._catalog_loaded:
+            return True
+        if self._required_soridormi_skills_need_refresh(required_skill_ids):
+            return True
+        if self._catalog_refresh_ttl_s <= 0:
+            return True
+        if self._catalog_last_loaded_at is None:
+            return True
+        return (
+            time.monotonic() - self._catalog_last_loaded_at
+        ) >= self._catalog_refresh_ttl_s
+
+    def _required_soridormi_skills_need_refresh(
+        self,
+        skill_ids: Iterable[str],
+    ) -> bool:
+        for skill_id in skill_ids:
+            if not skill_id.startswith("soridormi."):
+                continue
+            try:
+                definition = self.registry.get(skill_id)
+            except ValueError:
+                return True
+            if definition.metadata.get("catalog_absent") is True:
+                return True
+        return False
+
+    def _missing_soridormi_skill_ids(self, skill_ids: Iterable[str]) -> set[str]:
+        missing: set[str] = set()
+        for skill_id in skill_ids:
+            if not skill_id.startswith("soridormi."):
+                continue
+            try:
+                self.registry.get(skill_id)
+            except ValueError:
+                missing.add(skill_id)
+        return missing
 
     def _with_session_metadata(
         self,

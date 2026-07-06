@@ -350,6 +350,219 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(invoker.calls[-1][2].confirmed)
 
+    async def test_existing_body_skill_reuses_fresh_catalog(self) -> None:
+        invoker = _SoridormiInvoker()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+
+        for request_id in ["nod-1", "nod-2"]:
+            result = await coordinator.execute(
+                InteractionResponse(
+                    skills=[
+                        {
+                            "request_id": request_id,
+                            "skill_id": "soridormi.nod_yes",
+                            "args": {"count": 1},
+                        }
+                    ]
+                ),
+                session_id=f"sid-{request_id}",
+            )
+            self.assertEqual(result.status, "completed")
+
+        self.assertEqual(
+            [call[0] for call in invoker.calls].count("soridormi.skill.list"),
+            1,
+        )
+
+    async def test_unknown_body_skill_forces_catalog_refresh(self) -> None:
+        class ExpandingCatalogInvoker(_SoridormiInvoker):
+            def __init__(self) -> None:
+                super().__init__()
+                self.catalog_calls = 0
+                self.planned_skill_id = "nod_yes"
+
+            async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
+                self.calls.append((tool_name, args, context))
+                if tool_name == "soridormi.skill.list":
+                    self.catalog_calls += 1
+                    skills = [
+                        {
+                            "skill_id": "nod_yes",
+                            "available": True,
+                            "parameters_schema": {"type": "object"},
+                            "interruptible": True,
+                        }
+                    ]
+                    if self.catalog_calls >= 2:
+                        skills.append(
+                            {
+                                "skill_id": "wave_hand",
+                                "available": True,
+                                "parameters_schema": {"type": "object"},
+                                "interruptible": True,
+                            }
+                        )
+                    return ToolCallOutcome.success({"mode": "sim", "skills": skills})
+                if tool_name == "soridormi.skill.create_plan":
+                    self.planned_skill_id = str(args["skill_id"])
+                    return ToolCallOutcome.success({"plan_id": f"plan-{self.planned_skill_id}"})
+                if tool_name == "soridormi.safety.monitor_motion":
+                    return ToolCallOutcome.success({"ok": True, "event": None})
+                if tool_name == "soridormi.skill.execute_plan":
+                    return ToolCallOutcome.success(
+                        {"completed": True, "skill_id": self.planned_skill_id}
+                    )
+                return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
+
+        invoker = ExpandingCatalogInvoker()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+
+        first = await coordinator.execute(
+            InteractionResponse(skills=[{"skill_id": "soridormi.nod_yes"}]),
+            session_id="sid-nod",
+        )
+        second = await coordinator.execute(
+            InteractionResponse(skills=[{"skill_id": "soridormi.wave_hand"}]),
+            session_id="sid-wave",
+        )
+
+        self.assertEqual(first.status, "completed")
+        self.assertEqual(second.status, "completed")
+        self.assertEqual(invoker.catalog_calls, 2)
+        self.assertEqual(
+            [
+                call[1]["skill_id"]
+                for call in invoker.calls
+                if call[0] == "soridormi.skill.create_plan"
+            ],
+            ["nod_yes", "wave_hand"],
+        )
+
+    async def test_catalog_refresh_ttl_can_force_periodic_reload(self) -> None:
+        class VersionedCatalogInvoker(_SoridormiInvoker):
+            def __init__(self) -> None:
+                super().__init__()
+                self.catalog_calls = 0
+
+            async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
+                if tool_name == "soridormi.skill.list":
+                    self.calls.append((tool_name, args, context))
+                    self.catalog_calls += 1
+                    return ToolCallOutcome.success(
+                        {
+                            "mode": "sim",
+                            "skills": [
+                                {
+                                    "skill_id": "nod_yes",
+                                    "available": True,
+                                    "version": f"1.0.{self.catalog_calls}",
+                                    "parameters_schema": {"type": "object"},
+                                    "interruptible": True,
+                                }
+                            ],
+                        }
+                    )
+                return await super().invoke(tool_name, args, context=context)
+
+        invoker = VersionedCatalogInvoker()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+        coordinator._catalog_refresh_ttl_s = 0.0
+
+        for request_id in ["nod-1", "nod-2"]:
+            result = await coordinator.execute(
+                InteractionResponse(
+                    skills=[
+                        {
+                            "request_id": request_id,
+                            "skill_id": "soridormi.nod_yes",
+                        }
+                    ]
+                ),
+                session_id=f"sid-{request_id}",
+            )
+            self.assertEqual(result.status, "completed")
+
+        self.assertEqual(invoker.catalog_calls, 2)
+        self.assertEqual(
+            coordinator.registry.get("soridormi.nod_yes").version,
+            "1.0.2",
+        )
+
+    async def test_catalog_absent_requested_skill_forces_refresh(self) -> None:
+        class FlappingCatalogInvoker(_SoridormiInvoker):
+            def __init__(self) -> None:
+                super().__init__()
+                self.catalog_calls = 0
+                self.planned_skill_id = "nod_yes"
+
+            async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
+                self.calls.append((tool_name, args, context))
+                if tool_name == "soridormi.skill.list":
+                    self.catalog_calls += 1
+                    skills = [
+                        {
+                            "skill_id": "nod_yes",
+                            "available": True,
+                            "parameters_schema": {"type": "object"},
+                            "interruptible": True,
+                        }
+                    ]
+                    if self.catalog_calls != 2:
+                        skills.append(
+                            {
+                                "skill_id": "wave_hand",
+                                "available": True,
+                                "parameters_schema": {"type": "object"},
+                                "interruptible": True,
+                            }
+                        )
+                    return ToolCallOutcome.success({"mode": "sim", "skills": skills})
+                if tool_name == "soridormi.skill.create_plan":
+                    self.planned_skill_id = str(args["skill_id"])
+                    return ToolCallOutcome.success({"plan_id": f"plan-{self.planned_skill_id}"})
+                if tool_name == "soridormi.safety.monitor_motion":
+                    return ToolCallOutcome.success({"ok": True, "event": None})
+                if tool_name == "soridormi.skill.execute_plan":
+                    return ToolCallOutcome.success(
+                        {"completed": True, "skill_id": self.planned_skill_id}
+                    )
+                return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
+
+        invoker = FlappingCatalogInvoker()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+
+        first = await coordinator.execute(
+            InteractionResponse(skills=[{"skill_id": "soridormi.wave_hand"}]),
+            session_id="sid-wave-1",
+        )
+        await coordinator.refresh_soridormi_catalog(force=True)
+        self.assertTrue(
+            coordinator.registry.get("soridormi.wave_hand")
+            .metadata["catalog_absent"]
+        )
+
+        second = await coordinator.execute(
+            InteractionResponse(skills=[{"skill_id": "soridormi.wave_hand"}]),
+            session_id="sid-wave-2",
+        )
+
+        self.assertEqual(first.status, "completed")
+        self.assertEqual(second.status, "completed")
+        self.assertEqual(invoker.catalog_calls, 3)
+        self.assertTrue(coordinator.registry.get("soridormi.wave_hand").available)
+
     async def test_sim_auto_confirm_exemption_is_reportable(self) -> None:
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
