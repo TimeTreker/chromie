@@ -9,6 +9,12 @@ from typing import Any, Literal
 
 import httpx
 
+from shared.chromie_runtime.llm_diagnostics import (
+    ollama_completion_diagnostics,
+    ollama_prompt_preflight_diagnostics,
+)
+from shared.chromie_runtime.log_colors import colorize_for_cli
+
 
 logger = logging.getLogger("chromie.agent.ollama")
 
@@ -88,6 +94,11 @@ class OllamaClient:
             len(prompt),
             prompt_preview,
         )
+        for diagnostic in ollama_prompt_preflight_diagnostics(
+            prompt_chars=len(prompt),
+            options=options,
+        ):
+            self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
 
         started = time.perf_counter()
 
@@ -120,6 +131,12 @@ class OllamaClient:
                 len(text),
                 " ".join(text.split())[:160],
             )
+            for diagnostic in ollama_completion_diagnostics(
+                options=options,
+                data=data,
+                prompt_chars=len(prompt),
+            ):
+                self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
 
         except Exception as exc:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
@@ -140,6 +157,13 @@ class OllamaClient:
             return parsed
 
         raise ValueError(f"Unsupported response_format: {response_format}")
+
+    def _log_budget_diagnostic(self, level: int, rendered: str) -> None:
+        logger.log(
+            level,
+            "%s",
+            colorize_for_cli(rendered, level, env_var="CHROMIE_CLI_COLOR"),
+        )
 
     def _parse_json(self, text: str) -> dict[str, Any]:
         cleaned = self._strip_code_fence(text)

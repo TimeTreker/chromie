@@ -1117,6 +1117,91 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "cancelled")
         self.assertEqual(spoken, ["Starting."])
 
+    async def test_recoverable_body_failure_defers_to_recovery_confirmation(
+        self,
+    ) -> None:
+        spoken: list[dict[str, Any]] = []
+        invoker = _SoridormiInvoker(
+            execute_outcome=ToolCallOutcome.success(
+                {
+                    "completed": False,
+                    "skill_id": "nod_yes",
+                    "recoverable": True,
+                    "user_message": "The motion profile slipped.",
+                }
+            )
+        )
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(args) or {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                speech=[
+                    {"text": "Starting.", "timing": "immediate"},
+                    {"text": "Done.", "timing": "after_skills"},
+                ],
+                skills=[
+                    {
+                        "request_id": "nod-1",
+                        "skill_id": "soridormi.nod_yes",
+                    }
+                ],
+                metadata={"language": "en-US"},
+            ),
+            session_id="sid-recoverable",
+        )
+
+        self.assertEqual(result.status, "failed")
+        body_results = [
+            item for item in result.results if item.skill_id.startswith("soridormi.")
+        ]
+        self.assertEqual(body_results[0].status, "failed")
+        self.assertEqual([item["text"] for item in spoken], ["Starting."])
+
+    async def test_recoverable_body_failure_stops_after_retry_budget(
+        self,
+    ) -> None:
+        spoken: list[str] = []
+        invoker = _SoridormiInvoker(
+            execute_outcome=ToolCallOutcome.success(
+                {
+                    "completed": False,
+                    "skill_id": "nod_yes",
+                    "recoverable": True,
+                    "user_message": "The motion profile slipped again.",
+                }
+            )
+        )
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "nod-1_recovery1",
+                        "skill_id": "soridormi.nod_yes",
+                        "metadata": {"body_recovery_attempt": 1},
+                    }
+                ],
+                metadata={"language": "en-US"},
+            ),
+            session_id="sid-recoverable-budget",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(
+            spoken,
+            [
+                "The movement hit a recoverable issue again, so I will not keep retrying. I have stayed in the safer fallback state."
+            ],
+        )
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
+from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
+
 try:
     from chromie_contracts.interaction import SkillRequest
 except ImportError:  # pragma: no cover - repository development path
@@ -97,10 +99,12 @@ class CapabilityAgent(BaseAgent):
         if direct_actions:
             allowed = {match.capability_id: match for match in executable}
             selected_ids: list[str] = []
-            for action in sorted(
+            ordered_direct_actions = sorted(
                 direct_actions,
                 key=lambda item: int(item.get("sequence", 0)),
-            ):
+            )
+            route_stage = self._selected_route_stage(request)
+            for router_action_index, action in enumerate(ordered_direct_actions):
                 capability_id = str(action.get("capability_id") or "").strip()
                 match = allowed.get(capability_id)
                 if match is None:
@@ -133,10 +137,28 @@ class CapabilityAgent(BaseAgent):
                         f"router action args failed schema validation for {capability_id}: {arg_errors}",
                     )
                     return result
+                sequence = int(action.get("sequence", len(selected_ids)))
                 metadata = {
                     "source": "router_actions",
+                    "source_component": "agent.capability",
+                    "execution_mode": "proposed",
+                    "execution_semantics": "proposal_from_route2",
+                    "requires_runtime_validation": True,
                     "catalog_version": search.catalog_version,
-                    "sequence": int(action.get("sequence", len(selected_ids))),
+                    "sequence": sequence,
+                    "route_stage": route_stage,
+                    "route_source": request.route_decision.source,
+                    "route_intent": request.route_decision.intent,
+                    "route_confidence": request.route_decision.confidence,
+                    "router_action_index": router_action_index,
+                    "router_action_count": len(ordered_direct_actions),
+                    "router_compound_action_plan": len(ordered_direct_actions) > 1,
+                    "router_action_sequence": sequence,
+                    "capability_safety_class": match.safety_class,
+                    "capability_effects": list(match.effects or []),
+                    "capability_requires_confirmation": match.requires_confirmation,
+                    "capability_invocation_kind": match.invocation_kind,
+                    "capability_source": match.source,
                 }
                 action_confidence = action.get("confidence")
                 if isinstance(action_confidence, (int, float)) and not isinstance(action_confidence, bool):
@@ -151,6 +173,16 @@ class CapabilityAgent(BaseAgent):
                 score = self._catalog_score(match)
                 if score is not None:
                     metadata["catalog_score"] = score
+                reason = str(action.get("reason") or "").strip()
+                if reason:
+                    metadata["router_action_reason"] = reason[:200]
+                perception_dependency = live_perception_dependency_from_metadata(
+                    action,
+                    match.metadata,
+                    match.hints,
+                )
+                if perception_dependency is not None:
+                    metadata.update(perception_dependency)
                 if normalized:
                     metadata["schema_normalized_args"] = True
                 add_skill(
@@ -314,6 +346,12 @@ class CapabilityAgent(BaseAgent):
                         "max_per_call": batched_count_metadata["max_per_call"],
                     }
                 )
+            perception_dependency = live_perception_dependency_from_metadata(
+                match.metadata,
+                match.hints,
+            )
+            if perception_dependency is not None:
+                metadata.update(perception_dependency)
             if normalized:
                 metadata["schema_normalized_args"] = True
             request_item = SkillRequest(
@@ -506,6 +544,26 @@ class CapabilityAgent(BaseAgent):
         if request.route_decision.route != "robot_action":
             return False
         return plan.decision == "execute" and bool(plan.skills)
+
+    def _selected_route_stage(self, request: AgentRunRequest) -> str:
+        metadata = request.route_decision.metadata or {}
+        route_merge = metadata.get("route_merge")
+        if isinstance(route_merge, dict):
+            selected_stage = str(route_merge.get("selected_stage") or "").strip()
+            if selected_stage:
+                return selected_stage
+        route_stage_outputs = metadata.get("route_stage_outputs")
+        if isinstance(route_stage_outputs, list):
+            for output in reversed(route_stage_outputs):
+                if not isinstance(output, dict):
+                    continue
+                status = str(output.get("status") or "").strip()
+                if status == "passed":
+                    continue
+                stage = str(output.get("stage") or "").strip()
+                if stage:
+                    return stage
+        return "quick_intent"
 
     def _router_selected_capability_id(self, request: AgentRunRequest) -> str:
         intent = (request.route_decision.intent or "").strip()

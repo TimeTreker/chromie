@@ -17,6 +17,7 @@ from .models import (
 )
 from .planner import TaskGraphPlanner
 from .reporting import build_trace_outcome_summary
+from .residual import attach_residual_replan_state, build_residual_replan_state
 from .service import (
     TaskGraphDryRunRequest,
     TaskGraphExecuteRequest,
@@ -55,5 +56,7 @@ __all__ = [
     "TaskGraphService",
     "TaskGraphValidationResponse",
     "TaskNode",
+    "attach_residual_replan_state",
+    "build_residual_replan_state",
     "build_trace_outcome_summary",
 ]

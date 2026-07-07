@@ -122,6 +122,8 @@ class ConfirmationDialogue:
         origin_session_id: str | None,
         conversation_id: str | None,
         language: str | None = None,
+        prompt_override: str | None = None,
+        ttl_s: float | None = None,
     ) -> PendingConfirmation:
         request_ids = frozenset(confirmed_request_ids)
         known_ids = {request.request_id for request in response.skills}
@@ -133,14 +135,20 @@ class ConfirmationDialogue:
 
         stored = response.model_copy(deep=True)
         now = self._clock()
+        effective_ttl_s = self.ttl_s if ttl_s is None else min(300.0, max(1.0, float(ttl_s)))
+        prompt = (prompt_override or "").strip() or _confirmation_prompt(
+            stored,
+            request_ids,
+            language=language,
+        )
         pending = PendingConfirmation(
             confirmation_id=f"confirm_{uuid4().hex[:12]}",
             response=stored,
             confirmed_request_ids=request_ids,
             fingerprint=_request_fingerprint(stored, request_ids),
-            prompt=_confirmation_prompt(stored, request_ids, language=language),
+            prompt=prompt,
             created_at=now,
-            expires_at=now + self.ttl_s,
+            expires_at=now + effective_ttl_s,
             origin_session_id=origin_session_id,
             conversation_id=conversation_id,
         )

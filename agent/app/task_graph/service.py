@@ -25,6 +25,7 @@ from .async_executor import (
 from .executor import DagDryRunExecutor
 from .grants import ConfirmationGrantStore
 from .models import ExecutionTrace, TaskGraph
+from .residual import attach_residual_replan_state
 from .validator import GraphValidator
 
 
@@ -134,6 +135,7 @@ class TaskGraphService:
             raise ValueError("TaskGraph validation failed: " + "; ".join(validation.errors))
 
         trace = DagDryRunExecutor(self.registry, auto_confirm=auto_confirm).run(graph, validate=False)
+        trace = attach_residual_replan_state(graph, trace, registry=self.registry)
         self._store_trace(graph.graph_id, trace)
         return trace
 
@@ -164,6 +166,7 @@ class TaskGraphService:
                 resource_arbiter=self._resource_arbiter,
                 max_concurrency=self.max_concurrency,
             ).run(graph, proofs)
+            trace = attach_residual_replan_state(graph, trace, registry=self.registry)
             self._store_trace(graph.graph_id, trace)
             return trace
         finally:
@@ -256,6 +259,7 @@ class TaskGraphService:
         self._active_executions[graph.graph_id] = task
         try:
             trace = await execution
+            trace = attach_residual_replan_state(graph, trace, registry=self.registry)
             self._store_trace(graph.graph_id, trace)
             return trace
         finally:

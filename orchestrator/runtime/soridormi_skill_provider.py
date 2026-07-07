@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+"""Chromie-side adapter for Soridormi dynamic named skills.
+
+This module intentionally lives inside the Orchestrator runtime because it
+implements Chromie's ``SkillRuntime`` provider interface. It is not the
+Soridormi body controller and it does not contain per-skill hardware logic.
+
+The adapter accepts a trusted ``SkillRequest`` that has already passed Chromie
+preflight/confirmation gates, translates ``soridormi.<skill_id>`` into the
+upstream Soridormi named-skill ID, and invokes the Soridormi MCP planning,
+monitoring, execution, and cancellation tools. Soridormi still owns physical
+planning, realtime safety, motion execution, refusal, and recovery.
+
+Do not add one method per Soridormi skill here. New body skills should be
+published by Soridormi through ``soridormi.skill.list`` and then imported into
+Chromie's ``SkillRegistry`` dynamically.
+"""
+
 import logging
 from typing import Any, Protocol
 
@@ -9,6 +26,7 @@ from agent.app.tool_invocation import (
     ToolInvocationContext,
 )
 from shared.chromie_contracts.interaction import SkillRequest, SkillResult
+from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
 
 from .skill_runtime import SkillDefinition, SkillExecutionContext
 
@@ -19,7 +37,15 @@ class SoridormiInvoker(AsyncToolInvoker, Protocol):
     pass
 
 
-class SoridormiMcpSkillProvider:
+class SoridormiNamedSkillAdapter:
+    """Adapter from Chromie's SkillRuntime to Soridormi MCP named skills.
+
+    The class name deliberately says "adapter" rather than "controller" or
+    "hardware provider". Chromie supplies proposal-derived intent and trace
+    metadata; Soridormi creates the body-owned plan, decides whether it is safe
+    and feasible, monitors execution, and may refuse or reshape the request.
+    """
+
     provider_id = "soridormi.mcp"
 
     def __init__(self, invoker: SoridormiInvoker) -> None:
@@ -177,6 +203,11 @@ class SoridormiMcpSkillProvider:
             value = request.metadata.get(source_key)
             if value is not None:
                 payload[target_key] = value
+        perception_dependency = live_perception_dependency_from_metadata(
+            request.metadata,
+        )
+        if perception_dependency is not None:
+            payload.update(perception_dependency)
         return payload
 
     async def cancel(
@@ -221,3 +252,9 @@ class SoridormiMcpSkillProvider:
             reason_code=f"{stage}_{outcome.status}",
             message=outcome.error or f"Soridormi {stage} failed",
         )
+
+
+# Backward-compatible name used by earlier Chromie tests and imports. Prefer
+# SoridormiNamedSkillAdapter in new code because this module adapts the generic
+# MCP named-skill protocol; it does not provide or control hardware skills.
+SoridormiMcpSkillProvider = SoridormiNamedSkillAdapter

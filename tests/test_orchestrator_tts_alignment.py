@@ -25,7 +25,7 @@ from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.mind import default_mind_profile
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import InteractionResponse, SkillResult
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
@@ -786,6 +786,153 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 ("turn-1", "cancelled"),
             ],
         )
+
+
+    async def test_recoverable_body_failure_stages_confirmation_retry(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+        assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(
+            ttl_s=20.0
+        )
+        assistant.body_recovery_max_attempts = 1
+        assistant.body_recovery_confirmation_ttl_s = 7.0
+        execute_calls: list[InteractionResponse] = []
+        pending_records: list[dict[str, Any]] = []
+        agent_records: list[InteractionResponse] = []
+
+        async def reset_playback_ordering(self: VoiceAssistant) -> None:
+            return None
+
+        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
+            self.sessions.log(sid, message, *args)
+
+        def maybe_session_done(self: VoiceAssistant, sid: str | None) -> None:
+            return None
+
+        def record_experience(
+            self: VoiceAssistant,
+            *,
+            response: InteractionResponse,
+            execution: SkillRuntimeResult | None,
+            session_id: str | None,
+            errors: list[str] | None = None,
+        ) -> None:
+            return None
+
+        class _ConversationState:
+            conversation_id = "conv-recovery"
+
+            def update_pending_task_status_for_request_id(
+                self,
+                *,
+                request_id: str | None,
+                status: str,
+            ) -> bool:
+                return True
+
+            def record_agent_result(
+                self,
+                sid: str | None,
+                response: InteractionResponse,
+            ) -> None:
+                agent_records.append(response)
+
+            def record_pending_task(
+                self,
+                *,
+                sid: str | None,
+                task_type: str,
+                status: str,
+                summary: str,
+                metadata: dict[str, Any],
+            ) -> None:
+                pending_records.append(
+                    {
+                        "sid": sid,
+                        "task_type": task_type,
+                        "status": status,
+                        "summary": summary,
+                        "metadata": metadata,
+                    }
+                )
+
+        class _Runtime:
+            async def execute(
+                self,
+                response: InteractionResponse,
+                *,
+                session_id: str | None,
+                confirmed_request_ids: set[str] | None = None,
+            ) -> SkillRuntimeResult:
+                del session_id, confirmed_request_ids
+                execute_calls.append(response)
+                if len(execute_calls) == 1:
+                    return SkillRuntimeResult(
+                        interaction_id=response.interaction_id,
+                        status="failed",
+                        results=[
+                            SkillResult(
+                                request_id="grasp-1",
+                                skill_id="soridormi.grasp_object",
+                                status="failed",
+                                reason_code="execution_incomplete",
+                                output={
+                                    "completed": False,
+                                    "recoverable": True,
+                                    "user_message": "The object slipped.",
+                                },
+                            )
+                        ],
+                    )
+                return SkillRuntimeResult(
+                    interaction_id=response.interaction_id,
+                    status="completed",
+                )
+
+        assistant.reset_playback_ordering = MethodType(reset_playback_ordering, assistant)
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
+        assistant._record_experience = MethodType(record_experience, assistant)
+        assistant.conversation_state = _ConversationState()
+        assistant.interaction_runtime = _Runtime()
+
+        await assistant.execute_interaction_response(
+            InteractionResponse(
+                interaction_id="interaction-grasp",
+                skills=[
+                    {
+                        "request_id": "grasp-1",
+                        "skill_id": "soridormi.grasp_object",
+                        "args": {"object": "cup"},
+                    }
+                ],
+                metadata={"language": "en-US"},
+            ),
+            session_id,
+            reset_playback=False,
+        )
+
+        pending = assistant.confirmation_dialogue.pending
+        assert pending is not None
+        self.assertIn("recoverable movement issue", pending.prompt)
+        self.assertIn("The object slipped", pending.prompt)
+        self.assertEqual(
+            pending.confirmed_request_ids,
+            frozenset({"grasp-1_recovery1"}),
+        )
+        self.assertEqual(
+            pending.response.skills[0].metadata["body_recovery_attempt"],
+            1,
+        )
+        self.assertEqual(pending_records[0]["task_type"], "body_recovery_confirmation")
+        self.assertEqual(
+            pending_records[0]["metadata"]["retry_request_ids"],
+            ["grasp-1_recovery1"],
+        )
+        self.assertEqual(agent_records[-1].metadata["source"], "host_body_recovery_confirmation")
+        self.assertEqual(len(execute_calls), 2)
+        self.assertEqual(execute_calls[-1].speech[0].metadata["source"], "host_body_recovery_confirmation")
 
     async def test_interaction_speech_can_wait_until_playback_starts(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

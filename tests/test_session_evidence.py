@@ -161,6 +161,37 @@ class SessionEvidenceTests(unittest.TestCase):
                 )
         self.assertTrue(any("\033[33m" in line for line in warning_logs.output))
 
+
+    def test_llm_truncation_events_are_colored_red_in_cli(self) -> None:
+        tracker = SessionTracker(event_log_path=None)
+        sid = tracker.create()
+        with patch.dict(os.environ, {"ORCH_CLI_COLOR": "1"}, clear=False):
+            with self.assertLogs("orchestrator.runtime.session", level="ERROR") as error_logs:
+                tracker.log(
+                    sid,
+                    "llm_output_truncated: reason=%s done_reason=%s eval_count=%s num_predict=%s",
+                    "done_reason_length",
+                    "length",
+                    64,
+                    64,
+                )
+        self.assertTrue(any("\033[31m" in line for line in error_logs.output))
+
+    def test_llm_budget_pressure_events_are_colored_yellow_in_cli(self) -> None:
+        tracker = SessionTracker(event_log_path=None)
+        sid = tracker.create()
+        with patch.dict(os.environ, {"ORCH_CLI_COLOR": "1"}, clear=False):
+            with self.assertLogs("orchestrator.runtime.session", level="WARNING") as warning_logs:
+                tracker.log(
+                    sid,
+                    "llm_prompt_context_pressure: reason=%s prompt_eval_count=%s num_ctx=%s usage=%s",
+                    "prompt_eval_count_near_num_ctx",
+                    1900,
+                    2048,
+                    "0.93",
+                )
+        self.assertTrue(any("\033[33m" in line for line in warning_logs.output))
+
     def test_failed_nodes_can_be_colored_red_in_cli(self) -> None:
         tracker = SessionTracker(event_log_path=None)
         sid = tracker.create()

@@ -87,6 +87,7 @@ All risky or incomplete execution paths are default-off.
 | `AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION` | `0` | Enable bearer-authorized side-effect execution. |
 | `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` | `0` | Permit guarded physical nodes after all other proofs. |
 | `ORCH_ACTION_DRY_RUN` | `true` | Log compatibility actions instead of calling the hardware daemon. |
+| `ORCH_CLI_COLOR` | `auto` | Force Orchestrator session log color with `1`, disable with `0`; warnings are yellow and errors are red. |
 
 `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1` requires guarded execution.
 Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
@@ -182,6 +183,7 @@ configuration.
 | `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables semantic review/repair after malformed or timed-out quick-router outputs, including underspecified `robot_action` results. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
 | `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
+| `CHROMIE_CLI_COLOR` | `auto`; force Agent/Router Ollama diagnostic color with `1`, disable with `0`. Falls back to terminal detection and respects `NO_COLOR`. |
 
 Router routing has four decision stages plus deterministic validation
 guardrails. The hard emergency filter for interrupt and ignore stays
@@ -305,6 +307,11 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
+| `ORCH_BODY_RECOVERY_MAX_ATTEMPTS` | Maximum request-bound B-level recovery retries for recoverable Soridormi single-skill failures; code default `1`. Set `0` to disable recovery prompts and use terminal fallback speech. |
+| `ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S` | Confirmation TTL for B-level recovery prompts; code default `10`. A user confirmation after expiry does not retry; approved retries still re-enter preflight/SkillRuntime/Soridormi validation. |
+| `ORCH_CONDITIONAL_DEEPTHINK_ENABLED` | Enable Orchestrator-side conditional semantic delegation to `deepthinking_agent`; code default `true`. This does not authorize physical execution or bypass SkillRuntime/Soridormi validation. |
+| `ORCH_DEEPTHINK_CONFIDENCE_CHAT`, `ORCH_DEEPTHINK_CONFIDENCE_MEMORY`, `ORCH_DEEPTHINK_CONFIDENCE_TOOL` | Route-specific confidence thresholds for semantic delegation; code defaults `0.75`, `0.85`, and `0.82`. |
+| `ORCH_DEEPTHINK_CONFIDENCE_ROBOT_ACTION_SINGLE_EXACT`, `ORCH_DEEPTHINK_CONFIDENCE_ROBOT_ACTION_COMPOUND`, `ORCH_DEEPTHINK_CONFIDENCE_NAVIGATION_OR_MANIPULATION` | Robot-action semantic delegation thresholds; code defaults `0.70`, `0.82`, and `0.95`. Physical action still always goes through proposal, confirmation/preflight, and Soridormi safety gates. |
 | `TTS_FLUSH_CHARS` | Streaming direct-LLM text threshold before scheduling a sentence for TTS; common default `80`, code default `160`. |
 | `ORCH_TTS_TEXT_CHUNKING` | Split complete Agent/interaction speech into ordered TTS chunks before synthesis; common default `true`. |
 | `ORCH_TTS_FIRST_CHUNK_CHARS` | Preferred first complete-speech chunk size; common and code default `16` so short complete openers such as `I'm doing well.`, `Not tired.`, or `Too fast.` can be synthesized before longer follow-up sections. Set `0` to use `ORCH_TTS_CHUNK_CHARS` for every chunk. |

@@ -780,8 +780,16 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.skills[1].args["text"], "Why did the robot bring a map? Because every good walk needs direction.")
         self.assertEqual(response.skills[1].timing, "parallel")
+        self.assertEqual(response.skills[0].metadata["execution_mode"], "proposed")
+        self.assertEqual(response.skills[0].metadata["execution_semantics"], "proposal_from_route2")
+        self.assertTrue(response.skills[0].metadata["requires_runtime_validation"])
+        self.assertEqual(response.skills[0].metadata["source_component"], "agent.capability")
+        self.assertEqual(response.skills[0].metadata["route_stage"], "quick_intent")
+        self.assertTrue(response.skills[0].metadata["router_compound_action_plan"])
         self.assertEqual(response.skills[0].metadata["router_action_confidence"], 0.9)
         self.assertEqual(response.skills[1].metadata["router_action_confidence"], 0.87)
+        self.assertEqual(response.skills[1].metadata["execution_mode"], "proposed")
+        self.assertFalse(response.skills[1].metadata["capability_requires_confirmation"])
         proposals = [
             TaskProposal.model_validate(item)
             for item in response.metadata["agent_task_proposals"]

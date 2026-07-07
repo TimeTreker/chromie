@@ -4,13 +4,14 @@ import json
 import logging
 import os
 import re
-import sys
 import threading
 import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from shared.chromie_runtime.log_colors import colorize_for_cli
 
 logger = logging.getLogger(__name__)
 
@@ -227,12 +228,26 @@ class SessionTracker:
         event_name = rendered.split(":", 1)[0].strip()
         lowered = rendered.casefold()
 
-        if event_name in {"tts_stream_failed"}:
+        if event_name in {"tts_stream_failed", "llm_prompt_truncated", "llm_output_truncated"}:
             return logging.ERROR
-        if any(token in lowered for token in ("exception", "traceback", " error=", " error_type=")):
+        if any(
+            token in lowered
+            for token in (
+                "exception",
+                "traceback",
+                " error=",
+                " error_type=",
+                "done_reason=length",
+                "finish_reason=length",
+                "num_predict_exhausted",
+                "prompt_eval_count_reached_num_ctx",
+            )
+        ):
             return logging.ERROR
         if any(token in event_name for token in ("failed", "failure", "error")):
             return logging.ERROR
+        if event_name in {"llm_prompt_context_pressure", "llm_output_budget_pressure"}:
+            return logging.WARNING
 
         if event_name == "skill_result":
             status = self._field_value(rendered, "status").casefold()
@@ -307,20 +322,7 @@ class SessionTracker:
 
     @staticmethod
     def _colorize_for_cli(line: str, level: int) -> str:
-        color_mode = os.getenv("ORCH_CLI_COLOR", "auto").strip().lower()
-        if color_mode in {"0", "false", "no", "off", "never"}:
-            return line
-        color_forced = color_mode in {"1", "true", "yes", "on", "always"}
-        if not color_forced and os.getenv("NO_COLOR"):
-            return line
-        if not color_forced:
-            if not sys.stderr.isatty() or os.getenv("TERM", "").lower() == "dumb":
-                return line
-        if level >= logging.ERROR:
-            return f"\033[31m{line}\033[0m"
-        if level >= logging.WARNING:
-            return f"\033[33m{line}\033[0m"
-        return line
+        return colorize_for_cli(line, level, env_var="ORCH_CLI_COLOR")
 
     def _compact_workflow_message(self, rendered: str, *, limit: int = 320) -> str:
         text = " ".join(rendered.split())

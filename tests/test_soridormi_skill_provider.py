@@ -198,6 +198,41 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(chromie_intent["route_confidence"], 0.92)
         self.assertEqual(chromie_intent["router_source"], "router.v2")
 
+
+    async def test_named_skill_propagates_live_perception_contract(self) -> None:
+        invoker = _RecordingInvoker()
+        execution = await self._runtime(invoker).execute(
+            InteractionResponse(
+                interaction_id="interaction-live-perception",
+                skills=[
+                    {
+                        "request_id": "inspect-1",
+                        "skill_id": "soridormi.nod_yes",
+                        "args": {"count": 1, "amplitude": "small"},
+                        "metadata": {
+                            "requires_live_perception": True,
+                            "perception_dependency": "locate_target",
+                            "perception_reason": "Need Soridormi to locate the target before motion.",
+                        },
+                    }
+                ],
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids={"inspect-1"},
+                safety_monitor_active=True,
+            ),
+        )
+
+        self.assertEqual(execution.status, "completed")
+        chromie_intent = invoker.calls[0][1]["chromie_intent"]
+        self.assertTrue(chromie_intent["requires_live_perception"])
+        self.assertEqual(chromie_intent["perception_dependency"], "locate_object")
+        self.assertEqual(chromie_intent["physical_state_source"], "soridormi_runtime")
+        self.assertTrue(
+            chromie_intent["chromie_must_not_provide_physical_coordinates"]
+        )
+        self.assertTrue(chromie_intent["soridormi_owns_pose_estimation"])
+
     async def test_catalog_preserves_unavailable_skill_reason(self) -> None:
         registry = SkillRegistry()
         registry.import_soridormi_catalog(

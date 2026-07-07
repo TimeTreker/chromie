@@ -4,6 +4,9 @@ import inspect
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from agent.app.task_graph.models import ExecutionTrace, TaskGraph
+from agent.app.task_graph.residual import attach_residual_replan_state
+
 from shared.chromie_contracts.agent import AgentResult
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
@@ -129,6 +132,7 @@ class TaskGraphSkillProvider:
     ) -> SkillResult:
         raw = self._handler(request.args["graph"])
         output = await raw if inspect.isawaitable(raw) else raw
+        output = _with_residual_replan(request.args.get("graph"), output)
         status = _task_graph_skill_status(output)
         message = _task_graph_skill_message(output, status)
         return SkillResult(
@@ -149,6 +153,22 @@ class TaskGraphSkillProvider:
         context: SkillExecutionContext,
     ) -> None:
         self.cancelled_request_ids.add(request.request_id)
+
+
+def _with_residual_replan(graph_payload: Any, output: dict[str, Any]) -> dict[str, Any]:
+    if output.get("residual_replan") is not None:
+        return output
+    if str(output.get("status") or "").strip().lower() not in {"failed", "aborted"}:
+        return output
+    if not isinstance(graph_payload, dict):
+        return output
+    try:
+        graph = TaskGraph.model_validate(graph_payload)
+        trace = ExecutionTrace.model_validate(output)
+    except Exception:
+        return output
+    attach_residual_replan_state(graph, trace)
+    return trace.model_dump(mode="json")
 
 
 def _task_graph_skill_status(output: dict[str, Any]) -> str:

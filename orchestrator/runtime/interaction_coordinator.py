@@ -27,7 +27,11 @@ from .skill_runtime import (
     session_interrupt_definition,
 )
 from .skill_adapters import TaskGraphHandler, TaskGraphSkillProvider, task_graph_skill_definition
-from .soridormi_skill_provider import SoridormiMcpSkillProvider
+from .soridormi_skill_provider import SoridormiNamedSkillAdapter
+from .body_recovery import (
+    build_body_recovery_confirmation,
+    conservative_body_failure_message,
+)
 from .interaction_preflight import annotate_preflight_validation
 from .task_proposals import annotate_task_proposal_ledger
 
@@ -41,6 +45,17 @@ def _float_env(name: str, default: float, *, minimum: float = 0.0) -> float:
         return default
     try:
         value = float(raw)
+    except ValueError:
+        return default
+    return max(minimum, value)
+
+
+def _int_env(name: str, default: int, *, minimum: int = 0) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
     except ValueError:
         return default
     return max(minimum, value)
@@ -81,6 +96,15 @@ class InteractionRuntimeCoordinator:
         self._catalog_refresh_ttl_s = _float_env(
             "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S",
             30.0,
+        )
+        self.body_recovery_max_attempts = _int_env(
+            "ORCH_BODY_RECOVERY_MAX_ATTEMPTS",
+            1,
+        )
+        self.body_recovery_confirmation_ttl_s = _float_env(
+            "ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S",
+            10.0,
+            minimum=1.0,
         )
         self._catalog_lock = asyncio.Lock()
 
@@ -182,6 +206,7 @@ class InteractionRuntimeCoordinator:
             body_requests
             and self.soridormi_mode == "sim"
             and self.auto_confirm_sim
+            and self._body_auto_confirm_allowed(prepared)
         ):
             authorized_request_ids.update(
                 request.request_id for request in body_requests
@@ -247,6 +272,15 @@ class InteractionRuntimeCoordinator:
             return execution
         if failed_body_results:
             if optional_body_cue:
+                return execution
+            recovery_confirmation = build_body_recovery_confirmation(
+                prepared,
+                failed_body_results,
+                max_attempts=self.body_recovery_max_attempts,
+                timeout_s=self.body_recovery_confirmation_ttl_s,
+                language=str(prepared.metadata.get("language") or ""),
+            )
+            if recovery_confirmation is not None:
                 return execution
             fallback = InteractionResponse(
                 interaction_id=prepared.interaction_id,
@@ -412,6 +446,9 @@ class InteractionRuntimeCoordinator:
                 if zh
                 else "The movement timed out, and I could not confirm it completed safely."
             )
+        conservative = conservative_body_failure_message(results, language=language)
+        if conservative:
+            return conservative
         return (
             "我无法安全完成这个动作。"
             if zh
@@ -431,6 +468,19 @@ class InteractionRuntimeCoordinator:
             results=[*first.results, *second.results],
             traces=[*first.traces, *second.traces],
         )
+
+    @staticmethod
+    def _body_auto_confirm_allowed(response: InteractionResponse) -> bool:
+        metadata = response.metadata if isinstance(response.metadata, dict) else {}
+        if metadata.get("disable_body_auto_confirm") is True:
+            return False
+        if metadata.get("post_interrupt_physical_resume_lock") is True:
+            return False
+        for request in response.skills:
+            request_metadata = request.metadata if isinstance(request.metadata, dict) else {}
+            if request_metadata.get("post_interrupt_physical_resume_lock") is True:
+                return False
+        return True
 
     async def confirmation_request_ids(
         self,
@@ -457,6 +507,7 @@ class InteractionRuntimeCoordinator:
         if (
             self.soridormi_mode == "sim"
             and self.auto_confirm_sim
+            and self._body_auto_confirm_allowed(response)
         ):
             required.difference_update(
                 request.request_id for request in body_requests
@@ -480,6 +531,7 @@ class InteractionRuntimeCoordinator:
         if not (
             self.soridormi_mode == "sim"
             and self.auto_confirm_sim
+            and self._body_auto_confirm_allowed(response)
         ):
             return set()
         return {
@@ -540,7 +592,7 @@ class InteractionRuntimeCoordinator:
             )
             if "soridormi.mcp" not in self.runtime.provider_ids():
                 self.runtime.register_provider(
-                    SoridormiMcpSkillProvider(self.soridormi_invoker)
+                    SoridormiNamedSkillAdapter(self.soridormi_invoker)
                 )
             self._catalog_loaded = True
             self._catalog_last_loaded_at = time.monotonic()

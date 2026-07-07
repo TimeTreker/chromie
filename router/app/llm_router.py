@@ -9,6 +9,9 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
+from shared.chromie_runtime.llm_diagnostics import ollama_completion_diagnostics
+from shared.chromie_runtime.log_colors import colorize_for_cli
+
 from .fallback import fallback_decision
 from .schema import RouteDecision, RouteRequest, finalize_decision
 
@@ -737,7 +740,26 @@ class OllamaLLMRouter:
         async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
             response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+        for diagnostic in ollama_completion_diagnostics(
+            options=payload.get("options"),
+            data=data,
+            prompt_chars=self._payload_prompt_chars(payload),
+        ):
+            logger.log(
+                diagnostic.level,
+                "%s",
+                colorize_for_cli(diagnostic.render(), diagnostic.level),
+            )
+        return data
+
+    @staticmethod
+    def _payload_prompt_chars(payload: dict[str, Any]) -> int:
+        total = 0
+        for message in payload.get("messages") or []:
+            if isinstance(message, dict):
+                total += len(str(message.get("content") or ""))
+        return total
 
     def _decision_from_response(self, request: RouteRequest, data: dict[str, Any]) -> RouteDecision:
         content = data.get("message", {}).get("content", "")

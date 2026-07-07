@@ -115,6 +115,7 @@ class ExecutionTrace(BaseModel):
     outcome_summary: str = ""
     node_results: list[NodeResult] = Field(default_factory=list)
     events: list[ExecutionEvent] = Field(default_factory=list)
+    residual_replan: dict[str, Any] | None = None
 
     def result_map(self) -> dict[str, NodeResult]:
         return {result.node_id: result for result in self.node_results}

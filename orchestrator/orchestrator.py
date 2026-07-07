@@ -35,20 +35,33 @@ from orchestrator.runtime.abilities import (
     AbilityRegistry,
     build_default_ability_registry,
 )
+from orchestrator.runtime.body_recovery import (
+    BodyRecoveryConfirmation,
+    build_body_recovery_confirmation,
+)
 from orchestrator.runtime.confirmation import ConfirmationDialogue
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.episode import EpisodeRecorder
 from orchestrator.runtime.experience import ExperienceManager
+from orchestrator.runtime.deepthinking_policy import (
+    DeepThinkingDelegationPolicy,
+    DeepThinkingPolicyConfig,
+)
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
 )
 from orchestrator.runtime.mind import MindManager
+from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
 from orchestrator.runtime.session import SessionTracker, now_ms
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_runtime.llm_diagnostics import (
+    ollama_completion_diagnostics,
+    ollama_prompt_preflight_diagnostics,
+)
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -62,6 +75,26 @@ def env_bool(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.lower() in {"1", "true", "yes", "on"}
+
+
+def env_int(name: str, default: int, *, minimum: int = 0) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return max(minimum, int(value))
+    except ValueError:
+        return default
+
+
+def env_float(name: str, default: float, *, minimum: float = 0.0) -> float:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return max(minimum, float(value))
+    except ValueError:
+        return default
 
 
 class VoiceAssistant:
@@ -88,6 +121,9 @@ class VoiceAssistant:
         self.fast_first_response_enabled = env_bool(
             "ORCH_FAST_FIRST_RESPONSE_ENABLED",
             True,
+        )
+        self.deepthinking_policy = DeepThinkingDelegationPolicy(
+            DeepThinkingPolicyConfig.from_env()
         )
         self.router_url = os.getenv("ROUTER_URL", "http://127.0.0.1:8091")
         self.agent_url = os.getenv("AGENT_URL", "http://127.0.0.1:8092")
@@ -153,6 +189,15 @@ class VoiceAssistant:
         self.episode_recorder = EpisodeRecorder.from_env(PROJECT_ROOT)
         self.confirmation_dialogue = ConfirmationDialogue(
             ttl_s=float(os.getenv("ORCH_CONFIRMATION_TTL_SEC", "20")),
+        )
+        self.body_recovery_max_attempts = env_int(
+            "ORCH_BODY_RECOVERY_MAX_ATTEMPTS",
+            1,
+        )
+        self.body_recovery_confirmation_ttl_s = env_float(
+            "ORCH_BODY_RECOVERY_CONFIRMATION_TTL_S",
+            10.0,
+            minimum=1.0,
         )
         logger.info(
             "Conversation state: enabled=%s conversation_id=%s max_turns=%s idle_s=%s hard_idle_s=%s max_context_chars=%s",
@@ -1179,6 +1224,11 @@ class VoiceAssistant:
         sentence = ""
         llm_start_ms = now_ms()
         self.session_log(session_id, "llm_request_start: prompt_chars=%s input_chars=%s text=%r fallback_reason=%s route=%s think=%s num_ctx=%s num_predict=%s", len(prompt), len(user_text), user_text, fallback_reason or "", route or "", payload.get("think"), payload["options"]["num_ctx"], payload["options"]["num_predict"])
+        for diagnostic in ollama_prompt_preflight_diagnostics(
+            prompt_chars=len(prompt),
+            options=payload.get("options"),
+        ):
+            self.session_log(session_id, "%s", diagnostic.render())
         try:
             session = await self.get_http_session()
             async with session.post(self.llm_url, json=payload) as resp:
@@ -1226,6 +1276,12 @@ class VoiceAssistant:
                             state["llm_done"] = True
                         self.session_log(session_id, "llm_done: llm_ms=%.1f response_chars=%s scheduled_tts=%s", now_ms() - llm_start_ms, state.get("response_chars", 0) if state else "unknown", state.get("scheduled_tts", 0) if state else "unknown")
                         self.session_log(session_id, "llm_done_raw: done_reason=%s total_duration=%s load_duration=%s prompt_eval_count=%s prompt_eval_duration=%s eval_count=%s eval_duration=%s", data.get("done_reason"), data.get("total_duration"), data.get("load_duration"), data.get("prompt_eval_count"), data.get("prompt_eval_duration"), data.get("eval_count"), data.get("eval_duration"))
+                        for diagnostic in ollama_completion_diagnostics(
+                            options=payload.get("options"),
+                            data=data,
+                            prompt_chars=len(prompt),
+                        ):
+                            self.session_log(session_id, "%s", diagnostic.render())
                         self.maybe_session_done(session_id)
                         return
         except asyncio.CancelledError:
@@ -1762,6 +1818,31 @@ class VoiceAssistant:
         )
         return True
 
+    def _apply_conditional_deepthinking_policy(
+        self,
+        decision: RouteDecision,
+        *,
+        context: dict[str, Any],
+        session_id: str,
+    ) -> RouteDecision:
+        policy = getattr(self, "deepthinking_policy", None)
+        if policy is None:
+            policy = DeepThinkingDelegationPolicy()
+        delegation = policy.evaluate(decision, context=context)
+        if not delegation.should_delegate:
+            return decision
+        delegated = policy.delegate_decision(decision, delegation)
+        self.session_log(
+            session_id,
+            "conditional_deepthinking_delegate: original_route=%s original_intent=%s "
+            "confidence=%.2f reasons=%s",
+            delegation.original_route,
+            delegation.original_intent,
+            delegation.original_confidence,
+            ",".join(delegation.reasons),
+        )
+        return delegated
+
     async def handle_routed_text(self, user_text: str, session_id: str) -> None:
         if await self._handle_confirmation_reply(user_text, session_id):
             return
@@ -1858,6 +1939,12 @@ class VoiceAssistant:
             )
             return
 
+        decision = self._apply_conditional_deepthinking_policy(
+            decision,
+            context=context,
+            session_id=session_id,
+        )
+
         turn_metadata = {
             "source": decision.source,
             "confidence": decision.confidence,
@@ -1867,6 +1954,8 @@ class VoiceAssistant:
                 "task_relation",
                 "target_task_id",
                 "task_context_patch",
+                "orchestrator_deepthinking_delegation",
+                "orchestrator_original_route",
             ):
                 if key in decision.metadata:
                     turn_metadata[key] = decision.metadata[key]
@@ -2033,6 +2122,31 @@ class VoiceAssistant:
                 len(result.speak_after),
                 result.requires_confirmation,
             )
+            if result.actions:
+                locked_actions = []
+                locked_ids = []
+                for action in result.actions:
+                    locked_ids.append(action.id)
+                    locked_actions.append(
+                        action.model_copy(
+                            deep=True,
+                            update={
+                                "requires_confirmation": True,
+                                "metadata": {
+                                    **action.metadata,
+                                    "post_interrupt_physical_resume_lock": True,
+                                    "post_interrupt_resume_policy": "requires_fresh_confirmation",
+                                },
+                            },
+                        )
+                    )
+                result.actions = locked_actions
+                result.requires_confirmation = True
+                self.session_log(
+                    session_id,
+                    "post_interrupt_legacy_physical_resume_locked: action_ids=%s",
+                    ",".join(locked_ids),
+                )
             self.conversation_state.record_agent_result(session_id, result)
             await self.execute_agent_result(
                 result,
@@ -2129,6 +2243,13 @@ class VoiceAssistant:
                     response,
                     session_id=session_id,
                 )
+                response, locked_request_ids = lock_post_interrupt_physical_resume(response)
+                if locked_request_ids:
+                    self.session_log(
+                        session_id,
+                        "post_interrupt_physical_resume_locked: request_ids=%s",
+                        ",".join(locked_request_ids),
+                    )
                 self.session_log(
                     session_id,
                     "post_interrupt_interaction_done: agent_ms=%.1f speech=%s skills=%s requires_confirmation=%s",
@@ -2631,6 +2752,11 @@ class VoiceAssistant:
                         request_id=request.request_id,
                         status=execution.status,
                     )
+                await self._maybe_stage_body_recovery_confirmation(
+                    response,
+                    execution,
+                    session_id,
+                )
             self._record_experience(
                 response=self._prepared_interaction_response_for_record(
                     response,
@@ -2676,6 +2802,93 @@ class VoiceAssistant:
                         0,
                     ) + sum(len(item.text) for item in response.speech)
                 self.maybe_session_done(session_id)
+
+    async def _maybe_stage_body_recovery_confirmation(
+        self,
+        response: InteractionResponse,
+        execution: SkillRuntimeResult,
+        session_id: str | None,
+    ) -> bool:
+        if execution.status == "cancelled":
+            return False
+        recovery = build_body_recovery_confirmation(
+            response,
+            execution.results,
+            max_attempts=getattr(self, "body_recovery_max_attempts", 1),
+            timeout_s=getattr(self, "body_recovery_confirmation_ttl_s", 10.0),
+            language=str(response.metadata.get("language") or ""),
+        )
+        if recovery is None:
+            return False
+        return await self._stage_body_recovery_confirmation(
+            recovery,
+            session_id=session_id,
+            language=str(response.metadata.get("language") or ""),
+        )
+
+    async def _stage_body_recovery_confirmation(
+        self,
+        recovery: BodyRecoveryConfirmation,
+        *,
+        session_id: str | None,
+        language: str | None,
+    ) -> bool:
+        pending = self.confirmation_dialogue.begin(
+            recovery.response,
+            confirmed_request_ids=set(recovery.confirmed_request_ids),
+            origin_session_id=session_id,
+            conversation_id=self.conversation_state.conversation_id,
+            language=language,
+            prompt_override=recovery.prompt,
+            ttl_s=getattr(self, "body_recovery_confirmation_ttl_s", 10.0),
+        )
+        self.session_log(
+            session_id,
+            "body_recovery_requested: confirmation_id=%s interaction_id=%s "
+            "failed_request_ids=%s retry_request_ids=%s attempt=%s/%s expires_at=%.3f",
+            pending.confirmation_id,
+            recovery.response.interaction_id,
+            ",".join(recovery.failed_request_ids),
+            ",".join(recovery.retry_request_ids),
+            recovery.attempt,
+            recovery.max_attempts,
+            pending.expires_at,
+        )
+        self.conversation_state.record_agent_result(
+            session_id,
+            recovery.response,
+        )
+        self.conversation_state.record_pending_task(
+            sid=session_id,
+            task_type="body_recovery_confirmation",
+            status="awaiting_confirmation",
+            summary=", ".join(
+                request.skill_id
+                for request in recovery.response.skills
+                if request.request_id in recovery.confirmed_request_ids
+            ),
+            metadata={
+                "confirmation_id": pending.confirmation_id,
+                "interaction_id": recovery.response.interaction_id,
+                "fingerprint": pending.fingerprint,
+                "expires_at": pending.expires_at,
+                "failed_request_ids": list(recovery.failed_request_ids),
+                "retry_request_ids": list(recovery.retry_request_ids),
+                "body_recovery_attempt": recovery.attempt,
+                "body_recovery_max_attempts": recovery.max_attempts,
+            },
+        )
+        prompt_response = self._host_speech_response(
+            pending.prompt,
+            style="confirm",
+            source="host_body_recovery_confirmation",
+        )
+        self.conversation_state.record_agent_result(session_id, prompt_response)
+        await self.interaction_runtime.execute(
+            prompt_response,
+            session_id=session_id,
+        )
+        return True
 
     def _prepared_interaction_response_for_record(
         self,

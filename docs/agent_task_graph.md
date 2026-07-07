@@ -108,7 +108,12 @@ Every execution trace also carries `outcome_summary`, a deterministic one-line
 result summary derived from node results. It is the source that future report
 or speech nodes should use when explaining completion, refusal, timeout,
 cancellation, or blocked Soridormi subsystems without asking an LLM to infer the
-failure.
+failure. Failed and aborted traces additionally carry `residual_replan` context
+that preserves the original goal, completed steps, failed step, failure code,
+current physical state, irreversible effects, Soridormi recommended next
+actions, and a residual-only replan scope. This context is advisory: it is not
+a retry authorization, and any follow-up plan must be newly validated and pass
+the usual confirmation, SkillRuntime, and Soridormi gates.
 Planning execution may run `chromie.report` nodes through a local trace-only
 adapter, primarily as failure-policy fallback nodes. This records a report in
 the execution trace without invoking TTS or audio playback. `chromie.speak`

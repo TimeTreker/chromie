@@ -19,6 +19,7 @@ class _Outcome:
             {"skill_id": "walk_velocity", "description": "Walk.", "parameters_schema": {"type": "object"}, "available": True},
             {"skill_id": "turn_in_place", "description": "Turn.", "parameters_schema": {"type": "object"}, "available": True},
             {"skill_id": "nod_yes", "description": "Nod.", "parameters_schema": {"type": "object"}, "available": True},
+            {"skill_id": "inspect_object", "description": "Inspect an object using live perception.", "parameters_schema": {"type": "object"}, "available": True},
         ],
     }
 
@@ -100,6 +101,19 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[2].args["count"], 2)
         self.assertEqual(response.skills[2].args["amplitude"], "small")
         self.assertEqual(response.skills[2].args["duration_s"], 1.4)
+        for index, skill in enumerate(response.skills):
+            self.assertEqual(skill.metadata["source"], "router_actions")
+            self.assertEqual(skill.metadata["source_component"], "agent.capability")
+            self.assertEqual(skill.metadata["execution_mode"], "proposed")
+            self.assertEqual(skill.metadata["execution_semantics"], "proposal_from_route2")
+            self.assertTrue(skill.metadata["requires_runtime_validation"])
+            self.assertEqual(skill.metadata["route_stage"], "quick_intent")
+            self.assertEqual(skill.metadata["route_source"], "catalog")
+            self.assertEqual(skill.metadata["route_confidence"], 0.99)
+            self.assertEqual(skill.metadata["router_action_count"], 3)
+            self.assertEqual(skill.metadata["router_action_index"], index)
+            self.assertTrue(skill.metadata["router_compound_action_plan"])
+            self.assertEqual(skill.metadata["router_action_sequence"], index)
         self.assertEqual(response.speech[0].text, "I will run the selected actions in order.")
 
     async def test_router_speak_first_suppresses_generic_direct_plan_speech(self) -> None:
@@ -137,6 +151,54 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
             ["soridormi.walk_velocity", "soridormi.nod_yes"],
         )
         self.assertEqual([item.text for item in response.speech], ["Hello."])
+        self.assertEqual(response.skills[0].metadata["execution_mode"], "proposed")
+        self.assertEqual(response.skills[0].metadata["source_component"], "agent.capability")
+        self.assertEqual(response.skills[0].metadata["router_action_count"], 2)
+
+    async def test_router_action_live_perception_metadata_is_structured(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=None,
+                use_llm=False,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "inspect",
+                "text": "Find the object before moving.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "inspect_object",
+                    "confidence": 0.92,
+                    "language": "en-US",
+                    "source": "catalog",
+                    "actions": [
+                        {
+                            "capability_id": "soridormi.inspect_object",
+                            "args": {},
+                            "sequence": 0,
+                            "requires_live_perception": True,
+                            "perception_dependency": "find",
+                        },
+                    ],
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.inspect_object"])
+        metadata = response.skills[0].metadata
+        self.assertTrue(metadata["requires_live_perception"])
+        self.assertEqual(metadata["perception_dependency"], "locate_object")
+        self.assertEqual(metadata["physical_state_source"], "soridormi_runtime")
+        self.assertTrue(metadata["chromie_must_not_provide_physical_coordinates"])
+        self.assertTrue(metadata["soridormi_owns_pose_estimation"])
+
 
 
 if __name__ == "__main__":

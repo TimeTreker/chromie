@@ -179,7 +179,9 @@ closed.
 - Parallel execution is bounded and honors `can_run_parallel` and
   `exclusive_group`; physical work remains sequential.
 - Execution traces keep the planner `summary` and add a deterministic
-  `outcome_summary` from node results for report/speech use.
+  `outcome_summary` from node results for report/speech use. Failed or
+  aborted traces also include advisory `residual_replan` context so a future
+  planner can preserve completed work and replan only the remaining safe goal.
 - Planning execution can run `chromie.report` as a trace-only local fallback;
   audible `chromie.speak` stays outside the planning lane.
 - LLM-planned Soridormi task-submit nodes receive a default trace-only report
