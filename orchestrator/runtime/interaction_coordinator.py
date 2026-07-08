@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from collections.abc import Awaitable, Callable, Iterable
 from pathlib import Path
@@ -690,8 +691,6 @@ class InteractionRuntimeCoordinator:
             return response
         if self._has_effectful_runtime_skill(response):
             return response
-        language = str(response.metadata.get("language") or "")
-        text = self._truth_reconciliation_message(response, language=language)
         reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
         if not reason:
             reason = "deepthinking_effect_task_without_valid_skill"
@@ -700,6 +699,12 @@ class InteractionRuntimeCoordinator:
             "truth_reconciled": True,
             "truth_reconciliation_reason": reason,
         }
+        if self._safe_existing_truth_reconciliation_speech(response):
+            metadata["truth_reconciliation_speech_source"] = "llm_safe_existing_speech"
+            return response.model_copy(deep=True, update={"metadata": metadata})
+
+        language = str(response.metadata.get("language") or "")
+        text = self._truth_reconciliation_message(response, language=language)
         return response.model_copy(
             deep=True,
             update={
@@ -718,6 +723,31 @@ class InteractionRuntimeCoordinator:
                 ],
                 "metadata": metadata,
             },
+        )
+
+    def _safe_existing_truth_reconciliation_speech(
+        self,
+        response: InteractionResponse,
+    ) -> bool:
+        if not response.speech:
+            return False
+        for speech in response.speech:
+            text = " ".join(str(speech.text or "").strip().split())
+            if not text:
+                return False
+            if self._speech_claims_unverified_effect(text):
+                return False
+        return True
+
+    @staticmethod
+    def _speech_claims_unverified_effect(text: str) -> bool:
+        return bool(
+            re.search(
+                r"(?:执行(?:指令|命令)?|已经执行|正在执行|我会(?:马上|现在)?(?:向前|移动|走|转|执行)|我将(?:向前|移动|走|转|执行)|"
+                r"I(?:'ll| will) (?:walk|move|turn|execute|perform)|\b(?:moving|walking|turning|executing|performing)\b|soridormi\.|chromie\.)",
+                text,
+                flags=re.IGNORECASE,
+            )
         )
 
     def _truth_reconciliation_message(

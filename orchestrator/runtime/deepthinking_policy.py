@@ -190,7 +190,11 @@ class DeepThinkingDelegationPolicy:
             "requires_live_perception",
         ):
             reasons.append("requires_live_perception")
-        if high_risk_physical:
+        if high_risk_physical and not self._exact_capability_selection_without_actions(
+            decision,
+            route_items,
+            actions,
+        ):
             reasons.append("high_risk_physical_goal")
         if threshold is not None and decision.confidence < threshold:
             reasons.append(f"confidence_below_{threshold:.2f}")
@@ -277,6 +281,42 @@ class DeepThinkingDelegationPolicy:
                 return self.config.thresholds["robot_action_compound"]
             return self.config.thresholds["robot_action_single_exact"]
         return self.config.thresholds.get(decision.route)
+
+    def _exact_capability_selection_without_actions(
+        self,
+        decision: RouteDecision,
+        route_items: Iterable[dict[str, Any]],
+        actions: Iterable[dict[str, Any]],
+    ) -> bool:
+        """Let SkillRuntime/Soridormi adjudicate simple exact physical proposals.
+
+        An exact catalog intent such as ``capability:soridormi.walk_forward`` with
+        no router-authored action args is already grounded to an available
+        affordance, but it is still only a proposal.  Sending that through
+        deepthinking solely because it is physical can discard the proposal and
+        produce a confusing speech-only fallback.  CapabilityAgent,
+        SkillRuntime, and Soridormi remain the validation and safety boundary.
+        """
+
+        if decision.route != "robot_action":
+            return False
+        if not str(decision.intent or "").startswith("capability:"):
+            return False
+        if list(actions):
+            return False
+        route_items_list = list(route_items)
+        robot_items = [item for item in route_items_list if item.get("route") == "robot_action"]
+        if len(robot_items) > 1:
+            return False
+        for item in robot_items:
+            if item.get("requires_mind") is True:
+                return False
+            if str(item.get("lane") or "") == "deepthought":
+                return False
+            item_actions = item.get("actions")
+            if isinstance(item_actions, list) and item_actions:
+                return False
+        return True
 
     def _route_items_request_deepthinking(self, route_items: Iterable[dict[str, Any]]) -> bool:
         for item in route_items:

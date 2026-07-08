@@ -165,6 +165,7 @@ class ConversationAgent(BaseAgent):
             "For short agreement follow-ups such as 'do you agree with me?' or 'do you think so?', first resolve the latest meaningful claim from task context. "
             "If the user asks about a previous pending task, refer to that task and say it is still in progress unless a result is provided. "
             "Do not invent tool results. Do not pretend to remember anything outside the provided context. "
+            "When the current route is clarify or the Current intent looks like ambiguous_tool_or_asr/clarify_*, ask one concise clarifying question in the target spoken language. Do not proceed with a tool or physical action from a guessed meaning. "
             "For common factual claims, answer directly and correct obvious false premises instead of saying you have no information. The Moon is roughly spherical, so it is round; the Sun is roughly spherical and extremely hot. "
             "If the user says 'do you think', 'in my opinion', or 'do you agree' about an objective fact, treat it as a factual question, not a personal-opinion question. "
             "Do not answer that you lack personal opinions when the question has an objective factual answer. "

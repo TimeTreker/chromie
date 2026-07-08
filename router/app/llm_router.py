@@ -248,6 +248,44 @@ def _is_weather_like_text(text: str) -> bool:
     return True
 
 
+def _decision_selects_weather_tool(decision: RouteDecision) -> bool:
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    intent = str(decision.intent or "").casefold()
+    if decision.route == "tool" and ("weather" in intent or "forecast" in intent):
+        return True
+    if decision.route == "tool" and str(metadata.get("tool_name") or "").casefold() == "weather":
+        return True
+    if decision.route == "tool" and isinstance(metadata.get("weather_query"), dict):
+        return True
+    for item in decision.routes or []:
+        item_metadata = item.metadata if isinstance(item.metadata, dict) else {}
+        item_intent = str(item.intent or "").casefold()
+        if item.route == "tool" and ("weather" in item_intent or "forecast" in item_intent):
+            return True
+        if item.route == "tool" and str(item_metadata.get("tool_name") or "").casefold() == "weather":
+            return True
+        if item.route == "tool" and isinstance(item_metadata.get("weather_query"), dict):
+            return True
+    return False
+
+
+def _weather_query_location_from_decision(decision: RouteDecision) -> str:
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    query = metadata.get("weather_query")
+    if isinstance(query, dict):
+        location = str(query.get("location") or "").strip()
+        if location:
+            return location
+    for item in decision.routes or []:
+        item_metadata = item.metadata if isinstance(item.metadata, dict) else {}
+        query = item_metadata.get("weather_query")
+        if isinstance(query, dict):
+            location = str(query.get("location") or "").strip()
+            if location:
+                return location
+    return ""
+
+
 def _weather_location_hint(text: str) -> str:
     raw = " ".join((text or "").strip().split())
     if not raw:
@@ -1538,6 +1576,67 @@ class OllamaLLMRouter:
         )
         return finalized
 
+    def _reject_ambiguous_weather_tool_route(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        if not _decision_selects_weather_tool(decision):
+            return decision
+        if _is_weather_like_text(request.text):
+            return decision
+
+        location = _weather_query_location_from_decision(decision)
+        previous_metadata = {
+            key: value
+            for key, value in (decision.metadata if isinstance(decision.metadata, dict) else {}).items()
+            if key
+            not in {
+                "route_items",
+                "route_item_count",
+                "route_stage_outputs",
+                "task_list",
+                "task_proposals",
+                "route_merge",
+            }
+        }
+        metadata = {
+            **previous_metadata,
+            "llm_clarification_required": True,
+            "clarification_reason": "weather_route_without_explicit_weather_cue",
+            "rejected_weather_route": {
+                "original_route": decision.route,
+                "original_intent": decision.intent,
+                "original_confidence": decision.confidence,
+                "location": location or None,
+            },
+        }
+        clarified = RouteDecision(
+            route="clarify",
+            agents=["conversation_agent", "speaker_agent"],
+            intent="ambiguous_tool_or_asr",
+            confidence=min(decision.confidence, 0.45),
+            language=request.language or decision.language or "auto",
+            priority=decision.priority,
+            needs_agent=True,
+            should_speak=True,
+            candidate_capabilities=list(decision.candidate_capabilities),
+            reason=(f"{decision.reason}; " if decision.reason else "")
+            + "weather tool route rejected because user text lacks an explicit weather cue",
+            source="llm",
+            metadata=metadata,
+        )
+        finalized = finalize_decision(clarified, request, source="llm")
+        logger.info(
+            "router_weather_route_rejected_as_ambiguous sid=%s original_route=%s original_intent=%s location=%r text=%r",
+            request.sid,
+            decision.route,
+            decision.intent,
+            location,
+            request.text,
+        )
+        return finalized
+
 
     async def _repair_missing_fast_speech(
         self,
@@ -1893,6 +1992,7 @@ class OllamaLLMRouter:
             decision,
             reason="post_review_robot_action_weather_like",
         )
+        decision = self._reject_ambiguous_weather_tool_route(request, decision)
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:
             recovered = await self._recover_deterministic_only_decision(request, decision)

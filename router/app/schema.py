@@ -79,6 +79,29 @@ class FastSpeech(BaseModel):
             return {"text": value}
         return value
 
+    @model_validator(mode="after")
+    def reject_contract_marker_as_spoken_text(self) -> "FastSpeech":
+        """Drop enum/contract labels that a small LLM placed in text.
+
+        Values such as ``checking_only`` are routing contract metadata, not
+        playable speech.  Clearing the text lets the router repair path or the
+        downstream LLM produce natural language instead of speaking the marker.
+        """
+
+        marker = "_".join(self.text.strip().casefold().replace("-", "_").split())
+        if marker in {
+            "checking_only",
+            "prelude_only",
+            "needs_confirmation",
+            "acknowledge",
+            "acknowledge_and_check",
+            "clarify",
+            "thinking",
+            "safety_prelude",
+        }:
+            self.text = ""
+        return self
+
 
 class RouteItem(BaseModel):
     """One semantic route item inside a multi-route decision.
@@ -141,6 +164,19 @@ class RouteDecision(BaseModel):
 
     @model_validator(mode="after")
     def populate_speak_first_from_fast_speech(self) -> "RouteDecision":
+        if self.speak_first:
+            marker = "_".join(str(self.speak_first).strip().casefold().replace("-", "_").split())
+            if marker in {
+                "checking_only",
+                "prelude_only",
+                "needs_confirmation",
+                "acknowledge",
+                "acknowledge_and_check",
+                "clarify",
+                "thinking",
+                "safety_prelude",
+            }:
+                self.speak_first = None
         if not self.speak_first and self.fast_speech and self.fast_speech.text.strip():
             self.speak_first = self.fast_speech.text.strip()
         return self
@@ -1061,7 +1097,11 @@ def finalize_decision(
     elif decision.route == "clarify":
         decision.needs_agent = True
         decision.should_speak = True
-        if not decision.speak_first:
+        if decision.metadata.get("llm_clarification_required") is True:
+            decision.speak_first = None
+            decision.fast_speech = None
+            decision.agents = ["conversation_agent", "speaker_agent"]
+        elif not decision.speak_first:
             decision.speak_first = "你是指什么？" if decision.language.startswith("zh") else "What do you mean?"
 
     elif decision.route == "deep_thought":
