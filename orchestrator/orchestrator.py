@@ -1587,6 +1587,16 @@ class VoiceAssistant:
         return unique
 
     @staticmethod
+    def _fast_speech_payload_text(payload: Any) -> str | None:
+        if not payload:
+            return None
+        if hasattr(payload, "model_dump"):
+            payload = payload.model_dump(mode="json", exclude_none=True)
+        if isinstance(payload, dict):
+            return str(payload.get("text") or "")
+        return None
+
+    @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
         cleaned = " ".join((text or "").strip().split())
         if not cleaned or len(cleaned) > 120:
@@ -1605,9 +1615,13 @@ class VoiceAssistant:
             "walking",
             "turning",
             "tool result",
+            "the result is",
+            "i found the result",
             "i remembered",
             "i have remembered",
             "我记住了",
+            "我查到",
+            "查询结果",
             "已经",
             "完成",
             "执行",
@@ -1617,18 +1631,59 @@ class VoiceAssistant:
             return None
         return cleaned
 
-    def _immediate_route_speech_text(self, decision: RouteDecision) -> str | None:
+    def _router_fast_speech_diagnostics(self, decision: RouteDecision) -> dict[str, Any]:
+        top_raw = self._fast_speech_payload_text(getattr(decision, "fast_speech", None))
+        top_safe = self._safe_immediate_route_speech(top_raw)
+        item_raw_count = 0
+        item_safe_count = 0
+        direct_item_count = 0
         for item in self._route_item_dicts(decision):
-            if str(item.get("route") or "") != "chat":
-                continue
+            item_raw = self._fast_speech_payload_text(item.get("fast_speech"))
+            if item_raw:
+                item_raw_count += 1
+                if self._safe_immediate_route_speech(item_raw):
+                    item_safe_count += 1
+            if str(item.get("lane") or "") in {"immediate_speech", "fast_tts"} and item.get("direct_to_tts") is True:
+                direct_item_count += 1
+        speak_first_raw = " ".join((decision.speak_first or "").split())
+        speak_first_safe = self._safe_immediate_route_speech(speak_first_raw)
+        return {
+            "top_fast_speech_present": bool(top_raw),
+            "top_fast_speech_safe": bool(top_safe),
+            "route_item_fast_speech_count": item_raw_count,
+            "route_item_fast_speech_safe_count": item_safe_count,
+            "direct_immediate_speech_items": direct_item_count,
+            "speak_first_present": bool(speak_first_raw),
+            "speak_first_safe": bool(speak_first_safe),
+        }
+
+    def _router_fast_speech_text(self, decision: RouteDecision) -> str | None:
+        text = self._safe_immediate_route_speech(
+            self._fast_speech_payload_text(getattr(decision, "fast_speech", None))
+        )
+        if text:
+            return text
+
+        for item in self._route_item_dicts(decision):
+            item_fast = self._safe_immediate_route_speech(
+                self._fast_speech_payload_text(item.get("fast_speech"))
+            )
+            if item_fast:
+                return item_fast
             if str(item.get("lane") or "") not in {"immediate_speech", "fast_tts"}:
                 continue
             if item.get("direct_to_tts") is not True:
                 continue
-            text = self._safe_immediate_route_speech(str(item.get("text") or ""))
-            if text:
-                return text
+            item_text = self._safe_immediate_route_speech(str(item.get("text") or ""))
+            if item_text:
+                return item_text
         return None
+
+    def _immediate_route_speech_text(self, decision: RouteDecision) -> str | None:
+        # Backward-compatible name used by older tests/call sites. The actual
+        # source of fast-first speech is now the Router-generated fast_speech
+        # field or an immediate_speech route item, not an Orchestrator template.
+        return self._router_fast_speech_text(decision)
 
     async def _schedule_deep_thought_ack(
         self,
@@ -1664,38 +1719,83 @@ class VoiceAssistant:
         )
         return False
 
+
+    def _weather_tool_ack_text(
+        self,
+        decision: RouteDecision,
+        user_text: str,
+    ) -> str | None:
+        route_candidates: list[dict[str, Any]] = []
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        route_candidates.append({
+            "route": decision.route,
+            "intent": decision.intent,
+            "metadata": metadata,
+        })
+        route_candidates.extend(self._route_item_dicts(decision))
+
+        for item in route_candidates:
+            intent = str(item.get("intent") or "").casefold()
+            item_metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            if (
+                str(item.get("route") or "") != "tool"
+                and str(item_metadata.get("tool_name") or "").casefold() != "weather"
+                and "weather" not in intent
+                and "forecast" not in intent
+            ):
+                continue
+            if (
+                str(item_metadata.get("tool_name") or "").casefold() != "weather"
+                and "weather" not in intent
+                and "forecast" not in intent
+                and not isinstance(item_metadata.get("weather_query"), dict)
+            ):
+                continue
+            query = item_metadata.get("weather_query")
+            location = ""
+            date = "today"
+            if isinstance(query, dict):
+                location = " ".join(str(query.get("location") or "").split())
+                date = str(query.get("date") or "today").strip().casefold()
+            language = (decision.language or "").lower()
+            zh = language.startswith("zh") or any(
+                "\u4e00" <= ch <= "\u9fff" for ch in user_text
+            )
+            if zh:
+                day = "明天" if date in {"tomorrow", "明天"} else "今天"
+                return f"我查一下{location}{day}的天气。" if location else f"我查一下{day}的天气。"
+            day = "tomorrow" if date == "tomorrow" else "today"
+            return f"Let me check {location}'s weather {day}." if location else f"Let me check the weather {day}."
+        return None
+
     def _fast_first_response_text(
         self,
         decision: RouteDecision,
         user_text: str,
     ) -> str | None:
-        if not self.fast_first_response_enabled:
+        if not self.fast_first_response_enabled or not decision.should_speak:
             return None
-        immediate_route_text = self._immediate_route_speech_text(decision)
-        if immediate_route_text:
-            return immediate_route_text
-        if not decision.should_speak or decision.route in {"interrupt", "ignore", "clarify"}:
+        if decision.route in {"interrupt", "ignore"}:
             return None
+
+        router_text = self._router_fast_speech_text(decision)
+        if router_text:
+            return router_text
+
+        # Backward compatibility for validators that still populate speak_first
+        # directly, such as low-information clarification and low-confidence
+        # deep-thought handoff. This text still goes through the same safety
+        # filter and should remain a prelude, not a result or completion claim.
+        speak_first = self._safe_immediate_route_speech(decision.speak_first)
+        if speak_first:
+            return speak_first
+
         if decision.route == "deep_thought":
             return self._deep_thought_ack_text(decision, user_text)
 
-        language = (decision.language or "").lower()
-        zh = language.startswith("zh") or any(
-            "\u4e00" <= ch <= "\u9fff" for ch in user_text
-        )
-        if decision.route == "robot_action":
-            return None
-        if decision.speak_first:
-            return decision.speak_first.strip() or None
-        if decision.route == "tool":
-            return "我查一下。" if zh else "I'll check that."
-        if decision.route == "memory":
-            return "我记一下。" if zh else "I'll note that."
-        if decision.route == "chat":
-            intent = (decision.intent or "").casefold()
-            if any(part in intent for part in ("greeting", "small_talk", "general_conversation")):
-                return "我在。" if zh else "I'm here."
-            return "我来回答。" if zh else "I'll answer."
+        # Do not invent route-specific fast-first wording here. The quick Router
+        # is responsible for natural, context-aware immediate speech. If it did
+        # not provide one, stay silent and let the downstream Agent/Tool speak.
         return None
 
     async def _schedule_fast_first_response(
@@ -1704,21 +1804,19 @@ class VoiceAssistant:
         user_text: str,
         session_id: str,
     ) -> bool:
-        route_item_text = self._immediate_route_speech_text(decision)
-        if decision.route == "deep_thought" and not route_item_text:
-            return await self._schedule_deep_thought_ack(
-                decision,
-                user_text,
-                session_id,
-            )
         text = self._fast_first_response_text(decision, user_text)
         if not text:
             self.session_log(
                 session_id,
-                "fast_first_response_skipped: route=%s intent=%s reason=%s",
+                "fast_first_response_skipped: route=%s intent=%s reason=%s diagnostics=%s",
                 decision.route,
                 decision.intent,
                 "not_applicable",
+                json.dumps(
+                    self._router_fast_speech_diagnostics(decision),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
             )
             return False
 

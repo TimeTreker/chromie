@@ -73,6 +73,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md)
 - [Memory Extraction and Prompt Context](MEMORY_EXTRACTION.md)
 - [Agent Capability Registry](agent_capability_registry.md)
+- [Adding Agent and Tool Capabilities](ADDING_AGENT_CAPABILITIES.md)
 - [Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md)
 - [Catalog-Aware Router Tiers](CATALOG_AWARE_ROUTER_TIERS.md)
 - [Quick Router Task Planning](QUICK_ROUTER_TASK_PLANNING.md)

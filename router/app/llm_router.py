@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -17,7 +19,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime.log_colors import colorize_for_cli
 
 from .fallback import fallback_decision
-from .schema import RouteDecision, RouteRequest, finalize_decision
+from .schema import FastSpeech, RouteDecision, RouteRequest, finalize_decision
 
 
 logger = logging.getLogger("chromie.router.llm")
@@ -158,6 +160,34 @@ def _capability_ids_from_request(request: RouteRequest) -> set[str]:
     return capability_ids
 
 
+def _capability_route_lookup_from_request(request: RouteRequest) -> dict[str, str]:
+    routes: dict[str, str] = {}
+    for key in (
+        "common_ability_catalog",
+        "prompt_capabilities_common",
+        "full_ability_catalog",
+        "prompt_capabilities_all",
+    ):
+        value = request.context.get(key, [])
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            route = str(item.get("route") or "").strip()
+            if capability_id and route in ROUTE_NAMES and capability_id not in routes:
+                routes[capability_id] = route
+    return routes
+
+
+def _route_for_capability_id(capability_id: str, request: RouteRequest) -> str:
+    if not capability_id:
+        return "robot_action"
+    route = _capability_route_lookup_from_request(request).get(capability_id)
+    return route if route in ROUTE_NAMES else "robot_action"
+
+
 def _known_capability_id(text: Any, capability_ids: set[str]) -> str:
     value = str(text or "").strip()
     if not value:
@@ -165,6 +195,68 @@ def _known_capability_id(text: Any, capability_ids: set[str]) -> str:
     if value.startswith("capability:"):
         value = value.split(":", 1)[1].strip()
     return value if value in capability_ids else ""
+
+
+
+FAST_SPEECH_REPAIR_ROUTES = {"tool"}
+
+
+def _decision_has_fast_speech(decision: RouteDecision) -> bool:
+    if decision.fast_speech and str(decision.fast_speech.text or "").strip():
+        return True
+    return any(
+        item.fast_speech and str(item.fast_speech.text or "").strip()
+        for item in (decision.routes or [])
+    )
+
+
+def _decision_needs_router_fast_speech(decision: RouteDecision) -> bool:
+    if _decision_has_fast_speech(decision):
+        return False
+    if decision.route in FAST_SPEECH_REPAIR_ROUTES:
+        return True
+    return any(item.route in FAST_SPEECH_REPAIR_ROUTES for item in (decision.routes or []))
+
+
+def _decision_with_router_fast_speech(
+    decision: RouteDecision,
+    fast_speech: FastSpeech,
+    *,
+    reason_suffix: str,
+    stage: str,
+) -> RouteDecision:
+    updated_items = []
+    attached_to_item = False
+    for item in decision.routes or []:
+        if (
+            not attached_to_item
+            and item.route in FAST_SPEECH_REPAIR_ROUTES
+            and not item.fast_speech
+        ):
+            item = item.model_copy(update={"fast_speech": fast_speech})
+            attached_to_item = True
+        updated_items.append(item)
+
+    metadata = dict(decision.metadata or {})
+    metadata.setdefault("fast_speech_repair", {})
+    if isinstance(metadata["fast_speech_repair"], dict):
+        metadata["fast_speech_repair"].update(
+            {
+                "stage": stage,
+                "model_generated": True,
+                "commitment": fast_speech.commitment,
+                "purpose": fast_speech.purpose,
+            }
+        )
+    reason = (f"{decision.reason}; " if decision.reason else "") + reason_suffix
+    return decision.model_copy(
+        update={
+            "fast_speech": fast_speech,
+            "routes": updated_items,
+            "metadata": metadata,
+            "reason": reason,
+        }
+    )
 
 
 def _capability_contract(item: dict[str, Any]) -> str:
@@ -254,6 +346,173 @@ def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
     if len(text) > max_chars:
         return text[:max_chars].rstrip() + "..."
     return text
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"", "0", "false", "no", "off"}
+
+
+def _short_hash(value: Any) -> str:
+    try:
+        text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    except TypeError:
+        text = str(value)
+    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:12]
+
+
+def _json_log(value: Any, *, max_chars: int = 1600) -> str:
+    return _bounded_json(value, max_chars=max_chars)
+
+
+def _metadata_keys(value: Any) -> list[str]:
+    return sorted(str(key) for key in value.keys()) if isinstance(value, dict) else []
+
+
+def _payload_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return []
+    return [message for message in messages if isinstance(message, dict)]
+
+
+def _payload_message_texts(payload: dict[str, Any]) -> tuple[str, str, str]:
+    system_parts: list[str] = []
+    user_parts: list[str] = []
+    all_parts: list[str] = []
+    for message in _payload_messages(payload):
+        content = str(message.get("content") or "")
+        all_parts.append(content)
+        role = str(message.get("role") or "")
+        if role == "system":
+            system_parts.append(content)
+        elif role == "user":
+            user_parts.append(content)
+    system = "\n".join(system_parts)
+    user = "\n".join(user_parts)
+    return system, user, "\n".join(all_parts)
+
+
+def _prompt_feature_flags(text: str) -> dict[str, bool]:
+    lowered = text.casefold()
+    return {
+        "has_fast_speech_contract": "fast_speech" in lowered,
+        "has_tool_route_contract": "route=tool" in lowered
+        or '"route":"tool"' in lowered
+        or '"route": "tool"' in lowered,
+        "has_weather_query_contract": "weather_query" in lowered,
+        "has_weather_tool_instruction": "weather" in lowered and "tool" in lowered,
+    }
+
+
+def _route_item_count(value: Any) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
+def _raw_router_output_summary(content: str) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "raw_chars": len(content or ""),
+        "raw_hash": _short_hash(content or ""),
+        "has_json": False,
+        "raw_route": None,
+        "raw_intent": None,
+        "raw_confidence": None,
+        "raw_fast_speech_present": False,
+        "raw_routes_count": 0,
+        "raw_metadata_keys": [],
+    }
+    try:
+        parsed = _extract_json_object(content or "")
+    except Exception as exc:
+        summary["parse_error"] = f"{type(exc).__name__}: {exc}"
+        return summary
+    metadata = parsed.get("metadata") if isinstance(parsed.get("metadata"), dict) else {}
+    route_items = _route_items_from_parsed(parsed)
+    summary.update(
+        {
+            "has_json": True,
+            "raw_route": str(parsed.get("route") or ""),
+            "raw_intent": str(parsed.get("intent") or ""),
+            "raw_confidence": parsed.get("confidence"),
+            "raw_routes_count": len(route_items),
+            "raw_actions_count": _route_item_count(parsed.get("actions")),
+            "raw_fast_speech_present": isinstance(parsed.get("fast_speech"), (dict, str))
+            or any(isinstance(item.get("fast_speech"), (dict, str)) for item in route_items)
+            or isinstance(metadata.get("fast_speech"), (dict, str)),
+            "raw_metadata_keys": _metadata_keys(metadata),
+            "raw_weather_query_present": isinstance(metadata.get("weather_query"), dict)
+            or any(
+                isinstance(
+                    (item.get("metadata") if isinstance(item.get("metadata"), dict) else {}).get("weather_query"),
+                    dict,
+                )
+                for item in route_items
+            ),
+            "raw_tool_name": metadata.get("tool_name"),
+        }
+    )
+    return summary
+
+
+def _catalog_observability_profile(request: RouteRequest | None) -> dict[str, Any]:
+    if request is None:
+        return {}
+    context = request.context if isinstance(request.context, dict) else {}
+    common = context.get("common_ability_catalog") or context.get("prompt_capabilities_common") or []
+    full = context.get("full_ability_catalog") or context.get("prompt_capabilities_all") or []
+    candidates = context.get("candidate_capabilities") or []
+    if not isinstance(common, list):
+        common = []
+    if not isinstance(full, list):
+        full = []
+    if not isinstance(candidates, list):
+        candidates = []
+
+    def capability_ids(items: list[Any]) -> list[str]:
+        ids: list[str] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            if capability_id:
+                ids.append(capability_id)
+        return ids
+
+    def filtered_ids(items: list[Any], needle: str) -> list[str]:
+        found: list[str] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            haystack = " ".join(
+                str(item.get(key) or "")
+                for key in (
+                    "capability_id",
+                    "skill_id",
+                    "route",
+                    "contract",
+                    "description",
+                    "effects",
+                    "safety_class",
+                )
+            ).casefold()
+            if needle in haystack:
+                capability_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+                if capability_id:
+                    found.append(capability_id)
+        return found
+
+    common_ids = capability_ids(common)
+    return {
+        "common_ability_count": len(common),
+        "full_ability_count": len(full),
+        "candidate_capability_count": len(candidates),
+        "common_catalog_hash": _short_hash(_bounded_json(common, max_chars=50000)),
+        "common_ability_sample": common_ids[:10],
+        "tool_like_ability_ids": filtered_ids(common, "tool")[:10],
+        "weather_like_ability_ids": filtered_ids(common, "weather")[:10],
+    }
 
 
 def _context_without_prompt_globals(context: dict[str, Any]) -> dict[str, Any]:
@@ -405,6 +664,8 @@ class OllamaLLMRouter:
         self.slow_review_recovery_enabled = slow_review_recovery_enabled
         self.num_predict = max(32, num_predict)
         self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "router_system.txt"
+        self.debug_raw_output = _env_flag("CHROMIE_ROUTER_DEBUG_RAW") or _env_flag("ROUTER_DEBUG_RAW")
+        self.debug_prompt = _env_flag("CHROMIE_ROUTER_DEBUG_PROMPT") or _env_flag("ROUTER_DEBUG_PROMPT")
 
     def load_system_prompt(self) -> str:
         try:
@@ -450,15 +711,17 @@ class OllamaLLMRouter:
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             "Output Template Preview:\n"
-            "- Chat/fact/greeting: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9}\n"
+            "- Chat/fact/greeting: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9,\"fast_speech\":{\"text\":\"I’ll think about that.\",\"purpose\":\"acknowledge\",\"commitment\":\"prelude_only\",\"must_not_claim_completion\":true}}\n"
             "- Fast greeting with direct speech: {\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.9,\"routes\":[{\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.9,\"lane\":\"immediate_speech\",\"context_profile\":\"fast_minimal\",\"direct_to_tts\":true,\"text\":\"Hi, I'm here.\"}]}\n"
             "- Mixed chat/memory/deepthought: {\"route\":\"deep_thought\",\"intent\":\"mixed_request\",\"confidence\":0.82,\"routes\":[{\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.95,\"lane\":\"immediate_speech\",\"context_profile\":\"fast_minimal\",\"direct_to_tts\":true,\"text\":\"Hi, I'm here.\"},{\"route\":\"memory\",\"intent\":\"remember_user_preference\",\"confidence\":0.86,\"lane\":\"post_turn\",\"context_profile\":\"session_compact\"},{\"route\":\"deep_thought\",\"intent\":\"plan_complex_task\",\"confidence\":0.78,\"lane\":\"deepthought\",\"context_profile\":\"full_mind\",\"requires_mind\":true}]}\n"
-            "- Single listed skill: {\"route\":\"robot_action\",\"intent\":\"capability:<exact skill_id>\",\"confidence\":0.9}\n"
+            "- Single listed skill: {\"route\":\"robot_action\",\"intent\":\"capability:<exact skill_id>\",\"confidence\":0.9,\"fast_speech\":{\"text\":\"I’ll check whether I can do that safely.\",\"purpose\":\"safety_prelude\",\"commitment\":\"needs_confirmation\",\"must_not_claim_completion\":true}}\n"
             "- Multiple listed skills: {\"route\":\"robot_action\",\"intent\":\"compound_common_catalog_task\",\"confidence\":0.9,\"actions\":[{\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential\",\"confidence\":0.9}]}\n"
-            "- Missing ability: {\"route\":\"deep_thought\",\"intent\":\"missing_or_unsupported_ability\",\"confidence\":0.6,\"metadata\":{\"desired_abilities\":[{\"ability_id\":\"...\",\"intent\":\"...\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"...\"}]}}\n"
-            "- Clarify: {\"route\":\"clarify\",\"intent\":\"clarify_target_or_skill\",\"confidence\":0.7}\n"
+            "- Missing ability: {\"route\":\"deep_thought\",\"intent\":\"missing_or_unsupported_ability\",\"confidence\":0.6,\"fast_speech\":{\"text\":\"I’ll check whether I have that ability.\",\"purpose\":\"thinking\",\"commitment\":\"prelude_only\",\"must_not_claim_completion\":true},\"metadata\":{\"desired_abilities\":[{\"ability_id\":\"...\",\"intent\":\"...\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"...\"}]}}\n"
+            "- Tool/weather lookup: {\"route\":\"tool\",\"intent\":\"weather_query\",\"confidence\":0.86,\"fast_speech\":{\"text\":\"OK, I’ll check the weather in <city or place> today.\",\"purpose\":\"acknowledge_and_check\",\"commitment\":\"checking_only\",\"must_not_claim_completion\":true},\"metadata\":{\"tool_name\":\"weather\",\"weather_query\":{\"location\":\"<city or place>\",\"date\":\"today\",\"units\":\"metric\"}}}\n"
+            "- Clarify/confirm: {\"route\":\"clarify\",\"intent\":\"clarify_target_or_skill\",\"confidence\":0.5,\"fast_speech\":{\"text\":\"I didn’t fully understand; what would you like me to do?\",\"purpose\":\"clarify\",\"commitment\":\"needs_confirmation\",\"must_not_claim_completion\":true}}\n"
             "The top-level route is a compatibility primary route. Use routes[] for multiple independent policy lanes; use actions[] only for ordered listed skills inside a robot_action route item.\n"
             "Multi-route contract: when one utterance contains independent needs, preserve them as separate routes[] items so immediate speech, memory, robot_action proposals, tools, and deep planning keep their own policy lane. Do not collapse independent lanes into one route, and do not put multi-lane work in actions[]; actions[] is only for ordered robot_action skills.\n"
+            "Uncertainty/confirmation rule: when the user-provided information is insufficient to decide what Chromie should do next, ask for confirmation or clarification instead of guessing. Short ASR fragments, isolated letters, unclear pronouns, truncated utterances, or weak lexical associations with a catalog skill are not enough evidence for robot_action unless recent context clearly supplies the missing meaning. If no listed skill clearly supports a requested physical action, do not substitute a similar skill; route the missing ability so Chromie can tell the user the capability is not currently available.\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=1400)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Affordance Grounding:\n"
@@ -467,8 +730,10 @@ class OllamaLLMRouter:
             "If the user asks Chromie to physically perform a listed body/head/gaze/motion/expression skill now, prefer robot_action with intent capability:<exact skill_id>. "
             "Do not delegate to deep_thought merely because the user used duration, distance, count, direction, speed, politeness, or casual wording when one listed skill semantically fits. "
             "For a single parameterized physical request, it is valid to select the exact skill by intent and leave detailed args for the downstream capability planner; use actions[] only when every action can carry valid args or no args are required. "
-            "For compound listed-skill requests, preserve each requested skill in actions instead of collapsing to the first skill; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful speak_first. "
+            "For compound listed-skill requests, preserve each requested skill in actions instead of collapsing to the first skill; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful fast_speech or speak_first. "
+            "Do not choose a physical skill from isolated letters, partial words, weak sound-alikes, or low-information ASR fragments; choose clarify with low calibrated confidence unless context clearly disambiguates the action. "
             "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
+            "Use route=tool for read-only external lookups such as current weather or forecast questions. For weather, use intent weather_query and include compact metadata.weather_query with location, date=today|tomorrow, and units=metric|imperial|auto when those fields are clear. Route=tool MUST include fast_speech that says you will check the requested location/date; do not answer weather from memory or claim tool results in fast_speech or speak_first. "
             "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the compact skill catalog. "
             "Catalog entries are context, not authorization: never claim physical completion, never invent abilities, and never output raw motor/joint/actuator/controller-array/torque commands. "
             "If no listed skill fits clearly, choose deep_thought or clarify and include metadata.desired_abilities with status missing_ability when useful.\n\n"
@@ -481,7 +746,7 @@ class OllamaLLMRouter:
             "Return one compact JSON object matching one of the templates above. Required compatibility keys: route, intent, confidence. You may also output routes[] for independent route items. "
             "Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
             "Omit agents, metadata, candidate_capabilities, and explanations unless they change downstream routing. "
-            "Each routes[] item may include route, intent, confidence, lane, context_profile, requires_mind, direct_to_tts, text, skill_id, args, actions, reason, and metadata. "
+            "Each routes[] item may include route, intent, confidence, lane, context_profile, requires_mind, direct_to_tts, text, fast_speech, skill_id, args, actions, reason, and metadata. "
             "Allowed lanes: immediate_speech, conversation, post_turn, deepthought, skill_runtime, tool, deterministic_control, none. "
             "Allowed context_profile values: none, fast_minimal, session_compact, capability_safety, full_mind. "
             "metadata.desired_abilities may contain understood but non-executable ability proposals; these are not executable actions. "
@@ -493,11 +758,71 @@ class OllamaLLMRouter:
             "Never put missing or planned abilities in actions; put them in metadata.desired_abilities and choose deep_thought or clarify. "
             "Set action confidence from semantic fit and argument confidence. "
             "If you include actions, use a semantic intent such as compound_common_catalog_task instead of a placeholder capability intent. "
-            "For uncertain deep_thought handoff, you may include speak_first with one short user-facing sentence in the user's language, such as a natural request for a moment to think. "
-            "Speak_first must sound like Chromie herself: an embodied robot with natural, human-like social warmth, not a program, programme, backend, software process, or language model. "
-            "Do not use speak_first to claim physical action, tool results, memory writes, or completion. "
+            "Include fast_speech for ordinary chat, memory, clarify, and deep_thought preludes when a short natural immediate response would help the user wait. For route=tool, fast_speech is required. Fast_speech is emitted before downstream work finishes, so it must be a process acknowledgement only: no final answers, no tool results, no memory-write claims, and no physical execution/completion claims. "
+            "For uncertain deep_thought handoff, you may include fast_speech or speak_first with one short user-facing sentence in the user's language, such as a natural request for a moment to think. "
+            "Fast_speech and speak_first must sound like Chromie herself: an embodied robot with natural, human-like social warmth, not a program, programme, backend, software process, or language model. "
+            "Do not use fast_speech or speak_first to claim physical action, tool results, memory writes, or completion. "
             "For chat/clarify/interrupt/ignore, do not set capability intent. For deep_thought, use a short semantic intent such as deep_thought_complex_reasoning. Confidence is 0.0-1.0."
         )
+
+    def build_fast_speech_repair_payload(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> dict[str, Any]:
+        decision_json = _bounded_json(
+            decision.model_dump(mode="json", exclude_none=True),
+            max_chars=2400,
+        )
+        abilities_json = _bounded_json(
+            _compact_candidate_capabilities(_review_capabilities_from_request(request), limit=12),
+            max_chars=1800,
+        )
+        session_context = _bounded_json(_router_prompt_context(request.context), max_chars=1200)
+        return {
+            "model": self.model,
+            "stream": False,
+            "think": False,
+            "format": "json",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Current Job:\n"
+                        "- You are Chromie's AI robot-brain fast-speech repairer.\n"
+                        "- A previous router decision selected a route that will use a downstream Agent/Tool and needs a short immediate user-facing prelude.\n"
+                        "- Generate only the missing fast_speech. Do not change route, intent, metadata, tool arguments, skills, or safety policy.\n"
+                        "- The text should sound like Chromie herself: natural, warm, concise, and in the user's language when clear.\n\n"
+                        "Safety Contract:\n"
+                        "- fast_speech is emitted before downstream work finishes.\n"
+                        "- It must be a process acknowledgement only, not a final answer.\n"
+                        "- Never claim a tool result, weather value, memory commit, physical movement, execution, or completion.\n"
+                        "- For weather/tool lookup, say that Chromie will check the requested location/date.\n"
+                        "- If location or date is unclear, ask a brief clarification instead of guessing.\n\n"
+                        "Output Contract:\n"
+                        "- Return compact JSON only.\n"
+                        "- Return exactly one key fast_speech.\n"
+                        "- Shape: {\"fast_speech\":{\"text\":\"...\",\"purpose\":\"acknowledge_and_check|clarify|thinking\",\"commitment\":\"checking_only|needs_confirmation|prelude_only\",\"must_not_claim_completion\":true}}\n"
+                        "- Do not output markdown, analysis, scratchpad, or any text outside JSON."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Latest user input: {request.text}\n"
+                        f"Language hint: {request.language or 'auto'}\n"
+                        f"Existing router decision JSON: {decision_json}\n"
+                        f"Bounded session context JSON: {session_context}\n"
+                        f"Common ability catalog JSON: {abilities_json}"
+                    ),
+                },
+            ],
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_predict": min(96, max(48, self.num_predict)),
+            },
+        }
 
     def build_payload(self, request: RouteRequest, *, relaxed_json: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -551,15 +876,19 @@ class OllamaLLMRouter:
                         "- Review the latest user input and decide whether the quick route should be chat, deep_thought, robot_action, tool, memory, clarify, interrupt, or ignore.\n"
                         "- Body/head/gaze/motion/expression requests are robot_action when an available interaction_executable common ability can satisfy them.\n"
                         "- Capability questions can be polite requests; if the user is pragmatically asking Chromie to perform a listed physical action now, choose robot_action.\n"
-                        "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless physical motion is explicitly requested.\n\n"
+                        "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless physical motion or tool lookup is explicitly requested.\n"
+                        "- Current or upcoming weather and forecast questions are tool work when a weather lookup capability is present. Use route=tool with intent=weather_query, not ordinary chat, and do not answer weather from memory.\n"
+                        "- For weather route metadata, include metadata.tool_name=weather and metadata.weather_query with location/date/units when clear from the user text.\n\n"
                         "- Use working memory, task context, and recent action history for follow-up resolution, but not as authorization for side effects.\n"
                         "- Choose deep_thought for complex reasoning, debugging, design, implementation planning, or multi-step task-session work.\n\n"
                         "Output Contract:\n"
-                        "- Return compact JSON only with keys route, intent, and confidence.\n"
+                        "- Return compact JSON only. Required keys are route, intent, and confidence; metadata and fast_speech are allowed when they change downstream routing or immediate user acknowledgement.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore.\n"
+                        "- fast_speech, when present, must be a short process acknowledgement only. It must not claim completion, physical execution, memory commit, or a tool result.\n"
+                        "- For weather, fast_speech may say that Chromie will check the requested location/date, for example that it will check today's weather for the city.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not choose interrupt or ignore unless the text is plainly stop, cancel, silence, empty, or unusable audio.\n"
-                        "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short semantic intent such as robot_action."
+                        "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short semantic intent such as robot_action or weather_query."
                     ),
                 },
                 {
@@ -606,12 +935,14 @@ class OllamaLLMRouter:
                         "- Decide from meaning and common ability descriptions, not phrase rules.\n\n"
                         "Task Context Group:\n"
                         "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
-                        "- Speech-only requests are chat.\n"
+                        "- Speech-only requests are chat. Current or upcoming weather/forecast lookup is tool work when a weather capability is present.\n"
+                        "- Use route=tool and intent=weather_query for weather lookup; include metadata.tool_name=weather and metadata.weather_query when location/date/units are clear.\n"
                         "- Use deep_thought for complex reasoning or planning that should leave the quick route path.\n\n"
                         "- Use task context and recent action history for follow-ups, but never as standalone authorization.\n\n"
                         "Output Contract:\n"
-                        "- Return compact JSON only with keys route, intent, and confidence.\n"
+                        "- Return compact JSON only with required keys route, intent, and confidence. metadata and fast_speech are allowed for tool lookups.\n"
                         "- Valid routes: chat, deep_thought, robot_action, tool, memory, clarify.\n"
+                        "- fast_speech must be a short process acknowledgement only; never claim tool results, physical completion, or memory commit.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
                         "- Do not use interrupt or ignore.\n"
                         "- For a selected capability, set intent to capability:<exact capability_id>.\n"
@@ -755,6 +1086,92 @@ class OllamaLLMRouter:
             },
         }
 
+    def _log_payload_profile(
+        self,
+        payload: dict[str, Any],
+        *,
+        stage: str,
+        request: RouteRequest | None = None,
+    ) -> None:
+        system_text, user_text, all_text = _payload_message_texts(payload)
+        profile = {
+            "stage": stage,
+            "sid": request.sid if request is not None else None,
+            "model": payload.get("model"),
+            "prompt_chars": self._payload_prompt_chars(payload),
+            "system_chars": len(system_text),
+            "user_chars": len(user_text),
+            "system_hash": _short_hash(system_text),
+            "user_hash": _short_hash(user_text),
+            "num_predict": (payload.get("options") or {}).get("num_predict"),
+            **_prompt_feature_flags(all_text),
+            **_catalog_observability_profile(request),
+        }
+        logger.info("router_prompt_profile %s", _json_log(profile, max_chars=2200))
+        if self.debug_prompt:
+            logger.info(
+                "router_prompt_debug stage=%s sid=%s system=%r user=%r",
+                stage,
+                request.sid if request is not None else None,
+                system_text[:12000],
+                user_text[:12000],
+            )
+
+    def _log_response_summary(
+        self,
+        data: dict[str, Any],
+        *,
+        stage: str,
+        request: RouteRequest | None = None,
+    ) -> None:
+        content = str(data.get("message", {}).get("content") or "")
+        summary = {
+            "stage": stage,
+            "sid": request.sid if request is not None else None,
+            "model": data.get("model"),
+            "done": data.get("done"),
+            "done_reason": data.get("done_reason"),
+            "prompt_eval_count": data.get("prompt_eval_count"),
+            "eval_count": data.get("eval_count"),
+            **_raw_router_output_summary(content),
+        }
+        logger.info("router_llm_raw_summary %s", _json_log(summary, max_chars=2200))
+        if self.debug_raw_output:
+            logger.info(
+                "router_llm_raw_output stage=%s sid=%s raw=%r",
+                stage,
+                request.sid if request is not None else None,
+                content[:8000],
+            )
+
+    def _log_decision_summary(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+        *,
+        stage: str,
+        raw_summary: dict[str, Any] | None = None,
+    ) -> None:
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        summary = {
+            "stage": stage,
+            "sid": request.sid,
+            "raw_route": (raw_summary or {}).get("raw_route"),
+            "raw_intent": (raw_summary or {}).get("raw_intent"),
+            "raw_fast_speech_present": (raw_summary or {}).get("raw_fast_speech_present"),
+            "raw_routes_count": (raw_summary or {}).get("raw_routes_count"),
+            "final_route": decision.route,
+            "final_intent": decision.intent,
+            "final_confidence": decision.confidence,
+            "final_fast_speech_present": decision.fast_speech is not None,
+            "final_routes_count": len(decision.routes or []),
+            "metadata_keys": sorted(str(key) for key in metadata.keys())[:24],
+            "changed_route": bool(raw_summary and (raw_summary.get("raw_route") not in {None, "", decision.route})),
+            "changed_intent": bool(raw_summary and (raw_summary.get("raw_intent") not in {None, "", decision.intent})),
+            "reason": decision.reason,
+        }
+        logger.info("router_normalize_result %s", _json_log(summary, max_chars=2200))
+
     async def _chat(self, payload: dict[str, Any]) -> dict[str, Any]:
         timeout_s = self.timeout_s
         if self.review_model and str(payload.get("model") or "") == self.review_model:
@@ -775,6 +1192,18 @@ class OllamaLLMRouter:
             )
         return data
 
+    async def _chat_logged(
+        self,
+        payload: dict[str, Any],
+        *,
+        stage: str,
+        request: RouteRequest | None = None,
+    ) -> dict[str, Any]:
+        self._log_payload_profile(payload, stage=stage, request=request)
+        data = await self._chat(payload)
+        self._log_response_summary(data, stage=stage, request=request)
+        return data
+
     @staticmethod
     def _payload_prompt_chars(payload: dict[str, Any]) -> int:
         total = 0
@@ -783,8 +1212,15 @@ class OllamaLLMRouter:
                 total += len(str(message.get("content") or ""))
         return total
 
-    def _decision_from_response(self, request: RouteRequest, data: dict[str, Any]) -> RouteDecision:
+    def _decision_from_response(
+        self,
+        request: RouteRequest,
+        data: dict[str, Any],
+        *,
+        stage: str = "llm",
+    ) -> RouteDecision:
         content = data.get("message", {}).get("content", "")
+        raw_summary = _raw_router_output_summary(str(content or ""))
         parsed = _extract_json_object(content)
         route_items = _route_items_from_parsed(parsed)
         dominant_route = _dominant_route_from_items(route_items)
@@ -813,27 +1249,29 @@ class OllamaLLMRouter:
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
             ) + "LLM returned intent-only route JSON; router normalized route"
         elif "route" not in parsed and intent_capability_id:
-            parsed["route"] = "robot_action"
+            parsed["route"] = _route_for_capability_id(intent_capability_id, request)
             parsed["intent"] = f"capability:{intent_capability_id}"
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
-            ) + "LLM returned intent-only skill JSON; router normalized skill route"
+            ) + "LLM returned intent-only capability JSON; router normalized capability route"
         elif route_value and route_value not in ROUTE_NAMES and (
             routed_capability_id or intent_capability_id
         ):
             selected_capability_id = routed_capability_id or intent_capability_id
-            parsed["route"] = "robot_action"
+            parsed["route"] = _route_for_capability_id(selected_capability_id, request)
             parsed["intent"] = f"capability:{selected_capability_id}"
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
-            ) + "LLM returned skill id in route field; router normalized skill route"
+            ) + "LLM returned capability/skill id in route field; router normalized capability route"
         if "confidence" not in parsed and parsed.get("route") not in {"interrupt", "ignore"}:
             parsed["confidence"] = max(0.72, self.confidence_threshold)
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
             ) + "LLM returned route-only JSON; router applied default confidence"
         decision = RouteDecision.model_validate(parsed)
-        return finalize_decision(decision, request, source="llm")
+        finalized = finalize_decision(decision, request, source="llm")
+        self._log_decision_summary(request, finalized, stage=stage, raw_summary=raw_summary)
+        return finalized
 
     async def _review_route_only_robot_action(
         self,
@@ -846,8 +1284,8 @@ class OllamaLLMRouter:
             return decision
 
         try:
-            reviewed = await self._chat(self.build_intent_review_payload(request))
-            reviewed_decision = self._decision_from_response(request, reviewed)
+            reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
+            reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
         except Exception as exc:
             raw_content = ""
             if isinstance(locals().get("reviewed"), dict):
@@ -887,6 +1325,71 @@ class OllamaLLMRouter:
             return reviewed_decision
         return decision
 
+    async def _repair_missing_fast_speech(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        if not _decision_needs_router_fast_speech(decision):
+            return decision
+        if not self.slow_review_recovery_enabled:
+            logger.info(
+                "router_fast_speech_missing route=%s intent=%s repair=disabled",
+                decision.route,
+                decision.intent,
+            )
+            return decision
+        logger.info(
+            "router_fast_speech_repair_start route=%s intent=%s sid=%s",
+            decision.route,
+            decision.intent,
+            request.sid,
+        )
+        try:
+            data = await self._chat_logged(
+                self.build_fast_speech_repair_payload(request, decision),
+                stage="fast_speech_repair",
+                request=request,
+            )
+            parsed = _extract_json_object(str(data.get("message", {}).get("content") or ""))
+            raw_fast_speech = parsed.get("fast_speech")
+            if raw_fast_speech is None:
+                logger.info(
+                    "router_fast_speech_repair_done route=%s intent=%s added=false reason=model_returned_null",
+                    decision.route,
+                    decision.intent,
+                )
+                return decision
+            fast_speech = FastSpeech.model_validate(raw_fast_speech)
+            if not str(fast_speech.text or "").strip():
+                logger.info(
+                    "router_fast_speech_repair_done route=%s intent=%s added=false reason=empty_text",
+                    decision.route,
+                    decision.intent,
+                )
+                return decision
+        except Exception as exc:
+            logger.warning(
+                "router_fast_speech_repair_failed route=%s intent=%s error=%s",
+                decision.route,
+                decision.intent,
+                exc,
+            )
+            return decision
+        repaired = _decision_with_router_fast_speech(
+            decision,
+            fast_speech,
+            reason_suffix="router_llm repaired missing fast_speech",
+            stage="fast_speech_repair",
+        )
+        logger.info(
+            "router_fast_speech_repair_done route=%s intent=%s added=true text_chars=%s",
+            decision.route,
+            decision.intent,
+            len(fast_speech.text),
+        )
+        return repaired
+
     async def _review_ambiguous_deep_thought(
         self,
         request: RouteRequest,
@@ -899,8 +1402,8 @@ class OllamaLLMRouter:
         if decision.reason or decision.intent not in {"", "unknown"}:
             return decision
         try:
-            reviewed = await self._chat(self.build_intent_review_payload(request))
-            reviewed_decision = self._decision_from_response(request, reviewed)
+            reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
+            reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
         except Exception as exc:
             logger.warning("LLM review model ambiguous deep_thought check failed: %s", exc)
             return decision
@@ -939,8 +1442,8 @@ class OllamaLLMRouter:
             )
         if self.slow_review_recovery_enabled and self.review_model:
             try:
-                reviewed = await self._chat(self.build_intent_review_payload(request))
-                reviewed_decision = self._decision_from_response(request, reviewed)
+                reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
+                reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
             except Exception as exc:
                 logger.warning("LLM review model deterministic-only recovery failed: %s", exc)
             else:
@@ -961,8 +1464,8 @@ class OllamaLLMRouter:
                         decision.route,
                     )
         try:
-            repaired = await self._chat(self.build_deterministic_route_repair_payload(request))
-            repaired_decision = self._decision_from_response(request, repaired)
+            repaired = await self._chat_logged(self.build_deterministic_route_repair_payload(request), stage="deterministic_route_repair", request=request)
+            repaired_decision = self._decision_from_response(request, repaired, stage="deterministic_route_repair")
         except Exception as exc:
             logger.warning("LLM fast route repair failed: %s", exc)
         else:
@@ -998,8 +1501,8 @@ class OllamaLLMRouter:
                 reason=f"{reason_prefix}; slow repair disabled",
             )
         try:
-            repaired = await self._chat(self.build_placeholder_capability_repair_payload(request))
-            repaired_decision = self._decision_from_response(request, repaired)
+            repaired = await self._chat_logged(self.build_placeholder_capability_repair_payload(request), stage="placeholder_capability_repair", request=request)
+            repaired_decision = self._decision_from_response(request, repaired, stage="placeholder_capability_repair")
         except Exception as exc:
             logger.warning("LLM placeholder capability repair failed: %s", exc)
         else:
@@ -1024,10 +1527,12 @@ class OllamaLLMRouter:
         request: RouteRequest,
         interrupt_decision: RouteDecision,
     ) -> RouteDecision:
-        data = await self._chat(
-            self.build_post_interrupt_review_payload(request, interrupt_decision)
+        data = await self._chat_logged(
+            self.build_post_interrupt_review_payload(request, interrupt_decision),
+            stage="post_interrupt_review",
+            request=request,
         )
-        decision = self._decision_from_response(request, data)
+        decision = self._decision_from_response(request, data, stage="post_interrupt_review")
         if decision.route == "interrupt":
             decision.intent = "stop_current_output"
             decision.reason = (
@@ -1107,13 +1612,13 @@ class OllamaLLMRouter:
         payload = self.build_payload(request)
 
         try:
-            data = await self._chat(payload)
+            data = await self._chat_logged(payload, stage="quick_intent", request=request)
         except Exception as exc:
             logger.warning("Ollama router request failed: %s: %s", type(exc).__name__, exc)
             if self.slow_review_recovery_enabled and self.review_model:
                 try:
-                    reviewed = await self._chat(self.build_intent_review_payload(request))
-                    reviewed_decision = self._decision_from_response(request, reviewed)
+                    reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
+                    reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
                 except Exception as review_exc:
                     logger.warning("LLM review model primary-error recovery failed: %s", review_exc)
                 else:
@@ -1135,12 +1640,12 @@ class OllamaLLMRouter:
         content = ""
         try:
             content = data.get("message", {}).get("content", "")
-            decision = self._decision_from_response(request, data)
+            decision = self._decision_from_response(request, data, stage="quick_intent")
         except (ValueError, ValidationError) as exc:
             logger.warning("Invalid LLM router response: %s; content=%r", exc, content[:500])
             try:
-                relaxed = await self._chat(self.build_payload(request, relaxed_json=True))
-                decision = self._decision_from_response(request, relaxed)
+                relaxed = await self._chat_logged(self.build_payload(request, relaxed_json=True), stage="quick_intent_relaxed", request=request)
+                decision = self._decision_from_response(request, relaxed, stage="quick_intent_relaxed")
                 logger.info("LLM router recovered with relaxed JSON response")
             except Exception as relaxed_exc:
                 logger.warning("Relaxed LLM router retry failed: %s", relaxed_exc)
@@ -1171,9 +1676,11 @@ class OllamaLLMRouter:
         decision = await self._review_route_only_robot_action(request, decision)
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:
-            return await self._recover_deterministic_only_decision(request, decision)
+            recovered = await self._recover_deterministic_only_decision(request, decision)
+            return await self._repair_missing_fast_speech(request, recovered)
 
         if decision.route == "robot_action" and _is_placeholder_capability_intent(decision.intent):
-            return await self._recover_placeholder_capability_decision(request, decision)
+            recovered = await self._recover_placeholder_capability_decision(request, decision)
+            return await self._repair_missing_fast_speech(request, recovered)
 
-        return decision
+        return await self._repair_missing_fast_speech(request, decision)

@@ -15,6 +15,20 @@ class RouteRequest(BaseModel):
     context: dict[str, Any] = Field(default_factory=dict)
 
 
+class FastSpeech(BaseModel):
+    """A short Router-generated user-facing prelude for fast-first TTS.
+
+    This is a process acknowledgement, not an answer, tool result, memory commit,
+    or physical execution claim.
+    """
+
+    text: str = ""
+    purpose: str | None = None
+    language: str | None = None
+    commitment: str | None = None
+    must_not_claim_completion: bool = True
+
+
 class RouteItem(BaseModel):
     route: RouteName
     intent: str = "unknown"
@@ -25,6 +39,7 @@ class RouteItem(BaseModel):
     requires_mind: bool = False
     direct_to_tts: bool = False
     text: str | None = None
+    fast_speech: FastSpeech | None = None
     skill_id: str | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     actions: list[dict[str, Any]] = Field(default_factory=list)
@@ -44,6 +59,7 @@ class RouteDecision(BaseModel):
     needs_agent: bool = True
     should_speak: bool = True
     speak_first: str | None = None
+    fast_speech: FastSpeech | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None

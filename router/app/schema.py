@@ -51,6 +51,20 @@ class RouteRequest(BaseModel):
         return (value or "").strip()
 
 
+class FastSpeech(BaseModel):
+    """A short Router-generated user-facing prelude for fast-first TTS.
+
+    This is a process acknowledgement, not an answer, tool result, memory commit,
+    or physical execution claim.
+    """
+
+    text: str = ""
+    purpose: str | None = None
+    language: str | None = None
+    commitment: str | None = None
+    must_not_claim_completion: bool = True
+
+
 class RouteItem(BaseModel):
     """One semantic route item inside a multi-route decision.
 
@@ -68,6 +82,7 @@ class RouteItem(BaseModel):
     requires_mind: bool = False
     direct_to_tts: bool = False
     text: str | None = None
+    fast_speech: FastSpeech | None = None
     skill_id: str | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     actions: list[dict[str, Any]] = Field(default_factory=list)
@@ -89,6 +104,7 @@ class RouteDecision(BaseModel):
     needs_agent: bool = True
     should_speak: bool = True
     speak_first: str | None = None
+    fast_speech: FastSpeech | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
@@ -344,6 +360,7 @@ def _default_route_item(decision: RouteDecision) -> RouteItem:
         requires_mind=requires_mind,
         direct_to_tts=direct_to_tts,
         text=decision.speak_first if direct_to_tts else None,
+        fast_speech=decision.fast_speech,
         actions=list(decision.actions or []),
         reason=decision.reason,
     )
@@ -447,6 +464,8 @@ def _route_item_extra(item: RouteItem, index: int) -> dict[str, Any]:
     }
     if item.text:
         extra["text"] = item.text
+    if item.fast_speech:
+        extra["fast_speech"] = item.fast_speech.model_dump(mode="json", exclude_none=True)
     if item.skill_id:
         extra["capability_id"] = item.skill_id
         extra["args"] = item.args

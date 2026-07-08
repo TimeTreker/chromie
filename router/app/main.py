@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any, Literal
@@ -199,6 +200,174 @@ async def routes() -> dict:
         ],
     }
 
+
+
+def _normalized_information_units(text: str) -> str:
+    """Return compact user-visible information units for ambiguity gating.
+
+    This is not semantic routing. It only detects whether an ASR final text has
+    enough evidence to safely authorize side-effect lanes such as robot_action.
+    """
+
+    return "".join(re.findall(r"[\w\u4e00-\u9fff]+", text or "", flags=re.UNICODE))
+
+
+def _has_strong_followup_context(request: RouteRequest) -> bool:
+    context = request.context or {}
+    for key in (
+        "pending_confirmation",
+        "active_confirmation",
+        "confirmation_id",
+        "awaiting_user_choice",
+        "last_clarification_prompt",
+    ):
+        value = context.get(key)
+        if value:
+            return True
+    pending_tasks = context.get("pending_tasks")
+    if isinstance(pending_tasks, list) and pending_tasks:
+        return True
+    return False
+
+
+def _is_low_information_asr_fragment(request: RouteRequest) -> bool:
+    units = _normalized_information_units(request.text)
+    if not units:
+        return True
+    if _has_strong_followup_context(request):
+        return False
+    # Single letters, single CJK characters, and tiny alphanumeric fragments are
+    # often ASR remnants. They may be valid answers only when recent context
+    # explicitly provides that choice, so they must not trigger body/tool/memory
+    # side effects by themselves.
+    if len(units) <= 1:
+        return True
+    if len(units) <= 2 and units.isascii() and units.isalnum():
+        return True
+    return False
+
+
+def _clarify_insufficient_information_decision(
+    request: RouteRequest,
+    decision: RouteDecision,
+    *,
+    reason: str,
+) -> RouteDecision:
+    language = request.language or decision.language or "auto"
+    heard = " ".join((request.text or "").strip().split())
+    if language.startswith("zh"):
+        speak_first = f"我只听到“{heard}”，你想让我做什么？" if heard else "我没有听清，你想让我做什么？"
+    else:
+        speak_first = f'I only heard "{heard}". What would you like me to do?' if heard else "I did not catch that. What would you like me to do?"
+    return finalize_decision(
+        RouteDecision(
+            route="clarify",
+            agents=["speaker_agent"],
+            intent="clarify_insufficient_information",
+            confidence=0.0,
+            language=language,
+            priority="normal",
+            needs_agent=True,
+            should_speak=True,
+            speak_first=speak_first,
+            fast_speech={
+                "text": speak_first,
+                "purpose": "clarify",
+                "commitment": "needs_confirmation",
+                "must_not_claim_completion": True,
+            },
+            candidate_capabilities=list(decision.candidate_capabilities),
+            reason=reason,
+            source="llm",
+            metadata={
+                **(decision.metadata or {}),
+                "confidence_calibration": {
+                    "status": "downgraded_to_clarify",
+                    "reason": reason,
+                    "model_route": decision.route,
+                    "model_intent": decision.intent,
+                    "model_confidence": decision.confidence,
+                    "input_units": _normalized_information_units(request.text),
+                },
+            },
+        ),
+        request,
+        source="llm",
+    )
+
+
+def _missing_capability_decision(
+    request: RouteRequest,
+    *,
+    raw_intent: str,
+    reason: str,
+) -> RouteDecision:
+    language = request.language or "auto"
+    if language.startswith("zh"):
+        speak_first = "我没有找到能安全执行这个动作的对应技能，所以不会猜一个相似动作来做。"
+    else:
+        speak_first = "I do not have a matching skill for that action, so I will not guess a similar movement."
+    desired_intent = (request.text or raw_intent or "requested action").strip()[:160]
+    return finalize_decision(
+        RouteDecision(
+            route="clarify",
+            agents=["speaker_agent"],
+            intent="missing_or_unsupported_ability",
+            confidence=0.0,
+            language=language,
+            priority="normal",
+            needs_agent=True,
+            should_speak=True,
+            speak_first=speak_first,
+            fast_speech={
+                "text": speak_first,
+                "purpose": "clarify",
+                "commitment": "needs_confirmation",
+                "must_not_claim_completion": True,
+            },
+            candidate_capabilities=[],
+            reason=reason,
+            source="llm",
+            metadata={
+                "desired_abilities": [
+                    {
+                        "ability_id": "unknown_body_action",
+                        "intent": desired_intent,
+                        "status": "missing_ability",
+                        "confidence": 0.0,
+                        "reason": reason,
+                    }
+                ],
+                "capability_grounding": {
+                    "status": "missing_capability",
+                    "model_intent": raw_intent,
+                    "user_text": request.text,
+                    "reason": reason,
+                },
+            },
+        ),
+        request,
+        source="llm",
+    )
+
+
+def _guard_low_information_side_effect(
+    request: RouteRequest,
+    decision: RouteDecision,
+) -> RouteDecision | None:
+    side_effect_routes = {"robot_action", "tool", "memory"}
+    has_side_effect_route = decision.route in side_effect_routes or any(
+        item.route in side_effect_routes for item in (decision.routes or [])
+    )
+    if not has_side_effect_route:
+        return None
+    if not _is_low_information_asr_fragment(request):
+        return None
+    return _clarify_insufficient_information_decision(
+        request,
+        decision,
+        reason="low_information_asr_fragment_for_side_effect_route",
+    )
 
 def _capability_id(item: dict) -> str:
     return str(item.get("capability_id") or "").strip()
@@ -613,6 +782,12 @@ def _validate_llm_capability_decision(
                 ),
             )
         selected = by_id.get(selected_id)
+        if selected_id and selected is None:
+            return _fallback_unmatched_robot_action(
+                request,
+                raw_intent=raw_intent,
+                reason="llm_robot_action_unknown_catalog_skill",
+            )
         if selected_id and common_ability_ids and selected_id not in common_ability_ids:
             return _deep_thought_from_low_confidence(
                 request,
@@ -622,7 +797,7 @@ def _validate_llm_capability_decision(
                     f"ability catalog: {selected_id}"
                 ),
             )
-        if selected_id and (selected is None or not _capability_executable(selected)):
+        if selected_id and not _capability_executable(selected):
             executable = _interaction_executable_candidates(result)
             if not executable:
                 return _fallback_unmatched_robot_action(
@@ -826,8 +1001,9 @@ def _fallback_unmatched_robot_action(
     raw_intent: str,
     reason: str,
 ) -> RouteDecision:
-    return fallback_decision(
+    return _missing_capability_decision(
         request,
+        raw_intent=raw_intent,
         reason=(
             f"{reason}: no query-matched capability can support quick "
             f"robot_action intent {raw_intent or '<empty>'!r}"
@@ -1115,7 +1291,13 @@ async def route(request: RouteRequest) -> RouteDecision:
         if settings.mode in ("llm_only", "hybrid"):
             llm_decision = await llm_router.route(request)
             if llm_decision.source == "llm":
-                if llm_decision.route in {"interrupt", "ignore"}:
+                side_effect_guard = _guard_low_information_side_effect(
+                    request,
+                    llm_decision,
+                )
+                if side_effect_guard is not None:
+                    decision = side_effect_guard
+                elif llm_decision.route in {"interrupt", "ignore"}:
                     decision = _recover_invalid_operational_llm_decision(
                         request,
                         llm_decision,

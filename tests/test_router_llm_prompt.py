@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import unittest
 
-from router.app.llm_router import OllamaLLMRouter
+from router.app.llm_router import (
+    OllamaLLMRouter,
+    _catalog_observability_profile,
+    _payload_message_texts,
+    _prompt_feature_flags,
+    _raw_router_output_summary,
+)
 from router.app.schema import RouteDecision, RouteRequest
 
 
@@ -35,6 +41,12 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("fast lane splitter", prompt)
         self.assertIn("intent broadly", prompt)
         self.assertIn("Route Taxonomy", prompt)
+        self.assertIn("current or changing information", prompt)
+        self.assertIn("such as weather", prompt)
+        self.assertIn("Tool Grounding", prompt)
+        self.assertIn("intent=weather_query", prompt)
+        self.assertIn("metadata.weather_query", prompt)
+        self.assertIn("Do not answer the weather from memory", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("multi-step", prompt)
         self.assertIn("task creation", prompt)
@@ -49,6 +61,10 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("independent needs", prompt)
         self.assertIn("Do not collapse", prompt)
         self.assertIn("multi-lane work", prompt)
+        self.assertIn("Uncertainty And Confirmation Acting Rule", prompt)
+        self.assertIn("ask for confirmation or clarification", prompt)
+        self.assertIn("weak lexical association", prompt)
+        self.assertIn("do not substitute a similar skill", prompt)
         self.assertIn("Memory And Task Context", prompt)
         self.assertIn("Working memory, task context, and recent action history", prompt)
         self.assertIn("Metadata is optional", prompt)
@@ -67,6 +83,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("chromie.speak", prompt)
         self.assertIn("confidence", prompt)
         self.assertIn("agreement/disagreement", prompt)
+        self.assertIn("weather_query", prompt)
         self.assertIn("Catalog entries", prompt)
         self.assertIn("not authorization", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
@@ -82,9 +99,57 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Chat/fact/greeting template", prompt)
         self.assertIn("Single listed skill template", prompt)
         self.assertIn("Compound listed skill template", prompt)
+        self.assertIn("Clarify / confirmation template", prompt)
+        self.assertIn("too short, ambiguous", prompt)
         self.assertIn("Do not", prompt)
         self.assertIn("chain-of-thought", prompt)
         self.assertIn("progress text", prompt)
+
+
+    def test_router_observability_profiles_prompt_and_raw_weather_output(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            sid="weather-sid",
+            text="今天重庆天气怎么样？",
+            language="zh-CN",
+            context={
+                "prompt_capabilities_common": [
+                    {
+                        "capability_id": "soridormi.blink_eyes",
+                        "description": "Blink the robot eyes.",
+                        "route": "robot_action",
+                        "prompt_tier": "common",
+                        "interaction_executable": True,
+                    }
+                ]
+            },
+        )
+
+        payload = router.build_payload(request)
+        system_text, user_text, all_text = _payload_message_texts(payload)
+        flags = _prompt_feature_flags(all_text)
+        catalog_profile = _catalog_observability_profile(request)
+        raw_summary = _raw_router_output_summary(
+            '{"route":"tool","intent":"weather_query","confidence":0.9,'
+            '"fast_speech":{"text":"好的，我查一下重庆今天的天气。"},'
+            '"metadata":{"tool_name":"weather","weather_query":{"location":"重庆","date":"today"}}}'
+        )
+
+        self.assertIn("Tool Grounding", system_text)
+        self.assertIn("今天重庆天气怎么样？", user_text)
+        self.assertTrue(flags["has_fast_speech_contract"])
+        self.assertTrue(flags["has_tool_route_contract"])
+        self.assertTrue(flags["has_weather_query_contract"])
+        self.assertEqual(catalog_profile["common_ability_count"], 1)
+        self.assertEqual(raw_summary["raw_route"], "tool")
+        self.assertEqual(raw_summary["raw_intent"], "weather_query")
+        self.assertTrue(raw_summary["raw_fast_speech_present"])
+        self.assertTrue(raw_summary["raw_weather_query_present"])
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
         router = OllamaLLMRouter(
@@ -192,6 +257,15 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("separate routes[] items", prompt)
         self.assertIn("Do not collapse independent lanes into one route", prompt)
         self.assertIn("actions[] is only for ordered robot_action skills", prompt)
+        self.assertIn("Uncertainty/confirmation rule", prompt)
+        self.assertIn("insufficient to decide", prompt)
+        self.assertIn("Short ASR fragments", prompt)
+        self.assertIn("do not substitute a similar skill", prompt)
+        self.assertIn("fast_speech", prompt)
+        self.assertIn("process acknowledgement", prompt)
+        self.assertIn("checking_only", prompt)
+        self.assertIn("Tool/weather lookup", prompt)
+        self.assertIn("OK, I’ll check the weather", prompt)
         self.assertIn("Single listed skill", prompt)
         self.assertIn("Multiple listed skills", prompt)
         self.assertIn("Mixed chat/memory/deepthought", prompt)
@@ -205,6 +279,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("duration, distance, count, direction, speed", prompt)
         self.assertIn("single parameterized physical request", prompt)
         self.assertIn("downstream capability planner", prompt)
+        self.assertIn("Do not choose a physical skill from isolated letters", prompt)
+        self.assertIn("low-information ASR fragments", prompt)
         self.assertNotIn("Semantic Examples", prompt)
         self.assertNotIn("no executable blink skill is in the compact skill catalog", prompt)
         self.assertIn("Bounded session, memory, task, and robot/world context JSON", prompt)
@@ -546,6 +622,68 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(decision.route, "chat")
         self.assertGreaterEqual(decision.confidence, 0.72)
         self.assertIn("default confidence", decision.reason or "")
+
+    def test_intent_only_weather_capability_uses_tool_route(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="今天重庆天气怎么样？",
+            language="zh-CN",
+            context={
+                "prompt_capabilities_common": [
+                    {
+                        "capability_id": "chromie.weather.lookup",
+                        "description": "Read current weather or forecast for a city.",
+                        "route": "tool",
+                        "prompt_tier": "common",
+                    }
+                ]
+            },
+        )
+
+        decision = router._decision_from_response(
+            request,
+            {"message": {"content": '{"intent":"capability:chromie.weather.lookup","confidence":0.9}'}},
+        )
+
+        self.assertEqual(decision.route, "tool")
+        self.assertEqual(decision.intent, "capability:chromie.weather.lookup")
+        self.assertIn("normalized capability route", decision.reason or "")
+
+    def test_skill_id_route_weather_capability_uses_tool_route(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="今天重庆天气怎么样？",
+            language="zh-CN",
+            context={
+                "prompt_capabilities_common": [
+                    {
+                        "capability_id": "chromie.weather.lookup",
+                        "description": "Read current weather or forecast for a city.",
+                        "route": "tool",
+                        "prompt_tier": "common",
+                    }
+                ]
+            },
+        )
+
+        decision = router._decision_from_response(
+            request,
+            {"message": {"content": '{"route":"chromie.weather.lookup","confidence":0.9}'}},
+        )
+
+        self.assertEqual(decision.route, "tool")
+        self.assertEqual(decision.intent, "capability:chromie.weather.lookup")
+        self.assertIn("normalized capability route", decision.reason or "")
 
     def test_llm_router_accepts_deep_thought_route(self) -> None:
         router = OllamaLLMRouter(
@@ -1518,6 +1656,143 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
         self.assertIn("placeholder capability intent", decision.reason or "")
+
+
+    async def test_tool_route_missing_fast_speech_is_repaired_by_router_llm(self) -> None:
+        class WeatherRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.stages: list[str] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                system = str(payload["messages"][0].get("content") or "")
+                stage = "fast_speech_repair" if "fast-speech repairer" in system else "primary_router"
+                self.stages.append(stage)
+                if stage == "fast_speech_repair":
+                    return {
+                        "message": {
+                            "content": (
+                                '{"fast_speech":{"text":"好的，我查一下重庆今天的天气。",'
+                                '"purpose":"acknowledge_and_check",'
+                                '"commitment":"checking_only",'
+                                '"must_not_claim_completion":true}}'
+                            )
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"tool","intent":"weather_query","confidence":0.95,'
+                            '"metadata":{"tool_name":"weather",'
+                            '"weather_query":{"location":"重庆","date":"today","units":"metric"}}}'
+                        )
+                    }
+                }
+
+        router = WeatherRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="今天重庆天气怎么样？",
+                language="zh-CN",
+                context={
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "effects": ["external_read", "weather_lookup"],
+                            "description": "Retrieve current weather or forecast for a city.",
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "tool")
+        self.assertEqual(decision.intent, "weather_query")
+        self.assertIsNotNone(decision.fast_speech)
+        self.assertEqual(decision.fast_speech.text, "好的，我查一下重庆今天的天气。")
+        self.assertEqual(decision.fast_speech.commitment, "checking_only")
+        self.assertIn("fast_speech_repair", decision.metadata)
+        self.assertEqual(router.stages, ["primary_router", "fast_speech_repair"])
+
+    async def test_tool_route_existing_fast_speech_does_not_repair(self) -> None:
+        class WeatherRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.stages: list[str] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.stages.append("primary_router")
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"tool","intent":"weather_query","confidence":0.95,'
+                            '"fast_speech":{"text":"好的，我查一下重庆今天的天气。",'
+                            '"purpose":"acknowledge_and_check","commitment":"checking_only",'
+                            '"must_not_claim_completion":true},'
+                            '"metadata":{"tool_name":"weather",'
+                            '"weather_query":{"location":"重庆","date":"today","units":"metric"}}}'
+                        )
+                    }
+                }
+
+        router = WeatherRouter()
+        decision = await router.route(RouteRequest(text="今天重庆天气怎么样？", language="zh-CN"))
+
+        self.assertEqual(decision.route, "tool")
+        self.assertIsNotNone(decision.fast_speech)
+        self.assertEqual(router.stages, ["primary_router"])
+
+    def test_fast_speech_repair_payload_preserves_route_and_forbids_results(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="今天重庆天气怎么样？",
+            language="zh-CN",
+            context={
+                "common_ability_catalog": [
+                    {
+                        "capability_id": "chromie.weather.lookup",
+                        "route": "tool",
+                        "effects": ["external_read", "weather_lookup"],
+                        "description": "Retrieve current weather or forecast for a city.",
+                    }
+                ]
+            },
+        )
+        decision = RouteDecision(
+            route="tool",
+            intent="weather_query",
+            confidence=0.95,
+            metadata={
+                "tool_name": "weather",
+                "weather_query": {"location": "重庆", "date": "today", "units": "metric"},
+            },
+        )
+
+        payload = router.build_fast_speech_repair_payload(request, decision)
+        rendered = "\n".join(str(message.get("content") or "") for message in payload["messages"])
+
+        self.assertIn("fast-speech repairer", rendered)
+        self.assertIn("Do not change route", rendered)
+        self.assertIn("will check the requested location/date", rendered)
+        self.assertIn("Never claim a tool result", rendered)
+        self.assertIn("今天重庆天气怎么样", rendered)
+        self.assertIn("weather_query", rendered)
 
 
 if __name__ == "__main__":

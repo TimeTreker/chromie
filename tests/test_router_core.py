@@ -105,6 +105,38 @@ class RouterCoreTests(unittest.TestCase):
                 self.assertEqual(decision.source, "fallback")
                 self.assertTrue(decision.needs_agent)
 
+
+    def test_route_decision_preserves_fast_speech_contract(self) -> None:
+        from router.app.schema import RouteDecision
+
+        decision = RouteDecision.model_validate({
+            "route": "tool",
+            "intent": "weather_query",
+            "confidence": 0.91,
+            "fast_speech": {
+                "text": "好的，我查一下北京今天的天气。",
+                "purpose": "acknowledge_and_check",
+                "commitment": "checking_only",
+                "must_not_claim_completion": True,
+            },
+            "routes": [
+                {
+                    "route": "tool",
+                    "intent": "weather_query",
+                    "confidence": 0.91,
+                    "lane": "tool",
+                    "fast_speech": {
+                        "text": "好的，我查一下北京今天的天气。",
+                        "purpose": "acknowledge_and_check",
+                    },
+                }
+            ],
+        })
+
+        self.assertEqual(decision.fast_speech.text, "好的，我查一下北京今天的天气。")
+        self.assertEqual(decision.fast_speech.commitment, "checking_only")
+        self.assertEqual(decision.routes[0].fast_speech.purpose, "acknowledge_and_check")
+
     def test_router_use_llm_controls_default_mode(self) -> None:
         with patch.dict(os.environ, {"ROUTER_USE_LLM": "0"}, clear=True):
             self.assertEqual(router_mode_from_env(), "rules_only")

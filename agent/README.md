@@ -45,7 +45,7 @@ separate and default-off; enable it only with
 | `robot_pose_controller_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
 | `motion_planner_agent` | Legacy compatibility-only phrase parser for old `/run` callers; disabled unless `context.allow_legacy_rule_agents=true`. |
 | `safety_agent` | Rejects or clamps unsafe action proposals. |
-| `tool_agent` | Produces a validated TaskGraph when LLM TaskGraph planning is enabled; otherwise emits a compatibility `tool.*` action that this repository does not automatically execute. |
+| `tool_agent` | Handles read-only weather lookup directly; produces a validated TaskGraph when LLM TaskGraph planning is enabled; otherwise emits a compatibility `tool.*` action that this repository does not automatically execute. |
 | `memory_agent` | Produces refined `extracted_memory` updates plus compatibility `memory.store` actions. Chromie's current conversation state is process-local and not a durable memory store. |
 | `vision_agent` | Produces a compatibility `vision.query` proposal. No vision executor is included in this repository. |
 
@@ -137,6 +137,8 @@ Risk-bearing behavior is default-off.
 | `AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES` | `128` | Bound retained in-memory traces with LRU eviction. |
 | `AGENT_TASK_GRAPH_TRACE_TTL_SEC` | `900` | Expire retained traces after this many seconds. |
 | `AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES` | `128` | Bound unconsumed in-memory confirmation grants. |
+| `AGENT_WEATHER_ENABLED` | `1` | Enable read-only weather lookup through Open-Meteo. |
+| `AGENT_WEATHER_TIMEOUT_S` | `8` | Weather provider HTTP timeout in seconds. |
 | `AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION` | `0` | Enable authorized guarded side effects. Requires an execution token. |
 | `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` | `0` | Permit physical nodes after confirmation and active-monitor proof. Requires guarded execution. |
 

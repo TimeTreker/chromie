@@ -146,13 +146,14 @@ This generates runtime configuration, activates the selected Conda environment,
 installs changed requirements, warms Ollama, avoids duplicate processes, and
 starts the module from the repository root.
 
-The Orchestrator can emit a fast first phrase after Router returns and before
+The Orchestrator can emit a fast-first phrase after Router returns and before
 the slower Agent finishes. `ORCH_FAST_FIRST_RESPONSE_ENABLED=1` is the default.
-The phrase is route-level and truthful, for example "I'll check that." for tools
-or "I'm here." for simple chat. Robot actions skip this host-level fast-first
-phrase so the committed Agent `chromie.speak` task is the single spoken action
-acknowledgement. Fast-first speech is not authorization, and later Agent speech,
-confirmation, or correction still owns the final turn.
+The phrase now comes from the quick Router's `fast_speech` field or a safe
+`immediate_speech` route item; the Orchestrator validates and schedules it but
+does not invent route-template wording such as generic chat/tool acknowledgements.
+Fast speech is a prelude only: it must not claim a tool result, memory commit,
+physical execution, or final answer. Later Agent speech, confirmation, or
+correction still owns the final turn.
 
 Manual development start:
 

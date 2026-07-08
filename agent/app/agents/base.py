@@ -26,6 +26,7 @@ class AgentServices:
     task_graph_planner: "TaskGraphPlanner | None" = None
     capability_catalog: "CapabilityCatalog | None" = None
     capability_match_limit: int = 8
+    weather_client: Any | None = None
 
 
 logger = logging.getLogger("chromie.agent.base")

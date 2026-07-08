@@ -1787,5 +1787,172 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
+    async def test_short_asr_fragment_robot_action_is_downgraded_to_clarify(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="B.",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=31,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 31,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Blink the robot eyes visibly.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                    "effects": ["visual_expression"],
+                    "safety_class": "low_risk_action",
+                    "requires_confirmation": False,
+                }
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:soridormi.blink_eyes",
+                confidence=0.95,
+                language="en-US",
+                source="llm",
+                reason="badly over-confident fragment match",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="B.", language="en-US"))
+
+        self.assertEqual(decision.route, "clarify")
+        self.assertEqual(decision.intent, "clarify_insufficient_information")
+        self.assertEqual(decision.confidence, 0.0)
+        self.assertNotIn("capability_agent", decision.agents)
+        self.assertNotIn("safety_agent", decision.agents)
+        self.assertIn("I only heard", decision.speak_first or "")
+        self.assertEqual(
+            decision.metadata["confidence_calibration"]["status"],
+            "downgraded_to_clarify",
+        )
+        self.assertEqual(
+            decision.metadata["confidence_calibration"]["model_intent"],
+            "capability:soridormi.blink_eyes",
+        )
+
+    async def test_short_fragment_with_strong_followup_context_is_not_downgraded(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="B.",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=32,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 32,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Blink the robot eyes visibly.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:soridormi.blink_eyes",
+                confidence=0.95,
+                language="en-US",
+                source="llm",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(
+                    text="B.",
+                    language="en-US",
+                    context={"awaiting_user_choice": True},
+                )
+            )
+
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
+        self.assertIn("capability_agent", decision.agents)
+
+    async def test_missing_body_skill_tells_user_without_substitution(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="Please fly up to the ceiling.",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=33,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 33,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Blink the robot eyes visibly.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="capability:soridormi.fly_up",
+                confidence=0.92,
+                language="en-US",
+                source="llm",
+                reason="model invented unavailable flying skill",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="Please fly up to the ceiling.", language="en-US")
+            )
+
+        self.assertEqual(decision.route, "clarify")
+        self.assertEqual(decision.intent, "missing_or_unsupported_ability")
+        self.assertNotIn("capability_agent", decision.agents)
+        self.assertIn("matching skill", decision.speak_first or "")
+        self.assertEqual(
+            decision.metadata["desired_abilities"][0]["status"],
+            "missing_ability",
+        )
+        self.assertEqual(
+            decision.metadata["capability_grounding"]["status"],
+            "missing_capability",
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()

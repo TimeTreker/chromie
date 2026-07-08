@@ -818,7 +818,14 @@ class CapabilityCatalog:
         route: CapabilityRoute,
         matches: list[CapabilityMatch],
     ) -> list[str]:
-        agents = ["capability_agent", "conversation_agent"]
+        if route == "tool":
+            return ["tool_agent", "speaker_agent"]
+        if route == "memory":
+            return ["memory_agent", "speaker_agent"]
+        if route == "chat":
+            return ["conversation_agent", "speaker_agent"]
+
+        agents = ["capability_agent"]
         if route == "robot_action" and any(
             match.safety_class in {"physical_motion", "safety_critical"}
             or "physical_motion" in match.effects

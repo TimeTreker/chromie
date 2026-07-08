@@ -62,6 +62,10 @@
     "soridormi.walk_velocity": {
       "prompt_tier": "common",
       "reason": "Bounded velocity primitive commonly requested in conversation."
+    },
+    "chromie.weather.lookup": {
+      "prompt_tier": "common",
+      "reason": "Weather/current forecast questions are common read-only tool requests and must be visible to the fast Router."
     }
   }
 }

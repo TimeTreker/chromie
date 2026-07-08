@@ -239,16 +239,30 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
-    def test_fast_first_response_text_is_route_truthful(self) -> None:
+    def test_fast_first_response_text_uses_router_generated_speech(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
 
-        self.assertEqual(
+        self.assertIsNone(
             assistant._fast_first_response_text(
                 RouteDecision(route="chat", intent="general_conversation", language="en-US"),
                 "Hello, how are you?",
+            )
+        )
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                RouteDecision(
+                    route="chat",
+                    intent="general_conversation",
+                    language="en-US",
+                    fast_speech={
+                        "text": "Let me answer that.",
+                        "purpose": "acknowledge",
+                    },
+                ),
+                "Hello, how are you?",
             ),
-            "I'm here.",
+            "Let me answer that.",
         )
         self.assertEqual(
             assistant._fast_first_response_text(
@@ -280,12 +294,63 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ),
             "Hi, I'm here.",
         )
-        self.assertEqual(
+        self.assertIsNone(
             assistant._fast_first_response_text(
                 RouteDecision(route="chat", intent="fact_question", language="en-US"),
                 "What is 2 plus 2?",
+            )
+        )
+        self.assertIsNone(
+            assistant._fast_first_response_text(
+                RouteDecision(
+                    route="tool",
+                    intent="weather_query",
+                    language="zh-CN",
+                    metadata={
+                        "tool_name": "weather",
+                        "weather_query": {"location": "重庆", "date": "today"},
+                    },
+                ),
+                "重庆今天天气怎么样？",
+            )
+        )
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                RouteDecision(
+                    route="tool",
+                    intent="weather_query",
+                    language="zh-CN",
+                    fast_speech={
+                        "text": "好的，我查一下重庆今天的天气。",
+                        "purpose": "acknowledge_and_check",
+                    },
+                    metadata={
+                        "tool_name": "weather",
+                        "weather_query": {"location": "重庆", "date": "today"},
+                    },
+                ),
+                "重庆今天天气怎么样？",
             ),
-            "I'll answer.",
+            "好的，我查一下重庆今天的天气。",
+        )
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                RouteDecision(
+                    route="tool",
+                    intent="weather_query",
+                    language="en-US",
+                    fast_speech={
+                        "text": "OK, I’ll check Chongqing’s weather today.",
+                        "purpose": "acknowledge_and_check",
+                    },
+                    metadata={
+                        "tool_name": "weather",
+                        "weather_query": {"location": "Chongqing", "date": "today"},
+                    },
+                ),
+                "what's the weather today in chongqing",
+            ),
+            "OK, I’ll check Chongqing’s weather today.",
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -293,11 +358,20 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 "Walk forward for 15 seconds.",
             )
         )
-        self.assertIsNone(
+        self.assertEqual(
             assistant._fast_first_response_text(
-                RouteDecision(route="robot_action", intent="robot_action", language="zh-CN"),
-                "往前走个15秒。",
-            )
+                RouteDecision(
+                    route="robot_action",
+                    intent="robot_action",
+                    language="en-US",
+                    fast_speech={
+                        "text": "I’ll check whether I can do that safely.",
+                        "purpose": "safety_prelude",
+                    },
+                ),
+                "Walk forward for 15 seconds.",
+            ),
+            "I’ll check whether I can do that safely.",
         )
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -305,16 +379,22 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     route="robot_action",
                     intent="robot_action",
                     language="en-US",
-                    speak_first="I heard the movement request.",
+                    fast_speech={"text": "I am walking now."},
                 ),
                 "Walk forward for 15 seconds.",
             )
         )
-        self.assertIsNone(
+        self.assertEqual(
             assistant._fast_first_response_text(
-                RouteDecision(route="clarify", intent="clarify_target_location", language="en-US"),
+                RouteDecision(
+                    route="clarify",
+                    intent="clarify_target_location",
+                    language="en-US",
+                    fast_speech={"text": "Which location do you mean?"},
+                ),
                 "Move over there.",
-            )
+            ),
+            "Which location do you mean?",
         )
 
     def test_fast_first_response_can_be_disabled(self) -> None:

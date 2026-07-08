@@ -63,6 +63,13 @@ registry.
 Multiple manifest paths or directories may be separated by commas. Duplicate
 agent or tool identifiers fail registry construction.
 
+## Adding new Agent/tool capabilities
+
+Use [`../docs/ADDING_AGENT_CAPABILITIES.md`](../docs/ADDING_AGENT_CAPABILITIES.md)
+when adding a new Chromie-side Agent or read-only tool such as weather lookup.
+The capability must be exposed through the Agent catalog and prompt-tier policy
+before the Router can reliably ground natural language to it.
+
 ## Prompt-tier preset
 
 [`prompt_tiers.json`](prompt_tiers.json) is the owner-editable initial

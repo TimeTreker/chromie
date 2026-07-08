@@ -183,7 +183,18 @@ configuration.
 | `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables semantic review/repair after malformed or timed-out quick-router outputs, including underspecified `robot_action` results. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
 | `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
+| `CHROMIE_ROUTER_DEBUG_RAW` / `ROUTER_DEBUG_RAW` | `0`; when enabled, Router logs the full raw LLM JSON output after the default bounded raw-output summary. |
+| `CHROMIE_ROUTER_DEBUG_PROMPT` / `ROUTER_DEBUG_PROMPT` | `0`; when enabled, Router logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
 | `CHROMIE_CLI_COLOR` | `auto`; force Agent/Router Ollama diagnostic color with `1`, disable with `0`. Falls back to terminal detection and respects `NO_COLOR`. |
+
+
+Router observability logs are intentionally split into safe summaries and explicit debug output.
+By default, each LLM router call emits `router_prompt_profile`,
+`router_llm_raw_summary`, and `router_normalize_result`. These lines show whether
+the prompt contained the `fast_speech`, `tool`, and `weather_query` contracts,
+how many catalog items were visible, what route/intent the raw model JSON
+contained, and whether normalization changed the final route. Full raw model
+JSON and prompt text require the debug flags above.
 
 Router routing has four decision stages plus deterministic validation
 guardrails. The hard emergency filter for interrupt and ignore stays
@@ -282,6 +293,10 @@ changes.
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for Agent-side catalog search endpoints and native interaction retrieval; default `0.16`. The fast Router uses the common catalog snapshot instead of per-query catalog matching. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
+| `AGENT_WEATHER_ENABLED` | Enable the read-only weather lookup handled by `tool_agent`; default `1`. |
+| `AGENT_WEATHER_TIMEOUT_S` | HTTP timeout for Open-Meteo geocoding/forecast calls; default `8`. |
+| `AGENT_WEATHER_GEOCODING_URL` | Weather geocoding endpoint; default `https://geocoding-api.open-meteo.com/v1/search`. |
+| `AGENT_WEATHER_FORECAST_URL` | Weather forecast endpoint; default `https://api.open-meteo.com/v1/forecast`. |
 | `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
 | `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |

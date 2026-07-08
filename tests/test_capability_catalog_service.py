@@ -344,6 +344,37 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(speak.interaction_executable)
         self.assertEqual(speak.route, "chat")
 
+    async def test_weather_lookup_tool_is_common_router_visible_tool(self) -> None:
+        registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
+        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+
+        common = await catalog.prompt_entries(scope="common")
+        weather = next(item for item in common if item.capability_id == "chromie.weather.lookup")
+
+        self.assertEqual(weather.route, "tool")
+        self.assertEqual(weather.agent_id, "chromie.weather")
+        self.assertEqual(weather.safety_class, "safe_read")
+        self.assertFalse(weather.requires_confirmation)
+        self.assertFalse(weather.prompt_tier_locked)
+        self.assertFalse(weather.interaction_executable)
+        self.assertIn("weather_lookup", weather.effects)
+        self.assertIn("location", weather.input_schema.get("required", []))
+        self.assertIn("tool", weather.tags)
+        self.assertEqual(weather.prompt_tier, "common")
+        self.assertEqual(weather.hints.get("tool_name"), "weather")
+
+    async def test_chinese_weather_query_matches_weather_lookup_tool(self) -> None:
+        registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
+        catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
+
+        result = await catalog.search("今天重庆天气怎么样？", language="zh-CN")
+
+        self.assertTrue(result.matched)
+        self.assertEqual(result.suggested_route, "tool")
+        self.assertIn("tool_agent", result.suggested_agents)
+        self.assertEqual(result.matches[0].capability_id, "chromie.weather.lookup")
+        self.assertEqual(result.matches[0].route, "tool")
+
     async def test_physical_live_skill_requires_confirmation_despite_sim_exemption(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
 

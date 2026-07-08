@@ -110,10 +110,12 @@ greeting plus memory plus deep planning. Each route item carries its own
 uses `fast_minimal` for simple immediate speech, `session_compact` for ordinary
 chat/memory/tool work, `capability_safety` for Skill Runtime work, and
 `full_mind` when worldview, lifeview, valueview, identity principles, risk
-judgment, or long-horizon planning should be handled by deepthinking. Chat
-items may set `lane=immediate_speech`, `direct_to_tts=true`, and short safe
-`text`; the host can play that through the fast-first TTS lane while other
-items continue through their own policies.
+judgment, or long-horizon planning should be handled by deepthinking. Route items or the top-level decision may carry a short `fast_speech` object
+(`text`, `purpose`, `commitment`) for natural fast-first TTS. Chat items may
+still set `lane=immediate_speech`, `direct_to_tts=true`, and short safe `text`
+for backward compatibility. Fast speech must be a process acknowledgement only:
+it must not claim a tool result, memory commit, physical execution, or final
+answer.
 
 `RouteDecision.actions` remains the compatibility/execution hint for concrete
 capability actions inside robot-action work, such as ordered Soridormi skill

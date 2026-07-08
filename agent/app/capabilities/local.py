@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from .models import (
     AgentManifest,
     AgentStatus,
@@ -12,6 +14,21 @@ from .models import (
     ToolCapability,
     TransportSpec,
 )
+
+
+def _weather_tool_availability() -> ToolAvailability:
+    enabled = os.getenv("AGENT_WEATHER_ENABLED", "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+    return ToolAvailability(
+        available=enabled,
+        modes=["runtime", "read_only"],
+        requires=["network", "open_meteo"],
+        reason=None if enabled else "AGENT_WEATHER_ENABLED is disabled",
+    )
 
 
 def chromie_manifests() -> list[AgentManifest]:
@@ -113,7 +130,100 @@ def chromie_manifests() -> list[AgentManifest]:
             )
         ],
     )
-    return [speech, task]
+
+    weather = AgentManifest(
+        agent_id="chromie.weather",
+        display_name="Chromie Weather Tool Agent",
+        description=(
+            "Chromie-side read-only weather lookup agent. It resolves a user-"
+            "requested city/location and retrieves current or near-term forecast "
+            "data through the configured weather provider."
+        ),
+        transport=TransportSpec(kind="local_python", module="app.agents.tool"),
+        tags=["chromie", "tool", "weather", "external_read"],
+        tools=[
+            ToolCapability(
+                name="chromie.weather.lookup",
+                agent_id="chromie.weather",
+                display_name="Lookup weather",
+                description=(
+                    "Retrieve current weather or a short forecast for a named city "
+                    "or place. Use for user questions about today's weather, "
+                    "tomorrow's weather, 天气/天气预报, temperature, rain, humidity, wind, or "
+                    "forecast conditions. This is read-only and returns information; "
+                    "it does not control the robot body."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": (
+                                "City or place name supplied by the user, such as "
+                                "重庆, 北京, Chongqing, or Beijing."
+                            ),
+                        },
+                        "date": {
+                            "type": "string",
+                            "enum": ["today", "tomorrow"],
+                            "default": "today",
+                            "description": "Forecast date requested by the user.",
+                        },
+                        "units": {
+                            "type": "string",
+                            "enum": ["metric", "imperial", "auto"],
+                            "default": "metric",
+                            "description": "Preferred weather units.",
+                        },
+                    },
+                    "required": ["location"],
+                    "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string"},
+                        "date": {"type": "string"},
+                        "summary": {"type": "string"},
+                        "temperature_c": {"type": "number"},
+                        "high_c": {"type": "number"},
+                        "low_c": {"type": "number"},
+                    },
+                },
+                effects=["read_only", "external_read", "weather_lookup"],
+                safety_class="safe_read",
+                availability=_weather_tool_availability(),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=8.0,
+                    idempotent=True,
+                    side_effect_free=True,
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+                llm_hints={
+                    "prompt_tier": "common",
+                    "prompt_tier_reason": (
+                        "Weather/current forecast questions are common spoken "
+                        "tool requests and must be visible to the fast router."
+                    ),
+                    "when_to_use": (
+                        "Use when the user asks about current, today's, tomorrow's, "
+                        "or upcoming weather or forecast for a city/location."
+                    ),
+                    "router_contract": "route=tool; intent=weather_query",
+                    "router_intent": "weather_query",
+                    "tool_name": "weather",
+                    "semantic_type": "weather_lookup",
+                    "fast_speech_guidance": (
+                        "Acknowledge only that Chromie will check the requested "
+                        "location/date. Do not state weather results before the tool returns."
+                    ),
+                },
+            )
+        ],
+    )
+    return [speech, task, weather]
 
 
 def chromie_capability_bundle() -> CapabilityBundle:

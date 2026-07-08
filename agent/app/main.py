@@ -14,6 +14,7 @@ from .agents import AgentServices
 from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .clients.ollama_client import OllamaClient
+from .clients.weather_client import OpenMeteoWeatherClient
 from .interaction import (
     AgentResultInteractionAdapter,
     InteractionOutputCoordinator,
@@ -164,6 +165,10 @@ class Settings(BaseModel):
         ge=1,
         le=32,
     )
+    weather_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_WEATHER_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
     capability_prompt_tier_preset: str = Field(
         default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_PRESET", "")
     )
@@ -183,6 +188,8 @@ logging.basicConfig(
 logger = logging.getLogger("chromie.agent")
 
 ollama_client = OllamaClient(settings.ollama_url, settings.model, timeout_ms=settings.timeout_ms)
+weather_client = OpenMeteoWeatherClient() if settings.weather_enabled else None
+
 response_reviewer_client = (
     OllamaClient(
         settings.ollama_url,
@@ -228,6 +235,7 @@ services = AgentServices(
     task_graph_planner=task_graph_planner,
     capability_catalog=capability_catalog,
     capability_match_limit=settings.capability_match_limit,
+    weather_client=weather_client,
 )
 runtime = AgentRuntime(services)
 interaction_runtime = InteractionRuntime(services)
