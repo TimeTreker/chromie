@@ -131,6 +131,16 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('Skipping host Orchestrator (--no-orchestrator)', source)
         self.assertIn('ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE"', source)
 
+    def test_start_chromie_diagnoses_soridormi_probe_failures(self) -> None:
+        source = (ROOT / "scripts" / "start_chromie.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("check_soridormi_from_agent_container", source)
+        self.assertIn("chromie-agent cannot reach Soridormi MCP", source)
+        self.assertIn("Soridormi capability probe failed", source)
+        self.assertIn("host.docker.internal", source)
+        self.assertIn("Bind Soridormi MCP to 0.0.0.0", source)
+
     def test_voice_mujoco_text_case_allows_long_sim_skills(self) -> None:
         source = (ROOT / "scripts" / "run_voice_mujoco_text_case.sh").read_text(
             encoding="utf-8"

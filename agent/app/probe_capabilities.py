@@ -13,11 +13,23 @@ async def _run(
     excluded_effects: frozenset[str],
 ) -> int:
     configured = build_configured_registry(manifests)
-    results = await probe_mcp_capabilities(
-        configured.registry,
-        timeout_s=timeout_s,
-        excluded_effects=excluded_effects,
-    )
+    try:
+        results = await probe_mcp_capabilities(
+            configured.registry,
+            timeout_s=timeout_s,
+            excluded_effects=excluded_effects,
+        )
+    except Exception as exc:
+        print(
+            "[probe][error] Could not verify MCP capabilities: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        print(
+            "[probe][hint] Confirm SORIDORMI_MCP_URL is reachable from inside "
+            "the chromie-agent container and that Soridormi advertises the "
+            "manifest tools via MCP tools/list."
+        )
+        return 1
 
     failed = False
     for result in results:
@@ -32,6 +44,17 @@ async def _run(
         if result.schema_mismatches:
             failed = True
             print(f"  schema mismatch: {', '.join(sorted(result.schema_mismatches))}")
+            for tool_name, details in result.schema_mismatch_details.items():
+                for detail in details[:8]:
+                    print(f"    - {tool_name}: {detail}")
+                if len(details) > 8:
+                    print(f"    - {tool_name}: ... {len(details) - 8} more differences")
+        if result.schema_warnings:
+            for tool_name, warnings in result.schema_warnings.items():
+                for warning in warnings[:4]:
+                    print(f"  schema warning: {tool_name}: {warning}")
+                if len(warnings) > 4:
+                    print(f"  schema warning: {tool_name}: ... {len(warnings) - 4} more warnings")
         if result.extra_tools:
             print(f"  extra: {', '.join(sorted(result.extra_tools))}")
         if result.ok:

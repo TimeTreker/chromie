@@ -683,6 +683,46 @@ class _AdverbSpeedOllama:
         }
 
 
+class _ProposalAdjustedWalkOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "semantic skill proposals" in prompt
+        assert "proposed_args" in prompt
+        assert "semantic_intent" in prompt
+        assert "parameter_grounding" in prompt
+        assert "unmapped_intent" in prompt
+        assert "downstream runtime and Soridormi may accept, adjust" in kwargs["system"]
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "I will walk forward quickly with a safe bounded plan.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "semantic_intent": {
+                        "motion_type": "locomotion",
+                        "direction": "forward",
+                        "duration_requested_s": 15,
+                        "speed_modifier": "fast",
+                    },
+                    "proposed_args": {"duration_s": 15, "speed": "quickly"},
+                    "parameter_grounding": {
+                        "duration_s": {
+                            "source_text": "15 seconds",
+                            "requested_value": 15,
+                            "mapped_to": "duration_s",
+                        },
+                        "speed": {
+                            "source_text": "quickly",
+                            "semantic_value": "fast",
+                            "mapped_to": "speed",
+                        },
+                    },
+                    "unmapped_intent": [],
+                }
+            ],
+        }
+
+
 class _DuplicateWalkOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
@@ -990,6 +1030,59 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
         self.assertEqual(response.skills[0].args["speed"], "quick")
         self.assertTrue(response.skills[0].metadata["schema_normalized_args"])
+
+    async def test_capability_agent_adjudicates_llm_proposal_with_bounded_adjustment(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_ProposalAdjustedWalkOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "proposal-adjustment",
+                "text": "Walk forward for 15 seconds quickly.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.86,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(len(response.skills), 1)
+        skill = response.skills[0]
+        self.assertEqual(skill.skill_id, "soridormi.walk_forward")
+        self.assertEqual(skill.args, {"duration_s": 5.0, "speed": "quick"})
+        self.assertTrue(skill.requires_confirmation)
+        self.assertEqual(skill.metadata["execution_mode"], "proposed")
+        self.assertEqual(
+            skill.metadata["execution_semantics"],
+            "proposal_from_capability_agent",
+        )
+        self.assertEqual(
+            skill.metadata["proposal_adjudication_status"],
+            "adjusted_needs_confirmation",
+        )
+        self.assertEqual(skill.metadata["proposal_requested_args"]["duration_s"], 15)
+        self.assertEqual(skill.metadata["proposal_accepted_args"]["duration_s"], 5.0)
+        self.assertEqual(skill.metadata["proposal_semantic_intent"]["speed_modifier"], "fast")
+        self.assertEqual(
+            skill.metadata["proposal_parameter_grounding"]["speed"]["source_text"],
+            "quickly",
+        )
+        self.assertEqual(
+            skill.metadata["proposal_adjustments"][0]["reason"],
+            "bounded_to_schema_maximum",
+        )
 
     async def test_capability_plan_dedupes_identical_llm_skill_requests(self) -> None:
         runtime = InteractionRuntime(

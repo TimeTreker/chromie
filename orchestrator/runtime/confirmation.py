@@ -287,9 +287,11 @@ def _confirmation_prompt(
 def _describe_request(request: SkillRequest) -> str:
     skill_name = request.skill_id.removeprefix("soridormi.")
     skill_name = re.sub(r"[._-]+", " ", skill_name).strip() or "requested action"
+    adjustments = request.metadata.get("proposal_adjustments")
+    adjusted = isinstance(adjustments, list) and bool(adjustments)
     safe_args = _redact_prompt_value(request.args)
     if not safe_args:
-        return f"run {skill_name}"
+        return f"run {skill_name} with adjusted safe parameters" if adjusted else f"run {skill_name}"
     rendered = json.dumps(
         safe_args,
         ensure_ascii=False,
@@ -298,6 +300,8 @@ def _describe_request(request: SkillRequest) -> str:
     )
     if len(rendered) > 120:
         rendered = "the requested parameters"
+    if adjusted:
+        return f"run {skill_name} with adjusted safe parameters {rendered}"
     return f"run {skill_name} with {rendered}"
 
 

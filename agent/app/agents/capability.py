@@ -8,11 +8,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
-from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
-
 try:
+    from chromie_contracts.perception import live_perception_dependency_from_metadata
     from chromie_contracts.interaction import SkillRequest
 except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
     from shared.chromie_contracts.interaction import SkillRequest
 
 from ..capabilities.validator import (
@@ -29,6 +29,10 @@ logger = logging.getLogger("chromie.agent.capability")
 class _PlannedSkill(BaseModel):
     skill_id: str
     args: dict[str, Any] = Field(default_factory=dict)
+    proposed_args: dict[str, Any] = Field(default_factory=dict)
+    semantic_intent: dict[str, Any] = Field(default_factory=dict)
+    parameter_grounding: dict[str, Any] = Field(default_factory=dict)
+    unmapped_intent: list[Any] = Field(default_factory=list)
 
 
 class _CapabilityPlan(BaseModel):
@@ -292,8 +296,31 @@ class CapabilityAgent(BaseAgent):
             if match is None:
                 logger.warning("LLM selected capability outside candidate set: %s", item.skill_id)
                 continue
-            args, normalized = normalize_args_for_schema(item.args, match.input_schema)
+            proposal_args = self._skill_proposal_args(item)
+            args, normalized = normalize_args_for_schema(proposal_args, match.input_schema)
+            adjudication_status = "executable"
+            proposal_adjustments: list[dict[str, Any]] = []
             arg_errors = validate_args_for_schema(args, match.input_schema)
+            if arg_errors:
+                adjusted_args, proposal_adjustments = self._schema_bounded_adjustment(
+                    args,
+                    match.input_schema,
+                )
+                if proposal_adjustments:
+                    adjusted_args, adjusted_normalized = normalize_args_for_schema(
+                        adjusted_args,
+                        match.input_schema,
+                    )
+                    adjusted_errors = validate_args_for_schema(
+                        adjusted_args,
+                        match.input_schema,
+                    )
+                    if not adjusted_errors:
+                        args = adjusted_args
+                        normalized = normalized or adjusted_normalized or adjusted_args != proposal_args
+                        arg_errors = []
+                        adjudication_status = "adjusted_needs_confirmation"
+
             if arg_errors:
                 logger.warning("LLM selected invalid args for %s: %s", item.skill_id, arg_errors)
                 result.add_speak_immediate(
@@ -318,8 +345,21 @@ class CapabilityAgent(BaseAgent):
             seen_requests.add(dedupe_key)
             metadata = {
                 "source": "capability_catalog",
+                "source_component": "agent.capability",
+                "execution_mode": "proposed",
+                "execution_semantics": "proposal_from_capability_agent",
+                "requires_runtime_validation": True,
                 "catalog_version": search.catalog_version,
             }
+            metadata.update(
+                self._skill_proposal_metadata(
+                    item,
+                    proposal_args=proposal_args,
+                    accepted_args=args,
+                    adjudication_status=adjudication_status,
+                    adjustments=proposal_adjustments,
+                )
+            )
             if fast_path_metadata is not None:
                 metadata["source"] = str(
                     fast_path_metadata.get("source") or "router_task_list_fast_path"
@@ -358,7 +398,10 @@ class CapabilityAgent(BaseAgent):
                 skill_id=item.skill_id,
                 args=args,
                 timing="sequential",
-                requires_confirmation=match.requires_confirmation,
+                requires_confirmation=(
+                    bool(match.requires_confirmation)
+                    or adjudication_status == "adjusted_needs_confirmation"
+                ),
                 metadata=metadata,
             )
             add_skill(request_item)
@@ -601,6 +644,124 @@ class CapabilityAgent(BaseAgent):
             speech="That motion plan did not get a reliable review result, so I will not move.",
         )
 
+    @staticmethod
+    def _skill_proposal_args(item: _PlannedSkill) -> dict[str, Any]:
+        """Return the LLM's proposed executable args for schema adjudication.
+
+        ``args`` remains the backward-compatible contract. ``proposed_args`` is
+        the preferred proposal form because it makes the LLM/skill-agent split
+        explicit: the LLM proposes semantic parameters, and this CapabilityAgent
+        adjudicates them against the concrete skill schema before creating a
+        trusted SkillRequest.
+        """
+
+        if isinstance(item.proposed_args, dict) and item.proposed_args:
+            return dict(item.proposed_args)
+        return dict(item.args or {})
+
+    def _skill_proposal_metadata(
+        self,
+        item: _PlannedSkill,
+        *,
+        proposal_args: dict[str, Any],
+        accepted_args: dict[str, Any],
+        adjudication_status: str,
+        adjustments: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "proposal_adjudication_status": adjudication_status,
+        }
+        if proposal_args != accepted_args:
+            metadata["proposal_requested_args"] = dict(proposal_args)
+            metadata["proposal_accepted_args"] = dict(accepted_args)
+        if item.semantic_intent:
+            metadata["proposal_semantic_intent"] = self._bounded_metadata_value(
+                item.semantic_intent,
+                max_chars=900,
+            )
+        if item.parameter_grounding:
+            metadata["proposal_parameter_grounding"] = self._bounded_metadata_value(
+                item.parameter_grounding,
+                max_chars=1200,
+            )
+        if item.unmapped_intent:
+            metadata["proposal_unmapped_intent"] = self._bounded_metadata_value(
+                item.unmapped_intent,
+                max_chars=700,
+            )
+        if adjustments:
+            metadata["proposal_adjustments"] = adjustments
+            metadata["proposal_adjusted_requires_confirmation"] = True
+        return metadata
+
+    @staticmethod
+    def _bounded_metadata_value(value: Any, *, max_chars: int) -> Any:
+        try:
+            text = json.dumps(
+                value,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        except TypeError:
+            text = repr(value)
+        if len(text) <= max_chars:
+            return value
+        return {
+            "truncated": True,
+            "summary_json": text[:max_chars].rstrip() + "...",
+        }
+
+    def _schema_bounded_adjustment(
+        self,
+        args: dict[str, Any],
+        schema: dict[str, Any],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Bound numeric proposal fields to schema limits when that is enough.
+
+        This is the generic skill-agent adjudication step. It does not infer
+        human language. The LLM may propose ``duration_s=15`` or a velocity that
+        is too high; this function only asks whether the concrete skill schema
+        can accept a safer bounded version. Any adjustment is marked for user
+        confirmation by the caller.
+        """
+
+        if not isinstance(args, dict) or not isinstance(schema, dict):
+            return dict(args or {}), []
+        properties = schema.get("properties")
+        if not isinstance(properties, dict):
+            return dict(args), []
+
+        adjusted = dict(args)
+        adjustments: list[dict[str, Any]] = []
+        for field, prop in properties.items():
+            if field not in adjusted or not isinstance(prop, dict):
+                continue
+            value = adjusted[field]
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            bounded = float(value)
+            reason = ""
+            maximum = prop.get("maximum")
+            minimum = prop.get("minimum")
+            if isinstance(maximum, (int, float)) and not isinstance(maximum, bool) and bounded > float(maximum):
+                bounded = float(maximum)
+                reason = "bounded_to_schema_maximum"
+            if isinstance(minimum, (int, float)) and not isinstance(minimum, bool) and bounded < float(minimum):
+                bounded = float(minimum)
+                reason = "bounded_to_schema_minimum"
+            if reason and bounded != float(value):
+                adjusted[field] = int(bounded) if isinstance(value, int) and bounded.is_integer() else bounded
+                adjustments.append(
+                    {
+                        "field": str(field),
+                        "requested": value,
+                        "adjusted": adjusted[field],
+                        "reason": reason,
+                    }
+                )
+        return adjusted, adjustments
+
     def _direct_action_ack_speech(self, request: AgentRunRequest, action_count: int) -> str:
         if action_count <= 0:
             return ""
@@ -695,6 +856,7 @@ class CapabilityAgent(BaseAgent):
             "You are Chromie's capability selection agent. The prompt is organized as Global Context Group, Session Context Group, Current Job, Task Context Group, Cost Function, and Output Contract. "
             "Read the upper context first, then solve the current job, then return only the contract. "
             "Generalization-first principle: infer the user's desired physical/tool action from meaning, context, capability descriptions, and input_schema; do not turn prompt wording into phrase rules. "
+            "You generate schema-grounded skill proposals, not hardware commands; downstream runtime and Soridormi may accept, adjust, require confirmation, or refuse them. "
             "Select only exact skill_id values from the provided candidates. Never invent a skill. "
             "Never output raw joint, motor, actuator, controller-array, position-array, or torque controls. "
             "Schema obedience is more important than copying the user's words. "
@@ -716,6 +878,7 @@ class CapabilityAgent(BaseAgent):
             "Current Job:\n"
             "- You are now acting as Chromie's capability planner.\n"
             "- Use the upper context as background; output execute, clarify, or unsupported.\n"
+            "- For execute, produce semantic skill proposals that the capability/runtime layer can adjudicate against the concrete schema.\n"
             "- Do not answer unrelated chat here; return unsupported with no skills when no physical/tool skill should run.\n\n"
             "Task Context Group:\n"
             f"- Latest user input: {request.text}\n"
@@ -723,6 +886,8 @@ class CapabilityAgent(BaseAgent):
             f"- Available capability API surface: {json.dumps(candidate_payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))}\n"
             "- Ability interpretation: choose only from the provided skill_id values and satisfy that candidate's input_schema.\n"
             "- If Router-selected exact skill_id is best, use it; if another candidate better satisfies the action/schema, choose that candidate.\n"
+            "- Treat modifiers such as direction, duration, distance, count, speed, urgency, target, and object references as semantic parameter intent. Ground them to schema fields when the schema exposes a compatible field.\n"
+            "- If the schema does not expose a field for a user modifier, do not invent that field; place the unsupported modifier in unmapped_intent and explain briefly in speech when it matters.\n"
             "- Polite ability-shaped requests can be action requests when they ask Chromie to perform a listed physical action now.\n"
             "- For questions, identity/status, greetings, jokes, stories, songs, or other speech-only conversation, return unsupported with no skills.\n"
             "- Never combine an unrelated spoken answer with a body skill.\n"
@@ -731,6 +896,8 @@ class CapabilityAgent(BaseAgent):
             "- Choose the smallest validated set of executable skills.\n"
             "- Prefer human-facing wrapper skills over lower-level velocity/control skills when both satisfy the request.\n"
             "- Preserve the user's intended action class. Do not use social acknowledgement, gaze, attention, or idle gestures as fallback actions for an unrelated body request.\n"
+            "- Convert human modifiers into schema-grounded proposal args, but let schema and runtime bound the final executable parameters.\n"
+            "- If a requested numeric amount may exceed the schema range, still preserve the requested value in parameter_grounding and propose the closest schema-compatible safe value when clear; the runtime may require confirmation for adjustments.\n"
             "- If the request needs deeper task decomposition, runtime evidence, or a multi-session plan, clarify or return unsupported instead of guessing a physical skill.\n"
             "- Clarify when a required parameter is missing; unsupported when no candidate can satisfy the request.\n"
             "- Prefer natural, brief speech that accurately describes only the selected plan.\n\n"
@@ -738,8 +905,11 @@ class CapabilityAgent(BaseAgent):
             "- Return JSON only with keys decision, speech, and skills.\n"
             "- decision must be execute, clarify, or unsupported.\n"
             "- When decision is execute, skills is required and must contain at least one item. Never return execute with skills omitted, empty, null, or only speech.\n"
-            "- Each execute item must be {\"skill_id\":\"<exact candidate skill_id>\",\"args\":{...}}.\n"
-            "- For execute, every skills item must contain skill_id and args satisfying that candidate's input_schema.\n"
+            "- Each execute item must include skill_id and may include args or proposed_args. skill_id must be an exact candidate skill_id.\n"
+            "- Prefer proposed_args when you are translating human intent into concrete parameters; args remains accepted for backward compatibility.\n"
+            "- Optional proposal fields are semantic_intent, parameter_grounding, and unmapped_intent. Use them to explain how user intent maps to schema fields.\n"
+            "- proposed_args/args must use only fields from that candidate's input_schema. Do not invent fields for unsupported modifiers.\n"
+            "- For execute, every skills item must contain schema-grounded proposed_args or args that the capability layer can validate or safely bound.\n"
             "- For execute, speech is required: write one natural brief sentence generated from the chosen capability descriptions, user wording, and validated args.\n"
             "- Execution speech must be a short acknowledgement, not an implementation explanation; do not include Task Split, Key Risk, Next Step, internal skill IDs, schema field names, or raw args.\n"
             "- Do not depend on downstream code to convert skill_id or args into spoken wording; this planner owns the execution speech.\n"
@@ -1718,7 +1888,18 @@ class CapabilityAgent(BaseAgent):
                 if not isinstance(prop, dict):
                     continue
                 compact_prop: dict[str, Any] = {}
-                for key in ("type", "enum", "minimum", "maximum", "default"):
+                for key in (
+                    "type",
+                    "enum",
+                    "minimum",
+                    "maximum",
+                    "exclusiveMinimum",
+                    "exclusiveMaximum",
+                    "default",
+                    "unit",
+                    "units",
+                    "description",
+                ):
                     if key in prop:
                         compact_prop[key] = prop[key]
                 if compact_prop:

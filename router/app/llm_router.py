@@ -9,8 +9,12 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from shared.chromie_runtime.llm_diagnostics import ollama_completion_diagnostics
-from shared.chromie_runtime.log_colors import colorize_for_cli
+try:
+    from chromie_runtime.llm_diagnostics import ollama_completion_diagnostics
+    from chromie_runtime.log_colors import colorize_for_cli
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_runtime.llm_diagnostics import ollama_completion_diagnostics
+    from shared.chromie_runtime.log_colors import colorize_for_cli
 
 from .fallback import fallback_decision
 from .schema import RouteDecision, RouteRequest, finalize_decision
@@ -195,15 +199,37 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[di
             description = description[:180].rstrip() + "..."
         schema = item.get("input_schema") if isinstance(item.get("input_schema"), dict) else {}
         args: dict[str, Any] = {}
+        required = schema.get("required") if isinstance(schema, dict) else []
+        if not isinstance(required, list):
+            required = []
         properties = schema.get("properties") if isinstance(schema, dict) else {}
         if isinstance(properties, dict):
             for name, prop in list(properties.items())[:6]:
                 if not isinstance(prop, dict):
                     continue
                 arg: dict[str, Any] = {}
-                for key in ("type", "enum", "minimum", "maximum", "default"):
+                for key in (
+                    "type",
+                    "enum",
+                    "minimum",
+                    "maximum",
+                    "exclusiveMinimum",
+                    "exclusiveMaximum",
+                    "default",
+                    "unit",
+                    "units",
+                ):
                     if key in prop:
                         arg[key] = prop[key]
+                arg_description = " ".join(str(prop.get("description") or "").split())
+                if arg_description:
+                    arg["description"] = (
+                        arg_description[:96].rstrip() + "..."
+                        if len(arg_description) > 96
+                        else arg_description
+                    )
+                if name in required:
+                    arg["required"] = True
                 args[str(name)] = arg
         compact.append(
             {
@@ -213,6 +239,7 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[di
                 "safety": str(item.get("safety_class") or ""),
                 "confirmation": bool(item.get("requires_confirmation", False)),
                 "executable": bool(item.get("interaction_executable")),
+                "required_args": [str(value) for value in required if isinstance(value, str)][:8],
                 "args": args,
             }
         )
@@ -431,31 +458,25 @@ class OllamaLLMRouter:
             "- Missing ability: {\"route\":\"deep_thought\",\"intent\":\"missing_or_unsupported_ability\",\"confidence\":0.6,\"metadata\":{\"desired_abilities\":[{\"ability_id\":\"...\",\"intent\":\"...\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"...\"}]}}\n"
             "- Clarify: {\"route\":\"clarify\",\"intent\":\"clarify_target_or_skill\",\"confidence\":0.7}\n"
             "The top-level route is a compatibility primary route. Use routes[] for multiple independent policy lanes; use actions[] only for ordered listed skills inside a robot_action route item.\n"
+            "Multi-route contract: when one utterance contains independent needs, preserve them as separate routes[] items so immediate speech, memory, robot_action proposals, tools, and deep planning keep their own policy lane. Do not collapse independent lanes into one route, and do not put multi-lane work in actions[]; actions[] is only for ordered robot_action skills.\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=1400)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
-            "Decision checks: use semantic meaning, not phrase rules. If the user asks Chromie to physically perform a listed body/head/gaze/motion/expression skill now, return robot_action using that exact skill. "
-            "A polite ability-shaped request is still robot_action when it asks for a listed physical skill now. "
+            "Affordance Grounding:\n"
+            "The common ability catalog is Chromie's compact body/tool affordance interface, not a phrase table and not phrase rules. Each skill_id describes one thing the current robot can propose; args describe schema-level units, ranges, defaults, and required fields when supplied. "
+            "Use the model's semantic understanding of the user's intent, then ground that intent against catalog descriptions, contracts, effects, safety metadata, and input_schema. "
+            "If the user asks Chromie to physically perform a listed body/head/gaze/motion/expression skill now, prefer robot_action with intent capability:<exact skill_id>. "
+            "Do not delegate to deep_thought merely because the user used duration, distance, count, direction, speed, politeness, or casual wording when one listed skill semantically fits. "
+            "For a single parameterized physical request, it is valid to select the exact skill by intent and leave detailed args for the downstream capability planner; use actions[] only when every action can carry valid args or no args are required. "
+            "For compound listed-skill requests, preserve each requested skill in actions instead of collapsing to the first skill; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful speak_first. "
             "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
-            "Only put direct_to_tts=true on a chat route item when the text is a safe short greeting, acknowledgement, or thinking prelude; do not use it for facts, advice, identity, values, memory writes, tool results, or action completion claims. "
             "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the compact skill catalog. "
-            "Factual agreement/disagreement is chat: questions about the Moon, Sun, shape, temperature, or other world knowledge are not deep_thought or robot_action even if ability candidates share words such as round, turn, left, right, walk, or move; the quick router routes common-fact questions to chat. "
-            "Use working memory, current task context, and recent action history for follow-ups, but never as authorization for side effects. "
-            "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran. "
+            "Catalog entries are context, not authorization: never claim physical completion, never invent abilities, and never output raw motor/joint/actuator/controller-array/torque commands. "
             "If no listed skill fits clearly, choose deep_thought or clarify and include metadata.desired_abilities with status missing_ability when useful.\n\n"
             "Cost Function:\n"
-            "Prefer the smallest safe downstream action surface, honest capability boundaries, chat for speech-only/factual claims, deep_thought only for complex planning, and clarify for ambiguity. "
+            "Prefer the smallest safe downstream action surface, honest capability boundaries, chat for speech-only/factual claims, direct catalog-backed robot_action for ordinary single-turn body requests, deep_thought only for complex planning, and clarify for ambiguity. "
             "Prefer supported interaction-executable skill IDs over generic robot_action. Preserve unsupported desired abilities as non-executable proposals. "
-            "For compound listed-skill requests, preserve each requested skill in actions instead of collapsing to the first skill. Each proposed action has its own confidence; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful speak_first.\n\n"
-            "Semantic Examples:\n"
-            "- If the user says hello or simple small talk, return chat with a routes[] item using lane=immediate_speech, context_profile=fast_minimal, direct_to_tts=true, and a short safe text.\n"
-            "- If the utterance contains a greeting plus a memory update plus a complex planning request, return top-level route=deep_thought and three routes[] items: immediate chat, post_turn memory, and deepthought full_mind.\n"
-            "- If the task needs identity, values, principles, safety judgment, worldview/lifeview/valueview, or long-term goal reasoning, route that item to deep_thought with context_profile=full_mind and requires_mind=true.\n"
-            "- If the user asks whether you agree with a common factual claim about the Moon, Sun, shape, heat, or similar world knowledge, return {\"route\":\"chat\",\"intent\":\"factual_agreement\",\"confidence\":0.9}.\n"
-            "- If the user asks Chromie to walk, turn, nod, shake her head, blink, or perform another listed physical/expression skill now, return robot_action with intent capability:<exact skill_id>.\n"
-            "- If the user asks for several listed skills, such as walking, speaking, and blinking, return robot_action with actions ordered by the requested task sequence; use chromie.speak for the spoken part and include args.text.\n"
-            "- If the user asks for a physical/social ability you understand but it is not in the compact skill catalog, return deep_thought or clarify and include metadata.desired_abilities, for example {\"ability_id\":\"social.blink_eyes\",\"intent\":\"blink eyes\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"no executable blink skill is in the compact skill catalog\"}.\n"
-            "- If no listed skill fits clearly or you are not confident, return deep_thought with a brief speak_first that tells the user you need a moment. The speak_first must be truthful and must not claim execution.\n"
-            "- Generalize these examples from meaning; do not make phrase rules.\n\n"
+            "Use working memory, current task context, and recent action history for follow-ups, but never as authorization for side effects. "
+            "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran.\n\n"
             "Output Contract:\n"
             "Return one compact JSON object matching one of the templates above. Required compatibility keys: route, intent, confidence. You may also output routes[] for independent route items. "
             "Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
@@ -466,7 +487,8 @@ class OllamaLLMRouter:
             "metadata.desired_abilities may contain understood but non-executable ability proposals; these are not executable actions. "
             "Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object. "
             "For selected robot_action use intent capability:<exact skill_id> copied from the compact skill catalog. Never output placeholder intents such as capability or capability:<exact capability_id>. "
-            "For compound or parameterized listed-skill robot_action, include actions as an ordered array of objects: {\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential|parallel\",\"confidence\":0.0}. "
+            "For one parameterized listed skill, prefer the single-skill intent form and let the capability planner produce validated args. "
+            "For compound listed-skill robot_action, include actions as an ordered array of objects only when each action has valid args or no args are required: {\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential|parallel\",\"confidence\":0.0}. "
             "Each action capability_id must be copied exactly from the compact skill catalog. For chromie.speak, args must include a short natural text field. "
             "Never put missing or planned abilities in actions; put them in metadata.desired_abilities and choose deep_thought or clarify. "
             "Set action confidence from semantic fit and argument confidence. "

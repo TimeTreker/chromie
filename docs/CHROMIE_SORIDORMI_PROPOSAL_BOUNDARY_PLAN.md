@@ -303,6 +303,33 @@ The final acceptance tests cover the main safety chain across modules:
   requires fresh confirmation before planning;
 - the old provider class name remains a compatibility alias for existing code.
 
+### Addendum - Capability proposal adjudication
+
+Status: implemented for catalog-backed `CapabilityAgent` plans.
+
+The Capability Agent now treats LLM output as a skill proposal instead of a
+final executable command. A plan item may include `semantic_intent`,
+`proposed_args`, `parameter_grounding`, and `unmapped_intent`. These fields let
+the LLM preserve human intent such as direction, speed, duration, target, or
+object references without pretending that it has final physical authority.
+
+The agent then adjudicates the proposal against the selected capability schema:
+
+- only exact catalog `skill_id` values are accepted;
+- enum strings may be normalized to schema tokens;
+- numeric proposal fields can be bounded to schema limits when that produces a
+  valid safer proposal;
+- bounded numeric adjustments force request confirmation;
+- unsupported modifiers stay in `unmapped_intent` instead of becoming invented
+  schema fields;
+- resulting `SkillRequest` metadata records the semantic intent, parameter
+  grounding, requested vs. accepted args, and adjustment reasons.
+
+This keeps the desired split: the LLM generalizes user language into a semantic
+proposal; the capability layer accepts, adjusts, asks for confirmation, or
+blocks based on the concrete catalog schema; `SkillRuntime` and Soridormi still
+own runtime validation and physical execution authority.
+
 ## Acceptance gates
 
 A patch that changes this boundary must include tests proving at least one of
@@ -317,6 +344,8 @@ these behaviors:
 - Post-interrupt corrected physical skills require fresh confirmation and disable auto-confirm.
 - Perception-dependent plans do not contain invented coordinates from Chromie.
 - Soridormi `create_plan` advertises and receives proposal contract metadata.
+- Capability Agent skill proposals carry adjudication metadata when parameters
+  are accepted or safely bounded before confirmation.
 
 ## Current implemented scope
 
@@ -347,6 +376,9 @@ Implemented so far:
 11. Integration acceptance tests cover dynamic MCP skills, proposal metadata,
     live-perception contracts, and post-interrupt physical resume locking across
     module boundaries.
+12. Capability Agent LLM plans are treated as semantic skill proposals. The
+    agent records parameter grounding and can bound numeric fields to schema
+    limits while requiring confirmation for adjusted physical proposals.
 
 Still intentionally not implemented: always-on dual-brain parallelism, physical
 fast-path execution from LLM confidence, LLM-based physical critic behavior,

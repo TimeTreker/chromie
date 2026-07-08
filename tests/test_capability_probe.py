@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import unittest
+from unittest.mock import patch
 
 from agent.app.capabilities.models import (
     AgentManifest,
@@ -14,6 +16,7 @@ from agent.app.capabilities.probe import (
     _schema_satisfies_contract,
     probe_mcp_capabilities,
 )
+from agent.app.probe_capabilities import _run as run_probe_cli
 
 
 def _registry() -> CapabilityRegistry:
@@ -131,6 +134,17 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.schema_mismatches, frozenset({"remote.plan"}))
 
+
+    async def test_probe_cli_reports_connection_errors_without_traceback(self) -> None:
+        with patch.dict(os.environ, {"SORIDORMI_MCP_URL": "http://127.0.0.1:1/mcp"}):
+            rc = await run_probe_cli(
+                ["capabilities/soridormi.json"],
+                timeout_s=0.01,
+                excluded_effects=frozenset({"test_control"}),
+            )
+
+        self.assertEqual(rc, 1)
+
     async def test_probe_requires_an_mcp_endpoint(self) -> None:
         with self.assertRaisesRegex(ValueError, "no MCP Streamable HTTP endpoints"):
             await probe_mcp_capabilities(CapabilityRegistry())
@@ -173,6 +187,85 @@ class CapabilityProbeTests(unittest.IsolatedAsyncioTestCase):
         }
 
         self.assertTrue(_schema_satisfies_contract(actual, expected))
+
+
+    def test_schema_comparison_allows_unadvertised_optional_property_when_extras_allowed(self) -> None:
+        expected = {
+            "type": "object",
+            "properties": {
+                "skill_id": {"type": "string"},
+                "chromie_intent": {
+                    "type": "object",
+                    "properties": {
+                        "execution_mode": {"type": "string", "const": "proposed"},
+                    },
+                    "required": ["execution_mode"],
+                },
+            },
+            "required": ["skill_id"],
+        }
+        actual = {
+            "type": "object",
+            "properties": {
+                "skill_id": {"type": "string"},
+            },
+            "required": ["skill_id"],
+        }
+
+        self.assertTrue(_schema_satisfies_contract(actual, expected))
+
+    def test_schema_comparison_rejects_unadvertised_optional_property_when_extras_forbidden(self) -> None:
+        expected = {
+            "type": "object",
+            "properties": {
+                "skill_id": {"type": "string"},
+                "chromie_intent": {"type": "object"},
+            },
+            "required": ["skill_id"],
+        }
+        actual = {
+            "type": "object",
+            "properties": {
+                "skill_id": {"type": "string"},
+            },
+            "required": ["skill_id"],
+            "additionalProperties": False,
+        }
+
+        self.assertFalse(_schema_satisfies_contract(actual, expected))
+
+    async def test_probe_reports_optional_schema_warning_without_failing(self) -> None:
+        registry = _registry()
+        registry.get_tool("remote.plan").input_schema = {
+            "type": "object",
+            "properties": {
+                "skill_id": {"type": "string"},
+                "chromie_intent": {"type": "object"},
+            },
+            "required": ["skill_id"],
+        }
+
+        async def list_tools(url: str, timeout_s: float) -> dict[str, dict]:
+            return {
+                "remote.status": {},
+                "remote.plan": {
+                    "type": "object",
+                    "properties": {
+                        "skill_id": {"type": "string"},
+                    },
+                    "required": ["skill_id"],
+                },
+            }
+
+        [result] = await probe_mcp_capabilities(
+            registry,
+            list_tools=list_tools,
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.schema_mismatches, frozenset())
+        self.assertIn("remote.plan", result.schema_warnings)
+        self.assertIn("chromie_intent", result.schema_warnings["remote.plan"][0])
 
     def test_schema_comparison_rejects_incompatible_stricter_constraints(self) -> None:
         expected = {

@@ -191,19 +191,87 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+check_soridormi_from_agent_container() {
+  echo "[chromie] Checking Soridormi MCP reachability from chromie-agent..."
+  local output rc
+  set +e
+  output="$(docker compose "${COMPOSE_ARGS[@]}" exec -T \
+    -e "SORIDORMI_MCP_URL=$CONTAINER_MCP_URL" \
+    chromie-agent \
+    python - "$CONTAINER_MCP_URL" <<'PY_MCP_REACH' 2>&1
+from __future__ import annotations
+
+from urllib.parse import urlparse
+import socket
+import sys
+
+url = sys.argv[1]
+parsed = urlparse(url)
+host = parsed.hostname
+port = parsed.port or (443 if parsed.scheme == "https" else 80)
+if not host:
+    print(f"[chromie][error] Invalid Soridormi MCP URL for container: {url}", file=sys.stderr)
+    raise SystemExit(2)
+try:
+    with socket.create_connection((host, port), timeout=3.0):
+        pass
+except OSError as exc:
+    print(
+        f"[chromie][error] chromie-agent cannot reach Soridormi MCP at {url}: {exc}",
+        file=sys.stderr,
+    )
+    print(
+        "[chromie][hint] The host-side TCP check already passed. If the URL was "
+        "127.0.0.1/localhost on the host, Chromie rewrites it to "
+        "host.docker.internal for containers.",
+        file=sys.stderr,
+    )
+    print(
+        "[chromie][hint] This commonly means Soridormi is bound only to 127.0.0.1 "
+        "on the host. Bind Soridormi MCP to 0.0.0.0 or provide a container-reachable "
+        "--mcp-url, then rerun the check.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+print(f"[chromie] chromie-agent can reach Soridormi MCP TCP endpoint: {host}:{port}")
+PY_MCP_REACH
+  )"
+  rc=$?
+  set -e
+  [ -z "$output" ] || printf '%s\n' "$output"
+  return "$rc"
+}
+
+run_soridormi_capability_probe() {
+  echo "[chromie] Checking Soridormi capabilities..."
+  local output rc
+  set +e
+  output="$(docker compose "${COMPOSE_ARGS[@]}" exec -T \
+    -e "SORIDORMI_MCP_URL=$CONTAINER_MCP_URL" \
+    chromie-agent \
+    python -m app.probe_capabilities \
+    --manifest /app/capabilities/soridormi.json \
+    --exclude-effect test_control 2>&1)"
+  rc=$?
+  set -e
+  [ -z "$output" ] || printf '%s\n' "$output"
+  if [ "$rc" -ne 0 ]; then
+    echo "[chromie][error] Soridormi capability probe failed with exit code $rc." >&2
+    echo "[chromie][hint] Chromie services are up, but the agent could not verify the Soridormi MCP contract." >&2
+    echo "[chromie][hint] Inspect the probe output above first; then run:" >&2
+    echo "[chromie][hint]   docker compose ${COMPOSE_ARGS[*]} logs --tail=120 chromie-agent" >&2
+  fi
+  return "$rc"
+}
+
 wait_for_tcp 127.0.0.1 9001 900 "ASR"
 wait_for_tcp 127.0.0.1 5000 900 "TTS"
 wait_for_tcp 127.0.0.1 8091 300 "Router"
 wait_for_tcp 127.0.0.1 8092 300 "Agent"
 wait_for_tcp 127.0.0.1 11434 300 "Ollama"
 
-echo "[chromie] Checking Soridormi capabilities..."
-docker compose "${COMPOSE_ARGS[@]}" exec -T \
-  -e "SORIDORMI_MCP_URL=$CONTAINER_MCP_URL" \
-  chromie-agent \
-  python -m app.probe_capabilities \
-  --manifest /app/capabilities/soridormi.json \
-  --exclude-effect test_control
+check_soridormi_from_agent_container
+run_soridormi_capability_probe
 
 cat <<EOF_READY
 

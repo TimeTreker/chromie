@@ -17,7 +17,7 @@ class RouterLlmPromptTests(unittest.TestCase):
 
         prompt = router.load_system_prompt()
 
-        self.assertIn("robot-brain router", prompt)
+        self.assertIn("AI robot-brain fast router", prompt)
         self.assertIn("Prompt Architecture", prompt)
         self.assertIn("Global Context Group", prompt)
         self.assertIn("Session Context Group", prompt)
@@ -45,12 +45,20 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("context_profile=full_mind", prompt)
         self.assertIn("routes[]", prompt)
         self.assertIn("ordinary single-turn facts", prompt)
+        self.assertIn("Multi-route Contract", prompt)
+        self.assertIn("independent needs", prompt)
+        self.assertIn("Do not collapse", prompt)
+        self.assertIn("multi-lane work", prompt)
         self.assertIn("Memory And Task Context", prompt)
         self.assertIn("Working memory, task context, and recent action history", prompt)
         self.assertIn("Metadata is optional", prompt)
         self.assertNotIn("thinking_mode", prompt)
         self.assertIn("session_action=none|continue_current|", prompt)
         self.assertIn("candidate_capabilities", prompt)
+        self.assertIn("Affordance Grounding", prompt)
+        self.assertIn("body/tool affordance", prompt)
+        self.assertIn("not a phrase table", prompt)
+        self.assertIn("downstream capability", prompt)
         self.assertIn("not authorization", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("robot_action", prompt)
@@ -59,7 +67,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("chromie.speak", prompt)
         self.assertIn("confidence", prompt)
         self.assertIn("agreement/disagreement", prompt)
-        self.assertIn("Catalog entries are context, not authorization", prompt)
+        self.assertIn("Catalog entries", prompt)
+        self.assertIn("not authorization", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
         self.assertIn("status=missing_ability", prompt)
         self.assertIn("Return one compact JSON object", prompt)
@@ -74,7 +83,6 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Single listed skill template", prompt)
         self.assertIn("Compound listed skill template", prompt)
         self.assertIn("Do not", prompt)
-        self.assertIn("output chain-of-thought", prompt)
         self.assertIn("chain-of-thought", prompt)
         self.assertIn("progress text", prompt)
 
@@ -130,12 +138,15 @@ class RouterLlmPromptTests(unittest.TestCase):
                         "requires_confirmation": False,
                         "input_schema": {
                             "type": "object",
+                            "required": ["count"],
                             "properties": {
                                 "count": {
                                     "type": "number",
                                     "minimum": 1,
                                     "maximum": 6,
                                     "default": 2,
+                                    "unit": "times",
+                                    "description": "Number of visible eye blinks.",
                                 }
                             },
                         },
@@ -177,6 +188,10 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Output Template Preview", prompt)
         self.assertIn("compatibility primary route", prompt)
         self.assertIn("Use routes[] for multiple independent policy lanes", prompt)
+        self.assertIn("Multi-route contract", prompt)
+        self.assertIn("separate routes[] items", prompt)
+        self.assertIn("Do not collapse independent lanes into one route", prompt)
+        self.assertIn("actions[] is only for ordered robot_action skills", prompt)
         self.assertIn("Single listed skill", prompt)
         self.assertIn("Multiple listed skills", prompt)
         self.assertIn("Mixed chat/memory/deepthought", prompt)
@@ -184,13 +199,14 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertNotIn("not " + "recommendations", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
-        self.assertIn("no executable blink skill is in the compact skill catalog", prompt)
-        self.assertIn("Factual agreement/disagreement is chat", prompt)
-        self.assertIn("Moon, Sun, shape, temperature", prompt)
-        self.assertIn("not deep_thought or robot_action", prompt)
-        self.assertIn("routes common-fact questions to chat", prompt)
-        self.assertIn("Semantic Examples", prompt)
-        self.assertIn("factual_agreement", prompt)
+        self.assertIn("Affordance Grounding", prompt)
+        self.assertIn("compact body/tool affordance interface", prompt)
+        self.assertIn("not a phrase table", prompt)
+        self.assertIn("duration, distance, count, direction, speed", prompt)
+        self.assertIn("single parameterized physical request", prompt)
+        self.assertIn("downstream capability planner", prompt)
+        self.assertNotIn("Semantic Examples", prompt)
+        self.assertNotIn("no executable blink skill is in the compact skill catalog", prompt)
         self.assertIn("Bounded session, memory, task, and robot/world context JSON", prompt)
         self.assertIn("chromie_default_mind", prompt)
         self.assertIn("Chromie", prompt)
@@ -200,6 +216,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("soridormi.walk_velocity", prompt)
         self.assertIn("soridormi.blink_eyes", prompt)
         self.assertIn("count", prompt)
+        self.assertIn("required_args", prompt)
+        self.assertIn("Number of visible eye blinks", prompt)
+        self.assertIn("times", prompt)
         self.assertIn("low_risk_action", prompt)
         self.assertIn("robot_state", prompt)
         self.assertIn("position", prompt)
@@ -207,9 +226,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("authorize side effects", prompt)
         self.assertIn("Speech-only conversation", prompt)
         self.assertIn("treat the speech as a skill task", prompt)
-        self.assertIn("Only put direct_to_tts=true", prompt)
         self.assertIn("Do not return interrupt or ignore", prompt)
-        self.assertIn("polite ability-shaped request", prompt)
+        self.assertIn("politeness", prompt)
         self.assertIn("working memory, current task context, and recent action history", prompt)
         self.assertIn("Required compatibility keys: route, intent, confidence", prompt)
         self.assertIn("routes[] item", prompt)
@@ -219,7 +237,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("non-executable ability proposals", prompt)
         self.assertIn("include actions as an ordered array", prompt)
         self.assertIn("\"confidence\":0.0", prompt)
-        self.assertIn("Each proposed action has its own confidence", prompt)
+        self.assertIn("downstream capability planner", prompt)
         self.assertIn("chain-of-thought", prompt)
         self.assertIn("progress text", prompt)
         self.assertIn("placeholder intents", prompt)

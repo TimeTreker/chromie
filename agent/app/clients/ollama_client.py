@@ -9,11 +9,18 @@ from typing import Any, Literal
 
 import httpx
 
-from shared.chromie_runtime.llm_diagnostics import (
-    ollama_completion_diagnostics,
-    ollama_prompt_preflight_diagnostics,
-)
-from shared.chromie_runtime.log_colors import colorize_for_cli
+try:
+    from chromie_runtime.llm_diagnostics import (
+        ollama_completion_diagnostics,
+        ollama_prompt_preflight_diagnostics,
+    )
+    from chromie_runtime.log_colors import colorize_for_cli
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_runtime.llm_diagnostics import (
+        ollama_completion_diagnostics,
+        ollama_prompt_preflight_diagnostics,
+    )
+    from shared.chromie_runtime.log_colors import colorize_for_cli
 
 
 logger = logging.getLogger("chromie.agent.ollama")
