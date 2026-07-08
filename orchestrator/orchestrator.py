@@ -1838,6 +1838,18 @@ class VoiceAssistant:
                 scheduled.get("chunks", 1),
                 scheduled.get("generation"),
             )
+            decision.metadata = {
+                **(decision.metadata or {}),
+                "fast_first_response_scheduled": True,
+                "fast_first_response": {
+                    "scheduled": True,
+                    "route": decision.route,
+                    "intent": decision.intent,
+                    "text": text,
+                    "chunks": scheduled.get("chunks", 1),
+                    "generation": scheduled.get("generation"),
+                },
+            }
             if decision.speak_first and decision.speak_first.strip() == text:
                 decision.speak_first = None
             return True

@@ -302,7 +302,7 @@ def _missing_capability_decision(
     raw_intent: str,
     reason: str,
 ) -> RouteDecision:
-    language = request.language or "auto"
+    language = _request_language(request)
     if language.startswith("zh"):
         speak_first = "我没有找到能安全执行这个动作的对应技能，所以不会猜一个相似动作来做。"
     else:
@@ -331,7 +331,9 @@ def _missing_capability_decision(
             metadata={
                 "desired_abilities": [
                     {
-                        "ability_id": "unknown_body_action",
+                        "ability_id": "forward_motion"
+                        if _is_forward_motion_request(request.text)
+                        else "unknown_body_action",
                         "intent": desired_intent,
                         "status": "missing_ability",
                         "confidence": 0.0,
@@ -343,6 +345,7 @@ def _missing_capability_decision(
                     "model_intent": raw_intent,
                     "user_text": request.text,
                     "reason": reason,
+                    "forward_motion_request": _is_forward_motion_request(request.text),
                 },
             },
         ),
@@ -448,6 +451,75 @@ def _intent_capability_id(intent: str) -> str:
     if not normalized.startswith(prefix):
         return ""
     return normalized[len(prefix) :].strip()
+
+
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= ch <= "\u9fff" for ch in text or "")
+
+
+def _request_language(request: RouteRequest) -> str:
+    language = (request.language or "auto").strip() or "auto"
+    if language == "auto" and _contains_cjk(request.text):
+        return "zh-CN"
+    return language
+
+
+def _is_forward_motion_request(text: str) -> bool:
+    normalized = " ".join((text or "").strip().lower().split())
+    if not normalized:
+        return False
+    zh_forward = any(phrase in normalized for phrase in ("往前", "向前", "朝前", "前进"))
+    zh_motion = any(phrase in normalized for phrase in ("走", "移动", "挪", "行走"))
+    if zh_forward and zh_motion:
+        return True
+    if re.search(r"\b(?:walk|move|go|step)\s+(?:forward|ahead)\b", normalized):
+        return True
+    if re.search(r"\b(?:forward|ahead)\s+(?:walk|motion|move|movement|step)\b", normalized):
+        return True
+    return False
+
+
+def _forward_motion_capability_id(by_id: dict[str, dict[str, Any]], text: str) -> str:
+    if not _is_forward_motion_request(text):
+        return ""
+    for capability_id in ("soridormi.walk_forward", "soridormi.walk_velocity"):
+        item = by_id.get(capability_id)
+        if item is not None and _capability_executable(item):
+            return capability_id
+    return ""
+
+
+def _capability_presence_snapshot(
+    by_id: dict[str, dict[str, Any]],
+    capability_ids: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    snapshot: list[dict[str, Any]] = []
+    for capability_id in capability_ids:
+        item = by_id.get(capability_id)
+        if item is None:
+            continue
+        snapshot.append(
+            {
+                "capability_id": capability_id,
+                "available": item.get("available") is not False,
+                "interaction_executable": bool(item.get("interaction_executable")),
+                "route": str(item.get("route") or ""),
+                "source": str(item.get("source") or ""),
+            }
+        )
+    return snapshot
+
+
+def _prioritize_capability(
+    candidates: list[dict[str, Any]],
+    capability_id: str,
+) -> list[dict[str, Any]]:
+    if not capability_id:
+        return candidates
+    selected = [item for item in candidates if _capability_id(item) == capability_id]
+    if not selected:
+        return candidates
+    return [*selected, *(item for item in candidates if _capability_id(item) != capability_id)]
 
 
 def _unique_capability_suffix_match(raw_intent: str, by_id: dict[str, dict[str, Any]]) -> str:
@@ -644,6 +716,26 @@ def _validate_llm_capability_decision(
             normalized_reason = "validator normalized exact capability intent"
         else:
             selected_id = _unique_capability_suffix_match(raw_intent, by_id)
+    if not selected_id and decision.route == "robot_action":
+        recovered_forward_id = _forward_motion_capability_id(by_id, request.text)
+        if recovered_forward_id and raw_intent in {"", "unknown", "robot_action", "physical_motion"}:
+            selected_id = recovered_forward_id
+            candidates = _prioritize_capability(candidates, selected_id)
+            decision.candidate_capabilities = candidates
+            decision.intent = f"capability:{selected_id}"
+            decision.reason = (
+                f"{decision.reason}; " if decision.reason else ""
+            ) + "validator recovered forward motion from catalog affordance"
+            decision.metadata = {
+                **(decision.metadata or {}),
+                "catalog_affordance_recovery": {
+                    "status": "selected_exact_forward_motion_capability",
+                    "capability_id": selected_id,
+                    "raw_intent": raw_intent,
+                    "user_text": request.text,
+                },
+            }
+
     if selected_id and raw_intent != f"capability:{selected_id}":
         decision.intent = f"capability:{selected_id}"
         decision.reason = (
@@ -774,6 +866,16 @@ def _validate_llm_capability_decision(
             ) + "validator treated chromie.speak as chat output channel"
             return finalize_decision(decision, request, source="llm")
         if not selected_id and raw_intent in {"", "unknown", "robot_action"}:
+            if _is_forward_motion_request(request.text):
+                logger.info(
+                    "forward_motion_catalog_recovery_missed sid=%s raw_intent=%s known_forward_capabilities=%s",
+                    request.sid,
+                    raw_intent or "<empty>",
+                    _capability_presence_snapshot(
+                        by_id,
+                        ("soridormi.walk_forward", "soridormi.walk_velocity"),
+                    ),
+                )
             return fallback_decision(
                 request,
                 reason=(
@@ -813,6 +915,16 @@ def _validate_llm_capability_decision(
         elif not selected_id:
             executable = _interaction_executable_candidates(result)
             if not executable:
+                if _is_forward_motion_request(request.text):
+                    logger.info(
+                        "forward_motion_catalog_recovery_missed sid=%s raw_intent=%s known_forward_capabilities=%s",
+                        request.sid,
+                        raw_intent or "<empty>",
+                        _capability_presence_snapshot(
+                            by_id,
+                            ("soridormi.walk_forward", "soridormi.walk_velocity"),
+                        ),
+                    )
                 return _fallback_unmatched_robot_action(
                     request,
                     raw_intent=raw_intent,

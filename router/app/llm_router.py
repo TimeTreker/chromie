@@ -58,6 +58,33 @@ PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability:<exact capability_id>",
     "capability:<exact skill_id>",
 }
+
+WEATHER_LOOKUP_CAPABILITY_ID = "chromie.weather.lookup"
+_ZH_WEATHER_TERMS = (
+    "天气",
+    "气温",
+    "温度",
+    "预报",
+    "下雨",
+    "降雨",
+    "下雪",
+    "降雪",
+    "湿度",
+    "风力",
+    "风速",
+)
+_EN_WEATHER_TERMS = (
+    "weather",
+    "forecast",
+    "temperature",
+    "rain",
+    "raining",
+    "snow",
+    "snowing",
+    "humidity",
+    "wind",
+)
+
 _ROUTER_CONTEXT_OMIT_KEYS = {
     "candidate_capabilities",
     "common_ability_catalog",
@@ -179,6 +206,103 @@ def _capability_route_lookup_from_request(request: RouteRequest) -> dict[str, st
             if capability_id and route in ROUTE_NAMES and capability_id not in routes:
                 routes[capability_id] = route
     return routes
+
+
+def _catalog_item_by_capability_id(request: RouteRequest, capability_id: str) -> dict[str, Any] | None:
+    for key in (
+        "common_ability_catalog",
+        "prompt_capabilities_common",
+        "full_ability_catalog",
+        "prompt_capabilities_all",
+        "candidate_capabilities",
+    ):
+        value = request.context.get(key, [])
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            item_id = str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            if item_id == capability_id and item.get("available") is not False:
+                return item
+    return None
+
+
+def _has_weather_lookup_affordance(request: RouteRequest) -> bool:
+    item = _catalog_item_by_capability_id(request, WEATHER_LOOKUP_CAPABILITY_ID)
+    if item is None:
+        return False
+    route = str(item.get("route") or "").strip()
+    return route in {"", "tool"}
+
+
+def _is_weather_like_text(text: str) -> bool:
+    raw = text or ""
+    if any(term in raw for term in _ZH_WEATHER_TERMS):
+        return True
+    lowered = raw.casefold()
+    if not any(re.search(rf"\b{re.escape(term)}\b", lowered) for term in _EN_WEATHER_TERMS):
+        return False
+    if "weather station" in lowered and not any(mark in lowered for mark in ("?", "what", "how", "forecast", "temperature", "rain", "snow")):
+        return False
+    return True
+
+
+def _weather_location_hint(text: str) -> str:
+    raw = " ".join((text or "").strip().split())
+    if not raw:
+        return ""
+    for suffix in (
+        "今天天气情况怎么样",
+        "今天天气怎么样",
+        "今天的天气怎么样",
+        "天气情况怎么样",
+        "天气怎么样",
+        "天气如何",
+        "的天气",
+        "天气",
+    ):
+        if suffix in raw:
+            prefix = raw.split(suffix, 1)[0].strip(" ，。？！?!.、")
+            for day_word in ("今天", "明天"):
+                if prefix.endswith(day_word):
+                    prefix = prefix[: -len(day_word)].strip(" ，。？！?!.、")
+            if prefix and len(prefix) <= 32:
+                return prefix
+    match = re.search(
+        r"(?:weather|forecast|temperature)\s+(?:in|for)\s+([A-Za-z][A-Za-z .'-]{0,48})",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).strip(" .?!,;:")
+    match = re.search(
+        r"(?:in|for)\s+([A-Za-z][A-Za-z .'-]{0,48})\s+(?:weather|forecast|temperature)",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).strip(" .?!,;:")
+    return ""
+
+
+def _weather_date_hint(text: str) -> str:
+    raw = (text or "").casefold()
+    if "明天" in raw or "tomorrow" in raw:
+        return "tomorrow"
+    return "today"
+
+
+def _weather_fast_speech_text(request: RouteRequest) -> str:
+    language = request.language or "auto"
+    zh = language.startswith("zh") or any("\u4e00" <= ch <= "\u9fff" for ch in request.text)
+    location = _weather_location_hint(request.text)
+    date = _weather_date_hint(request.text)
+    if zh:
+        day = "明天" if date == "tomorrow" else "今天"
+        return f"好的，我查一下{location}{day}的天气。" if location else f"好的，我查一下{day}的天气。"
+    day = "tomorrow" if date == "tomorrow" else "today"
+    return f"OK, I’ll check {location}'s weather {day}." if location else f"OK, I’ll check the weather {day}."
 
 
 def _route_for_capability_id(capability_id: str, request: RouteRequest) -> str:
@@ -1291,11 +1415,18 @@ class OllamaLLMRouter:
             if isinstance(locals().get("reviewed"), dict):
                 raw_content = str(reviewed.get("message", {}).get("content") or "")
             logger.warning(
-                "LLM review model intent check failed: %s raw=%r",
+                "LLM review model intent check failed: error_type=%s error=%s raw_chars=%s raw_hash=%s raw_preview=%r",
+                type(exc).__name__,
                 exc,
+                len(raw_content),
+                _short_hash(raw_content),
                 raw_content[:240],
             )
-            return decision
+            return self._recover_weather_affordance_misroute(
+                request,
+                decision,
+                reason=f"intent_review_failed:{type(exc).__name__}",
+            )
 
         if reviewed_decision.route != "robot_action":
             reviewed_decision.reason = (
@@ -1324,6 +1455,89 @@ class OllamaLLMRouter:
             )
             return reviewed_decision
         return decision
+
+    def _recover_weather_affordance_misroute(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+        *,
+        reason: str,
+    ) -> RouteDecision:
+        if decision.route != "robot_action":
+            return decision
+        if decision.actions or decision.intent.startswith("capability:"):
+            return decision
+        if not _has_weather_lookup_affordance(request) or not _is_weather_like_text(request.text):
+            return decision
+
+        location = _weather_location_hint(request.text)
+        metadata_query: dict[str, Any] = {
+            "date": _weather_date_hint(request.text),
+            "units": "metric",
+        }
+        if location:
+            metadata_query["location"] = location
+        fast_speech = FastSpeech(
+            text=_weather_fast_speech_text(request),
+            purpose="acknowledge_and_check",
+            language=request.language or None,
+            commitment="checking_only",
+            must_not_claim_completion=True,
+        )
+        previous_metadata = {
+            key: value
+            for key, value in (decision.metadata or {}).items()
+            if key
+            not in {
+                "route_items",
+                "route_item_count",
+                "route_stage_outputs",
+                "task_list",
+                "task_proposals",
+                "route_merge",
+            }
+        }
+        metadata = {
+            **previous_metadata,
+            "tool_name": "weather",
+            "tool_capability_id": WEATHER_LOOKUP_CAPABILITY_ID,
+            "weather_query": metadata_query,
+            "weather_affordance_recovery": {
+                "reason": reason,
+                "original_route": decision.route,
+                "original_intent": decision.intent,
+                "review_model": self.review_model or None,
+            },
+        }
+        recovered = RouteDecision(
+            route="tool",
+            agents=["tool_agent", "speaker_agent"],
+            intent="weather_query",
+            confidence=max(decision.confidence, self.confidence_threshold, 0.72),
+            language=request.language or decision.language or "auto",
+            priority=decision.priority,
+            needs_agent=True,
+            should_speak=True,
+            speak_first=fast_speech.text,
+            fast_speech=fast_speech,
+            candidate_capabilities=list(decision.candidate_capabilities),
+            reason=(f"{decision.reason}; " if decision.reason else "")
+            + f"catalog-gated weather affordance recovery after {reason}",
+            source="llm",
+            metadata=metadata,
+        )
+        finalized = finalize_decision(recovered, request, source="llm")
+        logger.info(
+            "router_weather_affordance_recovered sid=%s reason=%s original_route=%s original_intent=%s location=%r date=%s",
+            request.sid,
+            reason,
+            decision.route,
+            decision.intent,
+            metadata_query.get("location"),
+            metadata_query.get("date"),
+        )
+        return finalized
+
 
     async def _repair_missing_fast_speech(
         self,
@@ -1674,6 +1888,11 @@ class OllamaLLMRouter:
         else:
             decision = await self._review_ambiguous_deep_thought(request, decision)
         decision = await self._review_route_only_robot_action(request, decision)
+        decision = self._recover_weather_affordance_misroute(
+            request,
+            decision,
+            reason="post_review_robot_action_weather_like",
+        )
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:
             recovered = await self._recover_deterministic_only_decision(request, decision)

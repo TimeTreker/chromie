@@ -49,6 +49,23 @@ def _safe_missing_ability_text(request: AgentRunRequest) -> str:
     return "I do not have a matching skill for that action, so I will not guess a similar movement."
 
 
+def _router_fast_first_already_scheduled(decision: RouteDecision) -> bool:
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    if metadata.get("fast_first_response_scheduled") is True:
+        return True
+    fast_first = metadata.get("fast_first_response")
+    return isinstance(fast_first, dict) and fast_first.get("scheduled") is True
+
+
+def _is_terminal_router_greeting(decision: RouteDecision) -> bool:
+    return (
+        decision.route == "chat"
+        and str(decision.intent or "").strip() == "greeting"
+        and decision.should_speak
+        and (bool(decision.speak_first) or _router_fast_first_already_scheduled(decision))
+    )
+
+
 _EXPRESSIVE_ATTENTION_ARGS = {
     "style": "neutral",
     "duration_s": 2.4,
@@ -134,6 +151,21 @@ class _AgentPipeline:
                 )
             result.requires_confirmation = False
             result.trace.append("runtime: terminal missing-ability clarify; skipped agent rewrite")
+            return result
+
+        if _is_terminal_router_greeting(decision):
+            result.status = "ok"
+            result.reason = decision.reason or "terminal_router_greeting"
+            if decision.speak_first:
+                result.add_speak_immediate(
+                    decision.speak_first,
+                    style="brief",
+                    priority=decision.priority,
+                )
+                result.trace.append("runtime: terminal router greeting emitted speak_first")
+            else:
+                result.trace.append("runtime: terminal router greeting already spoken by fast-first")
+            result.trace.append("runtime: terminal router greeting fast-first; skipped agent rewrite")
             return result
 
         if decision.speak_first and decision.should_speak:
