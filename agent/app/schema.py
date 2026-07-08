@@ -40,7 +40,8 @@ _INTERNAL_PLAN_LABEL_RE = re.compile(
     re.IGNORECASE,
 )
 _INTERNAL_EXECUTION_RE = re.compile(
-    r"\b(?:execute|call|run)\s+(?:soridormi|chromie)\.",
+    r"(?:\b(?:execute|call|run)\s+(?:soridormi|chromie)\.)"
+    r"|(?:执行(?:指令|命令)[:：]?\s*(?:soridormi|chromie)\.)",
     re.IGNORECASE,
 )
 _LEADING_PUNCT_RE = re.compile(r"^[\s,;:.!?，。！？、]+")

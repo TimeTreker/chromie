@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 try:
     from chromie_contracts.task_proposal import TaskProposal
@@ -64,6 +64,21 @@ class FastSpeech(BaseModel):
     commitment: str | None = None
     must_not_claim_completion: bool = True
 
+    @model_validator(mode="before")
+    @classmethod
+    def accept_bare_text(cls, value: Any) -> Any:
+        """Tolerate small-router/review JSON that emits fast_speech as text.
+
+        The prompt asks for an object, but qwen3:4b occasionally returns
+        ``"fast_speech": "..."``.  Treat that as a shorthand for
+        ``{"text": "..."}`` instead of rejecting an otherwise correct
+        route such as weather_query.
+        """
+
+        if isinstance(value, str):
+            return {"text": value}
+        return value
+
 
 class RouteItem(BaseModel):
     """One semantic route item inside a multi-route decision.
@@ -123,6 +138,12 @@ class RouteDecision(BaseModel):
             seen.add(agent)
             normalized.append(agent)
         return normalized
+
+    @model_validator(mode="after")
+    def populate_speak_first_from_fast_speech(self) -> "RouteDecision":
+        if not self.speak_first and self.fast_speech and self.fast_speech.text.strip():
+            self.speak_first = self.fast_speech.text.strip()
+        return self
 
 
 class HealthResponse(BaseModel):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 RouteName = Literal["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"]
 Priority = Literal["low", "normal", "high", "urgent"]
@@ -27,6 +27,13 @@ class FastSpeech(BaseModel):
     language: str | None = None
     commitment: str | None = None
     must_not_claim_completion: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_bare_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return {"text": value}
+        return value
 
 
 class RouteItem(BaseModel):

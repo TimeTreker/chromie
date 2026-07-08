@@ -21,7 +21,7 @@ from .agents import (
 )
 from .dispatcher import selected_agents
 from .interaction import InteractionDraft, NativeInteractionOutputError
-from .schema import AgentResult, AgentRunRequest
+from .schema import AgentResult, AgentRunRequest, RouteDecision
 
 try:
     from chromie_contracts.interaction import InteractionResponse, SkillRequest
@@ -29,6 +29,24 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
 
 logger = logging.getLogger("chromie.agent.runtime")
+
+
+def _is_missing_ability_clarify(decision: RouteDecision) -> bool:
+    return (
+        decision.route == "clarify"
+        and str(decision.intent or "") == "missing_or_unsupported_ability"
+    )
+
+
+def _safe_missing_ability_text(request: AgentRunRequest) -> str:
+    text = " ".join((request.route_decision.speak_first or "").strip().split())
+    if text:
+        return text
+    language = (request.language or request.route_decision.language or "").lower()
+    zh = language.startswith("zh") or any("\u4e00" <= ch <= "\u9fff" for ch in request.text)
+    if zh:
+        return "我没有找到能安全执行这个动作的对应技能，所以不会猜一个相似动作来做。"
+    return "I do not have a matching skill for that action, so I will not guess a similar movement."
 
 
 _EXPRESSIVE_ATTENTION_ARGS = {
@@ -103,6 +121,19 @@ class _AgentPipeline:
             result.reason = decision.reason or "route_interrupt"
             result.add_action("system", "session.interrupt", params={}, blocking=True, timeout_ms=300)
             result.trace.append("runtime: interrupt action emitted")
+            return result
+
+        if _is_missing_ability_clarify(decision):
+            result.status = "clarify"
+            result.reason = decision.reason or "missing_or_unsupported_ability"
+            if decision.should_speak and decision.speak_first:
+                result.add_speak_immediate(
+                    _safe_missing_ability_text(request),
+                    style="brief",
+                    priority=decision.priority,
+                )
+            result.requires_confirmation = False
+            result.trace.append("runtime: terminal missing-ability clarify; skipped agent rewrite")
             return result
 
         if decision.speak_first and decision.should_speak:
@@ -191,7 +222,11 @@ class InteractionRuntime(_AgentPipeline):
             request.route_decision.agents = ["conversation_agent", "speaker_agent"]
             return
         if request.route_decision.route == "clarify":
-            request.route_decision.agents = ["conversation_agent", "speaker_agent"]
+            request.route_decision.agents = (
+                ["speaker_agent"]
+                if _is_missing_ability_clarify(request.route_decision)
+                else ["conversation_agent", "speaker_agent"]
+            )
             return
         if request.route_decision.route == "robot_action":
             request.route_decision.agents = list(
