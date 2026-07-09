@@ -246,7 +246,7 @@ canonical full-suite gate above.
 
 At the current working revision the Level A suite is expected to run:
 
-- **640** current `unittest` cases under `tests/`;
+- the current `unittest` cases discovered under `tests/`;
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
@@ -257,7 +257,18 @@ forbidden-output expectations, writes timestamped comparison reports under
 `.chromie/reports/behavior-scenarios/`, and can compare against a previous
 `summary.json` to list regressions and improvements. This is Level A automated
 evidence only and does not create a target, simulator, microphone, speaker, or
-release-readiness claim. Scenario authoring templates and
+release-readiness claim.
+
+The general ability acceptance layer is now implemented as a claim-oriented
+wrapper over representative behavior scenarios and live text probes. The
+manifest at [`../scenarios/general_ability_acceptance.json`](../scenarios/general_ability_acceptance.json)
+groups cases by reusable ability class, and
+`python scripts/general_ability_acceptance.py --mode check` plus
+`--mode level-a` report evidence level, claim scope, per-class coverage, and
+whether a root-cause report is required. This is implemented and automatically
+verifiable at Level A. It does not create live service, microphone, speaker,
+simulator execution, physical robot, or release-readiness evidence by itself.
+
 `scripts/scenario_author.py` can create draft files, validate the scenario
 library, and print constrained prompts for LLM-assisted candidate generation;
 committed scenarios remain deterministic files reviewed by a human.
@@ -282,15 +293,26 @@ no-motion bridge-acceptance, and reference-candidate verifier refresh after
 committed base `f4bbb2f` passed `python scripts/check_docs.py`,
 `python scripts/test_matrix.py taskgraph soridormi`, local dry-run
 `--task-agent-bridge` acceptance against Soridormi MCP on `127.0.0.1:8011`,
-focused
-interaction/catalog task-agent tests, focused host Skill Runtime graph dispatch
-tests, focused Soridormi acceptance tests, focused robot-candidate verifier
-tests, and dependency-complete Orchestrator AgentClient coverage. The latest
-local `./scripts/run_tests.sh` attempt on 2026-07-04 passed
+focused interaction/catalog task-agent tests, focused host Skill Runtime graph
+dispatch tests, focused Soridormi acceptance tests, focused robot-candidate
+verifier tests, and dependency-complete Orchestrator AgentClient coverage. The
+retained local `./scripts/run_tests.sh` baseline on 2026-07-04 passed
 `python scripts/check_docs.py`, ran 640 current `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions. The behavior
-scenario runner also passed 353/353 adapter, Router, interaction, and dialogue scenario
-files with `--no-write`.
+scenario runner also passed 353/353 adapter, Router, interaction, and dialogue
+scenario files with `--no-write`.
+
+The current 2026-07-09 local gate attempt after the general ability
+reconstruction does not pass the canonical full suite yet. Focused
+general-ability checks pass, including
+`python scripts/general_ability_acceptance.py --mode check --no-write`,
+`python scripts/general_ability_acceptance.py --mode level-a --no-write`
+with 35/35 Level A representative probes, and
+`python scripts/test_matrix.py general-ability`. The full
+`./scripts/run_tests.sh` run discovers 741 `unittest` cases and currently ends
+with 6 failures and 1 error in existing interaction coordinator, native
+TaskGraph emission, provider fault matrix, and TaskGraph planning tests. That
+failed full gate is not release readiness.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
 quality, or real robot safety. The retained RTX evidence above separately
@@ -309,10 +331,11 @@ executed `soridormi.nod_yes` in MuJoCo `sim` mode and returned safe-idle under
 `.chromie/acceptance/text-mujoco/20260702T055207Z`. These are local text-input
 simulator evidence, not microphone, speaker-device, or physical-robot evidence.
 
-`scripts/interaction_text_skill_sweep.py` is available for text-input
-preview sweeps across maintained Soridormi skill prompts. It reports live
-available skills without text cases and executes motion only when explicitly
-run with `--execute` against a supervised simulator endpoint.
+The older standalone text prompt sweep has been removed as a behavior claim
+tool. Add or update live text probes through the general ability manifest
+instead, then run
+`python scripts/general_ability_acceptance.py --mode live-text` against the
+deployed stack.
 
 ## Open release-support gates
 

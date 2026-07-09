@@ -61,22 +61,34 @@ GROUPS: dict[str, TestGroup] = {
         ),
     ),
     "behavior": TestGroup(
-        "File-backed behavior scenarios for Router and InteractionRuntime.",
+        "Unit-tested file-backed behavior scenarios for Router and InteractionRuntime.",
         (
             _unittest(
                 "tests.test_behavior_scenario_runner",
                 "tests.test_behavior_truth_suite",
                 "tests.test_scenario_author",
+                "tests.test_general_ability_acceptance",
+            ),
+        ),
+    ),
+    "general-ability": TestGroup(
+        "Claim-oriented ability-class acceptance manifest and Level A coverage.",
+        (
+            _unittest("tests.test_general_ability_acceptance"),
+            (
+                sys.executable,
+                "scripts/general_ability_acceptance.py",
+                "--mode",
+                "check",
+                "--no-write",
             ),
             (
                 sys.executable,
-                "scripts/scenario_runner.py",
-                "--suite",
-                "router",
-                "--suite",
-                "interaction",
-                "--suite",
-                "dialogue",
+                "scripts/general_ability_acceptance.py",
+                "--mode",
+                "level-a",
+                "--ability-class",
+                "deterministic_safety_controls",
                 "--no-write",
             ),
         ),
@@ -142,9 +154,7 @@ GROUPS: dict[str, TestGroup] = {
         "Voice-to-MuJoCo acceptance tooling and text-path regression coverage.",
         (
             _unittest(
-                "tests.test_interaction_text_acceptance",
                 "tests.test_interaction_text_mujoco_check",
-                "tests.test_interaction_text_skill_sweep",
                 "tests.test_m13_acceptance",
                 "tests.test_m5_target_acceptance",
             ),
@@ -194,6 +204,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "tts",
         "router",
         "behavior",
+        "general-ability",
         "agent",
         "skill-runtime",
         "taskgraph",
@@ -208,6 +219,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "tts",
         "router",
         "behavior",
+        "general-ability",
         "agent",
         "skill-runtime",
         "taskgraph",
@@ -216,7 +228,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "release",
     ),
     "embodiment": ("agent", "skill-runtime", "taskgraph", "soridormi"),
-    "frontend-voice": ("asr", "tts", "router", "behavior", "agent", "skill-runtime"),
+    "frontend-voice": ("asr", "tts", "router", "behavior", "general-ability", "agent", "skill-runtime"),
 }
 
 

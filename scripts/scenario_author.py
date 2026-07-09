@@ -248,7 +248,9 @@ scenarios/{args.suite}/<id>.json
 
 Then validate and run:
 python scripts/scenario_author.py validate-all --suite {args.suite}
-python scripts/scenario_runner.py --suite {args.suite}
+Add representative cases to scenarios/general_ability_acceptance.json.
+python scripts/general_ability_acceptance.py --mode check --no-write
+python scripts/general_ability_acceptance.py --mode level-a --no-write
 """
     print(prompt)
     return 0

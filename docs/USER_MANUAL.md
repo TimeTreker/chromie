@@ -173,58 +173,28 @@ no walking skill, routes to the wrong final mode, or speaks planner labels such
 as `Task Split`, `Key Risk`, `Next Step`, or model-facing `soridormi.*` skill
 IDs.
 
-## Complex Text Scenarios
+## General Ability Text Probes
 
-Use this suite for robot-brain text behavior that is not just a single motion
-skill: false-belief questions, compliments, discourse markers, unsupported
-requests, deep-thinking handoff, emergency stop, and mixed speech/body cases.
-
-```bash
-conda run -n Chromie python scripts/interaction_text_scenario_suite.py --list-cases
-conda run -n Chromie python scripts/interaction_text_scenario_suite.py --only false_belief_sun_shape
-conda run -n Chromie python scripts/interaction_text_scenario_suite.py --only compliment_self_image
-```
-
-By default this is preview-only, headless, and no-microphone. The scenario text
-is the only user input. Expected routes, skills, and speech snippets are checked
-after Chromie has already planned its response. Scenario `expect_no_skills`
-means no user-task Soridormi skills; chat-only expressive cues such as
-`soridormi.express_attention` are allowed unless a case sets
-`allow_expressive_cues: false` or forbids that skill explicitly.
-
-Run all built-in complex scenarios against a running stack:
+Use the general ability runner for robot-brain text behavior that is not just a
+single motion skill: false-belief questions, compliments, discourse markers,
+unsupported requests, deep-thinking handoff, emergency stop, mixed speech/body
+cases, noisy ASR-like input, and Chinese/English ambiguity.
 
 ```bash
-conda run -n Chromie python scripts/interaction_text_scenario_suite.py \
+conda run -n Chromie python scripts/general_ability_acceptance.py --list
+conda run -n Chromie python scripts/general_ability_acceptance.py --mode check
+conda run -n Chromie python scripts/general_ability_acceptance.py --mode live-text \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-Use `--execute` only when you intentionally want emitted Soridormi skills to
-run in the supervised simulator.
+By default `--mode live-text` is preview-only, headless, and no-microphone. The
+scenario text is the only user input. Expected routes, skills, and speech
+snippets are checked after Chromie has already planned its response. Use
+`--execute` only when you intentionally want emitted Soridormi skills to run in
+the supervised simulator.
 
-## Skill Sweep
-
-Preview maintained text prompts without executing robot motion:
-
-```bash
-python scripts/interaction_text_skill_sweep.py \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
-```
-
-List built-in cases:
-
-```bash
-python scripts/interaction_text_skill_sweep.py --list-cases
-```
-
-Execute a selected case only while supervising the simulator:
-
-```bash
-python scripts/interaction_text_skill_sweep.py \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --execute \
-  --case walk_velocity
-```
+The old standalone text scenario suite and text skill sweep commands have been
+removed and should not be used as behavior-quality evidence.
 
 ## Voice Modes
 

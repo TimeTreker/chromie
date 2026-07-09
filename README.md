@@ -132,6 +132,9 @@ not prove GPU, microphone, speaker, simulator, or hardware behavior.
 Higher-level evidence commands and claim rules are in
 [Acceptance and Evidence](docs/ACCEPTANCE.md). Current simulator operational
 commands are in the [Runbook](CHROMIE_RUNBOOK.md).
+For behavior-quality changes, also use the general ability acceptance runner
+documented in
+[General Ability Test Reconstruction](docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md).
 
 ## Safety rules
 

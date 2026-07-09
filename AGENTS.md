@@ -21,6 +21,22 @@ archives, and old milestone prose are context only.
 - Inspect implementation and tests before editing documentation or behavior.
 - For user-visible robot weirdness, diagnose the root architectural or
   interaction-policy cause before changing prompts or phrasing.
+- Do not submit symptom-only interaction fixes. Before changing behavior for a
+  user-reported robot problem, write or report the observed turn, the expected
+  contract, the evidence or trace used, the earliest component that went wrong,
+  whether the fix is architecture, contract/schema, prompt, runtime policy, or
+  test evidence, and the regression boundary that would have caught it.
+- Treat reported utterances as probes into general ability classes, not as
+  isolated targets. Fix robust intent understanding, stable capability
+  grounding, natural uncertainty handling, composable high-level action
+  planning, truthful embodied speech, or evidence coverage rather than tuning
+  Chromie only to pass one pasted example.
+- For user-visible behavior changes, run or update the relevant
+  `scripts/general_ability_acceptance.py` ability class and report the evidence
+  level. Do not claim live robot behavior from Level A output.
+- Fix the earliest responsible boundary. Hardcoded phrase rules are acceptable
+  only for deterministic operational controls or as a last-resort guard after
+  the architecture, contract, and prompt boundary have been checked.
 - Keep microphone, VAD, playback, interruption, conversation state, and trusted
   Skill Runtime coordination in the host Orchestrator.
 - Keep embodied planning, execution, resource safety, stop/emergency behavior,

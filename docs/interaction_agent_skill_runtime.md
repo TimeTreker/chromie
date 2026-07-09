@@ -338,16 +338,18 @@ work.
 
 ## Acceptance
 
-The deterministic text-driven live Soridormi flow is exercised by:
+The behavior-quality text-driven live Soridormi preview is exercised by:
 
 ```bash
-./scripts/interaction_text_acceptance.py
+python scripts/general_ability_acceptance.py --mode live-text \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-It covers Router, native Agent interaction output, strict contracts,
-trusted Skill Runtime scheduling, live Soridormi MCP, and a test speech
-scheduler. It deliberately does not prove microphone capture, real TTS
-playback, or hardware motion.
+It covers Router, native Agent interaction output, strict contracts, live
+Soridormi preflight, and representative ability-class assertions. Use
+`scripts/interaction_text_mujoco_check.py --no-speaker` for retained
+text-to-simulator evidence. These paths deliberately do not prove microphone
+capture, real TTS playback, or hardware motion.
 
 The deployed text-to-MuJoCo check exercises the Router service, Agent
 `/interaction`, trusted Skill Runtime, live Soridormi MCP, and optional real
@@ -388,18 +390,19 @@ The retained `20260617T081411Z` bundle closes the historical M13 text
 interaction scope. Physical microphone and ASR behavior are intentionally
 separate from that closure.
 
-For broader text-input skill coverage without executing robot motion, use the
-preview sweep:
+For broader text-input behavior coverage without executing robot motion, use
+the general ability live-text preview:
 
 ```bash
-python scripts/interaction_text_skill_sweep.py \
+python scripts/general_ability_acceptance.py \
+  --mode live-text \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-The sweep validates maintained text prompts against expected Soridormi skill
-IDs and arguments, writes `.chromie/acceptance/text-skill-sweep/<id>/`, and
-reports live available skills that do not yet have text cases. Use `--execute`
-only for supervised simulator execution.
+This validates representative text probes against ability-class expectations
+and writes `.chromie/acceptance/general-ability/<id>/`. Use `--execute` only
+for supervised simulator execution. The older standalone text skill sweep has
+been removed because it was not a trustworthy behavior-claim gate.
 
 The physical voice-device matrix and evidence requirements are maintained in
 [`ACCEPTANCE.md`](ACCEPTANCE.md). Run and verify it only when a release claim

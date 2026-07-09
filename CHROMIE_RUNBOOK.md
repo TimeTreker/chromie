@@ -216,19 +216,19 @@ catalog/default timeouts unchanged. Evidence is written under
 interaction closure path. It is not supervised microphone evidence and does not
 prove physical audio-device quality.
 
-To sweep the maintained text prompts across Soridormi named skills without
-executing robot motion, run:
+For behavior-quality text probes without executing robot motion, run the
+general ability live-text preview:
 
 ```bash
-python scripts/interaction_text_skill_sweep.py \
+python scripts/general_ability_acceptance.py \
+  --mode live-text \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-This checks text-to-Router and Agent `/interaction` contracts in preview mode,
-writes evidence under `.chromie/acceptance/text-skill-sweep/<id>/`, and reports
-live available Soridormi skills that have no maintained text case. Use
-`--list-cases` to inspect the built-in text prompts. Add `--execute` only for a
-supervised simulator run; it remains headless unless `--speaker` is supplied.
+This checks representative ability-class probes through Router and Agent
+`/interaction` in preview mode and writes evidence under
+`.chromie/acceptance/general-ability/<id>/`. Add `--execute` only for a
+supervised simulator run.
 
 ## 6. Health checks
 
@@ -347,18 +347,16 @@ PYTHONPATH=agent python -m app.soridormi_acceptance \
 
 ## 10. Structured text acceptance
 
-```bash
-PYTHONPATH=. python scripts/interaction_text_acceptance.py nod
-```
-
-Cancellation example:
+Use the general ability preview for behavior claims:
 
 ```bash
-PYTHONPATH=. python scripts/interaction_text_acceptance.py nod \
-  --cancel-after-s 0.2
+python scripts/general_ability_acceptance.py --mode live-text \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-This is headless evidence. It does not use the microphone or physical speaker.
+Use `scripts/interaction_text_mujoco_check.py --no-speaker` when the claim
+requires retained text-to-simulator evidence. These paths do not use the
+microphone or physical speaker.
 
 ## 11. Guarded recovery acceptance
 

@@ -126,8 +126,11 @@ The release process must also probe the live endpoint and retain the result.
 ### Engineering
 
 - `./scripts/run_tests.sh` passes.
-- `python scripts/scenario_runner.py --suite router --suite interaction
-  --suite dialogue --no-write` passes.
+- `python scripts/general_ability_acceptance.py --mode check --no-write`
+  passes.
+- `python scripts/general_ability_acceptance.py --mode level-a --no-write`
+  passes, and any failed ability class has a root-cause report before release
+  work continues.
 - Docker images build from a clean checkout using versioned base/runtime
   references.
 - All direct Python dependencies are exact `==` pins and the release provenance

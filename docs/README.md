@@ -36,6 +36,7 @@ When documents disagree, correct the lower-authority document.
 | What retained trace artifacts can the CLI inspect? | `docs/TRACE_SCHEMA.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
+| How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
 | Where should a new collaborator resume? | `docs/HANDOFF.md` |
 | What can be published and supported? | `docs/RELEASE.md` |
@@ -71,6 +72,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 ## Interaction and execution
 
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
+- [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)
 - [Interaction Agent and Skill Runtime](interaction_agent_skill_runtime.md)
 - [Chromie High-Level Ability Registry](chromie_ability_registry.md)
 - [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md)

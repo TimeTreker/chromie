@@ -4,14 +4,16 @@ This directory stores one frozen behavior scenario per JSON file. The files are
 Level A regression fixtures: they are deterministic, dependency-light, and do
 not prove GPU, microphone, speaker, simulator, or robot behavior.
 
-Run them with:
+Run behavior-quality gates through the general ability manifest:
 
 ```bash
-python scripts/scenario_runner.py --suite router --suite interaction --suite dialogue
+python scripts/general_ability_acceptance.py --mode check
+python scripts/general_ability_acceptance.py --mode level-a
 ```
 
-Use `--baseline path/to/summary.json` to compare a new run with a previous
-report and list regressions, improvements, new cases, and removed cases.
+`scripts/scenario_runner.py` remains a low-level fixture engine for authoring
+and focused debugging, but it should not be used by itself as a claim that
+Chromie behaves naturally.
 
 Create and validate scenarios with:
 
@@ -108,6 +110,25 @@ python scripts/generate_dialogue_scenario_batch.py --target-count 300
 LLMs may help author new candidate scenarios, but committed scenario files must
 contain deterministic expectations. Normal regression runs must not depend on
 an LLM to decide whether the robot behaved correctly.
+
+## General ability acceptance manifest
+
+[`general_ability_acceptance.json`](general_ability_acceptance.json) groups
+representative scenarios by the broader robot ability they protect. It is not a
+scenario file itself and is not loaded by `scripts/scenario_runner.py`.
+
+Run the manifest-level checks with:
+
+```bash
+python scripts/general_ability_acceptance.py --mode check
+python scripts/general_ability_acceptance.py --mode level-a
+```
+
+That runner reports the evidence level and claim scope for each run. A passing
+Level A general-ability run is deterministic regression evidence only; it does
+not prove live Router/Agent services, microphone/speaker behavior, simulator
+execution, or robot hardware behavior. The reconstruction plan is documented in
+[General Ability Test Reconstruction](../docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md).
 
 The planned experience loop for turning low-scoring real dialogue/task episodes
 into reviewed scenario candidates is described in

@@ -1,0 +1,396 @@
+{
+  "schema_version": 1,
+  "title": "General ability acceptance reconstruction manifest",
+  "claim_policy": {
+    "principle": "Examples are probes into a general ability class, not the target by themselves.",
+    "level_a_scope": "Deterministic file-backed regression evidence only. It does not prove live services, microphone, speaker, simulator execution, or robot behavior.",
+    "live_text_scope": "Text enters the same Router and Agent interaction boundary used after ASR. Preview mode proves live interpretation and planning only; execute mode is required before claiming simulator execution.",
+    "failure_policy": "A failed case requires a root-cause report naming the earliest wrong boundary before prompts or wording are changed."
+  },
+  "ability_classes": [
+    {
+      "id": "robust_intent_understanding",
+      "title": "Robust Intent Understanding",
+      "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "ASR/audio",
+        "Router/intent",
+        "Agent contract",
+        "Test evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "router/song_discourse_marker_not_walk",
+          "rationale": "A discourse marker must not become locomotion."
+        },
+        {
+          "key": "router/voice_log_chinese_blink_chat_not_catalog_recovered",
+          "rationale": "Chinese chat text with body-like words must not be forced into an unrelated action."
+        },
+        {
+          "key": "interaction/voice_log_blink_eyes_asr_brink_not_walk",
+          "rationale": "ASR-like near words must not select a weakly related walking skill."
+        },
+        {
+          "key": "dialogue/daily_noisy_room_hearing_honesty",
+          "rationale": "Noisy or uncertain hearing should remain honest and clarifyable."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "wal_forward_typo_walk",
+          "text": "Wal forward for 15 seconds, quickly.",
+          "expected_routes": [
+            "robot_action"
+          ],
+          "expected_skills": [
+            "soridormi.walk_forward"
+          ],
+          "expected_speech_any": [
+            "walk",
+            "forward"
+          ],
+          "forbidden_speech_any": [
+            "matching skill",
+            "similar movement"
+          ],
+          "description": "ASR-style typo should be understood as a walking request when the live catalog supports walking."
+        }
+      ]
+    },
+    {
+      "id": "stable_capability_grounding",
+      "title": "Stable Capability Grounding",
+      "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Router/intent",
+        "Agent contract",
+        "Skill Runtime/provider",
+        "Test evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "interaction/walk_forward_direct_action",
+          "rationale": "A direct walk request should stay on the physical proposal path."
+        },
+        {
+          "key": "interaction/voice_log_exact_walk_forward_not_nod",
+          "rationale": "A walking request must not be repaired into a nod."
+        },
+        {
+          "key": "interaction/voice_log_generic_walk_review_unavailable_not_nod",
+          "rationale": "Unavailable or weak review output must not substitute a different body skill."
+        },
+        {
+          "key": "router/compound_walk_blink_joke_while_walking",
+          "rationale": "Mixed speech and body requests should keep each lane grounded."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "nod_head_twice",
+          "text": "nod your head twice",
+          "expected_routes": [
+            "robot_action"
+          ],
+          "expected_skills": [
+            "soridormi.nod_yes"
+          ],
+          "expected_args": [
+            "0:count=2"
+          ],
+          "expected_speech_any": [
+            "nod"
+          ],
+          "forbidden_speech_any": [
+            "matching skill",
+            "similar movement"
+          ],
+          "description": "Exact head nod request should ground to the catalog-backed nod skill."
+        },
+        {
+          "id": "walk_forward_quick",
+          "text": "walk forward for 15 seconds quickly",
+          "expected_routes": [
+            "robot_action"
+          ],
+          "expected_skills": [
+            "soridormi.walk_forward"
+          ],
+          "expected_args": [
+            "0:duration_s=15.0",
+            "0:speed=quick"
+          ],
+          "expected_speech_any": [
+            "walk",
+            "quick"
+          ],
+          "description": "Clean walking request should preserve duration and speed."
+        }
+      ]
+    },
+    {
+      "id": "natural_uncertainty_handling",
+      "title": "Natural Uncertainty Handling",
+      "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "ASR/audio",
+        "Router/intent",
+        "Agent contract",
+        "Orchestrator policy"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "router/ambiguous_move_there",
+          "rationale": "Unresolved location reference should not execute."
+        },
+        {
+          "key": "interaction/clarify_ambiguous_move",
+          "rationale": "The interaction response should ask for needed context."
+        },
+        {
+          "key": "dialogue/daily_ambiguous_mug_request_clarification",
+          "rationale": "A daily-life ambiguous object request should clarify."
+        },
+        {
+          "key": "dialogue/read_room_state_unknown",
+          "rationale": "Unknown perception state should be acknowledged honestly."
+        },
+        {
+          "key": "dialogue/battery_status_unknown",
+          "rationale": "Unknown robot state should not be fabricated."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "tianxin_ambiguous_tool",
+          "text": "你能查天信吗？",
+          "expected_routes": [
+            "clarify",
+            "tool",
+            "chat"
+          ],
+          "expect_no_skills": true,
+          "expected_speech_any": [
+            "天信",
+            "天气",
+            "意思",
+            "是想"
+          ],
+          "forbidden_speech_any": [
+            "动作",
+            "技能",
+            "相似动作",
+            "matching skill"
+          ],
+          "description": "Ambiguous Chinese tool-like text should clarify the meaning, not report a missing physical skill."
+        },
+        {
+          "id": "single_letter_b",
+          "text": "B.",
+          "expected_routes": [
+            "clarify"
+          ],
+          "expect_no_skills": true,
+          "expected_speech_any": [
+            "B",
+            "heard",
+            "mean",
+            "what"
+          ],
+          "description": "A low-information fragment should clarify instead of becoming blink or another nearby skill."
+        }
+      ]
+    },
+    {
+      "id": "composable_action_planning",
+      "title": "Composable High-Level Action Planning",
+      "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+      "minimum_level_a_cases": 3,
+      "root_cause_boundaries": [
+        "Router/intent",
+        "Agent contract",
+        "Skill Runtime/provider",
+        "Test evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "interaction/compound_walk_nod_blink",
+          "rationale": "A compound request should keep each supported body action."
+        },
+        {
+          "key": "dialogue/compound_walk_nod_then_status",
+          "rationale": "Follow-up status should remember the compound body request."
+        },
+        {
+          "key": "dialogue/batch2_motion_216_take_a_small_step_forward_and_nod",
+          "rationale": "A short step plus nod is a representative multi-skill action."
+        },
+        {
+          "key": "dialogue/batch2_motion_224_walk_forward_slowly_then_blink",
+          "rationale": "Walking plus a visual cue should stay ordered."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "compound_walk_nod_turn",
+          "text": "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left",
+          "expected_routes": [
+            "robot_action"
+          ],
+          "expected_skills": [
+            "soridormi.walk_velocity",
+            "soridormi.nod_yes",
+            "soridormi.turn_in_place"
+          ],
+          "expected_args": [
+            "0:vx_mps=0.2",
+            "0:duration_s=10.0",
+            "1:count=2",
+            "2:yaw_radps=-0.12"
+          ],
+          "expected_speech_any": [
+            "walk",
+            "nod",
+            "turn"
+          ],
+          "description": "Canonical live compound body request should preserve all ordered skills."
+        }
+      ]
+    },
+    {
+      "id": "truthful_embodied_speech",
+      "title": "Truthful Embodied Speech",
+      "general_rule": "Chromie speech should reflect proposal, confirmation, execution, refusal, cancellation, and provider evidence without claiming uncommitted or impossible work.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Agent contract",
+        "Orchestrator policy",
+        "Skill Runtime/provider",
+        "Test evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "interaction/walk_request_not_social_fallback",
+          "rationale": "A physical request should not degrade into unrelated social fallback text."
+        },
+        {
+          "key": "dialogue/raw_joint_command_refusal",
+          "rationale": "Low-level control requests must be refused at the model-facing boundary."
+        },
+        {
+          "key": "dialogue/daily_correct_pending_motion_status",
+          "rationale": "Pending or prior motion status must be described truthfully."
+        },
+        {
+          "key": "dialogue/daily_child_nearby_motion_hold",
+          "rationale": "Nearby people should keep movement speech cautious and conditional."
+        },
+        {
+          "key": "dialogue/emergency_claim_refuse_without_sensor",
+          "rationale": "Chromie must not claim emergency sensing without evidence."
+        }
+      ],
+      "live_text_cases": []
+    },
+    {
+      "id": "tool_and_conversation_lane_discipline",
+      "title": "Tool And Conversation Lane Discipline",
+      "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Router/intent",
+        "Agent contract",
+        "Prompt wording",
+        "Test evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "router/weather_check",
+          "rationale": "Weather intent should use the tool lane when available."
+        },
+        {
+          "key": "dialogue/weather_tool_unavailable_followup",
+          "rationale": "Unavailable tool support should be explained without fake lookup results."
+        },
+        {
+          "key": "dialogue/cooking_timer_no_builtin",
+          "rationale": "A missing timer capability should not be treated as completed work."
+        },
+        {
+          "key": "dialogue/music_request_no_speaker_claim",
+          "rationale": "Chromie should not claim playback support without a speaker/tool path."
+        },
+        {
+          "key": "dialogue/bilingual_translation_followup",
+          "rationale": "Ordinary language tasks should remain conversational, not embodied."
+        }
+      ],
+      "live_text_cases": []
+    },
+    {
+      "id": "deterministic_safety_controls",
+      "title": "Deterministic Safety Controls",
+      "general_rule": "Stop, cancel, emergency, silence, and unusable-audio paths must not depend on model judgment.",
+      "minimum_level_a_cases": 3,
+      "root_cause_boundaries": [
+        "Router/intent",
+        "Orchestrator policy",
+        "Skill Runtime/provider"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "router/polite_stop",
+          "rationale": "A polite stop should still route through the deterministic interrupt path."
+        },
+        {
+          "key": "dialogue/task_close_nevermind",
+          "rationale": "Cancellation language should close the pending task deterministically."
+        },
+        {
+          "key": "dialogue/confirmation_denied_followup",
+          "rationale": "Denied confirmation must remain denied in follow-up state."
+        },
+        {
+          "key": "dialogue/polite_interrupt_social",
+          "rationale": "Socially phrased interruption should not wait for model permission."
+        }
+      ],
+      "live_text_cases": []
+    },
+    {
+      "id": "evidence_coverage_and_claim_discipline",
+      "title": "Evidence Coverage And Claim Discipline",
+      "general_rule": "Tests should prove the user-visible boundary being claimed and should retain enough trace detail to locate the earliest wrong component.",
+      "minimum_level_a_cases": 4,
+      "root_cause_boundaries": [
+        "Test evidence",
+        "Router/intent",
+        "Agent contract",
+        "Orchestrator policy"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "dialogue/voice_log_20260630_planner_regression",
+          "rationale": "A retained voice-log regression should remain a representative scenario, not a one-off phrase patch."
+        },
+        {
+          "key": "interaction/look_out_warning_correction",
+          "rationale": "Truth reconciliation must be visible in metadata and final speech."
+        },
+        {
+          "key": "interaction/revise_window_gaze_to_warning_speech",
+          "rationale": "A revised proposal should supersede unsafe or wrong earlier action."
+        },
+        {
+          "key": "adapter/blocked_agent_result_becomes_refusal",
+          "rationale": "Compatibility adaptation should preserve refusal instead of hiding a blocked result."
+        }
+      ],
+      "live_text_cases": []
+    }
+  ]
+}

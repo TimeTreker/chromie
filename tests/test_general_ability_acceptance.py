@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from pathlib import Path
+
+from scripts.general_ability_acceptance import (
+    DEFAULT_MANIFEST,
+    build_parser,
+    level_a_keys,
+    live_case_ids,
+    load_manifest,
+    main,
+    manifest_summary,
+    run_level_a,
+    select_ability_classes,
+    validate_manifest,
+)
+
+
+class GeneralAbilityAcceptanceTests(unittest.TestCase):
+    def test_default_manifest_declares_core_ability_classes(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+
+        ability_ids = {item.ability_id for item in manifest.ability_classes}
+
+        self.assertIn("robust_intent_understanding", ability_ids)
+        self.assertIn("stable_capability_grounding", ability_ids)
+        self.assertIn("natural_uncertainty_handling", ability_ids)
+        self.assertIn("composable_action_planning", ability_ids)
+        self.assertIn("truthful_embodied_speech", ability_ids)
+        self.assertIn("evidence_coverage_and_claim_discipline", ability_ids)
+        self.assertEqual(validate_manifest(manifest), [])
+        self.assertGreaterEqual(len(level_a_keys(manifest.ability_classes)), 20)
+        self.assertIn("wal_forward_typo_walk", live_case_ids(manifest.ability_classes))
+
+    def test_manifest_summary_labels_scope_and_counts(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+
+        summary = manifest_summary(manifest)
+
+        self.assertTrue(summary["ok"], summary["errors"])
+        self.assertEqual(summary["mode"], "check")
+        self.assertGreater(summary["ability_class_count"], 0)
+        self.assertGreater(summary["level_a_case_count"], 0)
+        self.assertGreater(summary["live_text_case_count"], 0)
+
+    def test_select_ability_classes_rejects_unknown_id(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+
+        selected = select_ability_classes(manifest, ["deterministic_safety_controls"])
+
+        self.assertEqual([item.ability_id for item in selected], ["deterministic_safety_controls"])
+        with self.assertRaisesRegex(ValueError, "unknown ability class"):
+            select_ability_classes(manifest, ["missing"])
+
+    def test_level_a_runner_writes_rollup_for_selected_case(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manifest_path = Path(temp_dir) / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "title": "test manifest",
+                        "ability_classes": [
+                            {
+                                "id": "controls",
+                                "title": "Controls",
+                                "general_rule": "Stops must be deterministic.",
+                                "minimum_level_a_cases": 1,
+                                "root_cause_boundaries": ["Router/intent"],
+                                "level_a_scenarios": [
+                                    {
+                                        "key": "router/polite_stop",
+                                        "rationale": "Polite stop remains interrupt.",
+                                    }
+                                ],
+                                "live_text_cases": [],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = build_parser().parse_args(
+                [
+                    "--mode",
+                    "level-a",
+                    "--ability-manifest",
+                    str(manifest_path),
+                    "--no-write",
+                ]
+            )
+
+            summary = run_level_a(args)
+
+        self.assertTrue(summary["ok"], summary["errors"])
+        self.assertEqual(summary["evidence_level"], "A")
+        self.assertIn("deterministic file-backed evidence", summary["claim_scope"])
+        self.assertEqual(summary["case_count"], 1)
+        self.assertEqual(summary["ability_classes"][0]["id"], "controls")
+        self.assertEqual(summary["ability_classes"][0]["cases"][0]["key"], "router/polite_stop")
+
+    def test_cli_check_mode_returns_success_for_default_manifest(self) -> None:
+        with redirect_stdout(StringIO()):
+            code = main(["--mode", "check", "--no-write"])
+
+        self.assertEqual(code, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

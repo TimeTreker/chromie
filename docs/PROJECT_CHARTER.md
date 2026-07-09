@@ -92,22 +92,30 @@ future production robot backend.
    and phrase tables may retrieve candidates or validate and reject model
    output, but they must not decide ordinary robot intent or planning by
    themselves.
-3. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
+3. **General competence beats case patches.** Reported utterances and scenario
+   fixtures are probes into broad robot abilities, not the product goal by
+   themselves. A fix should improve the reusable capability class behind the
+   failure, such as robust intent understanding, stable catalog grounding,
+   natural uncertainty handling, composable high-level action planning,
+   truthful embodied speech, or valid end-to-end evidence. Do not tune Chromie
+   only to pass the last visible sentence while leaving the underlying ability
+   brittle.
+4. **Risky behavior fails closed.** Disabled, unavailable, malformed, expired,
    or unconfirmed work does not execute.
-4. **Operational controls stay deterministic.** Stop, cancel, emergency,
+5. **Operational controls stay deterministic.** Stop, cancel, emergency,
    silence, and unusable-audio paths do not depend on model judgment.
-5. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
+6. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
    the deterministic operational filter. Normal conversation, tool, memory,
    robot-action, and deep-thought intent must come from bounded model
    understanding and contract validation, or else clarify, delegate to deeper
    reasoning, or fail closed.
-6. **Simulation precedes hardware.** Logical closure, failure handling, and
+7. **Simulation precedes hardware.** Logical closure, failure handling, and
    recovery are proven in simulation before physical commissioning.
-7. **Evidence is part of the product.** Implemented, automatically verified,
+8. **Evidence is part of the product.** Implemented, automatically verified,
    target validated, and release ready are separate states.
-8. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
+9. **Physical rollout is progressive.** Shadow, dry-run, bounded single-skill,
    supervised multi-skill, and broader autonomy are distinct gates.
-9. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
+10. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
    timing, and recovery causes remain inspectable.
 
 ## Non-goals

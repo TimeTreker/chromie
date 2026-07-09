@@ -147,6 +147,29 @@ Exit criteria:
 - `python scripts/check_docs.py` and the relevant automated gates pass;
 - any demo tag is created only after the audit, not before it.
 
+## Open architecture track - General ability acceptance reconstruction
+
+The behavior test framework is being reconstructed so Chromie is evaluated by
+general robot abilities, not by one pasted user sentence at a time.
+
+The detailed design and staged implementation plan are maintained in
+[General Ability Test Reconstruction](docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md).
+
+Exit criteria before using this track as the default behavior-quality gate:
+
+- the general ability manifest groups representative Level A and live text
+  probes by reusable ability class;
+- `python scripts/general_ability_acceptance.py --mode check` validates the
+  manifest and all referenced deterministic scenarios;
+- `--mode level-a` reports ability-class coverage and evidence level without
+  overstating live behavior;
+- live text preview and simulator execution runs retain partial summaries,
+  per-case progress, and useful failure causes instead of hanging silently;
+- failures require a root-cause report that names the earliest wrong boundary;
+- status, acceptance, release, and coding-agent reports cite exact evidence
+  levels rather than saying only that the project was "tested";
+- `python scripts/check_docs.py` and the relevant focused test groups pass.
+
 ## Next implementation phase - Developer usability tools
 
 ### Objective

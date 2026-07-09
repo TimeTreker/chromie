@@ -146,7 +146,7 @@ Previously focused text/M13 tests also passed:
 ```text
 python -m unittest \
   tests.test_interaction_text_mujoco_check \
-  tests.test_interaction_text_acceptance \
+  tests.test_general_ability_acceptance \
   tests.test_m13_acceptance
 ```
 

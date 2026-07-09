@@ -96,43 +96,49 @@ gates pass from the intended revisions.
 
 ## Next sequence
 
-1. Continue the Developer Usability Tools phase described in
+1. Continue the general ability acceptance reconstruction described in
+   [docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md](docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md):
+   the first manifest/runner slice is implemented, and the next work is better
+   live-runner diagnostics, root-cause classification, broader live text
+   sampling, and voice-evidence integration without turning one reported
+   sentence into a special-case patch.
+2. Continue the Developer Usability Tools phase described in
    [docs/DEVELOPER_USABILITY_TOOLS.md](docs/DEVELOPER_USABILITY_TOOLS.md):
    PR0-PR6 are implemented; next harden retained trace examples from real
    bundles and keep `trace explain` deferred until causal semantics are stable.
-2. Use [docs/TRACE_SCHEMA.md](docs/TRACE_SCHEMA.md) as the trace-viewer
+3. Use [docs/TRACE_SCHEMA.md](docs/TRACE_SCHEMA.md) as the trace-viewer
    contract; avoid explanations that obscure session, interaction, TaskGraph,
    Skill Runtime, Soridormi, TTS, and fallback semantics.
-3. Treat Soridormi's high-level task and skill surface as declared for the
+4. Treat Soridormi's high-level task and skill surface as declared for the
    current no-motion contract: bounded locomotion, attention, gesture,
    sequence, stop, safe-idle, and planning-hold task types are present in the
    authoritative manifest; navigation, approach, and delivery remain
    future-blocked structured refusals.
-4. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
+5. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
    authoritative manifest. Use structured task goals for rich embodied requests
    and keep concrete named skills for explicit bounded body commands. Preserve
    Soridormi refusal metadata when reporting unsupported embodied tasks.
-5. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
+6. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
    types only. Missing navigation, approach, gaze, gesture, recovery, or
    manipulation goals must remain structured refusals or clarifications rather
    than velocity recipes.
-6. Keep Qwen/small-model routing advisory. Add or revise routing only with
+7. Keep Qwen/small-model routing advisory. Add or revise routing only with
    deterministic-control bypass, catalog constraints, confidence fallback,
    schema validation, Skill Runtime authorization, and Soridormi provider
    refusal/event checks.
-7. Select one reference-robot candidate and complete the identity,
+8. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
    `commissioning/reference_robot_candidate.schema.json` contract and keep the
    real manifest under ignored `.chromie/commissioning/`.
-8. Keep all physical-motion gates off while validating no-motion health,
+9. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
-9. If the next supported release claims real microphone/speaker voice-device
-   operation, run the full seven-case `supervised` matrix on the reference host,
-   review audible output and MuJoCo safe-idle/recovery behavior, verify the
-   bundle with `--require-clean`, then clear the compatibility blocker.
-10. Before publishing `0.0.1`, record the paired Chromie and Soridormi
+10. If the next supported release claims real microphone/speaker voice-device
+    operation, run the full seven-case `supervised` matrix on the reference host,
+    review audible output and MuJoCo safe-idle/recovery behavior, verify the
+    bundle with `--require-clean`, then clear the compatibility blocker.
+11. Before publishing `0.0.1`, record the paired Chromie and Soridormi
     revisions, rerun the Chromie documentation/test/scenario gates, rerun the
     Soridormi task-agent and locomotion-readiness gates, and keep the tag claim
     limited to generated-speech and Soridormi MuJoCo-executor evidence.

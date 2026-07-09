@@ -47,8 +47,10 @@ ASR and therefore does not prove physical audio-device quality.
 ./scripts/run_tests.sh
 ```
 
-At the current working revision this runs 627 current tests and 20 legacy Agent
-tests. It also runs the documentation consistency checker.
+This runs the documentation consistency checker, all current `unittest` cases
+discovered under `tests/`, and the dependency-light legacy Agent tests. Report
+the exact command output when making a claim; do not use a stale hardcoded test
+count as evidence.
 
 If the host Python environment is intentionally minimal, install the declared
 host test dependency set while running the gate:
@@ -71,6 +73,7 @@ For roadmap-aligned module and combination checks, use:
 python scripts/test_matrix.py --list
 python scripts/test_matrix.py router
 python scripts/test_matrix.py behavior
+python scripts/test_matrix.py general-ability
 python scripts/test_matrix.py asr tts router
 python scripts/test_matrix.py local-modules
 python scripts/test_matrix.py voice-mujoco-sim
@@ -81,13 +84,11 @@ be tested independently or in declared combinations, but it does not replace the
 canonical `./scripts/run_tests.sh` gate and it does not create GPU, microphone,
 MuJoCo, or hardware evidence.
 
-For behavior-quality regression reports, use the file-backed scenario runner:
-
-```bash
-python scripts/scenario_runner.py --suite router --suite interaction --suite dialogue
-python scripts/scenario_runner.py --suite router --suite interaction --suite dialogue \
-  --baseline .chromie/reports/behavior-scenarios/<previous>/summary.json
-```
+`scripts/scenario_runner.py` remains as a low-level deterministic scenario
+engine for fixture authoring and focused debugging. It is not the preferred
+behavior-quality gate. New user-visible behavior claims should use the general
+ability acceptance layer below so the report names the protected ability class
+and evidence level.
 
 The committed fixtures live under [`../scenarios/`](../scenarios/). Each file
 contains one deterministic scenario and expectation set. The runner writes a
@@ -98,6 +99,47 @@ GPU, microphone, speaker, simulator, or robot behavior.
 Interaction fixtures may opt into host response preparation to assert
 preflight, proposal-ledger, revision/supersede, and correction metadata without
 executing live TTS, simulator, or hardware side effects.
+
+For claim-oriented behavior coverage, run the general ability acceptance layer:
+
+```bash
+python scripts/general_ability_acceptance.py --mode check
+python scripts/general_ability_acceptance.py --mode level-a
+python scripts/general_ability_acceptance.py --mode level-a \
+  --ability-class deterministic_safety_controls
+```
+
+The manifest lives at
+[`../scenarios/general_ability_acceptance.json`](../scenarios/general_ability_acceptance.json).
+It groups representative scenario files by the general ability class they
+protect: robust intent understanding, stable capability grounding, natural
+uncertainty handling, composable action planning, truthful embodied speech,
+tool/conversation lane discipline, deterministic safety controls, and evidence
+claim discipline. The runner writes evidence summaries under
+`.chromie/acceptance/general-ability/` unless `--no-write` is supplied.
+
+A passing `--mode level-a` run is still Level A deterministic evidence only. It
+does not prove live services, microphone/speaker behavior, simulator execution,
+or physical robot behavior. When it fails, the retained summary marks
+`root_cause_report_required=true`; the next patch must identify the earliest
+wrong boundary before changing prompts or wording.
+
+Against deployed services, the same manifest can run live text probes:
+
+```bash
+conda run -n Chromie python scripts/general_ability_acceptance.py \
+  --mode live-text \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
+Use `--execute` only for supervised simulator runs. Live text preview checks the
+Router, Agent, and Soridormi status/preflight boundary but does not execute
+motion; live text execution can support a Level C simulator claim only when the
+summary shows successful Skill Runtime execution and safe idle. Neither mode is
+microphone, speaker, or physical hardware evidence.
+
+The reconstruction design and staged implementation plan are maintained in
+[General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md).
 
 To grow the scenario library, use the authoring helper:
 
@@ -204,37 +246,16 @@ PYTHONPATH=agent python -m app.soridormi_acceptance \
   --expected-mode sim
 ```
 
-Exercise the structured text-to-named-skill path:
+The older single-skill text acceptance command has been removed because it used
+a fixture-like legacy Agent result and could be mistaken for acceptance
+evidence. Use the general ability runner for behavior claims and
+`interaction_text_mujoco_check.py` for retained text-to-simulator evidence.
 
-```bash
-PYTHONPATH=. python scripts/interaction_text_acceptance.py nod
-```
-
-Optional cancellation:
-
-```bash
-PYTHONPATH=. python scripts/interaction_text_acceptance.py nod \
-  --cancel-after-s 0.2
-```
-
-The text acceptance path uses deterministic routing, the current Agent runtime,
-native Interaction output, the trusted Skill Runtime, and the live
-Soridormi MCP provider. It schedules speech through a test scheduler rather
-than a speaker device.
-
-To sweep maintained text prompts across Soridormi named skills without
-executing motion:
-
-```bash
-python scripts/interaction_text_skill_sweep.py \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
-```
-
-The sweep defaults to preview-only and no speaker. It writes per-case evidence
-and `summary.json` under `.chromie/acceptance/text-skill-sweep/<id>/`, validates
-expected skill IDs and arguments, and reports live available skills without a
-maintained text case. Use `--execute` only for supervised simulator execution.
-Use `--case-file cases.json` to add project-local text cases.
+The old standalone text skill sweep has been removed because it can overstate
+coverage and has been observed to fail unclearly when live inventory or service
+calls hang. Add representative live text probes to
+[`../scenarios/general_ability_acceptance.json`](../scenarios/general_ability_acceptance.json)
+instead.
 
 For a deployed text-to-MuJoCo check that skips microphone and ASR while keeping
 Router, Agent `/interaction`, the host trusted Skill Runtime, live Soridormi
@@ -301,20 +322,18 @@ evidence. It is the right gate when the goal is to skip microphone and ASR while
 proving the interaction contract, trusted Skill Runtime, live Soridormi
 execution, and safe-idle behavior.
 
-Complex robot-brain text scenarios are covered by:
+The old standalone text scenario suite has been removed for behavior claims.
+Its useful cases are represented by the general ability manifest so failures
+are reported by ability class rather than as a flat list of examples. Use:
 
 ```bash
-conda run -n Chromie python scripts/interaction_text_scenario_suite.py \
+conda run -n Chromie python scripts/general_ability_acceptance.py \
+  --mode live-text \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-This suite is preview-only and headless by default. It checks mixed
-conversation/body cases, false-belief questions, compliments, unsupported
-requests, discourse-marker traps such as `go ahead`, deep-thinking handoff, and
-deterministic stop routing. The scenario text is the only input; expected
-routes, skills, and speech snippets are post-run assertions. Chat-only
-expressive cues are default-off; cases that opt in can still allow reviewed
-expressive skills such as `soridormi.express_attention`.
+That command is preview-only and headless by default. Use `--execute` only for
+supervised simulator execution.
 
 ## Task-agent bridge acceptance
 

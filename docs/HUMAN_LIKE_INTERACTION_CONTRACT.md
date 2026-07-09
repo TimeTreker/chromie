@@ -29,6 +29,87 @@ Fixes should normally strengthen the contract, coordinator state, validation, or
 end-to-end test that allowed the bad behavior. Prompt changes are allowed only
 inside those contracts.
 
+## General Ability Principle
+
+Examples are probes, not the target.
+
+When a user reports one bad conversation, treat it as evidence that a broader
+ability may be weak. Do not make Chromie pass only the specific sentence,
+language, spelling, or scenario that exposed the bug. The fix must name and
+improve the general ability class behind the failure.
+
+Core ability classes include:
+
+- **Robust intent understanding** across normal phrasing, short utterances,
+  typos, ASR noise, Chinese/English input, and follow-up context.
+- **Stable capability grounding** from user meaning to the current live catalog
+  without depending on a fragile second chance that may timeout or change the
+  answer.
+- **Natural uncertainty handling** that asks about the real ambiguity instead
+  of producing generic missing-skill or internal-policy speech.
+- **Composable high-level action planning** for supported multi-step body
+  requests, while keeping physical TaskGraph and Skill Runtime execution
+  sequential and validated.
+- **Truthful embodied speech** that reflects proposal, confirmation,
+  execution, failure, cancellation, and provider evidence.
+- **Broad evidence coverage** that samples an ability family, not only the
+  single phrase that motivated the patch.
+
+Regression cases should therefore be representative examples of an ability
+class. A narrow fixture is acceptable only when it guards a general rule, and
+the final report must state the general rule being protected.
+
+## Root-cause development protocol
+
+No symptom patch without a root-cause report.
+
+For every user-reported robot behavior problem, identify the earliest wrong
+state before changing code or prompts. A final spoken sentence may be the only
+visible failure, but it is often caused earlier by ASR uncertainty, routing,
+state coordination, capability grounding, confirmation, execution evidence, or
+test coverage.
+
+Classify the root cause before choosing a fix:
+
+- **ASR/audio** - the transcript is wrong, uncertain, clipped, duplicated, or
+  over-trusted.
+- **Router/intent** - the route, intent, confidence, or affordance grounding is
+  wrong.
+- **Agent contract** - the model is allowed to invent speech acts, tool results,
+  skill proposals, or physical execution claims.
+- **Prompt wording** - the state and authority are correct, but the generated
+  wording is poor.
+- **Orchestrator policy** - fast-first/final response, conversation state,
+  confirmation, cancellation, timeout, or TTS scheduling is inconsistent.
+- **Skill Runtime/provider** - authorization, preflight, execution result,
+  fallback, or Soridormi/provider evidence is missing or misreported.
+- **Test evidence** - the existing tests mock or skip the boundary that failed
+  for the user.
+
+Choose the fix at the earliest responsible boundary:
+
+- Use an **architecture or runtime-policy fix** when components disagree about
+  authority, state, timing, or execution truth.
+- Use a **contract/schema fix** when model-facing inputs or outputs allow an
+  impossible, unsafe, or ungrounded state.
+- Use a **prompt fix** only after the state, authority, and allowed speech act
+  are already correct.
+- Use a **test-framework fix** when the current tests can pass while the same
+  user conversation still fails.
+
+For every patch that touches user-visible robot behavior, the final report or PR
+notes must state:
+
+```text
+Observed failure: <exact user/ASR text and wrong visible behavior>
+Expected contract: <what Chromie should have done>
+Earliest wrong component: <ASR/router/agent/orchestrator/runtime/provider/test>
+Fix class: <architecture/contract-schema/prompt/runtime-policy/test-evidence>
+Regression boundary: <trace replay, black-box interaction, integration, or unit>
+Evidence level: <live trace, retained trace, Level A, Level B/C/D, or not run>
+General ability protected: <intent understanding/capability grounding/uncertainty handling/composable planning/truthful speech/evidence coverage>
+```
+
 ## Architecture vs prompt
 
 Most bad robot behavior is architectural until proven otherwise.
@@ -226,6 +307,12 @@ claim robot behavior is fixed. Examples of weak evidence:
   unnatural speech;
 - verifying `skills=0` but not forbidding speech that claims execution;
 - using English-only examples for a bug reported in Chinese ASR text.
+
+Use
+[`general_ability_acceptance.json`](../scenarios/general_ability_acceptance.json)
+and `python scripts/general_ability_acceptance.py` when a fix is meant to
+protect a broad ability class. A single new fixture should either join an
+existing ability class or justify a new class in the manifest.
 
 ## Mandatory smoke cases
 

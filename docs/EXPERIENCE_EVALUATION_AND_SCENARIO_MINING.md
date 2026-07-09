@@ -459,6 +459,7 @@ Future implementation validation:
 ```bash
 python -m unittest tests.test_episode_recording tests.test_experience_evaluator
 python scripts/scenario_author.py validate-all
-python scripts/scenario_runner.py --suite router --suite interaction --suite dialogue --no-write
+python scripts/general_ability_acceptance.py --mode check --no-write
+python scripts/general_ability_acceptance.py --mode level-a --no-write
 ./scripts/run_tests.sh
 ```
