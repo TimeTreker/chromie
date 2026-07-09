@@ -302,17 +302,28 @@ then passed 20 dependency-light legacy Agent test functions. The behavior
 scenario runner also passed 353/353 adapter, Router, interaction, and dialogue
 scenario files with `--no-write`.
 
-The current 2026-07-09 local gate attempt after the general ability
-reconstruction does not pass the canonical full suite yet. Focused
-general-ability checks pass, including
-`python scripts/general_ability_acceptance.py --mode check --no-write`,
-`python scripts/general_ability_acceptance.py --mode level-a --no-write`
-with 35/35 Level A representative probes, and
-`python scripts/test_matrix.py general-ability`. The full
-`./scripts/run_tests.sh` run discovers 741 `unittest` cases and currently ends
-with 6 failures and 1 error in existing interaction coordinator, native
-TaskGraph emission, provider fault matrix, and TaskGraph planning tests. That
-failed full gate is not release readiness.
+The current 2026-07-09 local gate after the general ability reconstruction and
+regression fixes passes the canonical dependency-light suite:
+`./scripts/run_tests.sh` completed `python scripts/check_docs.py`, 743
+`unittest` cases, and 20 dependency-light legacy Agent tests. Focused
+general-ability checks also pass, including
+`python scripts/general_ability_acceptance.py --mode check`,
+`python scripts/general_ability_acceptance.py --mode level-a` with 35/35 Level
+A representative probes, and `python scripts/test_matrix.py general-ability`.
+The retained Level A summary is under
+`.chromie/acceptance/general-ability/20260709T080845Z-level-a/summary.json`.
+
+The 2026-07-09 live text preview run against local Router, Agent, and
+Soridormi MCP is not passing yet. After fixing a headless runner blocker where
+`sounddevice` was imported before `ORCH_AUDIO_INPUT_MODE=stdin` and
+`ORCH_AUDIO_OUTPUT_MODE=discard` could take effect, the retained live-text
+summary at
+`.chromie/acceptance/general-ability/20260709T082052Z-live-text/summary.json`
+shows 0/6 cases passed. All six live cases reached Router/Agent/MCP but routed
+through `deep_thought_router_unavailable` after live Router LLM timeouts instead
+of the expected `robot_action`, `clarify`, `tool`, or `chat` routes. This is
+live service evidence for a Router/model-latency and fallback-path failure, not
+simulator execution or release readiness.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
 quality, or real robot safety. The retained RTX evidence above separately

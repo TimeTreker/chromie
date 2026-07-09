@@ -4,9 +4,13 @@ import logging
 import os
 from typing import Any
 
-import sounddevice as sd
-
 logger = logging.getLogger(__name__)
+
+
+def _sounddevice() -> Any:
+    import sounddevice as sd
+
+    return sd
 
 
 def _parse_device(value: str | None) -> int | str | None:
@@ -30,6 +34,7 @@ class AudioDeviceManager:
         self.output_device = _parse_device(os.getenv("ORCH_OUTPUT_DEVICE"))
 
     def _query(self, device: int | str | None, kind: str) -> dict[str, Any]:
+        sd = _sounddevice()
         try:
             info = sd.query_devices(device=device, kind=kind)
         except Exception as exc:

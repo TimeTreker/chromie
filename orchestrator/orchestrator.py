@@ -20,7 +20,6 @@ load_dotenv(ORCH_DIR / ".env.local")
 
 import aiohttp
 import numpy as np
-import sounddevice as sd
 import websockets
 from scipy import signal
 
@@ -68,6 +67,12 @@ logging.basicConfig(
     format="[%(levelname)s] %(asctime)s - %(threadName)s - %(funcName)s - %(message)s",
 )
 logger = logging.getLogger("chromie-orchestrator")
+
+
+def _sounddevice() -> Any:
+    import sounddevice as sd
+
+    return sd
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -775,6 +780,7 @@ class VoiceAssistant:
         async with self.output_stream_lock:
             if self.output_stream is not None:
                 return
+            sd = _sounddevice()
             self.output_stream = sd.OutputStream(
                 samplerate=self.output_rate,
                 channels=self.output_channels,
@@ -3206,6 +3212,7 @@ class VoiceAssistant:
     async def mic_stream(self):
         logger.info("Opening microphone with sounddevice")
         self.loop = asyncio.get_running_loop()
+        sd = _sounddevice()
         with sd.InputStream(
             samplerate=self.input_rate,
             channels=self.input_channels,
