@@ -31,14 +31,6 @@ class ToolAgent(BaseAgent):
             if isinstance(request.route_decision.metadata, dict)
             else [],
         )
-        if self._is_weather_request(request):
-            logger.info(
-                "tool_agent_dispatch sid=%s tool=weather intent=%s",
-                request.sid,
-                request.route_decision.intent,
-            )
-            return await self._run_weather(request, result)
-
         planner = self.services.task_graph_planner
         if planner is not None and request.route_decision.route == "tool":
             try:
@@ -63,6 +55,14 @@ class ToolAgent(BaseAgent):
                     exc_info=True,
                 )
                 result.trace.append(f"tool_agent: TaskGraph planning failed: {type(exc).__name__}: {exc}")
+
+        if self._is_weather_request(request) and self.services.weather_client is not None:
+            logger.info(
+                "tool_agent_dispatch sid=%s tool=weather intent=%s",
+                request.sid,
+                request.route_decision.intent,
+            )
+            return await self._run_weather(request, result)
 
         intent = request.route_decision.intent or "tool_request"
         result.add_action(

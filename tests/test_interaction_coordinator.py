@@ -115,7 +115,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual(
             scheduled[0]["text"],
-            "Sorry, I could not turn that into a verified action, so I will not say I executed it.",
+            "I understand you want me to do a movement. For safety, I need to confirm first.",
         )
         self.assertEqual(
             scheduled[0]["metadata"]["source"],
@@ -155,7 +155,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             prepared.speech[0].text,
-            "Sorry, I could not turn that into a verified action, so I will not say I executed it.",
+            "I understand you want me to do a movement. For safety, I need to confirm first.",
         )
         ledger = prepared.metadata["task_proposal_ledger"]
         self.assertEqual(ledger["summary"]["not_committed_effectful_count"], 1)

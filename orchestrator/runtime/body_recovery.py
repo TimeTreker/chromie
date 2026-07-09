@@ -71,8 +71,7 @@ def is_recoverable_body_result(result: SkillResult) -> bool:
     ).strip().casefold()
     if failure_class in _RECOVERABLE_FAILURE_CLASSES:
         return True
-    reason_code = (result.reason_code or "").strip().casefold()
-    return reason_code.endswith("_failed_retryable")
+    return False
 
 
 def recoverable_body_results(results: list[SkillResult]) -> list[SkillResult]:

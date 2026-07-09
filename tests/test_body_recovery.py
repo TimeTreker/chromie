@@ -81,6 +81,19 @@ class BodyRecoveryTests(unittest.TestCase):
 
         self.assertFalse(is_recoverable_body_result(result))
 
+    def test_retryable_provider_fault_without_recovery_metadata_is_terminal(
+        self,
+    ) -> None:
+        result = SkillResult(
+            request_id="move-1",
+            skill_id="soridormi.move_base",
+            status="failed",
+            reason_code="execute_failed_retryable",
+            output={},
+        )
+
+        self.assertFalse(is_recoverable_body_result(result))
+
     def test_retry_budget_exhaustion_returns_no_recovery(self) -> None:
         response = InteractionResponse(
             interaction_id="interaction-grasp",
