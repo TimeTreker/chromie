@@ -778,9 +778,9 @@ class InteractionRuntimeCoordinator:
                 else "Sorry, I misunderstood that as a direction. Thanks for warning me. I will hold still."
             )
         return (
-            "抱歉，我没有生成可验证的动作指令，所以我不会说已经执行。"
+            "我理解你是想让我做一个动作。为了安全，我需要先确认一下。"
             if zh
-            else "Sorry, I could not turn that into a verified action, so I will not say I executed it."
+            else "I understand you want me to do a movement. For safety, I need to confirm first."
         )
 
     @staticmethod

@@ -89,7 +89,7 @@ class TurnPolicyArchitecture20260709Test(unittest.TestCase):
         spoken = " ".join(item.text for item in prepared.speech)
 
         self.assertNotIn("我这就往前走", spoken)
-        self.assertIn("不会说已经执行", spoken)
+        self.assertEqual(spoken, "我理解你是想让我做一个动作。为了安全，我需要先确认一下。")
         self.assertTrue(prepared.metadata.get("truth_reconciled"))
 
     def test_chinese_weather_ack_does_not_duplicate_today(self) -> None:

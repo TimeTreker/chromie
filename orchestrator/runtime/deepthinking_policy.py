@@ -540,6 +540,7 @@ class DeepThinkingDelegationPolicy:
 
 
 def _route_item_key(index: int, item: Mapping[str, Any]) -> str:
+    del index
     metadata = item.get("metadata")
     nested = item.get("route_item_metadata")
     for value in (
@@ -549,8 +550,35 @@ def _route_item_key(index: int, item: Mapping[str, Any]) -> str:
         nested.get("route_item_id") if isinstance(nested, Mapping) else None,
     ):
         if value:
-            return str(value)
-    return f"{index}:{item.get('route')}:{item.get('intent')}:{item.get('text')}"
+            return f"id:{value}"
+
+    # ``finalize_decision`` mirrors route items into both ``decision.routes`` and
+    # ``metadata.route_items``. Those two copies have different list indexes, so
+    # the fallback key must not include list position. Otherwise one exact
+    # physical proposal is misread as two robot actions and gets delegated to
+    # deepthinking.
+    action_fingerprint = ""
+    actions = item.get("actions")
+    if isinstance(actions, list) and actions:
+        action_fingerprint = repr(
+            sorted(
+                repr(action) for action in actions if isinstance(action, Mapping)
+            )
+        )
+    return "|".join(
+        str(value or "")
+        for value in (
+            item.get("route"),
+            item.get("intent"),
+            item.get("skill_id"),
+            item.get("capability_id"),
+            item.get("tool_name"),
+            item.get("lane") or "agent",
+            bool(item.get("requires_mind", False)),
+            item.get("text"),
+            action_fingerprint,
+        )
+    )
 
 
 

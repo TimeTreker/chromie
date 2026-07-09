@@ -57,10 +57,10 @@ def _router_fast_first_already_scheduled(decision: RouteDecision) -> bool:
     return isinstance(fast_first, dict) and fast_first.get("scheduled") is True
 
 
-def _is_terminal_router_greeting(decision: RouteDecision) -> bool:
+def _is_terminal_router_acknowledgement(decision: RouteDecision) -> bool:
     return (
         decision.route == "chat"
-        and str(decision.intent or "").strip() == "greeting"
+        and str(decision.intent or "").strip() in {"greeting", "gratitude_acknowledgement"}
         and decision.should_speak
         and (bool(decision.speak_first) or _router_fast_first_already_scheduled(decision))
     )
@@ -153,19 +153,33 @@ class _AgentPipeline:
             result.trace.append("runtime: terminal missing-ability clarify; skipped agent rewrite")
             return result
 
-        if _is_terminal_router_greeting(decision):
+        if _is_terminal_router_acknowledgement(decision):
             result.status = "ok"
-            result.reason = decision.reason or "terminal_router_greeting"
+            intent = str(decision.intent or "").strip()
+            is_greeting = intent == "greeting"
+            result.reason = decision.reason or f"terminal_router_{intent or 'acknowledgement'}"
             if decision.speak_first:
                 result.add_speak_immediate(
                     decision.speak_first,
                     style="brief",
                     priority=decision.priority,
                 )
-                result.trace.append("runtime: terminal router greeting emitted speak_first")
+                result.trace.append(
+                    "runtime: terminal router greeting emitted speak_first"
+                    if is_greeting
+                    else "runtime: terminal router acknowledgement emitted speak_first"
+                )
             else:
-                result.trace.append("runtime: terminal router greeting already spoken by fast-first")
-            result.trace.append("runtime: terminal router greeting fast-first; skipped agent rewrite")
+                result.trace.append(
+                    "runtime: terminal router greeting already spoken by fast-first"
+                    if is_greeting
+                    else "runtime: terminal router acknowledgement already spoken by fast-first"
+                )
+            result.trace.append(
+                "runtime: terminal router greeting fast-first; skipped agent rewrite"
+                if is_greeting
+                else "runtime: terminal router acknowledgement; skipped agent rewrite"
+            )
             return result
 
         if decision.speak_first and decision.should_speak:
