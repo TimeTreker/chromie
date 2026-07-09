@@ -259,6 +259,20 @@ def _clarify_insufficient_information_decision(
         speak_first = f"我只听到“{heard}”，你想让我做什么？" if heard else "我没有听清，你想让我做什么？"
     else:
         speak_first = f'I only heard "{heard}". What would you like me to do?' if heard else "I did not catch that. What would you like me to do?"
+    inherited_metadata = {
+        key: value
+        for key, value in (decision.metadata or {}).items()
+        if key
+        not in {
+            "routes",
+            "route_items",
+            "route_item_count",
+            "route_stage_outputs",
+            "task_list",
+            "task_proposals",
+            "route_merge",
+        }
+    }
     return finalize_decision(
         RouteDecision(
             route="clarify",
@@ -280,7 +294,7 @@ def _clarify_insufficient_information_decision(
             reason=reason,
             source="llm",
             metadata={
-                **(decision.metadata or {}),
+                **inherited_metadata,
                 "confidence_calibration": {
                     "status": "downgraded_to_clarify",
                     "reason": reason,

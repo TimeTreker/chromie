@@ -687,13 +687,27 @@ class InteractionRuntimeCoordinator:
             "deepthinking_valid_effect_task_count",
             fallback_key="deepthinking_valid_action_count",
         )
-        if proposed <= 0 or valid > 0:
+        unsafe_speech_without_effect = (
+            bool(response.speech)
+            and not self._has_effectful_runtime_skill(response)
+            and any(
+                self._speech_claims_unverified_effect(
+                    " ".join(str(speech.text or "").strip().split())
+                )
+                for speech in response.speech
+            )
+        )
+        if (proposed <= 0 or valid > 0) and not unsafe_speech_without_effect:
             return response
         if self._has_effectful_runtime_skill(response):
             return response
         reason = str(response.metadata.get("truth_reconciliation_reason") or "").strip()
         if not reason:
-            reason = "deepthinking_effect_task_without_valid_skill"
+            reason = (
+                "speech_claimed_effect_without_runtime_skill"
+                if unsafe_speech_without_effect
+                else "deepthinking_effect_task_without_valid_skill"
+            )
         metadata = {
             **response.metadata,
             "truth_reconciled": True,
@@ -743,7 +757,7 @@ class InteractionRuntimeCoordinator:
     def _speech_claims_unverified_effect(text: str) -> bool:
         return bool(
             re.search(
-                r"(?:执行(?:指令|命令)?|已经执行|正在执行|我会(?:马上|现在)?(?:向前|移动|走|转|执行)|我将(?:向前|移动|走|转|执行)|"
+                r"(?:执行(?:指令|命令)?|已经执行|正在执行|我(?:会|将|要|这就|马上|现在)(?:[^。！？,.，]*)(?:向前|往前|移动|走|转|执行)|"
                 r"I(?:'ll| will) (?:walk|move|turn|execute|perform)|\b(?:moving|walking|turning|executing|performing)\b|soridormi\.|chromie\.)",
                 text,
                 flags=re.IGNORECASE,

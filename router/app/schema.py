@@ -1063,6 +1063,46 @@ def annotate_pipeline_stage_outputs(
     )
 
 
+def _drop_inherited_route_item_metadata(decision: RouteDecision) -> RouteDecision:
+    """Remove stale route-item/task metadata before terminal turn acts.
+
+    Some router recovery paths are created from a rejected LLM decision and keep
+    its metadata for observability.  That metadata can include generated
+    ``route_items`` for the rejected decision.  If a terminal clarification then
+    calls ``normalize_route_items`` with those stale items still present, the
+    dominant-route compatibility rule can resurrect the rejected robot/tool route
+    and make a clarification look like a side effect.
+
+    Terminal conversational acts own their route.  They may keep audit fields,
+    but their active route items/tasks must be generated from the terminal
+    decision itself.
+    """
+
+    if decision.route not in {"clarify", "interrupt", "ignore"}:
+        return decision
+    if decision.routes:
+        return decision
+    metadata = dict(decision.metadata or {})
+    cleaned = {
+        key: value
+        for key, value in metadata.items()
+        if key
+        not in {
+            "routes",
+            "route_items",
+            "route_item_count",
+            "route_stage_outputs",
+            "task_list",
+            "task_proposals",
+            "route_merge",
+        }
+    }
+    if len(cleaned) == len(metadata):
+        return decision
+    cleaned["dropped_inherited_route_item_metadata"] = True
+    return decision.model_copy(update={"metadata": cleaned})
+
+
 def finalize_decision(
     decision: RouteDecision,
     request: RouteRequest | None = None,
@@ -1077,6 +1117,7 @@ def finalize_decision(
     if request is not None and decision.language in ("", "auto", "unknown"):
         decision.language = request.language or detect_language(request.text)
 
+    decision = _drop_inherited_route_item_metadata(decision)
     decision = normalize_route_items(decision)
 
     if not decision.agents:

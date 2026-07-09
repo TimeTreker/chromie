@@ -1531,9 +1531,16 @@ class VoiceAssistant:
     def _deep_thought_prelude_allowed(self, decision: RouteDecision) -> bool:
         if decision.route != "deep_thought" or not decision.should_speak:
             return False
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        original = metadata.get("orchestrator_original_route")
+        original_intent = ""
+        if isinstance(original, dict):
+            original_intent = str(original.get("intent") or "").strip().casefold()
+        if str(decision.intent or "").startswith("clarify_") or original_intent.startswith("clarify_"):
+            return False
         if decision.intent == "deep_thought_low_confidence" and not decision.speak_first:
             return False
-        if (decision.metadata or {}).get("thinking_ack_allowed") is False:
+        if metadata.get("thinking_ack_allowed") is False:
             return False
         return True
 

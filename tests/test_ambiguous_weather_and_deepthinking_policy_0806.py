@@ -108,7 +108,7 @@ class AmbiguousWeatherAndDeepthinkingPolicy0806Tests(unittest.TestCase):
 
         self.assertFalse(delegation.should_delegate)
         self.assertTrue(delegation.high_risk_physical)
-        self.assertEqual(delegation.threshold, 0.95)
+        self.assertEqual(delegation.threshold, 0.70)
 
     def test_exact_physical_capability_still_delegates_when_uncertain(self) -> None:
         policy = DeepThinkingDelegationPolicy(DeepThinkingPolicyConfig())
@@ -123,7 +123,7 @@ class AmbiguousWeatherAndDeepthinkingPolicy0806Tests(unittest.TestCase):
         delegation = policy.evaluate(decision, context={})
 
         self.assertTrue(delegation.should_delegate)
-        self.assertIn("confidence_below_0.95", delegation.reasons)
+        self.assertIn("confidence_below_0.70", delegation.reasons)
 
 
 if __name__ == "__main__":

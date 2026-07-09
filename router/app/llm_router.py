@@ -286,6 +286,21 @@ def _weather_query_location_from_decision(decision: RouteDecision) -> str:
     return ""
 
 
+
+def _strip_zh_weather_day_words(value: str) -> str:
+    cleaned = value.strip(" ，。？！?!.、")
+    changed = True
+    while changed:
+        changed = False
+        for day_word in ("今天", "明天"):
+            if cleaned.startswith(day_word):
+                cleaned = cleaned[len(day_word) :].strip(" ，。？！?!.、")
+                changed = True
+            if cleaned.endswith(day_word):
+                cleaned = cleaned[: -len(day_word)].strip(" ，。？！?!.、")
+                changed = True
+    return cleaned
+
 def _weather_location_hint(text: str) -> str:
     raw = " ".join((text or "").strip().split())
     if not raw:
@@ -301,10 +316,7 @@ def _weather_location_hint(text: str) -> str:
         "天气",
     ):
         if suffix in raw:
-            prefix = raw.split(suffix, 1)[0].strip(" ，。？！?!.、")
-            for day_word in ("今天", "明天"):
-                if prefix.endswith(day_word):
-                    prefix = prefix[: -len(day_word)].strip(" ，。？！?!.、")
+            prefix = _strip_zh_weather_day_words(raw.split(suffix, 1)[0])
             if prefix and len(prefix) <= 32:
                 return prefix
     match = re.search(
@@ -883,7 +895,7 @@ class OllamaLLMRouter:
             "- Clarify/confirm: {\"route\":\"clarify\",\"intent\":\"clarify_target_or_skill\",\"confidence\":0.5,\"fast_speech\":{\"text\":\"I didn’t fully understand; what would you like me to do?\",\"purpose\":\"clarify\",\"commitment\":\"needs_confirmation\",\"must_not_claim_completion\":true}}\n"
             "The top-level route is a compatibility primary route. Use routes[] for multiple independent policy lanes; use actions[] only for ordered listed skills inside a robot_action route item.\n"
             "Multi-route contract: when one utterance contains independent needs, preserve them as separate routes[] items so immediate speech, memory, robot_action proposals, tools, and deep planning keep their own policy lane. Do not collapse independent lanes into one route, and do not put multi-lane work in actions[]; actions[] is only for ordered robot_action skills.\n"
-            "Uncertainty/confirmation rule: when the user-provided information is insufficient to decide what Chromie should do next, ask for confirmation or clarification instead of guessing. Short ASR fragments, isolated letters, unclear pronouns, truncated utterances, or weak lexical associations with a catalog skill are not enough evidence for robot_action unless recent context clearly supplies the missing meaning. If no listed skill clearly supports a requested physical action, do not substitute a similar skill; route the missing ability so Chromie can tell the user the capability is not currently available.\n"
+            "Uncertainty/confirmation rule: when the user-provided information is insufficient to decide what Chromie should do next, ask for confirmation or clarification instead of guessing. Clarification is a conversational act, not robot_action. Short ASR fragments, isolated letters, unclear pronouns, truncated utterances, or weak lexical associations with a catalog skill are not enough evidence for robot_action unless recent context clearly supplies the missing meaning. If no listed skill clearly supports a requested physical action, do not substitute a similar skill; route the missing ability so Chromie can tell the user the capability is not currently available.\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=1400)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Affordance Grounding:\n"

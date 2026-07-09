@@ -12,6 +12,11 @@ except ImportError:  # pragma: no cover - repository development path
 
 TERMINAL_ROUTES = {"interrupt", "ignore", "clarify"}
 DELEGATED_ROUTE = "deep_thought"
+CLARIFICATION_INTENTS = {
+    "clarify_insufficient_information",
+    "insufficient_information",
+    "ambiguous_tool_or_asr",
+}
 
 
 @dataclass(frozen=True)
@@ -166,6 +171,8 @@ class DeepThinkingDelegationPolicy:
             return self._result(decision, should_delegate=False)
         if decision.route in TERMINAL_ROUTES or decision.interrupt_current:
             return self._result(decision, should_delegate=False)
+        if _is_clarification_intent(decision.intent):
+            return self._result(decision, should_delegate=False)
 
         context = context or {}
         reasons: list[str] = []
@@ -275,6 +282,12 @@ class DeepThinkingDelegationPolicy:
         high_risk_physical: bool,
     ) -> float | None:
         if decision.route == "robot_action":
+            if self._exact_capability_selection_without_actions(
+                decision,
+                _route_item_dicts(decision),
+                _action_dicts(decision, _route_item_dicts(decision)),
+            ):
+                return self.config.thresholds["robot_action_single_exact"]
             if high_risk_physical:
                 return self.config.thresholds["navigation_or_manipulation"]
             if compound_action:
@@ -296,15 +309,24 @@ class DeepThinkingDelegationPolicy:
         deepthinking solely because it is physical can discard the proposal and
         produce a confusing speech-only fallback.  CapabilityAgent,
         SkillRuntime, and Soridormi remain the validation and safety boundary.
+
+        Route merge metadata often repeats the selected skill_id inside a
+        route item.  That route-item skill_id is *not* an executable action
+        with args; it is just the catalog selection.  Do not count it as an
+        authored action that requires deepthinking.
         """
 
         if decision.route != "robot_action":
             return False
-        if not str(decision.intent or "").startswith("capability:"):
+        selected_id = _capability_intent_id(decision.intent)
+        if not selected_id:
             return False
-        if list(actions):
-            return False
+
         route_items_list = list(route_items)
+        for action in actions:
+            if not _is_unparameterized_selected_skill_marker(action, selected_id):
+                return False
+
         robot_items = [item for item in route_items_list if item.get("route") == "robot_action"]
         if len(robot_items) > 1:
             return False
@@ -313,9 +335,16 @@ class DeepThinkingDelegationPolicy:
                 return False
             if str(item.get("lane") or "") == "deepthought":
                 return False
-            item_actions = item.get("actions")
-            if isinstance(item_actions, list) and item_actions:
+            item_skill_id = str(item.get("skill_id") or item.get("capability_id") or "").strip()
+            if item_skill_id and item_skill_id != selected_id:
                 return False
+            item_actions = item.get("actions")
+            if isinstance(item_actions, list):
+                for action in item_actions:
+                    if not isinstance(action, Mapping):
+                        return False
+                    if not _is_unparameterized_selected_skill_marker(action, selected_id):
+                        return False
         return True
 
     def _route_items_request_deepthinking(self, route_items: Iterable[dict[str, Any]]) -> bool:
@@ -510,6 +539,56 @@ class DeepThinkingDelegationPolicy:
         return self._action_metadata_is_high_risk(candidate)
 
 
+def _route_item_key(index: int, item: Mapping[str, Any]) -> str:
+    metadata = item.get("metadata")
+    nested = item.get("route_item_metadata")
+    for value in (
+        item.get("id"),
+        item.get("route_item_id"),
+        metadata.get("route_item_id") if isinstance(metadata, Mapping) else None,
+        nested.get("route_item_id") if isinstance(nested, Mapping) else None,
+    ):
+        if value:
+            return str(value)
+    return f"{index}:{item.get('route')}:{item.get('intent')}:{item.get('text')}"
+
+
+
+def _is_clarification_intent(intent: Any) -> bool:
+    normalized = str(intent or "").strip().casefold()
+    return normalized in CLARIFICATION_INTENTS or normalized.startswith("clarify_")
+
+
+def _capability_intent_id(intent: Any) -> str:
+    value = str(intent or "").strip()
+    if not value.startswith("capability:"):
+        return ""
+    return value.split(":", 1)[1].strip()
+
+
+def _is_unparameterized_selected_skill_marker(
+    action: Mapping[str, Any],
+    selected_id: str,
+) -> bool:
+    skill_id = str(action.get("skill_id") or action.get("capability_id") or "").strip()
+    if skill_id != selected_id:
+        return False
+    args = action.get("args")
+    if isinstance(args, Mapping) and args:
+        return False
+    # A route item contributes only skill_id + intent when _action_dicts flattens
+    # it.  Treat that as a selected-catalog marker, not an executable action.
+    effectful_keys = {
+        "timeout_ms",
+        "requires_confirmation",
+        "cancellable",
+        "timing",
+        "effects",
+        "safety_class",
+        "requires_live_perception",
+    }
+    return not any(key in action for key in effectful_keys)
+
 def _route_item_dicts(decision: RouteDecision) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for item in getattr(decision, "routes", []) or []:
@@ -523,7 +602,20 @@ def _route_item_dicts(decision: RouteDecision) -> list[dict[str, Any]]:
     raw = metadata.get("route_items")
     if isinstance(raw, list):
         items.extend(item for item in raw if isinstance(item, dict))
-    return items
+
+    # ``finalize_decision`` stores the same route item both in ``decision.routes``
+    # and in ``metadata.route_items`` for compatibility/audit.  Treating both as
+    # independent route items makes one exact robot-action proposal look
+    # compound, which then sends it to deepthinking as a high-risk physical goal.
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        key = _route_item_key(index, item)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
 
 
 def _action_dicts(
