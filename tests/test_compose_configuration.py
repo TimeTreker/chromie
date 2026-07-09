@@ -66,11 +66,15 @@ class ComposeConfigurationTests(unittest.TestCase):
         )[0]
 
         self.assertIn("ROUTER_USE_LLM: ${ROUTER_USE_LLM:-1}", router_block)
-        self.assertIn("ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:0.6b}", router_block)
+        self.assertIn("ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:4b}", router_block)
+        self.assertIn("ROUTER_LLM_KEEP_ALIVE: ${ROUTER_LLM_KEEP_ALIVE:-24h}", router_block)
+        self.assertIn("ROUTER_WARM_LLM_ON_STARTUP: ${ROUTER_WARM_LLM_ON_STARTUP:-1}", router_block)
+        self.assertIn("ROUTER_WARM_LLM_TIMEOUT_MS: ${ROUTER_WARM_LLM_TIMEOUT_MS:-30000}", router_block)
         self.assertIn("ROUTER_REVIEW_MODEL: ${ROUTER_REVIEW_MODEL:-gemma4:e2b}", router_block)
-        self.assertIn("ROUTER_LLM_TIMEOUT_MS: ${ROUTER_LLM_TIMEOUT_MS:-2200}", router_block)
-        self.assertIn("ROUTER_LLM_NUM_PREDICT: ${ROUTER_LLM_NUM_PREDICT:-192}", router_block)
-        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-1600}", router_block)
+        self.assertIn("ROUTER_TIMEOUT_MS: ${ROUTER_TIMEOUT_MS:-5400}", router_block)
+        self.assertIn("ROUTER_LLM_TIMEOUT_MS: ${ROUTER_LLM_TIMEOUT_MS:-5400}", router_block)
+        self.assertIn("ROUTER_LLM_NUM_PREDICT: ${ROUTER_LLM_NUM_PREDICT:-96}", router_block)
+        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-100}", router_block)
         self.assertIn(
             "ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS: ${ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS:-5000}",
             router_block,

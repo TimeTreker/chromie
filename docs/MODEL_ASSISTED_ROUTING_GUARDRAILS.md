@@ -1,7 +1,7 @@
 # Model-Assisted Routing Guardrails
 
-This document records the routing safety rule for Chromie's small Router model,
-currently configured as `qwen3:0.6b` in common profiles.
+This document records the routing safety rule for Chromie's fast Router model,
+currently configured as `qwen3:4b` in common profiles.
 
 ## Position
 
@@ -34,7 +34,7 @@ emergency filter
 ```
 
 The emergency filter is deterministic and fastest. The quick intent router is
-normally the small Router model (`qwen3:0.6b`) with bounded context and the
+normally the fast Router model (`qwen3:4b`) with bounded context and the
 compact unlocked common skill catalog. Safety-locked catalog entries
 (`prompt_tier_locked=true` or safety-critical/restricted/guarded/commissioning
 classes) stay out of that fast prompt and are available only through the
@@ -51,10 +51,10 @@ The ownership invariant is:
 - only the emergency filter may use rules or phrase patterns to determine a
   route;
 - quick intent and common capability selection for normal language belong to the
-  catalog-aware small Router model, not to regexes or catalog-score action
+  catalog-aware fast Router model, not to regexes or catalog-score action
   rules;
 - quick intent may emit multiple unlocked common-catalog task proposals in
-  `RouteDecision.actions`; "quick" means small model plus compact catalog and
+  `RouteDecision.actions`; "quick" means fast model plus compact catalog and
   short latency, not "single task only";
 - deeper capability selection and revision belong to the Agent model
   interpreting the user request, full catalog descriptions, and schemas, not to
@@ -87,6 +87,13 @@ If any required action is below the Router threshold, the quick plan is
 delegated to `deep_thought` rather than partially executed. Spoken content
 inside a physical task is represented as `chromie.speak` with `args.text`, so
 speech and movement stay in the same task proposal substrate.
+If quick actions are schema-invalid or cover only part of a supported compound
+body request, the Router clears executable action hints and hands the full
+request to CapabilityAgent planning instead of narrowing the user's meaning.
+Likewise, if the quick model marks a weather/tool request as chat while its
+intent or metadata still carries weather semantics, the validator can normalize
+that decision back to `route=tool` only when the catalog exposes the weather
+lookup affordance and the user text is weather-like.
 Delegation preserves the quick plan in `quick_router_review_request`; the
 deepthinking output can then record `quick_review.decision=accept|revise|supersede`
 and mark replaced quick proposals as `superseded` in the shared ledger.
@@ -185,6 +192,6 @@ prove model-assisted routes cannot bypass:
 - Soridormi task preview/refusal/event monitoring;
 - physical-motion gates.
 
-This guardrail applies whether the small Router model is Qwen, another local
+This guardrail applies whether the fast Router model is Qwen, another local
 model, or a future classifier. Model quality can improve routing convenience,
 but safety must come from bounded contracts and deterministic runtime policy.

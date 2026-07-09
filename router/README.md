@@ -64,7 +64,7 @@ to determine a route:
 |---|---|---|
 | Emergency filter | Deterministic Router rules | Stop, cancel, emergency-style interruption, silence, unusable audio, repeated filler hallucinations, and obvious noise. |
 | Post-interrupt review | Review model after the interrupt has already been applied | Confirm the stop/cancel interpretation or propose a corrected non-interrupt task when ASR/wording was misheard. |
-| Quick intent | Common compact catalog plus small LLM router, normally `qwen3:0.6b` | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and propose one or more supported common routes/capability tasks by meaning. |
+| Quick intent | Common compact catalog plus fast LLM router, normally `qwen3:4b` warmed at Router startup | Understand normal requests, combine voice/body/tool intent, use bounded memory/context, and propose one or more supported common routes/capability tasks by meaning. |
 | Deep thought | Agent `deepthinking_agent` using the larger Agent model and full catalog | Split complex tasks, plan, debug, revise/supersede quick proposals, and answer using bounded session memory when the quick router is low confidence or explicitly chooses `deep_thought`. |
 
 Deterministic route validation sits between those stages as a guardrail, not as
@@ -208,12 +208,15 @@ ROUTER_MODE=hybrid
 ROUTER_USE_LLM=1
 ROUTER_RULES_FIRST=1
 ROUTER_OLLAMA_URL=http://chromie-llm:11434
-ROUTER_MODEL=qwen3:0.6b
+ROUTER_MODEL=qwen3:4b
 ROUTER_REVIEW_MODEL=gemma4:e2b
-ROUTER_TIMEOUT_MS=2200
-ROUTER_LLM_TIMEOUT_MS=2200
-ROUTER_LLM_NUM_PREDICT=192
-ROUTER_REVIEW_TIMEOUT_MS=1600
+ROUTER_TIMEOUT_MS=5400
+ROUTER_LLM_TIMEOUT_MS=5400
+ROUTER_LLM_NUM_PREDICT=96
+ROUTER_LLM_KEEP_ALIVE=24h
+ROUTER_WARM_LLM_ON_STARTUP=1
+ROUTER_WARM_LLM_TIMEOUT_MS=30000
+ROUTER_REVIEW_TIMEOUT_MS=100
 ROUTER_CONFIDENCE_THRESHOLD=0.55
 ROUTER_CAPABILITY_CATALOG_URL=http://chromie-agent:8092
 ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=400

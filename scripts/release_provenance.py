@@ -339,7 +339,7 @@ def collect_provenance(
         try:
             resolved_ollama = ollama_models(
                 env.get("OLLAMA_URL", "http://127.0.0.1:11434"),
-                [env.get("AGENT_MODEL", "gemma4:e2b"), env.get("ROUTER_MODEL", "qwen3:0.6b")],
+                [env.get("AGENT_MODEL", "gemma4:e2b"), env.get("ROUTER_MODEL", "qwen3:4b")],
             )
         except Exception as exc:  # release diagnostics should preserve all failures
             runtime_errors.append(f"could not capture Ollama model digests: {exc}")

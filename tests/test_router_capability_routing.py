@@ -941,6 +941,196 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             ["soridormi.walk_velocity", "soridormi.nod_yes"],
         )
 
+    async def test_schema_invalid_quick_actions_handoff_to_capability_planner(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="walk at 0.2 speed for 10 seconds and nod twice",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=30,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 30,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.walk_velocity",
+                    "description": "Track a bounded body velocity command.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "vx_mps": {"type": "number"},
+                            "duration_s": {"type": "number"},
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                {
+                    "capability_id": "soridormi.nod_yes",
+                    "description": "Visible yes nod.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {"count": {"type": "number"}},
+                        "additionalProperties": False,
+                    },
+                },
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="compound_common_catalog_task",
+                confidence=0.91,
+                language="en-US",
+                source="llm",
+                actions=[
+                    {
+                        "capability_id": "soridormi.walk_velocity",
+                        "args": {"speed": "0.2", "duration": "10"},
+                        "sequence": 0,
+                    },
+                    {
+                        "capability_id": "soridormi.nod_yes",
+                        "args": {"count": 2},
+                        "sequence": 1,
+                    },
+                ],
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(text="Walk at 0.2 speed for 10 seconds and nod twice.")
+            )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "compound_common_catalog_task")
+        self.assertEqual(decision.actions, [])
+        self.assertIn("capability_agent", decision.agents)
+        self.assertEqual(
+            decision.metadata["quick_router_action_handoff"]["status"],
+            "planner_required",
+        )
+        self.assertIn(
+            "unknown args",
+            " ".join(decision.metadata["quick_router_action_handoff"]["errors"]),
+        )
+        self.assertNotIn("deepthinking_agent", decision.agents)
+
+    async def test_narrowed_compound_route_items_handoff_to_capability_planner(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=35,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 35,
+            "capabilities": [
+                {
+                    "capability_id": "chromie.speak",
+                    "description": "Speak to the user.",
+                    "route": "chat",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                },
+                {
+                    "capability_id": "soridormi.walk_velocity",
+                    "description": "Track a bounded body velocity command.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                },
+                {
+                    "capability_id": "soridormi.nod_yes",
+                    "description": "Visible yes nod.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                },
+                {
+                    "capability_id": "soridormi.turn_in_place",
+                    "description": "Rotate left or right in place.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                },
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent", "speaker_agent"],
+                intent="chromie.speak",
+                confidence=0.95,
+                language="en-US",
+                source="llm",
+                metadata={
+                    "route_items": [
+                        {
+                            "route": "robot_action",
+                            "intent": "chromie.speak",
+                            "confidence": 0.95,
+                            "lane": "skill_runtime",
+                            "context_profile": "capability_safety",
+                        }
+                    ]
+                },
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(
+                RouteRequest(
+                    text=(
+                        "walk ahead at 0.2 speed for 10 seconds and then "
+                        "nod your head twice, then turn left"
+                    ),
+                    language="en-US",
+                )
+            )
+
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "compound_common_catalog_task")
+        self.assertEqual(decision.actions, [])
+        self.assertIn("capability_agent", decision.agents)
+        self.assertEqual(
+            decision.metadata["quick_router_action_handoff"]["status"],
+            "planner_required",
+        )
+        self.assertEqual(
+            decision.metadata["quick_router_action_handoff"]["reason"],
+            "quick_router_narrowed_compound_request",
+        )
+        self.assertEqual(
+            decision.metadata["route_items"][0]["intent"],
+            "compound_common_catalog_task",
+        )
+        self.assertNotIn("chromie.speak", decision.metadata["task_list"][0]["intent"])
+
     async def test_hybrid_low_confidence_handoff_uses_llm_speak_first_thinking_ack(self) -> None:
         from router.app import main
 
@@ -1845,6 +2035,107 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision.metadata["confidence_calibration"]["model_intent"],
             "capability:soridormi.blink_eyes",
         )
+
+    async def test_short_asr_fragment_chat_is_downgraded_to_clarify(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="B.",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=36,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 36,
+            "capabilities": [
+                {
+                    "capability_id": "chromie.speak",
+                    "description": "Speak to the user.",
+                    "route": "chat",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=0.95,
+                language="en-US",
+                source="llm",
+                reason="model treated an isolated letter as conversation",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="B.", language="en-US"))
+
+        self.assertEqual(decision.route, "clarify")
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.intent, "clarify_insufficient_information")
+        self.assertNotIn("conversation_agent", decision.agents)
+        self.assertIn("I only heard", decision.speak_first or "")
+        self.assertEqual(
+            decision.metadata["confidence_calibration"]["reason"],
+            "isolated_low_information_asr_fragment",
+        )
+
+    async def test_llm_unavailable_short_asr_fragment_clarifies_without_deep_thought(self) -> None:
+        from router.app import main
+
+        result = CapabilityCatalogResult(
+            query="B.",
+            matched=False,
+            suggested_route="chat",
+            catalog_version=34,
+            matches=[],
+        )
+        snapshot = {
+            "catalog_version": 34,
+            "capabilities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "agent_id": "soridormi.skill",
+                    "description": "Blink the robot eyes visibly.",
+                    "route": "robot_action",
+                    "prompt_tier": "common",
+                    "available": True,
+                    "interaction_executable": True,
+                }
+            ],
+        }
+        llm_router = _LlmRouter(
+            RouteDecision(
+                route="chat",
+                agents=["conversation_agent", "speaker_agent"],
+                intent="general_conversation",
+                confidence=0.45,
+                language="en-US",
+                source="fallback",
+                reason="llm_router_error:ReadTimeout",
+            )
+        )
+
+        with patch.object(main.settings, "mode", "hybrid"), patch.object(
+            main, "capability_catalog", _Catalog(result, snapshot=snapshot)
+        ), patch.object(main, "llm_router", llm_router):
+            decision = await main.route(RouteRequest(text="B.", language="en-US"))
+
+        self.assertEqual(decision.route, "clarify")
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.intent, "clarify_insufficient_information")
+        self.assertNotIn("deepthinking_agent", decision.agents)
+        self.assertNotIn("capability_agent", decision.agents)
+        self.assertIn("I only heard", decision.speak_first or "")
+        calibration = decision.metadata["confidence_calibration"]
+        self.assertEqual(calibration["status"], "downgraded_to_clarify")
+        self.assertIn("llm_router_unavailable", calibration["reason"])
 
     async def test_short_fragment_with_strong_followup_context_is_not_downgraded(self) -> None:
         from router.app import main

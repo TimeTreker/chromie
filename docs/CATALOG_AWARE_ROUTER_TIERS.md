@@ -27,7 +27,7 @@ Catalog entries carry a `prompt_tier`:
 
 | Tier | Used By | Purpose |
 |---|---|---|
-| `common` | Second Router / `qwen3:0.6b` | Usually used daily skills that should fit in the fast prompt. |
+| `common` | Second Router / `qwen3:4b` | Usually used daily skills that should fit in the fast prompt. |
 | `rare` | Deepthinking / larger Agent model | Seldom-used, operational, planning, commissioning, or specialized skills. |
 
 Catalog entries also carry:

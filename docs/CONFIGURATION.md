@@ -104,7 +104,7 @@ Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
 | `FOLLOW_LOGS=1` | Follow service logs after startup. |
 | `CHROMIE_PULL_POLICY` | Compose pull policy used by `start_services.sh`; default `never` for local project images. |
 | `CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced by `start_services.sh` after `.env.runtime`; intended for acceptance/service harnesses that need temporary Compose variables. |
-| `WARM_OLLAMA_BEFORE_ORCH` | Warm the Agent model before opening the microphone; when Router LLM is enabled, also warm the small Router model. Default `1`. |
+| `WARM_OLLAMA_BEFORE_ORCH` | Warm the Agent model before opening the microphone; when Router LLM is enabled, also warm the fast Router model. Default `1`. |
 | `OLLAMA_AUTO_RESTART_ON_CRASH` | `1` by default. During host warmup, restart `chromie-llm` once if Ollama reports a native `llama-server` crash such as a segmentation fault, then retry generation. |
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
@@ -165,15 +165,18 @@ configuration.
 | Variable | Default or profile behavior |
 |---|---|
 | `ROUTER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
-| `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the small Router model for fast semantic routing while the emergency filter remains deterministic. |
-| `ROUTER_RULES_FIRST` | `1`. Only hard interrupt/noise filtering runs before the small Router model; normal intent is not selected by phrase rules. |
-| `ROUTER_MODEL` | `qwen3:0.6b` in common configuration. |
+| `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the fast Router model for semantic routing while the emergency filter remains deterministic. |
+| `ROUTER_RULES_FIRST` | `1`. Only hard interrupt/noise filtering runs before the fast Router model; normal intent is not selected by phrase rules. |
+| `ROUTER_MODEL` | `qwen3:4b` in common configuration. |
 | `ROUTER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; used only when an optional review path is enabled. |
 | `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
-| `ROUTER_TIMEOUT_MS` | `2200` in common low-latency configuration. |
-| `ROUTER_LLM_TIMEOUT_MS` | `2200` in common configuration for the fast quick-router model path. |
-| `ROUTER_LLM_NUM_PREDICT` | `192`; compact JSON output budget for the fast quick-router model. |
-| `ROUTER_REVIEW_TIMEOUT_MS` | `1600` in common configuration for reviewer repair paths. |
+| `ROUTER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the quick semantic Router budget for legacy/default readers. |
+| `ROUTER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast quick-router model path. |
+| `ROUTER_LLM_NUM_PREDICT` | `96`; compact JSON output budget for the fast quick-router model. This keeps the quick router bounded to classification JSON and prevents long generations from consuming the realtime route budget. |
+| `ROUTER_LLM_KEEP_ALIVE` | `24h`; sent on Router Ollama calls so the warmed routing model remains resident. |
+| `ROUTER_WARM_LLM_ON_STARTUP` | `1`; the Router service warms its primary LLM during startup so the first live turn does not pay cold model load time. |
+| `ROUTER_WARM_LLM_TIMEOUT_MS` | `30000`; startup warm budget for the Router model. Failure is logged and the service still starts, but live evidence must report the warm failure. |
+| `ROUTER_REVIEW_TIMEOUT_MS` | `100` in common configuration for optional reviewer repair paths. The common profile prioritizes giving the quick semantic Router enough time to finish over spending most of the host budget on slow repair. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog snapshot or compatibility search request; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
@@ -204,7 +207,7 @@ confirm the stop or attach a corrected follow-up route. The quick intent stage
 uses catalog-bounded LLM routing when `ROUTER_MODE` is `hybrid` or `llm_only`.
 The deep-thought stage is reached when quick intent returns low confidence or
 explicitly chooses `deep_thought`; it is handled by the Agent deepthinking
-module, not by the small Router model. Soft deterministic validators may correct
+module, not by the fast Router model. Soft deterministic validators may correct
 impossible or unsafe route choices between stages, but they must not answer the
 user or select normal intent by phrase matching.
 
@@ -317,7 +320,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_ROUTER_TIMEOUT_MS` | `4000` in common low-latency configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_ROUTER_TIMEOUT_MS` | `6000` in common low-latency configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
@@ -493,7 +496,7 @@ Important variables include `OLLAMA_MODEL`, `OLLAMA_KEEP_ALIVE`,
 `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT`, `OLLAMA_TEMPERATURE`, and
 `OLLAMA_TOP_P`. Hardware profiles own the normal model and context defaults.
 Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
-`OLLAMA_NUM_PARALLEL=1`, which lets the small Router model and larger Agent
+`OLLAMA_NUM_PARALLEL=1`, which lets the fast Router model and larger Agent
 model stay resident together when memory allows without increasing per-model
 parallel KV-cache pressure.
 

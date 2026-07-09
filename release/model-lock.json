@@ -28,7 +28,7 @@
     ],
     "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json at release time",
     "router_models": [
-      "qwen3:0.6b"
+      "qwen3:4b"
     ]
   },
   "schema_version": 1,

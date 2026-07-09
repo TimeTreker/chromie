@@ -47,6 +47,10 @@ ROUTE_ITEM_PRIMARY_RANK = {
     "chat": 6,
     "ignore": 7,
 }
+REVIEW_STAGES = {
+    "intent_review",
+    "post_interrupt_review",
+}
 PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability",
     "capability:",
@@ -269,6 +273,27 @@ def _decision_selects_weather_tool(decision: RouteDecision) -> bool:
     return False
 
 
+def _decision_has_weather_semantics(decision: RouteDecision) -> bool:
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    intent = str(decision.intent or "").casefold()
+    if "weather" in intent or "forecast" in intent:
+        return True
+    if str(metadata.get("tool_name") or "").casefold() == "weather":
+        return True
+    if isinstance(metadata.get("weather_query"), dict):
+        return True
+    for item in decision.routes or []:
+        item_metadata = item.metadata if isinstance(item.metadata, dict) else {}
+        item_intent = str(item.intent or "").casefold()
+        if "weather" in item_intent or "forecast" in item_intent:
+            return True
+        if str(item_metadata.get("tool_name") or "").casefold() == "weather":
+            return True
+        if isinstance(item_metadata.get("weather_query"), dict):
+            return True
+    return False
+
+
 def _weather_query_location_from_decision(decision: RouteDecision) -> str:
     metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
     query = metadata.get("weather_query")
@@ -301,6 +326,36 @@ def _strip_zh_weather_day_words(value: str) -> str:
                 changed = True
     return cleaned
 
+
+def _strip_en_weather_day_words(value: str) -> str:
+    cleaned = value.strip(" .?!,;:")
+    day_words = (
+        "today",
+        "tomorrow",
+        "tonight",
+        "now",
+        "currently",
+        "current",
+        "this morning",
+        "this afternoon",
+        "this evening",
+    )
+    changed = True
+    while changed:
+        changed = False
+        lowered = cleaned.casefold()
+        for day_word in day_words:
+            if lowered.startswith(day_word + " "):
+                cleaned = cleaned[len(day_word) :].strip(" .?!,;:")
+                changed = True
+                break
+            if lowered.endswith(" " + day_word) or lowered == day_word:
+                cleaned = cleaned[: -len(day_word)].strip(" .?!,;:")
+                changed = True
+                break
+    return cleaned
+
+
 def _weather_location_hint(text: str) -> str:
     raw = " ".join((text or "").strip().split())
     if not raw:
@@ -325,14 +380,14 @@ def _weather_location_hint(text: str) -> str:
         flags=re.IGNORECASE,
     )
     if match:
-        return match.group(1).strip(" .?!,;:")
+        return _strip_en_weather_day_words(match.group(1))
     match = re.search(
         r"(?:in|for)\s+([A-Za-z][A-Za-z .'-]{0,48})\s+(?:weather|forecast|temperature)",
         raw,
         flags=re.IGNORECASE,
     )
     if match:
-        return match.group(1).strip(" .?!,;:")
+        return _strip_en_weather_day_words(match.group(1))
     return ""
 
 
@@ -433,19 +488,24 @@ def _decision_with_router_fast_speech(
     )
 
 
-def _capability_contract(item: dict[str, Any]) -> str:
-    explicit = str(item.get("contract") or "").strip()
-    if explicit:
-        return explicit
-    route = str(item.get("route") or "tool").strip() or "tool"
-    effects = [str(effect) for effect in list(item.get("effects") or [])[:3] if effect]
-    safety = str(item.get("safety_class") or "").strip()
-    parts = [route]
-    if effects:
-        parts.append("+".join(effects))
-    if safety:
-        parts.append(safety)
-    return ".".join(parts)
+def _compact_schema_field(name: str, prop: dict[str, Any]) -> str:
+    parts = [str(name)]
+    type_value = prop.get("type")
+    if isinstance(type_value, list):
+        type_text = "|".join(str(item) for item in type_value[:3])
+    elif isinstance(type_value, str):
+        type_text = type_value
+    else:
+        type_text = ""
+    if type_text:
+        parts.append(type_text)
+    enum = prop.get("enum")
+    if isinstance(enum, list) and enum:
+        parts.append("enum=" + "|".join(str(item) for item in enum[:4]))
+    unit = prop.get("unit") or prop.get("units")
+    if isinstance(unit, str) and unit.strip():
+        parts.append(f"unit={unit.strip()[:24]}")
+    return ":".join(parts)
 
 
 def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[dict[str, Any]]:
@@ -461,55 +521,93 @@ def _compact_prompt_capabilities(candidates: Any, *, limit: int = 96) -> list[di
         if not capability_id:
             continue
         description = " ".join(str(item.get("description") or "").split())
-        if len(description) > 180:
-            description = description[:180].rstrip() + "..."
+        if len(description) > 28:
+            description = description[:28].rstrip() + "..."
         schema = item.get("input_schema") if isinstance(item.get("input_schema"), dict) else {}
-        args: dict[str, Any] = {}
+        args: list[str] = []
         required = schema.get("required") if isinstance(schema, dict) else []
         if not isinstance(required, list):
             required = []
+        required_set = {str(value) for value in required if isinstance(value, str)}
         properties = schema.get("properties") if isinstance(schema, dict) else {}
         if isinstance(properties, dict):
-            for name, prop in list(properties.items())[:6]:
+            for name, prop in list(properties.items())[:3]:
                 if not isinstance(prop, dict):
                     continue
-                arg: dict[str, Any] = {}
-                for key in (
-                    "type",
-                    "enum",
-                    "minimum",
-                    "maximum",
-                    "exclusiveMinimum",
-                    "exclusiveMaximum",
-                    "default",
-                    "unit",
-                    "units",
+                enum = prop.get("enum")
+                unit = prop.get("unit") or prop.get("units")
+                if (
+                    str(name) not in required_set
+                    and not (isinstance(enum, list) and enum)
+                    and not (isinstance(unit, str) and unit.strip())
                 ):
-                    if key in prop:
-                        arg[key] = prop[key]
-                arg_description = " ".join(str(prop.get("description") or "").split())
-                if arg_description:
-                    arg["description"] = (
-                        arg_description[:96].rstrip() + "..."
-                        if len(arg_description) > 96
-                        else arg_description
-                    )
-                if name in required:
-                    arg["required"] = True
-                args[str(name)] = arg
-        compact.append(
-            {
-                "skill_id": capability_id,
-                "contract": _capability_contract(item),
-                "description": description,
-                "safety": str(item.get("safety_class") or ""),
-                "confirmation": bool(item.get("requires_confirmation", False)),
-                "executable": bool(item.get("interaction_executable")),
-                "required_args": [str(value) for value in required if isinstance(value, str)][:8],
-                "args": args,
-            }
-        )
+                    continue
+                field = _compact_schema_field(str(name), prop)
+                if str(name) in required_set:
+                    field += ":required"
+                args.append(field)
+        effects = [
+            str(effect).strip()
+            for effect in list(item.get("effects") or [])[:3]
+            if str(effect).strip()
+        ]
+        entry: dict[str, Any] = {
+            "skill_id": capability_id,
+            "route": str(item.get("route") or ""),
+        }
+        if description:
+            entry["desc"] = description
+        if effects:
+            entry["effect"] = effects[0]
+        safety = str(item.get("safety_class") or "")[:32]
+        if safety:
+            entry["safety"] = safety
+        if bool(item.get("requires_confirmation", False)):
+            entry["confirm"] = True
+        if item.get("interaction_executable") is False:
+            entry["exec"] = False
+        required_args = [str(value) for value in required if isinstance(value, str)][:6]
+        if required_args:
+            entry["required_args"] = required_args
+        if args:
+            entry["args"] = args
+        compact.append(entry)
     return compact
+
+
+def _compact_prompt_capability_lines(entries: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
+    for entry in entries:
+        skill_id = str(entry.get("skill_id") or "").strip()
+        if not skill_id:
+            continue
+        parts = [skill_id]
+        route = str(entry.get("route") or "").strip()
+        if route and route != "robot_action":
+            parts.append(f"route={route}")
+        desc = str(entry.get("desc") or "").strip()
+        if desc:
+            parts.append(f"desc={desc}")
+        effect = str(entry.get("effect") or "").strip()
+        if effect and effect != "physical_motion":
+            parts.append(f"effect={effect}")
+        safety = str(entry.get("safety") or "").strip()
+        if safety:
+            parts.append(f"safety={safety}")
+        if entry.get("confirm") is True:
+            parts.append("confirm")
+        if entry.get("exec") is False:
+            parts.append("exec=false")
+        required_args = entry.get("required_args")
+        if isinstance(required_args, list) and required_args:
+            parts.append(
+                "required_args=" + ",".join(str(value) for value in required_args[:4])
+            )
+        args = entry.get("args")
+        if isinstance(args, list) and args:
+            parts.append("args=" + ";".join(str(value) for value in args[:3]))
+        lines.append("|".join(parts))
+    return lines
 
 
 def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
@@ -520,6 +618,29 @@ def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
     if len(text) > max_chars:
         return text[:max_chars].rstrip() + "..."
     return text
+
+
+def _bounded_json_array(value: list[Any], *, max_chars: int = 4000) -> str:
+    items: list[Any] = []
+    for item in value:
+        candidate = [*items, item]
+        text = json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        if len(text) > max_chars:
+            break
+        items.append(item)
+    return json.dumps(
+        items,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
@@ -729,16 +850,10 @@ def _router_fast_context_section(mind: Any) -> str:
         }
     return (
         "Fast Router Context:\n"
-        f"{_bounded_json(identity or {'name': 'Chromie'}, max_chars=260)}\n"
+        f"{_bounded_json(identity or {'name': 'Chromie'}, max_chars=120)}\n"
         "The full owner-approved mind profile, worldview, lifeview, valueview, "
-        "long-term goals, and core principles are available only to downstream "
-        "full_mind/deepthought prompts. Do not reproduce or infer those details here.\n"
-        "Your job is to mark each route item with the lightest safe context_profile:\n"
-        "- fast_minimal for greetings, simple acknowledgements, and safe immediate speech.\n"
-        "- session_compact for ordinary chat, tools, or memory that need bounded session context.\n"
-        "- capability_safety for robot_action and other Skill Runtime work.\n"
-        "- full_mind for identity, values, principles, risk judgment, self-description, long-horizon goals, or complex planning.\n"
-        "If an item needs worldview/lifeview/valueview or long deliberation, route that item to deep_thought with context_profile=full_mind."
+        "long-term goals, and core principles are downstream only. "
+        "Pick context_profile: fast_minimal, session_compact, capability_safety, full_mind."
     )
 
 
@@ -823,7 +938,8 @@ class OllamaLLMRouter:
         review_timeout_ms: int | None = None,
         confidence_threshold: float,
         slow_review_recovery_enabled: bool = True,
-        num_predict: int = 192,
+        num_predict: int = 96,
+        keep_alive: str | None = None,
         prompt_path: Path | None = None,
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
@@ -837,6 +953,7 @@ class OllamaLLMRouter:
         self.confidence_threshold = confidence_threshold
         self.slow_review_recovery_enabled = slow_review_recovery_enabled
         self.num_predict = max(32, num_predict)
+        self.keep_alive = (keep_alive or "").strip() or None
         self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "router_system.txt"
         self.debug_raw_output = _env_flag("CHROMIE_ROUTER_DEBUG_RAW") or _env_flag("ROUTER_DEBUG_RAW")
         self.debug_prompt = _env_flag("CHROMIE_ROUTER_DEBUG_PROMPT") or _env_flag("ROUTER_DEBUG_PROMPT")
@@ -861,82 +978,31 @@ class OllamaLLMRouter:
             for item in compact_prompt_capabilities
             if item.get("skill_id")
         ]
-        common_ability_catalog_json = _bounded_json(
-            compact_prompt_capabilities,
-            max_chars=7200,
+        common_ability_catalog_json = _bounded_json_array(
+            _compact_prompt_capability_lines(compact_prompt_capabilities),
+            max_chars=2200,
         )
         mind = request.context.get("mind", {})
         session_context = _router_prompt_context(request.context)
-        context_json = _bounded_json(session_context, max_chars=500)
+        context_json = _bounded_json(session_context, max_chars=360)
         return (
             "Global Context Group:\n"
             f"{_router_fast_context_section(mind)}\n\n"
             "Session Context Group:\n"
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
-            f"Bounded session, memory, task, and robot/world context JSON: {context_json}\n\n"
+            f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n\n"
             "Current Job:\n"
-            "Act as Chromie's quick intent router and fast lane splitter. Return one compatibility route plus optional routes[] items; do not answer, execute, or authorize side effects. "
-            "Infer from meaning/context/abilities/schemas and understand intent broadly before checking the catalog; the catalog constrains executable actions, not meaning. "
-            "Choose route deep_thought for complex reasoning, design, debugging, implementation planning, or when the request needs deeper thought, task-session creation, or task-session continuation. "
-            "Choosing route=deep_thought is only delegation; do not perform or reveal reasoning inside the router. "
-            "For mixed utterances, split independent work into routes[] items so chat, memory, deep_thought, tools, and robot_action can follow separate policies. "
-            "Use context_profile on each item to decide whether the downstream task needs no mind context, compact session context, capability safety context, or full mind/worldview/lifeview/valueview context. "
-            "Return calibrated low confidence when uncertain.\n\n"
+            "quick intent router and fast lane splitter. Decide from meaning, bounded context, and common abilities. Return calibrated confidence; do not answer, execute, or authorize side effects.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
-            "Output Template Preview:\n"
-            "- Chat/fact/greeting: {\"route\":\"chat\",\"intent\":\"general_conversation\",\"confidence\":0.9,\"fast_speech\":{\"text\":\"I’ll think about that.\",\"purpose\":\"acknowledge\",\"commitment\":\"prelude_only\",\"must_not_claim_completion\":true}}\n"
-            "- Fast greeting with direct speech: {\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.9,\"routes\":[{\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.9,\"lane\":\"immediate_speech\",\"context_profile\":\"fast_minimal\",\"direct_to_tts\":true,\"text\":\"Hi, I'm here.\"}]}\n"
-            "- Mixed chat/memory/deepthought: {\"route\":\"deep_thought\",\"intent\":\"mixed_request\",\"confidence\":0.82,\"routes\":[{\"route\":\"chat\",\"intent\":\"greeting\",\"confidence\":0.95,\"lane\":\"immediate_speech\",\"context_profile\":\"fast_minimal\",\"direct_to_tts\":true,\"text\":\"Hi, I'm here.\"},{\"route\":\"memory\",\"intent\":\"remember_user_preference\",\"confidence\":0.86,\"lane\":\"post_turn\",\"context_profile\":\"session_compact\"},{\"route\":\"deep_thought\",\"intent\":\"plan_complex_task\",\"confidence\":0.78,\"lane\":\"deepthought\",\"context_profile\":\"full_mind\",\"requires_mind\":true}]}\n"
-            "- Single listed skill: {\"route\":\"robot_action\",\"intent\":\"capability:<exact skill_id>\",\"confidence\":0.9,\"fast_speech\":{\"text\":\"I’ll check whether I can do that safely.\",\"purpose\":\"safety_prelude\",\"commitment\":\"needs_confirmation\",\"must_not_claim_completion\":true}}\n"
-            "- Multiple listed skills: {\"route\":\"robot_action\",\"intent\":\"compound_common_catalog_task\",\"confidence\":0.9,\"actions\":[{\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential\",\"confidence\":0.9}]}\n"
-            "- Missing ability: {\"route\":\"deep_thought\",\"intent\":\"missing_or_unsupported_ability\",\"confidence\":0.6,\"fast_speech\":{\"text\":\"I’ll check whether I have that ability.\",\"purpose\":\"thinking\",\"commitment\":\"prelude_only\",\"must_not_claim_completion\":true},\"metadata\":{\"desired_abilities\":[{\"ability_id\":\"...\",\"intent\":\"...\",\"status\":\"missing_ability\",\"confidence\":0.9,\"reason\":\"...\"}]}}\n"
-            "- Tool/weather lookup: {\"route\":\"tool\",\"intent\":\"weather_query\",\"confidence\":0.86,\"fast_speech\":{\"text\":\"OK, I’ll check the weather in <city or place> today.\",\"purpose\":\"acknowledge_and_check\",\"commitment\":\"checking_only\",\"must_not_claim_completion\":true},\"metadata\":{\"tool_name\":\"weather\",\"weather_query\":{\"location\":\"<city or place>\",\"date\":\"today\",\"units\":\"metric\"}}}\n"
-            "- Clarify/confirm: {\"route\":\"clarify\",\"intent\":\"clarify_target_or_skill\",\"confidence\":0.5,\"fast_speech\":{\"text\":\"I didn’t fully understand; what would you like me to do?\",\"purpose\":\"clarify\",\"commitment\":\"needs_confirmation\",\"must_not_claim_completion\":true}}\n"
-            "The top-level route is a compatibility primary route. Use routes[] for multiple independent policy lanes; use actions[] only for ordered listed skills inside a robot_action route item.\n"
-            "Multi-route contract: when one utterance contains independent needs, preserve them as separate routes[] items so immediate speech, memory, robot_action proposals, tools, and deep planning keep their own policy lane. Do not collapse independent lanes into one route, and do not put multi-lane work in actions[]; actions[] is only for ordered robot_action skills.\n"
-            "Uncertainty/confirmation rule: when the user-provided information is insufficient to decide what Chromie should do next, ask for confirmation or clarification instead of guessing. Clarification is a conversational act, not robot_action. Short ASR fragments, isolated letters, unclear pronouns, truncated utterances, or weak lexical associations with a catalog skill are not enough evidence for robot_action unless recent context clearly supplies the missing meaning. If no listed skill clearly supports a requested physical action, do not substitute a similar skill; route the missing ability so Chromie can tell the user the capability is not currently available.\n"
-            f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=1400)}\n"
+            f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Affordance Grounding:\n"
-            "The common ability catalog is Chromie's compact body/tool affordance interface, not a phrase table and not phrase rules. Each skill_id describes one thing the current robot can propose; args describe schema-level units, ranges, defaults, and required fields when supplied. "
-            "Use the model's semantic understanding of the user's intent, then ground that intent against catalog descriptions, contracts, effects, safety metadata, and input_schema. "
-            "If the user asks Chromie to physically perform a listed body/head/gaze/motion/expression skill now, prefer robot_action with intent capability:<exact skill_id>. "
-            "Do not delegate to deep_thought merely because the user used duration, distance, count, direction, speed, politeness, or casual wording when one listed skill semantically fits. "
-            "For a single parameterized physical request, it is valid to select the exact skill by intent and leave detailed args for the downstream capability planner; use actions[] only when every action can carry valid args or no args are required. "
-            "For compound listed-skill requests, preserve each requested skill in actions instead of collapsing to the first skill; if any required action is below confidence threshold, delegate the whole plan to deep_thought with truthful fast_speech or speak_first. "
-            "Do not choose a physical skill from isolated letters, partial words, weak sound-alikes, or low-information ASR fragments; choose clarify with low calibrated confidence unless context clearly disambiguates the action. "
-            "Speech-only conversation, greetings, identity/status questions, facts, jokes, stories, songs, and spoken performance are chat unless physical/tool action is requested. "
-            "Use route=tool for read-only external lookups such as current weather or forecast questions. For weather, use intent weather_query and include compact metadata.weather_query with location, date=today|tomorrow, and units=metric|imperial|auto when those fields are clear. Route=tool MUST include fast_speech that says you will check the requested location/date; do not answer weather from memory or claim tool results in fast_speech or speak_first. "
-            "When speech is part of a physical request, treat the speech as a skill task with skill_id chromie.speak if it appears in the compact skill catalog. "
-            "Catalog entries are context, not authorization: never claim physical completion, never invent abilities, and never output raw motor/joint/actuator/controller-array/torque commands. "
-            "If no listed skill fits clearly, choose deep_thought or clarify and include metadata.desired_abilities with status missing_ability when useful.\n\n"
+            "Semantic first. Catalog is compact body/tool affordance interface, not a phrase table. Entries without route= default to robot_action. Body/tool now -> exact skill_id. one parameterized skill may leave args to CapabilityAgent; compound uses ordered actions[]. isolated letters and low-information ASR fragments clarify. Weather -> route=tool intent=weather_query metadata.tool_name=weather. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
             "Cost Function:\n"
-            "Prefer the smallest safe downstream action surface, honest capability boundaries, chat for speech-only/factual claims, direct catalog-backed robot_action for ordinary single-turn body requests, deep_thought only for complex planning, and clarify for ambiguity. "
-            "Prefer supported interaction-executable skill IDs over generic robot_action. Preserve unsupported desired abilities as non-executable proposals. "
-            "Use working memory, current task context, and recent action history for follow-ups, but never as authorization for side effects. "
-            "Do not return interrupt or ignore for ordinary body commands; the deterministic emergency/noise filter already ran.\n\n"
+            "Speech-only conversation=chat; catalog body=robot_action; lookup=tool; complex planning=deep_thought; ambiguity=clarify. Do not return interrupt or ignore; deterministic emergency/noise filter already ran.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object matching one of the templates above. Required compatibility keys: route, intent, confidence. You may also output routes[] for independent route items. "
-            "Valid routes: chat, deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. "
-            "Omit agents, metadata, candidate_capabilities, and explanations unless they change downstream routing. "
-            "Each routes[] item may include route, intent, confidence, lane, context_profile, requires_mind, direct_to_tts, text, fast_speech, skill_id, args, actions, reason, and metadata. "
-            "Allowed lanes: immediate_speech, conversation, post_turn, deepthought, skill_runtime, tool, deterministic_control, none. "
-            "Allowed context_profile values: none, fast_minimal, session_compact, capability_safety, full_mind. "
-            "metadata.desired_abilities may contain understood but non-executable ability proposals; these are not executable actions. "
-            "Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object. "
-            "For selected robot_action use intent capability:<exact skill_id> copied from the compact skill catalog. Never output placeholder intents such as capability or capability:<exact capability_id>. "
-            "For one parameterized listed skill, prefer the single-skill intent form and let the capability planner produce validated args. "
-            "For compound listed-skill robot_action, include actions as an ordered array of objects only when each action has valid args or no args are required: {\"capability_id\":\"<exact skill_id>\",\"args\":{},\"sequence\":0,\"timing\":\"sequential|parallel\",\"confidence\":0.0}. "
-            "Each action capability_id must be copied exactly from the compact skill catalog. For chromie.speak, args must include a short natural text field. "
-            "Never put missing or planned abilities in actions; put them in metadata.desired_abilities and choose deep_thought or clarify. "
-            "Set action confidence from semantic fit and argument confidence. "
-            "If you include actions, use a semantic intent such as compound_common_catalog_task instead of a placeholder capability intent. "
-            "Include fast_speech for ordinary chat, memory, clarify, and deep_thought preludes when a short natural immediate response would help the user wait. For route=tool, fast_speech is required. Fast_speech is emitted before downstream work finishes, so it must be a process acknowledgement only: no final answers, no tool results, no memory-write claims, and no physical execution/completion claims. "
-            "For uncertain deep_thought handoff, you may include fast_speech or speak_first with one short user-facing sentence in the user's language, such as a natural request for a moment to think. "
-            "Fast_speech and speak_first must sound like Chromie herself: an embodied robot with natural, human-like social warmth, not a program, programme, backend, software process, or language model. "
-            "Do not use fast_speech or speak_first to claim physical action, tool results, memory writes, or completion. "
-            "For chat/clarify/interrupt/ignore, do not set capability intent. For deep_thought, use a short semantic intent such as deep_thought_complex_reasoning. Confidence is 0.0-1.0."
+            "Return one compact JSON object. Required keys: route, intent, confidence. routes[] split lanes; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marker). Omit agents, metadata, candidate_capabilities, explanations unless needed. fast_speech/speak_first are process acknowledgements only, with human-like social warmth, not a program, programme, backend, software process, or language model. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
         )
 
     def build_fast_speech_repair_payload(
@@ -958,6 +1024,7 @@ class OllamaLLMRouter:
             "stream": False,
             "think": False,
             "format": "json",
+            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
             "messages": [
                 {
                     "role": "system",
@@ -1013,6 +1080,8 @@ class OllamaLLMRouter:
                 "num_predict": self.num_predict,
             },
         }
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
         payload["format"] = "json"
         return payload
 
@@ -1032,6 +1101,7 @@ class OllamaLLMRouter:
             "stream": False,
             "think": False,
             "format": "json",
+            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
             "messages": [
                 {
                     "role": "system",
@@ -1094,6 +1164,7 @@ class OllamaLLMRouter:
             "stream": False,
             "think": False,
             "format": "json",
+            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
             "messages": [
                 {
                     "role": "system",
@@ -1150,6 +1221,7 @@ class OllamaLLMRouter:
             "stream": False,
             "think": False,
             "format": "json",
+            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
             "messages": [
                 {
                     "role": "system",
@@ -1215,6 +1287,7 @@ class OllamaLLMRouter:
             "stream": False,
             "think": False,
             "format": "json",
+            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
             "messages": [
                 {
                     "role": "system",
@@ -1346,10 +1419,29 @@ class OllamaLLMRouter:
         }
         logger.info("router_normalize_result %s", _json_log(summary, max_chars=2200))
 
-    async def _chat(self, payload: dict[str, Any]) -> dict[str, Any]:
-        timeout_s = self.timeout_s
-        if self.review_model and str(payload.get("model") or "") == self.review_model:
-            timeout_s = self.review_timeout_s
+    async def warm_model(self, *, timeout_s: float | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "prompt": "Reply with exactly one word: ready",
+            "stream": False,
+            "think": False,
+            "options": {
+                "temperature": 0,
+                "num_predict": 1,
+            },
+        }
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
+        async with httpx.AsyncClient(
+            timeout=timeout_s or max(self.timeout_s, 0.1),
+            trust_env=False,
+        ) as client:
+            response = await client.post(f"{self.ollama_url}/api/generate", json=payload)
+            response.raise_for_status()
+            return response.json()
+
+    async def _chat(self, payload: dict[str, Any], *, stage: str) -> dict[str, Any]:
+        timeout_s = self.review_timeout_s if stage in REVIEW_STAGES else self.timeout_s
         async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
             response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
@@ -1374,7 +1466,12 @@ class OllamaLLMRouter:
         request: RouteRequest | None = None,
     ) -> dict[str, Any]:
         self._log_payload_profile(payload, stage=stage, request=request)
-        data = await self._chat(payload)
+        try:
+            data = await self._chat(payload, stage=stage)
+        except TypeError as exc:
+            if "unexpected keyword argument 'stage'" not in str(exc):
+                raise
+            data = await self._chat(payload)  # type: ignore[call-arg]
         self._log_response_summary(data, stage=stage, request=request)
         return data
 
@@ -1513,11 +1610,14 @@ class OllamaLLMRouter:
         *,
         reason: str,
     ) -> RouteDecision:
-        if decision.route != "robot_action":
-            return decision
-        if decision.actions or decision.intent.startswith("capability:"):
-            return decision
         if not _has_weather_lookup_affordance(request) or not _is_weather_like_text(request.text):
+            return decision
+        if _decision_selects_weather_tool(decision):
+            return decision
+        if decision.route == "robot_action":
+            if decision.actions or decision.intent.startswith("capability:"):
+                return decision
+        elif not _decision_has_weather_semantics(decision):
             return decision
 
         location = _weather_location_hint(request.text)

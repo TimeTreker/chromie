@@ -4,7 +4,7 @@
 **Current release-prep base:** `0.0.1` scope with Soridormi MuJoCo `sim`
 execution; retained target evidence below records the exact revision that
 produced each bundle
-**Status refresh date:** 2026-07-04
+**Status refresh date:** 2026-07-09
 **Current focus:** **Freeze the `0.0.1` release across the Chromie/Soridormi
 boundary, with Soridormi executing robot work through MuJoCo `sim`; physical
 pilot preparation and human voice-device validation remain separate
@@ -68,18 +68,33 @@ pipelines. Training or tuning motion-control models waits until a selected
 target body or simulator, calibration artifacts, telemetry, safety envelopes,
 and task-level acceptance metrics exist.
 
-The current small Router model is not a single source of truth for routing or
-safety. `qwen3:0.6b` may propose routes for normal requests, but deterministic
+The current fast Router model is not a single source of truth for routing or
+safety. `qwen3:4b` may propose routes for normal requests, but deterministic
 operational controls, capability-catalog constraints, low-confidence
 deepthought delegation, schema validation, host Skill Runtime authorization,
-and Soridormi provider checks remain authoritative. Deterministic semantic
-action parsing is now a rules-only or explicit compatibility fallback rather
-than the normal hybrid brain path. The fast Qwen-class Router now receives
-unlocked `common_ability_catalog`/`common_ability_ids` as its commonly used
-ability menu; per-query catalog matches are not used by the fast Router
-decision surface, and rare/full-catalog or `prompt_tier_locked` selections
-delegate to `deep_thought` instead of entering the immediate fast action
-surface. Catalog prompt tiers now carry `prompt_tier_source` and
+and Soridormi provider checks remain authoritative. The July 9, 2026 live-text
+general-ability failures exposed the earliest wrong boundary in the Router:
+the old `qwen3:0.6b` profile could time out on cold model load and misclassify
+ordinary catalog-backed body requests even when warm. The fix is architectural:
+use the locally available `qwen3:4b` fast-router profile, keep it resident with
+`ROUTER_LLM_KEEP_ALIVE`, warm it during Router startup, select primary/review
+timeouts by stage rather than model name, bound quick-router output to compact
+classification JSON with `ROUTER_LLM_NUM_PREDICT=96`, and convert
+schema-invalid or narrowed quick compound `actions[]` into CapabilityAgent
+planner handoff instead of executing or narrowing them. Isolated low-information
+ASR fragments clarify even if the fast model calls them chat. Weather/tool
+queries with semantic weather evidence are normalized back to the tool lane when
+the weather lookup affordance is present, even if a stale route item says chat.
+This is not evidence of microphone, speaker, simulator execution, or physical
+robot behavior until the corresponding live acceptance run is retained.
+Deterministic semantic action parsing is now a rules-only or explicit
+compatibility fallback rather than the normal hybrid brain path. The
+fast Qwen-class Router now receives unlocked
+`common_ability_catalog`/`common_ability_ids` as its commonly used ability menu;
+per-query catalog matches are not used by the fast Router decision surface, and
+rare/full-catalog or `prompt_tier_locked` selections delegate to `deep_thought`
+instead of entering the immediate fast action surface. Catalog prompt tiers now
+carry `prompt_tier_source` and
 `prompt_tier_reason`; the initial preset lives in
 `capabilities/prompt_tiers.json`, and an optional experience-derived overlay can
 move ordinary unlocked skills between common and rare, while safety-sensitive
@@ -204,7 +219,7 @@ Target validation or Release readiness.
 |---|---|---|---|---|
 | Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
 | Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR inference runs off the WebSocket event loop through an explicit final-utterance backend boundary; `ASR_BACKEND=sherpa_onnx` and `ASR_MODE=final` are the maintained defaults; ASR startup performs a synthetic warm-up decode before accepting WebSocket requests; Faster-Whisper remains selectable for fallback/comparison; TTS playback stays ordered while complete speech can be chunked across bounded restartable service workers; route-level fast-first speech can start after Router returns while the Agent continues | Component concurrency/cancellation, ASR backend-selection, sherpa-onnx normalization, ASR accuracy-evaluator tests, TTS worker-pool, TTS alignment, plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Local sherpa-onnx CPU and warmed CUDA evidence passed health plus English/Chinese final transcripts; clean SenseVoice A/B smoke showed 0 WER/CER for both sherpa-onnx and Faster-Whisper; physical microphone/speaker validation remains open for voice-device release claims | Sherpa-onnx SenseVoice CUDA provider default with startup warm-up; CPU fallback configurable; fast-first speech enabled by `.env.common` |
-| Deterministic Router operational controls plus quick LLM route classifier | Implemented; interrupt/ignore controls remain deterministic while normal requests use catalog context, the small Router model, validators, safe fallback, or deep model handoff; catalog search does not choose ordinary intent by itself; quick routing can emit ordered unlocked common-catalog compound `RouteDecision.actions` including `chromie.speak` speech tasks with per-action confidence, low-confidence `quick_router_review_request`, and deepthinking accept/revise/supersede review metadata | Router rule, capability-routing, LLM-prompt, deepthinking, interaction, and regression-scenario tests | Exercised by deployed smoke test; compound speech/body task path currently has automated evidence only | Enabled by `.env.common` |
+| Deterministic Router operational controls plus quick LLM route classifier | Implemented; interrupt/ignore controls remain deterministic while normal requests use catalog context, the fast Router model, validators, safe fallback, or deep model handoff; catalog search does not choose ordinary intent by itself; quick routing can emit ordered unlocked common-catalog compound `RouteDecision.actions` including `chromie.speak` speech tasks with per-action confidence, low-confidence `quick_router_review_request`, and deepthinking accept/revise/supersede review metadata | Router rule, capability-routing, LLM-prompt, deepthinking, interaction, and regression-scenario tests | Exercised by deployed smoke test; compound speech/body task path currently has automated evidence only | Enabled by `.env.common` |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Used by the current voice loop | Enabled by `.env.common` |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle | Host rollout flag off |
 | Native structured Interaction Agent | Implemented with direct `InteractionSpeech`/`SkillRequest` accumulation, review-gated robot-action planning, optional simulator-bounded expressive body cues, and safe defaults for underspecified walking requests | Native route, TaskGraph, validation, fail-closed, fallback, expressive cue, exact-intent, and compatibility-mode tests | Text-input MuJoCo closure evidence retained; physical microphone retention remains separate | Agent default; chat body cues off |

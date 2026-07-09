@@ -63,7 +63,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
     def test_ollama_digest_capture_requires_each_configured_model(self) -> None:
         payload = {
             "models": [
-                {"name": "qwen3:0.6b", "digest": "sha256:abc", "size": 12}
+                {"name": "qwen3:4b", "digest": "sha256:abc", "size": 12}
             ]
         }
         response = mock.MagicMock()
@@ -72,7 +72,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
         with mock.patch("scripts.release_provenance.urllib.request.urlopen", return_value=response), mock.patch(
             "scripts.release_provenance.json.load", return_value=payload
         ):
-            result = ollama_models("http://localhost:11434", ["qwen3:0.6b"])
+            result = ollama_models("http://localhost:11434", ["qwen3:4b"])
             self.assertEqual(result[0]["digest"], "sha256:abc")
             with self.assertRaisesRegex(RuntimeError, "not installed"):
                 ollama_models("http://localhost:11434", ["missing:tag"])

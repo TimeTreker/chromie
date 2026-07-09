@@ -27,8 +27,8 @@ Soridormi proves the required simulator pipelines. Motion-control model
 training is deferred until task semantics, target-body evidence, calibration,
 telemetry, and safety envelopes exist.
 
-The small Router model is also not an execution authority. Treat
-`qwen3:0.6b` as an advisory classifier only: deterministic controls,
+The fast Router model is also not an execution authority. Treat
+`qwen3:4b` as an advisory classifier only: deterministic controls,
 capability-catalog constraints, low-confidence deepthought delegation, schemas,
 Skill Runtime authorization, and Soridormi provider checks must catch wrong
 model routes.

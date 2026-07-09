@@ -156,7 +156,7 @@ LLM is not used as the pass/fail judge during regression runs.
 
 ## Model-assisted routing guardrails
 
-The small Router model is accepted only as an advisory semantic classifier.
+The fast Router model is accepted only as an advisory semantic classifier.
 Level A routing evidence must continue to prove:
 
 - deterministic stop, cancel, emergency, ignore, silence, and unusable-audio

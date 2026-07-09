@@ -39,14 +39,27 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     ollama_url: str = Field(default_factory=lambda: os.getenv("ROUTER_OLLAMA_URL", "http://chromie-llm:11434"))
-    model: str = Field(default_factory=lambda: os.getenv("ROUTER_MODEL", "qwen3:0.6b"))
+    model: str = Field(default_factory=lambda: os.getenv("ROUTER_MODEL", "qwen3:4b"))
     review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:e2b"))
-    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "2200")))
-    llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "2200"))))
-    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "192")))
+    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "5400")))
+    llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "5400"))))
+    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "96")))
+    llm_keep_alive: str = Field(
+        default_factory=lambda: os.getenv(
+            "ROUTER_LLM_KEEP_ALIVE",
+            os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
+        )
+    )
+    warm_llm_on_startup: bool = Field(
+        default_factory=lambda: os.getenv("ROUTER_WARM_LLM_ON_STARTUP", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    warm_llm_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("ROUTER_WARM_LLM_TIMEOUT_MS", "30000"))
+    )
     review_timeout_ms: int = Field(
         default_factory=lambda: int(
-            os.getenv("ROUTER_REVIEW_TIMEOUT_MS", "1600")
+            os.getenv("ROUTER_REVIEW_TIMEOUT_MS", "100")
         )
     )
     confidence_threshold: float = Field(
@@ -108,6 +121,27 @@ async def warm_capability_catalog_snapshot() -> None:
         await capability_catalog.snapshot(refresh=True)
     except Exception as exc:
         logger.warning("capability catalog startup snapshot failed: %s", exc)
+    if (
+        settings.mode in {"hybrid", "llm_only"}
+        and settings.warm_llm_on_startup
+    ):
+        try:
+            await llm_router.warm_model(
+                timeout_s=max(0.1, settings.warm_llm_timeout_ms / 1000.0)
+            )
+        except Exception as exc:
+            logger.warning(
+                "router LLM startup warm failed: model=%s error_type=%s error=%s",
+                settings.model,
+                type(exc).__name__,
+                exc,
+            )
+        else:
+            logger.info(
+                "router LLM startup warm succeeded: model=%s keep_alive=%s",
+                settings.model,
+                settings.llm_keep_alive or "default",
+            )
 
 
 llm_router = OllamaLLMRouter(
@@ -119,6 +153,7 @@ llm_router = OllamaLLMRouter(
     confidence_threshold=settings.confidence_threshold,
     slow_review_recovery_enabled=settings.slow_review_recovery_enabled,
     num_predict=settings.llm_num_predict,
+    keep_alive=settings.llm_keep_alive,
     prompt_path=Path(__file__).parent / "prompts" / "router_system.txt",
 )
 
@@ -170,7 +205,7 @@ async def routes() -> dict:
             },
             {
                 "id": "quick_intent",
-                "description": "Capability-catalog bounded quick intent and meaning routing with the small Router model.",
+                "description": "Capability-catalog bounded quick intent and meaning routing with the fast Router model.",
                 "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
                 "llm": settings.mode in {"hybrid", "llm_only"},
             },
@@ -318,11 +353,41 @@ def _is_low_information_asr_fragment(request: RouteRequest) -> bool:
     return False
 
 
+def _is_isolated_hearing_fragment(request: RouteRequest) -> bool:
+    units = _normalized_information_units(request.text)
+    if _has_strong_followup_context(request):
+        return False
+    return len(units) <= 1
+
+
+_ACTIVE_ROUTE_METADATA_KEYS = {
+    "routes",
+    "route_items",
+    "route_item_count",
+    "route_stage_outputs",
+    "task_list",
+    "task_proposals",
+    "route_merge",
+}
+
+
+def _clear_active_route_metadata(decision: RouteDecision, *, reason: str) -> None:
+    decision.routes = []
+    metadata = dict(decision.metadata or {})
+    decision.metadata = {
+        key: value
+        for key, value in metadata.items()
+        if key not in _ACTIVE_ROUTE_METADATA_KEYS
+    }
+    decision.metadata["dropped_inherited_route_item_metadata"] = reason
+
+
 def _clarify_insufficient_information_decision(
     request: RouteRequest,
     decision: RouteDecision,
     *,
     reason: str,
+    source: Literal["llm", "fallback"] = "llm",
 ) -> RouteDecision:
     language = request.language or decision.language or "auto"
     heard = " ".join((request.text or "").strip().split())
@@ -363,7 +428,7 @@ def _clarify_insufficient_information_decision(
             },
             candidate_capabilities=list(decision.candidate_capabilities),
             reason=reason,
-            source="llm",
+            source=source,
             metadata={
                 **inherited_metadata,
                 "confidence_calibration": {
@@ -377,7 +442,7 @@ def _clarify_insufficient_information_decision(
             },
         ),
         request,
-        source="llm",
+        source=source,
     )
 
 
@@ -638,6 +703,142 @@ def _capability_allowed_in_quick_action(item: dict) -> bool:
     return _capability_executable(item)
 
 
+_COMPOUND_SEQUENCER_RE = re.compile(
+    r"(?:[,;]|\b(?:and\s+then|then|and|while|after|before)\b|然后|接着|同时|再)"
+)
+_AFFORDANCE_STOPWORDS = {
+    "at",
+    "eyes",
+    "forward",
+    "head",
+    "idle",
+    "in",
+    "no",
+    "person",
+    "place",
+    "yes",
+}
+
+
+def _body_affordance_terms(
+    capability_id: str,
+    item: dict[str, Any],
+) -> tuple[str, list[str]]:
+    if capability_id == "chromie.speak":
+        return "", []
+    if str(item.get("route") or "") != "robot_action":
+        return "", []
+    if not _capability_executable(item):
+        return "", []
+    suffix = capability_id.rsplit(".", 1)[-1].casefold()
+    tokens = [
+        token
+        for token in re.findall(r"[a-z0-9]+", suffix)
+        if token and token not in _AFFORDANCE_STOPWORDS
+    ]
+    if not tokens:
+        return "", []
+    return tokens[0], tokens
+
+
+def _body_affordance_groups_for_text(
+    text: str,
+    by_id: dict[str, dict[str, Any]],
+) -> set[str]:
+    normalized_text = f" {' '.join((text or '').casefold().split())} "
+    if not normalized_text.strip():
+        return set()
+    groups: set[str] = set()
+    for capability_id, item in by_id.items():
+        group, tokens = _body_affordance_terms(capability_id, item)
+        if not tokens:
+            continue
+        if re.search(rf"\b{re.escape(group)}\b", normalized_text):
+            groups.add(group)
+    return groups
+
+
+def _is_supported_compound_body_request(
+    request: RouteRequest,
+    by_id: dict[str, dict[str, Any]],
+) -> bool:
+    text = request.text or ""
+    if not _COMPOUND_SEQUENCER_RE.search(text.casefold()):
+        return False
+    return len(_body_affordance_groups_for_text(text, by_id)) >= 2
+
+
+def _quick_route_body_groups(decision: RouteDecision, by_id: dict[str, dict[str, Any]]) -> set[str]:
+    groups: set[str] = set()
+    capability_ids: list[str] = []
+    selected_id = _intent_capability_id(decision.intent)
+    if selected_id:
+        capability_ids.append(selected_id)
+    for action in decision.actions or []:
+        if isinstance(action, dict):
+            capability_ids.append(
+                str(
+                    action.get("capability_id")
+                    or action.get("skill_id")
+                    or action.get("capability")
+                    or ""
+                ).strip()
+            )
+    for item in decision.routes or []:
+        capability_ids.append(_intent_capability_id(item.intent) or str(item.intent or "").strip())
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    for item in metadata.get("route_items") or []:
+        if isinstance(item, dict):
+            capability_ids.append(
+                _intent_capability_id(str(item.get("intent") or ""))
+                or str(item.get("intent") or "").strip()
+            )
+    for capability_id in capability_ids:
+        if not capability_id:
+            continue
+        item = by_id.get(capability_id)
+        if item is None:
+            continue
+        group, _tokens = _body_affordance_terms(capability_id, item)
+        if group:
+            groups.add(group)
+    return groups
+
+
+def _compound_planner_handoff_if_narrowed(
+    request: RouteRequest,
+    decision: RouteDecision,
+    by_id: dict[str, dict[str, Any]],
+) -> RouteDecision | None:
+    if not _is_supported_compound_body_request(request, by_id):
+        return None
+    requested_groups = _body_affordance_groups_for_text(request.text, by_id)
+    covered_groups = _quick_route_body_groups(decision, by_id)
+    if len(covered_groups) >= len(requested_groups):
+        return None
+    _clear_active_route_metadata(
+        decision,
+        reason="quick_router_narrowed_compound_request",
+    )
+    decision.route = "robot_action"
+    decision.intent = "compound_common_catalog_task"
+    decision.actions = []
+    decision.agents = ["capability_agent", "safety_agent", "speaker_agent"]
+    decision.reason = (
+        f"{decision.reason}; " if decision.reason else ""
+    ) + "validator handed narrowed compound body request to CapabilityAgent planning"
+    decision.metadata = {
+        **(decision.metadata or {}),
+        "quick_router_action_handoff": {
+            "status": "planner_required",
+            "reason": "quick_router_narrowed_compound_request",
+            "requested_affordance_groups": sorted(requested_groups),
+            "covered_affordance_groups": sorted(covered_groups),
+        },
+    }
+    return finalize_decision(decision, request, source="llm")
+
+
 def _quick_common_ability_ids(request: RouteRequest) -> set[str]:
     items = request.context.get("common_ability_catalog")
     if not isinstance(items, list):
@@ -679,6 +880,49 @@ def _action_confidence(action: dict[str, Any], fallback: float) -> float | None:
         return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
         return None
+
+
+def _router_action_schema_errors(args: Any, schema: Any) -> list[str]:
+    if not isinstance(args, dict):
+        return ["args is not an object"]
+    if not isinstance(schema, dict):
+        return []
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        properties = {}
+    errors: list[str] = []
+    if schema.get("additionalProperties") is False:
+        unknown = sorted(str(key) for key in args if str(key) not in properties)
+        if unknown:
+            errors.append("unknown args: " + ", ".join(unknown[:6]))
+    required = schema.get("required")
+    if isinstance(required, list):
+        missing = [
+            str(key)
+            for key in required
+            if isinstance(key, str) and key not in args
+        ]
+        if missing:
+            errors.append("missing required args: " + ", ".join(missing[:6]))
+    for key, value in args.items():
+        prop = properties.get(str(key))
+        if not isinstance(prop, dict):
+            continue
+        enum = prop.get("enum")
+        if isinstance(enum, list) and enum and value not in enum:
+            errors.append(f"{key} is outside enum")
+        expected_type = prop.get("type")
+        if expected_type == "number" and (
+            isinstance(value, bool) or not isinstance(value, (int, float))
+        ):
+            errors.append(f"{key} is not a number")
+        elif expected_type == "integer" and (
+            isinstance(value, bool) or not isinstance(value, int)
+        ):
+            errors.append(f"{key} is not an integer")
+        elif expected_type == "string" and not isinstance(value, str):
+            errors.append(f"{key} is not a string")
+    return errors
 
 
 def _default_thinking_speak_first(language: str) -> str:
@@ -828,10 +1072,19 @@ def _validate_llm_capability_decision(
         ) + normalized_reason
 
     if decision.route == "robot_action":
+        compound_handoff = _compound_planner_handoff_if_narrowed(
+            request,
+            decision,
+            by_id,
+        )
+        if compound_handoff is not None:
+            return compound_handoff
         if decision.actions:
             normalized_actions: list[dict[str, Any]] = []
             invalid_reasons: list[str] = []
             low_confidence_reasons: list[str] = []
+            planner_handoff_reasons: list[str] = []
+            planner_action_hints: list[dict[str, Any]] = []
             ordered_actions = sorted(
                 enumerate(decision.actions),
                 key=lambda pair: (_action_sequence(pair[1], pair[0]), pair[0]),
@@ -840,7 +1093,12 @@ def _validate_llm_capability_decision(
                 if not isinstance(action, dict):
                     invalid_reasons.append(f"action[{index}] is not an object")
                     continue
-                capability_id = str(action.get("capability_id") or "").strip()
+                capability_id = str(
+                    action.get("capability_id")
+                    or action.get("skill_id")
+                    or action.get("capability")
+                    or ""
+                ).strip()
                 if not capability_id:
                     invalid_reasons.append(f"action[{index}] missing capability_id")
                     continue
@@ -859,6 +1117,25 @@ def _validate_llm_capability_decision(
                 args = action.get("args") if isinstance(action.get("args"), dict) else {}
                 if capability_id == "chromie.speak" and not str(args.get("text") or "").strip():
                     invalid_reasons.append(f"action[{index}] chromie.speak missing args.text")
+                    continue
+                schema_errors = _router_action_schema_errors(
+                    args,
+                    selected.get("input_schema"),
+                )
+                if schema_errors:
+                    planner_handoff_reasons.extend(
+                        f"action[{index}] {capability_id}: {error}"
+                        for error in schema_errors[:4]
+                    )
+                    planner_action_hints.append(
+                        {
+                            "capability_id": capability_id,
+                            "args": args,
+                            "sequence": _action_sequence(action, normalized_index),
+                            "reason": str(action.get("reason") or "")[:160],
+                            "schema_errors": schema_errors[:6],
+                        }
+                    )
                     continue
                 action_confidence = _action_confidence(action, decision.confidence)
                 if action_confidence is None:
@@ -883,7 +1160,41 @@ def _validate_llm_capability_decision(
                 if reason:
                     normalized["reason"] = reason[:160]
                 normalized_actions.append(normalized)
-            if invalid_reasons or low_confidence_reasons or not normalized_actions:
+            if (
+                invalid_reasons
+                or low_confidence_reasons
+                or planner_action_hints
+                or not normalized_actions
+            ):
+                if (
+                    planner_action_hints
+                    and not invalid_reasons
+                    and not low_confidence_reasons
+                ):
+                    decision.actions = []
+                    if (
+                        not decision.intent
+                        or decision.intent in {"unknown", "robot_action"}
+                        or _is_placeholder_capability_intent(raw_intent)
+                    ):
+                        decision.intent = "compound_common_catalog_task"
+                    decision.metadata = {
+                        **(decision.metadata or {}),
+                        "quick_router_action_handoff": {
+                            "status": "planner_required",
+                            "reason": "quick_router_actions_failed_schema_validation",
+                            "action_hints": planner_action_hints,
+                            "errors": planner_handoff_reasons[:8],
+                        },
+                    }
+                    decision.reason = (
+                        f"{decision.reason}; " if decision.reason else ""
+                    ) + "validator cleared schema-invalid quick actions for CapabilityAgent planning"
+                    required_agents = ["capability_agent", "safety_agent"]
+                    if decision.should_speak:
+                        required_agents.append("speaker_agent")
+                    decision.agents = list(dict.fromkeys([*decision.agents, *required_agents]))
+                    return finalize_decision(decision, request, source="llm")
                 if low_confidence_reasons and not _safe_thinking_speak_first(
                     decision.speak_first,
                     language=decision.language or request.language or "auto",
@@ -904,6 +1215,10 @@ def _validate_llm_capability_decision(
                     ),
                 )
             if all(item.get("capability_id") == "chromie.speak" for item in normalized_actions):
+                _clear_active_route_metadata(
+                    decision,
+                    reason="validator_treated_speech_action_as_chat",
+                )
                 decision.route = "chat"
                 decision.intent = "general_conversation"
                 decision.actions = []
@@ -942,6 +1257,10 @@ def _validate_llm_capability_decision(
                 ),
             )
         if selected_id == "chromie.speak":
+            _clear_active_route_metadata(
+                decision,
+                reason="validator_treated_speech_capability_as_chat",
+            )
             decision.route = "chat"
             decision.intent = "general_conversation"
             decision.actions = []
@@ -1025,7 +1344,18 @@ def _validate_llm_capability_decision(
         return finalize_decision(decision, request, source="llm")
 
     if decision.route == "chat":
+        compound_handoff = _compound_planner_handoff_if_narrowed(
+            request,
+            decision,
+            by_id,
+        )
+        if compound_handoff is not None:
+            return compound_handoff
         if selected_id == "chromie.speak":
+            _clear_active_route_metadata(
+                decision,
+                reason="validator_treated_speech_capability_as_chat",
+            )
             decision.intent = "general_conversation"
             decision.reason = (
                 f"{decision.reason}; " if decision.reason else ""
@@ -1491,46 +1821,64 @@ async def route(request: RouteRequest) -> RouteDecision:
         if settings.mode in ("llm_only", "hybrid"):
             llm_decision = await llm_router.route(request)
             if llm_decision.source == "llm":
-                side_effect_guard = _guard_low_information_side_effect(
-                    request,
-                    llm_decision,
-                )
-                if side_effect_guard is not None:
-                    decision = side_effect_guard
-                elif llm_decision.route in {"interrupt", "ignore"}:
-                    decision = _recover_invalid_operational_llm_decision(
+                if _is_isolated_hearing_fragment(request):
+                    decision = _clarify_insufficient_information_decision(
                         request,
                         llm_decision,
-                        catalog_result,
+                        reason="isolated_low_information_asr_fragment",
                     )
-                elif _is_unmatched_capability_clarification(
-                    llm_decision,
-                    catalog_result,
-                ):
-                    decision = _recover_unmatched_capability_clarification(
-                        request,
-                        llm_decision,
-                        catalog_result,
-                    )
-                elif (
-                    llm_decision.confidence < settings.confidence_threshold
-                    and llm_decision.route not in {"chat", "deep_thought"}
-                ):
-                    decision = _deep_thought_from_low_confidence(request, llm_decision)
-                else:
-                    decision = _validate_llm_capability_decision(
-                        request,
-                        llm_decision,
-                        catalog_result,
-                    )
-            elif llm_decision.source == "fallback":
-                decision = _deep_thought_router_unavailable_decision(
-                    request,
-                    catalog_result,
-                    llm_decision=llm_decision,
-                )
                 if decision is None:
-                    decision = llm_decision
+                    side_effect_guard = _guard_low_information_side_effect(
+                        request,
+                        llm_decision,
+                    )
+                    if side_effect_guard is not None:
+                        decision = side_effect_guard
+                    elif llm_decision.route in {"interrupt", "ignore"}:
+                        decision = _recover_invalid_operational_llm_decision(
+                            request,
+                            llm_decision,
+                            catalog_result,
+                        )
+                    elif _is_unmatched_capability_clarification(
+                        llm_decision,
+                        catalog_result,
+                    ):
+                        decision = _recover_unmatched_capability_clarification(
+                            request,
+                            llm_decision,
+                            catalog_result,
+                        )
+                    elif (
+                        llm_decision.confidence < settings.confidence_threshold
+                        and llm_decision.route not in {"chat", "deep_thought"}
+                    ):
+                        decision = _deep_thought_from_low_confidence(request, llm_decision)
+                    else:
+                        decision = _validate_llm_capability_decision(
+                            request,
+                            llm_decision,
+                            catalog_result,
+                        )
+            elif llm_decision.source == "fallback":
+                if _is_low_information_asr_fragment(request):
+                    decision = _clarify_insufficient_information_decision(
+                        request,
+                        llm_decision,
+                        reason=(
+                            "llm_router_unavailable_low_information_fragment: "
+                            f"{llm_decision.reason or 'no_llm_route'}"
+                        ),
+                        source="fallback",
+                    )
+                else:
+                    decision = _deep_thought_router_unavailable_decision(
+                        request,
+                        catalog_result,
+                        llm_decision=llm_decision,
+                    )
+                    if decision is None:
+                        decision = llm_decision
 
         if decision is None:
             reason = (
