@@ -5,12 +5,13 @@ Guidance for coding agents working on Chromie.
 ## Read first
 
 1. `docs/PROJECT_CHARTER.md` — stable goal, boundaries, and non-goals
-2. `docs/STATUS.md` — current implementation and evidence authority
-3. `ROADMAP.md` — milestone intent and exit criteria
-4. `DEVELOPMENT_CHECKPOINT.md` — exact resume point
-5. `README.md` and the relevant component README
-6. `docs/ACCEPTANCE.md` — required validation level
-7. `docs/README.md` — documentation ownership and update rules
+2. `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` — root-cause rules for natural, grounded robot behavior
+3. `docs/STATUS.md` — current implementation and evidence authority
+4. `ROADMAP.md` — milestone intent and exit criteria
+5. `DEVELOPMENT_CHECKPOINT.md` — exact resume point
+6. `README.md` and the relevant component README
+7. `docs/ACCEPTANCE.md` — required validation level
+8. `docs/README.md` — documentation ownership and update rules
 
 Treat current source and tests as truth. Historical patches, tags, exported
 archives, and old milestone prose are context only.
@@ -18,6 +19,8 @@ archives, and old milestone prose are context only.
 ## Working rules
 
 - Inspect implementation and tests before editing documentation or behavior.
+- For user-visible robot weirdness, diagnose the root architectural or
+  interaction-policy cause before changing prompts or phrasing.
 - Keep microphone, VAD, playback, interruption, conversation state, and trusted
   Skill Runtime coordination in the host Orchestrator.
 - Keep embodied planning, execution, resource safety, stop/emergency behavior,

@@ -7,15 +7,18 @@ authoritative home and other documents should link to it rather than repeat it.
 
 1. [Project Charter](PROJECT_CHARTER.md) - stable mission, ownership, principles,
    and non-goals.
-2. [Current Status](STATUS.md) - implementation, automated verification, target
+2. [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) -
+   root-cause rules for natural, grounded robot behavior and valid interaction
+   evidence.
+3. [Current Status](STATUS.md) - implementation, automated verification, target
    validation, and release readiness.
-3. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
-4. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
-5. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
-6. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
+4. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
+5. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
+6. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
+7. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
    [Acceptance](ACCEPTANCE.md) - interface and evidence details.
-7. Component documents - local implementation boundaries.
-8. Decision documents - rationale for an established design.
+8. Component documents - local implementation boundaries.
+9. Decision documents - rationale for an established design.
 
 When documents disagree, correct the lower-authority document.
 
@@ -32,6 +35,7 @@ When documents disagree, correct the lower-authority document.
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
 | What retained trace artifacts can the CLI inspect? | `docs/TRACE_SCHEMA.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` |
+| What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
 | Where should a new collaborator resume? | `docs/HANDOFF.md` |
 | What can be published and supported? | `docs/RELEASE.md` |
@@ -45,6 +49,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Project README](../README.md)
 - [Chinese Guide](PROJECT_GUIDE.zh-CN.md)
 - [Project Charter](PROJECT_CHARTER.md)
+- [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [Current Status](STATUS.md)
 - [Roadmap](../ROADMAP.md)
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
@@ -65,6 +70,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 ## Interaction and execution
 
+- [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [Interaction Agent and Skill Runtime](interaction_agent_skill_runtime.md)
 - [Chromie High-Level Ability Registry](chromie_ability_registry.md)
 - [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md)
