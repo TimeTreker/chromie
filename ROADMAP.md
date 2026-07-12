@@ -406,3 +406,57 @@ Before accepting major work, ask:
 5. Does it avoid binding the model-facing contract to one robot?
 
 If the answer is no, defer the work or revise its scope.
+
+## Open architecture track - Goal-driven cognitive runtime
+
+### Objective
+
+Adopt [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+as the cognitive constitution for future Router, Agent, planning, continuity,
+response, and social-interaction work.
+
+The architecture changes the primary planning question from “which skill matches
+this utterance?” to “what existing or new user goals are present, and what
+verifiable plan completely satisfies them?”
+
+This track is documentation-approved design work only until each staged pull
+request is implemented and supported by the evidence required below.
+
+### Delivery sequence
+
+1. Goal contracts and bounded active-goal projection.
+2. Goal association before new-goal segmentation.
+3. Canonical plans and complete-coverage Fast Planner.
+4. Full-registry Deep Planner with bounded same-tier replanning.
+5. Consequence-aware parameter resolution and goal satisfaction reporting.
+6. Multi-goal response composition and model-driven social attention.
+7. Runtime migration, live-text evidence, and MuJoCo evidence.
+
+The Deep Planner does not return semantic work to the Fast Planner. Both tiers
+share capability and validation primitives and output the same canonical plan
+contract.
+
+### Required development method
+
+Each behavioral implementation must follow
+[Scenario-Driven Development](docs/SCENARIO_DRIVEN_DEVELOPMENT.md): retain the
+interaction or requirement as a scenario, demonstrate the failing boundary,
+implement the architectural correction, pass the retained scenario and full
+regression gates, and state the evidence level.
+
+### Exit criteria
+
+- goal association occurs before creation of new goals;
+- one turn can modify existing goals and create independent new goals;
+- Fast Planner executes only complete high-confidence coverage or escalates;
+- Deep Planner produces a final canonical plan without returning to Fast Planner;
+- partial or unconfirmed alternatives never execute;
+- information gaps remain attached to the original goal across turns;
+- speech, social attention, and user-task plans remain distinct;
+- all execution passes the same deterministic validator;
+- retained Level A scenario coverage passes;
+- live-text and MuJoCo evidence are retained before target behavior is claimed.
+
+This track does not replace the current physical pilot or audio evidence tracks.
+It must preserve existing deterministic stop, authorization, provider, evidence,
+and release boundaries.

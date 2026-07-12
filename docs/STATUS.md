@@ -516,3 +516,22 @@ Treat this revision as the **`0.0.1` release-prep snapshot** until it is tagged
 and published. It is not a production release, physical-robot release, or human
 voice-device release. Robot execution evidence for this release is limited to
 Soridormi MuJoCo `sim`. See [Release and Packaging](RELEASE.md).
+
+## Proposed architecture - Goal-driven cognitive runtime
+
+The project now has a proposed cognitive constitution in
+[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) and
+a companion [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
+policy.
+
+The proposal defines goal continuity before goal creation, independent multi-goal
+segmentation, a single-direction Fast-to-Deep planning hierarchy, one canonical
+plan contract, deterministic validation authority, consequence-aware parameter
+resolution, alternative-plan confirmation, evidence-bound response claims, and
+an auxiliary social-attention layer.
+
+This status is **design documented**, not implemented or automatically verified
+as a complete runtime architecture. Existing semantic-task continuity,
+capability planning, response-plan, social-attention, and scenario work provide
+migration foundations, but they do not yet establish all RFC invariants. The
+implementation sequence and evidence gates are tracked in `ROADMAP.md`.

@@ -7,18 +7,20 @@ authoritative home and other documents should link to it rather than repeat it.
 
 1. [Project Charter](PROJECT_CHARTER.md) - stable mission, ownership, principles,
    and non-goals.
-2. [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) -
+2. [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) -
+   cognitive constitution for goal continuity, multi-goal planning, validation, and interaction.
+3. [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) -
    root-cause rules for natural, grounded robot behavior and valid interaction
    evidence.
-3. [Current Status](STATUS.md) - implementation, automated verification, target
+4. [Current Status](STATUS.md) - implementation, automated verification, target
    validation, and release readiness.
-4. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
-5. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
-6. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
-7. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
+5. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
+6. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
+7. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
+8. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
    [Acceptance](ACCEPTANCE.md) - interface and evidence details.
-8. Component documents - local implementation boundaries.
-9. Decision documents - rationale for an established design.
+9. Component documents - local implementation boundaries.
+10. Decision documents - rationale for an established design.
 
 When documents disagree, correct the lower-authority document.
 
@@ -35,6 +37,8 @@ When documents disagree, correct the lower-authority document.
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
 | What retained trace artifacts can the CLI inspect? | `docs/TRACE_SCHEMA.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` |
+| What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
+| What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
 | How are semantic goals preserved and revised across turns? | `docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md` |
@@ -51,6 +55,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Project README](../README.md)
 - [Chinese Guide](PROJECT_GUIDE.zh-CN.md)
 - [Project Charter](PROJECT_CHARTER.md)
+- [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [Current Status](STATUS.md)
 - [Roadmap](../ROADMAP.md)
@@ -72,6 +78,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 ## Interaction and execution
 
+- [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)
 - [Interaction Agent and Skill Runtime](interaction_agent_skill_runtime.md)
