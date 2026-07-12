@@ -43,6 +43,11 @@ class Settings(BaseModel):
     review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:e2b"))
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "5400")))
     llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "5400"))))
+    llm_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_CTX", "4096")),
+        ge=2048,
+        le=131072,
+    )
     llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "96")))
     llm_keep_alive: str = Field(
         default_factory=lambda: os.getenv(
@@ -55,11 +60,11 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     warm_llm_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("ROUTER_WARM_LLM_TIMEOUT_MS", "30000"))
+        default_factory=lambda: int(os.getenv("ROUTER_WARM_LLM_TIMEOUT_MS", "60000"))
     )
     review_timeout_ms: int = Field(
         default_factory=lambda: int(
-            os.getenv("ROUTER_REVIEW_TIMEOUT_MS", "100")
+            os.getenv("ROUTER_REVIEW_TIMEOUT_MS", "2500")
         )
     )
     confidence_threshold: float = Field(
@@ -86,6 +91,14 @@ class Settings(BaseModel):
     )
     slow_review_recovery_enabled: bool = Field(
         default_factory=lambda: os.getenv("ROUTER_SLOW_REVIEW_RECOVERY_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    generic_chat_review_enabled: bool = Field(
+        default_factory=lambda: os.getenv("ROUTER_GENERIC_CHAT_REVIEW_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    tool_fast_speech_repair_enabled: bool = Field(
+        default_factory=lambda: os.getenv("ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     log_level: str = Field(default_factory=lambda: os.getenv("ROUTER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
@@ -152,6 +165,9 @@ llm_router = OllamaLLMRouter(
     review_timeout_ms=settings.review_timeout_ms,
     confidence_threshold=settings.confidence_threshold,
     slow_review_recovery_enabled=settings.slow_review_recovery_enabled,
+    generic_chat_review_enabled=settings.generic_chat_review_enabled,
+    tool_fast_speech_repair_enabled=settings.tool_fast_speech_repair_enabled,
+    num_ctx=settings.llm_num_ctx,
     num_predict=settings.llm_num_predict,
     keep_alive=settings.llm_keep_alive,
     prompt_path=Path(__file__).parent / "prompts" / "router_system.txt",
@@ -452,50 +468,52 @@ def _missing_capability_decision(
     raw_intent: str,
     reason: str,
 ) -> RouteDecision:
+    """Hand unresolved effectful meaning to semantic capability planning.
+
+    A quick Router failure to bind one exact catalog skill is not evidence that
+    the requested outcome is unsupported.  The bounded CapabilityAgent has the
+    complete utterance plus the full executable capability/provider surface and
+    is responsible for deciding exact execution, an alternative proposal,
+    clarification, or unavailability.
+    """
+
     language = _request_language(request)
-    if language.startswith("zh"):
-        speak_first = "我没有找到能安全执行这个动作的对应技能，所以不会猜一个相似动作来做。"
-    else:
-        speak_first = "I do not have a matching skill for that action, so I will not guess a similar movement."
     desired_intent = (request.text or raw_intent or "requested action").strip()[:160]
     return finalize_decision(
         RouteDecision(
-            route="clarify",
-            agents=["speaker_agent"],
-            intent="missing_or_unsupported_ability",
+            route="robot_action",
+            agents=["capability_agent", "safety_agent", "speaker_agent"],
+            intent="semantic_capability_planning",
             confidence=0.0,
             language=language,
             priority="normal",
             needs_agent=True,
             should_speak=True,
-            speak_first=speak_first,
-            fast_speech={
-                "text": speak_first,
-                "purpose": "clarify",
-                "commitment": "needs_confirmation",
-                "must_not_claim_completion": True,
-            },
+            speak_first=None,
+            fast_speech=None,
             candidate_capabilities=[],
             reason=reason,
             source="llm",
             metadata={
                 "desired_abilities": [
                     {
-                        "ability_id": "forward_motion"
-                        if _is_forward_motion_request(request.text)
-                        else "unknown_body_action",
+                        "ability_id": "unresolved_effectful_goal",
                         "intent": desired_intent,
-                        "status": "missing_ability",
+                        "status": "semantic_planning_required",
                         "confidence": 0.0,
                         "reason": reason,
                     }
                 ],
                 "capability_grounding": {
-                    "status": "missing_capability",
+                    "status": "unresolved_requires_planner",
                     "model_intent": raw_intent,
                     "user_text": request.text,
                     "reason": reason,
-                    "forward_motion_request": _is_forward_motion_request(request.text),
+                },
+                "router_semantic_handoff": {
+                    "status": "planner_required",
+                    "authority": "advisory",
+                    "must_not_execute_partial_route": True,
                 },
             },
         ),
@@ -614,64 +632,6 @@ def _request_language(request: RouteRequest) -> str:
     return language
 
 
-def _is_forward_motion_request(text: str) -> bool:
-    normalized = " ".join((text or "").strip().lower().split())
-    if not normalized:
-        return False
-    zh_forward = any(phrase in normalized for phrase in ("往前", "向前", "朝前", "前进"))
-    zh_motion = any(phrase in normalized for phrase in ("走", "移动", "挪", "行走"))
-    if zh_forward and zh_motion:
-        return True
-    if re.search(r"\b(?:walk|move|go|step)\s+(?:forward|ahead)\b", normalized):
-        return True
-    if re.search(r"\b(?:forward|ahead)\s+(?:walk|motion|move|movement|step)\b", normalized):
-        return True
-    return False
-
-
-def _forward_motion_capability_id(by_id: dict[str, dict[str, Any]], text: str) -> str:
-    if not _is_forward_motion_request(text):
-        return ""
-    for capability_id in ("soridormi.walk_forward", "soridormi.walk_velocity"):
-        item = by_id.get(capability_id)
-        if item is not None and _capability_executable(item):
-            return capability_id
-    return ""
-
-
-def _capability_presence_snapshot(
-    by_id: dict[str, dict[str, Any]],
-    capability_ids: tuple[str, ...],
-) -> list[dict[str, Any]]:
-    snapshot: list[dict[str, Any]] = []
-    for capability_id in capability_ids:
-        item = by_id.get(capability_id)
-        if item is None:
-            continue
-        snapshot.append(
-            {
-                "capability_id": capability_id,
-                "available": item.get("available") is not False,
-                "interaction_executable": bool(item.get("interaction_executable")),
-                "route": str(item.get("route") or ""),
-                "source": str(item.get("source") or ""),
-            }
-        )
-    return snapshot
-
-
-def _prioritize_capability(
-    candidates: list[dict[str, Any]],
-    capability_id: str,
-) -> list[dict[str, Any]]:
-    if not capability_id:
-        return candidates
-    selected = [item for item in candidates if _capability_id(item) == capability_id]
-    if not selected:
-        return candidates
-    return [*selected, *(item for item in candidates if _capability_id(item) != capability_id)]
-
-
 def _unique_capability_suffix_match(raw_intent: str, by_id: dict[str, dict[str, Any]]) -> str:
     normalized = (raw_intent or "").strip()
     if not normalized:
@@ -701,142 +661,6 @@ def _capability_allowed_in_quick_action(item: dict) -> bool:
     if capability_id == "chromie.speak":
         return _capability_available(item)
     return _capability_executable(item)
-
-
-_COMPOUND_SEQUENCER_RE = re.compile(
-    r"(?:[,;]|\b(?:and\s+then|then|and|while|after|before)\b|然后|接着|同时|再)"
-)
-_AFFORDANCE_STOPWORDS = {
-    "at",
-    "eyes",
-    "forward",
-    "head",
-    "idle",
-    "in",
-    "no",
-    "person",
-    "place",
-    "yes",
-}
-
-
-def _body_affordance_terms(
-    capability_id: str,
-    item: dict[str, Any],
-) -> tuple[str, list[str]]:
-    if capability_id == "chromie.speak":
-        return "", []
-    if str(item.get("route") or "") != "robot_action":
-        return "", []
-    if not _capability_executable(item):
-        return "", []
-    suffix = capability_id.rsplit(".", 1)[-1].casefold()
-    tokens = [
-        token
-        for token in re.findall(r"[a-z0-9]+", suffix)
-        if token and token not in _AFFORDANCE_STOPWORDS
-    ]
-    if not tokens:
-        return "", []
-    return tokens[0], tokens
-
-
-def _body_affordance_groups_for_text(
-    text: str,
-    by_id: dict[str, dict[str, Any]],
-) -> set[str]:
-    normalized_text = f" {' '.join((text or '').casefold().split())} "
-    if not normalized_text.strip():
-        return set()
-    groups: set[str] = set()
-    for capability_id, item in by_id.items():
-        group, tokens = _body_affordance_terms(capability_id, item)
-        if not tokens:
-            continue
-        if re.search(rf"\b{re.escape(group)}\b", normalized_text):
-            groups.add(group)
-    return groups
-
-
-def _is_supported_compound_body_request(
-    request: RouteRequest,
-    by_id: dict[str, dict[str, Any]],
-) -> bool:
-    text = request.text or ""
-    if not _COMPOUND_SEQUENCER_RE.search(text.casefold()):
-        return False
-    return len(_body_affordance_groups_for_text(text, by_id)) >= 2
-
-
-def _quick_route_body_groups(decision: RouteDecision, by_id: dict[str, dict[str, Any]]) -> set[str]:
-    groups: set[str] = set()
-    capability_ids: list[str] = []
-    selected_id = _intent_capability_id(decision.intent)
-    if selected_id:
-        capability_ids.append(selected_id)
-    for action in decision.actions or []:
-        if isinstance(action, dict):
-            capability_ids.append(
-                str(
-                    action.get("capability_id")
-                    or action.get("skill_id")
-                    or action.get("capability")
-                    or ""
-                ).strip()
-            )
-    for item in decision.routes or []:
-        capability_ids.append(_intent_capability_id(item.intent) or str(item.intent or "").strip())
-    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-    for item in metadata.get("route_items") or []:
-        if isinstance(item, dict):
-            capability_ids.append(
-                _intent_capability_id(str(item.get("intent") or ""))
-                or str(item.get("intent") or "").strip()
-            )
-    for capability_id in capability_ids:
-        if not capability_id:
-            continue
-        item = by_id.get(capability_id)
-        if item is None:
-            continue
-        group, _tokens = _body_affordance_terms(capability_id, item)
-        if group:
-            groups.add(group)
-    return groups
-
-
-def _compound_planner_handoff_if_narrowed(
-    request: RouteRequest,
-    decision: RouteDecision,
-    by_id: dict[str, dict[str, Any]],
-) -> RouteDecision | None:
-    if not _is_supported_compound_body_request(request, by_id):
-        return None
-    requested_groups = _body_affordance_groups_for_text(request.text, by_id)
-    covered_groups = _quick_route_body_groups(decision, by_id)
-    if len(covered_groups) >= len(requested_groups):
-        return None
-    _clear_active_route_metadata(
-        decision,
-        reason="quick_router_narrowed_compound_request",
-    )
-    decision.route = "robot_action"
-    decision.intent = "compound_common_catalog_task"
-    decision.actions = []
-    decision.agents = ["capability_agent", "safety_agent", "speaker_agent"]
-    decision.reason = (
-        f"{decision.reason}; " if decision.reason else ""
-    ) + "validator handed narrowed compound body request to CapabilityAgent planning"
-    decision.metadata = {
-        **(decision.metadata or {}),
-        "quick_router_action_handoff": {
-            "status": "planner_required",
-            "reason": "quick_router_narrowed_compound_request",
-            "requested_affordance_groups": sorted(requested_groups),
-            "covered_affordance_groups": sorted(covered_groups),
-        },
-    }
-    return finalize_decision(decision, request, source="llm")
 
 
 def _quick_common_ability_ids(request: RouteRequest) -> set[str]:
@@ -1045,26 +869,6 @@ def _validate_llm_capability_decision(
             normalized_reason = "validator normalized exact capability intent"
         else:
             selected_id = _unique_capability_suffix_match(raw_intent, by_id)
-    if not selected_id and decision.route == "robot_action":
-        recovered_forward_id = _forward_motion_capability_id(by_id, request.text)
-        if recovered_forward_id and raw_intent in {"", "unknown", "robot_action", "physical_motion"}:
-            selected_id = recovered_forward_id
-            candidates = _prioritize_capability(candidates, selected_id)
-            decision.candidate_capabilities = candidates
-            decision.intent = f"capability:{selected_id}"
-            decision.reason = (
-                f"{decision.reason}; " if decision.reason else ""
-            ) + "validator recovered forward motion from catalog affordance"
-            decision.metadata = {
-                **(decision.metadata or {}),
-                "catalog_affordance_recovery": {
-                    "status": "selected_exact_forward_motion_capability",
-                    "capability_id": selected_id,
-                    "raw_intent": raw_intent,
-                    "user_text": request.text,
-                },
-            }
-
     if selected_id and raw_intent != f"capability:{selected_id}":
         decision.intent = f"capability:{selected_id}"
         decision.reason = (
@@ -1072,13 +876,6 @@ def _validate_llm_capability_decision(
         ) + normalized_reason
 
     if decision.route == "robot_action":
-        compound_handoff = _compound_planner_handoff_if_narrowed(
-            request,
-            decision,
-            by_id,
-        )
-        if compound_handoff is not None:
-            return compound_handoff
         if decision.actions:
             normalized_actions: list[dict[str, Any]] = []
             invalid_reasons: list[str] = []
@@ -1270,16 +1067,6 @@ def _validate_llm_capability_decision(
             ) + "validator treated chromie.speak as chat output channel"
             return finalize_decision(decision, request, source="llm")
         if not selected_id and raw_intent in {"", "unknown", "robot_action"}:
-            if _is_forward_motion_request(request.text):
-                logger.info(
-                    "forward_motion_catalog_recovery_missed sid=%s raw_intent=%s known_forward_capabilities=%s",
-                    request.sid,
-                    raw_intent or "<empty>",
-                    _capability_presence_snapshot(
-                        by_id,
-                        ("soridormi.walk_forward", "soridormi.walk_velocity"),
-                    ),
-                )
             return fallback_decision(
                 request,
                 reason=(
@@ -1319,16 +1106,6 @@ def _validate_llm_capability_decision(
         elif not selected_id:
             executable = _interaction_executable_candidates(result)
             if not executable:
-                if _is_forward_motion_request(request.text):
-                    logger.info(
-                        "forward_motion_catalog_recovery_missed sid=%s raw_intent=%s known_forward_capabilities=%s",
-                        request.sid,
-                        raw_intent or "<empty>",
-                        _capability_presence_snapshot(
-                            by_id,
-                            ("soridormi.walk_forward", "soridormi.walk_velocity"),
-                        ),
-                    )
                 return _fallback_unmatched_robot_action(
                     request,
                     raw_intent=raw_intent,
@@ -1344,13 +1121,6 @@ def _validate_llm_capability_decision(
         return finalize_decision(decision, request, source="llm")
 
     if decision.route == "chat":
-        compound_handoff = _compound_planner_handoff_if_narrowed(
-            request,
-            decision,
-            by_id,
-        )
-        if compound_handoff is not None:
-            return compound_handoff
         if selected_id == "chromie.speak":
             _clear_active_route_metadata(
                 decision,
@@ -1851,7 +1621,7 @@ async def route(request: RouteRequest) -> RouteDecision:
                         )
                     elif (
                         llm_decision.confidence < settings.confidence_threshold
-                        and llm_decision.route not in {"chat", "deep_thought"}
+                        and llm_decision.route not in {"chat", "deep_thought", "clarify"}
                     ):
                         decision = _deep_thought_from_low_confidence(request, llm_decision)
                     else:

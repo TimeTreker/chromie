@@ -173,6 +173,13 @@ class DeepThinkingDelegationPolicy:
             return self._result(decision, should_delegate=False)
         if _is_clarification_intent(decision.intent):
             return self._result(decision, should_delegate=False)
+        if self._is_semantic_capability_planner_handoff(decision):
+            # This route is already an explicit semantic-planning handoff.  A
+            # second host-side delegation to the generic DeepThinkingAgent would
+            # bypass the CapabilityAgent that owns schema, provider, parameter,
+            # and alternative-plan reasoning.  Confidence may intentionally be
+            # zero because the quick Router declined to bind one exact skill.
+            return self._result(decision, should_delegate=False)
 
         context = context or {}
         reasons: list[str] = []
@@ -214,6 +221,24 @@ class DeepThinkingDelegationPolicy:
             high_risk_physical=high_risk_physical,
             compound_action=compound_action,
         )
+
+    @staticmethod
+    def _is_semantic_capability_planner_handoff(decision: RouteDecision) -> bool:
+        if decision.route != "robot_action":
+            return False
+        if decision.intent == "semantic_capability_planning":
+            return True
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        for key in ("router_semantic_handoff", "quick_router_action_handoff"):
+            handoff = metadata.get(key)
+            if not isinstance(handoff, Mapping):
+                continue
+            if str(handoff.get("status") or "").strip() in {
+                "planner_required",
+                "semantic_planning_required",
+            }:
+                return True
+        return False
 
     def delegate_decision(
         self,

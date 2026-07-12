@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "id": "chinese_walk_blink_alternative_requires_confirmation",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "A compound walk-and-blink request is evaluated semantically; an unavailable overlap becomes an unexecuted alternative awaiting confirmation.",
+  "tags": [
+    "robot-action",
+    "compound",
+    "semantic-planning",
+    "alternative",
+    "confirmation"
+  ],
+  "input": {
+    "text": "快速的往前走15秒，然后边走边眨眼睛，可以吗？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "robot_action",
+      "agents": [
+        "capability_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
+      "intent": "capability:soridormi.walk_forward",
+      "confidence": 0.95,
+      "language": "zh-CN",
+      "source": "llm"
+    },
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.walk_forward",
+        "description": "Walk forward for a bounded duration using a human-facing speed label.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 20.0
+            },
+            "speed": {
+              "type": "string",
+              "enum": [
+                "slow",
+                "normal",
+                "quick"
+              ]
+            }
+          },
+          "required": [
+            "duration_s",
+            "speed"
+          ],
+          "additionalProperties": false
+        },
+        "effects": [
+          "physical_motion"
+        ],
+        "requires_confirmation": true,
+        "can_run_parallel": true,
+        "exclusive_group": "soridormi.robot_motion",
+        "resource_claims": [
+          "robot_motion"
+        ]
+      },
+      {
+        "capability_id": "soridormi.blink_eyes",
+        "description": "Blink the robot eyes visibly.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            }
+          },
+          "required": [
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        "effects": [
+          "visual_expression"
+        ],
+        "safety_class": "low_risk_action",
+        "requires_confirmation": false,
+        "can_run_parallel": true,
+        "exclusive_group": "soridormi.robot_motion",
+        "resource_claims": [
+          "robot_motion"
+        ]
+      }
+    ],
+    "ollama_reply": {
+      "decision": "propose_alternative",
+      "speech": "我目前不能在行走时同时眨眼，但可以先走十五秒，再眨两下眼睛，可以吗？",
+      "skills": [
+        {
+          "skill_id": "soridormi.walk_forward",
+          "args": {
+            "duration_s": 15.0,
+            "speed": "quick"
+          },
+          "timing": "sequential"
+        },
+        {
+          "skill_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 2
+          },
+          "timing": "sequential"
+        }
+      ],
+      "plan_relation": "alternative",
+      "user_confirmation_required": true,
+      "original_goal_summary": "快速向前走十五秒并在行走期间眨眼",
+      "assessment": {
+        "goal_coverage": "complete alternative",
+        "timing_change": "parallel_to_sequential"
+      }
+    }
+  },
+  "expect": {
+    "skills": [
+      "soridormi.walk_forward",
+      "soridormi.blink_eyes"
+    ],
+    "skill_args": [
+      {
+        "duration_s": 15.0,
+        "speed": "quick"
+      },
+      {
+        "count": 2
+      }
+    ],
+    "requires_confirmation": true,
+    "metadata_true": [
+      "disable_body_auto_confirm",
+      "semantic_plan_confirmation_required"
+    ],
+    "metadata_json_contains": [
+      "alternative_plan",
+      "先走十五秒",
+      "parallel_to_sequential"
+    ]
+  }
+}

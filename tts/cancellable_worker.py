@@ -37,6 +37,7 @@ class RestartableProcessWorker:
         self._connection: Connection | None = None
         self._async_lock: asyncio.Lock | None = None
         self.restart_count = 0
+        self.ready_payload: dict[str, Any] = {}
 
     @property
     def is_alive(self) -> bool:
@@ -129,6 +130,7 @@ class RestartableProcessWorker:
             self._terminate_sync()
             detail = message.get("message") if isinstance(message, dict) else message
             raise RuntimeError(f"{self._name} failed to start: {detail}")
+        self.ready_payload = dict(message)
 
     def _stop_sync(self) -> None:
         if self.is_alive and self._connection is not None:
@@ -143,6 +145,7 @@ class RestartableProcessWorker:
         process = self._process
         self._connection = None
         self._process = None
+        self.ready_payload = {}
         if connection is not None:
             with suppress(OSError):
                 connection.close()

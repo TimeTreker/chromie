@@ -565,6 +565,20 @@ The normal startup script uses `/tmp/chromie-orchestrator.lock`.
 - Use `TTS_MAX_TEXT_CHARS` to shorten speech.
 - Run `./scripts/verify_tts_gpu.sh`.
 
+### TTS speaks only the first words
+
+- Compare `tts_schedule` text with `tts_server_metrics` audio duration. If the
+  full text was scheduled but only about one second of audio was returned, the
+  TTS model—not playback—truncated the waveform.
+- Inspect `prompt_tokens`, `generated_tokens`, `headroom`, and `limit_reached` in
+  `chromie-tts` logs. `limit_reached=true` means the prompt plus generated audio
+  tokens exhausted `TTS_MAX_LENGTH`.
+- The maintained RTX 4090 Laptop profile uses
+  `TTS_CONTEXT_SIZE=4096` and `TTS_MAX_LENGTH=4096`. Rebuild `.env.runtime` and
+  recreate `chromie-tts` after changing the profile.
+- Run `python scripts/benchmark_tts.py --repeat 2 --warmup 1`; the benchmark
+  fails when any case reaches the generation limit.
+
 ### Named skill fails before execution
 
 - Confirm `ORCH_ENABLE_SORIDORMI_SKILLS=1`.

@@ -126,6 +126,36 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             "sid-unverified-action",
         )
 
+    async def test_prepare_response_suppresses_effectful_skills_when_structured_planner_blocks(self) -> None:
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True}
+        )
+
+        prepared = coordinator.prepare_response(
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "walk-leak",
+                        "skill_id": "soridormi.walk_forward",
+                        "args": {"duration_s": 15.0, "speed": "quick"},
+                    }
+                ],
+                metadata={
+                    "capability_decision": "clarify",
+                    "planning_result": "needs_clarification",
+                },
+            ),
+            session_id="sid-structured-block",
+        )
+
+        self.assertEqual(prepared.skills, [])
+        self.assertFalse(prepared.requires_confirmation)
+        self.assertTrue(prepared.metadata["structured_planning_execution_suppressed"])
+        self.assertEqual(
+            prepared.metadata["suppressed_skill_ids"],
+            ["soridormi.walk_forward"],
+        )
+
     async def test_prepare_response_exposes_truth_correction_and_proposal_ledger(
         self,
     ) -> None:
@@ -584,6 +614,36 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             await coordinator.confirmation_exemption_request_ids(response),
             {"nod-1"},
+        )
+
+    async def test_semantic_alternative_disables_sim_auto_confirmation(self) -> None:
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(),
+            auto_confirm_sim=True,
+        )
+        response = InteractionResponse(
+            skills=[
+                {
+                    "request_id": "nod-alternative",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                    "requires_confirmation": True,
+                }
+            ],
+            metadata={
+                "disable_body_auto_confirm": True,
+                "semantic_plan_confirmation_required": True,
+            },
+        )
+
+        self.assertEqual(
+            await coordinator.confirmation_request_ids(response),
+            {"nod-alternative"},
+        )
+        self.assertEqual(
+            await coordinator.confirmation_exemption_request_ids(response),
+            set(),
         )
 
     async def test_body_skill_fails_closed_when_provider_is_disabled(self) -> None:

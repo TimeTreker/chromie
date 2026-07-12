@@ -121,6 +121,7 @@ running.
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Router and normal InteractionRuntime. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog or query-specific LLM context. |
+| `POST` | `/task-continuity` | Propose semantic create/modify/clarification/cancel and related task operations from bounded active-task context; the endpoint does not mutate host task state. |
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
@@ -139,8 +140,9 @@ signals for catalog inspection endpoints, not Router execution authorization.
 |---|---|---|
 | `POST` | `/run` | Established `AgentRequest -> AgentResult` compatibility path. |
 | `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; explicit adapter rollback remains configurable. |
+| `POST` | `/task-continuity` | Return a validated `SemanticTaskOperationSet` proposal for the current utterance and active-task snapshot. |
 
-Both endpoints currently accept the same request shape:
+All three endpoints currently accept the same request shape:
 
 - `sid`
 - `text`
@@ -148,6 +150,15 @@ Both endpoints currently accept the same request shape:
 - optional `language`
 - `context`
 - `history`
+
+`POST /task-continuity` is available only when
+`AGENT_TASK_CONTINUITY_ENABLED=1` and Agent LLM use is enabled. It treats the
+Router decision as advisory context, replaces model-provided operation IDs with
+stable request-bound IDs, rejects below-threshold or unknown-task operations,
+and may return an immediate `ResponsePlan`. It never applies task changes,
+authorizes side effects, or claims execution. The host decides whether to call
+it in `off`, `report_only`, or `apply` mode and remains the authority for task
+versions, confirmation validity, commitment, scheduling, and evidence.
 
 The host context now includes compact prompt-memory fields:
 `session_memory.memory_summary`, `session_memory.extracted_memory`, and
@@ -165,10 +176,14 @@ refined entry into prompt-facing session memory.
 contracts reject unknown fields and recursively reject low-level motor, joint,
 torque, and actuator fields. Native mode is the Agent default. The response
 metadata includes `interaction_output_mode` (`native`, `legacy-adapter`, or
-`legacy-fallback`) for operator diagnostics. When `AGENT_EXPRESSIVE_BODY_CUES`
-allows it, chat-only speech may include a parallel expressive skill such as
-`soridormi.express_attention`; confirmation and simulator/physical safety gates
-still apply. Body and tool requests are routed through the model-assisted
+`legacy-fallback`) for operator diagnostics. When `AGENT_SOCIAL_ATTENTION_MODE` allows it, the native runtime may attach an
+advisory model-authored `social_attention_plan` to response metadata and add
+validated auxiliary named skills. The model may also choose `none`. Applied
+skills carry `metadata.source=social_attention_plan` and
+`metadata.auxiliary_social_attention=true`; they are excluded from user task
+proposals. Runtime validation checks exact catalog membership, schemas, target
+evidence, resource conflicts, confirmation policy, and a bounded latency budget.
+Installation calibration is only a fallback when live target evidence is absent. Body and tool requests are routed through the model-assisted
 Router, capability catalog, Agent capability planner, schemas, and Skill
 Runtime validation rather than hidden phrase parsers. Plain walking requests
 use a normal safe forward speed of `0.18 m/s`;
@@ -273,14 +288,17 @@ Supported JSON text messages:
 
 | Request type | Result |
 |---|---|
-| `health` or `ping` | `pong` with sample rate, GPU-layer setting, generation limits, and available speakers. |
+| `health` or `ping` | `pong` with sample rate, GPU-layer setting, resolved/actual DAC device, generation profile, recent performance summary, worker state, and available speakers. |
 | `list_speakers` | `speakers` with speaker IDs. |
 | `create_speaker` | `speaker_created` or `error`; the WAV path must remain inside `SPEAKER_DIR`. |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
 A synthesis request includes `text`, optional `speaker_id`, and optional
 `request_id`. The `start` message declares `sample_rate`, `format=pcm_s16le`,
-and `channels=1`.
+`channels=1`, codec device, quantization, context size, and generation limit.
+The terminal `end` message includes audio duration plus model-generation, DAC
+decode, PCM conversion, worker round-trip, queue delay, total time, and
+real-time-factor fields. Older clients may ignore these additive fields.
 
 Each OuteTTS/llama.cpp model worker runs in a restartable child process. The
 common/default configuration uses one worker; high-memory GPU profiles may start

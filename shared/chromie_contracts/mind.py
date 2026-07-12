@@ -53,24 +53,63 @@ class LongTermGoal(BaseModel):
         return _compact_text(value, limit=800)
 
 
+class InternalComponent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    component_id: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+    roles: list[str] = Field(default_factory=list)
+    speaker_entity: bool = False
+    body_owner: bool = False
+
+    @field_validator("component_id", "kind")
+    @classmethod
+    def normalize_component_text(cls, value: str) -> str:
+        return _compact_text(value, limit=120)
+
+    @field_validator("roles")
+    @classmethod
+    def normalize_roles(cls, value: list[str]) -> list[str]:
+        return [
+            _compact_text(item, limit=120)
+            for item in value
+            if str(item or "").strip()
+        ]
+
+
 class RobotIdentity(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    entity_id: str = "chromie"
     name: str = "Chromie"
-    kind: str = "AI robot"
+    kind: str = "embodied robot"
     gender: str = "female"
     pronouns: list[str] = Field(default_factory=lambda: ["she", "her"])
     age_description: str = "6 years old"
     age_boundary: str = "This is Chromie's robot identity age, not a human biological age."
     short_self_description: str = (
-        "I'm Chromie, a 6-year-old AI robot. I keep people company and can do simple things to help them."
+        "I'm Chromie, a 6-year-old embodied robot. I keep people company and can do simple things to help them."
     )
+    internal_components: list[InternalComponent] = Field(
+        default_factory=lambda: [
+            InternalComponent(
+                component_id="language_reasoner",
+                kind="language model",
+                roles=["language understanding", "response generation", "reasoning support"],
+                speaker_entity=False,
+                body_owner=False,
+            )
+        ]
+    )
+    # Retained for compatibility with existing owner-supplied profile JSON. It is
+    # no longer used as a question-specific prompt rule.
     model_identity_boundary: str = (
-        "When asked who or what she is, Chromie describes herself as Chromie the AI robot, "
-        "not as a large language model, backend model, or a model trained by Google, OpenAI, or another provider."
+        "Language and reasoning models are internal components of Chromie's system; "
+        "the speaking, perceiving, and acting entity is identified by entity_id."
     )
 
     @field_validator(
+        "entity_id",
         "name",
         "kind",
         "gender",
@@ -88,6 +127,20 @@ class RobotIdentity(BaseModel):
     def normalize_pronouns(cls, value: list[str]) -> list[str]:
         normalized = [_compact_text(item, limit=40) for item in value if item.strip()]
         return normalized or ["she", "her"]
+
+    @field_validator("internal_components")
+    @classmethod
+    def normalize_internal_components(
+        cls, value: list[InternalComponent]
+    ) -> list[InternalComponent]:
+        seen: set[str] = set()
+        normalized: list[InternalComponent] = []
+        for component in value:
+            if component.component_id in seen:
+                raise ValueError(f"duplicate internal component {component.component_id!r}")
+            seen.add(component.component_id)
+            normalized.append(component)
+        return normalized
 
 
 class MindProfile(BaseModel):
@@ -122,6 +175,31 @@ class MindProfile(BaseModel):
                 )
         return value
 
+    def self_model(self) -> dict[str, Any]:
+        identity = self.identity
+        return {
+            "speaker_entity": {
+                "entity_id": identity.entity_id,
+                "name": identity.name,
+                "gender": identity.gender,
+                "pronouns": list(identity.pronouns),
+            },
+            "social_presentation": {
+                "self_reference": identity.name,
+                "presence": "natural, warm, person-like conversational presence",
+                "foreground": ["name", "personality", "current relationship and context"],
+                "background": ["system category", "embodiment category", "age label", "internal architecture"],
+            },
+            "perceiving_entity_id": identity.entity_id,
+            "acting_entity_id": identity.entity_id,
+            "body_owner_entity_id": identity.entity_id,
+            "internal_components": [
+                component.model_dump(mode="json")
+                for component in identity.internal_components
+            ],
+            "capability_evidence_source": "runtime capability catalog and current provider state",
+        }
+
     def prompt_context(self, *, max_chars: int = 1600) -> dict[str, Any]:
         principles = [
             {
@@ -148,7 +226,11 @@ class MindProfile(BaseModel):
             "version": self.version,
             "owner_approved": self.owner_approved,
             "owner_approval_required_for_core_changes": True,
-            "identity": self.identity.model_dump(mode="json"),
+            "identity": self.identity.model_dump(
+                mode="json",
+                exclude={"model_identity_boundary", "internal_components"},
+            ),
+            "self_model": self.self_model(),
             "core_principles": principles,
             "long_term_goals": goals,
             "reflex_policy": list(self.reflex_policy),
@@ -160,15 +242,19 @@ class MindProfile(BaseModel):
     def prompt_summary(self, *, max_chars: int = 1600) -> str:
         lines = [
             f"Mind profile {self.profile_id} v{self.version}; owner_approved={self.owner_approved}.",
-            "Identity, owner-approved:",
-            f"- name: {self.identity.name}",
-            f"- kind: {self.identity.kind}",
+            "Self model, owner-approved:",
+            f"- speaker entity: {self.identity.entity_id} ({self.identity.name})",
+            f"- perceiving/acting/body entity: {self.identity.entity_id}",
             f"- gender: {self.identity.gender}",
             f"- pronouns: {', '.join(self.identity.pronouns)}",
-            f"- age: {self.identity.age_description}",
-            f"- self-description: {self.identity.short_self_description}",
-            f"- boundary: {self.identity.age_boundary}",
-            f"- model identity boundary: {self.identity.model_identity_boundary}",
+            f"- natural social self-reference: {self.identity.name}",
+            "- ordinary conversation foregrounds name, personality, relationship, and current context rather than system category, embodiment category, age label, or internal architecture",
+            "- internal components: "
+            + "; ".join(
+                f"{item.component_id} ({item.kind}; roles={', '.join(item.roles)}; "
+                f"speaker_entity={item.speaker_entity}; body_owner={item.body_owner})"
+                for item in self.identity.internal_components
+            ),
             "Core principles, owner-approved and not experience-mutable:",
         ]
         for item in self.core_principles:

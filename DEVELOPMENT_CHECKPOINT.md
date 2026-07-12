@@ -2,7 +2,7 @@
 
 **Current release-prep base:** `0.0.1`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-04
+**Status refresh date:** 2026-07-12
 **Current focus:** Freeze `0.0.1` through the Chromie/Soridormi boundary with
 Soridormi using MuJoCo `sim` execution; physical pilot preparation and human
 voice-device validation remain separate tracks
@@ -24,7 +24,7 @@ The `0.0.1` release implementation is present:
 - evidence verification and release packaging;
 - small-model quick Router classification for normal semantic routing while
   stop/cancel/ignore controls remain deterministic;
-- model-assisted routing guardrails that treat `qwen3:0.6b` as a proposer, not
+- model-assisted routing guardrails that treat `qwen3:4b` as a proposer, not
   the authority for capabilities, safety, or physical execution;
 - short-term session memory exposed to Router and Agent prompts, plus a
   dedicated deepthinking Agent path for low-confidence or complex requests;
@@ -55,14 +55,46 @@ The `0.0.1` release implementation is present:
   manipulation, navigation, environment, task, safety, and state abilities,
   including `known_missing` and `planned` entries for unavailable human-like
   behaviors;
+- first two semantic task-continuity slices with shared open-goal/task-operation
+  contracts, bounded active-task snapshots, replay-safe versioned goal updates,
+  stale-plan and confirmation invalidation, structured information gaps,
+  dedicated Agent task-continuity resolution, staged report/apply rollout,
+  immediate ResponsePlan claim validation, and same-turn Router-to-Agent task
+  context;
+- Router route/intent contract recovery for stale cross-turn model output,
+  including independent semantic repair, low-confidence clarification, exact-skill
+  grounding, and file-backed single-turn plus weather-to-walk multi-turn replay;
+- July 12 voice-log reliability hardening: explicit Router context budget,
+  model-based generic-chat affordance review for compound body requests, removal
+  of normal-language forward/compound regex recovery, background non-blocking
+  continuity reporting with fail-safe endpoint degradation, effectful Agent
+  disconnect fallback that cannot promise unexecuted work, compact greeting retry,
+  and smaller CJK TTS chunks;
+- separate ASR and routed-turn lifecycles so a new utterance can replace stale
+  Agent/TTS work, with one newest pending VAD utterance retained while ASR is
+  still decoding instead of being dropped;
 - dream-broadly/execute-honestly proposal contract: quick Router and
   deepthinking may record understood but non-executable desired abilities as
   `missing_ability` task proposals, while executable work still requires exact
   catalog skill IDs and trusted runtime validation;
-- simulator-bounded expressive body cues and safe defaults for underspecified
-  walking requests;
+- model-authored optional social-attention plans that may choose subtle named
+  behavior or `none`, use live target evidence before installation calibration,
+  stay outside user task proposals, and fail closed on schema/resource/latency
+  conflicts; semantic safe defaults remain available for underspecified
+  low-consequence parameters;
 - ordered TTS playback with bounded chunked generation through configured
   service workers;
+- startup-primed English/Chinese fast-first acknowledgement audio cached as
+  ignored local WAV/PCM, with a 750 ms adaptive hedge that suppresses the cue
+  when the final response is ready first and cancels queued cues before playback;
+- TTS Stage 6 performance instrumentation: explicit DAC codec-device resolution,
+  worker-reported runtime device inspection, synchronized model-generation and
+  codec-decode timing, PCM/queue/IPC/real-time-factor metrics, a rolling health
+  summary, token-budget exhaustion detection, and a repeatable no-playback
+  benchmark; the RTX 4090 Laptop profile keeps a 4096-token per-chunk context
+  after live 2048-token evidence produced partial sentences, while FP16 remains
+  the quality-preserving default until retained benchmark and listening evidence
+  justify quantization;
 - Soridormi task-agent contract loading, structured task submission,
   idempotent `client_task_ref` generation, task-event monitoring, and
   fail-closed handling for task refusal, failure, timeout, and cancellation
@@ -96,49 +128,57 @@ gates pass from the intended revisions.
 
 ## Next sequence
 
-1. Continue the general ability acceptance reconstruction described in
+1. Continue the semantic task-continuity implementation described in
+   [docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md](docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md):
+   the shared contracts, host-applied versioned operations, active-task prompt
+   projection, dedicated staged continuity endpoint, capability information-gap
+   handling, immediate speech-claim validation, and non-blocking report-only
+   degradation are implemented; next collect retained report-only live-text
+   evidence, add full multi-goal response composition and
+   repair for rejected claims, then add generalized observation planning.
+2. Continue the general ability acceptance reconstruction described in
    [docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md](docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md):
    the first manifest/runner slice is implemented, and the next work is better
    live-runner diagnostics, root-cause classification, broader live text
    sampling, and voice-evidence integration without turning one reported
    sentence into a special-case patch.
-2. Continue the Developer Usability Tools phase described in
+3. Continue the Developer Usability Tools phase described in
    [docs/DEVELOPER_USABILITY_TOOLS.md](docs/DEVELOPER_USABILITY_TOOLS.md):
    PR0-PR6 are implemented; next harden retained trace examples from real
    bundles and keep `trace explain` deferred until causal semantics are stable.
-3. Use [docs/TRACE_SCHEMA.md](docs/TRACE_SCHEMA.md) as the trace-viewer
+4. Use [docs/TRACE_SCHEMA.md](docs/TRACE_SCHEMA.md) as the trace-viewer
    contract; avoid explanations that obscure session, interaction, TaskGraph,
    Skill Runtime, Soridormi, TTS, and fallback semantics.
-4. Treat Soridormi's high-level task and skill surface as declared for the
+5. Treat Soridormi's high-level task and skill surface as declared for the
    current no-motion contract: bounded locomotion, attention, gesture,
    sequence, stop, safe-idle, and planning-hold task types are present in the
    authoritative manifest; navigation, approach, and delivery remain
    future-blocked structured refusals.
-5. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
+6. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
    authoritative manifest. Use structured task goals for rich embodied requests
    and keep concrete named skills for explicit bounded body commands. Preserve
    Soridormi refusal metadata when reporting unsupported embodied tasks.
-6. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
+7. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
    types only. Missing navigation, approach, gaze, gesture, recovery, or
    manipulation goals must remain structured refusals or clarifications rather
    than velocity recipes.
-7. Keep Qwen/small-model routing advisory. Add or revise routing only with
+8. Keep Qwen/small-model routing advisory. Add or revise routing only with
    deterministic-control bypass, catalog constraints, confidence fallback,
    schema validation, Skill Runtime authorization, and Soridormi provider
    refusal/event checks.
-8. Select one reference-robot candidate and complete the identity,
+9. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
    `commissioning/reference_robot_candidate.schema.json` contract and keep the
    real manifest under ignored `.chromie/commissioning/`.
-9. Keep all physical-motion gates off while validating no-motion health,
+10. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
-10. If the next supported release claims real microphone/speaker voice-device
+11. If the next supported release claims real microphone/speaker voice-device
     operation, run the full seven-case `supervised` matrix on the reference host,
     review audible output and MuJoCo safe-idle/recovery behavior, verify the
     bundle with `--require-clean`, then clear the compatibility blocker.
-11. Before publishing `0.0.1`, record the paired Chromie and Soridormi
+12. Before publishing `0.0.1`, record the paired Chromie and Soridormi
     revisions, rerun the Chromie documentation/test/scenario gates, rerun the
     Soridormi task-agent and locomotion-readiness gates, and keep the tag claim
     limited to generated-speech and Soridormi MuJoCo-executor evidence.
@@ -167,7 +207,48 @@ Focused host Skill Runtime graph dispatch tests passed: 59 tests
 Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
-Full Level A baseline:
+Current 2026-07-12 automated regression gate:
+python scripts/check_docs.py passed
+828 current unittest cases and 20 legacy Agent tests passed with
+`./scripts/run_tests.sh`
+369/369 adapter, Router, Router-dialogue, interaction, and dialogue scenarios
+passed with `python scripts/scenario_runner.py --no-write`
+42/42 general-ability Level A representative probes passed
+The current reliability scenarios include English and Chinese walking requests,
+a forced stale weather intent, repeated walking after a weather turn, a Chinese
+nod-and-blink compound request misclassified as generic chat, exact capability
+grounding, confirmation, final Agent skill output, and forbidden
+weather/fallback speech checks. Task-continuity report-only work is now
+non-blocking, Agent disconnects fail closed for effectful routes, and long CJK
+responses use smaller TTS chunks. The prompt-facing self model now binds first-person speech, perception, action, and body ownership to Chromie while exposing language models as internal components and runtime capabilities as evidence. Its social presentation foregrounds Chromie's name and natural personality rather than volunteering system category, embodiment category, age labels, or internal architecture. Unresolved effectful Router outputs now hand the original utterance to CapabilityAgent semantic planning instead of ending in a generic missing-ability clarification. Identity and capability inquiries are handled by LLM semantics rather
+than question-specific branches, fixed replies, or normal-language regexes.
+Compound embodied requests are now reconstructed and planned by the Capability
+Agent as complete semantic outcomes. The model decides whether an exact plan,
+safe adjustment, alternative plan, clarification, or unsupported result is
+appropriate from capability/provider evidence. Missing parameter resolution is
+also model-driven: low-consequence reversible fields may receive an explicit or
+conservative schema-bounded default, while material fields become specific
+structured questions retained on the original task. Semantic capability-planner
+handoffs are not re-delegated to generic DeepThinking solely because the quick
+Router reported zero confidence; deterministic code only validates
+the full structured plan, commits all validated steps atomically, binds material
+alternatives to confirmation, and prevents partial or unconfirmed degraded plans
+from executing. Legacy normal-language capability fast-path parsers were removed. Stage 6.6
+retains the observed compound walk-and-blink interaction as multi-turn replay
+evidence. Unstructured model clarification is reviewed semantically against the
+complete capability surface before any user-facing question is spoken; internal
+schema placeholders are never used as dialogue. Alternative plans remain
+`awaiting_confirmation`, their structured gaps survive follow-up turns, and no
+partial skill can leak into execution. The host force-closes and discards VAD
+segments that remain open for more than 20 seconds, while valid high-energy short
+replies from 450 ms remain eligible for ASR.
+TTS unit coverage now also verifies explicit
+codec-device resolution, detailed stage timing, rolling performance summaries,
+benchmark aggregation, and restartable-worker startup metadata. This is
+automated evidence only; no Stage 6 live benchmark or listening result is
+retained yet.
+
+Historical full Level A baseline:
 640 current unittest cases and 20 legacy Agent tests passed on 2026-07-04 with
 `./scripts/run_tests.sh`. The behavior scenario runner also passed 344/344
 Router, interaction, and dialogue scenario files with `--no-write`.

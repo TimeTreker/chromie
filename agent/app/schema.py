@@ -215,6 +215,7 @@ class AgentResult(BaseModel):
     reason: str | None = None
     handled_by: list[str] = Field(default_factory=list)
     trace: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     def add_speak_immediate(
         self,
@@ -297,6 +298,10 @@ class HealthResponse(BaseModel):
     native_interaction_fallback_enabled: bool = False
     capability_catalog_enabled: bool = False
     capability_catalog_version: int = 0
+    task_continuity_enabled: bool = False
+    task_continuity_model: str | None = None
+    social_attention_mode: str = "off"
+    social_attention_model: str | None = None
 
 
 def detect_language(text: str) -> str:

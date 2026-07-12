@@ -492,6 +492,8 @@ def _agent_task_proposals(
         )
     offset = len(proposals)
     for index, item in enumerate(skills):
+        if item.metadata.get("auxiliary_social_attention") is True:
+            continue
         skill_id = item.skill_id
         proposals.append(
             TaskProposal(

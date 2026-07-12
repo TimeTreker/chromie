@@ -37,6 +37,7 @@ When documents disagree, correct the lower-authority document.
 | What validation supports a claim? | `docs/ACCEPTANCE.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
+| How are semantic goals preserved and revised across turns? | `docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
 | Where should a new collaborator resume? | `docs/HANDOFF.md` |
 | What can be published and supported? | `docs/RELEASE.md` |
@@ -86,6 +87,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Catalog-Aware Router Tiers](CATALOG_AWARE_ROUTER_TIERS.md)
 - [Quick Router Task Planning](QUICK_ROUTER_TASK_PLANNING.md)
 - [Orchestrator Task Proposal Merge](ORCHESTRATOR_TASK_PROPOSAL_MERGE.md)
+- [Semantic Task Continuity and Situational Planning](SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md)
 - [TaskGraph](agent_task_graph.md)
 - [Trace Schema](TRACE_SCHEMA.md)
 - [Chromie/Soridormi Task-Agent Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)

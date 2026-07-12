@@ -158,6 +158,11 @@ class CatalogCapability(BaseModel):
     tags: list[str] = Field(default_factory=list)
     hints: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    can_run_parallel: bool | None = None
+    parallel_metadata_declared: bool = False
+    exclusive_group: str | None = None
+    resource_claims: list[str] = Field(default_factory=list)
+    execution_constraints: dict[str, Any] = Field(default_factory=dict)
 
     def searchable_text(self) -> str:
         return " ".join(
@@ -508,6 +513,29 @@ class CapabilityCatalog:
                             "mode": output.get("mode"),
                             "version": item.get("version"),
                         },
+                        can_run_parallel=(
+                            bool(item.get("can_run_parallel"))
+                            if "can_run_parallel" in item
+                            else None
+                        ),
+                        parallel_metadata_declared=any(
+                            key in item
+                            for key in (
+                                "can_run_parallel",
+                                "exclusive_group",
+                                "resource_claims",
+                                "execution_constraints",
+                            )
+                        ),
+                        exclusive_group=(
+                            str(item.get("exclusive_group") or "").strip() or None
+                        ),
+                        resource_claims=[
+                            str(value)
+                            for value in (item.get("resource_claims") or [])
+                            if str(value).strip()
+                        ],
+                        execution_constraints=dict(item.get("execution_constraints") or {}),
                     )
                     live[capability_id] = self._apply_prompt_tier_policy(capability)
                 if live != self._live:
@@ -542,6 +570,31 @@ class CapabilityCatalog:
                 tags=[*agent.tags],
                 hints=dict(tool.llm_hints),
                 metadata={"version": tool.version},
+                can_run_parallel=(
+                    bool(tool.llm_hints.get("can_run_parallel"))
+                    if "can_run_parallel" in tool.llm_hints
+                    else None
+                ),
+                parallel_metadata_declared=any(
+                    key in tool.llm_hints
+                    for key in (
+                        "can_run_parallel",
+                        "exclusive_group",
+                        "resource_claims",
+                        "execution_constraints",
+                    )
+                ),
+                exclusive_group=(
+                    str(tool.llm_hints.get("exclusive_group") or "").strip() or None
+                ),
+                resource_claims=[
+                    str(value)
+                    for value in (tool.llm_hints.get("resource_claims") or [])
+                    if str(value).strip()
+                ],
+                execution_constraints=dict(
+                    tool.llm_hints.get("execution_constraints") or {}
+                ),
             )
             entries.append(self._apply_prompt_tier_policy(capability))
         return entries

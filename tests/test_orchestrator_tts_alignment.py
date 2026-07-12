@@ -314,6 +314,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 "重庆今天天气怎么样？",
             )
         )
+        assistant.fast_first_tool_response_enabled = True
         self.assertEqual(
             assistant._fast_first_response_text(
                 RouteDecision(
@@ -396,6 +397,85 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ),
             "Which location do you mean?",
         )
+
+
+    def test_tool_fast_first_response_is_opt_in(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.fast_first_response_enabled = True
+        decision = RouteDecision(
+            route="tool",
+            intent="weather_query",
+            language="zh-CN",
+            fast_speech={
+                "text": "好的，我查一下北京今天的天气。",
+                "purpose": "acknowledge_and_check",
+            },
+            metadata={
+                "tool_name": "weather",
+                "weather_query": {"location": "北京", "date": "today"},
+            },
+        )
+
+        assistant.fast_first_tool_response_enabled = False
+        self.assertIsNone(
+            assistant._fast_first_response_text(
+                decision,
+                "今天北京天气怎么样？",
+            )
+        )
+
+        assistant.fast_first_tool_response_enabled = True
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                decision,
+                "今天北京天气怎么样？",
+            ),
+            "好的，我查一下北京今天的天气。",
+        )
+
+    def test_validated_response_plan_uses_structured_claims_not_phrase_blocking(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.fast_first_response_enabled = True
+        decision = RouteDecision(
+            route="deep_thought",
+            intent="refine active task",
+            language="zh-CN",
+            metadata={
+                "response_plan": {
+                    "immediate": {
+                        "text": "好的，我正在确认新的任务要求。",
+                        "speech_act": "acknowledge",
+                        "commitment_state": "evaluating",
+                        "must_not_claim_completion": True,
+                        "covers_task_ids": ["task-1"],
+                    }
+                }
+            },
+        )
+        snapshots = [
+            {
+                "task_id": "task-1",
+                "status": "planning",
+                "semantic_goal": {
+                    "description": "处理当前请求。",
+                    "source_text": "请处理。",
+                },
+                "goal_version": 1,
+                "plan_version": 0,
+                "open_information_gaps": [],
+                "commitment_state": "evaluating",
+            }
+        ]
+
+        self.assertEqual(
+            assistant._fast_first_response_text(
+                decision,
+                "改一下要求。",
+                task_snapshots=snapshots,
+            ),
+            "好的，我正在确认新的任务要求。",
+        )
+        self.assertTrue(decision.metadata["response_plan_validation"]["accepted"])
 
     def test_fast_first_response_can_be_disabled(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -596,7 +676,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.metadata["auto_confirm_suppressed_confirmation_speech"], 1)
 
-    def test_direct_llm_prompt_preserves_chromie_robot_identity(self) -> None:
+    def test_direct_llm_prompt_uses_chromie_social_self_model(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.voice_system_prompt = "Answer briefly for spoken playback."
         assistant.mind = MindManager(default_mind_profile())
@@ -619,11 +699,16 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             route="robot_action",
         )
 
-        self.assertIn("You are Chromie speaking as the robot herself", prompt)
-        self.assertIn("name: Chromie", prompt)
-        self.assertIn("age: 6 years old", prompt)
-        self.assertIn("not a backend text model", prompt)
-        self.assertIn("Never say you are text-based", prompt)
+        self.assertIn("Use the supplied owner-approved self model", prompt)
+        self.assertIn('"entity_id":"chromie"', prompt)
+        self.assertIn('"social_presentation"', prompt)
+        self.assertIn('"self_reference":"Chromie"', prompt)
+        self.assertNotIn('"kind":"embodied robot"', prompt)
+        self.assertNotIn('"age_description"', prompt)
+        self.assertIn('"component_id":"language_reasoner"', prompt)
+        self.assertIn('"speaker_entity":false', prompt)
+        self.assertNotIn("If the user asks who you are", prompt)
+        self.assertNotIn("Never say you are text-based", prompt)
         self.assertIn("Direct fallback reason: agent_exception", prompt)
         self.assertIn("Route hint: robot_action", prompt)
         self.assertIn("Hello. I am listening.", prompt)
@@ -1432,6 +1517,27 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         chunks = assistant.split_tts_text("你好。我可以帮你。")
 
         self.assertEqual(chunks, ["你好。", "我可以帮你。"])
+
+    def test_tts_splitter_chunks_long_chinese_weather_reply_for_earlier_audio(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.tts_text_chunking_enabled = True
+        assistant.tts_first_chunk_chars = 16
+        assistant.tts_chunk_chars = 120
+        assistant.tts_cjk_chunk_chars = 36
+        assistant.tts_min_chunk_chars = 20
+        assistant.tts_cjk_min_chunk_chars = 8
+        assistant.tts_flush_chars = 160
+        assistant.tts_max_text_chars = 220
+
+        text = (
+            "北京今天雷雨伴冰雹，当前约31℃，最高31℃、最低25℃，"
+            "体感约37℃，降水概率最高约100%，风速约5公里每小时。"
+        )
+        chunks = assistant.split_tts_text(text)
+
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(len(chunk) <= 36 for chunk in chunks))
+        self.assertEqual("".join(chunks), text)
 
     def test_tts_splitter_does_not_make_tiny_fragment_without_sentence_boundary(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

@@ -80,10 +80,55 @@ class _StrictWalkOutcome:
                 "parameters_schema": {
                     "type": "object",
                     "properties": {"count": {"type": "number"}},
+                    "required": ["count"],
                     "additionalProperties": False,
                 },
                 "available": True,
                 "requires_confirmation": False,
+            },
+        ],
+    }
+
+
+class _ParallelWalkBlinkOutcome:
+    status = "success"
+    error = None
+    output = {
+        "mode": "sim",
+        "skills": [
+            {
+                "skill_id": "walk_forward",
+                "description": "Walk forward for a bounded duration.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {
+                        "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0},
+                        "speed": {"type": "string", "enum": ["slow", "normal", "quick"]},
+                    },
+                    "required": ["duration_s", "speed"],
+                    "additionalProperties": False,
+                },
+                "available": True,
+                "requires_confirmation": True,
+                "can_run_parallel": True,
+                "exclusive_group": "soridormi.locomotion",
+                "resource_claims": ["mobile_base"],
+            },
+            {
+                "skill_id": "blink_eyes",
+                "description": "Blink the robot eyes visibly.",
+                "parameters_schema": {
+                    "type": "object",
+                    "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 6}},
+                    "required": ["count"],
+                    "additionalProperties": False,
+                },
+                "effects": ["visual_expression"],
+                "available": True,
+                "requires_confirmation": False,
+                "can_run_parallel": True,
+                "exclusive_group": "soridormi.face_expression",
+                "resource_claims": ["eyelids"],
             },
         ],
     }
@@ -381,6 +426,13 @@ class _StrictWalkInvoker:
         return _StrictWalkOutcome()
 
 
+class _ParallelWalkBlinkInvoker:
+    async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _ParallelWalkBlinkOutcome:
+        del arguments, context
+        assert tool_name == "soridormi.skill.list"
+        return _ParallelWalkBlinkOutcome()
+
+
 class _LookForwardInvoker:
     async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context=None) -> _LookForwardOutcome:
         del arguments, context
@@ -482,33 +534,36 @@ class _InvalidWalkOllama:
 class _OverLimitBlinkClarifyOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "Brink your eyes for 15 times." in prompt
-        assert "Router-selected exact skill_id: soridormi.blink_eyes" in prompt
         assert "soridormi.blink_eyes" in prompt
-        assert '"maximum":6' in prompt
         assert kwargs["response_format"] == "json"
         return {
-            "decision": "clarify",
-            "speech": "I can blink my eyes, but I can only do it up to 6 times at a time.",
-            "skills": [],
+            "decision": "execute",
+            "speech": "Okay, I'll blink my eyes 15 times in three batches.",
+            "skills": [
+                {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
+                {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
+                {"skill_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
+            ],
+            "plan_relation": "exact",
+            "original_goal_summary": "blink fifteen times",
         }
 
 
 class _OverLimitBlinkClampedExecuteOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "Brink your eyes for 15 times." in prompt
-        assert "Router-selected exact skill_id: soridormi.blink_eyes" in prompt
         assert "soridormi.blink_eyes" in prompt
-        assert '"maximum":6' in prompt
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
-            "speech": "Okay, I'll blink my eyes 15 times for you!",
+            "speech": "Okay, I'll blink my eyes 15 times in three batches.",
             "skills": [
-                {
-                    "skill_id": "soridormi.blink_eyes",
-                    "args": {"count": 6},
-                }
+                {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
+                {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
+                {"skill_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
             ],
+            "plan_relation": "exact",
+            "original_goal_summary": "blink fifteen times",
         }
 
 
@@ -516,6 +571,21 @@ class _FailIfCalledOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         del prompt, kwargs
         raise AssertionError("capability planner should not be called")
+
+
+class _SemanticCapabilityPlanOllama:
+    def __init__(self, response: dict[str, Any], *, expected_text: str) -> None:
+        self.response = response
+        self.expected_text = expected_text
+        self.calls = 0
+
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        self.calls += 1
+        assert self.expected_text in prompt
+        assert "complete requested outcome" in prompt
+        assert "Do not return a partial executable plan" in prompt
+        assert kwargs["response_format"] == "json"
+        return self.response
 
 
 class _SelectedWalkOllama:
@@ -685,12 +755,12 @@ class _AdverbSpeedOllama:
 
 class _ProposalAdjustedWalkOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert "semantic skill proposals" in prompt
+        assert "complete requested outcome" in prompt
         assert "proposed_args" in prompt
         assert "semantic_intent" in prompt
         assert "parameter_grounding" in prompt
         assert "unmapped_intent" in prompt
-        assert "downstream runtime and Soridormi may accept, adjust" in kwargs["system"]
+        assert "semantic skill proposals" in kwargs["system"]
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
@@ -720,6 +790,187 @@ class _ProposalAdjustedWalkOllama:
                     "unmapped_intent": [],
                 }
             ],
+        }
+
+
+class _WalkBlinkAlternativeOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "快速的往前走15秒，然后边走边眨眼睛，可以吗？" in prompt
+        assert "soridormi.walk_forward" in prompt
+        assert "soridormi.blink_eyes" in prompt
+        assert '"parallel_metadata_declared":false' in prompt
+        assert "propose_alternative" in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "propose_alternative",
+            "speech": "我目前不能在行走时同时眨眼，但可以先走十五秒，再眨两下眼睛，可以吗？",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_velocity",
+                    "args": {"vx_mps": 0.25, "duration_s": 15.0},
+                    "timing": "sequential",
+                    "reason": "provider resources do not support overlap",
+                },
+                {
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "reason": "run after locomotion",
+                },
+            ],
+            "plan_relation": "alternative",
+            "user_confirmation_required": True,
+            "original_goal_summary": "快速向前走十五秒并在行走期间眨眼",
+            "assessment": {
+                "goal_coverage": "complete alternative",
+                "timing_change": "parallel_to_sequential",
+                "requires_confirmation": True,
+            },
+        }
+
+
+class _WalkBlinkParallelOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Walk forward quickly for 15 seconds while blinking twice." in prompt
+        assert '"exclusive_group":"soridormi.locomotion"' in prompt
+        assert '"exclusive_group":"soridormi.face_expression"' in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "I can walk forward while blinking twice.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 15.0, "speed": "quick"},
+                    "timing": "parallel",
+                },
+                {
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "parallel",
+                },
+            ],
+            "plan_relation": "exact",
+            "original_goal_summary": "walk forward quickly for fifteen seconds while blinking twice",
+            "assessment": {"provider_compatibility": "parallel resources are disjoint"},
+        }
+
+
+class _WalkBlinkInvalidSecondSkillOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert "Walk forward and blink." in prompt
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "execute",
+            "speech": "I will walk and blink.",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_velocity",
+                    "args": {"vx_mps": 0.25, "duration_s": 3.0},
+                },
+                {
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {},
+                },
+            ],
+            "plan_relation": "exact",
+            "original_goal_summary": "walk forward and blink",
+        }
+
+
+class _BlinkSafeDefaultRepairOllama:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        self.calls += 1
+        assert kwargs["response_format"] == "json"
+        if "Repair the capability plan's unresolved or invalid parameters" in prompt:
+            assert "safe ordinary default" in prompt
+            assert '"count"' in prompt
+            assert '"maximum":6' in prompt
+            return {
+                "decision": "execute",
+                "speech": "我眨四下眼睛。",
+                "skills": [
+                    {
+                        "skill_id": "soridormi.blink_eyes",
+                        "proposed_args": {"count": 4},
+                        "parameter_grounding": {
+                            "count": {
+                                "resolution": "use_safe_default",
+                                "rationale": "A short bounded visual gesture is low consequence and easily reversible.",
+                            }
+                        },
+                    }
+                ],
+                "plan_relation": "exact",
+                "original_goal_summary": "眨眼睛",
+                "assessment": {"parameter_policy": "safe_default"},
+            }
+        assert "Resolve missing parameters semantically" in prompt
+        return {
+            "decision": "execute",
+            "speech": "我眨眼睛。",
+            "skills": [
+                {
+                    "skill_id": "soridormi.blink_eyes",
+                    "proposed_args": {},
+                }
+            ],
+            "plan_relation": "exact",
+            "original_goal_summary": "眨眼睛",
+        }
+
+
+class _ImportantWalkParameterRepairOllama:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        self.calls += 1
+        assert kwargs["response_format"] == "json"
+        if "Repair the capability plan's unresolved or invalid parameters" in prompt:
+            assert "must not be guessed" in prompt
+            assert "duration_s" in prompt
+            return {
+                "decision": "clarify",
+                "speech": "你希望我往前走多久？请告诉我秒数。",
+                "skills": [],
+                "information_gaps": [
+                    {
+                        "gap_id": "soridormi.walk_velocity:duration_s",
+                        "description": "walking duration in seconds",
+                        "blocking": True,
+                        "required_for": ["soridormi.walk_velocity"],
+                        "preferred_resolution": "ask_user",
+                        "candidate_values": [],
+                        "metadata": {
+                            "schema_field": "duration_s",
+                            "skill_id": "soridormi.walk_velocity",
+                            "reason": "duration materially changes the physical action scope",
+                        },
+                    }
+                ],
+                "plan_relation": "none",
+                "original_goal_summary": "向前走",
+                "assessment": {"parameter_policy": "ask_user"},
+            }
+        assert "Resolve missing parameters semantically" in prompt
+        return {
+            "decision": "execute",
+            "speech": "我往前走。",
+            "skills": [
+                {
+                    "skill_id": "soridormi.walk_velocity",
+                    "proposed_args": {"vx_mps": 0.15},
+                    "parameter_grounding": {
+                        "vx_mps": {"resolution": "use_safe_default"}
+                    },
+                }
+            ],
+            "plan_relation": "exact",
+            "original_goal_summary": "向前走",
         }
 
 
@@ -778,7 +1029,8 @@ class _PromptBudgetOllama:
         assert "Lifeview" in prompt
         assert "Valueview" in prompt
         assert "Task Context Group" in prompt
-        assert len(prompt) < 9000
+        assert len(prompt) < 14000
+        assert "complete requested outcome" in prompt
         assert kwargs["response_format"] == "json"
         return {
             "decision": "execute",
@@ -1084,6 +1336,191 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             "bounded_to_schema_maximum",
         )
 
+    async def test_compound_action_alternative_waits_for_confirmation_without_partial_execution(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_WalkBlinkAlternativeOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=180,
+                capability_catalog=_catalog_with_invoker(_StrictWalkInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "walk-blink-alternative",
+                "text": "快速的往前走15秒，然后边走边眨眼睛，可以吗？",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.95,
+                    "language": "zh-CN",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(
+            [item.skill_id for item in response.skills],
+            ["soridormi.walk_velocity", "soridormi.blink_eyes"],
+        )
+        self.assertEqual([item.timing for item in response.skills], ["sequential", "sequential"])
+        self.assertTrue(response.requires_confirmation)
+        self.assertTrue(response.metadata["disable_body_auto_confirm"])
+        self.assertTrue(response.metadata["semantic_plan_confirmation_required"])
+        self.assertEqual(response.metadata["planning_result"], "alternative_plan")
+        self.assertIn("先走十五秒", response.metadata["confirmation_prompt"])
+        self.assertEqual(response.speech, [])
+
+    async def test_compound_action_exact_parallel_plan_preserves_every_requested_action(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_WalkBlinkParallelOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=180,
+                capability_catalog=_catalog_with_invoker(_ParallelWalkBlinkInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "walk-blink-parallel",
+                "text": "Walk forward quickly for 15 seconds while blinking twice.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.95,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(
+            [item.skill_id for item in response.skills],
+            ["soridormi.walk_forward", "soridormi.blink_eyes"],
+        )
+        self.assertEqual([item.timing for item in response.skills], ["parallel", "parallel"])
+        self.assertEqual(response.metadata["planning_result"], "composed_plan")
+        self.assertEqual(response.metadata["semantic_plan_relation"], "exact")
+        self.assertFalse(response.metadata.get("semantic_plan_confirmation_required", False))
+        self.assertEqual(response.speech[0].text, "I can walk forward while blinking twice.")
+
+    async def test_compound_action_invalid_second_skill_rejects_entire_plan_atomically(self) -> None:
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=_WalkBlinkInvalidSecondSkillOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=180,
+                capability_catalog=_catalog_with_invoker(_StrictWalkInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "walk-blink-invalid",
+                "text": "Walk forward and blink.",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_forward",
+                    "confidence": 0.95,
+                    "language": "en-US",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(response.skills, [])
+        self.assertTrue(response.metadata["atomic_plan_rejected"])
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
+        self.assertEqual(response.metadata["planning_result"], "needs_clarification")
+        self.assertEqual(response.metadata["invalid_capability_args"]["skill_id"], "soridormi.blink_eyes")
+
+    async def test_low_consequence_missing_blink_count_is_repaired_with_llm_safe_default(self) -> None:
+        planner = _BlinkSafeDefaultRepairOllama()
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=planner,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=180,
+                capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "blink-safe-default",
+                "text": "眨眨眼睛。",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.blink_eyes",
+                    "confidence": 0.95,
+                    "language": "zh-CN",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(planner.calls, 2)
+        self.assertEqual(len(response.skills), 1)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.blink_eyes")
+        self.assertEqual(response.skills[0].args, {"count": 4})
+        self.assertEqual(response.metadata["planning_result"], "direct_skill")
+        grounding = response.skills[0].metadata["proposal_parameter_grounding"]
+        self.assertEqual(grounding["count"]["resolution"], "use_safe_default")
+        self.assertEqual(response.speech[0].text, "我眨四下眼睛。")
+
+    async def test_material_missing_walk_duration_asks_specific_question(self) -> None:
+        planner = _ImportantWalkParameterRepairOllama()
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=planner,  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=180,
+                capability_catalog=_catalog_with_invoker(_StrictWalkInvoker()),
+                capability_match_limit=8,
+            )
+        )
+        request = AgentRunRequest.model_validate(
+            {
+                "sid": "walk-important-gap",
+                "text": "往前走。",
+                "route_decision": {
+                    "route": "robot_action",
+                    "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+                    "intent": "capability:soridormi.walk_velocity",
+                    "confidence": 0.95,
+                    "language": "zh-CN",
+                    "source": "llm",
+                },
+            }
+        )
+
+        response = await runtime.run(request)
+
+        self.assertEqual(planner.calls, 2)
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
+        self.assertEqual(response.metadata["planning_result"], "needs_clarification")
+        self.assertEqual(
+            response.metadata["information_gaps"][0]["metadata"]["schema_field"],
+            "duration_s",
+        )
+        self.assertIn("多久", response.speech[0].text)
+        self.assertNotIn("不能移动", response.speech[0].text)
+
     async def test_capability_plan_dedupes_identical_llm_skill_requests(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
@@ -1218,7 +1655,16 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
     async def test_router_task_list_fast_path_executes_low_risk_blink_without_llm(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
-                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                ollama=_SemanticCapabilityPlanOllama(
+                    {
+                        "decision": "execute",
+                        "speech": "Okay, I'll blink my eyes 5 times.",
+                        "skills": [{"skill_id": "soridormi.blink_eyes", "args": {"count": 5}}],
+                        "plan_relation": "exact",
+                        "original_goal_summary": "blink five times",
+                    },
+                    expected_text="Please blink your eyes 5 times.",
+                ),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
@@ -1262,20 +1708,25 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args, {"count": 5})
         self.assertEqual(
             response.skills[0].metadata["source"],
-            "router_task_list_fast_path",
+            "capability_catalog",
         )
         self.assertEqual(response.metadata["capability_decision"], "execute")
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.blink_eyes"])
-        self.assertEqual(
-            response.metadata["capability_fast_path"]["source"],
-            "router_task_list_fast_path",
-        )
         self.assertEqual(response.speech[0].text, "Okay, I'll blink my eyes 5 times.")
 
     async def test_router_task_list_fast_path_extracts_chinese_blink_count(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
-                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                ollama=_SemanticCapabilityPlanOllama(
+                    {
+                        "decision": "execute",
+                        "speech": "好的，我会眨眼2次。",
+                        "skills": [{"skill_id": "soridormi.blink_eyes", "args": {"count": 2}}],
+                        "plan_relation": "exact",
+                        "original_goal_summary": "眨眼两次",
+                    },
+                    expected_text="请眨两小眼睛。",
+                ),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
@@ -1317,16 +1768,21 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
         self.assertEqual(response.skills[0].args, {"count": 2})
-        self.assertEqual(
-            response.metadata["capability_fast_path"]["source"],
-            "router_task_list_fast_path",
-        )
         self.assertEqual(response.speech[0].text, "好的，我会眨眼2次。")
 
     async def test_router_task_list_fast_path_allows_optional_defaulted_blink_fields(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
-                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                ollama=_SemanticCapabilityPlanOllama(
+                    {
+                        "decision": "execute",
+                        "speech": "Okay, I'll blink my eyes 5 times.",
+                        "skills": [{"skill_id": "soridormi.blink_eyes", "args": {"count": 5}}],
+                        "plan_relation": "exact",
+                        "original_goal_summary": "blink five times",
+                    },
+                    expected_text="Please blink your eyes 5 times.",
+                ),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_catalog_with_invoker(_BlinkDefaultInvoker()),
@@ -1370,17 +1826,26 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args, {"count": 5})
         self.assertEqual(
             response.skills[0].metadata["source"],
-            "router_task_list_fast_path",
-        )
-        self.assertEqual(
-            response.metadata["capability_fast_path"]["source"],
-            "router_task_list_fast_path",
+            "capability_catalog",
         )
 
     async def test_router_task_list_fast_path_batches_over_limit_blink_without_llm(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
-                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                ollama=_SemanticCapabilityPlanOllama(
+                    {
+                        "decision": "execute",
+                        "speech": "Okay, I'll blink my eyes 15 times in three sequential batches.",
+                        "skills": [
+                            {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-1"},
+                            {"skill_id": "soridormi.blink_eyes", "args": {"count": 6}, "timing": "sequential", "step_id": "blink-batch-2"},
+                            {"skill_id": "soridormi.blink_eyes", "args": {"count": 3}, "timing": "sequential", "step_id": "blink-batch-3"},
+                        ],
+                        "plan_relation": "exact",
+                        "original_goal_summary": "blink fifteen times",
+                    },
+                    expected_text="Please blink your eyes 15 times.",
+                ),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_catalog_with_invoker(_BlinkLimitInvoker()),
@@ -1432,20 +1897,26 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             [item.args for item in response.skills],
             [{"count": 6}, {"count": 6}, {"count": 3}],
         )
-        self.assertEqual(
-            response.metadata["capability_fast_path"]["source"],
-            "exact_routed_count_batch_recovery",
-        )
-        self.assertEqual(
-            response.metadata["capability_batched_over_limit"]["source"],
-            "exact_routed_count_batch_recovery",
-        )
         self.assertIn("15", response.speech[0].text)
 
     async def test_router_task_list_fast_path_preserves_physical_confirmation(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
-                ollama=_FailIfCalledOllama(),  # type: ignore[arg-type]
+                ollama=_SemanticCapabilityPlanOllama(
+                    {
+                        "decision": "execute",
+                        "speech": "Walking forward quickly for three seconds.",
+                        "skills": [
+                            {
+                                "skill_id": "soridormi.walk_forward",
+                                "args": {"duration_s": 3.0, "speed": "quick"},
+                            }
+                        ],
+                        "plan_relation": "exact",
+                        "original_goal_summary": "walk forward quickly for three seconds",
+                    },
+                    expected_text="Walk forward quickly for 3 seconds.",
+                ),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_catalog(),
@@ -1491,11 +1962,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.requires_confirmation)
         self.assertEqual(
             response.skills[0].metadata["source"],
-            "router_task_list_fast_path",
-        )
-        self.assertEqual(
-            response.metadata["capability_fast_path"]["source"],
-            "router_task_list_fast_path",
+            "capability_catalog",
         )
 
     async def test_router_selected_capability_does_not_hide_better_candidate(self) -> None:
@@ -1661,7 +2128,8 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         response = await runtime.run(request)
 
         self.assertEqual(response.skills, [])
-        self.assertEqual(response.speech[0].text, "Please clarify the action before I move.")
+        self.assertIn("action detail", response.speech[0].text)
+        self.assertNotIn("schema-valid plan", response.speech[0].text)
         self.assertEqual(response.metadata["capability_decision"], "clarify")
         self.assertEqual(
             response.metadata["invalid_capability_args"]["errors"],
@@ -1711,17 +2179,6 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("blink", response.speech[0].text.lower())
         self.assertIn("15", response.speech[0].text)
         self.assertEqual(response.metadata["capability_decision"], "execute")
-        self.assertEqual(
-            response.metadata["capability_batched_over_limit"],
-            {
-                "skill_id": "soridormi.blink_eyes",
-                "requested_count": 15,
-                "max_per_call": 6,
-                "batch_count": 3,
-                "batches": [6, 6, 3],
-                "source": "exact_routed_count_batch_recovery",
-            },
-        )
 
     async def test_exact_blink_request_over_limit_batches_silently_clamped_plan(self) -> None:
         runtime = InteractionRuntime(
@@ -1763,10 +2220,6 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             [{"count": 6}, {"count": 6}, {"count": 3}],
         )
         self.assertEqual(response.metadata["capability_decision"], "execute")
-        self.assertEqual(
-            response.metadata["capability_batched_over_limit"]["source"],
-            "exact_routed_count_batch_recovery",
-        )
 
     async def test_capability_planner_failure_returns_clarification_not_exception(self) -> None:
         runtime = InteractionRuntime(

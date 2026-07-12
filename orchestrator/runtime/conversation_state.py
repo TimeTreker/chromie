@@ -10,8 +10,23 @@ from typing import Any, Deque
 
 from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
 
+try:
+    from chromie_contracts.semantic_task import (
+        InformationGap,
+        SemanticGoal,
+        SemanticTaskOperation,
+        TaskContextSnapshot,
+    )
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.semantic_task import (
+        InformationGap,
+        SemanticGoal,
+        SemanticTaskOperation,
+        TaskContextSnapshot,
+    )
 
-_DONE_TASK_STATUSES = {"done", "failed", "cancelled", "canceled", "expired"}
+
+_DONE_TASK_STATUSES = {"done", "failed", "refused", "timed_out", "cancelled", "canceled", "expired", "superseded"}
 _TASK_RELATIONS = {
     "new_task",
     "continue_task",
@@ -379,6 +394,603 @@ class ConversationStateManager:
                 return context
         return None
 
+    @staticmethod
+    def _semantic_goal_from_context(context: dict[str, Any]) -> SemanticGoal:
+        raw = context.get("semantic_goal")
+        if isinstance(raw, dict):
+            try:
+                return SemanticGoal.model_validate(raw)
+            except Exception:
+                pass
+        description = " ".join(
+            str(context.get("goal") or context.get("task_type") or "task").strip().split()
+        ) or "task"
+        source_text = " ".join(
+            str(context.get("last_meaningful_user_turn") or description).strip().split()
+        ) or description
+        constraints = context.get("constraints")
+        if not isinstance(constraints, dict):
+            constraints = {}
+        return SemanticGoal(
+            goal_id=str(context.get("task_id") or "") or None,
+            version=max(1, int(context.get("goal_version") or 1)),
+            description=description,
+            source_text=source_text,
+            constraints=constraints,
+        )
+
+    def _task_snapshot(self, context: dict[str, Any]) -> dict[str, Any]:
+        goal = self._semantic_goal_from_context(context)
+        raw_gaps = context.get("open_information_gaps")
+        gaps: list[InformationGap] = []
+        if isinstance(raw_gaps, list):
+            for item in raw_gaps:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    gap = InformationGap.model_validate(item)
+                except Exception:
+                    continue
+                if not gap.resolved:
+                    gaps.append(gap)
+        raw_status = str(context.get("status") or "open").strip().lower()
+        status_alias = {
+            "pending": "open",
+            "awaiting_user": "waiting_for_user",
+            "canceled": "cancelled",
+            "expired": "timed_out",
+        }
+        status = status_alias.get(raw_status, raw_status)
+        allowed_statuses = {
+            "open",
+            "planning",
+            "needs_context",
+            "waiting_for_user",
+            "awaiting_confirmation",
+            "committed",
+            "scheduled",
+            "running",
+            "paused",
+            "recoverable",
+            "done",
+            "failed",
+            "refused",
+            "timed_out",
+            "cancelled",
+            "superseded",
+        }
+        if status not in allowed_statuses:
+            status = "open"
+        commitment = str(context.get("commitment_state") or "none").strip().lower()
+        if commitment not in {
+            "none",
+            "heard",
+            "evaluating",
+            "accepted",
+            "waiting_for_user",
+            "executing",
+            "completed",
+            "failed",
+            "cancelled",
+        }:
+            commitment = "none"
+        confirmation = context.get("confirmation")
+        if not isinstance(confirmation, dict):
+            confirmation = None
+        evidence = context.get("evidence_summary")
+        if not isinstance(evidence, dict):
+            evidence = {}
+        metadata = context.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        return TaskContextSnapshot(
+            task_id=str(context.get("task_id") or "unknown-task"),
+            status=status,  # type: ignore[arg-type]
+            semantic_goal=goal,
+            goal_version=max(1, int(context.get("goal_version") or goal.version or 1)),
+            plan_version=max(0, int(context.get("plan_version") or 0)),
+            open_information_gaps=gaps,
+            confirmation=confirmation,
+            commitment_state=commitment,  # type: ignore[arg-type]
+            last_user_update=str(context.get("last_meaningful_user_turn") or ""),
+            evidence_summary=evidence,
+            metadata={
+                "task_type": context.get("task_type"),
+                "task_relation": context.get("task_relation"),
+                "updated_ms": context.get("updated_ms"),
+                **{
+                    key: metadata.get(key)
+                    for key in (
+                        "last_route",
+                        "last_intent",
+                        "restored_from_task_store",
+                        "restored_original_status",
+                    )
+                    if metadata.get(key) is not None
+                },
+            },
+        ).model_dump(mode="json", exclude_none=True)
+
+    def active_task_snapshots(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        active = self._active_task_contexts()
+        if limit is None:
+            limit = self.max_pending_tasks
+        limit = max(0, int(limit))
+        if limit == 0:
+            return []
+        return [self._task_snapshot(item) for item in active[-limit:]]
+
+    @staticmethod
+    def _semantic_operations_from_metadata(
+        metadata: dict[str, Any] | None,
+    ) -> list[SemanticTaskOperation]:
+        if not isinstance(metadata, dict):
+            return []
+        raw = (
+            metadata.get("semantic_task_operations")
+            or metadata.get("task_operations")
+            or metadata.get("semantic_task_operation")
+        )
+        if raw is None:
+            return []
+        if isinstance(raw, dict):
+            if isinstance(raw.get("operations"), list):
+                raw = raw["operations"]
+            else:
+                raw = [raw]
+        if not isinstance(raw, list):
+            return []
+        operations: list[SemanticTaskOperation] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            try:
+                operations.append(SemanticTaskOperation.model_validate(item))
+            except Exception:
+                continue
+        return operations
+
+    @staticmethod
+    def _context_has_operation_id(
+        context: dict[str, Any],
+        operation_id: str,
+    ) -> bool:
+        history = context.get("operation_history")
+        if not isinstance(history, list):
+            return False
+        return any(
+            isinstance(item, dict)
+            and str(item.get("operation_id") or "") == operation_id
+            for item in history
+        )
+
+    def _context_by_operation_id(
+        self,
+        operation_id: str,
+    ) -> dict[str, Any] | None:
+        if not operation_id:
+            return None
+        for context in reversed(self._task_contexts):
+            if self._context_has_operation_id(context, operation_id):
+                return context
+        return None
+
+    def _new_semantic_task_context(
+        self,
+        *,
+        sid: str | None,
+        operation: SemanticTaskOperation,
+        user_text: str,
+        route: str | None,
+        intent: str | None,
+        source: str | None,
+    ) -> dict[str, Any]:
+        assert operation.goal is not None
+        now = _now_ms()
+        task_id = self._new_task_id()
+        goal = operation.goal.model_copy(
+            update={
+                "goal_id": task_id,
+                "version": 1,
+                "source_text": operation.goal.source_text or user_text,
+            }
+        )
+        status = operation.status_update or (
+            "waiting_for_user"
+            if any(gap.blocking and gap.preferred_resolution == "ask_user" for gap in operation.information_gaps)
+            else "planning"
+            if operation.requires_replan
+            else "open"
+        )
+        commitment = operation.commitment_state or (
+            "waiting_for_user" if status == "waiting_for_user" else "evaluating"
+        )
+        context = {
+            "task_id": task_id,
+            "conversation_id": self.conversation_id,
+            "status": status,
+            "task_relation": "new_task",
+            "task_type": str((operation.metadata or {}).get("task_type") or self._default_task_type(route, intent)),
+            "goal": self._compact_text(goal.description, limit=220),
+            "semantic_goal": goal.model_dump(mode="json", exclude_none=True),
+            "goal_version": 1,
+            "plan_version": 0,
+            "plan_status": "not_planned",
+            "commitment_state": commitment,
+            "important_claims": [],
+            "entities": [],
+            "constraints": dict(goal.constraints),
+            "pending_questions": [gap.description for gap in operation.information_gaps if gap.blocking],
+            "open_information_gaps": [
+                gap.model_dump(mode="json", exclude_none=True)
+                for gap in operation.information_gaps
+                if not gap.resolved
+            ],
+            "operation_history": [
+                {
+                    "operation_id": operation.operation_id,
+                    "operation": operation.operation,
+                    "goal_version": 1,
+                    "ts_ms": now,
+                    "reason_summary": operation.reason_summary,
+                }
+            ],
+            "last_meaningful_user_turn": self._compact_text(user_text, limit=220),
+            "last_assistant_response": None,
+            "related_sids": [sid] if sid else [],
+            "created_ms": now,
+            "updated_ms": now,
+            "persistence_policy": str((operation.metadata or {}).get("persistence_policy") or "persist_if_unfinished"),
+            "confirmation": None,
+            "evidence_summary": {},
+            "metadata": {
+                "last_route": route,
+                "last_intent": intent,
+                "source": source,
+                "semantic_operation_id": operation.operation_id,
+                "semantic_operation_confidence": operation.confidence,
+                "semantic_relationship": operation.relationship,
+                "requires_replan": operation.requires_replan,
+            },
+        }
+        self._task_contexts.append(context)
+        return context
+
+    @staticmethod
+    def _merge_semantic_goal(
+        goal: SemanticGoal,
+        operation: SemanticTaskOperation,
+        *,
+        user_text: str,
+    ) -> SemanticGoal:
+        update = dict(operation.goal_update or {})
+        if operation.goal is not None:
+            replacement = operation.goal
+            update = {
+                "description": replacement.description,
+                "source_text": replacement.source_text,
+                "beneficiary": replacement.beneficiary,
+                "object": replacement.object,
+                "constraints": replacement.constraints,
+                "success_criteria": replacement.success_criteria,
+                "metadata": replacement.metadata,
+                **update,
+            }
+
+        constraints = dict(goal.constraints)
+        replacement_constraints = update.get("constraints")
+        if isinstance(replacement_constraints, dict):
+            constraints = dict(replacement_constraints)
+        constraint_updates = update.get("constraint_updates")
+        if isinstance(constraint_updates, dict):
+            constraints.update(constraint_updates)
+        removals = update.get("constraint_removals")
+        if isinstance(removals, list):
+            for key in removals:
+                constraints.pop(str(key), None)
+
+        object_value = dict(goal.object)
+        replacement_object = update.get("object")
+        if isinstance(replacement_object, dict):
+            object_value = replacement_object
+        object_updates = update.get("object_updates")
+        if isinstance(object_updates, dict):
+            object_value.update(object_updates)
+
+        criteria = update.get("success_criteria", goal.success_criteria)
+        metadata = dict(goal.metadata)
+        update_metadata = update.get("metadata")
+        if isinstance(update_metadata, dict):
+            metadata.update(update_metadata)
+
+        version = goal.version + 1
+        return SemanticGoal(
+            goal_id=goal.goal_id,
+            version=version,
+            description=str(update.get("description") or goal.description),
+            source_text=str(update.get("source_text") or user_text or goal.source_text),
+            beneficiary=(
+                str(update.get("beneficiary"))
+                if update.get("beneficiary") is not None
+                else goal.beneficiary
+            ),
+            object=object_value,
+            constraints=constraints,
+            success_criteria=criteria,
+            metadata=metadata,
+        )
+
+    def _apply_semantic_operation_to_context(
+        self,
+        context: dict[str, Any],
+        operation: SemanticTaskOperation,
+        *,
+        sid: str | None,
+        user_text: str,
+        route: str | None,
+        intent: str | None,
+        source: str | None,
+    ) -> dict[str, Any]:
+        now = _now_ms()
+        result: dict[str, Any] = {
+            "operation_id": operation.operation_id,
+            "operation": operation.operation,
+            "task_id": context.get("task_id"),
+            "applied": False,
+        }
+        if self._context_has_operation_id(context, operation.operation_id):
+            result.update(
+                {
+                    "replayed": True,
+                    "reason": "operation_already_applied",
+                    "goal_version": int(context.get("goal_version") or 1),
+                    "plan_version": int(context.get("plan_version") or 0),
+                    "status": context.get("status"),
+                }
+            )
+            return result
+
+        status = str(context.get("status") or "open").lower()
+        if status in _DONE_TASK_STATUSES and operation.operation not in {"query_status"}:
+            result["reason"] = f"task_status_{status}_is_not_modifiable"
+            return result
+
+        if operation.operation in {"cancel", "reject"}:
+            context["status"] = "cancelled" if operation.operation == "cancel" else "refused"
+            context["commitment_state"] = "cancelled" if operation.operation == "cancel" else "failed"
+        elif operation.operation == "pause":
+            context["status"] = "paused"
+        elif operation.operation == "resume":
+            context["status"] = operation.status_update or "planning"
+            context["commitment_state"] = operation.commitment_state or "evaluating"
+        elif operation.operation == "confirm":
+            context["status"] = operation.status_update or "committed"
+            context["commitment_state"] = operation.commitment_state or "accepted"
+        elif operation.operation == "query_status":
+            pass
+        else:
+            goal = self._semantic_goal_from_context(context)
+            revised = self._merge_semantic_goal(goal, operation, user_text=user_text)
+            context["semantic_goal"] = revised.model_dump(mode="json", exclude_none=True)
+            context["goal"] = self._compact_text(revised.description, limit=220)
+            context["goal_version"] = revised.version
+            context["constraints"] = dict(revised.constraints)
+
+            raw_gaps = context.get("open_information_gaps")
+            existing_gaps: list[dict[str, Any]] = [
+                dict(item) for item in raw_gaps if isinstance(item, dict)
+            ] if isinstance(raw_gaps, list) else []
+            resolved = set(operation.resolved_gap_ids)
+            existing_gaps = [
+                item for item in existing_gaps
+                if str(item.get("gap_id") or "") not in resolved
+            ]
+            by_id = {
+                str(item.get("gap_id") or ""): item
+                for item in existing_gaps
+                if str(item.get("gap_id") or "")
+            }
+            for gap in operation.information_gaps:
+                if gap.resolved:
+                    by_id.pop(gap.gap_id, None)
+                else:
+                    by_id[gap.gap_id] = gap.model_dump(mode="json", exclude_none=True)
+            context["open_information_gaps"] = list(by_id.values())
+            context["pending_questions"] = [
+                str(item.get("description") or "")
+                for item in context["open_information_gaps"]
+                if item.get("blocking") is not False and str(item.get("description") or "")
+            ][:4]
+
+            old_plan_version = max(0, int(context.get("plan_version") or 0))
+            if operation.requires_replan or operation.operation in {
+                "modify",
+                "clarification_answer",
+                "correct",
+                "replace",
+            }:
+                if old_plan_version:
+                    superseded = context.get("superseded_plan_versions")
+                    if not isinstance(superseded, list):
+                        superseded = []
+                    if old_plan_version not in superseded:
+                        superseded.append(old_plan_version)
+                    context["superseded_plan_versions"] = superseded[-12:]
+                context["plan_status"] = "superseded" if old_plan_version else "not_planned"
+                confirmation = context.get("confirmation")
+                if isinstance(confirmation, dict) and confirmation:
+                    invalidated = context.get("invalidated_confirmations")
+                    if not isinstance(invalidated, list):
+                        invalidated = []
+                    invalidated.append({**confirmation, "invalidated_ms": now, "reason": "goal_version_changed"})
+                    context["invalidated_confirmations"] = invalidated[-8:]
+                    context["confirmation"] = None
+
+            blocking_user_gap = any(
+                bool(item.get("blocking", True))
+                and str(item.get("preferred_resolution") or "") == "ask_user"
+                for item in context["open_information_gaps"]
+            )
+            blocking_context_gap = any(
+                bool(item.get("blocking", True))
+                and str(item.get("preferred_resolution") or "")
+                in {"observe_environment", "query_trusted_service"}
+                for item in context["open_information_gaps"]
+            )
+            context["status"] = operation.status_update or (
+                "waiting_for_user"
+                if blocking_user_gap
+                else "needs_context"
+                if blocking_context_gap
+                else "planning"
+            )
+            context["commitment_state"] = operation.commitment_state or (
+                "waiting_for_user" if context["status"] == "waiting_for_user" else "evaluating"
+            )
+
+        context["task_relation"] = {
+            "modify": "modify_task",
+            "clarification_answer": "clarify_task",
+            "correct": "modify_task",
+            "replace": "modify_task",
+            "cancel": "close_task",
+            "reject": "close_task",
+        }.get(operation.operation, context.get("task_relation") or "continue_task")
+        context["updated_ms"] = now
+        context["last_meaningful_user_turn"] = self._compact_text(user_text, limit=220)
+        if sid:
+            related = context.get("related_sids")
+            if not isinstance(related, list):
+                related = []
+            if sid not in related:
+                related.append(sid)
+            context["related_sids"] = related[-12:]
+        history = context.get("operation_history")
+        if not isinstance(history, list):
+            history = []
+        history.append(
+            {
+                "operation_id": operation.operation_id,
+                "operation": operation.operation,
+                "goal_version": int(context.get("goal_version") or 1),
+                "plan_version": int(context.get("plan_version") or 0),
+                "ts_ms": now,
+                "reason_summary": operation.reason_summary,
+            }
+        )
+        context["operation_history"] = history[-24:]
+        metadata = context.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        context["metadata"] = {
+            **metadata,
+            "last_route": route,
+            "last_intent": intent,
+            "source": source,
+            "semantic_operation_id": operation.operation_id,
+            "semantic_operation_confidence": operation.confidence,
+            "semantic_relationship": operation.relationship,
+            "requires_replan": operation.requires_replan,
+        }
+        result.update(
+            {
+                "applied": True,
+                "goal_version": int(context.get("goal_version") or 1),
+                "plan_version": int(context.get("plan_version") or 0),
+                "status": context.get("status"),
+            }
+        )
+        return result
+
+    def apply_semantic_task_operations(
+        self,
+        operations: list[SemanticTaskOperation] | list[dict[str, Any]],
+        *,
+        sid: str | None,
+        user_text: str,
+        route: str | None = None,
+        intent: str | None = None,
+        source: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if not self.enabled:
+            return []
+        validated: list[SemanticTaskOperation] = []
+        for item in operations:
+            if isinstance(item, SemanticTaskOperation):
+                validated.append(item)
+            elif isinstance(item, dict):
+                try:
+                    validated.append(SemanticTaskOperation.model_validate(item))
+                except Exception:
+                    continue
+        results: list[dict[str, Any]] = []
+        for operation in validated:
+            if operation.operation == "create":
+                existing = self._context_by_operation_id(operation.operation_id)
+                if existing is not None:
+                    results.append(
+                        {
+                            "operation_id": operation.operation_id,
+                            "operation": operation.operation,
+                            "task_id": existing.get("task_id"),
+                            "applied": False,
+                            "replayed": True,
+                            "reason": "operation_already_applied",
+                            "goal_version": int(existing.get("goal_version") or 1),
+                            "plan_version": int(existing.get("plan_version") or 0),
+                            "status": existing.get("status"),
+                        }
+                    )
+                    continue
+                context = self._new_semantic_task_context(
+                    sid=sid,
+                    operation=operation,
+                    user_text=user_text,
+                    route=route,
+                    intent=intent,
+                    source=source,
+                )
+                results.append(
+                    {
+                        "operation_id": operation.operation_id,
+                        "operation": operation.operation,
+                        "task_id": context["task_id"],
+                        "applied": True,
+                        "goal_version": context["goal_version"],
+                        "plan_version": context["plan_version"],
+                        "status": context["status"],
+                    }
+                )
+                continue
+            for task_id in operation.target_task_ids:
+                context = self._task_context_by_id(task_id)
+                if context is None:
+                    results.append(
+                        {
+                            "operation_id": operation.operation_id,
+                            "operation": operation.operation,
+                            "task_id": task_id,
+                            "applied": False,
+                            "reason": "unknown_task_id",
+                        }
+                    )
+                    continue
+                results.append(
+                    self._apply_semantic_operation_to_context(
+                        context,
+                        operation,
+                        sid=sid,
+                        user_text=user_text,
+                        route=route,
+                        intent=intent,
+                        source=source,
+                    )
+                )
+        if results:
+            self._persist_task_contexts_if_enabled()
+            self.last_activity_ms = _now_ms()
+        return results
+
     def _looks_like_meaningful_task_text(self, text: str | None) -> bool:
         normalized = self._normalized(text)
         if not normalized:
@@ -450,17 +1062,23 @@ class ConversationStateManager:
         route: str | None,
         metadata: dict[str, Any] | None,
     ) -> str | None:
+        """Compatibility relation inference without semantic phrase matching.
+
+        Normal task continuation and modification must arrive as structured model
+        output. This fallback only opens a task for an explicitly effectful route
+        or records a side conversation; it never binds a follow-up to an existing
+        task through keywords, regexes, pronouns, or recency.
+        """
+
         relation = self._task_relation_from_metadata(metadata)
         if relation:
             return relation
         if not self._looks_like_meaningful_task_text(text):
             return None
-        if self.is_followup_reference(text) and self._current_task_context():
-            return "continue_task"
         route = str(route or "").strip()
         if route in {"robot_action", "tool", "memory", "deep_thought"}:
             return "new_task"
-        return "side_conversation"
+        return None
 
     def _record_task_context_from_user_turn(
         self,
@@ -495,6 +1113,25 @@ class ConversationStateManager:
                 "task_relation": relation,
                 "task_type": str(patch.get("task_type") or self._default_task_type(route, intent)),
                 "goal": self._compact_text(str(patch.get("goal") or text), limit=220),
+                "semantic_goal": SemanticGoal(
+                    goal_id=task_id,
+                    version=1,
+                    description=self._compact_text(str(patch.get("goal") or text), limit=220),
+                    source_text=self._compact_text(text, limit=220),
+                    constraints=(
+                        dict(patch.get("constraints"))
+                        if isinstance(patch.get("constraints"), dict)
+                        else {}
+                    ),
+                ).model_dump(mode="json", exclude_none=True),
+                "goal_version": 1,
+                "plan_version": 0,
+                "plan_status": "not_planned",
+                "commitment_state": "evaluating",
+                "open_information_gaps": [],
+                "operation_history": [],
+                "confirmation": None,
+                "evidence_summary": {},
                 "important_claims": [],
                 "entities": [],
                 "constraints": {},
@@ -518,6 +1155,7 @@ class ConversationStateManager:
         context["task_type"] = str(patch.get("task_type") or context.get("task_type") or self._default_task_type(route, intent))
         if patch.get("goal"):
             context["goal"] = self._compact_text(str(patch.get("goal")), limit=220)
+        legacy_goal = self._semantic_goal_from_context(context)
         context["important_claims"] = self._merge_string_list(
             context.get("important_claims"),
             patch.get("important_claims") or patch.get("claims"),
@@ -537,6 +1175,15 @@ class ConversationStateManager:
         if isinstance(patch_constraints, dict):
             constraints = {**constraints, **patch_constraints}
         context["constraints"] = constraints
+        legacy_goal = legacy_goal.model_copy(
+            update={
+                "description": str(context.get("goal") or legacy_goal.description),
+                "source_text": self._compact_text(text, limit=220),
+                "constraints": dict(constraints),
+            }
+        )
+        context["semantic_goal"] = legacy_goal.model_dump(mode="json", exclude_none=True)
+        context["goal_version"] = max(1, int(context.get("goal_version") or legacy_goal.version or 1))
         related_sids = context.get("related_sids")
         if not isinstance(related_sids, list):
             related_sids = []
@@ -724,6 +1371,7 @@ class ConversationStateManager:
             "current_task": current_task,
             "current_task_context": current_task_context,
             "active_task_contexts": active_task_contexts[-4:],
+            "active_task_snapshots": self.active_task_snapshots(limit=4),
             "active_pending_tasks": active_tasks[-4:],
             "extracted_memory": extracted_memory["entries"],
             "memory_summary": extracted_memory["summary"],
@@ -749,6 +1397,7 @@ class ConversationStateManager:
             "active_pending_tasks": self._active_pending_tasks(),
             "task_contexts": list(self._task_contexts),
             "active_task_contexts": self._active_task_contexts(),
+            "active_task_snapshots": self.active_task_snapshots(),
             "current_task_context": self._current_task_context(),
             "extracted_memory": self._memory_store.snapshot(),
             "session_memory": self.session_memory(),
@@ -784,6 +1433,21 @@ class ConversationStateManager:
         compact = self._compact_text(text)
         if not compact:
             return
+        turn_metadata = dict(metadata or {})
+        semantic_operations = self._semantic_operations_from_metadata(turn_metadata)
+        semantic_resolution_authoritative = bool(
+            turn_metadata.get("semantic_task_resolution_authoritative")
+        )
+        if semantic_operations:
+            operation_results = self.apply_semantic_task_operations(
+                semantic_operations,
+                sid=sid,
+                user_text=compact,
+                route=route,
+                intent=intent,
+                source=str(turn_metadata.get("source") or "router"),
+            )
+            turn_metadata["semantic_task_operation_results"] = operation_results
         self._turns.append(
             {
                 "role": "user",
@@ -793,22 +1457,23 @@ class ConversationStateManager:
                 "intent": intent,
                 "ts_ms": _now_ms(),
                 "conversation_id": self.conversation_id,
-                "metadata": metadata or {},
+                "metadata": turn_metadata,
             }
         )
-        self._record_task_context_from_user_turn(
-            sid=sid,
-            text=compact,
-            route=route,
-            intent=intent,
-            metadata=metadata,
-        )
+        if not semantic_operations and not semantic_resolution_authoritative:
+            self._record_task_context_from_user_turn(
+                sid=sid,
+                text=compact,
+                route=route,
+                intent=intent,
+                metadata=turn_metadata,
+            )
         self._memory_store.add_many(
             self._memory_extractor.extract_user_turn(
                 sid=sid,
                 text=compact,
                 route=route,
-                metadata=metadata,
+                metadata=turn_metadata,
                 task_context=self._current_task_context(),
             )
         )
@@ -988,6 +1653,123 @@ class ConversationStateManager:
             return True
         return False
 
+    def _record_planning_metadata(
+        self,
+        metadata: dict[str, Any],
+    ) -> None:
+        planning_result = str(metadata.get("planning_result") or "").strip()
+        if not planning_result:
+            return
+        task_id = str(metadata.get("task_id") or "").strip()
+        context = self._task_context_by_id(task_id) if task_id else self._current_task_context()
+        if context is None:
+            return
+        try:
+            proposed_goal_version = int(metadata.get("goal_version") or context.get("goal_version") or 1)
+        except (TypeError, ValueError):
+            proposed_goal_version = 1
+        current_goal_version = max(1, int(context.get("goal_version") or 1))
+        if proposed_goal_version != current_goal_version:
+            meta = context.get("metadata")
+            if not isinstance(meta, dict):
+                meta = {}
+            context["metadata"] = {
+                **meta,
+                "stale_planning_result_rejected": {
+                    "planning_result": planning_result,
+                    "proposed_goal_version": proposed_goal_version,
+                    "current_goal_version": current_goal_version,
+                    "ts_ms": _now_ms(),
+                },
+            }
+            return
+
+        raw_gaps = metadata.get("information_gaps")
+        gaps: list[dict[str, Any]] = []
+        if isinstance(raw_gaps, list):
+            for item in raw_gaps:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    gap = InformationGap.model_validate(item)
+                except Exception:
+                    continue
+                if not gap.resolved:
+                    gaps.append(gap.model_dump(mode="json", exclude_none=True))
+
+        if planning_result == "needs_clarification":
+            context["status"] = "waiting_for_user"
+            context["commitment_state"] = "waiting_for_user"
+            context["plan_status"] = "blocked_on_user"
+            context["open_information_gaps"] = gaps
+            context["pending_questions"] = [
+                str(item.get("description") or "")
+                for item in gaps
+                if item.get("blocking") is not False
+            ][:4]
+        elif planning_result == "needs_context":
+            context["status"] = "needs_context"
+            context["commitment_state"] = "evaluating"
+            context["plan_status"] = "blocked_on_context"
+            context["open_information_gaps"] = gaps
+        elif planning_result in {"unavailable", "refused"}:
+            context["status"] = "refused"
+            context["commitment_state"] = "failed"
+            context["plan_status"] = planning_result
+            context["open_information_gaps"] = gaps
+        elif planning_result in {
+            "direct_skill",
+            "composed_plan",
+            "safe_adjustment",
+            "alternative_plan",
+        }:
+            context["plan_version"] = max(0, int(context.get("plan_version") or 0)) + 1
+            context["plan_status"] = "proposed"
+            requires_confirmation = bool(
+                metadata.get("semantic_plan_confirmation_required")
+                or metadata.get("confirmation_prompt")
+                or planning_result == "alternative_plan"
+            )
+            context["status"] = (
+                "awaiting_confirmation" if requires_confirmation else "planning"
+            )
+            context["commitment_state"] = (
+                "waiting_for_user" if requires_confirmation else "evaluating"
+            )
+            context["open_information_gaps"] = []
+            confirmation_prompt = " ".join(
+                str(metadata.get("confirmation_prompt") or "").strip().split()
+            )
+            context["pending_questions"] = (
+                [confirmation_prompt] if confirmation_prompt else []
+            )
+            planned_skills = metadata.get("planned_skills")
+            if isinstance(planned_skills, list):
+                context["plan_summary"] = {
+                    "result": planning_result,
+                    "skills": [item for item in planned_skills if isinstance(item, dict)][:12],
+                }
+            if requires_confirmation:
+                context["confirmation"] = {
+                    "status": "pending",
+                    "goal_version": current_goal_version,
+                    "plan_version": context["plan_version"],
+                    "prompt": confirmation_prompt,
+                }
+        else:
+            return
+
+        context["updated_ms"] = _now_ms()
+        meta = context.get("metadata")
+        if not isinstance(meta, dict):
+            meta = {}
+        context["metadata"] = {
+            **meta,
+            "last_planning_result": planning_result,
+            "last_planning_goal_version": current_goal_version,
+        }
+        self._persist_task_contexts_if_enabled()
+
     def record_agent_result(self, sid: str | None, result: Any) -> None:
         """Record assistant speech and lightweight task hints from AgentResult."""
         if not self.enabled:
@@ -999,6 +1781,10 @@ class ConversationStateManager:
             data = result
         else:
             data = {}
+
+        result_metadata = data.get("metadata")
+        if isinstance(result_metadata, dict):
+            self._record_planning_metadata(result_metadata)
 
         speech_parts: list[str] = []
         for key in ("speak_immediate", "speak_after", "speech"):
@@ -1043,15 +1829,31 @@ class ConversationStateManager:
                             or "action"
                         )
                     )
+            planning_result = (
+                str(result_metadata.get("planning_result") or "").strip()
+                if isinstance(result_metadata, dict)
+                else ""
+            )
+            confirmation_pending = bool(
+                isinstance(result_metadata, dict)
+                and (
+                    result_metadata.get("semantic_plan_confirmation_required")
+                    or result_metadata.get("confirmation_prompt")
+                    or planning_result == "alternative_plan"
+                )
+            )
+            pending_status = "awaiting_confirmation" if confirmation_pending else "scheduled"
             self.record_pending_task(
                 sid=sid,
                 task_type="robot_action",
-                status="scheduled",
+                status=pending_status,
                 summary=", ".join(action_summaries),
                 metadata={
                     "action_count": len(actions),
                     "request_ids": request_ids,
                     "remaining_request_ids": list(request_ids),
+                    "planning_result": planning_result,
+                    "confirmation_pending": confirmation_pending,
                 },
             )
 

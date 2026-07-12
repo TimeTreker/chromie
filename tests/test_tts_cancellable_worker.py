@@ -9,7 +9,7 @@ from tts.cancellable_worker import RestartableProcessWorker
 
 
 def _fake_generation_worker(connection) -> None:
-    connection.send({"type": "ready"})
+    connection.send({"type": "ready", "profile": "test"})
     try:
         while True:
             command = connection.recv()
@@ -42,6 +42,7 @@ class RestartableProcessWorkerTests(unittest.IsolatedAsyncioTestCase):
         )
         await worker.start()
         try:
+            self.assertEqual(worker.ready_payload["profile"], "test")
             request = asyncio.create_task(
                 worker.request({"type": "block", "seconds": 30.0})
             )

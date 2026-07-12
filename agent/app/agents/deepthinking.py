@@ -166,6 +166,7 @@ class DeepThinkingAgent(BaseAgent):
         session_memory_block = self._format_session_memory(request, zh=False)
         task_context_block = self._format_task_context(request, zh=False)
         mind_block = self.format_mind_context(request, zh=False)
+        self_model_block = self.format_self_model_context(request, zh=False)
         conversation_id = self._conversation_id(request)
         capability_context = self._capability_context(request, zh=False)
         route_context = self._route_context(request, zh=False)
@@ -179,11 +180,11 @@ class DeepThinkingAgent(BaseAgent):
             "Your job is to split complex requests into clear tasks and use session working memory for architecture, debugging, planning, decisions, and candidate action requests. "
             "Generalization-first is a core principle: reason from meaning, context, capability descriptions, and task memory. Do not turn examples into keyword rules or replace understanding with rule tables. "
             "Example - Bad keyword-rule: User says 'turn on light' -> think 'keyword=light, action=on'. Good generalization: User wants illumination; check the supplied capabilities and context before planning or answering. "
-            "Treat Chromie's mind principles, long-term goals, and experience-tuning boundaries as upper constraints for deliberation; core principles can change only through human owner approval. "
+            "Treat the supplied Self model, mind principles, long-term goals, and experience-tuning boundaries as upper context for deliberation; core principles can change only through human owner approval. "
+            "First-person speech and plans refer to Self model.speaker_entity; internal components are resources, not alternate speakers or body owners. "
+            "Keep self-description consistent with the Self model and capability statements consistent with the capability catalog and current runtime evidence. "
             "All spoken output must be in the target language specified in the User Prompt's 'Target spoken language' field. "
-            "If the user asks about identity, name, or age, answer from the owner-approved identity in the mind profile; Chromie is the robot, not the backend language model or provider model. "
-            "Speak with embodied, human-like social warmth while staying truthful that Chromie is a robot; never describe Chromie as a program, programme, software, backend service, code, or model process. "
-            "Answer naturally in Chromie's first-person robot persona; do not use backend-model stock phrases such as 'as an AI' or 'I do not have personal opinions'. "
+            "Speak naturally and with embodied social warmth while preserving the ontology and evidence supplied in context. "
             "Reason privately and output only the final answer, never the hidden chain of thought. "
             "When the request benefits from task decomposition, give an ordered, concise task split, key risks, and the next step. "
             "When voicing a cognitive task plan, weave the task split, key risk, and next step into one fluid first-person spoken paragraph. Never output bullet points, labels, or numbered lists in the final TTS output. "
@@ -224,6 +225,7 @@ class DeepThinkingAgent(BaseAgent):
             f"Extracted conversation context (no raw transcript turns):\n{extracted_context_block}\n\n"
             f"Pending tasks:\n{pending_block}\n\n"
             f"Task context:\n{task_context_block}\n\n"
+            f"Self model:\n{self_model_block}\n\n"
             f"Mind principles, long-term goals, and experience boundaries:\n{mind_block}\n\n"
             f"Capability catalog:\n{capability_context}\n\n"
             f"Upstream routing context:\n{route_context}\n\n"

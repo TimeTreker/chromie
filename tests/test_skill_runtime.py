@@ -115,6 +115,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     "available": False,
                     "unavailable_reason": "calibrating",
                     "timeout_s": 2.0,
+                    "can_run_parallel": True,
+                    "exclusive_group": "soridormi.face_expression",
+                    "resource_claims": ["eyelids"],
+                    "execution_constraints": {"requires_stationary_head": False},
                 }
             ],
             requires_confirmation=False,
@@ -126,6 +130,13 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(definition.unavailable_reason, "calibrating")
         self.assertEqual(definition.timeout_ms, 2000)
         self.assertIn("count", definition.input_schema["properties"])
+        self.assertTrue(definition.can_run_parallel)
+        self.assertEqual(definition.exclusive_group, "soridormi.face_expression")
+        self.assertEqual(definition.metadata["resource_claims"], ["eyelids"])
+        self.assertEqual(
+            definition.metadata["execution_constraints"],
+            {"requires_stationary_head": False},
+        )
 
     async def test_soridormi_import_marks_absent_live_skills_unavailable(self) -> None:
         registry = SkillRegistry()

@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "id": "live_compound_walk_blink_recovery",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "Replay the live compound walk-and-blink failure: preserve the complete goal, resolve a low-consequence blink count semantically, propose a specific alternative when overlap is unsupported, and execute the confirmed complete plan.",
+  "tags": [
+    "live-regression",
+    "compound-action",
+    "parameter-resolution",
+    "alternative-plan",
+    "task-continuity"
+  ],
+  "stub": {
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.walk_forward",
+        "description": "Walk forward for a bounded duration at a selected speed.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 20.0,
+              "description": "walking duration in seconds"
+            },
+            "speed": {
+              "type": "string",
+              "enum": [
+                "slow",
+                "normal",
+                "quick"
+              ],
+              "default": "normal",
+              "description": "walking speed preset"
+            }
+          },
+          "required": [
+            "duration_s",
+            "speed"
+          ],
+          "additionalProperties": false
+        },
+        "effects": [
+          "physical_motion"
+        ],
+        "safety_class": "physical_motion",
+        "interaction_executable": true,
+        "requires_confirmation": true,
+        "can_run_parallel": false,
+        "exclusive_group": "locomotion"
+      },
+      {
+        "capability_id": "soridormi.blink_eyes",
+        "description": "Blink the eyes a bounded number of times as a reversible visual expression.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6,
+              "description": "number of eye blinks"
+            }
+          },
+          "required": [
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        "effects": [
+          "visual_expression"
+        ],
+        "safety_class": "low_risk_action",
+        "interaction_executable": true,
+        "requires_confirmation": false,
+        "can_run_parallel": false,
+        "exclusive_group": "visual_expression"
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "compound_request",
+      "ask": "往前走个15秒，然后边走边眨眼睛。",
+      "language": "zh-CN",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": [
+            "capability_agent",
+            "safety_agent",
+            "speaker_agent"
+          ],
+          "intent": "capability:soridormi.walk_forward",
+          "confidence": 0.95,
+          "language": "zh-CN",
+          "source": "llm"
+        },
+        "ollama_replies": [
+          {
+            "decision": "execute",
+            "speech": "好的，我往前走十五秒，同时眨眼睛。",
+            "skills": [
+              {
+                "skill_id": "soridormi.walk_forward",
+                "proposed_args": {
+                  "duration_s": 15,
+                  "speed": "normal"
+                },
+                "timing": "parallel",
+                "step_id": "walk"
+              },
+              {
+                "skill_id": "soridormi.blink_eyes",
+                "proposed_args": {},
+                "timing": "parallel",
+                "step_id": "blink"
+              }
+            ],
+            "plan_relation": "exact",
+            "original_goal_summary": "往前走十五秒并在行走时眨眼睛",
+            "assessment": {
+              "goal_coverage_complete": true,
+              "provider_compatibility": "requires parameter and overlap repair"
+            }
+          },
+          {
+            "decision": "propose_alternative",
+            "speech": "我目前不能同时完成这两个动作，但可以先走十五秒，再眨四下眼睛，可以吗？",
+            "skills": [
+              {
+                "skill_id": "soridormi.walk_forward",
+                "proposed_args": {
+                  "duration_s": 15,
+                  "speed": "normal"
+                },
+                "timing": "sequential",
+                "step_id": "walk"
+              },
+              {
+                "skill_id": "soridormi.blink_eyes",
+                "proposed_args": {
+                  "count": 4
+                },
+                "parameter_grounding": {
+                  "count": {
+                    "resolution": "use_safe_default",
+                    "rationale": "A short bounded blink count is low consequence and reversible."
+                  }
+                },
+                "timing": "sequential",
+                "step_id": "blink"
+              }
+            ],
+            "plan_relation": "alternative",
+            "user_confirmation_required": true,
+            "original_goal_summary": "往前走十五秒并在行走时眨眼睛",
+            "assessment": {
+              "goal_coverage_complete": true,
+              "provider_compatibility": "parallel execution not supported"
+            }
+          }
+        ],
+        "host_prepare_response": true
+      },
+      "expect": {
+        "forbidden_speech_any": [
+          "schema-valid plan",
+          "specific action detail",
+          "缺少必要参数",
+          "不能移动"
+        ],
+        "skills": [
+          "soridormi.walk_forward",
+          "soridormi.blink_eyes"
+        ],
+        "skill_args": [
+          {
+            "duration_s": 15.0,
+            "speed": "normal"
+          },
+          {
+            "count": 4
+          }
+        ],
+        "requires_confirmation": true,
+        "current_task_context_contains": [
+          "awaiting_confirmation",
+          "先走十五秒",
+          "soridormi.blink_eyes"
+        ],
+        "metadata_json_contains": [
+          "alternative_plan",
+          "我目前不能同时完成这两个动作",
+          "先走十五秒",
+          "眨四下"
+        ],
+        "skill_metadata_json_contains": [
+          "use_safe_default",
+          "semantic_plan_confirmation_required"
+        ]
+      }
+    },
+    {
+      "id": "confirm_alternative",
+      "ask": "可以，就按这个来。",
+      "language": "zh-CN",
+      "stub": {
+        "route_decision": {
+          "route": "robot_action",
+          "agents": [
+            "capability_agent",
+            "safety_agent",
+            "speaker_agent"
+          ],
+          "intent": "semantic_capability_planning",
+          "confidence": 0.88,
+          "language": "zh-CN",
+          "source": "llm",
+          "metadata": {
+            "task_relation": "continue_task"
+          }
+        },
+        "ollama_reply": {
+          "decision": "execute",
+          "speech": "好，我先走十五秒，然后眨四下眼睛。",
+          "skills": [
+            {
+              "skill_id": "soridormi.walk_forward",
+              "proposed_args": {
+                "duration_s": 15,
+                "speed": "normal"
+              },
+              "timing": "sequential",
+              "step_id": "walk"
+            },
+            {
+              "skill_id": "soridormi.blink_eyes",
+              "proposed_args": {
+                "count": 4
+              },
+              "timing": "sequential",
+              "step_id": "blink"
+            }
+          ],
+          "plan_relation": "exact",
+          "original_goal_summary": "执行已确认的顺序方案",
+          "assessment": {
+            "goal_coverage_complete": true,
+            "confirmed_alternative": true
+          }
+        }
+      },
+      "expect": {
+        "speech_all": [
+          "先走十五秒",
+          "眨四下"
+        ],
+        "forbidden_speech_any": [
+          "schema-valid plan",
+          "缺少必要参数"
+        ],
+        "skills": [
+          "soridormi.walk_forward",
+          "soridormi.blink_eyes"
+        ],
+        "skill_args": [
+          {
+            "duration_s": 15.0,
+            "speed": "normal"
+          },
+          {
+            "count": 4
+          }
+        ],
+        "requires_confirmation": true,
+        "history_contains": [
+          "往前走个15秒，然后边走边眨眼睛"
+        ]
+      }
+    }
+  ]
+}

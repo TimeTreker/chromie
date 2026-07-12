@@ -146,14 +146,22 @@ This generates runtime configuration, activates the selected Conda environment,
 installs changed requirements, warms Ollama, avoids duplicate processes, and
 starts the module from the repository root.
 
-The Orchestrator can emit a fast-first phrase after Router returns and before
-the slower Agent finishes. `ORCH_FAST_FIRST_RESPONSE_ENABLED=1` is the default.
-The phrase now comes from the quick Router's `fast_speech` field or a safe
-`immediate_speech` route item; the Orchestrator validates and schedules it but
-does not invent route-template wording such as generic chat/tool acknowledgements.
-Fast speech is a prelude only: it must not claim a tool result, memory commit,
-physical execution, or final answer. Later Agent speech, confirmation, or
-correction still owns the final turn.
+The Orchestrator has a true fast-first audio path for slow tool, planning,
+memory, and embodied turns. At startup it primes a small speaker-specific
+English/Chinese acknowledgement cache through the configured TTS service and
+loads the PCM into host memory. During a turn, an adaptive hedge timer waits
+`ORCH_FAST_FIRST_AUDIO_HEDGE_MS` (750 ms by default): if the final Agent/tool
+response is ready first, no acknowledgement plays; otherwise the cached audio
+is queued directly without another LLM or TTS request. A cue that is queued but
+has not started is cancelled when the final response wins the race.
+
+These cues are intentionally generic low-commitment states such as “One
+moment” or “我先确认一下”. They are presentation mappings after semantic routing,
+not phrase-based intent decisions, and they never claim a tool result, memory
+commit, physical execution, or completion. The older Router-generated dynamic
+`fast_speech` path remains available for explicit compatibility use, while
+`ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED=0` keeps full generative tool preludes
+disabled.
 
 Manual development start:
 
@@ -178,6 +186,12 @@ blindly. This is not a long-term personal memory system. See
 [`../docs/conversation_state.md`](../docs/conversation_state.md).
 
 ## Scheduling, interruption, and cancellation
+
+The microphone path keeps ASR decoding and routed-turn execution as separate
+lifecycles. A valid barge-in can therefore cancel stale turn processing while a
+new utterance enters ASR. If another VAD utterance closes while ASR is still
+decoding, the Orchestrator retains the newest pending audio instead of dropping
+it; at most one pending utterance is kept to bound memory and latency.
 
 The Interaction Coordinator validates the response and submits speech and skill
 requests to the Skill Runtime. Scheduling is bounded by

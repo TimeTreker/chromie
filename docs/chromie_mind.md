@@ -6,7 +6,7 @@ Implemented as a structured context layer in the Orchestrator and shared
 contracts. The first version provides:
 
 - an owner-approved default mind profile;
-- an owner-approved identity for self-description questions;
+- an owner-approved structured self model for the speaking, perceiving, acting, and body-owning entity;
 - core principles that cannot be changed by experience;
 - long-term goals that can be tuned by reviewed experience;
 - prompt-safe context for Router, conversation, and deepthinking;
@@ -39,17 +39,17 @@ The current default profile lives in
 [`shared/chromie_contracts/mind.py`](../shared/chromie_contracts/mind.py).
 Operators can provide a JSON replacement with `ORCH_MIND_PROFILE_PATH`, but the
 schema rejects core principles that are marked experience-mutable or do not
-require owner approval. The default identity names the robot Chromie, describes
-her as a female AI robot with she/her pronouns, and gives her a 6-year-old
-robot identity age while preserving the boundary that this is not a human
-biological age. Her base self-description is that she keeps people company and
-can do simple things to help them. When answering identity questions, Chromie
-must describe herself as the robot, not as the backend LLM or model provider.
-The default core principles also make generalization ability explicit: normal
-robot behavior should be driven by LLM meaning-understanding, bounded context,
-capability descriptions, schemas, and task memory rather than brittle phrase
-rules. Phrase and pattern rules remain reserved for the fast deterministic
-emergency/noise filter.
+require owner approval. The owner-approved profile may retain implementation and persona metadata, but the prompt-facing self model exposes one stable speaking, perceiving, acting, and body-owning entity named Chromie. Its social presentation foregrounds name, personality, relationship, and current context; system category, embodiment category, age labels, and internal architecture remain background context and are not ordinary self-introduction material. Language and reasoning models appear as internal components with bounded roles rather than alternate speakers or body owners. This keeps conversation natural without falsely asserting that Chromie is human. Conversation, Router, DeepThinking, and
+direct-fallback prompts use this same ontology together with the supplied
+runtime capability catalog and provider state. The model therefore answers
+self-description and capability questions from general context; there is no
+identity-question branch, fixed identity reply, or phrase/regex mapping for
+normal capability interpretation. The default core principles also make
+generalization ability explicit: normal robot behavior should be driven by LLM
+meaning-understanding, bounded context, capability descriptions, schemas, and
+task memory rather than brittle phrase rules. Phrase and pattern rules remain
+reserved for the fast deterministic emergency/noise filter and other explicit
+operational safety boundaries.
 
 ## Prompt Context Groups
 
@@ -113,8 +113,10 @@ Soridormi provider checks remain separate runtime authority.
 The Orchestrator builds a context object for every routed turn. It now includes:
 
 - `mind`: bounded profile summary and structured policy fields;
-- `mind.identity`: stable self-description fields used by conversation and
-  deepthinking prompts;
+- `mind.identity`: stable owner-approved descriptive fields;
+- `mind.self_model`: structured speaker, perceiver, actor, body owner, internal
+  components, and capability-evidence source used by Router, conversation,
+  deepthinking, and direct-fallback prompts;
 - `core_principles`: short alias for prompt and inspection code;
 - `long_term_goals`: short alias for prompt and inspection code;
 - `experience_tuning_policy`: explicit learning boundary.

@@ -76,7 +76,15 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `0` | Use Agent `/interaction` and the trusted Skill Runtime instead of `/run`. |
 | `ORCH_ENABLE_SORIDORMI_SKILLS` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_AUTO_CONFIRM_SIM_SKILLS` | `1` | Apply only Soridormi-declared simulation confirmation exemptions. |
-| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Let the host speak a short truthful route-level first phrase before the slower Agent response completes. |
+| `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Enable immediate-response policy for slow tool, planning, memory, and embodied turns. |
+| `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Use startup-primed in-memory PCM acknowledgements instead of a realtime generative-TTS request. |
+| `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | Wait this long after Agent/tool work starts; suppress the acknowledgement when the final response becomes ready first. |
+| `ORCH_FAST_FIRST_AUDIO_CACHE_DIR` | `.chromie/cache/fast-first-audio` | Ignored local WAV cache for speaker-specific English and Chinese acknowledgement cues. |
+| `ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP` | `1` | Generate any missing cache entries through the configured TTS service before opening microphone input. |
+| `ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS` | `120000` | Total startup cache-prime budget. Individual cue synthesis is also bounded; timeout continues with the cues already available. |
+| `ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED` | `0` | Legacy opt-in for Router-generated tool wording sent through full generative TTS. Cached fast-first audio is independent of this setting. |
+| `ORCH_TTS_CJK_CHUNK_CHARS` | `36` | Smaller chunk target for CJK speech so long Chinese weather/status responses can begin playback while later chunks are still synthesized. |
+| `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Use native structured output for `/interaction`; set `legacy-adapter` only for rollback. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | Opt in to legacy adapter fallback after native schema validation fails. Default-off preserves fail-closed behavior. |
@@ -172,23 +180,49 @@ configuration.
 | `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
 | `ROUTER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the quick semantic Router budget for legacy/default readers. |
 | `ROUTER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast quick-router model path. |
+| `ROUTER_LLM_NUM_CTX` | `4096`; explicit Router context budget. This prevents the approximately 10k-character quick prompt and common ability menu from being silently truncated by Ollama's smaller global context default. |
 | `ROUTER_LLM_NUM_PREDICT` | `96`; compact JSON output budget for the fast quick-router model. This keeps the quick router bounded to classification JSON and prevents long generations from consuming the realtime route budget. |
 | `ROUTER_LLM_KEEP_ALIVE` | `24h`; sent on Router Ollama calls so the warmed routing model remains resident. |
 | `ROUTER_WARM_LLM_ON_STARTUP` | `1`; the Router service warms its primary LLM during startup so the first live turn does not pay cold model load time. |
-| `ROUTER_WARM_LLM_TIMEOUT_MS` | `30000`; startup warm budget for the Router model. Failure is logged and the service still starts, but live evidence must report the warm failure. |
-| `ROUTER_REVIEW_TIMEOUT_MS` | `100` in common configuration for optional reviewer repair paths. The common profile prioritizes giving the quick semantic Router enough time to finish over spending most of the host budget on slow repair. |
+| `ROUTER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Router model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
+| `ROUTER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for optional review paths. Exact capability IDs are normalized without review; semantic repair uses the fast Router model, while the larger review model remains bounded and fail-safe. |
 | `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
 | `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog snapshot or compatibility search request; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
 | `ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Router-side cache for the prompt catalog snapshot. The fast Router path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
 | `ROUTER_CAPABILITY_MATCH_LIMIT` | Compatibility search-client limit for catalog inspection/fallback surfaces; default `8`. It is not the fast Router prompt size. |
 | `ROUTER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
-| `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables semantic review/repair after malformed or timed-out quick-router outputs, including underspecified `robot_action` results. |
+| `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables model-based semantic review/repair after malformed, contradictory, low-information, or stale quick-router outputs. |
+| `ROUTER_GENERIC_CHAT_REVIEW_ENABLED` | `1`; a content-free generic chat result such as `acknowledge` is independently rechecked against the supplied executable affordances. The deterministic trigger does not inspect user words or choose a skill. |
+| `ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED` | `0`; disables a second Router generation solely to invent a tool prelude. The full result is still spoken, and deployments may opt in after measuring a genuinely faster acknowledgement path. |
 | `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
 | `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 | `CHROMIE_ROUTER_DEBUG_RAW` / `ROUTER_DEBUG_RAW` | `0`; when enabled, Router logs the full raw LLM JSON output after the default bounded raw-output summary. |
 | `CHROMIE_ROUTER_DEBUG_PROMPT` / `ROUTER_DEBUG_PROMPT` | `0`; when enabled, Router logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
 | `CHROMIE_CLI_COLOR` | `auto`; force Agent/Router Ollama diagnostic color with `1`, disable with `0`. Falls back to terminal detection and respects `NO_COLOR`. |
+
+## Semantic task continuity
+
+| Variable | Default or profile behavior |
+|---|---|
+| `AGENT_TASK_CONTINUITY_ENABLED` | `1`; exposes the dedicated Agent semantic task-continuity endpoint when Agent LLM use is enabled. This endpoint only proposes operations and never mutates task state. |
+| `AGENT_TASK_CONTINUITY_MODEL` | `qwen3:4b`; fast model used for bounded active-task association and semantic goal revisions. |
+| `AGENT_TASK_CONTINUITY_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Model or parse failure returns an empty, non-authoritative operation set instead of HTTP 500. |
+| `AGENT_TASK_CONTINUITY_MIN_CONFIDENCE` | `0.65`; operations below this confidence are retained as rejected diagnostics and cannot reach host task state. |
+| `AGENT_TASK_CONTINUITY_MAX_ACTIVE_TASKS` | `8`; maximum bounded active-task snapshots supplied to one continuity call. Candidate selection is context projection only and does not decide semantic association. |
+| `AGENT_TASK_CONTINUITY_NUM_CTX` | `4096`; bounded context budget for active tasks, session summary, Router advisory output, and the structured contract. |
+| `AGENT_TASK_CONTINUITY_NUM_PREDICT` | `256`; compact JSON output budget. |
+| `ORCH_TASK_CONTINUITY_MODE` | `report_only` in `.env.common`; when active-task snapshots exist, the dedicated resolver runs as a background diagnostic and never blocks the current Router/Agent turn. The code fallback remains `off`; `apply` makes a healthy dedicated resolution authoritative before deterministic host validation. |
+| `ORCH_TASK_CONTINUITY_TIMEOUT_MS` | `3500`; host timeout for the dedicated Agent endpoint. Failure records diagnostics and leaves the current Router proposal unchanged. |
+
+In `apply` mode, an authoritative empty result also suppresses legacy route-based
+task creation. This prevents an ordinary side conversation routed through
+`deep_thought` from becoming a new task merely because no semantic operation was
+needed. ResponsePlan immediate speech is accepted only when its task scope,
+commitment, and evidence claims are consistent with trusted host task state.
+The common profile now enables report-only observation while keeping semantic
+operations non-authoritative. `apply` remains an explicit operator choice until
+report-only live-text evidence is retained and reviewed.
 
 
 Router observability logs are intentionally split into safe summaries and explicit debug output.
@@ -244,14 +278,13 @@ conversation.
 | `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl`; stores rolling conversation-thread snapshots keyed by `conversation_id`. |
 | `ORCH_EPISODE_MAX_TURNS` | `12`; maximum recent turns retained in one episode snapshot. |
 
-The default mind profile also carries Chromie's owner-approved identity: her
-name is Chromie, she is a female AI robot using she/her pronouns, and her age is
-6 years old as a robot identity age rather than a human biological age. She is
-defined as a companion robot who can keep people company and do simple helpful
-things. Identity answers must describe Chromie as the robot, not as the backend
-LLM or model provider. Core principles require owner approval and are not
-changed by experience. The experience journal can support future prompt, test,
-strategy, and long-term-goal tuning, but proposals are never auto-applied. See
+The default mind profile also carries Chromie's owner-approved structured self model. One stable entity named Chromie owns first-person speech, perception, action, and embodiment; language and reasoning models are described as internal components with bounded roles. The prompt-facing social presentation foregrounds Chromie's name and natural personality, while system category, embodiment category, age labels, and internal architecture stay in the background unless they are genuinely relevant. Prompts combine that self model with the runtime
+capability catalog and provider state so the LLM can answer self-description and
+capability questions semantically. This is not implemented as an
+identity-question branch, fixed reply, or phrase/regex capability map. Core
+principles require owner approval and are not changed by experience. The
+experience journal can support future prompt, test, strategy, and long-term-goal
+tuning, but proposals are never auto-applied. See
 [`chromie_mind.md`](chromie_mind.md).
 
 Episode snapshots can be scored and mined offline:
@@ -288,7 +321,20 @@ changes.
 | `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
-| `AGENT_EXPRESSIVE_BODY_CUES` | Expressive body cue policy for native `/interaction`: `off`, `sim_only`, or `on`. Default `off`; enable only when expressive chat motion has been reviewed for the target robot/sim. |
+| `AGENT_SOCIAL_ATTENTION_MODE` | Structured model-driven attention policy: `off`, `report_only`, `sim_only`, or `on`. Default `off`. `report_only` retains the advisory plan without adding skills. |
+| `CHROMIE_SOCIAL_ATTENTION_MODE` | Host launcher override used by `scripts/start_chromie.sh`; maintained voice-MuJoCo startup defaults it to `sim_only` while project-wide Agent configuration remains `off`. |
+| `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
+| `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. |
+| `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `4096`. |
+| `AGENT_SOCIAL_ATTENTION_NUM_PREDICT` | JSON output budget for social-attention planning; default `160`. |
+| `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | Maximum additional wait after the main Agent response for the concurrently running optional plan; default `150`. A timeout skips attention rather than delaying speech. |
+| `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
+| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Comma-separated exact catalog IDs eligible for social-attention selection. Availability does not force selection; the model may choose `none`. |
+| `AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET` | Optional installation-calibrated target reference. Default `none`; live target evidence overrides calibration. |
+| `AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION` | Optional calibrated relative direction associated with the fallback target. |
+| `AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD` | Optional calibrated yaw supplied as target evidence for compatible schemas. |
+| `AGENT_SOCIAL_ATTENTION_FALLBACK_CONFIDENCE` | Confidence attached to installation calibration; default `0.0`. |
+| `AGENT_EXPRESSIVE_BODY_CUES` | Deprecated compatibility alias used only when `AGENT_SOCIAL_ATTENTION_MODE` is unset. |
 | `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Common low-latency default `0`; set to `1` for stricter review where executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If the Router selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
@@ -303,6 +349,7 @@ changes.
 | `AGENT_CAPABILITY_NUM_CTX` | Ollama context window for LLM capability selection; common default `24576` while validating feasibility. Do not reduce this below the capability prompt size; truncated JSON plans fail closed. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | Output token budget for LLM capability-selection JSON; common default `512`. |
 | `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | Output token budget for semantic capability-plan review JSON; common default `160`. |
+| `AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT` | Output token budget for the semantic parameter-resolution retry; common default `384`. This retry runs only when a model-authored capability plan is schema-invalid. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` by default; `legacy-adapter` is the explicit rollback path for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | Default `0`; when enabled, only native contract-validation failures use the compatibility adapter. |
 | `AGENT_TASK_GRAPH_MAX_CONCURRENCY` | Process-local TaskGraph bound; default `4`, range 1–64. |
@@ -351,7 +398,8 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_INPUT_GAIN` | `1.0`; software gain applied to captured microphone audio before VAD and ASR conversion. Use only to compensate for a quiet host source, and prefer fixing OS mixer gain first. |
 | `ORCH_VAD_MODE` | `3`. |
 | `ORCH_VAD_SILENCE_MS` | `650`. |
-| `ORCH_MIN_AUDIO_MS` | `1200`. |
+| `ORCH_MIN_AUDIO_MS` | `450`; accepts natural short replies when VAD and RMS gates pass. |
+| `ORCH_VAD_MAX_UTTERANCE_MS` | `20000`; force-closes and discards a continuously open VAD segment before it can become a multi-minute ASR request. |
 | `ORCH_MIN_RMS` | `120`. |
 | `ORCH_BARGE_IN_MIN_RMS` | `350`. |
 | `ORCH_PLAYBACK_CHUNK_MS` | `80`. |
@@ -464,7 +512,7 @@ Faster-Whisper fallback deployments should keep exact model revisions in
 | `TTS_QUANTIZATION` | Common default `FP16`. |
 | `TTS_N_GPU_LAYERS` | Common default `-1` for full offload. |
 | `TTS_CONTEXT_SIZE` | Profile-specific model context. |
-| `TTS_MAX_LENGTH` | Generation-token budget, **not** a text limit. |
+| `TTS_MAX_LENGTH` | Total OuteTTS token budget for the speaker/prompt **and** generated audio-code tokens; **not** a text limit. |
 | `MIN_TTS_GENERATION_LENGTH` | Minimum safe generation budget; profiles use `1024`. |
 | `TTS_MAX_TEXT_CHARS` | Spoken text character limit. |
 | `TTS_MIN_TEXT_CHARS` | Minimum accepted text; common default `1` so short Chinese acknowledgements such as `我在。` synthesize instead of returning empty audio. |
@@ -475,7 +523,10 @@ Faster-Whisper fallback deployments should keep exact model revisions in
 | `TTS_WORKER_COUNT` | Number of independent OuteTTS model workers; common/default value `1`; RTX 5090 profile uses `2`. |
 | `TTS_GENERATION_RETRIES` | Common default `1`. |
 | `TTS_RESET_LLAMA_STATE` | Common low-latency default `0`; set to `1` for stricter per-request state reset at the cost of slower first audio. |
-| `TTS_AUDIO_CODEC_DEVICE` | Common default `cpu`. |
+| `TTS_AUDIO_CODEC_DEVICE` | `auto` resolves to CUDA when available and CPU otherwise. The resolved and actual DAC devices are reported by TTS health. |
+| `TTS_DETAILED_TIMING` | Emit synchronized model-generation, DAC-decode, PCM-conversion, queue, IPC, and real-time-factor metrics; common default `1`. |
+| `TTS_METRICS_WINDOW` | Number of recent successful requests summarized in TTS health; common default `20`. |
+| `GGML_CUDA_DISABLE_GRAPHS` | Common default `0`; leave CUDA graphs enabled unless a measured compatibility problem requires disabling them. |
 | `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY` | Common defaults `0.4`, `1.1`. |
 | `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Maximum wait for initial or post-cancellation model-worker startup; default `600`. |
 | `SPEAKER_DIR`, `TTS_SPEAKER_ID` | Speaker-profile storage and host selection. |
@@ -488,6 +539,25 @@ OuteTTS/llama.cpp runs in a restartable child process. Cancelling an active
 synthesis terminates that process and starts a clean worker, preventing stale
 native generation from occupying the only model slot. New synthesis waits for
 the replacement model worker to become ready.
+
+The RTX 4090 Laptop profile uses a 4096-token TTS context. A 2048-token
+experiment left too little headroom after the speaker/prompt tokens and caused
+otherwise short sentences to stop after their first words. The service now
+records prompt/generated token counts and rejects audio when generation reaches
+`max_length`, rather than playing a known-truncated waveform. Use the benchmark
+below before lowering the context or changing quantization:
+
+```bash
+python scripts/benchmark_tts.py --repeat 2 --warmup 1 \
+  --output .chromie/evidence/tts-benchmark.json
+```
+
+The benchmark reports observed time to first binary audio, model generation, DAC
+decode, PCM conversion, queue delay, total time, generation/audio real-time
+factor, and whether any request exhausted the model token budget. It exits
+non-zero on token-budget exhaustion because a fast but incomplete waveform is
+not a valid performance result. It does not play audio and is not a
+voice-quality acceptance test.
 
 ## Ollama
 

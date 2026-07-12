@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections import deque
 import json
 import logging
 import math
@@ -31,12 +32,37 @@ from scipy import signal
 from model_sources import apply_model_sources, resolve_model_sources
 
 from cancellable_worker import RestartableProcessWorker
+from performance import (
+    TtsPerformanceSample,
+    nonnegative_remainder,
+    realtime_factor,
+    resolve_audio_codec_device,
+    summarize_samples,
+)
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("chromie-tts")
+
+
+def env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return bool(default)
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def cuda_available() -> bool:
+    cuda = getattr(torch, "cuda", None)
+    checker = getattr(cuda, "is_available", None)
+    if not callable(checker):
+        return False
+    try:
+        return bool(checker())
+    except Exception:
+        return False
 
 
 def env_int(name: str, default: int, *, minimum: int | None = None) -> int:
@@ -106,17 +132,20 @@ TTS_WORKER_COUNT = env_int("TTS_WORKER_COUNT", 1, minimum=1)
 TTS_MIN_TEXT_CHARS = env_int("TTS_MIN_TEXT_CHARS", 4, minimum=1)
 TTS_MAX_TEXT_CHARS = env_int("TTS_MAX_TEXT_CHARS", 220, minimum=TTS_MIN_TEXT_CHARS)
 TTS_GENERATION_RETRIES = env_int("TTS_GENERATION_RETRIES", 1, minimum=1)
-TTS_RESET_LLAMA_STATE = os.getenv("TTS_RESET_LLAMA_STATE", "1").lower() not in {
-    "0",
-    "false",
-    "no",
-    "off",
-}
+TTS_RESET_LLAMA_STATE = env_bool("TTS_RESET_LLAMA_STATE", True)
+TTS_DETAILED_TIMING = env_bool("TTS_DETAILED_TIMING", True)
+TTS_METRICS_WINDOW = env_int("TTS_METRICS_WINDOW", 20, minimum=1)
+TTS_AUDIO_CODEC_DEVICE_REQUESTED = os.getenv("TTS_AUDIO_CODEC_DEVICE", "auto")
+TTS_AUDIO_CODEC_DEVICE = resolve_audio_codec_device(
+    TTS_AUDIO_CODEC_DEVICE_REQUESTED,
+    cuda_available=cuda_available(),
+)
 
 SPEAKER_DIR = Path(os.getenv("SPEAKER_DIR", "/app/speakers"))
 SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
 
 synthesis_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SYNTHESIS)
+recent_performance_samples: deque[TtsPerformanceSample] = deque(maxlen=TTS_METRICS_WINDOW)
 
 # One global OuteTTS Interface owns one llama.cpp model/context. Treat it as
 # process-global mutable CUDA state inside the generation worker process.
@@ -207,7 +236,8 @@ def build_model_config():
     logger.info(
         "Loading OuteTTS model: size=%s quantization=%s n_gpu_layers=%s "
         "n_ctx=%s requested_max_length=%s effective_max_length=%s "
-        "min_generation_length=%s n_batch=%s n_threads=%s max_text_chars=%s",
+        "min_generation_length=%s n_batch=%s n_threads=%s max_text_chars=%s "
+        "audio_codec_device=%s detailed_timing=%s",
         MODEL_SIZE,
         QUANTIZATION_NAME,
         TTS_N_GPU_LAYERS,
@@ -218,6 +248,8 @@ def build_model_config():
         TTS_N_BATCH,
         TTS_THREADS,
         TTS_MAX_TEXT_CHARS,
+        TTS_AUDIO_CODEC_DEVICE,
+        TTS_DETAILED_TIMING,
     )
 
     cfg = outetts.ModelConfig.auto_config(
@@ -237,7 +269,9 @@ def build_model_config():
     )
     cfg.n_gpu_layers = TTS_N_GPU_LAYERS
     cfg.max_seq_length = TTS_CONTEXT_SIZE
-    cfg.device = "cuda"
+    # OuteTTS uses ModelConfig.device for the DAC codec. The llama.cpp model
+    # remains controlled independently by n_gpu_layers.
+    cfg.device = TTS_AUDIO_CODEC_DEVICE
     cfg.verbose = True
 
     # Do not duplicate OuteTTS top-level fields here. OuteTTS already passes
@@ -378,6 +412,170 @@ def create_speaker_profile_from_wav(speaker_id: str, wav_path: Path, save_as_def
 # lets websocket cancellation terminate native OuteTTS/llama.cpp work rather
 # than leaving stale generation on the sole worker.
 interface: Interface | None = None
+_active_timing_metrics: dict[str, object] | None = None
+
+
+def _cuda_synchronize() -> None:
+    if not TTS_DETAILED_TIMING or not cuda_available():
+        return
+    cuda = getattr(torch, "cuda", None)
+    synchronize = getattr(cuda, "synchronize", None)
+    if callable(synchronize):
+        try:
+            synchronize()
+        except Exception as exc:
+            logger.debug("CUDA synchronize unavailable for detailed timing: %s", exc)
+
+
+def _measure_generation_stage(name: str, call, *args, **kwargs):
+    metrics = _active_timing_metrics
+    if metrics is None:
+        return call(*args, **kwargs)
+    _cuda_synchronize()
+    started = time.perf_counter()
+    try:
+        return call(*args, **kwargs)
+    finally:
+        _cuda_synchronize()
+        metrics[name] = metrics.get(name, 0.0) + (time.perf_counter() - started)
+
+
+def _token_count(value) -> int:
+    if value is None:
+        return 0
+    size = getattr(value, "size", None)
+    if callable(size):
+        try:
+            shape = size()
+            if hasattr(shape, "__len__") and len(shape):
+                return max(0, int(shape[-1]))
+        except Exception:
+            pass
+    try:
+        return max(0, len(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _record_generation_token_budget(args, kwargs, output) -> None:
+    metrics = _active_timing_metrics
+    if metrics is None:
+        return
+    input_ids = kwargs.get("input_ids")
+    if input_ids is None and args:
+        input_ids = args[0]
+    config = kwargs.get("config")
+    if config is None and len(args) > 1:
+        config = args[1]
+
+    prompt_tokens = _token_count(input_ids)
+    generated_tokens = _token_count(output)
+    try:
+        max_length = max(0, int(getattr(config, "max_length", 0) or 0))
+    except (TypeError, ValueError):
+        max_length = 0
+    total_tokens = prompt_tokens + generated_tokens
+    headroom = max(0, max_length - total_tokens) if max_length else 0
+
+    metrics["model_prompt_tokens"] = metrics.get("model_prompt_tokens", 0) + prompt_tokens
+    metrics["model_generated_tokens"] = metrics.get("model_generated_tokens", 0) + generated_tokens
+    metrics["generation_max_length"] = max(
+        int(metrics.get("generation_max_length", 0) or 0),
+        max_length,
+    )
+    previous_headroom = metrics.get("generation_headroom_tokens")
+    if previous_headroom is None:
+        metrics["generation_headroom_tokens"] = headroom
+    else:
+        metrics["generation_headroom_tokens"] = min(int(previous_headroom), headroom)
+    if max_length and total_tokens >= max_length:
+        metrics["generation_limit_reached"] = True
+
+
+def install_generation_timing_hooks(tts_interface: Interface) -> None:
+    """Time OuteTTS model generation and DAC decode without replacing either."""
+    model = getattr(tts_interface, "model", None)
+    model_generate = getattr(model, "generate", None)
+    if callable(model_generate) and not getattr(model, "_chromie_timing_hook", False):
+        original_model_generate = model_generate
+
+        def timed_model_generate(*args, **kwargs):
+            output = _measure_generation_stage(
+                "model_generate_seconds",
+                original_model_generate,
+                *args,
+                **kwargs,
+            )
+            _record_generation_token_budget(args, kwargs, output)
+            return output
+
+        model.generate = timed_model_generate
+        model._chromie_timing_hook = True
+
+    codec = getattr(tts_interface, "audio_codec", None)
+    codec_decode = getattr(codec, "decode", None)
+    if callable(codec_decode) and not getattr(codec, "_chromie_timing_hook", False):
+        original_codec_decode = codec_decode
+
+        def timed_codec_decode(*args, **kwargs):
+            return _measure_generation_stage(
+                "codec_decode_seconds",
+                original_codec_decode,
+                *args,
+                **kwargs,
+            )
+
+        codec.decode = timed_codec_decode
+        codec._chromie_timing_hook = True
+
+
+def describe_audio_codec(tts_interface: Interface) -> dict[str, object]:
+    codec = getattr(tts_interface, "audio_codec", None)
+    reported_device = str(getattr(codec, "device", "unknown"))
+    model = getattr(codec, "model", None)
+    model_device = str(getattr(model, "device", "unknown"))
+    parameter_device = "unknown"
+    parameters = getattr(model, "parameters", None)
+    if callable(parameters):
+        try:
+            first_parameter = next(iter(parameters()), None)
+            if first_parameter is not None:
+                parameter_device = str(getattr(first_parameter, "device", "unknown"))
+        except Exception:
+            parameter_device = "unknown"
+    effective_device = parameter_device if parameter_device != "unknown" else model_device
+    if effective_device == "unknown":
+        effective_device = reported_device
+    return {
+        "requested": TTS_AUDIO_CODEC_DEVICE_REQUESTED,
+        "configured": TTS_AUDIO_CODEC_DEVICE,
+        "reported": reported_device,
+        "model": model_device,
+        "parameter": parameter_device,
+        "effective": effective_device,
+    }
+
+
+def validate_audio_codec_device(codec_status: dict[str, object]) -> None:
+    effective = str(codec_status.get("effective") or "unknown").strip().lower()
+    expected = TTS_AUDIO_CODEC_DEVICE
+    if effective == "unknown":
+        logger.warning(
+            "Could not determine effective TTS audio codec device: %s",
+            codec_status,
+        )
+        return
+    actual_family = "cuda" if effective.startswith("cuda") else "cpu"
+    if actual_family == expected:
+        return
+    message = (
+        "TTS audio codec device mismatch: "
+        f"requested={TTS_AUDIO_CODEC_DEVICE_REQUESTED!r} "
+        f"resolved={expected!r} effective={effective!r}"
+    )
+    if str(TTS_AUDIO_CODEC_DEVICE_REQUESTED).strip().lower() != "auto":
+        raise RuntimeError(message)
+    logger.warning(message)
 
 
 def reset_llama_generation_state() -> None:
@@ -396,15 +594,38 @@ def reset_llama_generation_state() -> None:
 
 
 def generate_tts_sync(cfg: GenerationConfig):
-    """Run OuteTTS generation under a process-wide interface lock."""
+    """Run OuteTTS generation and return the untouched output plus stage timings."""
+    global _active_timing_metrics
     if interface is None:
         raise RuntimeError("TTS interface is not initialized")
+    metrics = {
+        "model_generate_seconds": 0.0,
+        "codec_decode_seconds": 0.0,
+        "model_prompt_tokens": 0,
+        "model_generated_tokens": 0,
+        "generation_max_length": 0,
+        "generation_headroom_tokens": None,
+        "generation_limit_reached": False,
+    }
     with tts_interface_lock:
         reset_llama_generation_state()
+        _active_timing_metrics = metrics
+        _cuda_synchronize()
+        started = time.perf_counter()
         try:
-            return interface.generate(config=cfg)
+            output = interface.generate(config=cfg)
+            _cuda_synchronize()
+            metrics["generate_seconds"] = time.perf_counter() - started
+            metrics["pipeline_overhead_seconds"] = nonnegative_remainder(
+                metrics["generate_seconds"],
+                metrics["model_generate_seconds"],
+                metrics["codec_decode_seconds"],
+            )
+            return output, metrics
         finally:
+            _active_timing_metrics = None
             reset_llama_generation_state()
+
 
 def load_default_speaker():
     if interface is None:
@@ -490,11 +711,27 @@ def generation_worker_main(connection) -> None:
         log_llama_cpp_backend()
         interface = Interface(config=build_model_config())
         patch_audio_loader(interface)
+        install_generation_timing_hooks(interface)
+        codec_status = describe_audio_codec(interface)
+        validate_audio_codec_device(codec_status)
         speakers_cache = {}
         default_speaker = load_default_speaker()
         speakers_cache["default"] = default_speaker
-        logger.info("TTS model loaded in generation worker")
-        connection.send({"type": "ready"})
+        logger.info(
+            "TTS model loaded in generation worker audio_codec=%s",
+            codec_status,
+        )
+        connection.send(
+            {
+                "type": "ready",
+                "audio_codec": codec_status,
+                "quantization": QUANTIZATION_NAME,
+                "context_size": TTS_CONTEXT_SIZE,
+                "max_length": EFFECTIVE_TTS_MAX_LENGTH,
+                "n_batch": TTS_N_BATCH,
+                "detailed_timing": TTS_DETAILED_TIMING,
+            }
+        )
     except Exception as exc:
         logger.error("TTS generation worker failed to initialize: %s", exc, exc_info=True)
         try:
@@ -527,13 +764,22 @@ def generation_worker_main(connection) -> None:
                         ),
                         max_length=EFFECTIVE_TTS_MAX_LENGTH,
                     )
-                    started = time.time()
-                    output = generate_tts_sync(cfg)
+                    output, timings = generate_tts_sync(cfg)
+                    pcm_started = time.perf_counter()
+                    pcm = audio_to_pcm16(getattr(output, "audio", None))
+                    pcm_conversion_seconds = time.perf_counter() - pcm_started
+                    audio_seconds = len(pcm) / (TTS_SAMPLE_RATE * 2) if pcm else 0.0
+                    timings["pcm_conversion_seconds"] = pcm_conversion_seconds
+                    timings["audio_seconds"] = audio_seconds
+                    timings["realtime_factor"] = realtime_factor(
+                        timings.get("generate_seconds", 0.0),
+                        audio_seconds,
+                    )
                     connection.send(
                         {
                             "type": "generated",
-                            "pcm": audio_to_pcm16(getattr(output, "audio", None)),
-                            "generate_seconds": time.time() - started,
+                            "pcm": pcm,
+                            "timings": timings,
                         }
                     )
                     continue
@@ -605,6 +851,11 @@ def generation_worker_status() -> list[dict[str, object]]:
             "index": index,
             "alive": worker.is_alive,
             "restart_count": worker.restart_count,
+            "audio_codec": worker.ready_payload.get("audio_codec"),
+            "quantization": worker.ready_payload.get("quantization"),
+            "context_size": worker.ready_payload.get("context_size"),
+            "max_length": worker.ready_payload.get("max_length"),
+            "n_batch": worker.ready_payload.get("n_batch"),
         }
         for index, worker in enumerate(generation_workers)
     ]
@@ -631,7 +882,9 @@ async def synthesize_text(
     ws,
     request_id: Optional[str] = None,
 ):
+    request_received = time.perf_counter()
     async with synthesis_semaphore:
+        queue_wait_seconds = time.perf_counter() - request_received
         text = normalize_tts_text(text)
         if not is_valid_tts_text(text):
             logger.warning("Skipping invalid TTS text request_id=%s text=%r", request_id, text)
@@ -654,12 +907,16 @@ async def synthesize_text(
                 "format": "pcm_s16le",
                 "channels": 1,
                 "max_length": EFFECTIVE_TTS_MAX_LENGTH,
+                "audio_codec_device": TTS_AUDIO_CODEC_DEVICE,
+                "quantization": QUANTIZATION_NAME,
+                "context_size": TTS_CONTEXT_SIZE,
             },
         )
 
         for attempt in range(1, TTS_GENERATION_RETRIES + 1):
             try:
                 worker_index, worker = await select_generation_worker()
+                worker_started = time.perf_counter()
                 response = await worker.request(
                     {
                         "type": "generate",
@@ -667,6 +924,7 @@ async def synthesize_text(
                         "speaker_id": speaker_id,
                     }
                 )
+                worker_roundtrip_seconds = time.perf_counter() - worker_started
                 if response.get("type") == "error":
                     raise RuntimeError(str(response.get("message") or "generation failed"))
                 if response.get("type") != "generated":
@@ -674,7 +932,40 @@ async def synthesize_text(
                         f"Unexpected generation-worker response: {response.get('type')!r}"
                     )
                 pcm = response.get("pcm") or b""
-                generate_seconds = float(response.get("generate_seconds") or 0.0)
+                timings = response.get("timings")
+                if not isinstance(timings, dict):
+                    timings = {}
+                generate_seconds = float(timings.get("generate_seconds") or 0.0)
+                model_generate_seconds = float(
+                    timings.get("model_generate_seconds") or 0.0
+                )
+                codec_decode_seconds = float(
+                    timings.get("codec_decode_seconds") or 0.0
+                )
+                pcm_conversion_seconds = float(
+                    timings.get("pcm_conversion_seconds") or 0.0
+                )
+                pipeline_overhead_seconds = float(
+                    timings.get("pipeline_overhead_seconds") or 0.0
+                )
+                model_prompt_tokens = int(timings.get("model_prompt_tokens") or 0)
+                model_generated_tokens = int(timings.get("model_generated_tokens") or 0)
+                generation_max_length = int(timings.get("generation_max_length") or 0)
+                generation_headroom_tokens = int(
+                    timings.get("generation_headroom_tokens") or 0
+                )
+                generation_limit_reached = bool(
+                    timings.get("generation_limit_reached", False)
+                )
+                if generation_limit_reached:
+                    raise RuntimeError(
+                        "OuteTTS reached its generation max_length before the audio end token; "
+                        "refusing to play a truncated sentence. "
+                        f"prompt_tokens={model_prompt_tokens}, "
+                        f"generated_tokens={model_generated_tokens}, "
+                        f"max_length={generation_max_length}, text_chars={len(text)}. "
+                        "Increase TTS_CONTEXT_SIZE/TTS_MAX_LENGTH or shorten the host TTS chunk."
+                    )
                 if not pcm:
                     raise RuntimeError(
                         "OuteTTS generated empty audio. "
@@ -689,24 +980,62 @@ async def synthesize_text(
                     await asyncio.sleep(0)
 
                 audio_seconds = len(pcm) / (TTS_SAMPLE_RATE * 2)
-                await send_json(
-                    ws,
-                    {
-                        "type": "end",
-                        "request_id": request_id,
-                        "audio_seconds": audio_seconds,
-                        "generate_seconds": generate_seconds,
-                        "total_seconds": time.time() - start_time,
-                    },
+                total_seconds = time.time() - start_time
+                sample = TtsPerformanceSample(
+                    audio_seconds=audio_seconds,
+                    generate_seconds=generate_seconds,
+                    model_generate_seconds=model_generate_seconds,
+                    codec_decode_seconds=codec_decode_seconds,
+                    pcm_conversion_seconds=pcm_conversion_seconds,
+                    worker_roundtrip_seconds=worker_roundtrip_seconds,
+                    queue_wait_seconds=queue_wait_seconds,
+                    total_seconds=total_seconds,
                 )
+                recent_performance_samples.append(sample)
+                end_payload = {
+                    "type": "end",
+                    "request_id": request_id,
+                    **sample.as_dict(),
+                    "pipeline_overhead_seconds": pipeline_overhead_seconds,
+                    "ipc_overhead_seconds": nonnegative_remainder(
+                        worker_roundtrip_seconds,
+                        generate_seconds,
+                        pcm_conversion_seconds,
+                    ),
+                    "audio_codec_device": TTS_AUDIO_CODEC_DEVICE,
+                    "quantization": QUANTIZATION_NAME,
+                    "context_size": TTS_CONTEXT_SIZE,
+                    "max_length": EFFECTIVE_TTS_MAX_LENGTH,
+                    "model_prompt_tokens": model_prompt_tokens,
+                    "model_generated_tokens": model_generated_tokens,
+                    "generation_max_length": generation_max_length,
+                    "generation_headroom_tokens": generation_headroom_tokens,
+                    "generation_limit_reached": generation_limit_reached,
+                }
+                await send_json(ws, end_payload)
                 logger.info(
-                    "TTS done request_id=%s worker=%s attempt=%s audio=%.2fs generate=%.2fs total=%.2fs",
+                    "TTS done request_id=%s worker=%s attempt=%s audio=%.2fs "
+                    "generate=%.2fs model=%.2fs codec=%.2fs pcm=%.3fs "
+                    "queue=%.3fs roundtrip=%.2fs rtf=%s total=%.2fs "
+                    "prompt_tokens=%s generated_tokens=%s headroom=%s limit_reached=%s",
                     request_id,
                     worker_index,
                     attempt,
                     audio_seconds,
                     generate_seconds,
-                    time.time() - start_time,
+                    model_generate_seconds,
+                    codec_decode_seconds,
+                    pcm_conversion_seconds,
+                    queue_wait_seconds,
+                    worker_roundtrip_seconds,
+                    f"{sample.realtime_factor:.3f}"
+                    if sample.realtime_factor is not None
+                    else "n/a",
+                    total_seconds,
+                    model_prompt_tokens,
+                    model_generated_tokens,
+                    generation_headroom_tokens,
+                    generation_limit_reached,
                 )
                 return
             except Exception as exc:
@@ -816,6 +1145,17 @@ async def ws_handler(ws):
                         "effective_max_length": EFFECTIVE_TTS_MAX_LENGTH,
                         "min_generation_length": MIN_TTS_GENERATION_LENGTH,
                         "max_text_chars": TTS_MAX_TEXT_CHARS,
+                        "quantization": QUANTIZATION_NAME,
+                        "context_size": TTS_CONTEXT_SIZE,
+                        "n_batch": TTS_N_BATCH,
+                        "audio_codec_device_requested": TTS_AUDIO_CODEC_DEVICE_REQUESTED,
+                        "audio_codec_device": TTS_AUDIO_CODEC_DEVICE,
+                        "detailed_timing": TTS_DETAILED_TIMING,
+                        "reject_truncated_generation": True,
+                        "metrics_window": TTS_METRICS_WINDOW,
+                        "recent_performance": summarize_samples(
+                            recent_performance_samples
+                        ),
                         "speakers": list_speaker_ids(),
                     },
                 )

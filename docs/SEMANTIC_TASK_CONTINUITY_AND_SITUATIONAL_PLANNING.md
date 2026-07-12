@@ -2,14 +2,18 @@
 
 ## Status
 
-**Design status:** proposed architecture and implementation guide.
+**Design status:** proposed target architecture with two implemented runtime slices.
 
-**Design refresh date:** 2026-07-11.
+**Design refresh date:** 2026-07-12.
 
-This document does not claim that the complete design is implemented. It
-extends the current Router, conversation state, task-proposal ledger,
-Interaction Runtime, TaskGraph, Skill Runtime, and Soridormi boundaries without
-widening execution authority.
+The complete design is not implemented. The current slices add shared
+semantic-task contracts, bounded active-task snapshots, Router-proposed advisory
+operations, a dedicated Task Continuity model endpoint, deterministic versioned
+goal updates, replay protection, structured capability-planning information
+gaps, staged report/apply rollout, and first structured ResponsePlan claim
+validation. They extend the current Router, Agent, conversation state,
+task-proposal ledger, Interaction Runtime, TaskGraph, Skill Runtime, and
+Soridormi boundaries without widening execution authority.
 
 Related documents:
 
@@ -216,6 +220,79 @@ This proposal builds on current implemented foundations:
 
 The design must preserve the current rule that model output is advisory until
 validated and committed by trusted runtime code.
+
+The current reliability slice also makes `report_only` asynchronous, returns an
+empty diagnostic result when its model is unavailable, and removes normal-language
+forward-motion/compound phrase recovery from deterministic Router validation.
+Generic chat outputs can be rechecked by a second bounded semantic call when the
+ability catalog exposes executable embodied affordances; that call remains a
+proposal source, not execution authority.
+
+## Current Implementation Slice
+
+The first dependency-light slice is implemented in the current repository:
+
+- `shared/chromie_contracts/semantic_task.py` defines versioned contracts for
+  open semantic goals, task operations, active-task snapshots, information
+  gaps, planning results, and response plans;
+- `ConversationStateManager` exposes bounded active-task snapshots and
+  deterministically validates and applies model-proposed create, modify,
+  clarification-answer, confirm, reject, cancel, pause, resume, query, correct,
+  and replace operations;
+- semantic goal changes increment `goal_version`, supersede affected plan
+  versions, invalidate stale confirmations, and retain operation history;
+- operation IDs are replay-safe so retries do not duplicate task creation or
+  apply one semantic update twice;
+- the quick Router prompt receives the bounded active-task snapshot and may emit
+  advisory `metadata.semantic_task_operations`; normal association is explicitly
+  meaning-based and may not be decided by regexes, phrase tables, lexical
+  overlap, or recency alone;
+- the Orchestrator applies accepted semantic operations before downstream Agent
+  planning and rebuilds the same-turn context;
+- Capability Agent planning reports `direct_skill`, `composed_plan`,
+  `safe_adjustment`, `alternative_plan`, `needs_clarification`, or `unavailable`
+  metadata and converts missing required schema fields into structured
+  information gaps;
+- compound embodied requests are reconstructed by the model as complete outcomes
+  with explicit parallel/sequential relations. Provider resource and concurrency
+  metadata are evidence, while missing provider metadata remains unknown rather
+  than being converted into a hardcoded compatibility rule;
+- all model-proposed skill steps are schema-validated before any step is committed.
+  A malformed or unavailable sub-step rejects the entire effectful plan, so a
+  clarification response cannot coexist with a leaked partial execution;
+- a material alternative plan is retained as a complete pending proposal with
+  the model-authored explanation and is never simulator-auto-confirmed. The host
+  waits for user confirmation tied to that plan version before execution;
+- legacy normal-language capability parsers for action names, counts, speeds, and
+  durations are removed from the Capability Agent. Deterministic code remains
+  responsible only for contract validation, resource arbitration, confirmation,
+  authorization, and evidence;
+- planning results are bound to a task and goal version; stale results are
+  retained as rejected metadata rather than changing the newer task;
+- ordinary chat no longer opens or rebinds a task merely because a phrase looks
+  referential;
+- `agent/app/task_continuity.py` provides a dedicated semantic Task Continuity
+  model endpoint that receives bounded active-task snapshots, treats Router
+  output as advisory, emits deterministic replay-safe operation IDs, and rejects
+  unknown-task or below-threshold operations;
+- the Orchestrator supports `off`, `report_only`, and `apply` rollout modes. In
+  apply mode, the dedicated continuity result becomes authoritative for semantic
+  task operations while deterministic lifecycle validation remains in the host;
+- an authoritative empty continuity result prevents the legacy route fallback
+  from inventing a new task merely because the route is `deep_thought`;
+- structured immediate `ResponsePlan` stages are checked against current task
+  status and trusted evidence before fast-first playback. Unscoped or
+  unsupported accepted/executing/completed/failed/cancelled claims are rejected;
+- validated ResponsePlan speech uses structural claims instead of the legacy
+  phrase blacklist as its primary truthfulness boundary. Legacy fast-speech
+  fields retain the conservative fallback filter.
+
+These slices are automatically verified only. They do not yet provide full
+multi-goal response composition, model repair for rejected speech claims,
+generalized observation planning, affordance-rich capability contracts,
+live-text evidence, simulator evidence, or any widened physical execution
+claim. The dedicated continuity path remains default-off in the host until
+report-only evidence is reviewed.
 
 ## Target Runtime Flow
 
@@ -466,6 +543,8 @@ The planner returns one of these result classes:
 ```text
 direct_skill
 composed_plan
+safe_adjustment
+alternative_plan
 needs_context
 needs_clarification
 needs_confirmation
@@ -485,6 +564,25 @@ provide a credible path to the requested outcome.
 
 The planner must not infer that similarly named skills compose safely unless the
 capability contracts support that composition.
+
+### Safe adjustment
+
+Use a bounded adjustment only when the planner concludes from supplied policy,
+provider, and runtime evidence that the change preserves the material user goal.
+The model must explain the adjustment naturally. A material goal change must be
+represented as an alternative plan instead of silently executed.
+
+### Alternative plan
+
+When the exact timing, composition, or method cannot be supported but a credible
+alternative exists, the model returns the full alternative—not a partially
+executable remainder—and asks for confirmation in natural language. No effectful
+step is committed until the confirmed plan version matches the proposal.
+
+Deterministic code does not decide that a particular pair of actions should be
+sequential or parallel from their names. It validates model-authored timing
+against explicit provider/resource evidence and safely treats absent evidence as
+unknown.
 
 ### Needs context
 
@@ -526,6 +624,27 @@ use_owner_approved_preference
 use_safe_default
 unresolvable
 ```
+
+The semantic planner, not a phrase rule, chooses among these classes from the
+complete utterance, the field schema, explicit schema defaults, field bounds,
+capability safety class, effects, provider constraints, and the consequence of
+being wrong. A low-consequence and easily reversible field may be filled with an
+explicit schema default or a conservative bounded value. For example, when a
+blink capability requires a count but the user simply asks Chromie to blink,
+the model may choose an ordinary small count and record that decision as
+`use_safe_default`.
+
+A parameter that materially changes duration, direction, target, authorization,
+cost, irreversible effects, or physical risk remains an information gap. The
+planner must ask for the specific missing fact rather than saying only that the
+action cannot be performed. The clarification should name the field in natural
+language and may offer valid candidate values when the schema supplies them.
+
+Deterministic code does not classify the semantic importance of a parameter. It
+validates the model-proposed value against the schema and provider state, or
+validates the structured information gap when the model decides to ask. If the
+parameter-resolution model is unavailable, the fail-closed fallback may list
+the exact schema-derived gaps, but it must not invent a semantic default.
 
 Example planning result:
 
@@ -860,7 +979,7 @@ execution claims.
 
 ## Implementation Sequence
 
-### PR0 - Contracts and fixtures
+### PR0 - Contracts and fixtures — first slice implemented
 
 - Add shared versioned contracts for `SemanticGoal`, `TaskContextSnapshot`,
   `SemanticTaskOperation`, `InformationGap`, `PlanningResult`, and
@@ -868,41 +987,53 @@ execution claims.
 - Add contract-only examples and validation tests.
 - Do not change runtime behavior.
 
-### PR1 - Task context projection
+### PR1 - Task context projection — first slice implemented
 
 - Extend conversation/task state to expose a bounded active-task snapshot.
 - Include task ID, semantic goal summary, goal version, state, open gaps,
   confirmation state, and compact evidence.
 - Keep raw conversation and full execution logs out of normal prompts.
 
-### PR2 - Advisory task-continuity model
+### PR2 - Advisory task-continuity model — implemented with staged rollout
 
-- Add a semantic Task Continuity or Interaction Planner stage.
-- Run it in report-only mode beside current routing.
-- Retain proposed operations and compare them with existing behavior.
-- Do not allow it to mutate task state yet.
+- Add a dedicated semantic Task Continuity model endpoint.
+- Support host `off`, `report_only`, and `apply` modes; repository default remains
+  `off` while report-only evidence is collected.
+- Retain the model result, accepted/rejected operation diagnostics, and stable
+  operation IDs.
+- In apply mode, let only the deterministic host apply validated operations and
+  mark the result authoritative so legacy route fallback cannot invent tasks.
 
-### PR3 - Versioned goal updates
+### PR3 - Versioned goal updates — first slice implemented
 
 - Let the Orchestrator validate and apply approved semantic operations.
 - Add goal versions, plan versions, operation IDs, and supersession links.
 - Invalidate stale confirmation fingerprints and queued uncommitted work.
 - Preserve the task-proposal ledger as the audit substrate.
 
-### PR4 - Planning information gaps
+### PR4 - Planning information gaps — first slice implemented
 
 - Extend the Capability Planner to return structured result classes and
   information gaps.
 - Add `waiting_for_user` and context-acquisition states.
 - Bind clarification answers back to the original task.
 
-### PR5 - Semantic ResponsePlan and claim validation
+### PR5 - Semantic ResponsePlan and claim validation — first slice implemented
 
-- Let an Interaction Planner or Response Composer generate one natural response
-  across related RouteItems.
+The runtime also implements a startup-primed cached-audio hedge for generic
+low-commitment acknowledgements. This removes realtime LLM/TTS generation from
+the first-audio path while preserving semantic routing and deterministic claim
+validation. The cue is suppressed when final speech is ready before the hedge
+threshold and cancelled if queued but not yet audible.
+
+- The Task Continuity endpoint may propose one immediate ResponsePlan across
+  related RouteItems; full multi-goal response composition remains open.
 - Add structured commitment and speech claims.
-- Validate claims against trusted task state before playback.
-- Retain safe deterministic fallback speech.
+- Validate immediate claims against trusted task status and evidence before
+  fast-first playback.
+- Reject unknown task scopes, premature accepted/executing/terminal claims, and
+  unsupported evidence claims; retain safe legacy fallback speech.
+- Add model repair and progress/final-stage claim validation in a later slice.
 
 ### PR6 - Affordance-rich capabilities
 
@@ -972,6 +1103,20 @@ The expected invariant is semantic continuity, not matching the word “coffee.�
 - unavailable capability paths produce honest speech and no skill commitment;
 - progress and completion speech match trusted runtime evidence;
 - deterministic stop and cancel behavior does not regress.
+
+## Focused Verification
+
+```bash
+python -m unittest tests.test_semantic_task_continuity
+python -m unittest \
+  tests.test_conversation_state \
+  tests.test_capability_aware_interaction \
+  tests.test_router_llm_prompt \
+  tests.test_task_proposals \
+  tests.test_semantic_task_continuity
+python scripts/check_docs.py
+./scripts/run_tests.sh
+```
 
 ## Non-Goals
 

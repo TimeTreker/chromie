@@ -3,11 +3,12 @@
   "id": "voice_log_greeting_chat_with_attention_cue",
   "suite": "interaction",
   "level": "integration",
-  "description": "A plain greeting should stay chat speech and may attach a simulator-only expressive attention cue after routing, instead of becoming a robot_action.",
+  "description": "A plain greeting stays chat speech while a separate model-authored social-attention plan may coordinate a subtle simulator cue toward the calibrated user position.",
   "tags": [
     "voice-log",
     "greeting",
-    "expressive-cue",
+    "social-attention",
+    "model-driven",
     "router-agent-contract"
   ],
   "input": {
@@ -28,6 +29,16 @@
         "capability_id": "soridormi.express_attention",
         "agent_id": "soridormi.skill",
         "description": "Small head-only attention/listening gesture using a bounded neutral-home MuJoCo trajectory.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "style": {"type": "string", "enum": ["neutral"]},
+            "duration_s": {"type": "number", "minimum": 0.5, "maximum": 4.0},
+            "hold_fraction": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+          },
+          "required": ["style", "duration_s", "hold_fraction"],
+          "additionalProperties": false
+        },
         "effects": ["physical_motion"],
         "safety_class": "physical_motion",
         "requires_confirmation": true,
@@ -35,26 +46,59 @@
         "interaction_executable": true,
         "route": "robot_action",
         "score": 0.5,
+        "can_run_parallel": true,
+        "exclusive_group": "head_expression",
+        "resource_claims": ["head_expression"],
         "metadata": {
           "mode": "sim"
         }
       }
     ],
     "expressive_body_cues": "sim_only",
-    "ollama_reply": "Hello. I am functioning correctly."
+    "social_attention_mode": "sim_only",
+    "social_attention_capability_ids": ["soridormi.express_attention"],
+    "social_attention_fallback_target": "calibrated_right_side",
+    "social_attention_fallback_direction": "right",
+    "social_attention_fallback_yaw_rad": 0.35,
+    "social_attention_fallback_confidence": 0.7,
+    "ollama_reply": "Hello. I am doing well.",
+    "social_attention_reply": {
+      "decision": "express",
+      "target": {
+        "target_ref": "calibrated_right_side",
+        "source": "installation_calibration",
+        "relative_direction": "right",
+        "confidence": 0.7,
+        "metadata": {}
+      },
+      "behaviors": [
+        {
+          "skill_id": "soridormi.express_attention",
+          "args": {
+            "style": "neutral",
+            "duration_s": 2.0,
+            "hold_fraction": 0.3
+          },
+          "timing": "parallel",
+          "reason": "A subtle attention gesture supports the greeting."
+        }
+      ],
+      "confidence": 0.88,
+      "reason": "The user directly greeted Chromie."
+    }
   },
   "expect": {
-    "speech_any": ["Hello", "functioning correctly"],
+    "speech_any": ["Hello", "doing well"],
     "skills": ["soridormi.express_attention"],
     "skill_args": [
       {
         "style": "neutral",
-        "duration_s": 2.4,
-        "hold_fraction": 0.35
+        "duration_s": 2.0,
+        "hold_fraction": 0.3
       }
     ],
-    "skill_metadata_json_contains": ["expressive_body_cue", "chat_attention"],
-    "metadata_json_contains": ["expressive_body_cue", "soridormi.express_attention"],
+    "skill_metadata_json_contains": ["social_attention_plan", "calibrated_right_side"],
+    "metadata_json_contains": ["social_attention_plan", "social_attention_skills", "installation_calibration"],
     "requires_confirmation": true
   }
 }

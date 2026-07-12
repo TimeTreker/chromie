@@ -21,6 +21,22 @@ def _response() -> InteractionResponse:
 
 
 class ConfirmationDialogueTests(unittest.TestCase):
+    def test_begin_uses_semantic_alternative_prompt_override(self) -> None:
+        dialogue = ConfirmationDialogue(ttl_s=20, clock=lambda: 100.0)
+
+        pending = dialogue.begin(
+            _response(),
+            confirmed_request_ids={"nod-1"},
+            origin_session_id="sid-1",
+            conversation_id="conversation-1",
+            prompt_override="I cannot overlap those actions, but I can do them in sequence. Is that okay?",
+        )
+
+        self.assertEqual(
+            pending.prompt,
+            "I cannot overlap those actions, but I can do them in sequence. Is that okay?",
+        )
+
     def test_approval_returns_exact_single_use_request(self) -> None:
         dialogue = ConfirmationDialogue(ttl_s=20, clock=lambda: 100.0)
         pending = dialogue.begin(

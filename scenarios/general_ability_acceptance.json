@@ -35,6 +35,18 @@
         {
           "key": "dialogue/daily_noisy_room_hearing_honesty",
           "rationale": "Noisy or uncertain hearing should remain honest and clarifyable."
+        },
+        {
+          "key": "router/unclear_headset_fragment_semantic_clarification",
+          "rationale": "A low-confidence referential fragment must clarify instead of fabricating understanding."
+        },
+        {
+          "key": "router_dialogue/weather_then_repeated_walk_stays_grounded",
+          "rationale": "A prior weather turn must not contaminate repeated physical-action interpretation."
+        },
+        {
+          "key": "router/chinese_walk_after_weather_intent_repaired",
+          "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
         }
       ],
       "live_text_cases": [
@@ -86,6 +98,18 @@
         {
           "key": "router/compound_walk_blink_joke_while_walking",
           "rationale": "Mixed speech and body requests should keep each lane grounded."
+        },
+        {
+          "key": "router/walk_forward_stale_weather_route_repaired",
+          "rationale": "An internally inconsistent stale weather route is semantically repaired to the exact walking affordance."
+        },
+        {
+          "key": "router_dialogue/weather_then_repeated_walk_stays_grounded",
+          "rationale": "The same walking request remains grounded across repeated turns after a weather query."
+        },
+        {
+          "key": "router/chinese_walk_after_weather_intent_repaired",
+          "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
         }
       ],
       "live_text_cases": [
@@ -292,6 +316,18 @@
         {
           "key": "dialogue/emergency_claim_refuse_without_sensor",
           "rationale": "Chromie must not claim emergency sensing without evidence."
+        },
+        {
+          "key": "dialogue/self_model_capability_inquiry",
+          "rationale": "Self-description and capability inquiries stay grounded in the structured self model and supplied runtime capability evidence without executing actions."
+        },
+        {
+          "key": "interaction/voice_log_greeting_chat_with_attention_cue",
+          "rationale": "Speech may coordinate a model-authored, evidence-bound auxiliary attention gesture without turning it into the user's main task."
+        },
+        {
+          "key": "interaction/social_attention_model_can_choose_none",
+          "rationale": "Natural attention remains optional; the model can choose speech-only behavior instead of a repetitive fixed gesture."
         }
       ],
       "live_text_cases": []

@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "unclear_headset_fragment_semantic_clarification",
+  "suite": "router",
+  "level": "integration",
+  "description": "A low-confidence referential headset fragment must be semantically reviewed and clarified instead of receiving a fabricated understanding acknowledgement.",
+  "tags": [
+    "voice-log",
+    "uncertainty",
+    "clarify",
+    "deep-thought",
+    "referential-fragment"
+  ],
+  "input": {
+    "text": "嗯，我用的耳麦，他那个。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "catalog_version": 71,
+      "capabilities": []
+    },
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "deep_thought",
+          "intent": "deep_thought_low_confidence",
+          "confidence": 0.45,
+          "language": "zh-CN"
+        }
+      },
+      {
+        "stage": "intent_review",
+        "decision": {
+          "route": "deep_thought",
+          "intent": "deep_thought_low_confidence",
+          "confidence": 0.43,
+          "language": "zh-CN"
+        }
+      },
+      {
+        "stage": "semantic_route_repair",
+        "decision": {
+          "route": "clarify",
+          "intent": "clarify_headset_reference",
+          "confidence": 0.45,
+          "language": "zh-CN"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "route": "clarify",
+    "intent": "clarify_headset_reference",
+    "source": "llm",
+    "llm_calls": 3,
+    "llm_stages": [
+      "quick_intent",
+      "intent_review",
+      "semantic_route_repair"
+    ],
+    "task_types_include": ["speech.ask_clarification"],
+    "task_types_forbid": ["cognition.deep_think", "task.execute_skill"]
+  }
+}

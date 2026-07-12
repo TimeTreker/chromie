@@ -585,9 +585,9 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.speak_immediate[0].text, "Yes. The Sun is extremely hot.")
         self.assertEqual(len(ollama.calls), 2)
-        self.assertIn("Chromie's first-person robot persona", ollama.calls[0]["system"])
-        self.assertIn("human-like social warmth", ollama.calls[0]["system"])
-        self.assertIn("never describe Chromie as a program", ollama.calls[0]["system"])
+        self.assertIn("First-person speech and plans refer to Self model.speaker_entity", ollama.calls[0]["system"])
+        self.assertIn("embodied social warmth", ollama.calls[0]["system"])
+        self.assertIn("preserving the ontology and evidence", ollama.calls[0]["system"])
         self.assertIn("Candidate spoken response", ollama.calls[1]["prompt"])
         self.assertIn("Judge meaning, not keyword rules", ollama.calls[1]["system"])
 

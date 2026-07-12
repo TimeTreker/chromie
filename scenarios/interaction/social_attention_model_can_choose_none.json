@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "id": "social_attention_model_can_choose_none",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "Social attention is optional: the model may choose no gesture when speech alone is natural, instead of attaching a fixed cue to every reply.",
+  "tags": ["social-attention", "model-driven", "optional", "non-repetitive"],
+  "input": {
+    "text": "Please read this short sentence clearly.",
+    "language": "en-US"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "chat",
+      "agents": ["conversation_agent", "speaker_agent"],
+      "intent": "speech_content_request",
+      "confidence": 0.92,
+      "language": "en-US",
+      "source": "llm"
+    },
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.blink_eyes",
+        "agent_id": "soridormi.skill",
+        "description": "Blink the visible social eyes.",
+        "input_schema": {
+          "type": "object",
+          "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 6}},
+          "required": ["count"],
+          "additionalProperties": false
+        },
+        "effects": ["visual_expression"],
+        "safety_class": "low_risk_action",
+        "requires_confirmation": false,
+        "available": true,
+        "interaction_executable": true,
+        "route": "robot_action",
+        "score": 0.4,
+        "can_run_parallel": true,
+        "resource_claims": ["face_expression"],
+        "metadata": {"mode": "sim"}
+      }
+    ],
+    "social_attention_mode": "sim_only",
+    "social_attention_capability_ids": ["soridormi.blink_eyes"],
+    "ollama_reply": "Here is the sentence clearly.",
+    "social_attention_reply": {
+      "decision": "none",
+      "target": {
+        "target_ref": "none",
+        "source": "none",
+        "confidence": 0.0,
+        "metadata": {}
+      },
+      "behaviors": [],
+      "confidence": 0.82,
+      "reason": "Speech alone is natural for this turn."
+    }
+  },
+  "expect": {
+    "speech_any": ["sentence clearly"],
+    "skills": [],
+    "metadata_json_contains": ["social_attention_plan", "not_selected"],
+    "requires_confirmation": false
+  }
+}

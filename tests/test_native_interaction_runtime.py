@@ -76,6 +76,44 @@ class _AgreementOllama:
         return "Yes, you are correct."
 
 
+class _SocialAttentionOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs["response_format"] == "json"
+        assert "eligible_social_capabilities" in prompt
+        return {
+            "decision": "express",
+            "target": {
+                "target_ref": "calibrated_right_side",
+                "source": "installation_calibration",
+                "relative_direction": "right",
+                "confidence": 0.7,
+                "metadata": {},
+            },
+            "behaviors": [
+                {
+                    "skill_id": "soridormi.express_attention",
+                    "args": {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
+                    "timing": "parallel",
+                    "reason": "A subtle attention cue supports the spoken reply.",
+                }
+            ],
+            "confidence": 0.86,
+            "reason": "The user is directly engaging Chromie.",
+        }
+
+
+class _SocialAttentionNoneOllama:
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs["response_format"] == "json"
+        return {
+            "decision": "none",
+            "target": {"target_ref": "none", "source": "none", "confidence": 0.0, "metadata": {}},
+            "behaviors": [],
+            "confidence": 0.8,
+            "reason": "Speech alone is natural for this turn.",
+        }
+
+
 class _ChatOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> str:
         del prompt, kwargs
@@ -185,6 +223,12 @@ class _AttentionCatalog:
         )
 
 
+    async def get_capability(self, capability_id: str, **kwargs: Any) -> CapabilityMatch | None:
+        del kwargs
+        result = await self.search("")
+        return next((item for item in result.matches if item.capability_id == capability_id), None)
+
+
 class _ChatCatalog:
     async def search(self, text: str, **kwargs: Any) -> CapabilitySearchResult:
         del kwargs
@@ -237,6 +281,12 @@ class _SpeechCatalog:
                 ),
             ],
         )
+
+
+    async def get_capability(self, capability_id: str, **kwargs: Any) -> CapabilityMatch | None:
+        del kwargs
+        result = await self.search("")
+        return next((item for item in result.matches if item.capability_id == capability_id), None)
 
 
 class _WalkCatalog:
@@ -814,6 +864,13 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 max_speak_chars=160,
                 capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
                 expressive_body_cues="sim_only",
+                social_attention_mode="sim_only",
+                social_attention_ollama=_SocialAttentionOllama(),  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.express_attention",),
+                social_attention_fallback_target="calibrated_right_side",
+                social_attention_fallback_direction="right",
+                social_attention_fallback_yaw_rad=0.35,
+                social_attention_fallback_confidence=0.7,
             )
         ).run(request)
 
@@ -829,9 +886,9 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.skills[0].requires_confirmation)
         self.assertEqual(
             response.skills[0].metadata["source"],
-            "expressive_body_cue",
+            "social_attention_plan",
         )
-        self.assertEqual(response.metadata["expressive_body_cue"], "soridormi.express_attention")
+        self.assertEqual(response.metadata["social_attention_skills"][0], "soridormi.express_attention")
 
     async def test_chat_only_response_adds_attention_cue(self) -> None:
         request = _request(
@@ -847,6 +904,13 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 max_speak_chars=160,
                 capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
                 expressive_body_cues="sim_only",
+                social_attention_mode="sim_only",
+                social_attention_ollama=_SocialAttentionOllama(),  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.express_attention",),
+                social_attention_fallback_target="calibrated_right_side",
+                social_attention_fallback_direction="right",
+                social_attention_fallback_yaw_rad=0.35,
+                social_attention_fallback_confidence=0.7,
             )
         ).run(request)
 
@@ -859,11 +923,11 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.skills[0].timing, "parallel")
         self.assertEqual(
-            response.skills[0].metadata["reason"],
-            "chat_attention",
+            response.skills[0].metadata["behavior_reason"],
+            "A subtle attention cue supports the spoken reply.",
         )
         self.assertEqual(
-            response.metadata["expressive_body_cue"],
+            response.metadata["social_attention_skills"][0],
             "soridormi.express_attention",
         )
 
@@ -881,6 +945,13 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 max_speak_chars=160,
                 capability_catalog=_SpeechCatalog(),  # type: ignore[arg-type]
                 expressive_body_cues="sim_only",
+                social_attention_mode="sim_only",
+                social_attention_ollama=_SocialAttentionOllama(),  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.express_attention",),
+                social_attention_fallback_target="calibrated_right_side",
+                social_attention_fallback_direction="right",
+                social_attention_fallback_yaw_rad=0.35,
+                social_attention_fallback_confidence=0.7,
             )
         ).run(request)
 
@@ -1057,6 +1128,29 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args, {"vx_mps": 0.2, "duration_s": 10.0})
         self.assertEqual(response.skills[2].args, {"count": 2})
 
+    async def test_social_attention_model_can_choose_none(self) -> None:
+        request = _request(
+            text="Tell me something interesting.",
+            route="chat",
+            intent="general_conversation",
+            agents=["conversation_agent", "speaker_agent"],
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ChatOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
+                social_attention_mode="sim_only",
+                social_attention_ollama=_SocialAttentionNoneOllama(),  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.express_attention",),
+            )
+        ).run(request)
+
+        self.assertEqual(response.speech[0].text, "I am listening.")
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.metadata["social_attention_status"], "not_selected")
+
     async def test_expressive_body_cues_off_keeps_chat_speech_only(self) -> None:
         request = _request(
             text="Tell me something interesting.",
@@ -1097,7 +1191,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills, [])
         self.assertEqual(
             response.speech[0].text,
-            "I heard you, but my language model is not responding.",
+            "I heard you, but my language understanding is temporarily unavailable.",
         )
 
     async def test_weak_catalog_match_does_not_promote_chat_identity_to_motion(self) -> None:
@@ -1221,7 +1315,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills, [])
         self.assertEqual(
             response.speech[0].text,
-            "I heard you, but my language model is not responding.",
+            "I heard you, but my language understanding is temporarily unavailable.",
         )
 
     async def test_legacy_run_contract_remains_unchanged(self) -> None:

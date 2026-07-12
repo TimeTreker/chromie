@@ -1030,7 +1030,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("deepthinking_agent", decision.agents)
 
-    async def test_narrowed_compound_route_items_handoff_to_capability_planner(self) -> None:
+    async def test_validator_does_not_infer_compound_plan_from_user_phrase(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -1113,23 +1113,11 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(decision.source, "llm")
-        self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "compound_common_catalog_task")
+        self.assertEqual(decision.route, "chat")
+        self.assertEqual(decision.intent, "general_conversation")
         self.assertEqual(decision.actions, [])
-        self.assertIn("capability_agent", decision.agents)
-        self.assertEqual(
-            decision.metadata["quick_router_action_handoff"]["status"],
-            "planner_required",
-        )
-        self.assertEqual(
-            decision.metadata["quick_router_action_handoff"]["reason"],
-            "quick_router_narrowed_compound_request",
-        )
-        self.assertEqual(
-            decision.metadata["route_items"][0]["intent"],
-            "compound_common_catalog_task",
-        )
-        self.assertNotIn("chromie.speak", decision.metadata["task_list"][0]["intent"])
+        self.assertNotIn("quick_router_action_handoff", decision.metadata)
+        self.assertNotIn("compound_common_catalog_task", str(decision.metadata))
 
     async def test_hybrid_low_confidence_handoff_uses_llm_speak_first_thinking_ack(self) -> None:
         from router.app import main
@@ -2230,17 +2218,22 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 RouteRequest(text="Please fly up to the ceiling.", language="en-US")
             )
 
-        self.assertEqual(decision.route, "clarify")
-        self.assertEqual(decision.intent, "missing_or_unsupported_ability")
-        self.assertNotIn("capability_agent", decision.agents)
-        self.assertIn("matching skill", decision.speak_first or "")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "semantic_capability_planning")
+        self.assertIn("capability_agent", decision.agents)
+        self.assertIn("safety_agent", decision.agents)
+        self.assertIsNone(decision.speak_first)
         self.assertEqual(
             decision.metadata["desired_abilities"][0]["status"],
-            "missing_ability",
+            "semantic_planning_required",
         )
         self.assertEqual(
             decision.metadata["capability_grounding"]["status"],
-            "missing_capability",
+            "unresolved_requires_planner",
+        )
+        self.assertEqual(
+            decision.metadata["router_semantic_handoff"]["authority"],
+            "advisory",
         )
 
 

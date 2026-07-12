@@ -22,11 +22,28 @@ class AgentServices:
     use_llm: bool = True
     max_speak_chars: int = 120
     expressive_body_cues: str = "off"
+    social_attention_mode: str = ""
+    social_attention_ollama: OllamaClient | None = None
+    social_attention_num_ctx: int = 4096
+    social_attention_num_predict: int = 160
+    social_attention_max_behaviors: int = 2
+    social_attention_wait_after_response_ms: int = 150
+    social_attention_capability_ids: tuple[str, ...] = ()
+    social_attention_fallback_target: str = "none"
+    social_attention_fallback_direction: str | None = None
+    social_attention_fallback_yaw_rad: float | None = None
+    social_attention_fallback_confidence: float = 0.0
     require_capability_plan_review: bool = False
     task_graph_planner: "TaskGraphPlanner | None" = None
     capability_catalog: "CapabilityCatalog | None" = None
     capability_match_limit: int = 8
     weather_client: Any | None = None
+
+    def effective_social_attention_mode(self) -> str:
+        raw = (self.social_attention_mode or self.expressive_body_cues or "off").strip().lower()
+        if raw not in {"off", "report_only", "sim_only", "on"}:
+            return "off"
+        return raw
 
 
 logger = logging.getLogger("chromie.agent.base")
@@ -73,6 +90,50 @@ class BaseAgent(ABC):
         compact = json.dumps(mind, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         if len(compact) > 1600:
             compact = compact[:1600].rstrip() + "..."
+        return compact
+
+    def self_model_context(self, request: AgentRunRequest) -> dict[str, Any]:
+        mind = self.mind_context(request)
+        self_model = mind.get("self_model") if isinstance(mind, dict) else None
+        if isinstance(self_model, dict):
+            return self_model
+        identity = mind.get("identity") if isinstance(mind, dict) else None
+        if not isinstance(identity, dict):
+            return {}
+        entity_id = str(identity.get("entity_id") or identity.get("name") or "chromie")
+        name = str(identity.get("name") or "Chromie")
+        return {
+            "speaker_entity": {
+                "entity_id": entity_id,
+                "name": name,
+                "gender": identity.get("gender"),
+                "pronouns": identity.get("pronouns"),
+            },
+            "social_presentation": {
+                "self_reference": name,
+                "presence": "natural, warm, person-like conversational presence",
+                "foreground": ["name", "personality", "current relationship and context"],
+                "background": ["system category", "embodiment category", "age label", "internal architecture"],
+            },
+            "perceiving_entity_id": entity_id,
+            "acting_entity_id": entity_id,
+            "body_owner_entity_id": entity_id,
+            "internal_components": [],
+            "capability_evidence_source": "runtime capability catalog and current provider state",
+        }
+
+    def format_self_model_context(self, request: AgentRunRequest, *, zh: bool) -> str:
+        self_model = self.self_model_context(request)
+        if not self_model:
+            return "无" if zh else "None"
+        compact = json.dumps(
+            self_model,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        if len(compact) > 1800:
+            compact = compact[:1800].rstrip() + "..."
         return compact
 
     async def review_spoken_response(
@@ -253,6 +314,7 @@ class BaseAgent(ABC):
         target_language: str,
     ) -> str:
         del agent_system
+        self_model = self._bounded_json(self.self_model_context(request), 1400)
         task_context = self._bounded_json(self._task_context_from_request(request), 1200)
         extracted_context = self._bounded_text(
             self._extracted_context_summary(request),
@@ -280,6 +342,7 @@ class BaseAgent(ABC):
             f"Target spoken language: {target_language}\n"
             "Use an explicit user-requested output language when the current input or context asks for one; otherwise use the target spoken language.\n"
             f"Current user input: {request.text}\n"
+            f"Self model: {self_model}\n"
             f"Route context: {route_context}\n"
             f"Extracted conversation context: {extracted_context}\n"
             f"Task context: {task_context}\n"
@@ -306,13 +369,12 @@ class BaseAgent(ABC):
             "This single reviewer prompt is multilingual; understand Chinese and English input, but return JSON only. "
             "Preserve the generalization-first principle: judge normal response quality from semantics, context, and capability boundaries, not from phrase-rule tables. "
             "Accept the candidate when it naturally answers the user, asks a necessary clarification, "
-            "uses the supplied context, and speaks as Chromie the robot herself. "
+            "uses the supplied context, and keeps first-person speech consistent with the supplied Self model. "
             "Revise the candidate when it is empty, only one incomplete word, visibly truncated, "
             "or too fragmentary to play as speech. "
             "Revise the candidate when it is an empty promise, fails to actually perform a harmless requested "
-            "creative response, ignores available context, describes Chromie as a backend/model/provider, "
-            "program, programme, software, code, or model process, "
-            "uses a model-style refusal where Chromie should answer normally, or mainly repeats, quotes, "
+            "creative response, ignores available context, assigns first-person speaker or body ownership to an internal component, "
+            "uses a component-style refusal where the speaking entity should answer normally, or mainly repeats, quotes, "
             "or paraphrases the user's current words instead of directly answering. "
             "Revise the candidate when it falsely says Chromie cannot perform a body/tool ability that the supplied capability context shows as available. "
             "Revise the candidate when it claims Chromie will now execute movement, body action, or a tool side effect while Route context is chat or clarify and no executable action route is present. "

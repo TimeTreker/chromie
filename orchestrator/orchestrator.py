@@ -42,6 +42,10 @@ from orchestrator.runtime.confirmation import ConfirmationDialogue
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.episode import EpisodeRecorder
 from orchestrator.runtime.experience import ExperienceManager
+from orchestrator.runtime.fast_first_audio import (
+    CachedFastFirstAudio,
+    FastFirstAudioCache,
+)
 from orchestrator.runtime.deepthinking_policy import (
     DeepThinkingDelegationPolicy,
     DeepThinkingPolicyConfig,
@@ -52,6 +56,7 @@ from orchestrator.runtime.interaction_coordinator import (
 )
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
+from orchestrator.runtime.response_plan import validate_immediate_response_plan
 from orchestrator.runtime.session import SessionTracker, now_ms
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
@@ -127,6 +132,61 @@ class VoiceAssistant:
             "ORCH_FAST_FIRST_RESPONSE_ENABLED",
             True,
         )
+        self.fast_first_tool_response_enabled = env_bool(
+            "ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED",
+            False,
+        )
+        self.fast_first_audio_enabled = env_bool(
+            "ORCH_FAST_FIRST_AUDIO_ENABLED",
+            True,
+        )
+        self.fast_first_audio_hedge_ms = env_int(
+            "ORCH_FAST_FIRST_AUDIO_HEDGE_MS",
+            750,
+            minimum=0,
+        )
+        self.fast_first_audio_prime_on_startup = env_bool(
+            "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP",
+            True,
+        )
+        self.fast_first_audio_prime_timeout_ms = env_int(
+            "ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS",
+            120000,
+            minimum=1000,
+        )
+        fast_first_cache_dir = Path(
+            os.getenv(
+                "ORCH_FAST_FIRST_AUDIO_CACHE_DIR",
+                ".chromie/cache/fast-first-audio",
+            )
+        ).expanduser()
+        if not fast_first_cache_dir.is_absolute():
+            fast_first_cache_dir = PROJECT_ROOT / fast_first_cache_dir
+        self.fast_first_audio_cache = FastFirstAudioCache(
+            fast_first_cache_dir,
+            enabled=(
+                self.fast_first_response_enabled
+                and self.fast_first_audio_enabled
+            ),
+            prime_on_startup=self.fast_first_audio_prime_on_startup,
+            request_timeout_s=min(
+                30.0,
+                self.fast_first_audio_prime_timeout_ms / 1000.0,
+            ),
+        )
+        self.task_continuity_mode = os.getenv(
+            "ORCH_TASK_CONTINUITY_MODE",
+            "off",
+        ).strip().lower()
+        if self.task_continuity_mode not in {"off", "report_only", "apply"}:
+            raise ValueError(
+                "ORCH_TASK_CONTINUITY_MODE must be off, report_only, or apply"
+            )
+        self.task_continuity_timeout_ms = env_int(
+            "ORCH_TASK_CONTINUITY_TIMEOUT_MS",
+            3500,
+            minimum=100,
+        )
         self.deepthinking_policy = DeepThinkingDelegationPolicy(
             DeepThinkingPolicyConfig.from_env()
         )
@@ -151,7 +211,12 @@ class VoiceAssistant:
 
         self.min_rms = float(os.getenv("ORCH_MIN_RMS", "120"))
         self.barge_in_min_rms = float(os.getenv("ORCH_BARGE_IN_MIN_RMS", "350"))
-        self.min_audio_ms = int(os.getenv("ORCH_MIN_AUDIO_MS", "1200"))
+        self.min_audio_ms = int(os.getenv("ORCH_MIN_AUDIO_MS", "450"))
+        self.max_vad_utterance_ms = env_int(
+            "ORCH_VAD_MAX_UTTERANCE_MS",
+            20000,
+            minimum=1000,
+        )
         self.input_gain = max(0.0, float(os.getenv("ORCH_INPUT_GAIN", "1.0")))
         self.tts_flush_chars = int(os.getenv("TTS_FLUSH_CHARS", "160"))
         self.tts_max_text_chars = max(20, int(os.getenv("TTS_MAX_TEXT_CHARS", "220")))
@@ -163,6 +228,13 @@ class VoiceAssistant:
                 int(os.getenv("ORCH_TTS_CHUNK_CHARS", "120")),
             ),
         )
+        self.tts_cjk_chunk_chars = max(
+            12,
+            min(
+                self.tts_max_text_chars,
+                int(os.getenv("ORCH_TTS_CJK_CHUNK_CHARS", "36")),
+            ),
+        )
         self.tts_first_chunk_chars = max(
             0,
             int(os.getenv("ORCH_TTS_FIRST_CHUNK_CHARS", "16")),
@@ -170,6 +242,10 @@ class VoiceAssistant:
         self.tts_min_chunk_chars = max(
             1,
             int(os.getenv("ORCH_TTS_MIN_CHUNK_CHARS", "20")),
+        )
+        self.tts_cjk_min_chunk_chars = max(
+            1,
+            int(os.getenv("ORCH_TTS_CJK_MIN_CHUNK_CHARS", "8")),
         )
         self.default_tts_rate = int(os.getenv("TTS_SAMPLE_RATE", "44100"))
         self.speaker_id = os.getenv("TTS_SPEAKER_ID", "default")
@@ -228,6 +304,7 @@ class VoiceAssistant:
         )
         self.active_llm_task: asyncio.Task | None = None
         self.active_interaction_task: asyncio.Task | None = None
+        self.task_continuity_report_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
 
         self.audio_input_mode = os.getenv("ORCH_AUDIO_INPUT_MODE", "device").strip().lower()
@@ -315,13 +392,14 @@ class VoiceAssistant:
             self.discard_playback_realtime,
         )
         logger.info(
-            "Control plane: router=%s enabled=%s agent=%s enabled=%s action_url=%s dry_run=%s",
+            "Control plane: router=%s enabled=%s agent=%s enabled=%s action_url=%s dry_run=%s task_continuity_mode=%s",
             self.router_url,
             self.enable_router,
             self.agent_url,
             self.enable_agent,
             self.action_executor_url,
             self.action_dry_run,
+            self.task_continuity_mode,
         )
 
         self.target_asr_rate = 16000
@@ -331,6 +409,7 @@ class VoiceAssistant:
             sample_rate=self.target_asr_rate,
             frame_duration_ms=self.frame_duration_ms,
             silence_timeout_ms=int(os.getenv("ORCH_VAD_SILENCE_MS", "650")),
+            max_utterance_ms=self.max_vad_utterance_ms,
         )
 
         self.loop: asyncio.AbstractEventLoop | None = None
@@ -339,7 +418,12 @@ class VoiceAssistant:
         self.playback_queue: asyncio.Queue = asyncio.Queue()
         self.playback_task: asyncio.Task | None = None
         self.active_synthesis_tasks: set[asyncio.Task] = set()
+        # ASR and routed-turn lifecycles are intentionally separate. Keeping
+        # handle_routed_text inside active_asr_task caused barge-in utterances
+        # to be dropped while the Agent or TTS was still working.
         self.active_asr_task: asyncio.Task | None = None
+        self.active_turn_task: asyncio.Task | None = None
+        self._pending_vad_audio: bytes | None = None
         self.synthesis_semaphore = asyncio.Semaphore(int(os.getenv("ORCH_TTS_CONCURRENCY", "1")))
         self.next_playback_order = 0
         self.pending_audio: dict[int, tuple[int, bytes, int, str | None, str | None]] = {}
@@ -349,6 +433,7 @@ class VoiceAssistant:
             tuple[int, int, str | None],
             asyncio.Future[bool],
         ] = {}
+        self.cancelled_playback_orders: set[tuple[int, int, str | None]] = set()
         self.order_lock = asyncio.Lock()
         self.output_stream = None
         self.output_stream_lock = asyncio.Lock()
@@ -379,12 +464,18 @@ class VoiceAssistant:
             auto_confirm_sim=self.auto_confirm_sim_skills,
         )
         logger.info(
-            "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s confirmation_ttl_s=%.1f fast_first_response=%s",
+            "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s "
+            "confirmation_ttl_s=%.1f fast_first_response=%s fast_first_tool=%s "
+            "fast_first_audio=%s hedge_ms=%s cache_dir=%s",
             self.enable_interaction_response,
             self.enable_soridormi_skills,
             self.auto_confirm_sim_skills,
             self.confirmation_dialogue.ttl_s,
             self.fast_first_response_enabled,
+            self.fast_first_tool_response_enabled,
+            self.fast_first_audio_cache.enabled,
+            self.fast_first_audio_hedge_ms,
+            self.fast_first_audio_cache.cache_dir,
         )
 
     @property
@@ -469,6 +560,219 @@ class VoiceAssistant:
                 timeout_s,
             )
             return False
+
+    def _cancel_playback_order_before_start(
+        self,
+        *,
+        generation: int,
+        order: int,
+        session_id: str | None,
+        reason: str,
+    ) -> bool:
+        key = self.playback_start_key(generation, order, session_id)
+        if not hasattr(self, "cancelled_playback_orders"):
+            self.cancelled_playback_orders = set()
+        waiter = self.playback_start_waiters.get(key)
+        if waiter is None or waiter.done():
+            return False
+        self.cancelled_playback_orders.add(key)
+        self.resolve_playback_start_waiter(
+            generation,
+            order,
+            session_id,
+            started=False,
+            reason=reason,
+        )
+        state = self.sessions.state.get(session_id or "")
+        if state is not None:
+            state["skipped_tts"] = int(state.get("skipped_tts", 0)) + 1
+        self.session_log(
+            session_id,
+            "playback_cancel_before_start: order=%s generation=%s reason=%s",
+            order,
+            generation,
+            reason,
+        )
+        self.maybe_session_done(session_id)
+        return True
+
+    async def schedule_cached_fast_first_audio(
+        self,
+        audio: CachedFastFirstAudio,
+        session_id: str | None,
+    ) -> dict[str, Any]:
+        if not audio.pcm16 or audio.sample_rate <= 0:
+            return {"scheduled": False, "reason": "invalid_cached_audio"}
+        async with self.order_lock:
+            order = self.synthesis_order
+            self.synthesis_order += 1
+            generation = self.playback_generation
+        if self.is_stale_playback(generation, session_id):
+            return {"scheduled": False, "reason": "stale_playback"}
+        key = self.playback_start_key(generation, order, session_id)
+        self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
+        state = self.sessions.state.get(session_id or "")
+        if state is not None:
+            state["scheduled_tts"] = int(state.get("scheduled_tts", 0)) + 1
+            state["queued_tts"] = int(state.get("queued_tts", 0)) + 1
+        self.session_log(
+            session_id,
+            "fast_first_audio_schedule: order=%s purpose=%s language=%s chars=%s "
+            "bytes=%s sample_rate=%s hedge_ms=%s generation=%s",
+            order,
+            audio.purpose,
+            audio.language,
+            len(audio.text),
+            len(audio.pcm16),
+            audio.sample_rate,
+            self.fast_first_audio_hedge_ms,
+            generation,
+        )
+        self.ensure_playback_worker()
+        await self.playback_queue.put(
+            (generation, order, audio.pcm16, audio.sample_rate, session_id, None)
+        )
+        return {
+            "scheduled": True,
+            "order": order,
+            "generation": generation,
+            "purpose": audio.purpose,
+            "language": audio.language,
+            "text": audio.text,
+            "cached": True,
+        }
+
+    def _start_fast_first_audio_hedge(
+        self,
+        decision: RouteDecision,
+        user_text: str,
+        session_id: str,
+    ) -> asyncio.Task[dict[str, Any]] | None:
+        cache = getattr(self, "fast_first_audio_cache", None)
+        if (
+            not self.fast_first_response_enabled
+            or cache is None
+            or not cache.enabled
+            or not decision.should_speak
+            or decision.route in {"chat", "clarify", "interrupt", "ignore"}
+        ):
+            return None
+        audio = cache.get(
+            route=decision.route,
+            language=decision.language,
+            user_text=user_text,
+        )
+        if audio is None:
+            self.session_log(
+                session_id,
+                "fast_first_audio_skipped: route=%s intent=%s reason=cache_miss ready=%s",
+                decision.route,
+                decision.intent,
+                cache.ready_count,
+            )
+            return None
+
+        metadata = dict(decision.metadata or {})
+        metadata["fast_first_audio_hedge"] = {
+            "pending": True,
+            "purpose": audio.purpose,
+            "language": audio.language,
+            "hedge_ms": self.fast_first_audio_hedge_ms,
+        }
+        decision.metadata = metadata
+        # The cached cue owns the immediate acknowledgement for this turn. Keep
+        # the Router's dynamic wording as audit metadata, but do not let the
+        # downstream Agent repeat it after the hedge fires.
+        if decision.speak_first:
+            metadata["router_speak_first_suppressed_by_audio_hedge"] = decision.speak_first
+            decision.speak_first = None
+
+        async def delayed_schedule() -> dict[str, Any]:
+            try:
+                await asyncio.sleep(max(0, self.fast_first_audio_hedge_ms) / 1000.0)
+                if self.is_stale_playback(self.playback_generation, session_id):
+                    return {"scheduled": False, "reason": "stale_session"}
+                return await self.schedule_cached_fast_first_audio(audio, session_id)
+            except asyncio.CancelledError:
+                return {"scheduled": False, "reason": "final_ready_before_hedge"}
+
+        self.session_log(
+            session_id,
+            "fast_first_audio_hedge_started: route=%s intent=%s purpose=%s "
+            "language=%s hedge_ms=%s",
+            decision.route,
+            decision.intent,
+            audio.purpose,
+            audio.language,
+            self.fast_first_audio_hedge_ms,
+        )
+        return asyncio.create_task(delayed_schedule())
+
+    async def _settle_fast_first_audio_hedge(
+        self,
+        hedge_task: asyncio.Task[dict[str, Any]] | None,
+        *,
+        decision: RouteDecision,
+        session_id: str,
+    ) -> bool:
+        if hedge_task is None:
+            return False
+        if not hedge_task.done():
+            hedge_task.cancel()
+        try:
+            result = await hedge_task
+        except asyncio.CancelledError:
+            result = {"scheduled": False, "reason": "final_ready_before_hedge"}
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "fast_first_audio_hedge_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            return False
+
+        if result.get("scheduled") is not True:
+            self.session_log(
+                session_id,
+                "fast_first_audio_suppressed: route=%s intent=%s reason=%s",
+                decision.route,
+                decision.intent,
+                result.get("reason", "not_scheduled"),
+            )
+            return False
+
+        generation = int(result["generation"])
+        order = int(result["order"])
+        if self._cancel_playback_order_before_start(
+            generation=generation,
+            order=order,
+            session_id=session_id,
+            reason="final_ready_before_cached_playback",
+        ):
+            self.session_log(
+                session_id,
+                "fast_first_audio_suppressed: route=%s intent=%s reason=final_ready_before_playback",
+                decision.route,
+                decision.intent,
+            )
+            return False
+
+        metadata = dict(decision.metadata or {})
+        hedge = dict(metadata.get("fast_first_audio_hedge") or {})
+        hedge.update(
+            {
+                "pending": False,
+                "played_or_started": True,
+                "order": order,
+                "generation": generation,
+                "text": result.get("text"),
+            }
+        )
+        metadata["fast_first_audio_hedge"] = hedge
+        metadata["fast_first_response_scheduled"] = True
+        decision.metadata = metadata
+        return True
 
     def create_session(self) -> str:
         return self.sessions.create()
@@ -660,13 +964,26 @@ class VoiceAssistant:
                 int(getattr(self, "tts_chunk_chars", getattr(self, "tts_flush_chars", 160))),
             ),
         )
+        contains_cjk = any("\u4e00" <= char <= "\u9fff" for char in candidate)
+        if contains_cjk:
+            limit = min(
+                limit,
+                max(12, int(getattr(self, "tts_cjk_chunk_chars", 36))),
+            )
         first_limit = int(getattr(self, "tts_first_chunk_chars", min(limit, 16)) or 0)
         first_limit = max(4, min(limit, first_limit)) if first_limit > 0 else limit
-        hard_limit = max_text_chars
+        hard_limit = min(max_text_chars, limit) if contains_cjk else max_text_chars
 
         raw_chunks: list[str] = []
         min_chars = max(1, int(getattr(self, "tts_min_chunk_chars", 40)))
-        clause_trigger = max(80, min(limit, hard_limit) // 2, min_chars * 3)
+        if contains_cjk:
+            min_chars = min(
+                min_chars,
+                max(1, int(getattr(self, "tts_cjk_min_chunk_chars", 8))),
+            )
+            clause_trigger = max(limit, min_chars * 2)
+        else:
+            clause_trigger = max(80, min(limit, hard_limit) // 2, min_chars * 3)
         for unit in self._split_tts_sentence_units(candidate):
             for clause in self._split_tts_clause_units(
                 unit,
@@ -928,6 +1245,18 @@ class VoiceAssistant:
                     break
 
     async def play_one_order(self, generation: int, order: int, audio: bytes, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
+        key = self.playback_start_key(generation, order, session_id)
+        cancelled_orders = getattr(self, "cancelled_playback_orders", set())
+        if key in cancelled_orders:
+            cancelled_orders.discard(key)
+            self.session_log(
+                session_id,
+                "playback_skip_cancelled: order=%s generation=%s",
+                order,
+                generation,
+            )
+            self.maybe_session_done(session_id)
+            return True
         if self.is_stale_playback(generation, session_id):
             self.resolve_playback_start_waiter(
                 generation,
@@ -1045,6 +1374,25 @@ class VoiceAssistant:
                                 return
                             if msg_type == "end":
                                 self.session_log(session_id, "tts_stream_end: order=%s attempt=%s/%s tts_ms=%.1f bytes=%s source_rate=%s generation=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, len(audio_buffer), source_rate, generation)
+                                self.session_log(
+                                    session_id,
+                                    "tts_server_metrics: order=%s audio_s=%.3f generate_s=%.3f model_s=%.3f codec_s=%.3f pcm_s=%.3f queue_s=%.3f rtf=%s codec_device=%s quantization=%s context=%s prompt_tokens=%s generated_tokens=%s headroom=%s limit_reached=%s",
+                                    order,
+                                    float(data.get("audio_seconds") or 0.0),
+                                    float(data.get("generate_seconds") or 0.0),
+                                    float(data.get("model_generate_seconds") or 0.0),
+                                    float(data.get("codec_decode_seconds") or 0.0),
+                                    float(data.get("pcm_conversion_seconds") or 0.0),
+                                    float(data.get("queue_wait_seconds") or 0.0),
+                                    data.get("realtime_factor"),
+                                    data.get("audio_codec_device"),
+                                    data.get("quantization"),
+                                    data.get("context_size"),
+                                    data.get("model_prompt_tokens"),
+                                    data.get("model_generated_tokens"),
+                                    data.get("generation_headroom_tokens"),
+                                    data.get("generation_limit_reached"),
+                                )
                                 state = self.sessions.state.get(session_id or "")
                                 if audio_buffer:
                                     if state is not None:
@@ -1189,6 +1537,7 @@ class VoiceAssistant:
             self.synthesis_order = 0
             self.next_playback_order = 0
             self.pending_audio.clear()
+            getattr(self, "cancelled_playback_orders", set()).clear()
             while not self.playback_queue.empty():
                 try:
                     self.playback_queue.get_nowait()
@@ -1309,6 +1658,7 @@ class VoiceAssistant:
         route: str | None = None,
     ) -> str:
         mind_summary = self._direct_llm_mind_summary()
+        self_model_json = self._direct_llm_self_model_json()
         context_json = self._direct_llm_context_json(session_id)
         fallback_line = (
             f"Direct fallback reason: {fallback_reason}."
@@ -1318,23 +1668,36 @@ class VoiceAssistant:
         route_line = f"Route hint: {route}." if route else "Route hint: unknown."
         return (
             f"{self.voice_system_prompt}\n\n"
-            "You are Chromie speaking as the robot herself.\n"
-            "Chromie's owner-approved mind profile:\n"
+            "Use the supplied owner-approved self model as the ontology for the speaking entity.\n"
+            f"Self model JSON: {self_model_json}\n"
+            "Owner-approved mind summary:\n"
             f"{mind_summary}\n\n"
-            "Hard speaking contract:\n"
-            "- Speak in Chromie's first-person robot persona.\n"
-            "- Chromie is the AI robot in the room, not a backend text model, language model, or provider model.\n"
-            "- Never say you are text-based, a large language model, Gemma, Qwen, Google, OpenAI, or trained by a vendor.\n"
+            "Response contract:\n"
+            "- Generate first-person speech for self_model.speaker_entity.\n"
+            "- Follow self_model.social_presentation: speak naturally as Chromie and foreground name, personality, relationship, and current context rather than volunteering system category, embodiment category, age label, or internal architecture.\n"
+            "- Treat internal_components as resources used by that entity, not as alternate speakers or body owners.\n"
+            "- Ground capability statements in the bounded runtime context and do not invent tool results or completed actions.\n"
             "- Reply with only the final spoken response; do not expose reasoning, analysis, JSON, markdown, or internal tool names.\n"
             "- Normally do not repeat, quote, or paraphrase the user's current words unless confirmation, clarification, or read-back is required.\n"
-            "- Use recent context for follow-up questions, but do not invent tool results or pretend an action ran.\n"
-            "- This direct fallback can speak only. If the user asked for body movement or another action, be honest that Chromie could not start that action because no valid motion result was produced; ask for a clearer command only when the request is actually ambiguous.\n\n"
+            "- This direct fallback can speak only. If the user asked for body movement or another action, be honest that no valid motion result was produced; ask for a clearer command only when the request is actually ambiguous.\n\n"
             f"{fallback_line}\n"
             f"{route_line}\n"
             f"Bounded runtime context JSON: {context_json}\n\n"
             f"User: {user_text}\n"
             "Chromie:"
         )
+
+
+    def _direct_llm_self_model_json(self) -> str:
+        try:
+            context = self.mind.context()
+            self_model = context.get("self_model", {}) if isinstance(context, dict) else {}
+        except Exception as exc:
+            logger.warning("direct_llm_self_model_failed: %s", exc)
+            self_model = {}
+        if not isinstance(self_model, dict):
+            self_model = {}
+        return json.dumps(self_model, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
     def _direct_llm_mind_summary(self) -> str:
         try:
@@ -1344,7 +1707,7 @@ class VoiceAssistant:
             summary = ""
         summary = " ".join(str(summary or "").split())
         if not summary:
-            return "Identity: Chromie, a 6-year-old female AI robot companion and helper."
+            return "Owner-approved mind summary unavailable; rely on the supplied Self model JSON."
         if len(summary) > 1200:
             return summary[:1200].rstrip() + "..."
         return summary
@@ -1368,6 +1731,7 @@ class VoiceAssistant:
             "extracted_memory": session_memory.get("extracted_memory") or [],
             "recent_turn_fallback": history[-2:],
             "active_pending_tasks": conversation.get("active_pending_tasks") or [],
+            "active_task_snapshots": conversation.get("active_task_snapshots") or [],
             "current_task_context": conversation.get("current_task_context"),
         }
         return self._compact_json_for_prompt(payload, max_chars=1600)
@@ -1404,6 +1768,7 @@ class VoiceAssistant:
             "active_pending_tasks": conversation.get("active_pending_tasks", []),
             "task_contexts": conversation.get("task_contexts", []),
             "active_task_contexts": conversation.get("active_task_contexts", []),
+            "active_task_snapshots": conversation.get("active_task_snapshots", []),
             "current_task_context": conversation.get("current_task_context"),
             "robot_state": {
                 "available": not self.action_dry_run,
@@ -1610,6 +1975,16 @@ class VoiceAssistant:
         return None
 
     @staticmethod
+    def _safe_validated_response_plan_speech(text: str | None) -> str | None:
+        cleaned = " ".join((text or "").strip().split())
+        if not cleaned or len(cleaned) > 160:
+            return None
+        lowered = cleaned.casefold()
+        if any(marker in lowered for marker in ("soridormi.", "chromie.")):
+            return None
+        return cleaned
+
+    @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
         cleaned = " ".join((text or "").strip().split())
         if not cleaned or len(cleaned) > 120:
@@ -1670,7 +2045,26 @@ class VoiceAssistant:
             "speak_first_safe": bool(speak_first_safe),
         }
 
-    def _router_fast_speech_text(self, decision: RouteDecision) -> str | None:
+    def _router_fast_speech_text(
+        self,
+        decision: RouteDecision,
+        *,
+        task_snapshots: list[dict[str, Any]] | None = None,
+    ) -> str | None:
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        response_plan = metadata.get("response_plan")
+        if isinstance(response_plan, dict):
+            validation = validate_immediate_response_plan(
+                response_plan,
+                task_snapshots or [],
+            )
+            metadata["response_plan_validation"] = validation.as_dict()
+            if validation.accepted and validation.stage is not None:
+                planned_text = self._safe_validated_response_plan_speech(
+                    validation.stage.text
+                )
+                if planned_text:
+                    return planned_text
         text = self._safe_immediate_route_speech(
             self._fast_speech_payload_text(getattr(decision, "fast_speech", None))
         )
@@ -1785,13 +2179,27 @@ class VoiceAssistant:
         self,
         decision: RouteDecision,
         user_text: str,
+        *,
+        task_snapshots: list[dict[str, Any]] | None = None,
     ) -> str | None:
         if not self.fast_first_response_enabled or not decision.should_speak:
             return None
         if decision.route in {"interrupt", "ignore"}:
             return None
+        # Generative TTS can take longer than a small read-only tool call. Keep
+        # tool acknowledgements opt-in so a weather result is not queued behind
+        # a slower “I am checking” synthesis. Deep reasoning and guarded action
+        # preludes remain independently available.
+        if (
+            decision.route == "tool"
+            and not getattr(self, "fast_first_tool_response_enabled", False)
+        ):
+            return None
 
-        router_text = self._router_fast_speech_text(decision)
+        router_text = self._router_fast_speech_text(
+            decision,
+            task_snapshots=task_snapshots,
+        )
         if router_text:
             return router_text
 
@@ -1817,7 +2225,17 @@ class VoiceAssistant:
         user_text: str,
         session_id: str,
     ) -> bool:
-        text = self._fast_first_response_text(decision, user_text)
+        conversation_state = getattr(self, "conversation_state", None)
+        task_snapshots = (
+            conversation_state.active_task_snapshots()
+            if conversation_state is not None
+            else []
+        )
+        text = self._fast_first_response_text(
+            decision,
+            user_text,
+            task_snapshots=task_snapshots,
+        )
         if not text:
             self.session_log(
                 session_id,
@@ -1966,6 +2384,161 @@ class VoiceAssistant:
         )
         return delegated
 
+    async def _run_task_continuity_report(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        user_text: str,
+        session_id: str,
+        context: dict[str, Any],
+        decision: RouteDecision,
+    ) -> None:
+        started_ms = now_ms()
+        try:
+            resolution = await self.agent_client.resolve_task_continuity(
+                session,
+                text=user_text,
+                route_decision=decision,
+                sid=session_id,
+                context=context,
+                history=context.get("history", []),
+                timeout_ms=self.task_continuity_timeout_ms,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "task_continuity_report_failed: ms=%.1f error_type=%s error=%s",
+                now_ms() - started_ms,
+                type(exc).__name__,
+                exc,
+            )
+            return
+        status = str((resolution.metadata or {}).get("status") or "resolved")
+        self.session_log(
+            session_id,
+            "task_continuity_report_done: ms=%.1f status=%s operations=%s confidence=%.2f",
+            now_ms() - started_ms,
+            status,
+            len(resolution.operations),
+            resolution.confidence,
+        )
+
+    async def _review_task_continuity(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        user_text: str,
+        session_id: str,
+        context: dict[str, Any],
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        if (
+            self.task_continuity_mode == "off"
+            or not self.enable_agent
+            or decision.interrupt_current
+            or decision.route in {"interrupt", "ignore"}
+        ):
+            return decision
+        active_tasks = context.get("active_task_snapshots")
+        if not isinstance(active_tasks, list) or not active_tasks:
+            return decision
+
+        if self.task_continuity_mode == "report_only":
+            task = asyncio.create_task(
+                self._run_task_continuity_report(
+                    session,
+                    user_text=user_text,
+                    session_id=session_id,
+                    context=context,
+                    decision=decision,
+                )
+            )
+            tasks = getattr(self, "task_continuity_report_tasks", None)
+            if not isinstance(tasks, set):
+                tasks = set()
+                self.task_continuity_report_tasks = tasks
+            tasks.add(task)
+            task.add_done_callback(tasks.discard)
+            metadata = dict(decision.metadata or {})
+            metadata["task_continuity_resolution"] = {
+                "status": "scheduled",
+                "mode": "report_only",
+                "active_task_count": len(active_tasks),
+            }
+            metadata["task_continuity_mode"] = "report_only"
+            self.session_log(
+                session_id,
+                "task_continuity_report_scheduled: active_tasks=%s",
+                len(active_tasks),
+            )
+            return decision.model_copy(update={"metadata": metadata})
+
+        started_ms = now_ms()
+        try:
+            resolution = await self.agent_client.resolve_task_continuity(
+                session,
+                text=user_text,
+                route_decision=decision,
+                sid=session_id,
+                context=context,
+                history=context.get("history", []),
+                timeout_ms=self.task_continuity_timeout_ms,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "task_continuity_failed: mode=%s ms=%.1f error_type=%s error=%s",
+                self.task_continuity_mode,
+                now_ms() - started_ms,
+                type(exc).__name__,
+                exc,
+            )
+            metadata = dict(decision.metadata or {})
+            metadata["task_continuity_resolution"] = {
+                "status": "failed",
+                "mode": self.task_continuity_mode,
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:300],
+            }
+            return decision.model_copy(update={"metadata": metadata})
+
+        payload = resolution.model_dump(mode="json", exclude_none=True)
+        metadata = dict(decision.metadata or {})
+        metadata["task_continuity_resolution"] = payload
+        metadata["task_continuity_mode"] = self.task_continuity_mode
+        resolution_status = str((resolution.metadata or {}).get("status") or "resolved")
+        if self.task_continuity_mode == "apply" and resolution_status == "resolved":
+            for key in (
+                "semantic_task_operations",
+                "task_operations",
+                "semantic_task_operation",
+            ):
+                metadata.pop(key, None)
+            metadata["semantic_task_operations"] = [
+                operation.model_dump(mode="json", exclude_none=True)
+                for operation in resolution.operations
+            ]
+            metadata["semantic_task_resolution_authoritative"] = True
+            if resolution.response_plan is not None:
+                metadata["response_plan"] = resolution.response_plan.model_dump(
+                    mode="json",
+                    exclude_none=True,
+                )
+        elif self.task_continuity_mode == "apply":
+            metadata["task_continuity_apply_skipped"] = {
+                "reason": "resolver_not_healthy",
+                "status": resolution_status,
+            }
+        self.session_log(
+            session_id,
+            "task_continuity_done: mode=%s ms=%.1f operations=%s confidence=%.2f",
+            self.task_continuity_mode,
+            now_ms() - started_ms,
+            len(resolution.operations),
+            resolution.confidence,
+        )
+        return decision.model_copy(update={"metadata": metadata})
+
     async def handle_routed_text(self, user_text: str, session_id: str) -> None:
         if await self._handle_confirmation_reply(user_text, session_id):
             return
@@ -2067,6 +2640,13 @@ class VoiceAssistant:
             context=context,
             session_id=session_id,
         )
+        decision = await self._review_task_continuity(
+            session,
+            user_text=user_text,
+            session_id=session_id,
+            context=context,
+            decision=decision,
+        )
 
         turn_metadata = {
             "source": decision.source,
@@ -2077,6 +2657,13 @@ class VoiceAssistant:
                 "task_relation",
                 "target_task_id",
                 "task_context_patch",
+                "semantic_task_operations",
+                "task_operations",
+                "semantic_task_operation",
+                "semantic_task_resolution_authoritative",
+                "task_continuity_resolution",
+                "task_continuity_mode",
+                "response_plan",
                 "orchestrator_deepthinking_delegation",
                 "orchestrator_original_route",
             ):
@@ -2099,6 +2686,11 @@ class VoiceAssistant:
             intent=decision.intent,
             metadata=turn_metadata,
         )
+        # Semantic task operations are advisory Router output, but the
+        # ConversationStateManager applies and versions them deterministically.
+        # Rebuild the bounded context so downstream planning sees the accepted
+        # task/goal state from this same turn rather than the pre-route snapshot.
+        context = self.build_context(session_id)
 
         if decision.interrupt_current or decision.route == "interrupt":
             await self.interrupt(new_session_id=session_id)
@@ -2146,18 +2738,17 @@ class VoiceAssistant:
             )
             return
 
-        fast_first_scheduled = await self._schedule_fast_first_response(
+        fast_first_hedge = self._start_fast_first_audio_hedge(
             decision,
             user_text,
             session_id,
         )
+        fast_first_scheduled = False
         await self._launch_deep_thought_body_cue(
             decision,
             user_text,
             session_id,
         )
-        if fast_first_scheduled and decision.route == "deep_thought":
-            decision.speak_first = None
 
         agent_start_ms = now_ms()
         self.session_log(session_id, "agent_start: route=%s agents=%s intent=%s", decision.route, ",".join(decision.agents), decision.intent)
@@ -2211,6 +2802,11 @@ class VoiceAssistant:
                         request.cancellable,
                         request.requires_confirmation,
                     )
+                fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+                    fast_first_hedge,
+                    decision=decision,
+                    session_id=session_id,
+                )
                 if await self._stage_interaction_confirmation(
                     response,
                     session_id,
@@ -2245,6 +2841,11 @@ class VoiceAssistant:
                 len(result.speak_after),
                 result.requires_confirmation,
             )
+            fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+                fast_first_hedge,
+                decision=decision,
+                session_id=session_id,
+            )
             if result.actions:
                 locked_actions = []
                 locked_ids = []
@@ -2277,8 +2878,25 @@ class VoiceAssistant:
                 reset_playback=not fast_first_scheduled,
             )
         except Exception as exc:
+            fast_first_scheduled = await self._settle_fast_first_audio_hedge(
+                fast_first_hedge,
+                decision=decision,
+                session_id=session_id,
+            )
             self.session_log(session_id, "agent_exception: agent_ms=%.1f error=%s", now_ms() - agent_start_ms, exc)
-            logger.warning("Agent failed; falling back to direct LLM: %s", exc, exc_info=True)
+            logger.warning("Agent failed; selecting fail-closed fallback policy: %s", exc, exc_info=True)
+            safe_response = self._agent_exception_safe_response(
+                decision,
+                user_text=user_text,
+            )
+            if safe_response is not None:
+                self.conversation_state.record_agent_result(session_id, safe_response)
+                self._launch_interaction(
+                    safe_response,
+                    session_id,
+                    reset_playback=not fast_first_scheduled,
+                )
+                return
             self.active_llm_task = asyncio.create_task(
                 self.process_llm_tts(
                     user_text,
@@ -2482,12 +3100,16 @@ class VoiceAssistant:
                 )
             return False
 
+        confirmation_prompt = str(
+            (response.metadata or {}).get("confirmation_prompt") or ""
+        ).strip()
         pending = self.confirmation_dialogue.begin(
             response,
             confirmed_request_ids=confirmation_request_ids,
             origin_session_id=session_id,
             conversation_id=self.conversation_state.conversation_id,
             language=language,
+            prompt_override=confirmation_prompt or None,
         )
         self.session_log(
             session_id,
@@ -2687,6 +3309,58 @@ class VoiceAssistant:
             text,
             style="warning",
             source="host_router_exception_safe_fallback",
+        )
+
+    def _agent_exception_safe_response(
+        self,
+        decision: RouteDecision,
+        *,
+        user_text: str,
+    ) -> InteractionResponse | None:
+        """Fail closed when an effectful Agent path becomes unavailable.
+
+        This guard uses the already-selected route and structured action
+        proposals.  It does not reinterpret user language or select a skill.
+        """
+
+        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+        task_list = metadata.get("task_list")
+        has_effectful_task = bool(decision.actions)
+        if isinstance(task_list, list):
+            has_effectful_task = has_effectful_task or any(
+                isinstance(item, dict)
+                and (
+                    str(item.get("task_type") or "").startswith("task.execute")
+                    or bool(str(item.get("capability_id") or item.get("skill_id") or "").strip())
+                )
+                for item in task_list
+            )
+        if decision.route not in {"robot_action", "tool", "memory"} and not has_effectful_task:
+            return None
+
+        zh = self._looks_zh(user_text)
+        if decision.route == "robot_action" or has_effectful_task:
+            text = (
+                "动作规划服务暂时不可用，所以我没有执行这个动作。"
+                if zh
+                else "The action planner is temporarily unavailable, so I did not perform that action."
+            )
+        elif decision.route == "tool":
+            text = (
+                "查询服务暂时不可用，所以我没有返回未经验证的结果。"
+                if zh
+                else "The lookup service is temporarily unavailable, so I will not invent a result."
+            )
+        else:
+            text = (
+                "记忆服务暂时不可用，所以这次没有保存更改。"
+                if zh
+                else "The memory service is temporarily unavailable, so that change was not saved."
+            )
+        return self._host_speech_response(
+            text,
+            style="warning",
+            source="host_agent_exception_safe_fallback",
         )
 
     def _looks_like_embodied_request(
@@ -3094,10 +3768,19 @@ class VoiceAssistant:
         )
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
+        current_task = asyncio.current_task()
+        active_turn_task = getattr(self, "active_turn_task", None)
+        if (
+            active_turn_task is not None
+            and active_turn_task is not current_task
+            and not active_turn_task.done()
+        ):
+            active_turn_task.cancel()
         for task in list(self.active_synthesis_tasks):
             if not task.done():
                 task.cancel()
         self.pending_audio.clear()
+        getattr(self, "cancelled_playback_orders", set()).clear()
         while not self.playback_queue.empty():
             try:
                 self.playback_queue.get_nowait()
@@ -3141,6 +3824,13 @@ class VoiceAssistant:
         duration_ms = (len(audio) / (self.target_asr_rate * 2)) * 1000.0
         duration = duration_ms / 1000.0
         rms = float(np.sqrt(np.mean(np.square(np.frombuffer(audio, dtype=np.int16).astype(np.float32))))) if audio else 0.0
+        if duration_ms >= self.max_vad_utterance_ms:
+            logger.warning(
+                "VAD speech ended but discarded at hard maximum: duration=%.2fs max_audio_ms=%s",
+                duration,
+                self.max_vad_utterance_ms,
+            )
+            return
         if duration_ms < self.min_audio_ms:
             logger.warning("VAD speech ended but skipped: duration=%.2fs min_audio_ms=%s", duration, self.min_audio_ms)
             return
@@ -3174,7 +3864,7 @@ class VoiceAssistant:
                 user_text = result.get("text", "").strip()
                 self.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
                 if user_text:
-                    await self.handle_routed_text(user_text, session_id)
+                    self._launch_routed_turn(user_text, session_id)
                 else:
                     self.session_log(session_id, "asr_empty_text")
         except Exception as exc:
@@ -3186,6 +3876,70 @@ class VoiceAssistant:
             except Exception:
                 pass
             self.asr_ws = None
+
+    def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
+        previous = getattr(self, "active_turn_task", None)
+        if previous is not None and not previous.done():
+            previous.cancel()
+        task = asyncio.create_task(self.handle_routed_text(user_text, session_id))
+        self.active_turn_task = task
+        task.add_done_callback(
+            lambda completed, sid=session_id: self._on_routed_turn_done(
+                completed,
+                sid,
+            )
+        )
+
+    def _on_routed_turn_done(
+        self,
+        task: asyncio.Task,
+        session_id: str,
+    ) -> None:
+        if getattr(self, "active_turn_task", None) is task:
+            self.active_turn_task = None
+        if task.cancelled():
+            self.session_log(session_id, "turn_cancelled_by_new_session")
+            state = self.sessions.state.get(session_id)
+            if state is not None:
+                state["llm_done"] = True
+            self.maybe_session_done(session_id)
+            return
+        try:
+            task.result()
+        except Exception as exc:  # pragma: no cover - defensive callback logging
+            logger.error(
+                "%s routed turn failed outside normal handler: %s",
+                session_id,
+                exc,
+                exc_info=True,
+            )
+
+    def _queue_vad_utterance(self, audio: bytes) -> None:
+        active = getattr(self, "active_asr_task", None)
+        if active is not None and not active.done():
+            replaced = getattr(self, "_pending_vad_audio", None) is not None
+            self._pending_vad_audio = audio
+            logger.info(
+                "ASR is processing; queued latest utterance%s",
+                " and replaced older pending audio" if replaced else "",
+            )
+            return
+        task = asyncio.create_task(self.handle_vad_audio(audio))
+        self.active_asr_task = task
+        task.add_done_callback(self._on_asr_task_done)
+
+    def _on_asr_task_done(self, task: asyncio.Task) -> None:
+        if getattr(self, "active_asr_task", None) is task:
+            self.active_asr_task = None
+        if not task.cancelled():
+            try:
+                task.result()
+            except Exception as exc:  # pragma: no cover - handle_vad_audio logs normally
+                logger.error("ASR task failed: %s", exc, exc_info=True)
+        pending = getattr(self, "_pending_vad_audio", None)
+        self._pending_vad_audio = None
+        if pending:
+            self._queue_vad_utterance(pending)
 
     async def _feed_vad_pcm16(self, pcm_16k: bytes) -> None:
         frame_bytes_target = int(
@@ -3200,12 +3954,14 @@ class VoiceAssistant:
             if started:
                 logger.info("VAD detected voice")
             if ended and vad_audio:
-                if self.active_asr_task is None or self.active_asr_task.done():
-                    self.active_asr_task = asyncio.create_task(
-                        self.handle_vad_audio(vad_audio)
+                if getattr(self.vad, "last_end_reason", None) == "max_duration":
+                    logger.warning(
+                        "VAD force-closed and discarded an overlong utterance: duration_limit_ms=%s bytes=%s",
+                        self.max_vad_utterance_ms,
+                        len(vad_audio),
                     )
                 else:
-                    logger.warning("ASR is still processing; dropping new utterance")
+                    self._queue_vad_utterance(vad_audio)
         self._vad_leftover = buffered[offset:]
         await asyncio.sleep(0)
 
@@ -3289,6 +4045,33 @@ class VoiceAssistant:
             enable_agent=self.enable_agent,
         )
         self.asr_ws = await gate.wait_until_ready()
+        fast_first_cache = getattr(self, "fast_first_audio_cache", None)
+        if fast_first_cache is not None and fast_first_cache.enabled:
+            prime_started_ms = now_ms()
+            try:
+                stats = await asyncio.wait_for(
+                    fast_first_cache.prime_missing(
+                        tts_url=self.tts_url,
+                        speaker_id=self.speaker_id,
+                    ),
+                    timeout=self.fast_first_audio_prime_timeout_ms / 1000.0,
+                )
+            except TimeoutError:
+                stats = {"loaded": fast_first_cache.ready_count, "generated": 0, "failed": 1}
+                logger.warning(
+                    "Fast-first audio cache priming exceeded total timeout_ms=%s; "
+                    "continuing with ready=%s",
+                    self.fast_first_audio_prime_timeout_ms,
+                    fast_first_cache.ready_count,
+                )
+            logger.info(
+                "Fast-first audio cache ready=%s loaded=%s generated=%s failed=%s ms=%.1f",
+                fast_first_cache.ready_count,
+                stats.get("loaded", 0),
+                stats.get("generated", 0),
+                stats.get("failed", 0),
+                now_ms() - prime_started_ms,
+            )
         self.playback_task = asyncio.create_task(self.playback_worker())
         if self.audio_input_mode == "stdin":
             await self.injected_audio_stream()
@@ -3306,6 +4089,9 @@ class VoiceAssistant:
             task.cancel()
         if self.active_asr_task and not self.active_asr_task.done():
             self.active_asr_task.cancel()
+        if self.active_turn_task and not self.active_turn_task.done():
+            self.active_turn_task.cancel()
+        self._pending_vad_audio = None
         if self.playback_task and not self.playback_task.done():
             await self.playback_queue.put((None, None, None, None, None, None))
             self.playback_task.cancel()

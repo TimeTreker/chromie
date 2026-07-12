@@ -21,15 +21,17 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         router_cases = load_scenarios(suites={"router"})
         adapter_cases = load_scenarios(suites={"adapter"})
         dialogue_cases = load_scenarios(suites={"dialogue"})
+        router_dialogue_cases = load_scenarios(suites={"router_dialogue"})
         selected = load_scenarios(only={"router/normal_greeting"})
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 353)
+        self.assertEqual(len(all_cases), 369)
         self.assertEqual(len(adapter_cases), 4)
-        self.assertEqual(len(router_cases), 17)
-        self.assertEqual(len(dialogue_cases), 316)
-        self.assertEqual(len(load_scenarios(suites={"interaction"})), 16)
+        self.assertEqual(len(router_cases), 23)
+        self.assertEqual(len(router_dialogue_cases), 2)
+        self.assertEqual(len(dialogue_cases), 319)
+        self.assertEqual(len(load_scenarios(suites={"interaction"})), 21)
         self.assertIn("dialogue/walk_then_followup_status", dialogue_keys)
         self.assertIn("dialogue/raw_joint_command_refusal", dialogue_keys)
         self.assertIn("dialogue/batch2_safety_117_walk_into_a_smoky_hallway", dialogue_keys)
@@ -111,6 +113,33 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertEqual([turn["id"] for turn in turns], ["walk_request", "followup_status"])
         self.assertIn("Walk forward slowly.", str(turns[1]["pre_context"]["history"]))
         self.assertIn("soridormi.walk_velocity", str(turns[1]["pre_context"]["session_memory"]))
+
+
+    def test_router_dialogue_replays_weather_then_repeated_walk(self) -> None:
+        scenarios = load_scenarios(
+            only={"router_dialogue/weather_then_repeated_walk_stays_grounded"}
+        )
+
+        report = run_scenarios_sync(scenarios)
+        turns = report["cases"][0]["actual"]["turns"]
+
+        self.assertTrue(report["ok"], report["cases"][0]["errors"])
+        self.assertEqual(
+            [turn["route"]["route"] for turn in turns],
+            ["tool", "robot_action", "robot_action"],
+        )
+        self.assertEqual(
+            turns[1]["llm_stages"],
+            ["quick_intent", "semantic_route_repair"],
+        )
+        self.assertEqual(
+            turns[2]["interaction"]["skills"],
+            ["soridormi.walk_velocity"],
+        )
+        self.assertIn(
+            "What is the weather in Beijing today?",
+            str(turns[1]["pre_context"]["history"]),
+        )
 
     def test_dialogue_scenario_checks_extracted_memory_context(self) -> None:
         scenarios = load_scenarios(only={"dialogue/remember_tea_preference"})

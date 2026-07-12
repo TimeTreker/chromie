@@ -21,6 +21,7 @@ from .interaction import (
     NativeInteractionOutputError,
 )
 from .runtime import AgentRuntime, InteractionRuntime
+from .task_continuity import TaskContinuityResolver
 from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .task_graph import (
     ExecutionTrace,
@@ -40,8 +41,10 @@ from .tool_invocation import McpStreamableHttpInvoker
 
 try:
     from chromie_contracts.interaction import InteractionResponse
+    from chromie_contracts.semantic_task import SemanticTaskOperationSet
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import InteractionResponse
+    from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
 
 
 class Settings(BaseModel):
@@ -70,6 +73,70 @@ class Settings(BaseModel):
     max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "220")))
     expressive_body_cues: Literal["off", "sim_only", "on"] = Field(
         default_factory=lambda: os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "off")
+    )
+    social_attention_mode: Literal["off", "report_only", "sim_only", "on"] = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_SOCIAL_ATTENTION_MODE",
+            os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "off"),
+        )
+    )
+    social_attention_model: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_SOCIAL_ATTENTION_MODEL",
+            os.getenv("ROUTER_MODEL", "qwen3:4b"),
+        )
+    )
+    social_attention_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS", "2500")),
+        ge=100,
+        le=30000,
+    )
+    social_attention_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_NUM_CTX", "4096")),
+        ge=512,
+    )
+    social_attention_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_NUM_PREDICT", "160")),
+        ge=32,
+        le=1024,
+    )
+    social_attention_wait_after_response_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS", "150")),
+        ge=0,
+        le=5000,
+    )
+    social_attention_max_behaviors: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS", "2")),
+        ge=1,
+        le=3,
+    )
+    social_attention_capability_ids: tuple[str, ...] = Field(
+        default_factory=lambda: tuple(
+            item.strip()
+            for item in os.getenv(
+                "AGENT_SOCIAL_ATTENTION_CAPABILITIES",
+                "soridormi.express_attention,soridormi.look_at_person,soridormi.blink_eyes,soridormi.nod_yes",
+            ).split(",")
+            if item.strip()
+        )
+    )
+    social_attention_fallback_target: str = Field(
+        default_factory=lambda: os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET", "none")
+    )
+    social_attention_fallback_direction: str | None = Field(
+        default_factory=lambda: os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION") or None
+    )
+    social_attention_fallback_yaw_rad: float | None = Field(
+        default_factory=lambda: (
+            float(os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD"))
+            if os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD") not in {None, ""}
+            else None
+        )
+    )
+    social_attention_fallback_confidence: float = Field(
+        default_factory=lambda: float(os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_CONFIDENCE", "0.0")),
+        ge=0.0,
+        le=1.0,
     )
     require_capability_plan_review: bool = Field(
         default_factory=lambda: os.getenv("AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW", "1").strip().lower()
@@ -175,6 +242,38 @@ class Settings(BaseModel):
     capability_prompt_tier_overrides: str = Field(
         default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES", "")
     )
+    task_continuity_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_TASK_CONTINUITY_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    task_continuity_model: str = Field(
+        default_factory=lambda: os.getenv("AGENT_TASK_CONTINUITY_MODEL", "qwen3:4b")
+    )
+    task_continuity_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_TIMEOUT_MS", "3000")),
+        ge=100,
+        le=120000,
+    )
+    task_continuity_min_confidence: float = Field(
+        default_factory=lambda: float(os.getenv("AGENT_TASK_CONTINUITY_MIN_CONFIDENCE", "0.65")),
+        ge=0.0,
+        le=1.0,
+    )
+    task_continuity_max_active_tasks: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_MAX_ACTIVE_TASKS", "8")),
+        ge=1,
+        le=32,
+    )
+    task_continuity_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_CTX", "4096")),
+        ge=2048,
+        le=131072,
+    )
+    task_continuity_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_PREDICT", "256")),
+        ge=128,
+        le=4096,
+    )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     mode: Literal["runtime"] = "runtime"
 
@@ -197,6 +296,35 @@ response_reviewer_client = (
         timeout_ms=settings.response_review_timeout_ms,
     )
     if settings.use_llm and settings.response_review_enabled
+    else None
+)
+social_attention_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.social_attention_model,
+        timeout_ms=settings.social_attention_timeout_ms,
+    )
+    if settings.use_llm and settings.social_attention_mode != "off"
+    else None
+)
+task_continuity_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.task_continuity_model,
+        timeout_ms=settings.task_continuity_timeout_ms,
+    )
+    if settings.use_llm and settings.task_continuity_enabled
+    else None
+)
+task_continuity_resolver = (
+    TaskContinuityResolver(
+        task_continuity_client,
+        min_confidence=settings.task_continuity_min_confidence,
+        max_active_tasks=settings.task_continuity_max_active_tasks,
+        num_ctx=settings.task_continuity_num_ctx,
+        num_predict=settings.task_continuity_num_predict,
+    )
+    if task_continuity_client is not None
     else None
 )
 configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
@@ -231,6 +359,17 @@ services = AgentServices(
     use_llm=settings.use_llm,
     max_speak_chars=settings.max_speak_chars,
     expressive_body_cues=settings.expressive_body_cues,
+    social_attention_mode=settings.social_attention_mode,
+    social_attention_ollama=social_attention_client,
+    social_attention_num_ctx=settings.social_attention_num_ctx,
+    social_attention_num_predict=settings.social_attention_num_predict,
+    social_attention_max_behaviors=settings.social_attention_max_behaviors,
+    social_attention_wait_after_response_ms=settings.social_attention_wait_after_response_ms,
+    social_attention_capability_ids=settings.social_attention_capability_ids,
+    social_attention_fallback_target=settings.social_attention_fallback_target,
+    social_attention_fallback_direction=settings.social_attention_fallback_direction,
+    social_attention_fallback_yaw_rad=settings.social_attention_fallback_yaw_rad,
+    social_attention_fallback_confidence=settings.social_attention_fallback_confidence,
     require_capability_plan_review=settings.require_capability_plan_review,
     task_graph_planner=task_graph_planner,
     capability_catalog=capability_catalog,
@@ -347,6 +486,14 @@ async def health() -> HealthResponse:
         native_interaction_fallback_enabled=settings.native_interaction_fallback,
         capability_catalog_enabled=True,
         capability_catalog_version=capability_catalog.version,
+        task_continuity_enabled=task_continuity_resolver is not None,
+        task_continuity_model=(
+            settings.task_continuity_model if task_continuity_resolver is not None else None
+        ),
+        social_attention_mode=settings.social_attention_mode,
+        social_attention_model=(
+            settings.social_attention_model if social_attention_client is not None else None
+        ),
     )
 
 
@@ -361,6 +508,34 @@ async def agents() -> dict:
             "safety_agent": "validates and clamps risky actions",
         },
     }
+
+
+@app.post("/task-continuity", response_model=SemanticTaskOperationSet)
+async def resolve_task_continuity(request: AgentRunRequest) -> SemanticTaskOperationSet:
+    if task_continuity_resolver is None:
+        raise HTTPException(status_code=503, detail="Task continuity resolver is disabled")
+    try:
+        return await task_continuity_resolver.resolve(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - final service-boundary guard
+        logger.exception(
+            "task_continuity_endpoint_degraded sid=%s error_type=%s error=%s",
+            request.sid,
+            type(exc).__name__,
+            exc,
+        )
+        return SemanticTaskOperationSet(
+            confidence=0.0,
+            reason_summary="Task continuity service failed safely; no operation was accepted.",
+            metadata={
+                "resolver": "task_continuity_agent",
+                "status": "service_unavailable",
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:300],
+                "sid": request.sid,
+            },
+        )
 
 
 @app.get("/capabilities")

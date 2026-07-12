@@ -112,14 +112,19 @@ TTS_QUANTIZATION=FP16
 TTS_SAMPLE_RATE=44100
 TTS_CHUNK_MS=120
 TTS_N_GPU_LAYERS=-1
-TTS_CONTEXT_SIZE=4096
-TTS_MAX_LENGTH=4096
+# Profile-specific; RTX 4090 Laptop uses 2048/2048, larger desktop profiles use 4096/4096.
+TTS_CONTEXT_SIZE=2048
+TTS_MAX_LENGTH=2048
 TTS_MAX_TEXT_CHARS=220
 TTS_MIN_TEXT_CHARS=1
 TTS_MAX_CONCURRENT_SYNTHESIS=1
 TTS_WORKER_COUNT=1
 TTS_GENERATION_RETRIES=1
 TTS_RESET_LLAMA_STATE=0
+TTS_AUDIO_CODEC_DEVICE=auto
+TTS_DETAILED_TIMING=1
+TTS_METRICS_WINDOW=20
+GGML_CUDA_DISABLE_GRAPHS=0
 TTS_WORKER_STARTUP_TIMEOUT_SEC=600
 TTS_SPEAKER_ID=default
 ```
@@ -131,6 +136,42 @@ model size requires updating code, tests, the lock, and these operational docs.
 
 The full settings list is in
 [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md).
+
+## Performance diagnostics
+
+OuteTTS uses `ModelConfig.device` for the DAC codec while llama.cpp layer
+offload is controlled separately by `TTS_N_GPU_LAYERS`. `auto` resolves the
+codec to CUDA when Torch can see a GPU. The worker startup payload and health
+response expose the requested, configured, reported, model, parameter, and
+effective codec devices so configuration cannot silently disagree with runtime.
+
+Each successful `end` response includes:
+
+- model-generation time;
+- DAC-decode time;
+- remaining pipeline overhead;
+- PCM conversion time;
+- worker round-trip and queue time;
+- audio duration and generation/audio real-time factor.
+
+Run a repeatable no-playback benchmark with:
+
+```bash
+python scripts/benchmark_tts.py --repeat 2 --warmup 1 \
+  --output .chromie/evidence/tts-benchmark.json
+```
+
+Or include it in GPU verification:
+
+```bash
+RUN_TTS_BENCHMARK=1 ./scripts/verify_tts_gpu.sh
+```
+
+This benchmark measures throughput and time to the first binary PCM frame. The
+current service still returns the first binary frame only after one complete
+TTS request has generated and decoded; host sentence/clause chunking is what
+allows later chunks to overlap earlier playback. The benchmark does not prove
+microphone, speaker, pronunciation, or voice-quality acceptance.
 
 ## Speaker setup and verification
 

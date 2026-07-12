@@ -29,11 +29,12 @@ from agent.app.schema import AgentResult, AgentRunRequest
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from router.app.capability_catalog import CapabilityCatalogResult
+from router.app.llm_router import OllamaLLMRouter
 from router.app.schema import RouteDecision, RouteRequest
 
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
-SUPPORTED_SUITES = {"router", "interaction", "dialogue", "adapter"}
+SUPPORTED_SUITES = {"router", "router_dialogue", "interaction", "dialogue", "adapter"}
 
 
 @dataclass(frozen=True)
@@ -78,12 +79,75 @@ class _RouterLlm:
     def __init__(self, decision: RouteDecision | None) -> None:
         self.decision = decision
         self.calls = 0
+        self.stages: list[str] = []
 
     async def route(self, request: RouteRequest) -> RouteDecision:
         self.calls += 1
+        self.stages.append("quick_intent")
         if self.decision is None:
             raise AssertionError(f"LLM router should not be called for {request.text!r}")
         return self.decision
+
+
+class _ScriptedOllamaRouter(OllamaLLMRouter):
+    """Run the real Router recovery pipeline with deterministic model output.
+
+    This is intentionally closer to a live Router turn than `_RouterLlm`: the
+    quick decision, review, semantic repair, normalization, and validators all
+    run through `OllamaLLMRouter.route()`. Only the external model completion is
+    replaced by a file-backed script.
+    """
+
+    def __init__(self, script: list[dict[str, Any]]) -> None:
+        super().__init__(
+            ollama_url="http://scenario.invalid",
+            model="scenario-fast-router",
+            review_model="scenario-review-router",
+            timeout_ms=1000,
+            review_timeout_ms=1000,
+            confidence_threshold=0.55,
+            slow_review_recovery_enabled=True,
+            num_predict=160,
+        )
+        self.script = [dict(item) for item in script]
+        self.calls = 0
+        self.stages: list[str] = []
+
+    async def _chat_logged(
+        self,
+        payload: dict[str, Any],
+        *,
+        stage: str,
+        request: RouteRequest | None = None,
+    ) -> dict[str, Any]:
+        del payload, request
+        self.calls += 1
+        self.stages.append(stage)
+        if not self.script:
+            raise AssertionError(f"unexpected model stage {stage!r}; script exhausted")
+        item = self.script.pop(0)
+        expected_stage = str(item.get("stage") or "").strip()
+        if expected_stage and expected_stage != stage:
+            raise AssertionError(
+                f"model stage {stage!r}, expected scripted stage {expected_stage!r}"
+            )
+        if item.get("error"):
+            raise RuntimeError(str(item["error"]))
+        if "content" in item:
+            content = str(item.get("content") or "")
+        else:
+            decision = item.get("decision")
+            if not isinstance(decision, dict):
+                raise AssertionError(
+                    f"scripted stage {stage!r} requires decision object or content"
+                )
+            content = json.dumps(decision, ensure_ascii=False, separators=(",", ":"))
+        return {
+            "model": "scenario-model",
+            "message": {"content": content},
+            "done": True,
+            "done_reason": "stop",
+        }
 
 
 class _AgentCatalog:
@@ -127,6 +191,29 @@ class _AgentCatalog:
                     route=str(item.get("route") or "robot_action"),
                     score=float(item.get("score", 0.9)),
                     metadata=dict(item.get("metadata") or {"mode": "sim"}),
+                    can_run_parallel=(
+                        bool(item.get("can_run_parallel"))
+                        if "can_run_parallel" in item
+                        else None
+                    ),
+                    parallel_metadata_declared=any(
+                        key in item
+                        for key in (
+                            "can_run_parallel",
+                            "exclusive_group",
+                            "resource_claims",
+                            "execution_constraints",
+                        )
+                    ),
+                    exclusive_group=(
+                        str(item.get("exclusive_group") or "").strip() or None
+                    ),
+                    resource_claims=[
+                        str(value)
+                        for value in (item.get("resource_claims") or [])
+                        if str(value).strip()
+                    ],
+                    execution_constraints=dict(item.get("execution_constraints") or {}),
                 )
                 for item in self.capabilities
                 if item.get("capability_id")
@@ -134,15 +221,33 @@ class _AgentCatalog:
         )
 
 
+    async def get_capability(self, capability_id: str, **kwargs: Any) -> CapabilityMatch | None:
+        del kwargs
+        result = await self.search("")
+        return next((item for item in result.matches if item.capability_id == capability_id), None)
+
+
 class _AgentOllama:
-    def __init__(self, reply: str | dict[str, Any] | None) -> None:
-        self.reply = reply
+    def __init__(
+        self,
+        reply: str | dict[str, Any] | list[str | dict[str, Any]] | None,
+    ) -> None:
+        self.replies = list(reply) if isinstance(reply, list) else [reply]
+        self.prompts: list[str] = []
+        self.calls = 0
 
     async def generate(self, prompt: str, **kwargs: Any) -> str | dict[str, Any]:
-        del prompt, kwargs
-        if self.reply is None:
+        del kwargs
+        self.prompts.append(prompt)
+        self.calls += 1
+        if not self.replies or self.replies[0] is None:
             raise AssertionError("LLM should not be called for this interaction scenario")
-        return self.reply
+        if len(self.replies) > 1:
+            reply = self.replies.pop(0)
+        else:
+            reply = self.replies[0]
+        assert reply is not None
+        return reply
 
 
 def _tuple_of_strings(value: Any) -> tuple[str, ...]:
@@ -184,11 +289,17 @@ def _text_contains_all(text: str, phrases: tuple[str, ...]) -> bool:
     return all(phrase.lower() in lower or phrase in text for phrase in phrases)
 
 
-def _validate_dialogue_turns(raw_turns: Any, *, path: Path, scenario_id: str) -> tuple[dict[str, Any], ...]:
+def _validate_dialogue_turns(
+    raw_turns: Any,
+    *,
+    path: Path,
+    scenario_id: str,
+    suite: str = "dialogue",
+) -> tuple[dict[str, Any], ...]:
     if not isinstance(raw_turns, list) or not raw_turns:
         raise ValueError(f"{path}: dialogue scenarios require a non-empty turns list")
     turns: list[dict[str, Any]] = []
-    scenario_key = f"dialogue/{scenario_id}"
+    scenario_key = f"{suite}/{scenario_id}"
     for index, item in enumerate(raw_turns):
         if not isinstance(item, dict):
             raise ValueError(f"{path}: turns[{index}] must be an object")
@@ -221,8 +332,13 @@ def load_scenario_file(path: Path) -> BehaviorScenario:
     if not isinstance(stub, dict) or not isinstance(expect, dict):
         raise ValueError(f"{path}: stub and expect must be objects")
 
-    if suite == "dialogue":
-        turns = _validate_dialogue_turns(raw.get("turns"), path=path, scenario_id=scenario_id)
+    if suite in {"dialogue", "router_dialogue"}:
+        turns = _validate_dialogue_turns(
+            raw.get("turns"),
+            path=path,
+            scenario_id=scenario_id,
+            suite=suite,
+        )
         return BehaviorScenario(
             path=path,
             scenario_id=scenario_id,
@@ -351,6 +467,25 @@ def _router_decision_from_stub(scenario: BehaviorScenario) -> RouteDecision | No
     return RouteDecision.model_validate(raw)
 
 
+def _router_script_from_stub(
+    scenario_key: str,
+    stub: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    raw = stub.get("llm_script")
+    if raw is None:
+        return None
+    if not isinstance(raw, list) or not raw:
+        raise ValueError(f"{scenario_key}: stub.llm_script must be a non-empty list")
+    script: list[dict[str, Any]] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"{scenario_key}: stub.llm_script[{index}] must be an object"
+            )
+        script.append(dict(item))
+    return script
+
+
 def _task_types_from_decision(decision: RouteDecision) -> list[str]:
     return [
         str(item.get("task_type") or "")
@@ -369,13 +504,20 @@ def _evaluate_router_expectations(
     *,
     decision: RouteDecision,
     llm_calls: int,
+    llm_stages: list[str] | None = None,
+    expect: dict[str, Any] | None = None,
 ) -> list[str]:
-    expect = scenario.expect
+    expect = expect if isinstance(expect, dict) else scenario.expect
     errors: list[str] = []
     _expect_equal(errors, "route", decision.route, expect.get("route"))
     _expect_equal(errors, "intent", decision.intent, expect.get("intent"))
     _expect_equal(errors, "source", decision.source, expect.get("source"))
     _expect_equal(errors, "llm_calls", llm_calls, expect.get("llm_calls"))
+    expected_stages = _tuple_of_strings(expect.get("llm_stages"))
+    if expected_stages and list(expected_stages) != list(llm_stages or []):
+        errors.append(
+            f"llm_stages={list(llm_stages or [])!r}, expected {list(expected_stages)!r}"
+        )
     _expect_equal(errors, "interrupt_current", decision.interrupt_current, expect.get("interrupt_current"))
     _expect_equal(errors, "should_speak", decision.should_speak, expect.get("should_speak"))
 
@@ -399,31 +541,121 @@ def _evaluate_router_expectations(
     for phrase in _tuple_of_strings(expect.get("metadata_json_forbid")):
         if phrase in metadata_json:
             errors.append(f"metadata JSON contained forbidden phrase {phrase!r}")
+
+    expected_actions = expect.get("actions")
+    if expected_actions is not None:
+        if not isinstance(expected_actions, list):
+            errors.append("expect.actions must be a list")
+        else:
+            actual_actions = list(decision.actions or [])
+            if len(actual_actions) != len(expected_actions):
+                errors.append(
+                    f"actions count={len(actual_actions)}, expected {len(expected_actions)}; "
+                    f"actual={actual_actions!r}"
+                )
+            for index, expected_action in enumerate(expected_actions):
+                if index >= len(actual_actions) or not isinstance(expected_action, dict):
+                    continue
+                actual_action = actual_actions[index]
+                expected_capability = expected_action.get("capability_id")
+                if expected_capability is not None and actual_action.get("capability_id") != expected_capability:
+                    errors.append(
+                        f"actions[{index}].capability_id={actual_action.get('capability_id')!r}, "
+                        f"expected {expected_capability!r}"
+                    )
+                expected_args = expected_action.get("args")
+                if isinstance(expected_args, dict):
+                    actual_args = actual_action.get("args")
+                    if not isinstance(actual_args, dict):
+                        errors.append(f"actions[{index}].args={actual_args!r}, expected object")
+                    else:
+                        for key, value in expected_args.items():
+                            if actual_args.get(key) != value:
+                                errors.append(
+                                    f"actions[{index}].args[{key!r}]={actual_args.get(key)!r}, "
+                                    f"expected {value!r}"
+                                )
     return errors
 
 
-async def evaluate_router_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
+def _scenario_router_from_stub(
+    scenario_key: str,
+    stub: dict[str, Any],
+    *,
+    fallback_decision: RouteDecision | None = None,
+) -> _RouterLlm | _ScriptedOllamaRouter:
+    script = _router_script_from_stub(scenario_key, stub)
+    if script is not None:
+        return _ScriptedOllamaRouter(script)
+    raw_decision = stub.get("llm_decision")
+    if raw_decision is None:
+        return _RouterLlm(fallback_decision)
+    if not isinstance(raw_decision, dict):
+        raise ValueError(f"{scenario_key}: stub.llm_decision must be an object or null")
+    return _RouterLlm(RouteDecision.model_validate(raw_decision))
+
+
+async def _run_router_turn(
+    *,
+    scenario: BehaviorScenario,
+    text: str,
+    language: str | None,
+    context: dict[str, Any] | None,
+    stub: dict[str, Any],
+) -> tuple[RouteDecision, _RouterLlm | _ScriptedOllamaRouter]:
     from router.app import main
 
-    llm = _RouterLlm(_router_decision_from_stub(scenario))
-    mode = str(scenario.stub.get("router_mode") or "hybrid")
+    router = _scenario_router_from_stub(
+        scenario.key,
+        stub,
+        fallback_decision=_router_decision_from_stub(scenario),
+    )
+    mode = str(stub.get("router_mode") or "hybrid")
+    stub_scenario = BehaviorScenario(
+        path=scenario.path,
+        scenario_id=scenario.scenario_id,
+        suite="router",
+        level=scenario.level,
+        text=text,
+        language=language,
+        description=scenario.description,
+        tags=scenario.tags,
+        stub=stub,
+        expect=scenario.expect,
+    )
     with patch.object(main.settings, "mode", mode), patch.object(
         main,
         "capability_catalog",
         _RouterCatalog(
-            _router_catalog_from_stub(scenario),
-            snapshot=_router_snapshot_from_stub(scenario),
+            _router_catalog_from_stub(stub_scenario),
+            snapshot=_router_snapshot_from_stub(stub_scenario),
         ),
-    ), patch.object(main, "llm_router", llm):
+    ), patch.object(main, "llm_router", router):
         decision = await main.route(
-            RouteRequest(text=scenario.text, language=scenario.language)
+            RouteRequest(
+                text=text,
+                language=language,
+                context=dict(context or {}),
+            )
         )
+    return decision, router
+
+
+async def evaluate_router_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
+    decision, router = await _run_router_turn(
+        scenario=scenario,
+        text=scenario.text,
+        language=scenario.language,
+        context={},
+        stub=scenario.stub,
+    )
 
     task_types = _task_types_from_decision(decision)
     errors = _evaluate_router_expectations(
         scenario,
         decision=decision,
-        llm_calls=llm.calls,
+        llm_calls=router.calls,
+        llm_stages=router.stages,
     )
     return {
         "ok": not errors,
@@ -435,7 +667,9 @@ async def evaluate_router_scenario(scenario: BehaviorScenario) -> dict[str, Any]
             "confidence": decision.confidence,
             "interrupt_current": decision.interrupt_current,
             "should_speak": decision.should_speak,
-            "llm_calls": llm.calls,
+            "llm_calls": router.calls,
+            "llm_stages": list(router.stages),
+            "actions": list(decision.actions or []),
             "task_types": task_types,
             "metadata": decision.metadata,
         },
@@ -590,8 +824,13 @@ async def _run_interaction_turn(
     catalog_capabilities = stub.get("catalog_capabilities")
     if catalog_capabilities is not None and not isinstance(catalog_capabilities, list):
         raise ValueError(f"{scenario_key}: stub.catalog_capabilities must be a list")
-    ollama_reply = stub.get("ollama_reply")
-    reviewer_reply = stub.get("reviewer_reply")
+    ollama_reply = stub.get("ollama_replies", stub.get("ollama_reply"))
+    reviewer_reply = stub.get("reviewer_replies", stub.get("reviewer_reply"))
+    social_attention_reply = stub.get(
+        "social_attention_replies",
+        stub.get("social_attention_reply"),
+    )
+    fallback_yaw = stub.get("social_attention_fallback_yaw_rad")
     services = AgentServices(
         ollama=_AgentOllama(ollama_reply),  # type: ignore[arg-type]
         response_reviewer=(
@@ -601,6 +840,32 @@ async def _run_interaction_turn(
         max_speak_chars=int(stub.get("max_speak_chars", 160)),
         capability_catalog=_AgentCatalog(catalog_capabilities),  # type: ignore[arg-type]
         expressive_body_cues=str(stub.get("expressive_body_cues") or "off"),
+        social_attention_mode=str(stub.get("social_attention_mode") or ""),
+        social_attention_ollama=(
+            _AgentOllama(social_attention_reply)
+            if social_attention_reply is not None
+            else None
+        ),  # type: ignore[arg-type]
+        social_attention_capability_ids=tuple(
+            str(item).strip()
+            for item in (stub.get("social_attention_capability_ids") or [])
+            if str(item).strip()
+        ),
+        social_attention_fallback_target=str(
+            stub.get("social_attention_fallback_target") or "none"
+        ),
+        social_attention_fallback_direction=(
+            str(stub.get("social_attention_fallback_direction") or "").strip() or None
+        ),
+        social_attention_fallback_yaw_rad=(
+            float(fallback_yaw) if isinstance(fallback_yaw, (int, float)) else None
+        ),
+        social_attention_fallback_confidence=float(
+            stub.get("social_attention_fallback_confidence", 0.0)
+        ),
+        social_attention_wait_after_response_ms=int(
+            stub.get("social_attention_wait_after_response_ms", 150)
+        ),
         require_capability_plan_review=bool(stub.get("require_capability_plan_review", False)),
     )
     request = AgentRunRequest.model_validate(
@@ -946,9 +1211,144 @@ async def evaluate_dialogue_scenario(scenario: BehaviorScenario) -> dict[str, An
     }
 
 
+async def evaluate_router_dialogue_scenario(
+    scenario: BehaviorScenario,
+) -> dict[str, Any]:
+    manager = ConversationStateManager(
+        base_conversation_id=scenario.scenario_id,
+        max_turns=int(scenario.stub.get("max_turns", 12)),
+        max_pending_tasks=int(scenario.stub.get("max_pending_tasks", 8)),
+        task_store_enabled=False,
+    )
+    turn_reports: list[dict[str, Any]] = []
+    all_errors: list[str] = []
+
+    for index, turn in enumerate(scenario.turns):
+        turn_id = str(turn.get("id") or f"turn_{index + 1}")
+        text = _turn_text(turn, scenario_key=scenario.key, index=index)
+        language = _turn_language(turn, scenario.language)
+        manager.prepare_for_user_text(text, sid=turn_id)
+        pre_snapshot = manager.snapshot()
+        stub = _merged_turn_stub(scenario, turn)
+        context = _turn_context(scenario, turn, pre_snapshot)
+        context.setdefault("history", pre_snapshot.get("history") or [])
+        context.setdefault(
+            "active_task_snapshots",
+            pre_snapshot.get("active_task_snapshots") or [],
+        )
+
+        decision, router = await _run_router_turn(
+            scenario=scenario,
+            text=text,
+            language=language,
+            context=context,
+            stub=stub,
+        )
+        expect = turn.get("expect") or {}
+        errors = _evaluate_router_expectations(
+            scenario,
+            decision=decision,
+            llm_calls=router.calls,
+            llm_stages=router.stages,
+            expect=expect if isinstance(expect, dict) else {},
+        )
+
+        interaction_actual: dict[str, Any] | None = None
+        if bool(stub.get("run_interaction", False)):
+            interaction_stub = {
+                **stub,
+                "route_decision": decision.model_dump(mode="json", exclude_none=True),
+                "catalog_capabilities": stub.get("agent_capabilities")
+                or (stub.get("catalog") or {}).get("capabilities")
+                or [],
+            }
+            response = await _run_interaction_turn(
+                scenario_key=f"{scenario.key}#{turn_id}",
+                scenario_id=f"{scenario.scenario_id}:{turn_id}",
+                text=text,
+                language=language,
+                stub=interaction_stub,
+                context=context,
+                history=manager.get_history(),
+            )
+            interaction_actual = _interaction_actual(response)
+            turn_scenario = BehaviorScenario(
+                path=scenario.path,
+                scenario_id=f"{scenario.scenario_id}:{turn_id}",
+                suite="interaction",
+                level=scenario.level,
+                text=text,
+                language=language,
+                expect=expect if isinstance(expect, dict) else {},
+            )
+            errors.extend(
+                _evaluate_interaction_expectations(
+                    turn_scenario,
+                    speech=interaction_actual["speech"],
+                    skill_ids=interaction_actual["skills"],
+                    skill_args=interaction_actual["skill_args"],
+                    skill_timeout_ms=interaction_actual["skill_timeout_ms"],
+                    skill_metadata=interaction_actual["skill_metadata"],
+                    requires_confirmation=interaction_actual["requires_confirmation"],
+                    status=interaction_actual["status"],
+                    reason=interaction_actual["reason"],
+                    metadata=interaction_actual["metadata"],
+                )
+            )
+
+        route_metadata = _route_metadata_for_state(
+            decision.model_dump(mode="json", exclude_none=True)
+        )
+        manager.record_user_turn(
+            turn_id,
+            text,
+            route=decision.route,
+            intent=decision.intent,
+            metadata=route_metadata,
+        )
+        post_snapshot = manager.snapshot()
+        if isinstance(expect, dict):
+            _evaluate_context_expectations(
+                errors,
+                expect,
+                pre_snapshot=_context_report(pre_snapshot),
+                post_snapshot=_context_report(post_snapshot),
+            )
+
+        if errors:
+            all_errors.extend(f"{turn_id}: {error}" for error in errors)
+        turn_reports.append(
+            {
+                "id": turn_id,
+                "ask": text,
+                "ok": not errors,
+                "errors": errors,
+                "route": {
+                    "route": decision.route,
+                    "intent": decision.intent,
+                    "confidence": decision.confidence,
+                    "actions": list(decision.actions or []),
+                    "metadata": decision.metadata,
+                },
+                "llm_stages": list(router.stages),
+                "interaction": interaction_actual,
+                "pre_context": _context_report(pre_snapshot),
+                "post_context": _context_report(post_snapshot),
+            }
+        )
+
+    return {
+        "ok": not all_errors,
+        "errors": all_errors,
+        "actual": {"turn_count": len(turn_reports), "turns": turn_reports},
+    }
+
+
 async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
     if scenario.suite == "router":
         return await evaluate_router_scenario(scenario)
+    if scenario.suite == "router_dialogue":
+        return await evaluate_router_dialogue_scenario(scenario)
     if scenario.suite == "interaction":
         return await evaluate_interaction_scenario(scenario)
     if scenario.suite == "adapter":

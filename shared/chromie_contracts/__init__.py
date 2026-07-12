@@ -25,6 +25,22 @@ from .mind import (
     default_mind_profile,
 )
 from .session import SessionContext
+from .social_attention import (
+    SocialAttentionBehavior,
+    SocialAttentionPlan,
+    SocialAttentionTarget,
+)
+from .semantic_task import (
+    CommitmentState,
+    InformationGap,
+    PlanningResult,
+    ResponsePlan,
+    ResponseStage,
+    SemanticGoal,
+    SemanticTaskOperation,
+    SemanticTaskOperationSet,
+    TaskContextSnapshot,
+)
 
 __all__ = [
     "RouteRequest",
@@ -53,4 +69,16 @@ __all__ = [
     "RobotIdentity",
     "default_mind_profile",
     "SessionContext",
+    "SocialAttentionBehavior",
+    "SocialAttentionPlan",
+    "SocialAttentionTarget",
+    "CommitmentState",
+    "InformationGap",
+    "PlanningResult",
+    "ResponsePlan",
+    "ResponseStage",
+    "SemanticGoal",
+    "SemanticTaskOperation",
+    "SemanticTaskOperationSet",
+    "TaskContextSnapshot",
 ]

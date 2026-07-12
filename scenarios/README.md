@@ -40,10 +40,11 @@ the deterministic judge.
 
 ```text
 scenarios/
-  router/       Router module scenarios
-  interaction/  InteractionRuntime scenarios
-  dialogue/     Multi-turn InteractionRuntime conversation scenarios
-  templates/    Authoring templates, not executed as scenarios
+  router/           Router module and scripted-model recovery scenarios
+  router_dialogue/  Multi-turn Router-to-Agent replay scenarios
+  interaction/      InteractionRuntime scenarios
+  dialogue/         Multi-turn InteractionRuntime conversation scenarios
+  templates/        Authoring templates, not executed as scenarios
 ```
 
 Each file contains exactly one scenario object. The file stem must match the
@@ -110,6 +111,44 @@ python scripts/generate_dialogue_scenario_batch.py --target-count 300
 LLMs may help author new candidate scenarios, but committed scenario files must
 contain deterministic expectations. Normal regression runs must not depend on
 an LLM to decide whether the robot behaved correctly.
+
+
+### Scripted Router recovery scenarios
+
+Router fixtures may use `stub.llm_script` instead of one final
+`stub.llm_decision`. The scenario runner then executes the real
+`OllamaLLMRouter.route()` normalization, review, semantic-repair, and validation
+pipeline while replacing only external model completions. Each scripted item
+may declare the expected model stage and a compact decision:
+
+```json
+{
+  "llm_script": [
+    {
+      "stage": "quick_intent",
+      "decision": {
+        "route": "chat",
+        "intent": "weather_query",
+        "confidence": 0.95
+      }
+    },
+    {
+      "stage": "semantic_route_repair",
+      "decision": {
+        "route": "robot_action",
+        "intent": "capability:soridormi.walk_velocity",
+        "confidence": 0.97
+      }
+    }
+  ]
+}
+```
+
+`router_dialogue` scenarios run ordered Router turns with one bounded
+conversation-state snapshot. A turn may set `run_interaction=true` to pass the
+final Router decision through the dependency-light native InteractionRuntime
+and assert emitted skills and arguments. This is deterministic Level A replay,
+not a live-model, microphone, simulator, or robot claim.
 
 ## General ability acceptance manifest
 

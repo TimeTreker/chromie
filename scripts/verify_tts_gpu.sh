@@ -20,7 +20,7 @@ docker exec "$SERVICE" bash -lc 'nvidia-smi || true'
 
 echo
 echo "[verify] Checking TTS GPU env inside container..."
-docker exec "$SERVICE" bash -lc 'echo "NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-}"; echo "NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-}"; echo "TTS_N_GPU_LAYERS=${TTS_N_GPU_LAYERS:-}"; echo "TTS_CUDA_ARCH is build-time only: check docker compose build args"'
+docker exec "$SERVICE" bash -lc 'echo "NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-}"; echo "NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-}"; echo "TTS_N_GPU_LAYERS=${TTS_N_GPU_LAYERS:-}"; echo "TTS_AUDIO_CODEC_DEVICE=${TTS_AUDIO_CODEC_DEVICE:-}"; echo "TTS_QUANTIZATION=${TTS_QUANTIZATION:-}"; echo "TTS_CONTEXT_SIZE=${TTS_CONTEXT_SIZE:-}"; echo "TTS_N_BATCH=${TTS_N_BATCH:-}"; echo "TTS_CUDA_ARCH is build-time only: check docker compose build args"'
 
 echo
 echo "[verify] Checking llama-cpp-python CUDA backend..."
@@ -47,12 +47,29 @@ async def main():
             await ws.send(json.dumps({"type": "health"}))
             msg = await asyncio.wait_for(ws.recv(), timeout=5)
             print(msg)
-            print("OK: TTS websocket health responded")
+            data = json.loads(msg)
+            workers = data.get("workers") or []
+            codec = workers[0].get("audio_codec") if workers else None
+            print(f"Resolved audio codec: {codec}")
+            expected = data.get("audio_codec_device")
+            effective = codec.get("effective") if isinstance(codec, dict) else None
+            if expected == "cuda" and not str(effective or "").startswith("cuda"):
+                raise SystemExit(
+                    f"ERROR: audio codec expected CUDA but effective device is {effective!r}"
+                )
+            print("OK: TTS websocket health responded with runtime device metadata")
     except Exception as exc:
         raise SystemExit(f"ERROR: TTS websocket health check failed: {exc}")
 
 asyncio.run(main())
 PY
 
+if [ "${RUN_TTS_BENCHMARK:-0}" = "1" ]; then
+  echo
+  echo "[verify] Running short TTS performance benchmark..."
+  python scripts/benchmark_tts.py --warmup 0 --repeat 1 \
+    --output .chromie/evidence/tts-benchmark.json
+fi
+
 echo
-echo "[verify] Done. Confirm TTS_N_GPU_LAYERS=-1 and inspect TTS logs for CUDA/GGML layer offload messages."
+echo "[verify] Done. Confirm full layer offload, the effective DAC device, and benchmark RTF."

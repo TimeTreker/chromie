@@ -21,7 +21,7 @@ class ForwardMotionRecovery0806Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.matches[0].capability_id, "soridormi.walk_forward")
         self.assertTrue(result.matches[0].interaction_executable)
 
-    async def test_router_recovers_generic_physical_motion_to_catalog_walk(self) -> None:
+    async def test_router_does_not_phrase_match_generic_motion_to_a_skill(self) -> None:
         from router.app import main
 
         result = CapabilityCatalogResult(
@@ -67,7 +67,7 @@ class ForwardMotionRecovery0806Tests(unittest.IsolatedAsyncioTestCase):
                 confidence=1.0,
                 language="zh-CN",
                 source="llm",
-                reason="quick router understood physical motion but did not select exact skill",
+                reason="quick router did not select an exact skill",
             )
         )
 
@@ -78,14 +78,13 @@ class ForwardMotionRecovery0806Tests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
+        self.assertEqual(decision.intent, "semantic_capability_planning")
         self.assertIn("capability_agent", decision.agents)
-        self.assertIn("safety_agent", decision.agents)
+        self.assertNotIn("catalog_affordance_recovery", decision.metadata)
         self.assertEqual(
-            decision.metadata["catalog_affordance_recovery"]["capability_id"],
-            "soridormi.walk_forward",
+            decision.metadata["desired_abilities"][0]["ability_id"],
+            "unresolved_effectful_goal",
         )
-        self.assertEqual(decision.candidate_capabilities[0]["capability_id"], "soridormi.walk_forward")
 
     async def test_missing_forward_motion_speech_uses_user_language(self) -> None:
         from router.app import main
@@ -129,12 +128,17 @@ class ForwardMotionRecovery0806Tests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(main, "llm_router", llm_router):
             decision = await main.route(RouteRequest(text="你往前走个15秒。"))
 
-        self.assertEqual(decision.route, "clarify")
-        self.assertEqual(decision.intent, "missing_or_unsupported_ability")
+        self.assertEqual(decision.route, "robot_action")
+        self.assertEqual(decision.intent, "semantic_capability_planning")
         self.assertTrue(decision.language.startswith("zh"))
-        self.assertIn("我没有找到", decision.speak_first or "")
-        self.assertTrue(
-            decision.metadata["capability_grounding"]["forward_motion_request"]
+        self.assertIsNone(decision.speak_first)
+        self.assertEqual(
+            decision.metadata["desired_abilities"][0]["ability_id"],
+            "unresolved_effectful_goal",
+        )
+        self.assertEqual(
+            decision.metadata["capability_grounding"]["status"],
+            "unresolved_requires_planner",
         )
 
 

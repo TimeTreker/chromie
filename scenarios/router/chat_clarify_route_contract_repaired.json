@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "id": "chat_clarify_route_contract_repaired",
+  "suite": "router",
+  "level": "integration",
+  "description": "A route=chat decision carrying intent=clarify is structurally inconsistent and must be semantically repaired instead of being sent to the conversation lane unchanged.",
+  "tags": ["router-contract", "semantic-repair", "clarify", "model-authority"],
+  "input": {
+    "text": "Make that one colder.",
+    "language": "en-US"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {"catalog_version": 75, "capabilities": []},
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "chat",
+          "intent": "clarify",
+          "confidence": 0.95,
+          "language": "en-US"
+        }
+      },
+      {
+        "stage": "semantic_route_repair",
+        "decision": {
+          "route": "clarify",
+          "intent": "ambiguous_reference",
+          "confidence": 0.45,
+          "language": "en-US"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "route": "clarify",
+    "intent": "ambiguous_reference",
+    "source": "llm",
+    "llm_calls": 2,
+    "llm_stages": ["quick_intent", "semantic_route_repair"],
+    "task_types_include": ["speech.ask_clarification"],
+    "metadata_json_contains": ["semantic_route_repair", "route_name_intent_mismatch"]
+  }
+}

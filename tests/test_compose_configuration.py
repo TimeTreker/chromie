@@ -61,7 +61,7 @@ class ComposeConfigurationTests(unittest.TestCase):
     def test_router_service_uses_fast_llm_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         router_block = compose.split("  chromie-router:", 1)[1].split(
-            "  chromie-agent:",
+            "\n  chromie-agent:",
             1,
         )[0]
 
@@ -69,12 +69,13 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("ROUTER_MODEL: ${ROUTER_MODEL:-qwen3:4b}", router_block)
         self.assertIn("ROUTER_LLM_KEEP_ALIVE: ${ROUTER_LLM_KEEP_ALIVE:-24h}", router_block)
         self.assertIn("ROUTER_WARM_LLM_ON_STARTUP: ${ROUTER_WARM_LLM_ON_STARTUP:-1}", router_block)
-        self.assertIn("ROUTER_WARM_LLM_TIMEOUT_MS: ${ROUTER_WARM_LLM_TIMEOUT_MS:-30000}", router_block)
+        self.assertIn("ROUTER_WARM_LLM_TIMEOUT_MS: ${ROUTER_WARM_LLM_TIMEOUT_MS:-60000}", router_block)
         self.assertIn("ROUTER_REVIEW_MODEL: ${ROUTER_REVIEW_MODEL:-gemma4:e2b}", router_block)
         self.assertIn("ROUTER_TIMEOUT_MS: ${ROUTER_TIMEOUT_MS:-5400}", router_block)
         self.assertIn("ROUTER_LLM_TIMEOUT_MS: ${ROUTER_LLM_TIMEOUT_MS:-5400}", router_block)
+        self.assertIn("ROUTER_LLM_NUM_CTX: ${ROUTER_LLM_NUM_CTX:-4096}", router_block)
         self.assertIn("ROUTER_LLM_NUM_PREDICT: ${ROUTER_LLM_NUM_PREDICT:-96}", router_block)
-        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-100}", router_block)
+        self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-2500}", router_block)
         self.assertIn(
             "ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS: ${ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS:-5000}",
             router_block,
@@ -87,11 +88,29 @@ class ComposeConfigurationTests(unittest.TestCase):
             "ROUTER_SLOW_REVIEW_RECOVERY_ENABLED: ${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-1}",
             router_block,
         )
+        self.assertIn(
+            "ROUTER_GENERIC_CHAT_REVIEW_ENABLED: ${ROUTER_GENERIC_CHAT_REVIEW_ENABLED:-1}",
+            router_block,
+        )
+        self.assertIn(
+            "ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED: ${ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED:-0}",
+            router_block,
+        )
+
+    def test_router_waits_for_agent_catalog_service_before_starting(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        router_block = compose.split("  chromie-router:", 1)[1].split(
+            "\n  chromie-agent:",
+            1,
+        )[0]
+
+        self.assertIn("chromie-agent:", router_block)
+        self.assertIn("condition: service_healthy", router_block)
 
     def test_router_build_context_includes_shared_contracts(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         router_block = compose.split("  chromie-router:", 1)[1].split(
-            "  chromie-agent:",
+            "\n  chromie-agent:",
             1,
         )[0]
 

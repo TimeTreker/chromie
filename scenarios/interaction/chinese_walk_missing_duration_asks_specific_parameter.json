@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "id": "chinese_walk_missing_duration_asks_specific_parameter",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "A materially important missing walking duration produces a specific information gap and no physical execution.",
+  "tags": ["robot-action", "parameter-policy", "clarification", "walking"],
+  "input": {
+    "text": "往前走。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "robot_action",
+      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "intent": "capability:soridormi.walk_velocity",
+      "confidence": 0.95,
+      "language": "zh-CN",
+      "source": "llm"
+    },
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.walk_velocity",
+        "description": "Walk forward with bounded velocity for a specified duration.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "vx_mps": {"type": "number", "minimum": 0.01, "maximum": 0.25},
+            "duration_s": {"type": "number", "minimum": 0.5, "maximum": 20.0, "description": "walking duration in seconds"}
+          },
+          "required": ["vx_mps", "duration_s"],
+          "additionalProperties": false
+        },
+        "effects": ["physical_motion"],
+        "safety_class": "physical_motion",
+        "interaction_executable": true,
+        "requires_confirmation": true
+      }
+    ],
+    "ollama_reply": {
+      "decision": "clarify",
+      "speech": "你希望我往前走多久？请告诉我秒数。",
+      "skills": [],
+      "information_gaps": [
+        {
+          "gap_id": "soridormi.walk_velocity:duration_s",
+          "description": "walking duration in seconds",
+          "blocking": true,
+          "required_for": ["soridormi.walk_velocity"],
+          "preferred_resolution": "ask_user",
+          "candidate_values": [],
+          "metadata": {
+            "schema_field": "duration_s",
+            "skill_id": "soridormi.walk_velocity",
+            "reason": "duration materially changes the physical action scope"
+          }
+        }
+      ],
+      "plan_relation": "none",
+      "original_goal_summary": "向前走",
+      "assessment": {"parameter_policy": "ask_user"}
+    }
+  },
+  "expect": {
+    "speech_all": ["多久", "秒"],
+    "forbidden_speech_any": ["缺少必要参数", "不能移动"],
+    "skills": [],
+    "requires_confirmation": false,
+    "metadata_json_contains": ["needs_clarification", "duration_s", "ask_user"]
+  }
+}

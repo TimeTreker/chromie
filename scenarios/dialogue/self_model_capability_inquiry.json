@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "id": "self_model_capability_inquiry",
+  "suite": "dialogue",
+  "level": "integration",
+  "description": "Chromie answers self-description and capability inquiries from the supplied self model and runtime capability evidence without executing an action.",
+  "tags": ["identity", "self-model", "capability-inquiry", "prompt-grounding"],
+  "turns": [
+    {
+      "id": "self_description",
+      "ask": "你是谁？",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "self_description",
+          "confidence": 0.94,
+          "language": "zh-CN",
+          "source": "llm"
+        },
+        "ollama_reply": "我是 Chromie。"
+      },
+      "expect": {
+        "speech_all": ["Chromie"],
+        "forbidden_speech_any": ["语言模型", "Gemma", "Qwen"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "missing_dance_capability",
+      "ask": "你会跳舞吗？",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "capability_inquiry",
+          "confidence": 0.92,
+          "language": "zh-CN",
+          "source": "llm",
+          "candidate_capabilities": [
+            {
+              "capability_id": "soridormi.blink_eyes",
+              "description": "Blink the robot's eyes.",
+              "available": true,
+              "interaction_executable": true
+            },
+            {
+              "capability_id": "soridormi.nod_yes",
+              "description": "Nod the robot head.",
+              "available": true,
+              "interaction_executable": true
+            }
+          ]
+        },
+        "ollama_reply": "我现在还不会跳舞。"
+      },
+      "expect": {
+        "speech_all": ["不会跳舞"],
+        "forbidden_speech_any": ["语言模型", "正在跳舞", "已经跳舞"],
+        "history_contains": ["Chromie"],
+        "no_skills": true
+      }
+    },
+    {
+      "id": "available_blink_capability",
+      "ask": "你会眨眼吗？",
+      "stub": {
+        "route_decision": {
+          "route": "chat",
+          "agents": ["conversation_agent", "speaker_agent"],
+          "intent": "capability_inquiry",
+          "confidence": 0.95,
+          "language": "zh-CN",
+          "source": "llm",
+          "candidate_capabilities": [
+            {
+              "capability_id": "soridormi.blink_eyes",
+              "description": "Blink the robot's eyes.",
+              "available": true,
+              "interaction_executable": true
+            }
+          ]
+        },
+        "ollama_reply": "会，我可以眨眼。"
+      },
+      "expect": {
+        "speech_all": ["可以眨眼"],
+        "forbidden_speech_any": ["正在眨眼", "已经眨眼"],
+        "history_contains": ["不会跳舞"],
+        "no_skills": true
+      }
+    }
+  ]
+}

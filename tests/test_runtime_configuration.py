@@ -40,21 +40,25 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ROUTER_MODEL"], "qwen3:4b")
         self.assertEqual(values["ROUTER_LLM_KEEP_ALIVE"], "24h")
         self.assertEqual(values["ROUTER_WARM_LLM_ON_STARTUP"], "1")
-        self.assertEqual(values["ROUTER_WARM_LLM_TIMEOUT_MS"], "30000")
+        self.assertEqual(values["ROUTER_WARM_LLM_TIMEOUT_MS"], "60000")
         self.assertEqual(values["ROUTER_REVIEW_MODEL"], "gemma4:e2b")
         self.assertEqual(values["ROUTER_TIMEOUT_MS"], "5400")
         self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "5400")
+        self.assertEqual(values["ROUTER_LLM_NUM_CTX"], "4096")
         self.assertEqual(values["ROUTER_LLM_NUM_PREDICT"], "96")
-        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "100")
+        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "2500")
         self.assertEqual(values["ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
         self.assertEqual(values["ROUTER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
         self.assertEqual(values["ROUTER_SLOW_REVIEW_RECOVERY_ENABLED"], "1")
+        self.assertEqual(values["ROUTER_GENERIC_CHAT_REVIEW_ENABLED"], "1")
+        self.assertEqual(values["ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED"], "0")
 
     def test_ollama_keeps_router_and_agent_models_loaded_without_extra_parallelism(self) -> None:
         values = _common_env()
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
         self.assertEqual(values["OLLAMA_NUM_PARALLEL"], "1")
         self.assertEqual(values["OLLAMA_AUTO_RESTART_ON_CRASH"], "1")
+        self.assertEqual(values["OLLAMA_WARM_NUM_PREDICT"], "1")
 
     def test_capability_planner_has_json_output_budget(self) -> None:
         values = _common_env()
@@ -74,6 +78,43 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_CONVERSATION_NUM_PREDICT"], "64")
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_CTX"], "8192")
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_PREDICT"], "384")
+
+    def test_tool_fast_first_is_disabled_and_task_continuity_is_report_only_in_common_profile(self) -> None:
+        values = _common_env()
+        self.assertEqual(values["ORCH_FAST_FIRST_RESPONSE_ENABLED"], "1")
+        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_ENABLED"], "1")
+        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_HEDGE_MS"], "750")
+        self.assertEqual(
+            values["ORCH_FAST_FIRST_AUDIO_CACHE_DIR"],
+            ".chromie/cache/fast-first-audio",
+        )
+        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP"], "1")
+        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED"], "0")
+        self.assertEqual(values["ORCH_TASK_CONTINUITY_MODE"], "report_only")
+        self.assertEqual(values["ORCH_TASK_CONTINUITY_TIMEOUT_MS"], "3500")
+        self.assertEqual(values["AGENT_TASK_CONTINUITY_MODEL"], "qwen3:4b")
+        self.assertEqual(values["AGENT_TASK_CONTINUITY_TIMEOUT_MS"], "3000")
+        self.assertEqual(values["AGENT_TASK_CONTINUITY_NUM_CTX"], "4096")
+        self.assertEqual(values["AGENT_TASK_CONTINUITY_NUM_PREDICT"], "256")
+
+    def test_chinese_tts_uses_smaller_chunks_for_lower_first_audio_latency(self) -> None:
+        values = _common_env()
+        self.assertEqual(values["ORCH_TTS_CJK_CHUNK_CHARS"], "36")
+        self.assertEqual(values["ORCH_TTS_CJK_MIN_CHUNK_CHARS"], "8")
+
+    def test_tts_performance_diagnostics_and_cuda_graphs_are_enabled(self) -> None:
+        values = _common_env()
+        self.assertEqual(values["TTS_AUDIO_CODEC_DEVICE"], "auto")
+        self.assertEqual(values["TTS_DETAILED_TIMING"], "1")
+        self.assertEqual(values["TTS_METRICS_WINDOW"], "20")
+        self.assertEqual(values["GGML_CUDA_DISABLE_GRAPHS"], "0")
+
+        profile = (ROOT / "env" / "profiles" / "rtx4090_laptop.env").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("TTS_CONTEXT_SIZE=4096", profile)
+        self.assertIn("TTS_MAX_LENGTH=4096", profile)
 
     def test_episode_recording_is_enabled_by_default(self) -> None:
         values = _common_env()

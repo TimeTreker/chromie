@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "id": "chinese_nod_blink_generic_chat_repaired",
+  "suite": "router",
+  "level": "integration",
+  "description": "The live Chinese compound body request must be semantically rechecked when the quick model emits a generic chat acknowledgement, then grounded to both exact abilities without phrase-rule recovery.",
+  "tags": [
+    "voice-log",
+    "zh-CN",
+    "generic-chat-review",
+    "compound",
+    "nod",
+    "blink",
+    "model-authority"
+  ],
+  "input": {
+    "text": "你点点头再眨两下眼睛。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "catalog_version": 74,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.nod_yes",
+          "description": "Nod the robot head yes a bounded number of times.",
+          "route": "robot_action",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": ["physical_motion"],
+          "requires_confirmation": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {"count": {"type": "integer"}},
+            "required": ["count"]
+          }
+        },
+        {
+          "capability_id": "soridormi.blink_eyes",
+          "description": "Blink the robot eyes a bounded number of times.",
+          "route": "robot_action",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": ["physical_motion"],
+          "requires_confirmation": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {"count": {"type": "integer"}},
+            "required": ["count"]
+          }
+        }
+      ]
+    },
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "chat",
+          "intent": "acknowledge",
+          "confidence": 0.95,
+          "language": "zh-CN"
+        }
+      },
+      {
+        "stage": "capability_grounding_review",
+        "decision": {
+          "route": "robot_action",
+          "intent": "compound_common_catalog_task",
+          "confidence": 0.97,
+          "language": "zh-CN",
+          "actions": [
+            {
+              "capability_id": "soridormi.nod_yes",
+              "args": {"count": 1},
+              "sequence": 0,
+              "timing": "sequential",
+              "confidence": 0.98
+            },
+            {
+              "capability_id": "soridormi.blink_eyes",
+              "args": {"count": 2},
+              "sequence": 1,
+              "timing": "sequential",
+              "confidence": 0.98
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "expect": {
+    "route": "robot_action",
+    "intent": "compound_common_catalog_task",
+    "source": "llm",
+    "llm_calls": 2,
+    "llm_stages": ["quick_intent", "capability_grounding_review"],
+    "actions": [
+      {"capability_id": "soridormi.nod_yes", "args": {"count": 1}},
+      {"capability_id": "soridormi.blink_eyes", "args": {"count": 2}}
+    ],
+    "task_types_include": ["task.execute_skill"],
+    "task_types_forbid": ["speech.answer"],
+    "metadata_json_contains": [
+      "generic_chat_affordance_review",
+      "soridormi.nod_yes",
+      "soridormi.blink_eyes"
+    ]
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "id": "chinese_blink_unspecified_uses_semantic_safe_default",
+  "suite": "interaction",
+  "level": "integration",
+  "description": "A low-consequence blink request with no count uses a model-selected bounded default rather than a generic missing-parameter refusal.",
+  "tags": [
+    "robot-action",
+    "parameter-policy",
+    "safe-default",
+    "blink"
+  ],
+  "input": {
+    "text": "眨眨眼睛。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "route_decision": {
+      "route": "robot_action",
+      "agents": [
+        "capability_agent",
+        "safety_agent",
+        "speaker_agent"
+      ],
+      "intent": "capability:soridormi.blink_eyes",
+      "confidence": 0.95,
+      "language": "zh-CN",
+      "source": "llm"
+    },
+    "catalog_capabilities": [
+      {
+        "capability_id": "soridormi.blink_eyes",
+        "description": "Blink the eyes visibly as a short reversible expression.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            }
+          },
+          "required": [
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        "effects": [
+          "visual_expression"
+        ],
+        "safety_class": "low_risk_action",
+        "interaction_executable": true,
+        "requires_confirmation": false
+      }
+    ],
+    "ollama_reply": {
+      "decision": "execute",
+      "speech": "我眨四下眼睛。",
+      "skills": [
+        {
+          "skill_id": "soridormi.blink_eyes",
+          "proposed_args": {
+            "count": 4
+          },
+          "parameter_grounding": {
+            "count": {
+              "resolution": "use_safe_default",
+              "rationale": "A bounded short visual expression is low consequence and easily reversible."
+            }
+          }
+        }
+      ],
+      "plan_relation": "exact",
+      "original_goal_summary": "眨眼睛",
+      "assessment": {
+        "parameter_policy": "safe_default"
+      }
+    }
+  },
+  "expect": {
+    "speech_all": [
+      "眨",
+      "四"
+    ],
+    "forbidden_speech_any": [
+      "缺少必要参数",
+      "不能移动"
+    ],
+    "skills": [
+      "soridormi.blink_eyes"
+    ],
+    "skill_args": [
+      {
+        "count": 4
+      }
+    ],
+    "requires_confirmation": false,
+    "metadata_json_contains": [
+      "safe_default",
+      "direct_skill"
+    ]
+  }
+}

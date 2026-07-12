@@ -112,8 +112,11 @@ class SkillRegistry:
                     unavailable_reason=item.get("unavailable_reason"),
                     requires_confirmation=effective_requires_confirmation,
                     interruptible=bool(item.get("interruptible", False)),
-                    can_run_parallel=True,
-                    exclusive_group="soridormi.robot_motion",
+                    can_run_parallel=bool(item.get("can_run_parallel", True)),
+                    exclusive_group=(
+                        str(item.get("exclusive_group") or "").strip()
+                        or "soridormi.robot_motion"
+                    ),
                     timeout_ms=max(
                         1,
                         int(float(item.get("timeout_s") or 30.0) * 1000),
@@ -126,6 +129,14 @@ class SkillRegistry:
                         "fallback": item.get("fallback"),
                         "hardware_enabled": item.get("hardware_enabled"),
                         "provider_managed_safety_monitor": True,
+                        "resource_claims": [
+                            str(value)
+                            for value in (item.get("resource_claims") or [])
+                            if str(value).strip()
+                        ],
+                        "execution_constraints": dict(
+                            item.get("execution_constraints") or {}
+                        ),
                     },
                 )
             )

@@ -50,6 +50,19 @@ ROUTE_ITEM_PRIMARY_RANK = {
 REVIEW_STAGES = {
     "intent_review",
     "post_interrupt_review",
+    "semantic_route_repair",
+    "capability_grounding_review",
+    "fast_speech_repair",
+}
+
+_GENERIC_CHAT_INTENTS = {
+    "",
+    "unknown",
+    "chat",
+    "conversation",
+    "acknowledge",
+    "acknowledgement",
+    "response",
 }
 PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability",
@@ -103,6 +116,10 @@ _ROUTER_CONTEXT_OMIT_KEYS = {
     "experience_tuning_policy",
     "conversation",
     "history",
+    "task_contexts",
+    "active_task_contexts",
+    "active_task_snapshots",
+    "current_task_context",
 }
 
 
@@ -290,6 +307,56 @@ def _decision_has_weather_semantics(decision: RouteDecision) -> bool:
         if str(item_metadata.get("tool_name") or "").casefold() == "weather":
             return True
         if isinstance(item_metadata.get("weather_query"), dict):
+            return True
+    return False
+
+
+def _route_intent_contract_conflict(
+    request: RouteRequest,
+    decision: RouteDecision,
+) -> str | None:
+    """Return a structural route/intent conflict without interpreting user text.
+
+    Semantic repair is delegated to a model. This guard only notices that the
+    model's own output contradicts a declared route contract.
+    """
+
+    if (
+        _decision_has_weather_semantics(decision)
+        and not _decision_selects_weather_tool(decision)
+    ):
+        return "weather_semantics_require_tool_route"
+
+    intent = str(decision.intent or "").strip()
+    if intent in ROUTE_NAMES and intent != decision.route:
+        return "route_name_intent_mismatch"
+    capability_id = _known_capability_id(intent, _capability_ids_from_request(request))
+    if capability_id:
+        expected_route = _route_for_capability_id(capability_id, request)
+        if decision.route != expected_route:
+            return "capability_intent_route_mismatch"
+    return None
+
+
+def _has_executable_robot_affordance(request: RouteRequest) -> bool:
+    for key in (
+        "common_ability_catalog",
+        "prompt_capabilities_common",
+        "full_ability_catalog",
+        "prompt_capabilities_all",
+    ):
+        items = request.context.get(key, [])
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("route") or "") != "robot_action":
+                continue
+            if item.get("available") is False:
+                continue
+            if item.get("interaction_executable") is False:
+                continue
             return True
     return False
 
@@ -818,6 +885,65 @@ def _context_without_prompt_globals(context: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compact_active_task_snapshots(
+    context: dict[str, Any],
+    *,
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    raw = context.get("active_task_snapshots")
+    if not isinstance(raw, list) or not raw:
+        raw = context.get("active_task_contexts")
+    if not isinstance(raw, list):
+        return []
+    compact: list[dict[str, Any]] = []
+    for item in raw[-max(1, limit) :]:
+        if not isinstance(item, dict):
+            continue
+        semantic_goal = item.get("semantic_goal")
+        if not isinstance(semantic_goal, dict):
+            semantic_goal = {
+                "description": item.get("goal") or item.get("task_type") or "task",
+                "constraints": item.get("constraints") if isinstance(item.get("constraints"), dict) else {},
+            }
+        gaps = item.get("open_information_gaps")
+        if not isinstance(gaps, list):
+            gaps = [
+                {"description": value, "blocking": True}
+                for value in (item.get("pending_questions") or [])
+                if isinstance(value, str)
+            ]
+        compact.append(
+            {
+                "task_id": str(item.get("task_id") or ""),
+                "status": str(item.get("status") or "open"),
+                "goal_version": int(item.get("goal_version") or semantic_goal.get("version") or 1),
+                "plan_version": int(item.get("plan_version") or 0),
+                "goal": {
+                    "description": str(semantic_goal.get("description") or "")[:240],
+                    "beneficiary": semantic_goal.get("beneficiary"),
+                    "object": semantic_goal.get("object") if isinstance(semantic_goal.get("object"), dict) else {},
+                    "constraints": semantic_goal.get("constraints") if isinstance(semantic_goal.get("constraints"), dict) else {},
+                },
+                "open_information_gaps": [
+                    {
+                        "gap_id": str(gap.get("gap_id") or ""),
+                        "description": str(gap.get("description") or "")[:160],
+                        "preferred_resolution": gap.get("preferred_resolution"),
+                    }
+                    for gap in gaps[:4]
+                    if isinstance(gap, dict)
+                ],
+                "commitment_state": item.get("commitment_state"),
+                "last_user_update": str(
+                    item.get("last_user_update")
+                    or item.get("last_meaningful_user_turn")
+                    or ""
+                )[:220],
+            }
+        )
+    return compact
+
+
 def _router_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
     prompt_context = _context_without_prompt_globals(context)
     memory = prompt_context.get("session_memory")
@@ -839,18 +965,29 @@ def _router_fast_context_section(mind: Any) -> str:
     """
 
     identity = {}
-    if isinstance(mind, dict) and isinstance(mind.get("identity"), dict):
-        raw_identity = mind["identity"]
-        identity = {
-            "profile_id": mind.get("profile_id"),
-            "version": mind.get("version"),
-            "name": raw_identity.get("name"),
-            "pronouns": raw_identity.get("pronouns"),
-            "role": raw_identity.get("role") or raw_identity.get("description"),
-        }
+    if isinstance(mind, dict):
+        self_model = mind.get("self_model")
+        speaker = self_model.get("speaker_entity") if isinstance(self_model, dict) else None
+        if isinstance(speaker, dict):
+            identity = {
+                "profile_id": mind.get("profile_id"),
+                "version": mind.get("version"),
+                "entity_id": speaker.get("entity_id"),
+                "name": speaker.get("name"),
+                "kind": speaker.get("kind"),
+            }
+        elif isinstance(mind.get("identity"), dict):
+            raw_identity = mind["identity"]
+            identity = {
+                "profile_id": mind.get("profile_id"),
+                "version": mind.get("version"),
+                "entity_id": raw_identity.get("entity_id"),
+                "name": raw_identity.get("name"),
+                "kind": raw_identity.get("kind"),
+            }
     return (
         "Fast Router Context:\n"
-        f"{_bounded_json(identity or {'name': 'Chromie'}, max_chars=120)}\n"
+        f"{_bounded_json(identity or {'entity_id': 'chromie', 'name': 'Chromie'}, max_chars=180)}\n"
         "The full owner-approved mind profile, worldview, lifeview, valueview, "
         "long-term goals, and core principles are downstream only. "
         "Pick context_profile: fast_minimal, session_compact, capability_safety, full_mind."
@@ -861,6 +998,7 @@ def _router_global_context_section(mind: Any) -> str:
     if not isinstance(mind, dict) or not mind:
         mind = {}
     identity = mind.get("identity") if isinstance(mind.get("identity"), dict) else {}
+    self_model = mind.get("self_model") if isinstance(mind.get("self_model"), dict) else {}
     core_principles = mind.get("core_principles", [])
     long_term_goals = mind.get("long_term_goals", [])
     summary = " ".join(str(mind.get("prompt_summary") or "").split())
@@ -875,8 +1013,8 @@ def _router_global_context_section(mind: Any) -> str:
     return (
         "Mind Profile:\n"
         f"{_bounded_json(profile, max_chars=180)}\n"
-        "Robot Identity:\n"
-        f"{_bounded_json(identity or 'not supplied', max_chars=260)}\n"
+        "Self Model:\n"
+        f"{_bounded_json(self_model or {'speaker_entity': identity}, max_chars=520)}\n"
         "Worldview:\n"
         "- Chromie is an embodied realtime robot/voice assistant; use only supplied runtime evidence.\n"
         "Lifeview:\n"
@@ -938,6 +1076,9 @@ class OllamaLLMRouter:
         review_timeout_ms: int | None = None,
         confidence_threshold: float,
         slow_review_recovery_enabled: bool = True,
+        generic_chat_review_enabled: bool = True,
+        tool_fast_speech_repair_enabled: bool = False,
+        num_ctx: int = 4096,
         num_predict: int = 96,
         keep_alive: str | None = None,
         prompt_path: Path | None = None,
@@ -952,6 +1093,9 @@ class OllamaLLMRouter:
         )
         self.confidence_threshold = confidence_threshold
         self.slow_review_recovery_enabled = slow_review_recovery_enabled
+        self.generic_chat_review_enabled = bool(generic_chat_review_enabled)
+        self.tool_fast_speech_repair_enabled = bool(tool_fast_speech_repair_enabled)
+        self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(32, num_predict)
         self.keep_alive = (keep_alive or "").strip() or None
         self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "router_system.txt"
@@ -984,25 +1128,32 @@ class OllamaLLMRouter:
         )
         mind = request.context.get("mind", {})
         session_context = _router_prompt_context(request.context)
-        context_json = _bounded_json(session_context, max_chars=360)
+        context_json = _bounded_json(session_context, max_chars=520)
+        active_tasks_json = _bounded_json_array(
+            _compact_active_task_snapshots(request.context),
+            max_chars=1800,
+        )
         return (
             "Global Context Group:\n"
             f"{_router_fast_context_section(mind)}\n\n"
             "Session Context Group:\n"
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
-            f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n\n"
+            f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n"
+            f"Active Task Snapshot JSON:{active_tasks_json}\n\n"
             "Current Job:\n"
-            "quick intent router and fast lane splitter. Decide from meaning, bounded context, and common abilities. Return calibrated confidence; do not answer, execute, or authorize side effects.\n\n"
+            "quick intent router and fast lane splitter. Decide from meaning, bounded context, active semantic goals, and common abilities. Return calibrated confidence; do not answer, execute, commit task changes, or authorize side effects.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
+            "Task Continuity:\n"
+            "Use active task IDs and open goals semantically. A turn may create, modify, answer, correct, confirm, reject, cancel, pause, resume, replace, or query a task. Decide by meaning, never keywords, regexes, overlap, or recency alone. One independent responsibility is one route item; plan steps are downstream. Clarify ambiguous targets instead of guessing a task ID.\n"
             "Affordance Grounding:\n"
-            "Semantic first. Catalog is compact body/tool affordance interface, not a phrase table. Entries without route= default to robot_action. Body/tool now -> exact skill_id. one parameterized skill may leave args to CapabilityAgent; compound uses ordered actions[]. isolated letters and low-information ASR fragments clarify. Weather -> route=tool intent=weather_query metadata.tool_name=weather. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
+            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Bind an exact skill only for an explicit execution method with one clear match. One parameterized skill may leave args to CapabilityAgent; compound explicit skills use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. Weather -> route=tool intent=weather_query metadata.tool_name=weather. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
             "Cost Function:\n"
-            "Speech-only conversation=chat; catalog body=robot_action; lookup=tool; complex planning=deep_thought; ambiguity=clarify. Do not return interrupt or ignore; deterministic emergency/noise filter already ran.\n\n"
+            "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Do not return interrupt or ignore; the deterministic emergency/noise filter already ran.\n\n"
             "Output Contract:\n"
-            "Return one compact JSON object. Required keys: route, intent, confidence. routes[] split lanes; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marker). Omit agents, metadata, candidate_capabilities, explanations unless needed. fast_speech/speak_first are process acknowledgements only, with human-like social warmth, not a program, programme, backend, software process, or language model. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
+            "Return one compact JSON object. Required keys: route, intent, confidence. routes[] split independent responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marker) only for explicit skills. metadata.semantic_task_operations may contain advisory operations with operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, and reason_summary. create requires goal.description and source_text; later operations use exact supplied task IDs. fast_speech/speak_first and metadata.response_plan.immediate are process acknowledgement only, with human-like social warmth, not a program, programme, backend, software process, or language model; they must not claim completion. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
         )
 
     def build_fast_speech_repair_payload(
@@ -1061,6 +1212,7 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
+                "num_ctx": self.num_ctx,
                 "num_predict": min(96, max(48, self.num_predict)),
             },
         }
@@ -1077,6 +1229,7 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
+                "num_ctx": self.num_ctx,
                 "num_predict": self.num_predict,
             },
         }
@@ -1147,6 +1300,7 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
+                "num_ctx": self.num_ctx,
                 "num_predict": self.num_predict,
             },
         }
@@ -1206,7 +1360,81 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
+                "num_ctx": self.num_ctx,
                 "num_predict": self.num_predict,
+            },
+        }
+
+    def build_semantic_route_repair_payload(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+        *,
+        reason: str,
+    ) -> dict[str, Any]:
+        abilities_json = _bounded_json(
+            _compact_candidate_capabilities(
+                _review_capabilities_from_request(request),
+                limit=20,
+            ),
+            max_chars=3000,
+        )
+        session_context = _bounded_json(
+            _router_prompt_context(request.context),
+            max_chars=2400,
+        )
+        decision_json = _bounded_json(
+            decision.model_dump(mode="json", exclude_none=True),
+            max_chars=1800,
+        )
+        return {
+            "model": self.model,
+            "stream": False,
+            "think": False,
+            "format": "json",
+            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Current Job:\n"
+                        "- Independently repair an uncertain or internally inconsistent semantic route.\n"
+                        "- Reinterpret only the latest user input using bounded session/task context and supplied ability descriptions.\n"
+                        "- The previous decision is evidence of a routing failure, not a semantic instruction; do not preserve a stale intent merely because it appears there.\n"
+                        "- Decide by meaning. Do not create phrase rules, regex rules, keyword tables, lexical-overlap rules, or recency-only rules.\n\n"
+                        "Routing Contract:\n"
+                        "- chat is speech-only conversation or a direct factual/social answer.\n"
+                        "- robot_action is an explicit current request for one or more supplied executable body/embodied abilities. Use capability:<exact capability_id> when clear.\n"
+                        "- tool is an external/changing lookup. Weather semantics require route=tool and intent=weather_query.\n"
+                        "- memory is a requested memory operation.\n"
+                        "- deep_thought is clear complex reasoning, situational planning, or multi-step task work.\n"
+                        "- clarify is required when the current input remains referential, fragmentary, or semantically underdetermined after using supplied context.\n"
+                        "- Never return interrupt or ignore; deterministic controls already ran.\n\n"
+                        "Output Contract:\n"
+                        "- Return compact RouteDecision JSON only with route, intent, and confidence.\n"
+                        "- Optional actions must use exact supplied capability IDs.\n"
+                        "- Use confidence >= 0.72 only when the repaired meaning is clear.\n"
+                        "- When it is not clear, return route=clarify with one short semantic intent and confidence <= 0.55.\n"
+                        "- Do not output chain-of-thought, hidden analysis, markdown, or text outside JSON."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Repair reason: {reason}\n"
+                        f"Latest user input: {request.text}\n"
+                        f"Language hint: {request.language or 'auto'}\n"
+                        f"Bounded session/task context JSON: {session_context}\n"
+                        f"Supplied common abilities JSON: {abilities_json}\n"
+                        f"Rejected previous decision JSON: {decision_json}"
+                    ),
+                },
+            ],
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_ctx": self.num_ctx,
+                "num_predict": max(128, self.num_predict),
             },
         }
 
@@ -1231,8 +1459,8 @@ class OllamaLLMRouter:
                         "- The quick router returned robot_action with a placeholder capability intent instead of a real capability ID.\n"
                         "- Decide from semantic meaning, bounded context, and common abilities, not phrase rules.\n\n"
                         "Task Context Group:\n"
-                        "- Speech-only, greeting, identity/status, factual, joke, story, song, and spoken performance requests are chat unless physical/tool action is explicitly requested.\n"
-                        "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
+                        "- Speech-only conversation and questions about whether an ability is available are chat; use a semantic intent such as capability_inquiry when appropriate.\n"
+                        "- A request to perform an available interaction_executable physical capability now is robot_action. Decide inquiry versus execution from meaning and context, not phrase patterns.\n"
                         "- Use deep_thought for complex reasoning or planning.\n\n"
                         "- Use working memory, task context, and recent action history to resolve follow-ups, but not to authorize side effects.\n\n"
                         "Output Contract:\n"
@@ -1257,6 +1485,7 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
+                "num_ctx": self.num_ctx,
                 "num_predict": self.num_predict,
             },
         }
@@ -1329,6 +1558,7 @@ class OllamaLLMRouter:
             "options": {
                 "temperature": 0,
                 "top_p": 0.9,
+                "num_ctx": self.num_ctx,
                 "num_predict": max(128, self.num_predict),
             },
         }
@@ -1351,6 +1581,7 @@ class OllamaLLMRouter:
             "system_hash": _short_hash(system_text),
             "user_hash": _short_hash(user_text),
             "num_predict": (payload.get("options") or {}).get("num_predict"),
+            "num_ctx": (payload.get("options") or {}).get("num_ctx"),
             **_prompt_feature_flags(all_text),
             **_catalog_observability_profile(request),
         }
@@ -1427,6 +1658,7 @@ class OllamaLLMRouter:
             "think": False,
             "options": {
                 "temperature": 0,
+                "num_ctx": self.num_ctx,
                 "num_predict": 1,
             },
         }
@@ -1534,6 +1766,12 @@ class OllamaLLMRouter:
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
             ) + "LLM returned capability/skill id in route field; router normalized capability route"
+        elif intent_capability_id:
+            parsed["route"] = _route_for_capability_id(intent_capability_id, request)
+            parsed["intent"] = f"capability:{intent_capability_id}"
+            parsed["reason"] = (
+                f"{parsed.get('reason')}; " if parsed.get("reason") else ""
+            ) + "LLM returned exact capability id as intent; router normalized capability intent"
         if "confidence" not in parsed and parsed.get("route") not in {"interrupt", "ignore"}:
             parsed["confidence"] = max(0.72, self.confidence_threshold)
             parsed["reason"] = (
@@ -1602,6 +1840,92 @@ class OllamaLLMRouter:
             )
             return reviewed_decision
         return decision
+
+    async def _review_generic_chat_affordance(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        """Semantically recheck generic chat when embodied affordances exist.
+
+        This is deliberately model-based.  The deterministic trigger observes
+        only that the first model returned a content-free generic chat label
+        while the supplied catalog contains executable embodied affordances; it
+        does not inspect the user's words or choose an action by phrase rules.
+        """
+
+        if not self.generic_chat_review_enabled or not self.slow_review_recovery_enabled:
+            return decision
+        if decision.route != "chat":
+            return decision
+        if str(decision.intent or "").strip().casefold() not in _GENERIC_CHAT_INTENTS:
+            return decision
+        if not _has_executable_robot_affordance(request):
+            return decision
+
+        try:
+            reviewed = await self._chat_logged(
+                self.build_semantic_route_repair_payload(
+                    request,
+                    decision,
+                    reason="generic_chat_requires_capability_grounding_review",
+                ),
+                stage="capability_grounding_review",
+                request=request,
+            )
+            reviewed_decision = self._decision_from_response(
+                request,
+                reviewed,
+                stage="capability_grounding_review",
+            )
+        except Exception as exc:
+            logger.warning(
+                "generic chat capability review failed sid=%s error_type=%s error=%s",
+                request.sid,
+                type(exc).__name__,
+                exc,
+            )
+            return decision
+
+        conflict = _route_intent_contract_conflict(request, reviewed_decision)
+        if conflict is not None:
+            logger.warning(
+                "generic chat capability review remained inconsistent sid=%s conflict=%s",
+                request.sid,
+                conflict,
+            )
+            return decision
+        if reviewed_decision.route in DETERMINISTIC_ONLY_ROUTES:
+            return decision
+        if reviewed_decision.route != "clarify" and (
+            reviewed_decision.confidence < self.confidence_threshold
+        ):
+            return decision
+        if reviewed_decision.route == "chat":
+            return decision
+
+        metadata = dict(reviewed_decision.metadata or {})
+        metadata["generic_chat_affordance_review"] = {
+            "status": "reclassified",
+            "original_route": decision.route,
+            "original_intent": decision.intent,
+            "reviewed_route": reviewed_decision.route,
+            "reviewed_intent": reviewed_decision.intent,
+        }
+        reviewed_decision = reviewed_decision.model_copy(update={"metadata": metadata})
+        reviewed_decision.reason = (
+            f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
+        ) + "generic chat output rechecked against supplied executable affordances"
+        logger.info(
+            "generic chat capability review reclassified sid=%s original=%s/%s reviewed=%s/%s confidence=%.2f",
+            request.sid,
+            decision.route,
+            decision.intent,
+            reviewed_decision.route,
+            reviewed_decision.intent,
+            reviewed_decision.confidence,
+        )
+        return reviewed_decision
 
     def _recover_weather_affordance_misroute(
         self,
@@ -1757,6 +2081,13 @@ class OllamaLLMRouter:
     ) -> RouteDecision:
         if not _decision_needs_router_fast_speech(decision):
             return decision
+        if decision.route == "tool" and not self.tool_fast_speech_repair_enabled:
+            logger.info(
+                "router_fast_speech_missing route=%s intent=%s repair=tool_disabled",
+                decision.route,
+                decision.intent,
+            )
+            return decision
         if not self.slow_review_recovery_enabled:
             logger.info(
                 "router_fast_speech_missing route=%s intent=%s repair=disabled",
@@ -1815,40 +2146,249 @@ class OllamaLLMRouter:
         )
         return repaired
 
+    def _safe_semantic_clarification(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+        *,
+        reason: str,
+    ) -> RouteDecision:
+        metadata = {
+            key: value
+            for key, value in (decision.metadata or {}).items()
+            if key
+            not in {
+                "route_items",
+                "route_item_count",
+                "route_stage_outputs",
+                "task_list",
+                "task_proposals",
+                "route_merge",
+                "tool_name",
+                "tool_capability_id",
+                "weather_query",
+            }
+        }
+        metadata.update(
+            {
+                "llm_clarification_required": True,
+                "semantic_route_repair": {
+                    "status": "clarify",
+                    "reason": reason,
+                    "original_route": decision.route,
+                    "original_intent": decision.intent,
+                    "original_confidence": decision.confidence,
+                },
+                "thinking_ack_allowed": False,
+            }
+        )
+        return finalize_decision(
+            RouteDecision(
+                route="clarify",
+                agents=["speaker_agent"],
+                intent="clarify_uncertain_request",
+                confidence=min(float(decision.confidence), 0.45),
+                language=request.language or decision.language or "auto",
+                priority=decision.priority,
+                needs_agent=True,
+                should_speak=True,
+                candidate_capabilities=list(decision.candidate_capabilities),
+                reason=(f"{decision.reason}; " if decision.reason else "") + reason,
+                source="llm",
+                metadata=metadata,
+            ),
+            request,
+            source="llm",
+        )
+
+    async def _repair_semantic_route(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+        *,
+        reason: str,
+    ) -> RouteDecision:
+        try:
+            repaired = await self._chat_logged(
+                self.build_semantic_route_repair_payload(
+                    request,
+                    decision,
+                    reason=reason,
+                ),
+                stage="semantic_route_repair",
+                request=request,
+            )
+            repaired_decision = self._decision_from_response(
+                request,
+                repaired,
+                stage="semantic_route_repair",
+            )
+        except Exception as exc:
+            logger.warning(
+                "semantic route repair failed sid=%s reason=%s error_type=%s error=%s",
+                request.sid,
+                reason,
+                type(exc).__name__,
+                exc,
+            )
+            return self._safe_semantic_clarification(
+                request,
+                decision,
+                reason=f"{reason}; semantic repair failed",
+            )
+
+        conflict = _route_intent_contract_conflict(request, repaired_decision)
+        if (
+            repaired_decision.route == "deep_thought"
+            and repaired_decision.intent in {"", "unknown", "deep_thought_low_confidence"}
+        ):
+            return self._safe_semantic_clarification(
+                request,
+                decision,
+                reason=f"{reason}; repaired decision remained semantically unresolved",
+            )
+        if conflict is not None:
+            logger.warning(
+                "semantic route repair remained inconsistent sid=%s conflict=%s route=%s intent=%s",
+                request.sid,
+                conflict,
+                repaired_decision.route,
+                repaired_decision.intent,
+            )
+            return self._safe_semantic_clarification(
+                request,
+                decision,
+                reason=f"{reason}; repaired decision still violates {conflict}",
+            )
+        if repaired_decision.route in DETERMINISTIC_ONLY_ROUTES:
+            return self._safe_semantic_clarification(
+                request,
+                decision,
+                reason=f"{reason}; repair returned deterministic-only route",
+            )
+        if (
+            repaired_decision.route != "clarify"
+            and repaired_decision.confidence < self.confidence_threshold
+        ):
+            return self._safe_semantic_clarification(
+                request,
+                decision,
+                reason=f"{reason}; repaired decision remained low confidence",
+            )
+
+        metadata = dict(repaired_decision.metadata or {})
+        metadata["semantic_route_repair"] = {
+            "status": "repaired",
+            "reason": reason,
+            "original_route": decision.route,
+            "original_intent": decision.intent,
+            "original_confidence": decision.confidence,
+        }
+        repaired_decision = repaired_decision.model_copy(update={"metadata": metadata})
+        repaired_decision.reason = (
+            f"{repaired_decision.reason}; " if repaired_decision.reason else ""
+        ) + f"fast_model:{self.model} semantic route repair after {reason}"
+        logger.info(
+            "semantic route repaired sid=%s reason=%s original=%s/%s repaired=%s/%s confidence=%.2f",
+            request.sid,
+            reason,
+            decision.route,
+            decision.intent,
+            repaired_decision.route,
+            repaired_decision.intent,
+            repaired_decision.confidence,
+        )
+        return repaired_decision
+
+    async def _repair_route_intent_contract(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        conflict = _route_intent_contract_conflict(request, decision)
+        if conflict is None:
+            return decision
+        return await self._repair_semantic_route(
+            request,
+            decision,
+            reason=conflict,
+        )
+
     async def _review_ambiguous_deep_thought(
         self,
         request: RouteRequest,
         decision: RouteDecision,
     ) -> RouteDecision:
-        if not self.slow_review_recovery_enabled or not self.review_model:
-            return decision
         if decision.route != "deep_thought":
             return decision
-        if decision.reason or decision.intent not in {"", "unknown"}:
+        ambiguous_shape = decision.intent in {"", "unknown"} and not decision.reason
+        low_confidence = (
+            decision.confidence < self.confidence_threshold
+            or decision.intent == "deep_thought_low_confidence"
+        )
+        if not ambiguous_shape and not low_confidence:
             return decision
-        try:
-            reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
-            reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
-        except Exception as exc:
-            logger.warning("LLM review model ambiguous deep_thought check failed: %s", exc)
-            return decision
-        if (
-            reviewed_decision.route == "deep_thought"
-            and reviewed_decision.intent in {"", "unknown"}
-            and not reviewed_decision.reason
-        ):
-            return decision
-        if reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES:
-            reviewed_decision.reason = (
-                f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-            ) + f"review_model:{self.review_model} reviewed ambiguous deep_thought"
-            logger.info(
-                "LLM review model changed ambiguous deep_thought to %s/%s",
-                reviewed_decision.route,
-                reviewed_decision.intent,
-            )
-            return reviewed_decision
-        return decision
+
+        reason = (
+            "ambiguous_deep_thought_without_semantic_intent"
+            if ambiguous_shape
+            else "low_confidence_deep_thought_requires_semantic_review"
+        )
+        if self.slow_review_recovery_enabled and self.review_model:
+            try:
+                reviewed = await self._chat_logged(
+                    self.build_intent_review_payload(request),
+                    stage="intent_review",
+                    request=request,
+                )
+                reviewed_decision = self._decision_from_response(
+                    request,
+                    reviewed,
+                    stage="intent_review",
+                )
+            except Exception as exc:
+                logger.warning(
+                    "LLM review model uncertain deep_thought check failed: %s",
+                    exc,
+                )
+            else:
+                conflict = _route_intent_contract_conflict(request, reviewed_decision)
+                review_resolved = not (
+                    reviewed_decision.route == "deep_thought"
+                    and reviewed_decision.intent
+                    in {"", "unknown", "deep_thought_low_confidence"}
+                )
+                if (
+                    conflict is None
+                    and review_resolved
+                    and reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES
+                    and (
+                        reviewed_decision.route == "clarify"
+                        or reviewed_decision.confidence >= self.confidence_threshold
+                    )
+                ):
+                    review_label = (
+                        "ambiguous deep_thought"
+                        if ambiguous_shape
+                        else "uncertain deep_thought"
+                    )
+                    reviewed_decision.reason = (
+                        f"{reviewed_decision.reason}; "
+                        if reviewed_decision.reason
+                        else ""
+                    ) + f"review_model:{self.review_model} reviewed {review_label}"
+                    logger.info(
+                        "LLM review model changed uncertain deep_thought to %s/%s",
+                        reviewed_decision.route,
+                        reviewed_decision.intent,
+                    )
+                    return reviewed_decision
+
+        return await self._repair_semantic_route(
+            request,
+            decision,
+            reason=reason,
+        )
 
     async def _recover_deterministic_only_decision(
         self,
@@ -2099,11 +2639,17 @@ class OllamaLLMRouter:
         else:
             decision = await self._review_ambiguous_deep_thought(request, decision)
         decision = await self._review_route_only_robot_action(request, decision)
+        # First normalize a genuine weather request through the catalog-gated
+        # tool affordance. If weather semantics remain on a non-tool route for
+        # non-weather text, treat that as an internally inconsistent model
+        # decision and ask a semantic model to repair it.
         decision = self._recover_weather_affordance_misroute(
             request,
             decision,
             reason="post_review_robot_action_weather_like",
         )
+        decision = await self._repair_route_intent_contract(request, decision)
+        decision = await self._review_generic_chat_affordance(request, decision)
         decision = self._reject_ambiguous_weather_tool_route(request, decision)
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:

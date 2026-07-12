@@ -196,6 +196,33 @@ class DeepThinkingDelegationPolicyTest(unittest.TestCase):
         self.assertIn("missing_or_desired_ability", metadata["reasons"])
         self.assertIn("SkillRuntime", metadata["note"])
 
+    def test_semantic_capability_planner_handoff_is_not_redelegated(self) -> None:
+        decision = RouteDecision(
+            route="robot_action",
+            agents=["capability_agent", "safety_agent", "speaker_agent"],
+            intent="semantic_capability_planning",
+            confidence=0.0,
+            metadata={
+                "desired_abilities": [
+                    {
+                        "ability_id": "unresolved_effectful_goal",
+                        "status": "semantic_planning_required",
+                    }
+                ],
+                "router_semantic_handoff": {
+                    "status": "planner_required",
+                    "authority": "advisory",
+                },
+            },
+            source="llm",
+        )
+
+        delegation = self.policy.evaluate(decision, context={})
+
+        self.assertFalse(delegation.should_delegate)
+        self.assertEqual(delegation.original_route, "robot_action")
+        self.assertEqual(delegation.original_intent, "semantic_capability_planning")
+
     def test_route_item_can_request_deepthinking_without_physical_risk(self) -> None:
         decision = RouteDecision(
             route="chat",

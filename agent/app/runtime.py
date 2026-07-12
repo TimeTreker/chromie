@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 from typing import Any
 
@@ -21,6 +23,7 @@ from .agents import (
 )
 from .dispatcher import selected_agents
 from .interaction import InteractionDraft, NativeInteractionOutputError
+from .social_attention import SocialAttentionPlanner
 from .schema import AgentResult, AgentRunRequest, RouteDecision
 
 try:
@@ -66,36 +69,6 @@ def _is_terminal_router_acknowledgement(decision: RouteDecision) -> bool:
     )
 
 
-_EXPRESSIVE_ATTENTION_ARGS = {
-    "style": "neutral",
-    "duration_s": 2.4,
-    "hold_fraction": 0.35,
-}
-_EXPRESSIVE_CUE_CAPABILITY_IDS = (
-    "soridormi.express_attention",
-)
-
-
-def _catalog_item(
-    request: AgentRunRequest,
-    capability_id: str,
-) -> dict | None:
-    candidates = request.route_decision.candidate_capabilities
-    if not candidates:
-        candidates = request.context.get("capability_candidates") or []
-    if not isinstance(candidates, list):
-        return None
-    for item in candidates:
-        if not isinstance(item, dict):
-            continue
-        if item.get("capability_id") != capability_id:
-            continue
-        if item.get("available") is False:
-            return None
-        if item.get("interaction_executable") is not True:
-            return None
-        return item
-    return None
 
 
 class _AgentPipeline:
@@ -116,6 +89,7 @@ class _AgentPipeline:
             SpeakerAgent(services),
         ]
         self.agents: dict[str, BaseAgent] = {agent.name: agent for agent in agents}
+        self.social_attention_planner = SocialAttentionPlanner(services)
 
     def available_agents(self) -> list[str]:
         return sorted(self.agents)
@@ -218,10 +192,18 @@ class InteractionRuntime(_AgentPipeline):
 
     async def run(self, request: AgentRunRequest) -> InteractionResponse:
         await self._prepare_capability_route(request)
-        result = await self._run_pipeline(request, InteractionDraft())
+        attention_task = self._start_social_attention_plan(request)
+        try:
+            result = await self._run_pipeline(request, InteractionDraft())
+        except Exception:
+            if attention_task is not None and not attention_task.done():
+                attention_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await attention_task
+            raise
         if not isinstance(result, InteractionDraft):  # pragma: no cover - defensive
             raise TypeError("native interaction runtime returned a non-InteractionDraft value")
-        self._add_expressive_body_cue(request, result)
+        await self._finish_social_attention_plan(request, result, attention_task)
         try:
             return result.to_response()
         except ValidationError as exc:
@@ -242,7 +224,7 @@ class InteractionRuntime(_AgentPipeline):
         request.route_decision.candidate_capabilities = [
             match.model_dump(mode="json") for match in search.matches
         ]
-        await self._ensure_expressive_body_cue_candidates(request)
+        await self._ensure_social_attention_candidates(request)
         request.context["capability_catalog_version"] = search.catalog_version
         request.context["capability_candidates"] = list(
             request.route_decision.candidate_capabilities
@@ -309,116 +291,187 @@ class InteractionRuntime(_AgentPipeline):
         request.context["capability_candidates"] = list(payload)
         request.context["capability_catalog_scope"] = "all"
 
-    async def _ensure_expressive_body_cue_candidates(
+    async def _ensure_social_attention_candidates(
         self,
         request: AgentRunRequest,
     ) -> None:
-        if self.services.expressive_body_cues == "off":
+        mode = self.services.effective_social_attention_mode()
+        if mode == "off":
             return
         catalog = self.services.capability_catalog
         if catalog is None:
             return
-        candidates = request.route_decision.candidate_capabilities
-        existing = {
-            item.get("capability_id")
-            for item in candidates
-            if isinstance(item, dict)
-        }
-        missing = [
+        configured_ids = tuple(
             capability_id
-            for capability_id in _EXPRESSIVE_CUE_CAPABILITY_IDS
-            if capability_id not in existing
-        ]
-        if not missing:
+            for capability_id in self.services.social_attention_capability_ids
+            if capability_id
+        )
+        if not configured_ids:
             return
-        try:
-            cue_search = await catalog.search(
-                "express attention nod yes",
-                language=request.language or request.route_decision.language,
-                limit=max(self.services.capability_match_limit, 16),
-                min_score=0.0,
-                prefer_interaction_executable=True,
-            )
-        except Exception as exc:  # pragma: no cover - defensive service boundary
-            logger.warning("expressive cue catalog lookup failed: %s", exc)
-            return
-        for match in cue_search.matches:
-            payload = match.model_dump(mode="json")
-            capability_id = payload.get("capability_id")
-            if capability_id in missing and capability_id not in existing:
-                candidates.append(payload)
-                existing.add(capability_id)
 
-    def _add_expressive_body_cue(
+        candidates: list[dict[str, Any]] = []
+        for capability_id in configured_ids:
+            item = None
+            if hasattr(catalog, "get_capability"):
+                try:
+                    item = await catalog.get_capability(capability_id)
+                except Exception as exc:  # pragma: no cover - defensive service boundary
+                    logger.warning(
+                        "social attention capability lookup failed id=%s error=%s",
+                        capability_id,
+                        exc,
+                    )
+                    continue
+            if item is None and hasattr(catalog, "entries"):
+                for entry in catalog.entries():
+                    if str(getattr(entry, "capability_id", "")) == capability_id:
+                        item = entry
+                        break
+            if item is None:
+                continue
+            payload = (
+                item.model_dump(mode="json")
+                if hasattr(item, "model_dump")
+                else dict(item)
+                if isinstance(item, dict)
+                else None
+            )
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("available") is False:
+                continue
+            if payload.get("interaction_executable") is not True:
+                continue
+            if mode == "sim_only" and str((payload.get("metadata") or {}).get("mode") or "") != "sim":
+                continue
+            candidates.append(payload)
+
+        if candidates:
+            request.context["social_attention_candidates"] = candidates
+            request.context["social_attention_target_evidence"] = self._social_attention_target_evidence(request)
+
+    def _social_attention_target_evidence(self, request: AgentRunRequest) -> dict[str, Any]:
+        for key in ("social_attention_target", "active_user_target", "perceived_user_target"):
+            value = request.context.get(key)
+            if isinstance(value, dict) and value:
+                explicit_source = str(value.get("source") or "").strip()
+                source = (
+                    explicit_source
+                    if explicit_source in {"live_perception", "conversation_context"}
+                    else "live_perception"
+                    if "perception" in key or "perceived" in key
+                    else "conversation_context"
+                )
+                target = value.get("target")
+                if not isinstance(target, dict):
+                    target = dict(value)
+                    target.pop("source", None)
+                    target.pop("available", None)
+                return {
+                    "available": True,
+                    "source": source,
+                    "target": target,
+                }
+
+        target_ref = (self.services.social_attention_fallback_target or "none").strip()
+        if target_ref.lower() in {"", "none", "off", "disabled"}:
+            return {"available": False}
+        target: dict[str, Any] = {
+            "target_ref": target_ref,
+            "source": "installation_calibration",
+            "confidence": max(0.0, min(1.0, float(self.services.social_attention_fallback_confidence))),
+        }
+        direction = (self.services.social_attention_fallback_direction or "").strip()
+        if direction:
+            target["relative_direction"] = direction
+        yaw = self.services.social_attention_fallback_yaw_rad
+        if isinstance(yaw, (int, float)):
+            target["suggested_args"] = {"target_yaw_rad": float(yaw)}
+        return {"available": True, "source": "installation_calibration", "target": target}
+
+    def _start_social_attention_plan(
+        self,
+        request: AgentRunRequest,
+    ) -> asyncio.Task | None:
+        if self.services.effective_social_attention_mode() == "off":
+            return None
+        if request.route_decision.route in {"ignore", "interrupt"}:
+            return None
+        if not request.route_decision.should_speak:
+            return None
+        if not request.context.get("social_attention_candidates"):
+            return None
+        if self.services.social_attention_ollama is None:
+            return None
+        return asyncio.create_task(
+            self.social_attention_planner.plan(request),
+            name=f"social-attention:{request.sid or 'turn'}",
+        )
+
+    async def _finish_social_attention_plan(
         self,
         request: AgentRunRequest,
         result: InteractionDraft,
+        task: asyncio.Task | None,
     ) -> None:
-        if self.services.expressive_body_cues == "off":
+        if task is None:
             return
-        if request.route_decision.route != "chat":
-            return
-        if result.status != "ok":
-            return
-        if getattr(result, "_skills", []):
+        plan = None
+        if task.done():
+            try:
+                plan = task.result()
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("social attention task failed sid=%s error=%s", request.sid, exc)
+                result.metadata["social_attention_status"] = "model_unavailable"
+                return
+        else:
+            wait_ms = max(0, int(self.services.social_attention_wait_after_response_ms))
+            if wait_ms <= 0:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+                result.metadata["social_attention_status"] = "skipped_latency_budget"
+                result.trace.append("runtime: social attention skipped after latency budget")
+                return
+            try:
+                plan = await asyncio.wait_for(asyncio.shield(task), timeout=wait_ms / 1000.0)
+            except TimeoutError:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+                result.metadata["social_attention_status"] = "skipped_latency_budget"
+                result.trace.append("runtime: social attention skipped after latency budget")
+                return
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("social attention task failed sid=%s error=%s", request.sid, exc)
+                result.metadata["social_attention_status"] = "model_unavailable"
+                return
+        if plan is None:
+            result.metadata["social_attention_status"] = "model_unavailable"
             return
 
-        speech_text = " ".join(item.text for item in result.speak_immediate)
-        if not speech_text.strip():
+        result.metadata["social_attention_plan"] = plan.model_dump(mode="json", exclude_none=True)
+        mode = self.services.effective_social_attention_mode()
+        if mode == "report_only":
+            result.metadata["social_attention_status"] = "report_only"
             return
-
-        match = self._expressive_cue_catalog_item(
-            request,
-            "soridormi.express_attention",
-        )
-        if match is None:
-            return
-        self._add_expressive_skill(
+        skills, reasons = self.social_attention_planner.validate_and_materialize(
             request,
             result,
-            match,
-            skill_id="soridormi.express_attention",
-            args=dict(_EXPRESSIVE_ATTENTION_ARGS),
-            reason="chat_attention",
+            plan,
         )
-
-    def _expressive_cue_catalog_item(
-        self,
-        request: AgentRunRequest,
-        capability_id: str,
-    ) -> dict | None:
-        match = _catalog_item(request, capability_id)
-        if match is None:
-            return None
-        cue_mode = self.services.expressive_body_cues
-        capability_mode = str((match.get("metadata") or {}).get("mode") or "")
-        if cue_mode == "sim_only" and capability_mode != "sim":
-            return None
-        return match
-
-    def _add_expressive_skill(
-        self,
-        request: AgentRunRequest,
-        result: InteractionDraft,
-        match: dict,
-        *,
-        skill_id: str,
-        args: dict,
-        reason: str,
-    ) -> None:
-        result.add_skill(
-            SkillRequest(
-                skill_id=skill_id,
-                args=args,
-                timing="parallel",
-                requires_confirmation=bool(match.get("requires_confirmation")),
-                metadata={
-                    "source": "expressive_body_cue",
-                    "reason": reason,
-                    "catalog_version": request.context.get("capability_catalog_version"),
-                    "catalog_score": match.get("score"),
-                },
+        if reasons:
+            result.metadata["social_attention_validation_reasons"] = reasons
+        if not skills:
+            result.metadata["social_attention_status"] = (
+                "not_selected" if plan.decision == "none" else "not_applied"
             )
+            return
+        for skill in skills:
+            result.add_skill(skill)
+        result.metadata["social_attention_status"] = "applied"
+        result.metadata["social_attention_skills"] = [skill.skill_id for skill in skills]
+        result.trace.append(
+            "runtime: applied model-authored social attention "
+            + ",".join(skill.skill_id for skill in skills)
         )
-        result.metadata["expressive_body_cue"] = skill_id
-        result.trace.append(f"runtime: added expressive {skill_id} cue")

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "id": "compound_unresolved_handoff_to_capability_planner",
+  "suite": "router",
+  "level": "integration",
+  "description": "A quick Router that invents one compound skill for a walk-and-blink request must hand the complete utterance to semantic capability planning instead of declaring the ability missing.",
+  "tags": ["compound-action", "semantic-planning", "walk", "blink", "no-terminal-fallback"],
+  "input": {
+    "text": "哎，你能往前跑个15秒，然后同时眨眨眼睛吗？边跑边眨眼睛。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "matched": true,
+      "suggested_route": "robot_action",
+      "suggested_agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "catalog_version": 91,
+      "capabilities": [
+        {
+          "capability_id": "soridormi.walk_forward",
+          "agent_id": "soridormi.skill",
+          "description": "Walk forward for a bounded duration and speed.",
+          "route": "robot_action",
+          "prompt_tier": "common",
+          "score": 0.91,
+          "available": true,
+          "interaction_executable": true
+        },
+        {
+          "capability_id": "soridormi.blink_eyes",
+          "agent_id": "soridormi.skill",
+          "description": "Blink the eyes a bounded number of times.",
+          "route": "robot_action",
+          "prompt_tier": "common",
+          "score": 0.88,
+          "available": true,
+          "interaction_executable": true
+        }
+      ]
+    },
+    "llm_decision": {
+      "route": "robot_action",
+      "agents": ["capability_agent", "safety_agent", "speaker_agent"],
+      "intent": "soridormi.walk_and_blink_together",
+      "confidence": 0.95,
+      "language": "zh-CN",
+      "source": "llm",
+      "reason": "quick model compressed the compound goal into an invented skill"
+    }
+  },
+  "expect": {
+    "route": "robot_action",
+    "intent": "semantic_capability_planning",
+    "source": "llm",
+    "llm_calls": 1,
+    "task_types_include": ["task.execute_robot_action"],
+    "metadata_json_contains": ["unresolved_requires_planner", "planner_required", "must_not_execute_partial_route"],
+    "metadata_json_forbid": ["missing_or_unsupported_ability", "missing_capability"]
+  }
+}

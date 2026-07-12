@@ -23,12 +23,12 @@ class MindProfileTests(unittest.TestCase):
 
         self.assertTrue(profile.owner_approved)
         self.assertEqual(profile.identity.name, "Chromie")
-        self.assertEqual(profile.identity.kind, "AI robot")
+        self.assertEqual(profile.identity.kind, "embodied robot")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
         self.assertEqual(profile.version, "0.1.2")
         self.assertIn("keep people company", profile.identity.short_self_description)
-        self.assertIn("not as a large language model", profile.identity.model_identity_boundary)
+        self.assertIn("internal components", profile.identity.model_identity_boundary)
         self.assertIn("she", profile.identity.pronouns)
         self.assertIn(
             "generalization_first_ai",
@@ -45,10 +45,25 @@ class MindProfileTests(unittest.TestCase):
             )
         )
         self.assertIn("owner-approved", profile.prompt_summary())
-        self.assertIn("Identity", profile.prompt_summary())
+        self.assertIn("Self model", profile.prompt_summary())
         self.assertIn("Chromie", profile.prompt_summary())
-        self.assertIn("model identity boundary", profile.prompt_summary())
-        self.assertEqual(profile.prompt_context()["identity"]["name"], "Chromie")
+        self.assertIn("language_reasoner", profile.prompt_summary())
+        context = profile.prompt_context()
+        self.assertEqual(context["identity"]["name"], "Chromie")
+        self.assertEqual(context["self_model"]["speaker_entity"]["entity_id"], "chromie")
+        self.assertEqual(context["self_model"]["acting_entity_id"], "chromie")
+        self.assertEqual(
+            context["self_model"]["social_presentation"]["self_reference"],
+            "Chromie",
+        )
+        self.assertNotIn("kind", context["self_model"]["speaker_entity"])
+        self.assertNotIn("age_description", context["self_model"]["speaker_entity"])
+        self.assertFalse(context["self_model"]["internal_components"][0]["speaker_entity"])
+        self.assertEqual(
+            context["self_model"]["internal_components"][0]["kind"],
+            "language model",
+        )
+        self.assertNotIn("model_identity_boundary", context["identity"])
         self.assertIn(
             "generalization_first_ai",
             {item["id"] for item in profile.prompt_context()["core_principles"]},

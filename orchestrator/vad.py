@@ -21,16 +21,19 @@ class VAD:
         frame_duration_ms: int = 30,
         silence_timeout_ms: int = 650,
         pre_roll_ms: int = 300,
+        max_utterance_ms: int = 20000,
     ):
         self.mode = int(mode)
         self.sample_rate = int(sample_rate)
         self.frame_duration_ms = int(frame_duration_ms)
         self.silence_timeout_ms = int(silence_timeout_ms)
         self.pre_roll_ms = int(pre_roll_ms)
+        self.max_utterance_ms = max(0, int(max_utterance_ms))
         self.vad = webrtcvad.Vad(self.mode) if webrtcvad else None
         self.in_speech = False
         self.silence_ms = 0
         self.current = bytearray()
+        self.last_end_reason: str | None = None
         self.pre_roll_frames = collections.deque(
             maxlen=max(1, int(self.pre_roll_ms / max(1, self.frame_duration_ms)))
         )
@@ -54,6 +57,7 @@ class VAD:
             return False
 
     def process_chunk(self, frame: bytes) -> tuple[bool, bool, bytes | None]:
+        self.last_end_reason = None
         speech = self._is_speech(frame)
         started = False
         ended = False
@@ -71,6 +75,17 @@ class VAD:
             return started, ended, audio
 
         self.current.extend(frame)
+        if self.max_utterance_ms > 0:
+            current_ms = (
+                len(self.current) / max(1, self.sample_rate * 2) * 1000.0
+            )
+            if current_ms >= self.max_utterance_ms:
+                ended = True
+                audio = bytes(self.current)
+                self.reset()
+                self.last_end_reason = "max_duration"
+                return started, ended, audio
+
         if speech:
             self.silence_ms = 0
             return started, ended, audio
@@ -80,4 +95,5 @@ class VAD:
             ended = True
             audio = bytes(self.current)
             self.reset()
+            self.last_end_reason = "silence"
         return started, ended, audio

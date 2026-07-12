@@ -341,7 +341,9 @@ class InteractionRuntimeCoordinator:
         return annotate_task_proposal_ledger(
             annotate_preflight_validation(
                 self._reconcile_truth(
-                    self._with_session_metadata(response, session_id),
+                    self._enforce_structured_planning_state(
+                        self._with_session_metadata(response, session_id)
+                    ),
                     session_id=session_id,
                 ),
                 registry=self.registry,
@@ -349,6 +351,54 @@ class InteractionRuntimeCoordinator:
                 confirmed_request_ids=confirmed_request_ids,
                 soridormi_catalog_loaded=self._catalog_loaded,
             )
+        )
+
+
+    def _enforce_structured_planning_state(
+        self,
+        response: InteractionResponse,
+    ) -> InteractionResponse:
+        """Prevent effectful execution when the structured planner blocked it.
+
+        This does not interpret user language or choose an alternative. It only
+        enforces the planner's structured decision so a partially accumulated
+        skill cannot survive a clarification/unavailable result.
+        """
+
+        metadata = response.metadata if isinstance(response.metadata, dict) else {}
+        planning_result = str(metadata.get("planning_result") or "").strip()
+        capability_decision = str(metadata.get("capability_decision") or "").strip()
+        blocked = planning_result in {
+            "needs_clarification",
+            "unavailable",
+            "blocked",
+        } or capability_decision in {"clarify", "unsupported", "blocked"}
+        if not blocked:
+            return response
+        effectful = [
+            request
+            for request in response.skills
+            if request.skill_id != "chromie.speak"
+        ]
+        if not effectful:
+            return response
+        return response.model_copy(
+            deep=True,
+            update={
+                "skills": [
+                    request
+                    for request in response.skills
+                    if request.skill_id == "chromie.speak"
+                ],
+                "requires_confirmation": False,
+                "metadata": {
+                    **metadata,
+                    "structured_planning_execution_suppressed": True,
+                    "suppressed_skill_ids": [
+                        request.skill_id for request in effectful
+                    ],
+                },
+            },
         )
 
     async def _body_setup_failure(

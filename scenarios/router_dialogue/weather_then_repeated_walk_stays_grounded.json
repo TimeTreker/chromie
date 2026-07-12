@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "id": "weather_then_repeated_walk_stays_grounded",
+  "suite": "router_dialogue",
+  "level": "integration",
+  "description": "After a weather query, repeated walking requests must remain grounded to the walking skill even when the mocked quick model repeatedly emits the stale weather intent.",
+  "tags": [
+    "voice-log",
+    "multi-turn",
+    "weather-context-pollution",
+    "repeatability",
+    "walk",
+    "router-agent-contract"
+  ],
+  "stub": {
+    "router_mode": "hybrid",
+    "catalog": {
+      "catalog_version": 72,
+      "capabilities": [
+        {
+          "capability_id": "chromie.weather.lookup",
+          "agent_id": "chromie.tool",
+          "description": "Read current weather or forecast for a city.",
+          "route": "tool",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": [
+            "read_only",
+            "weather_lookup"
+          ],
+          "safety_class": "safe_read",
+          "requires_confirmation": false
+        },
+        {
+          "capability_id": "soridormi.walk_velocity",
+          "agent_id": "soridormi.skill",
+          "description": "Walk forward or backward at a bounded velocity for a bounded duration.",
+          "route": "robot_action",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": [
+            "physical_motion"
+          ],
+          "safety_class": "physical_motion",
+          "requires_confirmation": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "vx_mps": {
+                "type": "number"
+              },
+              "duration_s": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "vx_mps",
+              "duration_s"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "turns": [
+    {
+      "id": "weather",
+      "ask": "What is the weather in Beijing today?",
+      "language": "en-US",
+      "stub": {
+        "llm_script": [
+          {
+            "stage": "quick_intent",
+            "decision": {
+              "route": "tool",
+              "intent": "weather_query",
+              "confidence": 0.96,
+              "language": "en-US",
+              "fast_speech": {
+                "text": "Okay, I will check today's weather in Beijing.",
+                "purpose": "acknowledge_and_check",
+                "commitment": "checking_only",
+                "must_not_claim_completion": true
+              },
+              "metadata": {
+                "tool_name": "weather",
+                "weather_query": {
+                  "location": "Beijing",
+                  "date": "today",
+                  "units": "metric"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "expect": {
+        "route": "tool",
+        "intent": "weather_query",
+        "source": "llm",
+        "llm_calls": 1,
+        "llm_stages": [
+          "quick_intent"
+        ],
+        "task_types_include": [
+          "task.use_tool"
+        ]
+      }
+    },
+    {
+      "id": "walk_first",
+      "ask": "walk forward for 15 seconds quickly",
+      "language": "en-US",
+      "stub": {
+        "run_interaction": true,
+        "llm_script": [
+          {
+            "stage": "quick_intent",
+            "decision": {
+              "route": "chat",
+              "intent": "weather_query",
+              "confidence": 0.95,
+              "language": "en-US",
+              "metadata": {
+                "tool_name": "weather"
+              }
+            }
+          },
+          {
+            "stage": "semantic_route_repair",
+            "decision": {
+              "route": "robot_action",
+              "intent": "capability:soridormi.walk_velocity",
+              "confidence": 0.97,
+              "language": "en-US",
+              "actions": [
+                {
+                  "capability_id": "soridormi.walk_velocity",
+                  "args": {
+                    "vx_mps": 0.25,
+                    "duration_s": 15.0
+                  },
+                  "sequence": 0,
+                  "timing": "sequential",
+                  "confidence": 0.97
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expect": {
+        "route": "robot_action",
+        "intent": "capability:soridormi.walk_velocity",
+        "source": "llm",
+        "llm_calls": 2,
+        "llm_stages": [
+          "quick_intent",
+          "semantic_route_repair"
+        ],
+        "history_contains": [
+          "What is the weather in Beijing today?"
+        ],
+        "actions": [
+          {
+            "capability_id": "soridormi.walk_velocity",
+            "args": {
+              "vx_mps": 0.25,
+              "duration_s": 15.0
+            }
+          }
+        ],
+        "skills": [
+          "soridormi.walk_velocity"
+        ],
+        "skill_args": [
+          {
+            "vx_mps": 0.25,
+            "duration_s": 15.0
+          }
+        ],
+        "requires_confirmation": true,
+        "status": "ok",
+        "speech_all": [
+          "I will run that action."
+        ],
+        "forbidden_speech_any": [
+          "weather",
+          "forecast",
+          "please say that again"
+        ]
+      }
+    },
+    {
+      "id": "walk_repeat",
+      "ask": "walk forward for 15 seconds quickly",
+      "language": "en-US",
+      "stub": {
+        "run_interaction": true,
+        "llm_script": [
+          {
+            "stage": "quick_intent",
+            "decision": {
+              "route": "chat",
+              "intent": "weather_query",
+              "confidence": 0.95,
+              "language": "en-US",
+              "metadata": {
+                "tool_name": "weather"
+              }
+            }
+          },
+          {
+            "stage": "semantic_route_repair",
+            "decision": {
+              "route": "robot_action",
+              "intent": "capability:soridormi.walk_velocity",
+              "confidence": 0.97,
+              "language": "en-US",
+              "actions": [
+                {
+                  "capability_id": "soridormi.walk_velocity",
+                  "args": {
+                    "vx_mps": 0.25,
+                    "duration_s": 15.0
+                  },
+                  "sequence": 0,
+                  "timing": "sequential",
+                  "confidence": 0.97
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expect": {
+        "route": "robot_action",
+        "intent": "capability:soridormi.walk_velocity",
+        "source": "llm",
+        "llm_calls": 2,
+        "llm_stages": [
+          "quick_intent",
+          "semantic_route_repair"
+        ],
+        "history_contains": [
+          "What is the weather in Beijing today?",
+          "walk forward for 15 seconds quickly"
+        ],
+        "actions": [
+          {
+            "capability_id": "soridormi.walk_velocity",
+            "args": {
+              "vx_mps": 0.25,
+              "duration_s": 15.0
+            }
+          }
+        ],
+        "skills": [
+          "soridormi.walk_velocity"
+        ],
+        "skill_args": [
+          {
+            "vx_mps": 0.25,
+            "duration_s": 15.0
+          }
+        ],
+        "requires_confirmation": true,
+        "status": "ok",
+        "speech_all": [
+          "I will run that action."
+        ],
+        "forbidden_speech_any": [
+          "weather",
+          "forecast",
+          "please say that again"
+        ]
+      }
+    }
+  ]
+}

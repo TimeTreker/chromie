@@ -48,3 +48,4 @@ class AgentResult(BaseModel):
     reason: str | None = None
     handled_by: list[str] = Field(default_factory=list)
     trace: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)

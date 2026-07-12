@@ -82,7 +82,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Do not", prompt)
         self.assertIn("chain-of-thought", prompt)
         self.assertIn("progress text", prompt)
-        self.assertLess(len(prompt), 4600)
+        self.assertLess(len(prompt), 4900)
 
 
     def test_router_observability_profiles_prompt_and_raw_weather_output(self) -> None:
@@ -129,6 +129,20 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(raw_summary["raw_intent"], "weather_query")
         self.assertTrue(raw_summary["raw_fast_speech_present"])
         self.assertTrue(raw_summary["raw_weather_query_present"])
+
+
+    def test_router_prompt_semantically_separates_capability_inquiry_from_execution(self) -> None:
+        router = OllamaLLMRouter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        system = router.load_system_prompt()
+        self.assertIn("Capability Inquiry And Execution", system)
+        self.assertIn("Availability questions stay chat", system)
+        self.assertIn("execution requests use robot_action", system)
+        self.assertIn("semantic distinction, not a phrase pattern", system)
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
         router = OllamaLLMRouter(
@@ -234,9 +248,9 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Affordance Grounding", prompt)
         self.assertIn("compact body/tool affordance interface", prompt)
         self.assertIn("not a phrase table", prompt)
-        self.assertIn("one parameterized skill", prompt)
+        self.assertIn("One parameterized skill", prompt)
         self.assertIn("CapabilityAgent", prompt)
-        self.assertIn("isolated letters", prompt)
+        self.assertIn("Isolated letters", prompt)
         self.assertIn("low-information ASR fragments", prompt)
         self.assertNotIn("Semantic Examples", prompt)
         self.assertNotIn("no executable blink skill is in the compact skill catalog", prompt)
@@ -554,6 +568,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(payload["format"], "json")
         self.assertEqual(relaxed["format"], "json")
         self.assertEqual(payload["options"]["num_predict"], 96)
+        self.assertEqual(payload["options"]["num_ctx"], 4096)
         self.assertIn("Go ahead and sing a song for me.", payload["messages"][1]["content"])
 
     def test_route_only_json_response_gets_default_llm_confidence(self) -> None:
@@ -1330,7 +1345,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
-        self.assertEqual(decision.intent, "soridormi.walk_forward")
+        self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
         self.assertIn("selected exact skill for underspecified robot_action", decision.reason or "")
         self.assertIn("soridormi.walk_forward", review_user)
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
@@ -1389,7 +1404,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("selected exact skill for underspecified robot_action", decision.reason or "")
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
 
-    async def test_ambiguous_deep_thought_tries_review_before_fallback(self) -> None:
+    async def test_ambiguous_deep_thought_tries_review_then_clarifies(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
             def __init__(self) -> None:
                 super().__init__(
@@ -1428,10 +1443,14 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertIn("ambiguous_llm_deep_thought", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "clarify")
+        self.assertEqual(decision.intent, "clarify_uncertain_request")
+        self.assertIn("semantically unresolved", decision.reason or "")
+        self.assertEqual(
+            [payload["model"] for payload in router.payloads],
+            ["test-model", "review-model", "test-model"],
+        )
 
     async def test_ambiguous_deep_thought_review_recovers_chinese_walk_command(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
@@ -1496,7 +1515,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("往前走个15秒", review_prompt)
         self.assertIn("soridormi.walk_forward", review_prompt)
 
-    async def test_ambiguous_deep_thought_review_failure_falls_back_to_chat(self) -> None:
+    async def test_ambiguous_deep_thought_review_failure_clarifies(self) -> None:
         class ReviewRouter(OllamaLLMRouter):
             def __init__(self) -> None:
                 super().__init__(
@@ -1522,9 +1541,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         router = ReviewRouter()
         decision = await router.route(RouteRequest(text="Hello, how are you."))
 
-        self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.route, "chat")
-        self.assertIn("ambiguous_llm_deep_thought", decision.reason or "")
+        self.assertEqual(decision.source, "llm")
+        self.assertEqual(decision.route, "clarify")
+        self.assertEqual(decision.intent, "clarify_uncertain_request")
+        self.assertIn("semantically unresolved", decision.reason or "")
 
     async def test_placeholder_capability_intent_is_repaired_before_agent(self) -> None:
         class PlaceholderRouter(OllamaLLMRouter):
@@ -1618,6 +1638,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     model="test-model",
                     timeout_ms=800,
                     confidence_threshold=0.55,
+                    tool_fast_speech_repair_enabled=True,
                 )
                 self.stages: list[str] = []
 
@@ -1671,6 +1692,51 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.fast_speech.commitment, "checking_only")
         self.assertIn("fast_speech_repair", decision.metadata)
         self.assertEqual(router.stages, ["primary_router", "fast_speech_repair"])
+
+    async def test_tool_route_missing_fast_speech_does_not_add_router_latency_by_default(self) -> None:
+        class WeatherRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="test-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.calls = 0
+
+            async def _chat(self, payload: dict) -> dict:
+                self.calls += 1
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"tool","intent":"weather_query","confidence":0.95,'
+                            '"metadata":{"tool_name":"weather",'
+                            '"weather_query":{"location":"重庆","date":"today","units":"metric"}}}'
+                        )
+                    }
+                }
+
+        router = WeatherRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="今天重庆天气怎么样？",
+                language="zh-CN",
+                context={
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "effects": ["external_read", "weather_lookup"],
+                            "description": "Retrieve current weather or forecast for a city.",
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "tool")
+        self.assertIsNone(decision.fast_speech)
+        self.assertEqual(router.calls, 1)
 
     async def test_tool_route_existing_fast_speech_does_not_repair(self) -> None:
         class WeatherRouter(OllamaLLMRouter):

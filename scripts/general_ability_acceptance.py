@@ -135,9 +135,12 @@ def _skill_items(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _is_expressive_cue_skill(item: dict[str, Any]) -> bool:
     metadata = item.get("metadata")
-    return (
+    return bool(
         isinstance(metadata, dict)
-        and metadata.get("source") == "expressive_body_cue"
+        and (
+            metadata.get("source") in {"expressive_body_cue", "social_attention_plan"}
+            or metadata.get("auxiliary_social_attention") is True
+        )
     )
 
 

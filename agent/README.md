@@ -114,7 +114,12 @@ Risk-bearing behavior is default-off.
 | `AGENT_RESPONSE_REVIEW_MODEL` | `gemma4:e2b` | Semantic reviewer model; defaults to the main Agent model so weak replies are judged with enough context. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
 | `AGENT_RESPONSE_REVIEW_MODE` | `auto` | In `auto`, skip the extra spoken-response review for clearly low-risk chat replies while still reviewing task/capability/action-risk replies. Use `always` for diagnostics. |
-| `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Optional native chat body cue policy: `off`, `sim_only`, or `on`. Leave off unless the target robot/sim has reviewed expressive motion. |
+| `AGENT_SOCIAL_ATTENTION_MODE` | `off` | Model-authored optional social-attention policy: `off`, `report_only`, `sim_only`, or `on`. The model may select a bounded named gesture or `none`; runtime validates target evidence, schemas, resources, and confirmation policy. |
+| `AGENT_SOCIAL_ATTENTION_MODEL` | `qwen3:4b` | Dedicated model for structured `SocialAttentionPlan` output. |
+| `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | `150` | Maximum extra wait after the main response for an already-running attention plan; timeout skips the optional behavior. |
+| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named skills | Exact catalog IDs eligible for model selection; this list does not force any gesture. |
+| `AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET` | `none` | Optional installation-calibrated target used only when live perception is absent. |
+| `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Deprecated compatibility alias used only when `AGENT_SOCIAL_ATTENTION_MODE` is unset. |
 | `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | Fail closed when semantic review is unavailable for an executable robot action; exact Router capability substitutions require a reviewer revision. Enable for stricter review. |
 | `AGENT_CONVERSATION_NUM_CTX` | `2048` | Context window for normal conversation prompts. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | `64` | Output budget for normal conversation replies. |
@@ -128,6 +133,7 @@ Risk-bearing behavior is default-off.
 | `AGENT_CAPABILITY_NUM_CTX` | `24576` | Verification-mode context window for LLM capability selection prompts. Optimize downward only after feasibility and latency evidence are both acceptable. |
 | `AGENT_CAPABILITY_NUM_PREDICT` | `512` | Output budget for LLM capability-selection JSON. |
 | `AGENT_CAPABILITY_REVIEW_NUM_PREDICT` | `160` | Output budget for semantic capability-plan review JSON. |
+| `AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT` | `384` | Output budget for the semantic parameter-resolution retry used only when a proposed skill plan fails its supplied schema. |
 | `AGENT_ENABLE_TASK_GRAPH_PLANNING` | `0` | Allow LLM-authored TaskGraph planning for tool routes. |
 | `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION` | `0` | Enable side-effect-free read-only execution. |
 | `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION` | `0` | Enable stateful `planning_only` execution. |
@@ -143,6 +149,22 @@ Risk-bearing behavior is default-off.
 | `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION` | `0` | Permit physical nodes after confirmation and active-monitor proof. Requires guarded execution. |
 
 See [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md) for all settings.
+
+## Model-driven social attention
+
+The native interaction runtime may start a dedicated social-attention planner in
+parallel with the main response. The planner receives eligible named social
+skills, the dialogue act, recent context, and evidence for the active user
+target. It may select subtle gaze, blink, nod, another supplied expression, or
+`none`. The plan is advisory until deterministic validation confirms exact
+skill IDs, argument schemas, target evidence, availability, resource
+compatibility, confirmation policy, and the small latency budget.
+
+Attention skills carry `metadata.auxiliary_social_attention=true`, are excluded
+from user task proposals, and are dropped rather than delaying or conflicting
+with the primary task. Project defaults remain off. The maintained voice-MuJoCo
+launcher enables `sim_only` with a calibrated right-side fallback; a future live
+perception target overrides that calibration.
 
 ## Capability manifests
 

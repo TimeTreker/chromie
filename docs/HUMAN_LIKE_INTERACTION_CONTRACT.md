@@ -235,6 +235,27 @@ expose internal fallback text such as:
 我没有生成可验证的动作指令，所以我不会说已经执行。
 ```
 
+## Social attention during speech
+
+Chromie may coordinate speech with subtle nonverbal attention, but attention is
+the goal and no particular gesture is mandatory. Blinking, gaze, a small nod,
+or remaining still are possible model-selected expressions, not fixed responses
+attached to every utterance.
+
+The interaction model receives the current turn, recent context, eligible named
+social capabilities, target evidence, and provider/resource metadata. It may
+produce a structured `SocialAttentionPlan` with `decision=express` or
+`decision=none`. It must not create a new user task, claim perception that is
+not present, or invent a target. Live perception wins over installation
+calibration; a calibrated position is only a fallback when perception is absent.
+
+Deterministic runtime code validates exact skill IDs, schemas, target evidence,
+confirmation policy, execution availability, latency budget, and resource
+conflicts. Auxiliary attention skills are not user task proposals and must be
+suppressed when they would interfere with the primary action. Do not implement
+normal attention through rules such as "blink twice after every reply" or
+"always look right."
+
 ## LLM wording inside contracts
 
 Avoid hardcoded user-facing text as the normal interaction strategy. The system

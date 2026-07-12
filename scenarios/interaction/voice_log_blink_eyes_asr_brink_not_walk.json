@@ -114,9 +114,40 @@
       "source": "llm"
     },
     "ollama_reply": {
-      "decision": "clarify",
-      "speech": "I can blink my eyes, but I can only do it up to 6 times at a time.",
-      "skills": []
+      "decision": "execute",
+      "speech": "Okay, I'll blink my eyes 15 times in three batches.",
+      "skills": [
+        {
+          "skill_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 6
+          },
+          "timing": "sequential",
+          "step_id": "blink-batch-1"
+        },
+        {
+          "skill_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 6
+          },
+          "timing": "sequential",
+          "step_id": "blink-batch-2"
+        },
+        {
+          "skill_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 3
+          },
+          "timing": "sequential",
+          "step_id": "blink-batch-3"
+        }
+      ],
+      "plan_relation": "exact",
+      "original_goal_summary": "blink fifteen times",
+      "assessment": {
+        "goal_coverage": "complete",
+        "batching": "model-authored schema-valid sequence"
+      }
     }
   },
   "expect": {
@@ -157,8 +188,8 @@
       "chromie.speak",
       "preflight_validation",
       "unknown_until_runtime",
-      "capability_batched_over_limit",
-      "exact_routed_count_batch_recovery"
+      "step_id",
+      "blink-batch-2"
     ],
     "metadata_json_forbid": [
       "soridormi.walk_forward",

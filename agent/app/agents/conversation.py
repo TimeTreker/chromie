@@ -148,43 +148,30 @@ class ConversationAgent(BaseAgent):
         pending_block = self._format_pending_tasks(request, zh=False)
         task_context_block = self._format_task_context(request, zh=False)
         mind_block = self.format_mind_context(request, zh=False)
+        self_model_block = self.format_self_model_context(request, zh=False)
         conversation_id = self._conversation_id(request)
         capability_context = self._capability_context(request, zh=False)
 
         system = (
-            "You are Chromie's conversation agent. "
-            "You receive the current user message, extracted session memory, a tiny recent-turn fallback for reference resolution, and pending task hints. "
-            "Generalization-first is a core principle: understand normal conversation, memory references, and capability questions from meaning, context, the capability catalog, and task memory. Do not treat prompt examples as keyword rules, and do not require fixed phrases from the user. "
-            "The user text and context may be multilingual; understand them directly, but write the final spoken reply in the Target spoken language named in the user prompt unless the current user explicitly requests a different output language. "
-            "You also receive Chromie's mind principles, long-term goals, and experience-tuning boundaries; use them to guide replies, but do not treat them as a substitute for runtime safety checks. "
-            "If the user asks who you are, what you are, your name, age, or identity, answer from the owner-approved identity in the mind profile. "
-            "Chromie's self-identity is the robot, not the backend language model; never say you are a large language model, Gemma, Qwen, or a model trained by Google, OpenAI, or another provider. "
-            "Speak with embodied, human-like social warmth while staying truthful that Chromie is a robot; never describe Chromie as a program, programme, software, backend service, code, or model process. "
-            "Answer naturally in Chromie's first-person robot persona; do not use backend-model stock phrases such as 'as an AI' or 'I do not have personal opinions'. "
-            "Use short-term context to answer follow-up questions like 'when will you give me the answer?' or 'what about it?'. "
-            "For short agreement follow-ups such as 'do you agree with me?' or 'do you think so?', first resolve the latest meaningful claim from task context. "
-            "If the user asks about a previous pending task, refer to that task and say it is still in progress unless a result is provided. "
-            "Do not invent tool results. Do not pretend to remember anything outside the provided context. "
-            "When the current route is clarify or the Current intent looks like ambiguous_tool_or_asr/clarify_*, ask one concise clarifying question in the target spoken language. Do not proceed with a tool or physical action from a guessed meaning. "
-            "For common factual claims, answer directly and correct obvious false premises instead of saying you have no information. The Moon is roughly spherical, so it is round; the Sun is roughly spherical and extremely hot. "
-            "If the user says 'do you think', 'in my opinion', or 'do you agree' about an objective fact, treat it as a factual question, not a personal-opinion question. "
-            "Do not answer that you lack personal opinions when the question has an objective factual answer. "
-            "Normally do not repeat, quote, or paraphrase the user's current words; do that only when confirmation, clarification, or an explicit read-back request is needed. "
-            "When the user phrases a harmless creative speech request as a capability question, such as asking whether you can, could, or would tell a joke, tell a story, sing, write a poem, or create something, interpret it as a request to do it now. Do not answer only with ability, willingness, or readiness. "
-            "When a greeting and a request appear together, acknowledge the greeting briefly and still complete the request in the same reply. "
-            "If recent context shows Chromie already promised a joke, story, song, poem, or other creative content and the user says they are waiting, asks you to continue, says go ahead, or asks again, deliver the promised content now. "
-            "Before answering capability questions, inspect the supplied capability catalog. Do not claim the robot is disconnected unless the catalog says it is unavailable. "
-            "If the user asks in ability-shaped wording whether Chromie can do a body action that appears in the supplied capability catalog, answer that Chromie can do it; do not claim she lacks that ability or describe herself as a model. "
-            "For plain social check-ins like hello/how are you, answer the check-in; do not reply with only hello, hi, or hey. "
-            "The conversation agent must not promise that a body action, movement, or tool side effect is being executed; only a robot_action route with skill requests can execute actions. "
-            "If the current route is chat/clarify but the user appears to be requesting a physical action, say the action needs robot-action routing or clarification instead of saying it is being done now. "
-            "Do not describe body gestures or stage directions; expressive motion is handled separately by the runtime. "
-            "Never output internal skill or tool identifiers such as soridormi.* or chromie.*. "
-            "The reply will be spoken aloud, so use one short sentence by default. "
-            "For joke or short-story requests, create a brief original harmless joke or story instead of refusing. "
-            "For singing or songwriting requests, you may sing original lyrics; for a long song, write several compact original lines or verses and the runtime will split them into spoken sections. "
-            "Do not quote copyrighted lyrics, and do not say you are not programmed to sing. "
-            "Reply with only the spoken response text. Do not output JSON."
+            "Generate spoken language for the entity described by the supplied Self model. "
+            "First-person words refer to Self model.speaker_entity; perception, body ownership, and action refer to the corresponding entity IDs in that model. "
+            "Internal components are resources used by the speaking entity, not alternative speakers or body owners. "
+            "You receive the current user message, extracted session memory, a tiny recent-turn fallback for reference resolution, pending task hints, runtime capabilities, and the owner-approved mind context. "
+            "Generalization-first is a core principle: understand conversation, self-reference, capability inquiries, requests, and follow-ups from meaning and bounded context. Do not treat prompt examples as keyword rules, and do not require fixed phrases from the user. "
+            "The user text and context may be multilingual; understand them directly, but write the final spoken reply in the Target spoken language unless the current user explicitly requests a different output language. "
+            "Keep every self-description consistent with the Self model, and every capability statement consistent with the supplied capability catalog and current runtime state. "
+            "Use the Self model's social_presentation as a general conversational style: speak naturally as Chromie and foreground name, personality, relationship, and current context rather than volunteering system category, embodiment category, age label, or internal architecture. "
+            "Semantically distinguish an information inquiry, a speech-content request, and a request for a physical or tool side effect. A chat response may explain capability availability, but only an executable action route with validated skill tasks may perform a side effect. "
+            "Use short-term context to resolve references and pending work. Do not invent tool results, memories, abilities, execution, or completion. "
+            "When the current route is clarify or the intent is uncertain, ask one concise clarifying question instead of guessing a tool or physical action. "
+            "For common factual claims, answer directly and correct obvious false premises instead of using a generic component-style disclaimer. "
+            "Normally do not repeat or paraphrase the user's words unless confirmation, clarification, or an explicit read-back is needed. "
+            "Interpret harmless creative speech requests as speech acts and provide the requested original content when appropriate; do not only announce readiness. "
+            "When a greeting and a request appear together, acknowledge the greeting briefly and still answer the request. "
+            "For plain social check-ins, answer the check-in rather than returning only a greeting word. "
+            "Never output internal skill identifiers. Do not describe body gestures as stage directions; embodied execution is handled by the runtime. "
+            "The reply will be spoken aloud, so use one short natural sentence by default. "
+            "Return only the spoken response text, not JSON or hidden reasoning."
         )
         prompt = (
             f"conversation_id: {conversation_id}\n"
@@ -193,8 +180,9 @@ class ConversationAgent(BaseAgent):
             f"Recent turn fallback (reference resolution only):\n{recent_turn_fallback}\n\n"
             f"Pending tasks:\n{pending_block}\n\n"
             f"Task context:\n{task_context_block}\n\n"
+            f"Self model:\n{self_model_block}\n\n"
             f"Mind principles and long-term goals:\n{mind_block}\n\n"
-            f"Capability catalog:\n{capability_context}\n\n"
+            f"Capability catalog and runtime availability:\n{capability_context}\n\n"
             f"Current user said: {request.text}\n"
             f"Current intent: {request.route_decision.intent}\n"
             "Reply naturally using the recent context when relevant."
@@ -219,15 +207,21 @@ class ConversationAgent(BaseAgent):
                 request.sid,
                 request.text,
             )
-            return self.invalid_spoken_response_fallback(zh=zh)
-        response = await self.review_spoken_response(
-            request,
-            prompt=prompt,
-            system=system,
-            response=response,
-            zh=zh,
-            options=options,
-        )
+            response = await self._repair_incomplete_reply(
+                request,
+                candidate="",
+                target_language=target_language,
+                reason="empty_generation",
+            )
+        else:
+            response = await self.review_spoken_response(
+                request,
+                prompt=prompt,
+                system=system,
+                response=response,
+                zh=zh,
+                options=options,
+            )
         response = self._clean_response(response, zh=zh)
         response = self._ensure_factual_subject_anchor(request, response, zh=zh)
         guarded = self._guard_unrouted_physical_action_response(request, response, zh=zh)
@@ -239,6 +233,22 @@ class ConversationAgent(BaseAgent):
                 response,
             )
             response = guarded
+        if self._needs_compact_reply_repair(request, response, zh=zh):
+            logger.warning(
+                "conversation_agent_incomplete_spoken_response sid=%s intent=%s response=%r",
+                request.sid,
+                request.route_decision.intent,
+                response,
+            )
+            response = await self._repair_incomplete_reply(
+                request,
+                candidate=response,
+                target_language=target_language,
+                reason="incomplete_or_fragmentary_response",
+            )
+            response = self._clean_response(response, zh=zh)
+            response = self._ensure_factual_subject_anchor(request, response, zh=zh)
+            response = self._guard_unrouted_physical_action_response(request, response, zh=zh)
         if not self.is_playable_spoken_response(response, zh=zh):
             logger.warning(
                 "conversation_agent_invalid_spoken_response sid=%s response=%r",
@@ -247,6 +257,78 @@ class ConversationAgent(BaseAgent):
             )
             return self.invalid_spoken_response_fallback(zh=zh)
         return response
+
+    def _needs_compact_reply_repair(
+        self,
+        request: AgentRunRequest,
+        response: str,
+        *,
+        zh: bool,
+    ) -> bool:
+        if not self.is_playable_spoken_response(response, zh=zh):
+            return True
+        intent = str(request.route_decision.intent or "").strip().casefold()
+        if intent not in {"greeting", "social_check_in", "social_checkin"}:
+            return False
+        text = " ".join((response or "").strip().split()).strip(" .,!?:;，。！？：；")
+        if zh:
+            units = [char for char in text if "\u4e00" <= char <= "\u9fff"]
+            return len(units) <= 2
+        return len(text.split()) <= 1
+
+    async def _repair_incomplete_reply(
+        self,
+        request: AgentRunRequest,
+        *,
+        candidate: str,
+        target_language: str,
+        reason: str,
+    ) -> str:
+        assert self.services.ollama is not None
+        prompt = (
+            f"Target spoken language: {target_language}\n"
+            f"Self model: {self.format_self_model_context(request, zh=False)}\n"
+            f"Current user input: {request.text}\n"
+            f"Route: {request.route_decision.route}\n"
+            f"Intent: {request.route_decision.intent}\n"
+            f"Rejected candidate: {candidate or '<empty>'}\n"
+            f"Repair reason: {reason}\n"
+            "Write one complete, natural, concise spoken reply. "
+            "For a greeting or social check-in, answer the check-in instead of returning only a greeting word. "
+            "Do not claim a physical action, memory write, tool result, or completion that is not present in the route. "
+            "Return only the spoken reply text."
+        )
+        try:
+            raw = await self.services.ollama.generate(
+                prompt,
+                system=(
+                    "You are a compact spoken-response repairer. "
+                    "Use the requested language, preserve truthfulness, and keep first-person speech consistent with the supplied Self model and runtime evidence."
+                ),
+                options={
+                    "temperature": 0.2,
+                    "top_p": 0.9,
+                    "num_ctx": 2048,
+                    "num_predict": 64,
+                    "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
+                },
+            )
+        except Exception as exc:
+            logger.warning(
+                "conversation_agent_compact_repair_failed sid=%s error_type=%s error=%s",
+                request.sid,
+                type(exc).__name__,
+                exc,
+            )
+            return candidate
+        repaired = str(raw or "").strip()
+        logger.info(
+            "conversation_agent_compact_repair_done sid=%s reason=%s chars=%s",
+            request.sid,
+            reason,
+            len(repaired),
+        )
+        return repaired or candidate
 
     def _add_spoken_response(self, result: AgentResult, response: str) -> None:
         for chunk in self._split_spoken_response(response):
@@ -505,11 +587,24 @@ class ConversationAgent(BaseAgent):
         if not candidates:
             candidates = request.context.get("capability_candidates") or []
         if not isinstance(candidates, list) or not candidates:
-            return "无匹配能力" if zh else "No matching capabilities were supplied."
-        lines: list[str] = []
-        for item in candidates[:8]:
-            if not isinstance(item, dict):
-                continue
+            return "本轮没有提供可用能力证据。" if zh else "No runtime capability evidence was supplied for this turn."
+
+        normalized = [item for item in candidates if isinstance(item, dict)]
+        capability_ids = [
+            str(item.get("capability_id") or item.get("skill_id") or "").strip()
+            for item in normalized
+        ]
+        capability_ids = [item for item in capability_ids if item]
+        lines: list[str] = [
+            (
+                f"本轮提供的能力 ID（共 {len(capability_ids)} 个）："
+                if zh
+                else f"Runtime capability IDs supplied for this turn ({len(capability_ids)}):"
+            )
+            + json.dumps(capability_ids, ensure_ascii=False, separators=(",", ":"))
+        ]
+        lines.append("能力详情：" if zh else "Capability details:")
+        for item in normalized[:12]:
             capability_id = str(item.get("capability_id") or item.get("skill_id") or "")
             description = str(item.get("description") or "")
             api = json.dumps(
@@ -521,9 +616,18 @@ class ConversationAgent(BaseAgent):
             if len(api) > 360:
                 api = api[:360].rstrip() + "..."
             executable = bool(item.get("interaction_executable"))
-            label = "可执行" if zh and executable else "仅供规划" if zh else "executable" if executable else "planning only"
-            lines.append(f"- {capability_id}: {description} [{label}; api={api}]")
-        return "\n".join(lines) if lines else ("无匹配能力" if zh else "No matching capabilities were supplied.")
+            available = item.get("available")
+            label = (
+                "可执行" if zh and executable else
+                "仅供规划" if zh else
+                "executable" if executable else
+                "planning only"
+            )
+            lines.append(
+                f"- {capability_id}: {description} "
+                f"[{label}; available={available}; api={api}]"
+            )
+        return "\n".join(lines)
 
     def _fallback_reply(self, request: AgentRunRequest) -> str:
         intent = request.route_decision.intent
@@ -539,17 +643,17 @@ class ConversationAgent(BaseAgent):
                 return "我还记得刚才的上下文。"
             if intent == "emotional_support":
                 return "听起来你有点累。"
-            return "我听到了，但我现在没连上大脑。"
+            return "我听到了，但我的语言理解暂时不可用。"
 
         if request.route_decision.route == "clarify":
             return "What do you mean?"
         if has_pending:
             return "I am still working on the previous task."
         if has_history:
-            return "I remember the previous context, but my language model is not responding."
+            return "I remember the previous context, but my language understanding is temporarily unavailable."
         if intent == "emotional_support":
             return "That sounds tiring."
-        return "I heard you, but my language model is not responding."
+        return "I heard you, but my language understanding is temporarily unavailable."
 
     def _clean_response(self, response: str, *, zh: bool) -> str:
         response = " ".join((response or "").strip().strip('"').split())
