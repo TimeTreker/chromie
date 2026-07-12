@@ -49,6 +49,23 @@ The Orchestrator should behave like a careful adult:
 - correct earlier misunderstandings when later evidence is better;
 - tell the user what changed without claiming work that did not happen.
 
+### Semantic consolidation is not deterministic merge
+
+This document uses “merge” for proposal-state reconciliation, commitment, and
+audit. It must not imply that the Orchestrator can understand how several user
+goals should be combined into natural language or how an indirect later
+utterance semantically modifies an earlier task.
+
+Semantic consolidation belongs to a bounded model stage such as an Interaction
+Planner, Task Continuity Agent, or Response Composer. That stage may propose
+goal relationships, task operations, plan revisions, and one natural
+`ResponsePlan`. The Orchestrator then validates task IDs, versions, lifecycle,
+authorization, confirmation, commitments, and speech claims. It does not use
+regexes, phrase tables, or string concatenation as a substitute for semantic
+reasoning.
+
+See [Semantic Task Continuity and Situational Planning](SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md).
+
 ## Proposal States
 
 The merge path uses these conceptual states:

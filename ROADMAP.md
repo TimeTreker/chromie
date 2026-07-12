@@ -125,6 +125,41 @@ Exit criteria before treating this as a complete smart merge layer:
   and correction causes without injecting raw history into prompts;
 - `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
 
+## Open architecture track - Semantic task continuity and situational planning
+
+Chromie should preserve open semantic user goals across turns, associate later
+utterances with active tasks through model-based meaning understanding, and
+select concrete skills only during capability planning. The detailed design and
+staged implementation sequence are maintained in
+[Semantic Task Continuity and Situational Planning](docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md).
+
+This track complements the proposal ledger. Semantic models propose task
+creation, modification, clarification, correction, cancellation, and response
+composition. The Orchestrator remains the deterministic authority for task IDs,
+versions, lifecycle transitions, authorization, confirmation validity,
+commitment, scheduling, and execution evidence.
+
+Exit criteria before treating semantic task continuity as a maintained runtime
+capability:
+
+- goals are retained as versioned open semantic descriptions rather than fixed
+  action or intent enums;
+- one independent user responsibility maps to one RouteItem, while implementation
+  steps remain TaskGraph or provider-plan nodes;
+- later turns can semantically modify, clarify, confirm, cancel, or query active
+  tasks without regex, phrase-table, or lexical-score decisions;
+- missing user parameters retain the original task in a waiting-for-user state,
+  while missing world facts request observation or trusted lookup;
+- capability planning returns a direct skill, valid composition, context request,
+  clarification request, or honest unavailable result;
+- goal changes supersede stale plans and confirmations before any effectful work
+  can execute;
+- natural multi-goal feedback is model-composed, while speech claims and
+  commitments are checked against trusted task state;
+- simple chat and explicit direct-skill latency remain bounded;
+- generalization-oriented Level A and retained live-text evidence pass;
+- `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
+
 ## Current checkpoint - Simulation-demo release audit
 
 Before publishing or recreating a demo tag, the paired Chromie and Soridormi
