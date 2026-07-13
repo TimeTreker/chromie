@@ -174,6 +174,10 @@ class VoiceAssistant:
                 self.fast_first_audio_prime_timeout_ms / 1000.0,
             ),
         )
+        self.fast_planner_mode = os.getenv("ORCH_FAST_PLANNER_MODE", "off").strip().lower()
+        if self.fast_planner_mode not in {"off", "report_only"}:
+            raise ValueError("ORCH_FAST_PLANNER_MODE must be off or report_only")
+        self.fast_planner_timeout_ms = env_int("ORCH_FAST_PLANNER_TIMEOUT_MS", 3000, minimum=100)
         self.goal_association_mode = os.getenv(
             "ORCH_GOAL_ASSOCIATION_MODE",
             "off",
@@ -317,6 +321,7 @@ class VoiceAssistant:
         self.active_interaction_task: asyncio.Task | None = None
         self.task_continuity_report_tasks: set[asyncio.Task] = set()
         self.goal_association_report_tasks: set[asyncio.Task] = set()
+        self.fast_planner_report_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
 
         self.audio_input_mode = os.getenv("ORCH_AUDIO_INPUT_MODE", "device").strip().lower()
@@ -2397,6 +2402,41 @@ class VoiceAssistant:
         )
         return delegated
 
+    async def _run_fast_planner_report(
+        self, session: aiohttp.ClientSession, *, user_text: str, session_id: str,
+        context: dict[str, Any], decision: RouteDecision,
+    ) -> None:
+        started_ms = now_ms()
+        try:
+            plan = await self.agent_client.resolve_fast_plan(
+                session, text=user_text, route_decision=decision, sid=session_id,
+                context=context, history=context.get("history", []), timeout_ms=self.fast_planner_timeout_ms,
+            )
+        except Exception as exc:
+            self.session_log(session_id, "fast_planner_report_failed: ms=%.1f error_type=%s error=%s",
+                             now_ms() - started_ms, type(exc).__name__, exc)
+            return
+        self.session_log(session_id,
+            "fast_planner_report_done: ms=%.1f coverage=%s disposition=%s steps=%s confidence=%.2f escalation=%s",
+            now_ms() - started_ms, plan.coverage, plan.disposition, len(plan.steps), plan.confidence,
+            plan.escalation_reason or "none")
+
+    def _schedule_fast_planner_report(
+        self, session: aiohttp.ClientSession, *, user_text: str, session_id: str,
+        context: dict[str, Any], decision: RouteDecision,
+    ) -> RouteDecision:
+        if self.fast_planner_mode != "report_only" or not self.enable_agent or decision.interrupt_current or decision.route in {"interrupt", "ignore"}:
+            return decision
+        task = asyncio.create_task(self._run_fast_planner_report(
+            session, user_text=user_text, session_id=session_id, context=context, decision=decision))
+        self.fast_planner_report_tasks.add(task)
+        task.add_done_callback(self.fast_planner_report_tasks.discard)
+        metadata = dict(decision.metadata or {})
+        metadata["fast_planner_resolution"] = {"status": "scheduled", "mode": "report_only"}
+        metadata["fast_planner_mode"] = "report_only"
+        self.session_log(session_id, "fast_planner_report_scheduled")
+        return decision.model_copy(update={"metadata": metadata})
+
     async def _run_goal_association_report(
         self,
         session: aiohttp.ClientSession,
@@ -2742,6 +2782,9 @@ class VoiceAssistant:
             session_id=session_id,
             context=context,
             decision=decision,
+        )
+        decision = self._schedule_fast_planner_report(
+            session, user_text=user_text, session_id=session_id, context=context, decision=decision
         )
         decision = await self._review_task_continuity(
             session,

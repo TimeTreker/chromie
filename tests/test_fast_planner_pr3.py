@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+import asyncio
+import unittest
+
+from agent.app.fast_planner import FastPlannerResolver
+from agent.app.schema import AgentRunRequest, RouteDecision
+from agent.app.capabilities.catalog import CatalogCapability
+from shared.chromie_contracts.plan import CanonicalPlan
+
+
+class FakeOllama:
+    def __init__(self, response):
+        self.response = response
+        self.prompts = []
+
+    async def generate(self, prompt, **kwargs):
+        self.prompts.append((prompt, kwargs))
+        if isinstance(self.response, Exception):
+            raise self.response
+        return self.response
+
+
+class FakeCatalog:
+    def __init__(self):
+        self.items = [
+            CatalogCapability(capability_id="soridormi.blink_eyes", agent_id="capability_agent", description="Blink eyes", input_schema={"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":10}},"required":["count"]}, route="robot_action", available=True, interaction_executable=True, prompt_tier="common"),
+            CatalogCapability(capability_id="soridormi.walk_forward", agent_id="capability_agent", description="Walk forward", input_schema={"type":"object","properties":{"duration_s":{"type":"number","minimum":0.1}},"required":["duration_s"]}, route="robot_action", available=True, interaction_executable=True, prompt_tier="common"),
+        ]
+
+    async def prompt_entries(self, **kwargs):
+        return self.items
+
+
+def request(text: str, route="robot_action"):
+    return AgentRunRequest(sid="sid-pr3", text=text, language="zh-CN", route_decision=RouteDecision(route=route, intent="test", confidence=0.9, source="llm"), context={"active_goal_snapshots": []}, history=[])
+
+
+class CanonicalPlanContractTests(unittest.TestCase):
+    def test_partial_plan_cannot_carry_steps(self):
+        with self.assertRaises(ValueError):
+            CanonicalPlan(plan_id="p", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.5, escalation_reason="compound", steps=[{"step_id":"s","skill_id":"soridormi.walk_forward","args":{"duration_s":15}}])
+
+    def test_complete_execute_requires_steps(self):
+        with self.assertRaises(ValueError):
+            CanonicalPlan(plan_id="p", planner_tier="fast", disposition="execute", coverage="complete", confidence=0.9)
+
+    def test_simple_chat_can_be_complete_response(self):
+        plan = CanonicalPlan(plan_id="p", planner_tier="fast", disposition="respond", coverage="complete", confidence=0.9, response_text="你好。")
+        self.assertEqual(plan.response_text, "你好。")
+
+
+class FastPlannerResolverTests(unittest.TestCase):
+    def test_simple_blink_produces_complete_direct_plan(self):
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_summary":"blink four times","steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential"}]}
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨四下眼睛。")))
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.coverage, "complete")
+        self.assertEqual(plan.steps[0].skill_id, "soridormi.blink_eyes")
+        self.assertEqual(plan.metadata["authority"], "advisory")
+
+    def test_simple_chat_produces_complete_response(self):
+        raw = {"disposition":"respond","coverage":"complete","confidence":0.93,"goal_summary":"greet","response_text":"你好。","steps":[]}
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", route="chat")))
+        self.assertEqual(plan.disposition, "respond")
+        self.assertEqual(plan.steps, [])
+
+    def test_compound_walk_and_blink_escalates_without_partial_steps(self):
+        raw = {"disposition":"escalate","coverage":"partial","confidence":0.88,"goal_summary":"walk while blinking","steps":[],"escalation_reason":"compound_goal_requires_full_planning","unresolved":["concurrency feasibility","blink count"]}
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("往前走15秒，同时眨眼。")))
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+        self.assertIn("concurrency feasibility", plan.unresolved)
+
+    def test_low_confidence_complete_claim_is_forced_to_escalate(self):
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":3}}]}
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog(), min_confidence=0.8).resolve(request("眨眼。")))
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+
+    def test_non_common_or_non_executable_skill_escalates(self):
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"steps":[{"skill_id":"invented.skill","args":{}}]}
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。")))
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.escalation_reason, "step_not_in_executable_common_catalog")
+
+    def test_prompt_defines_complete_coverage_not_skill_matching(self):
+        ollama = FakeOllama({"disposition":"respond","coverage":"complete","confidence":0.9,"response_text":"你好。"})
+        asyncio.run(FastPlannerResolver(ollama, FakeCatalog()).resolve(request("你好。", route="chat")))
+        prompt = ollama.prompts[0][0]
+        self.assertIn("Finding one matching skill is not complete coverage", prompt)
+        self.assertIn("zero steps", prompt)
+
+    def test_model_failure_escalates_safely(self):
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(RuntimeError("offline")), FakeCatalog()).resolve(request("眨眼。")))
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.metadata["status"], "escalate")
+
+
+class OrchestratorFastPlannerTests(unittest.TestCase):
+    def test_report_only_schedules_without_changing_route(self):
+        from orchestrator.orchestrator import VoiceAssistant
+        from orchestrator.schemas.route import RouteDecision as ODecision
+
+        class Client:
+            async def resolve_fast_plan(self, *args, **kwargs):
+                return CanonicalPlan(plan_id="p", planner_tier="fast", disposition="respond", coverage="complete", confidence=0.9, response_text="hi")
+
+        async def run():
+            assistant = VoiceAssistant.__new__(VoiceAssistant)
+            assistant.fast_planner_mode = "report_only"
+            assistant.fast_planner_timeout_ms = 1000
+            assistant.enable_agent = True
+            assistant.agent_client = Client()
+            assistant.fast_planner_report_tasks = set()
+            assistant.session_log = lambda *args, **kwargs: None
+            decision = ODecision(route="chat", intent="conversation", confidence=0.8, source="llm")
+            reviewed = assistant._schedule_fast_planner_report(object(), user_text="hello", session_id="sid", context={"history":[]}, decision=decision)
+            self.assertEqual(reviewed.route, "chat")
+            self.assertEqual(reviewed.metadata["fast_planner_resolution"]["status"], "scheduled")
+            await asyncio.gather(*list(assistant.fast_planner_report_tasks))
+        asyncio.run(run())
+
+
+if __name__ == "__main__":
+    unittest.main()

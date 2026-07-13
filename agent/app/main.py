@@ -23,6 +23,7 @@ from .interaction import (
 from .runtime import AgentRuntime, InteractionRuntime
 from .task_continuity import TaskContinuityResolver
 from .goal_association import GoalAssociationResolver
+from .fast_planner import FastPlannerResolver
 from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .task_graph import (
     ExecutionTrace,
@@ -292,6 +293,26 @@ class Settings(BaseModel):
     goal_association_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_NUM_PREDICT", "512")), ge=128, le=4096
     )
+    fast_planner_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_FAST_PLANNER_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    fast_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_FAST_PLANNER_MODEL", "qwen3:4b"))
+    fast_planner_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "2500")), ge=100, le=120000
+    )
+    fast_planner_min_confidence: float = Field(
+        default_factory=lambda: float(os.getenv("AGENT_FAST_PLANNER_MIN_CONFIDENCE", "0.80")), ge=0.0, le=1.0
+    )
+    fast_planner_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_CTX", "4096")), ge=2048, le=131072
+    )
+    fast_planner_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_PREDICT", "512")), ge=128, le=4096
+    )
+    fast_planner_max_capabilities: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_MAX_CAPABILITIES", "24")), ge=1, le=64
+    )
     task_continuity_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_PREDICT", "256")),
         ge=128,
@@ -471,6 +492,24 @@ goal_association_resolver = (
     else None
 )
 
+fast_planner_client = (
+    OllamaClient(settings.ollama_url, settings.fast_planner_model, timeout_ms=settings.fast_planner_timeout_ms)
+    if settings.use_llm and settings.fast_planner_enabled
+    else None
+)
+fast_planner_resolver = (
+    FastPlannerResolver(
+        fast_planner_client,
+        capability_catalog,
+        min_confidence=settings.fast_planner_min_confidence,
+        num_ctx=settings.fast_planner_num_ctx,
+        num_predict=settings.fast_planner_num_predict,
+        max_capabilities=settings.fast_planner_max_capabilities,
+    )
+    if fast_planner_client is not None
+    else None
+)
+
 
 app = FastAPI(
     title="Chromie Agent",
@@ -535,6 +574,8 @@ async def health() -> HealthResponse:
         goal_association_model=(
             settings.goal_association_model if goal_association_resolver is not None else None
         ),
+        fast_planner_enabled=fast_planner_resolver is not None,
+        fast_planner_model=(settings.fast_planner_model if fast_planner_resolver is not None else None),
         task_continuity_model=(
             settings.task_continuity_model if task_continuity_resolver is not None else None
         ),
@@ -556,6 +597,13 @@ async def agents() -> dict:
             "safety_agent": "validates and clamps risky actions",
         },
     }
+
+
+@app.post("/fast-plan")
+async def resolve_fast_plan(request: AgentRunRequest):
+    if fast_planner_resolver is None:
+        raise HTTPException(status_code=503, detail="Fast planner is disabled")
+    return await fast_planner_resolver.resolve(request)
 
 
 @app.post("/goal-association")

@@ -214,6 +214,15 @@ configuration.
 | `AGENT_GOAL_ASSOCIATION_NUM_PREDICT` | `512`; compact JSON output budget for associations plus independent new goals. |
 | `ORCH_GOAL_ASSOCIATION_MODE` | `report_only` in `.env.common`; schedules background diagnostics without changing Router, task, planning, or execution state. Code fallback is `off`. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
+| `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
+| `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b`; compact model for complete common-goal coverage. |
+| `AGENT_FAST_PLANNER_TIMEOUT_MS` | `2500`; Fast Planner model timeout. |
+| `AGENT_FAST_PLANNER_MIN_CONFIDENCE` | `0.80`; complete plans below this threshold are converted to escalation. |
+| `AGENT_FAST_PLANNER_NUM_CTX` | `4096`; bounded Fast Planner context. |
+| `AGENT_FAST_PLANNER_NUM_PREDICT` | `512`; canonical-plan JSON budget. |
+| `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
+| `ORCH_FAST_PLANNER_MODE` | `report_only` in `.env.common`; records plans without affecting routing or execution. Code fallback is `off`. |
+| `ORCH_FAST_PLANNER_TIMEOUT_MS` | `3000`; host timeout for report-only planning. |
 
 ## Semantic task continuity
 

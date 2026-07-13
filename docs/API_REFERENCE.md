@@ -151,6 +151,8 @@ The interaction, goal-association, and task-continuity endpoints accept the same
 - `context`
 - `history`
 
+`POST /fast-plan` is available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. It returns the shared `CanonicalPlan` contract. The Fast Planner may return a complete simple response, a complete direct common-capability plan, or an escalation. Partial or uncertain coverage is contractually required to contain zero executable steps. The endpoint is advisory and uses the same deterministic validator path planned for later apply mode. The host currently supports `off` and background `report_only` observation.
+
 `POST /goal-association` is available only when
 `AGENT_GOAL_ASSOCIATION_ENABLED=1` and Agent LLM use is enabled. It applies
 continuity before creation: each semantic responsibility may associate with

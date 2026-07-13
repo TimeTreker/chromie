@@ -6,6 +6,7 @@ from typing import Any
 import aiohttp
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
 
 try:
@@ -85,6 +86,28 @@ class AgentClient:
                     f"Agent interaction endpoint returned HTTP {resp.status}: {body[:500]}"
                 )
             return InteractionResponse.model_validate_json(body)
+
+    async def resolve_fast_plan(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        text: str,
+        route_decision: RouteDecision,
+        sid: str | None = None,
+        context: dict[str, Any] | None = None,
+        history: list[dict[str, Any]] | None = None,
+        timeout_ms: int | None = None,
+    ) -> CanonicalPlan:
+        req = AgentRequest(
+            sid=sid, text=text, route_decision=route_decision,
+            context=context or {}, history=history or [],
+        )
+        timeout = aiohttp.ClientTimeout(total=max(100, int(timeout_ms or self.timeout_ms)) / 1000.0)
+        async with session.post(f"{self.base_url}/fast-plan", json=req.model_dump(mode="json"), timeout=timeout) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                raise RuntimeError(f"Agent fast-plan endpoint returned HTTP {resp.status}: {body[:500]}")
+            return CanonicalPlan.model_validate_json(body)
 
     async def resolve_goal_association(
         self,

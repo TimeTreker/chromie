@@ -536,3 +536,8 @@ snapshots, and a bounded read-only active-goal projection. These contracts are
 automatically verified but are not yet used to change Router or Agent behavior.
 Goal association, segmentation, canonical planning, and runtime migration remain
 future staged work tracked in `ROADMAP.md`.
+
+
+### Goal-driven architecture implementation status
+
+PR1 goal contracts and active-goal projection, PR2 report-only goal association, and PR3 report-only canonical Fast Planning are implemented with automated evidence. Fast plans do not yet replace Router/Agent behavior or commit execution; Deep Planner integration remains PR4.

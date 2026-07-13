@@ -98,3 +98,5 @@ __all__ = [
     "SemanticTaskOperationSet",
     "TaskContextSnapshot",
 ]
+
+from .plan import CanonicalPlan, CanonicalPlanStep, PlanCoverage, PlanDisposition, PlannerTier

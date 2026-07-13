@@ -461,3 +461,8 @@ regression gates, and state the evidence level.
 This track does not replace the current physical pilot or audio evidence tracks.
 It must preserve existing deterministic stop, authorization, provider, evidence,
 and release boundaries.
+
+
+### Goal-driven PR3 implementation note
+
+The shared CanonicalPlan schema and report-only Fast Planner are implemented. Partial or uncertain coverage cannot carry executable steps. Apply-mode migration and the Deep Planner remain open.

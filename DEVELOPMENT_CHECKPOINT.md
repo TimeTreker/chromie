@@ -318,3 +318,8 @@ Goal-driven cognitive architecture PR2 checkpoint:
 - materially ambiguous references produce natural clarification without exposing goal IDs
 - Orchestrator `.env.common` integration is background `report_only`; no runtime state mutation or execution behavior change
 - focused Goal Association and PR1 contract tests passed
+
+
+## Goal-driven architecture PR3 checkpoint
+
+PR3 adds the shared CanonicalPlan contract and a report-only Fast Planner. Complete high-confidence chat or common-capability coverage may be represented as a canonical plan; partial, uncertain, low-confidence, unavailable, or non-common coverage is converted to a zero-step escalation. Runtime routing and execution remain unchanged.

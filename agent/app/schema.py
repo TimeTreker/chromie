@@ -301,6 +301,8 @@ class HealthResponse(BaseModel):
     task_continuity_enabled: bool = False
     goal_association_enabled: bool = False
     goal_association_model: str | None = None
+    fast_planner_enabled: bool = False
+    fast_planner_model: str | None = None
     task_continuity_model: str | None = None
     social_attention_mode: str = "off"
     social_attention_model: str | None = None
