@@ -11,6 +11,7 @@ from typing import Any, Deque
 from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
 
 try:
+    from chromie_contracts.goal import ActiveGoalSnapshot
     from chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -18,6 +19,7 @@ try:
         TaskContextSnapshot,
     )
 except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.goal import ActiveGoalSnapshot
     from shared.chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -519,6 +521,15 @@ class ConversationStateManager:
         if limit == 0:
             return []
         return [self._task_snapshot(item) for item in active[-limit:]]
+
+    def active_goal_snapshots(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return a bounded goal-first projection without changing task runtime behavior."""
+
+        task_snapshots = self.active_task_snapshots(limit=limit)
+        return [
+            ActiveGoalSnapshot.from_task_snapshot(item).model_dump(mode="json", exclude_none=True)
+            for item in task_snapshots
+        ]
 
     @staticmethod
     def _semantic_operations_from_metadata(

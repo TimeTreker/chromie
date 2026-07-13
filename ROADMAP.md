@@ -419,12 +419,13 @@ The architecture changes the primary planning question from “which skill match
 this utterance?” to “what existing or new user goals are present, and what
 verifiable plan completely satisfies them?”
 
-This track is documentation-approved design work only until each staged pull
-request is implemented and supported by the evidence required below.
+This track is being implemented incrementally. PR1 is automatically verified and
+keeps runtime behavior unchanged by default; later stages remain design-approved
+work until their own implementation and evidence gates pass.
 
 ### Delivery sequence
 
-1. Goal contracts and bounded active-goal projection.
+1. **Implemented (Level A):** Goal contracts and bounded active-goal projection.
 2. Goal association before new-goal segmentation.
 3. Canonical plans and complete-coverage Fast Planner.
 4. Full-registry Deep Planner with bounded same-tier replanning.

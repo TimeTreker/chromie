@@ -530,8 +530,9 @@ plan contract, deterministic validation authority, consequence-aware parameter
 resolution, alternative-plan confirmation, evidence-bound response claims, and
 an auxiliary social-attention layer.
 
-This status is **design documented**, not implemented or automatically verified
-as a complete runtime architecture. Existing semantic-task continuity,
-capability planning, response-plan, social-attention, and scenario work provide
-migration foundations, but they do not yet establish all RFC invariants. The
-implementation sequence and evidence gates are tracked in `ROADMAP.md`.
+This status is **partially implemented**. PR1 now provides shared goal contracts,
+replay-safe goal-operation IDs, compatibility mapping from current semantic-task
+snapshots, and a bounded read-only active-goal projection. These contracts are
+automatically verified but are not yet used to change Router or Agent behavior.
+Goal association, segmentation, canonical planning, and runtime migration remain
+future staged work tracked in `ROADMAP.md`.

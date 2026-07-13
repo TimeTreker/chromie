@@ -30,6 +30,14 @@ from .social_attention import (
     SocialAttentionPlan,
     SocialAttentionTarget,
 )
+from .goal import (
+    ActiveGoalSnapshot,
+    GoalAssociation,
+    GoalRelationship,
+    GoalSet,
+    GoalVersionRef,
+    stable_goal_operation_id,
+)
 from .semantic_task import (
     CommitmentState,
     InformationGap,
@@ -72,6 +80,12 @@ __all__ = [
     "SocialAttentionBehavior",
     "SocialAttentionPlan",
     "SocialAttentionTarget",
+    "ActiveGoalSnapshot",
+    "GoalAssociation",
+    "GoalRelationship",
+    "GoalSet",
+    "GoalVersionRef",
+    "stable_goal_operation_id",
     "CommitmentState",
     "InformationGap",
     "PlanningResult",

@@ -209,7 +209,7 @@ dependency-light local skips for `aiohttp` client coverage
 
 Current 2026-07-12 automated regression gate:
 python scripts/check_docs.py passed
-828 current unittest cases and 20 legacy Agent tests passed with
+834 current unittest cases and 20 legacy Agent tests passed with
 `./scripts/run_tests.sh`
 369/369 adapter, Router, Router-dialogue, interaction, and dialogue scenarios
 passed with `python scripts/scenario_runner.py --no-write`
@@ -300,3 +300,11 @@ First-reference-robot selection requirements are maintained in
 - Do not report automated or dry-run output as target evidence.
 - Do not publish `0.0.1` or remove release blockers without retained
   evidence for the exact supported scope.
+
+
+Goal-driven cognitive architecture PR1 checkpoint:
+- shared GoalAssociation, GoalSet, GoalVersionRef, and ActiveGoalSnapshot contracts added
+- stable replay-safe goal operation IDs added
+- current TaskContextSnapshot maps to a bounded goal-first compatibility projection
+- ConversationStateManager exposes read-only active_goal_snapshots without changing routing or execution
+- focused goal/semantic continuity tests passed: 18
