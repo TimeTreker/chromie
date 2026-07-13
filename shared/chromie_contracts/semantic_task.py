@@ -177,6 +177,7 @@ class ResponseStage(BaseModel):
     commitment_state: CommitmentState = "none"
     must_not_claim_completion: bool = True
     covers_task_ids: list[str] = Field(default_factory=list)
+    covers_goal_ids: list[str] = Field(default_factory=list)
     claims: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -187,7 +188,7 @@ class ResponseStage(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @field_validator("covers_task_ids", "claims", mode="before")
+    @field_validator("covers_task_ids", "covers_goal_ids", "claims", mode="before")
     @classmethod
     def normalize_text_list(cls, value: Any) -> list[str]:
         if value is None:

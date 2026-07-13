@@ -294,9 +294,11 @@ class InteractionRuntime(_AgentPipeline):
     async def _ensure_social_attention_candidates(
         self,
         request: AgentRunRequest,
+        *,
+        allow_when_off: bool = False,
     ) -> None:
         mode = self.services.effective_social_attention_mode()
-        if mode == "off":
+        if mode == "off" and not allow_when_off:
             return
         catalog = self.services.capability_catalog
         if catalog is None:
@@ -342,13 +344,20 @@ class InteractionRuntime(_AgentPipeline):
                 continue
             if payload.get("interaction_executable") is not True:
                 continue
-            if mode == "sim_only" and str((payload.get("metadata") or {}).get("mode") or "") != "sim":
+            if not allow_when_off and mode == "sim_only" and str((payload.get("metadata") or {}).get("mode") or "") != "sim":
                 continue
             candidates.append(payload)
 
         if candidates:
             request.context["social_attention_candidates"] = candidates
             request.context["social_attention_target_evidence"] = self._social_attention_target_evidence(request)
+
+    async def prepare_response_composition_context(
+        self,
+        request: AgentRunRequest,
+    ) -> None:
+        """Attach advisory social candidates and target evidence for PR6 composition."""
+        await self._ensure_social_attention_candidates(request, allow_when_off=True)
 
     def _social_attention_target_evidence(self, request: AgentRunRequest) -> dict[str, Any]:
         for key in ("social_attention_target", "active_user_target", "perceived_user_target"):

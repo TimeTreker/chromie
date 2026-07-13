@@ -25,6 +25,13 @@ from .mind import (
     default_mind_profile,
 )
 from .session import SessionContext
+from .response_composition import (
+    CoordinatedResponsePlan,
+    ResponseCompositionPhase,
+    ResponseCompositionResolution,
+    ResponseCompositionStatus,
+    canonical_plan_fingerprint,
+)
 from .social_attention import (
     SocialAttentionBehavior,
     SocialAttentionPlan,
@@ -78,6 +85,11 @@ __all__ = [
     "RobotIdentity",
     "default_mind_profile",
     "SessionContext",
+    "ResponseCompositionStatus",
+    "ResponseCompositionPhase",
+    "ResponseCompositionResolution",
+    "CoordinatedResponsePlan",
+    "canonical_plan_fingerprint",
     "SocialAttentionBehavior",
     "SocialAttentionPlan",
     "SocialAttentionTarget",
@@ -97,6 +109,21 @@ __all__ = [
     "SemanticTaskOperation",
     "SemanticTaskOperationSet",
     "TaskContextSnapshot",
+    "CanonicalPlan",
+    "CanonicalPlanStep",
+    "GoalSatisfactionAssessment",
+    "PlanCoverage",
+    "PlanDisposition",
+    "PlanParameterResolution",
+    "PlannerTier",
 ]
 
-from .plan import CanonicalPlan, CanonicalPlanStep, PlanCoverage, PlanDisposition, PlannerTier
+from .plan import (
+    CanonicalPlan,
+    CanonicalPlanStep,
+    GoalSatisfactionAssessment,
+    PlanCoverage,
+    PlanDisposition,
+    PlanParameterResolution,
+    PlannerTier,
+)

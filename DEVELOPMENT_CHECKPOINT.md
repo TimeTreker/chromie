@@ -323,3 +323,18 @@ Goal-driven cognitive architecture PR2 checkpoint:
 ## Goal-driven architecture PR3 checkpoint
 
 PR3 adds the shared CanonicalPlan contract and a report-only Fast Planner. Complete high-confidence chat or common-capability coverage may be represented as a canonical plan; partial, uncertain, low-confidence, unavailable, or non-common coverage is converted to a zero-step escalation. Runtime routing and execution remain unchanged.
+
+
+## Goal-driven architecture PR4 checkpoint
+
+PR4 adds an advisory full-catalog Deep Planner using the shared `CanonicalPlan` contract. Fast Planner escalation is one-way; Deep Planner never returns to Fast Planner. Deterministic validation may provide structured feedback for one bounded same-tier revision. The Orchestrator integration remains report-only and does not alter routing, commitment, or execution.
+
+
+## PR5 Goal Satisfaction checkpoint
+
+Canonical plans now carry structured parameter-resolution strategies and a goal-satisfaction assessment. The model owns semantic importance and default selection; deterministic validation only checks blocking gaps, schema validity, capability availability, and configured satisfaction thresholds. Runtime routing and execution remain unchanged in report-only mode.
+
+
+## PR6 Response Composition checkpoint
+
+Terminal Fast or Deep canonical plans can now be composed into a fingerprint-bound `CoordinatedResponsePlan` containing goal-scoped `ResponsePlan` stages and an optional auxiliary `SocialAttentionPlan`. The response composer cannot mutate task steps, pre-execution speech cannot claim completion, every canonical goal must be covered, and optional attention is dropped on target, schema, confirmation, or resource-conflict failure. Host integration is report-only and leaves the production interaction path unchanged.

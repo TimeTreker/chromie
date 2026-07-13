@@ -52,7 +52,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
 
 class FastPlannerResolverTests(unittest.TestCase):
     def test_simple_blink_produces_complete_direct_plan(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_summary":"blink four times","steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential"}]}
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_summary":"blink four times","steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential"}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨四下眼睛。")))
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.coverage, "complete")
@@ -60,7 +60,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.metadata["authority"], "advisory")
 
     def test_simple_chat_produces_complete_response(self):
-        raw = {"disposition":"respond","coverage":"complete","confidence":0.93,"goal_summary":"greet","response_text":"你好。","steps":[]}
+        raw = {"disposition":"respond","coverage":"complete","confidence":0.93,"goal_summary":"greet","response_text":"你好。","steps":[],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", route="chat")))
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.steps, [])
@@ -73,13 +73,13 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("concurrency feasibility", plan.unresolved)
 
     def test_low_confidence_complete_claim_is_forced_to_escalate(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":3}}]}
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":3}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog(), min_confidence=0.8).resolve(request("眨眼。")))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.steps, [])
 
     def test_non_common_or_non_executable_skill_escalates(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"steps":[{"skill_id":"invented.skill","args":{}}]}
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"steps":[{"skill_id":"invented.skill","args":{}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。")))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.escalation_reason, "step_not_in_executable_common_catalog")

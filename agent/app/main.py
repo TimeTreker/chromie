@@ -24,6 +24,8 @@ from .runtime import AgentRuntime, InteractionRuntime
 from .task_continuity import TaskContinuityResolver
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
+from .deep_planner import DeepPlannerResolver
+from .response_composer import ResponseComposerResolver
 from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .task_graph import (
     ExecutionTrace,
@@ -313,6 +315,46 @@ class Settings(BaseModel):
     fast_planner_max_capabilities: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_MAX_CAPABILITIES", "24")), ge=1, le=64
     )
+    deep_planner_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_DEEP_PLANNER_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    deep_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_DEEP_PLANNER_MODEL", "gemma4:e2b"))
+    deep_planner_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_TIMEOUT_MS", "9000")), ge=100, le=120000
+    )
+    deep_planner_min_confidence: float = Field(
+        default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_CONFIDENCE", "0.65")), ge=0.0, le=1.0
+    )
+    deep_planner_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_NUM_CTX", "8192")), ge=4096, le=131072
+    )
+    deep_planner_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_NUM_PREDICT", "1024")), ge=256, le=8192
+    )
+    deep_planner_max_capabilities: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_CAPABILITIES", "96")), ge=1, le=256
+    )
+    deep_planner_min_goal_satisfaction: float = Field(default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION", "0.75")), ge=0.0, le=1.0)
+    deep_planner_max_replans: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_REPLANS", "1")), ge=0, le=2
+    )
+    response_composer_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    response_composer_model: str = Field(
+        default_factory=lambda: os.getenv("AGENT_RESPONSE_COMPOSER_MODEL", "gemma4:e2b")
+    )
+    response_composer_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_TIMEOUT_MS", "4500")), ge=100, le=120000
+    )
+    response_composer_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_CTX", "4096")), ge=2048, le=131072
+    )
+    response_composer_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_PREDICT", "640")), ge=128, le=4096
+    )
     task_continuity_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_PREDICT", "256")),
         ge=128,
@@ -509,6 +551,42 @@ fast_planner_resolver = (
     if fast_planner_client is not None
     else None
 )
+deep_planner_client = (
+    OllamaClient(settings.ollama_url, settings.deep_planner_model, timeout_ms=settings.deep_planner_timeout_ms)
+    if settings.use_llm and settings.deep_planner_enabled
+    else None
+)
+deep_planner_resolver = (
+    DeepPlannerResolver(
+        deep_planner_client, capability_catalog,
+        min_confidence=settings.deep_planner_min_confidence,
+        num_ctx=settings.deep_planner_num_ctx,
+        num_predict=settings.deep_planner_num_predict,
+        max_capabilities=settings.deep_planner_max_capabilities,
+        max_replans=settings.deep_planner_max_replans,
+        min_goal_satisfaction=settings.deep_planner_min_goal_satisfaction,
+    )
+    if deep_planner_client is not None
+    else None
+)
+response_composer_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.response_composer_model,
+        timeout_ms=settings.response_composer_timeout_ms,
+    )
+    if settings.use_llm and settings.response_composer_enabled
+    else None
+)
+response_composer_resolver = (
+    ResponseComposerResolver(
+        response_composer_client,
+        num_ctx=settings.response_composer_num_ctx,
+        num_predict=settings.response_composer_num_predict,
+    )
+    if response_composer_client is not None
+    else None
+)
 
 
 app = FastAPI(
@@ -576,6 +654,10 @@ async def health() -> HealthResponse:
         ),
         fast_planner_enabled=fast_planner_resolver is not None,
         fast_planner_model=(settings.fast_planner_model if fast_planner_resolver is not None else None),
+        deep_planner_enabled=deep_planner_resolver is not None,
+        deep_planner_model=(settings.deep_planner_model if deep_planner_resolver is not None else None),
+        response_composer_enabled=response_composer_resolver is not None,
+        response_composer_model=(settings.response_composer_model if response_composer_resolver is not None else None),
         task_continuity_model=(
             settings.task_continuity_model if task_continuity_resolver is not None else None
         ),
@@ -604,6 +686,21 @@ async def resolve_fast_plan(request: AgentRunRequest):
     if fast_planner_resolver is None:
         raise HTTPException(status_code=503, detail="Fast planner is disabled")
     return await fast_planner_resolver.resolve(request)
+
+
+@app.post("/deep-plan")
+async def resolve_deep_plan(request: AgentRunRequest):
+    if deep_planner_resolver is None:
+        raise HTTPException(status_code=503, detail="Deep planner is disabled")
+    return await deep_planner_resolver.resolve(request)
+
+
+@app.post("/compose-response-plan")
+async def compose_response_plan(request: AgentRunRequest):
+    if response_composer_resolver is None:
+        raise HTTPException(status_code=503, detail="Response composer is disabled")
+    await interaction_runtime.prepare_response_composition_context(request)
+    return await response_composer_resolver.resolve(request)
 
 
 @app.post("/goal-association")

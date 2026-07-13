@@ -178,6 +178,18 @@ class VoiceAssistant:
         if self.fast_planner_mode not in {"off", "report_only"}:
             raise ValueError("ORCH_FAST_PLANNER_MODE must be off or report_only")
         self.fast_planner_timeout_ms = env_int("ORCH_FAST_PLANNER_TIMEOUT_MS", 3000, minimum=100)
+        self.deep_planner_mode = os.getenv("ORCH_DEEP_PLANNER_MODE", "off").strip().lower()
+        if self.deep_planner_mode not in {"off", "report_only"}:
+            self.deep_planner_mode = "off"
+        self.deep_planner_timeout_ms = env_int("ORCH_DEEP_PLANNER_TIMEOUT_MS", 10000, minimum=100)
+        self.response_composer_mode = os.getenv(
+            "ORCH_RESPONSE_COMPOSER_MODE", "off"
+        ).strip().lower()
+        if self.response_composer_mode not in {"off", "report_only"}:
+            raise ValueError("ORCH_RESPONSE_COMPOSER_MODE must be off or report_only")
+        self.response_composer_timeout_ms = env_int(
+            "ORCH_RESPONSE_COMPOSER_TIMEOUT_MS", 5000, minimum=100
+        )
         self.goal_association_mode = os.getenv(
             "ORCH_GOAL_ASSOCIATION_MODE",
             "off",
@@ -322,6 +334,7 @@ class VoiceAssistant:
         self.task_continuity_report_tasks: set[asyncio.Task] = set()
         self.goal_association_report_tasks: set[asyncio.Task] = set()
         self.fast_planner_report_tasks: set[asyncio.Task] = set()
+        self.deep_planner_report_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
 
         self.audio_input_mode = os.getenv("ORCH_AUDIO_INPUT_MODE", "device").strip().lower()
@@ -2402,6 +2415,80 @@ class VoiceAssistant:
         )
         return delegated
 
+    async def _run_response_composer_report(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        user_text: str,
+        session_id: str,
+        context: dict[str, Any],
+        decision: RouteDecision,
+        plan: Any,
+    ) -> None:
+        if getattr(self, "response_composer_mode", "off") != "report_only":
+            return
+        started_ms = now_ms()
+        composition_context = dict(context)
+        composition_context["canonical_plan_resolution"] = plan.model_dump(mode="json")
+        self.session_log(
+            session_id,
+            "response_composer_report_started: plan_id=%s disposition=%s goals=%s",
+            plan.plan_id,
+            plan.disposition,
+            len(plan.goal_ids),
+        )
+        try:
+            resolution = await self.agent_client.compose_response_plan(
+                session,
+                text=user_text,
+                route_decision=decision,
+                sid=session_id,
+                context=composition_context,
+                history=context.get("history", []),
+                timeout_ms=getattr(self, "response_composer_timeout_ms", 5000),
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "response_composer_report_failed: ms=%.1f error_type=%s error=%s",
+                now_ms() - started_ms,
+                type(exc).__name__,
+                exc,
+            )
+            return
+        composition = resolution.composition
+        if composition is None:
+            self.session_log(
+                session_id,
+                "response_composer_report_done: ms=%.1f status=%s composition=false reason=%s",
+                now_ms() - started_ms,
+                resolution.status,
+                resolution.reason_summary or "none",
+            )
+            return
+        response_plan = composition.response_plan
+        stage_count = sum(
+            1
+            for stage in (
+                response_plan.immediate,
+                response_plan.pre_action,
+                *response_plan.progress,
+                response_plan.final,
+            )
+            if stage is not None
+        )
+        attention = composition.social_attention_plan
+        self.session_log(
+            session_id,
+            "response_composer_report_done: ms=%.1f status=%s stages=%s attention=%s confidence=%.2f fingerprint=%s",
+            now_ms() - started_ms,
+            resolution.status,
+            stage_count,
+            attention.decision if attention is not None else "absent",
+            composition.confidence,
+            composition.canonical_plan_fingerprint[:12],
+        )
+
     async def _run_fast_planner_report(
         self, session: aiohttp.ClientSession, *, user_text: str, session_id: str,
         context: dict[str, Any], decision: RouteDecision,
@@ -2420,6 +2507,37 @@ class VoiceAssistant:
             "fast_planner_report_done: ms=%.1f coverage=%s disposition=%s steps=%s confidence=%.2f escalation=%s",
             now_ms() - started_ms, plan.coverage, plan.disposition, len(plan.steps), plan.confidence,
             plan.escalation_reason or "none")
+        if plan.disposition != "escalate":
+            await self._run_response_composer_report(
+                session, user_text=user_text, session_id=session_id,
+                context=context, decision=decision, plan=plan,
+            )
+            return
+        if self.deep_planner_mode != "report_only":
+            return
+        deep_context = dict(context)
+        deep_context["fast_plan_resolution"] = plan.model_dump(mode="json")
+        deep_started_ms = now_ms()
+        self.session_log(session_id, "deep_planner_report_started: fast_plan_id=%s reason=%s",
+                         plan.plan_id, plan.escalation_reason or "unspecified")
+        try:
+            deep_plan = await self.agent_client.resolve_deep_plan(
+                session, text=user_text, route_decision=decision, sid=session_id,
+                context=deep_context, history=context.get("history", []),
+                timeout_ms=self.deep_planner_timeout_ms,
+            )
+        except Exception as exc:
+            self.session_log(session_id, "deep_planner_report_failed: ms=%.1f error_type=%s error=%s",
+                             now_ms() - deep_started_ms, type(exc).__name__, exc)
+            return
+        self.session_log(session_id,
+            "deep_planner_report_done: ms=%.1f coverage=%s disposition=%s steps=%s confidence=%.2f attempts=%s",
+            now_ms() - deep_started_ms, deep_plan.coverage, deep_plan.disposition, len(deep_plan.steps),
+            deep_plan.confidence, deep_plan.metadata.get("attempt_count", 1))
+        await self._run_response_composer_report(
+            session, user_text=user_text, session_id=session_id,
+            context=context, decision=decision, plan=deep_plan,
+        )
 
     def _schedule_fast_planner_report(
         self, session: aiohttp.ClientSession, *, user_text: str, session_id: str,
@@ -2434,6 +2552,12 @@ class VoiceAssistant:
         metadata = dict(decision.metadata or {})
         metadata["fast_planner_resolution"] = {"status": "scheduled", "mode": "report_only"}
         metadata["fast_planner_mode"] = "report_only"
+        if getattr(self, "response_composer_mode", "off") == "report_only":
+            metadata["response_composer_resolution"] = {
+                "status": "waiting_for_terminal_plan",
+                "mode": "report_only",
+            }
+            metadata["response_composer_mode"] = "report_only"
         self.session_log(session_id, "fast_planner_report_scheduled")
         return decision.model_copy(update={"metadata": metadata})
 

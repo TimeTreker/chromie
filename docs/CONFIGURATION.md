@@ -223,6 +223,24 @@ configuration.
 | `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
 | `ORCH_FAST_PLANNER_MODE` | `report_only` in `.env.common`; records plans without affecting routing or execution. Code fallback is `off`. |
 | `ORCH_FAST_PLANNER_TIMEOUT_MS` | `3000`; host timeout for report-only planning. |
+| `AGENT_DEEP_PLANNER_ENABLED` | `1`; exposes the full-catalog advisory Deep Planner. |
+| `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b`; model used after Fast Planner escalation. |
+| `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
+| `AGENT_DEEP_PLANNER_MIN_CONFIDENCE` | `0.65`; complete deep plans below this threshold receive bounded same-tier revision. |
+| `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; complete deep plans below this semantic goal-satisfaction score receive bounded same-tier revision. |
+| `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. |
+| `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; canonical-plan JSON budget. |
+| `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
+| `AGENT_DEEP_PLANNER_MAX_REPLANS` | `1`; maximum validator-feedback revisions within the Deep Planner. |
+| `ORCH_DEEP_PLANNER_MODE` | `report_only` in `.env.common`; invokes Deep Planner only after Fast Planner escalation. |
+| `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `10000`; host timeout for report-only deep planning. |
+| `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes advisory composition of an immutable terminal `CanonicalPlan` with a goal-scoped `ResponsePlan` and optional auxiliary `SocialAttentionPlan`. |
+| `AGENT_RESPONSE_COMPOSER_MODEL` | `gemma4:e2b`; model used for multi-goal speech and social-presence composition. |
+| `AGENT_RESPONSE_COMPOSER_TIMEOUT_MS` | `4500`; response-composer model timeout. Failure does not alter the canonical task plan. |
+| `AGENT_RESPONSE_COMPOSER_NUM_CTX` | `4096`; bounded composition context. |
+| `AGENT_RESPONSE_COMPOSER_NUM_PREDICT` | `640`; structured response/social-plan JSON budget. |
+| `ORCH_RESPONSE_COMPOSER_MODE` | `report_only` in `.env.common`; invokes composition only after a terminal Fast or Deep `CanonicalPlan` and never changes speech, routing, task state, or execution. Code fallback is `off`. |
+| `ORCH_RESPONSE_COMPOSER_TIMEOUT_MS` | `5000`; host timeout for report-only composition. |
 
 ## Semantic task continuity
 

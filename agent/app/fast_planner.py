@@ -90,7 +90,7 @@ class FastPlannerResolver:
             "or required capability remains unresolved, return coverage partial or uncertain and disposition escalate with zero steps. "
             "For simple chat, complete coverage may use disposition respond and response_text. For a complete direct common-skill goal, use disposition execute. "
             "Use only exact supplied capability IDs. Return compact JSON matching CanonicalPlan: planner_tier=fast, disposition, coverage, confidence, "
-            "goal_ids, goal_summary, response_text, steps, escalation_reason, unresolved, metadata. Do not execute, authorize, or claim completion."
+            "goal_ids, goal_summary, response_text, steps, escalation_reason, unresolved, parameter_resolutions, goal_satisfaction, metadata. Do not execute, authorize, or claim completion."
         )
 
     @staticmethod
@@ -98,7 +98,7 @@ class FastPlannerResolver:
         return (
             "You are Chromie's Fast Planner. Plan semantically, not with phrase rules. Your responsibility is fast complete coverage, not skill matching. "
             "You may produce a complete simple response or complete direct common-skill plan. Otherwise escalate once to the Deep Planner. "
-            "Never emit partial executable steps. Return JSON only."
+            "Never emit partial executable steps. For complete plans, assess goal satisfaction and explain how every requested responsibility is covered. Resolve only low-consequence parameters with explicit schema or safe semantic defaults; otherwise escalate. Return JSON only."
         )
 
     def _normalize(self, raw: dict[str, Any], *, request: AgentRunRequest, plan_id: str) -> dict[str, Any]:
@@ -129,6 +129,8 @@ class FastPlannerResolver:
         out.setdefault("response_text", "")
         out.setdefault("escalation_reason", "")
         out.setdefault("unresolved", [])
+        out.setdefault("parameter_resolutions", [])
+        out.setdefault("goal_satisfaction", None)
         out.setdefault("metadata", {})
         return out
 
@@ -137,6 +139,8 @@ class FastPlannerResolver:
         if plan.coverage != "complete" or plan.confidence < self.min_confidence:
             return self._escalation(plan.plan_id, request, "coverage_not_complete", unresolved=plan.unresolved,
                                     metadata={"proposed_coverage": plan.coverage, "proposed_confidence": plan.confidence})
+        if plan.goal_satisfaction is None or plan.goal_satisfaction.score < 0.95:
+            return self._escalation(plan.plan_id, request, "goal_satisfaction_not_exact", unresolved=plan.unresolved, metadata={"proposed_goal_satisfaction": (plan.goal_satisfaction.model_dump(mode="json") if plan.goal_satisfaction else None)})
         for step in plan.steps:
             capability = allowed.get(step.skill_id)
             if capability is None or not capability.get("available") or not capability.get("interaction_executable"):
