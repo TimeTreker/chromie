@@ -22,6 +22,7 @@ from .interaction import (
 )
 from .runtime import AgentRuntime, InteractionRuntime
 from .task_continuity import TaskContinuityResolver
+from .goal_association import GoalAssociationResolver
 from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .task_graph import (
     ExecutionTrace,
@@ -269,6 +270,28 @@ class Settings(BaseModel):
         ge=2048,
         le=131072,
     )
+    goal_association_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_GOAL_ASSOCIATION_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    goal_association_model: str = Field(
+        default_factory=lambda: os.getenv("AGENT_GOAL_ASSOCIATION_MODEL", "qwen3:4b")
+    )
+    goal_association_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_TIMEOUT_MS", "3000")), ge=100, le=120000
+    )
+    goal_association_min_confidence: float = Field(
+        default_factory=lambda: float(os.getenv("AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE", "0.65")), ge=0.0, le=1.0
+    )
+    goal_association_max_active_goals: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS", "8")), ge=1, le=32
+    )
+    goal_association_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_NUM_CTX", "4096")), ge=2048, le=131072
+    )
+    goal_association_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_NUM_PREDICT", "512")), ge=128, le=4096
+    )
     task_continuity_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_PREDICT", "256")),
         ge=128,
@@ -427,6 +450,27 @@ logger.info(
     ",".join(configured_registry.manifest_files) or "<none>",
     len(capability_registry.list_tools()),
 )
+goal_association_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.goal_association_model,
+        timeout_ms=settings.goal_association_timeout_ms,
+    )
+    if settings.use_llm and settings.goal_association_enabled
+    else None
+)
+goal_association_resolver = (
+    GoalAssociationResolver(
+        goal_association_client,
+        min_confidence=settings.goal_association_min_confidence,
+        max_active_goals=settings.goal_association_max_active_goals,
+        num_ctx=settings.goal_association_num_ctx,
+        num_predict=settings.goal_association_num_predict,
+    )
+    if goal_association_client is not None
+    else None
+)
+
 
 app = FastAPI(
     title="Chromie Agent",
@@ -487,6 +531,10 @@ async def health() -> HealthResponse:
         capability_catalog_enabled=True,
         capability_catalog_version=capability_catalog.version,
         task_continuity_enabled=task_continuity_resolver is not None,
+        goal_association_enabled=goal_association_resolver is not None,
+        goal_association_model=(
+            settings.goal_association_model if goal_association_resolver is not None else None
+        ),
         task_continuity_model=(
             settings.task_continuity_model if task_continuity_resolver is not None else None
         ),
@@ -508,6 +556,13 @@ async def agents() -> dict:
             "safety_agent": "validates and clamps risky actions",
         },
     }
+
+
+@app.post("/goal-association")
+async def resolve_goal_association(request: AgentRunRequest):
+    if goal_association_resolver is None:
+        raise HTTPException(status_code=503, detail="Goal association resolver is disabled")
+    return await goal_association_resolver.resolve(request)
 
 
 @app.post("/task-continuity", response_model=SemanticTaskOperationSet)

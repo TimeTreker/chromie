@@ -201,6 +201,20 @@ configuration.
 | `CHROMIE_ROUTER_DEBUG_PROMPT` / `ROUTER_DEBUG_PROMPT` | `0`; when enabled, Router logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
 | `CHROMIE_CLI_COLOR` | `auto`; force Agent/Router Ollama diagnostic color with `1`, disable with `0`. Falls back to terminal detection and respects `NO_COLOR`. |
 
+## Goal association before segmentation
+
+| Variable | Default or profile behavior |
+|---|---|
+| `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b`; compact semantic model for continuity-before-creation and independent-goal segmentation. |
+| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Failure returns a non-authoritative clarification result. |
+| `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
+| `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
+| `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
+| `AGENT_GOAL_ASSOCIATION_NUM_PREDICT` | `512`; compact JSON output budget for associations plus independent new goals. |
+| `ORCH_GOAL_ASSOCIATION_MODE` | `report_only` in `.env.common`; schedules background diagnostics without changing Router, task, planning, or execution state. Code fallback is `off`. |
+| `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
+
 ## Semantic task continuity
 
 | Variable | Default or profile behavior |

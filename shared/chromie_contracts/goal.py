@@ -230,3 +230,49 @@ def stable_goal_operation_id(
     payload = "|".join([normalized_turn, str(ordinal), normalized_relationship, *targets])
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20]
     return f"goalop_{digest}"
+
+
+class GoalAssociationResolution(BaseModel):
+    """Advisory result for continuity-before-creation on one user turn."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = Field(default=1, ge=1)
+    turn_id: str = Field(min_length=1)
+    associations: list[GoalAssociation] = Field(default_factory=list)
+    new_goals: list[SemanticGoal] = Field(default_factory=list)
+    clarification: str = ""
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    reason_summary: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("turn_id", "clarification", "reason_summary", mode="before")
+    @classmethod
+    def normalize_resolution_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @field_validator("metadata")
+    @classmethod
+    def reject_resolution_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
+
+    @model_validator(mode="after")
+    def validate_resolution_shape(self) -> "GoalAssociationResolution":
+        existing_targets = {
+            goal_id
+            for association in self.associations
+            if association.relationship != "new"
+            for goal_id in association.target_goal_ids
+        }
+        new_ids = [goal.goal_id for goal in self.new_goals if goal.goal_id]
+        if len(new_ids) != len(set(new_ids)):
+            raise ValueError("new_goals goal_id values must be unique")
+        if existing_targets.intersection(new_ids):
+            raise ValueError("new_goals must not reuse target existing goal IDs")
+        if self.clarification and (self.new_goals or self.associations):
+            raise ValueError("clarification result must not also propose goal changes")
+        if not self.clarification and not self.new_goals and not self.associations:
+            raise ValueError("resolution must contain associations, new_goals, or clarification")
+        return self

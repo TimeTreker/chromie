@@ -174,6 +174,17 @@ class VoiceAssistant:
                 self.fast_first_audio_prime_timeout_ms / 1000.0,
             ),
         )
+        self.goal_association_mode = os.getenv(
+            "ORCH_GOAL_ASSOCIATION_MODE",
+            "off",
+        ).strip().lower()
+        if self.goal_association_mode not in {"off", "report_only"}:
+            raise ValueError("ORCH_GOAL_ASSOCIATION_MODE must be off or report_only")
+        self.goal_association_timeout_ms = env_int(
+            "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
+            3500,
+            minimum=100,
+        )
         self.task_continuity_mode = os.getenv(
             "ORCH_TASK_CONTINUITY_MODE",
             "off",
@@ -305,6 +316,7 @@ class VoiceAssistant:
         self.active_llm_task: asyncio.Task | None = None
         self.active_interaction_task: asyncio.Task | None = None
         self.task_continuity_report_tasks: set[asyncio.Task] = set()
+        self.goal_association_report_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
 
         self.audio_input_mode = os.getenv("ORCH_AUDIO_INPUT_MODE", "device").strip().lower()
@@ -1769,6 +1781,7 @@ class VoiceAssistant:
             "task_contexts": conversation.get("task_contexts", []),
             "active_task_contexts": conversation.get("active_task_contexts", []),
             "active_task_snapshots": conversation.get("active_task_snapshots", []),
+            "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
             "current_task_context": conversation.get("current_task_context"),
             "robot_state": {
                 "available": not self.action_dry_run,
@@ -2384,6 +2397,89 @@ class VoiceAssistant:
         )
         return delegated
 
+    async def _run_goal_association_report(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        user_text: str,
+        session_id: str,
+        context: dict[str, Any],
+        decision: RouteDecision,
+    ) -> None:
+        started_ms = now_ms()
+        try:
+            resolution = await self.agent_client.resolve_goal_association(
+                session,
+                text=user_text,
+                route_decision=decision,
+                sid=session_id,
+                context=context,
+                history=context.get("history", []),
+                timeout_ms=self.goal_association_timeout_ms,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "goal_association_report_failed: ms=%.1f error_type=%s error=%s",
+                now_ms() - started_ms,
+                type(exc).__name__,
+                exc,
+            )
+            return
+        status = str((resolution.metadata or {}).get("status") or "resolved")
+        relationships = ",".join(item.relationship for item in resolution.associations) or "none"
+        self.session_log(
+            session_id,
+            "goal_association_report_done: ms=%.1f status=%s associations=%s new_goals=%s clarification=%s confidence=%.2f",
+            now_ms() - started_ms,
+            status,
+            relationships,
+            len(resolution.new_goals),
+            bool(resolution.clarification),
+            resolution.confidence,
+        )
+
+    def _schedule_goal_association_report(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        user_text: str,
+        session_id: str,
+        context: dict[str, Any],
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        if (
+            self.goal_association_mode != "report_only"
+            or not self.enable_agent
+            or decision.interrupt_current
+            or decision.route in {"interrupt", "ignore"}
+        ):
+            return decision
+        task = asyncio.create_task(
+            self._run_goal_association_report(
+                session,
+                user_text=user_text,
+                session_id=session_id,
+                context=context,
+                decision=decision,
+            )
+        )
+        self.goal_association_report_tasks.add(task)
+        task.add_done_callback(self.goal_association_report_tasks.discard)
+        metadata = dict(decision.metadata or {})
+        metadata["goal_association_resolution"] = {
+            "status": "scheduled",
+            "mode": "report_only",
+            "active_goal_count": len(context.get("active_goal_snapshots") or []),
+        }
+        metadata["goal_association_mode"] = "report_only"
+        self.session_log(
+            session_id,
+            "goal_association_report_scheduled: active_goals=%s",
+            len(context.get("active_goal_snapshots") or []),
+        )
+        return decision.model_copy(update={"metadata": metadata})
+
     async def _run_task_continuity_report(
         self,
         session: aiohttp.ClientSession,
@@ -2640,6 +2736,13 @@ class VoiceAssistant:
             context=context,
             session_id=session_id,
         )
+        decision = self._schedule_goal_association_report(
+            session,
+            user_text=user_text,
+            session_id=session_id,
+            context=context,
+            decision=decision,
+        )
         decision = await self._review_task_continuity(
             session,
             user_text=user_text,
@@ -2654,6 +2757,8 @@ class VoiceAssistant:
         }
         if isinstance(decision.metadata, dict):
             for key in (
+                "goal_association_resolution",
+                "goal_association_mode",
                 "task_relation",
                 "target_task_id",
                 "task_context_patch",

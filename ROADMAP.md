@@ -426,7 +426,7 @@ work until their own implementation and evidence gates pass.
 ### Delivery sequence
 
 1. **Implemented (Level A):** Goal contracts and bounded active-goal projection.
-2. Goal association before new-goal segmentation.
+2. **Implemented in report-only mode (Level A):** Goal association before new-goal segmentation.
 3. Canonical plans and complete-coverage Fast Planner.
 4. Full-registry Deep Planner with bounded same-tier replanning.
 5. Consequence-aware parameter resolution and goal satisfaction reporting.

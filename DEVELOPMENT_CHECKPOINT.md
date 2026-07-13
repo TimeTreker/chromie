@@ -308,3 +308,13 @@ Goal-driven cognitive architecture PR1 checkpoint:
 - current TaskContextSnapshot maps to a bounded goal-first compatibility projection
 - ConversationStateManager exposes read-only active_goal_snapshots without changing routing or execution
 - focused goal/semantic continuity tests passed: 18
+
+
+Goal-driven cognitive architecture PR2 checkpoint:
+- advisory GoalAssociationResolution contract added
+- dedicated `/goal-association` Agent endpoint added
+- continuity-before-creation prompt receives bounded active goals and recent dialogue
+- one turn may update existing goals and create multiple independent new goals
+- materially ambiguous references produce natural clarification without exposing goal IDs
+- Orchestrator `.env.common` integration is background `report_only`; no runtime state mutation or execution behavior change
+- focused Goal Association and PR1 contract tests passed

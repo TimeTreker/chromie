@@ -33,6 +33,7 @@ from .social_attention import (
 from .goal import (
     ActiveGoalSnapshot,
     GoalAssociation,
+    GoalAssociationResolution,
     GoalRelationship,
     GoalSet,
     GoalVersionRef,
@@ -82,6 +83,7 @@ __all__ = [
     "SocialAttentionTarget",
     "ActiveGoalSnapshot",
     "GoalAssociation",
+    "GoalAssociationResolution",
     "GoalRelationship",
     "GoalSet",
     "GoalVersionRef",

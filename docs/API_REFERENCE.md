@@ -142,7 +142,7 @@ signals for catalog inspection endpoints, not Router execution authorization.
 | `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; explicit adapter rollback remains configurable. |
 | `POST` | `/task-continuity` | Return a validated `SemanticTaskOperationSet` proposal for the current utterance and active-task snapshot. |
 
-All three endpoints currently accept the same request shape:
+The interaction, goal-association, and task-continuity endpoints accept the same request shape:
 
 - `sid`
 - `text`
@@ -150,6 +150,16 @@ All three endpoints currently accept the same request shape:
 - optional `language`
 - `context`
 - `history`
+
+`POST /goal-association` is available only when
+`AGENT_GOAL_ASSOCIATION_ENABLED=1` and Agent LLM use is enabled. It applies
+continuity before creation: each semantic responsibility may associate with
+existing active goals, become an independent new goal, or produce one natural
+clarification when the reference is ambiguous. Existing goal IDs must be copied
+from the supplied active-goal snapshots; unknown or below-threshold associations
+are rejected. The endpoint is advisory and does not mutate task state, authorize
+side effects, alter Router output, or execute plans. The host currently supports
+`off` and background `report_only` observation.
 
 `POST /task-continuity` is available only when
 `AGENT_TASK_CONTINUITY_ENABLED=1` and Agent LLM use is enabled. It treats the
