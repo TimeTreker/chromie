@@ -415,6 +415,27 @@ Goal continuity is cognitive. Task lifecycle is operational.
 
 The two must be linked but not conflated.
 
+### 6.6 Active goals protect conversational continuity
+
+A goal remains conversationally active while it is planning, waiting for user
+input, awaiting confirmation, executing, paused, or recoverably blocked. It does
+not become disposable merely because no provider request is currently running.
+
+Soft-topic and idle-boundary heuristics must not clear active goals. A short
+answer after a long pause may still resolve an existing information gap.
+Candidate history remains bounded, but goal lifecycle is the authority for
+whether continuity is still possible.
+
+### 6.7 Explicit reset is narrower than semantic cancellation
+
+Whole-conversation reset is an operational control and requires an explicit
+whole-utterance instruction such as “start a new conversation” or “reset the
+session.” Phrases such as “算了”, “不用了”, or “never mind” are semantically
+ambiguous. They must reach Goal Association so the model can determine whether
+one goal, several goals, or the current proposal is being cancelled.
+
+A deterministic reset phrase table must never pre-empt normal goal association.
+
 ## 7. Multi-goal segmentation
 
 ### 7.1 Independent responsibility test
@@ -471,6 +492,30 @@ and evidence.
 Semantic composition belongs to a model. The Orchestrator validates references,
 commitments, versions, and evidence; it does not concatenate strings to imitate
 understanding.
+
+### 7.5 Independent goals may end the same turn differently
+
+A multi-goal turn does not require one global terminal outcome. One independent
+goal may be executable while another needs clarification, is unavailable, is
+refused, or can be answered immediately. The canonical plan therefore records a
+per-goal outcome and associates every executable step and information gap with
+the goals it serves.
+
+Example:
+
+```text
+User: 点一下头，再往前走。
+Goal A: nod once          -> execute
+Goal B: walk forward      -> clarify duration
+```
+
+The valid result may execute Goal A while keeping Goal B in
+`waiting_for_user`. It must not execute an incomplete step for Goal B, and Goal
+B must not prevent a fully independent, safe Goal A from completing.
+
+A `mixed` canonical-plan disposition means complete accounting of all goals,
+not complete satisfaction of every goal. Each goal retains its own disposition,
+coverage, satisfaction, response, information gaps, and execution evidence.
 
 ## 8. Hierarchical planning
 
@@ -595,6 +640,12 @@ explanation of what is covered, changed, or unresolved.
 
 Partial satisfaction is not authorization to execute a degraded plan.
 
+For a mixed multi-goal plan, satisfaction thresholds apply to each executable
+or directly answered goal. An unavailable, refused, or waiting goal may lower
+the aggregate diagnostic score without invalidating a fully satisfied,
+independent executable goal. Aggregate satisfaction remains useful for audit,
+but it must not silently turn all-or-nothing behavior back on.
+
 ## 10. Parameter resolution
 
 ### 10.1 Semantic ownership
@@ -684,9 +735,24 @@ blink action usually does not.
 ### 11.4 Atomic commitment
 
 All steps in a complete or alternative plan are validated before any effectful
-step is committed.
+step is committed. An invalid second step must not leak a valid first step into
+execution.
 
-An invalid second step must not leak a valid first step into execution.
+Goal-state mutation also follows a two-phase boundary:
+
+```text
+associate and plan
+-> compose response
+-> trusted host prepares and validates the InteractionResponse
+-> atomically commit all goal operations
+-> confirm / execute
+```
+
+If host preparation, capability validation, or any goal operation fails, none of
+the staged goal mutations from that turn become durable. Execution request IDs
+and terminal provider evidence are then recorded against every source goal they
+serve; optional social-attention requests never enter the primary user-goal
+lifecycle.
 
 ## 12. Social interaction layer
 

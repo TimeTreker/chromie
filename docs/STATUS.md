@@ -416,6 +416,22 @@ These results are
 automated evidence; a retained Stage 6 GPU benchmark, listening check, and live
 voice or live-text rerun are still required.
 
+The 2026-07-13 post-PR7 cognitive-architecture review passes
+`python scripts/check_docs.py`, 917 current `unittest` cases, 20 legacy Agent
+tests, 378/378 file-backed behavior scenarios, and 42/42 General Ability Level
+A probes. Five new deterministic Goal Runtime scenarios and an expanded live
+end-to-end manifest cover mixed execute-and-clarify outcomes, an alternative
+plan revised before confirmation, ambiguous cancellation, side conversation
+while waiting for input, and independent success plus unavailability. The review
+found and corrected four architecture defects: one global plan disposition could
+not represent independent goal outcomes; goal mutations could occur before host
+response preparation; provider requests were associated with only one goal and
+auxiliary attention could contaminate task lifecycle; and broad reset phrases
+such as “算了” bypassed semantic Goal Association. Active goals now preserve
+conversation continuity across idle boundaries. These are Level A automated and
+harness results only; the expanded live manifest has not yet been run against
+deployed Router, Agent, Ollama, and MuJoCo services.
+
 The 2026-07-09 live text preview run against local Router, Agent, and
 Soridormi MCP is not passing yet. After fixing a headless runner blocker where
 `sounddevice` was imported before `ORCH_AUDIO_INPUT_MODE=stdin` and

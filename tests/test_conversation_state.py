@@ -21,6 +21,43 @@ class ConversationStateTests(unittest.TestCase):
         self.assertNotEqual(manager.conversation_id, original_id)
         self.assertEqual(manager.get_history(), [])
 
+    def test_ambiguous_cancellation_does_not_clear_all_goal_context(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="test")
+        manager.apply_semantic_task_operations_atomically(
+            [
+                {
+                    "operation_id": "create-coffee",
+                    "operation": "create",
+                    "goal": {
+                        "goal_id": "goal-coffee",
+                        "description": "Prepare coffee.",
+                        "source_text": "准备咖啡。",
+                    },
+                },
+                {
+                    "operation_id": "create-weather",
+                    "operation": "create",
+                    "goal": {
+                        "goal_id": "goal-weather",
+                        "description": "Check weather.",
+                        "source_text": "查天气。",
+                    },
+                },
+            ],
+            sid="s1",
+            user_text="准备咖啡，也查天气。",
+        )
+        original_id = manager.conversation_id
+
+        boundary = manager.prepare_for_user_text("算了，刚才那个不用了。", "s2")
+
+        self.assertFalse(boundary["started_new"])
+        self.assertEqual(manager.conversation_id, original_id)
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-coffee", "goal-weather"],
+        )
+
     def test_followup_keeps_context_after_soft_idle(self) -> None:
         manager = ConversationStateManager(soft_idle_timeout_sec=10, hard_idle_timeout_sec=100)
         manager.record_user_turn("s1", "check the weather")
@@ -41,6 +78,83 @@ class ConversationStateTests(unittest.TestCase):
 
         self.assertFalse(boundary["started_new"])
         self.assertEqual(boundary["reason"], "active_pending_task")
+
+    def test_waiting_goal_keeps_context_after_soft_idle_without_pending_request(self) -> None:
+        manager = ConversationStateManager(
+            soft_idle_timeout_sec=10,
+            hard_idle_timeout_sec=100,
+        )
+        manager.apply_semantic_task_operations_atomically(
+            [
+                {
+                    "operation_id": "create-waiting-goal",
+                    "operation": "create",
+                    "goal": {
+                        "goal_id": "goal-walk",
+                        "description": "Walk forward.",
+                        "source_text": "往前走。",
+                    },
+                    "status_update": "waiting_for_user",
+                    "commitment_state": "waiting_for_user",
+                    "information_gaps": [
+                        {
+                            "gap_id": "duration",
+                            "description": "Walking duration.",
+                            "blocking": True,
+                            "required_for": ["goal-walk"],
+                            "preferred_resolution": "ask_user",
+                        }
+                    ],
+                }
+            ],
+            sid="s1",
+            user_text="往前走。",
+        )
+        manager.last_activity_ms -= 20_000
+
+        boundary = manager.prepare_for_user_text("tell me another thing", "s2")
+
+        self.assertFalse(boundary["started_new"])
+        self.assertEqual(boundary["reason"], "active_goal")
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-walk"],
+        )
+
+    def test_active_goal_survives_hard_idle_conversation_boundary(self) -> None:
+        manager = ConversationStateManager(
+            soft_idle_timeout_sec=5,
+            hard_idle_timeout_sec=5,
+        )
+        manager.apply_semantic_task_operations_atomically(
+            [
+                {
+                    "operation_id": "create-long-waiting-goal",
+                    "operation": "create",
+                    "goal": {
+                        "goal_id": "goal-reminder",
+                        "description": "Create a reminder after the user supplies a time.",
+                        "source_text": "提醒我。",
+                    },
+                    "status_update": "waiting_for_user",
+                    "commitment_state": "waiting_for_user",
+                }
+            ],
+            sid="s1",
+            user_text="提醒我。",
+        )
+        original_id = manager.conversation_id
+        manager.last_activity_ms -= 6_000
+
+        boundary = manager.prepare_for_user_text("明天下午三点。", "s2")
+
+        self.assertFalse(boundary["started_new"])
+        self.assertEqual(boundary["reason"], "active_goal")
+        self.assertEqual(manager.conversation_id, original_id)
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-reminder"],
+        )
 
     def test_history_respects_turn_and_character_limits(self) -> None:
         manager = ConversationStateManager(max_turns=3, max_context_chars=200)

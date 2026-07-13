@@ -59,14 +59,14 @@ class CoordinatedResponsePlan(BaseModel):
         return reject_forbidden_low_level_fields(value)
 
     @staticmethod
-    def _stages(plan: ResponsePlan) -> list[ResponseStage]:
+    def _stages(plan: ResponsePlan) -> list[tuple[str, ResponseStage]]:
         return [
-            stage
-            for stage in (
-                plan.immediate,
-                plan.pre_action,
-                *plan.progress,
-                plan.final,
+            (phase, stage)
+            for phase, stage in (
+                ("immediate", plan.immediate),
+                ("pre_action", plan.pre_action),
+                *[("progress", item) for item in plan.progress],
+                ("final", plan.final),
             )
             if stage is not None
         ]
@@ -82,7 +82,8 @@ class CoordinatedResponsePlan(BaseModel):
         if self.canonical_plan_fingerprint != expected_fingerprint:
             raise ValueError("canonical plan fingerprint mismatch")
 
-        stages = self._stages(self.response_plan)
+        phased_stages = self._stages(self.response_plan)
+        stages = [stage for _, stage in phased_stages]
         if not stages:
             raise ValueError("terminal canonical plans require at least one spoken response stage")
 
@@ -112,6 +113,38 @@ class CoordinatedResponsePlan(BaseModel):
                     )
                 if not stage.must_not_claim_completion:
                     raise ValueError("pre-execution response stages must forbid completion claims")
+        elif plan.disposition == "mixed":
+            execute_goals = set(plan.executable_goal_ids())
+            clarify_goals = set(plan.waiting_goal_ids())
+            if execute_goals and self.response_plan.final is not None:
+                raise ValueError("mixed pre-execution composition must not include a final stage")
+            allowed = {"none", "heard", "evaluating", "waiting_for_user"}
+            for _, stage in phased_stages:
+                if set(stage.covers_goal_ids).intersection(execute_goals):
+                    if stage.commitment_state not in allowed:
+                        raise ValueError(
+                            "mixed pre-execution response overstates commitment: "
+                            + stage.commitment_state
+                        )
+                    if not stage.must_not_claim_completion:
+                        raise ValueError(
+                            "mixed pre-execution stages must forbid completion claims"
+                        )
+            covered_clarifications: set[str] = set()
+            for _, stage in phased_stages:
+                if (
+                    stage.speech_act.casefold() in {"clarify", "ask_clarification"}
+                    and stage.commitment_state == "waiting_for_user"
+                ):
+                    covered_clarifications.update(
+                        set(stage.covers_goal_ids).intersection(clarify_goals)
+                    )
+            if covered_clarifications != clarify_goals:
+                missing = sorted(clarify_goals - covered_clarifications)
+                raise ValueError(
+                    "mixed plans require waiting-for-user clarification for goals: "
+                    + ",".join(missing)
+                )
         elif plan.disposition == "clarify":
             clarification_stages = [
                 stage

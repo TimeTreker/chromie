@@ -113,7 +113,7 @@ class DeepPlannerResolver:
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
             "Produce the final planner-tier=deep CanonicalPlan for the complete user goal. Deep planning is terminal: never return to the Fast Planner. "
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, and concurrency. Resolve low-consequence "
-            "parameters semantically when justified; otherwise return a specific natural clarification. Exact, safe-adjusted, or alternative executable plans "
+            "parameters semantically when justified; otherwise return a specific natural clarification. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute. A material alternative must be described in response_text and metadata and must require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction with score, status, satisfied goals, and unmet requirements. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. Return JSON only."
@@ -156,6 +156,7 @@ class DeepPlannerResolver:
         out.setdefault("escalation_reason", "")
         out.setdefault("unresolved", [])
         out.setdefault("parameter_resolutions", [])
+        out.setdefault("goal_outcomes", [])
         out.setdefault("goal_satisfaction", None)
         out.setdefault("metadata", {})
         return out
@@ -169,8 +170,32 @@ class DeepPlannerResolver:
         if plan.coverage == "complete":
             if plan.goal_satisfaction is None:
                 errors.append({"type": "missing_goal_satisfaction"})
-            elif plan.goal_satisfaction.score < self.min_goal_satisfaction:
+            elif (
+                plan.disposition != "mixed"
+                and plan.goal_satisfaction.score < self.min_goal_satisfaction
+            ):
                 errors.append({"type": "goal_satisfaction_below_threshold", "score": plan.goal_satisfaction.score, "required": self.min_goal_satisfaction})
+        if plan.disposition == "mixed":
+            for outcome in plan.goal_outcomes:
+                if outcome.disposition not in {"execute", "respond"}:
+                    continue
+                if outcome.satisfaction is None:
+                    errors.append(
+                        {
+                            "type": "missing_goal_outcome_satisfaction",
+                            "goal_id": outcome.goal_id,
+                            "disposition": outcome.disposition,
+                        }
+                    )
+                elif outcome.satisfaction.score < self.min_goal_satisfaction:
+                    errors.append(
+                        {
+                            "type": "goal_outcome_satisfaction_below_threshold",
+                            "goal_id": outcome.goal_id,
+                            "score": outcome.satisfaction.score,
+                            "required": self.min_goal_satisfaction,
+                        }
+                    )
         step_ids = {step.step_id for step in plan.steps}
         for resolution in plan.parameter_resolutions:
             if resolution.step_id not in step_ids and not resolution.blocking:

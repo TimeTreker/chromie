@@ -133,6 +133,26 @@ Required assertions:
 - invalid second step cannot leak the first step;
 - final speech reflects the validated plan rather than raw ASR wording.
 
+## 6.1 Complex cognitive scenario matrix
+
+Architecture changes must include scenarios that combine independent goals and
+lifecycle transitions, not only isolated utterances. At minimum, the maintained
+matrix should cover:
+
+- one goal executing while another asks a specific clarification;
+- one goal succeeding while another is unavailable or refused;
+- ambiguous cancellation with multiple active goals;
+- an alternative plan revised before confirmation;
+- a side conversation while an earlier goal remains `waiting_for_user`;
+- a later parameter answer resuming the original goal after an idle interval;
+- host preparation or validation failure leaving all staged goal state unchanged;
+- a multi-goal provider request updating every source goal but no auxiliary
+  social-attention lifecycle.
+
+Each scenario must assert goal IDs, per-goal dispositions, information gaps,
+confirmation state, effectful skills, speech commitments, and final lifecycle.
+Testing only the top-level route or global plan disposition is insufficient.
+
 ## 7. Scenario-before-fix policy
 
 For a reported behavioral defect:

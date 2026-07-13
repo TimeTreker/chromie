@@ -147,6 +147,85 @@ class ResponseCompositionContractTests(unittest.TestCase):
 
 
 class ResponseComposerResolverTests(unittest.TestCase):
+    def test_mixed_execute_and_clarify_composes_one_truthful_response(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-mixed-response",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.93,
+            goal_ids=["goal-nod", "goal-walk"],
+            goal_summary="Nod twice and ask how long to walk.",
+            steps=[
+                {
+                    "step_id": "nod",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-nod"],
+                }
+            ],
+            parameter_resolutions=[
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "strategy": "ask_user",
+                    "blocking": True,
+                    "source_goal_ids": ["goal-walk"],
+                    "rationale": "Walking duration is required.",
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-nod",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["nod"],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": ["goal-nod"],
+                    },
+                },
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "clarify",
+                    "coverage": "partial",
+                    "response_text": "你希望我往前走多久？",
+                },
+            ],
+            goal_satisfaction={
+                "score": 0.75,
+                "status": "substantial",
+                "satisfied_goal_ids": ["goal-nod"],
+                "unmet_goal_ids": ["goal-walk"],
+            },
+        )
+        raw = {
+            "response_plan": {
+                "immediate": {
+                    "text": "我先点头两次。你希望我往前走多久？",
+                    "speech_act": "clarify",
+                    "commitment_state": "waiting_for_user",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-nod", "goal-walk"],
+                }
+            },
+            "social_attention_plan": {"decision": "none"},
+            "confidence": 0.92,
+        }
+        result = asyncio.run(
+            ResponseComposerResolver(FakeOllama(raw)).resolve(request(canonical))
+        )
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(
+            result.composition.response_plan.immediate.covers_goal_ids,  # type: ignore[union-attr]
+            ["goal-nod", "goal-walk"],
+        )
+        self.assertEqual(
+            result.composition.response_plan.immediate.commitment_state,  # type: ignore[union-attr]
+            "waiting_for_user",
+        )
+
     def test_multi_goal_response_and_none_attention_resolve(self):
         canonical = plan(goals=["goal-weather", "goal-calendar"])
         raw = {

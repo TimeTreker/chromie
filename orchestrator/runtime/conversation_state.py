@@ -71,29 +71,18 @@ def _split_phrases(value: str | None, defaults: tuple[str, ...]) -> tuple[str, .
 DEFAULT_RESET_PHRASES = (
     "new topic",
     "new session",
-    "start over",
     "start a new session",
+    "start a new conversation",
     "reset conversation",
     "reset session",
-    "forget that",
-    "forget it",
-    "forget this task",
     "clear session",
-    "never mind",
-    "nevermind",
-    "change topic",
-    "let's talk about something else",
-    "重新开始",
+    "clear conversation",
     "新的会话",
     "新会话",
     "开始新的会话",
-    "重来",
-    "换个话题",
+    "开始新会话",
+    "重置会话",
     "清空会话",
-    "忘记这个任务",
-    "别管刚才",
-    "不用了",
-    "算了",
 )
 
 DEFAULT_FOLLOWUP_PHRASES = (
@@ -610,7 +599,7 @@ class ConversationStateManager:
         task_id = self._new_task_id()
         goal = operation.goal.model_copy(
             update={
-                "goal_id": task_id,
+                "goal_id": operation.goal.goal_id or task_id,
                 "version": 1,
                 "source_text": operation.goal.source_text or user_text,
             }
@@ -1221,6 +1210,31 @@ class ConversationStateManager:
             self.last_activity_ms = _now_ms()
         return results
 
+    def apply_semantic_task_operations_atomically(
+        self,
+        operations: list[SemanticTaskOperation] | list[dict[str, Any]],
+        *,
+        sid: str | None,
+        user_text: str,
+        route: str | None = None,
+        intent: str | None = None,
+        source: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Validate the full batch before mutating goal state.
+
+        This prevents a malformed later operation from leaving an earlier goal
+        partially committed. Existing idempotent replays remain accepted.
+        """
+        validated: list[SemanticTaskOperation] = []
+        for item in operations:
+            validated.append(
+                item if isinstance(item, SemanticTaskOperation)
+                else SemanticTaskOperation.model_validate(item)
+            )
+        return self.apply_semantic_task_operations(
+            validated, sid=sid, user_text=user_text, route=route, intent=intent, source=source
+        )
+
     def _looks_like_meaningful_task_text(self, text: str | None) -> bool:
         normalized = self._normalized(text)
         if not normalized:
@@ -1472,7 +1486,16 @@ class ConversationStateManager:
         return False
 
     def is_explicit_reset(self, text: str | None) -> bool:
-        return self._contains_phrase(self._normalized(text), self.reset_phrases)
+        # Conversation reset is an operational control, so require one explicit
+        # whole-utterance command. Goal cancellation, replacement, and phrases
+        # such as “never mind” or “算了” are semantic and must be resolved by
+        # Goal Association rather than clearing every active goal here.
+        normalized = self._normalized(text).strip(" \t\r\n.,!?;:，。！？；：")
+        return normalized in {
+            phrase.strip().lower().strip(" \t\r\n.,!?;:，。！？；：")
+            for phrase in self.reset_phrases
+            if phrase.strip()
+        }
 
     def is_followup_reference(self, text: str | None) -> bool:
         normalized = self._normalized(text)
@@ -1525,12 +1548,24 @@ class ConversationStateManager:
         if self.is_explicit_reset(normalized):
             return self.start_new_conversation(reason="explicit_reset", sid=sid)
 
-        if self._has_any_context() and idle_sec >= self.hard_idle_timeout_sec:
-            return self.start_new_conversation(reason="hard_idle_timeout", sid=sid)
-
         if self._active_pending_tasks():
             self.last_split_reason = "kept_active_pending_task"
             return {"started_new": False, "reason": "active_pending_task", "conversation_id": self.conversation_id, "sid": sid}
+
+        # A goal waiting for clarification, confirmation, provider recovery, or
+        # later continuation is still active even when it has no current Skill
+        # Runtime request. Conversation-boundary heuristics must not discard it.
+        if self._active_task_contexts():
+            self.last_split_reason = "kept_active_goal"
+            return {
+                "started_new": False,
+                "reason": "active_goal",
+                "conversation_id": self.conversation_id,
+                "sid": sid,
+            }
+
+        if self._has_any_context() and idle_sec >= self.hard_idle_timeout_sec:
+            return self.start_new_conversation(reason="hard_idle_timeout", sid=sid)
 
         if self.is_followup_reference(normalized):
             self.last_split_reason = "kept_followup_reference"
@@ -1738,6 +1773,60 @@ class ConversationStateManager:
             self._persist_task_contexts_if_enabled()
         self.last_activity_ms = _now_ms()
 
+    def _record_goal_pending_execution(
+        self,
+        *,
+        sid: str | None,
+        goal_id: str,
+        status: str,
+        summary: str,
+        request_ids: list[str],
+        planning_result: str,
+        planned_skills: list[dict[str, Any]],
+        confirmation_pending: bool,
+    ) -> None:
+        """Track execution lifecycle for one semantic goal only.
+
+        Multi-goal plans must not attach every provider request to whichever goal
+        happens to be last in the deque. Auxiliary social-attention requests are
+        intentionally omitted by the caller.
+        """
+
+        if not self.enabled or not goal_id or not request_ids:
+            return
+        timestamp_ms = _now_ms()
+        metadata = {
+            "goal_id": goal_id,
+            "request_ids": list(request_ids),
+            "remaining_request_ids": list(request_ids),
+            "request_statuses": {},
+            "planning_result": planning_result,
+            "confirmation_pending": confirmation_pending,
+            "planned_skills": [dict(item) for item in planned_skills],
+        }
+        self._pending_tasks.append(
+            {
+                "sid": sid,
+                "type": "goal_execution",
+                "status": status,
+                "summary": self._compact_text(summary or goal_id),
+                "ts_ms": timestamp_ms,
+                "updated_ms": timestamp_ms,
+                "conversation_id": self.conversation_id,
+                "metadata": metadata,
+            }
+        )
+        context = self._task_context_by_id(goal_id)
+        if context is not None:
+            context["status"] = status
+            context["updated_ms"] = timestamp_ms
+            current_metadata = context.get("metadata")
+            if not isinstance(current_metadata, dict):
+                current_metadata = {}
+            context["metadata"] = {**current_metadata, **metadata}
+            self._persist_task_contexts_if_enabled()
+        self.last_activity_ms = timestamp_ms
+
     def record_pending_task(
         self,
         *,
@@ -1825,7 +1914,8 @@ class ConversationStateManager:
             "failed": "failed",
             "error": "failed",
         }.get(normalized_status, normalized_status)
-        for task in reversed(self._pending_tasks):
+        matched = False
+        for task in list(self._pending_tasks):
             metadata = task.get("metadata")
             if not isinstance(metadata, dict):
                 continue
@@ -1834,54 +1924,74 @@ class ConversationStateManager:
                 request_ids = [request_ids]
             if not isinstance(request_ids, list) or request_id not in request_ids:
                 continue
+            matched = True
             statuses = metadata.setdefault("request_statuses", {})
-            if isinstance(statuses, dict):
-                statuses[request_id] = final_status
+            if not isinstance(statuses, dict):
+                statuses = {}
+                metadata["request_statuses"] = statuses
+            statuses[request_id] = final_status
             remaining = metadata.get("remaining_request_ids")
             if isinstance(remaining, str):
                 remaining = [remaining]
-            if isinstance(remaining, list):
-                metadata["remaining_request_ids"] = [
-                    item for item in remaining if item != request_id
-                ]
-                if metadata["remaining_request_ids"]:
-                    task["status"] = "running"
-                else:
-                    values = list(statuses.values()) if isinstance(statuses, dict) else [final_status]
-                    if "failed" in values:
-                        task["status"] = "failed"
-                    elif "cancelled" in values:
-                        task["status"] = "cancelled"
-                    elif "expired" in values:
-                        task["status"] = "expired"
-                    else:
-                        task["status"] = "done"
+            if not isinstance(remaining, list):
+                remaining = list(request_ids)
+            remaining = [item for item in remaining if item != request_id]
+            metadata["remaining_request_ids"] = remaining
+            if remaining:
+                task_status = "running"
             else:
-                task["status"] = final_status
+                values = list(statuses.values())
+                if "failed" in values:
+                    task_status = "failed"
+                elif "cancelled" in values:
+                    task_status = "cancelled"
+                elif "expired" in values:
+                    task_status = "expired"
+                else:
+                    task_status = "done"
+            task["status"] = task_status
             task["updated_ms"] = _now_ms()
-            for context in reversed(self._task_contexts):
-                metadata = context.get("metadata")
-                if not isinstance(metadata, dict):
-                    continue
-                request_ids = metadata.get("request_ids")
-                if isinstance(request_ids, str):
-                    request_ids = [request_ids]
-                if isinstance(request_ids, list) and request_id in request_ids:
-                    context["status"] = task["status"]
-                    context["updated_ms"] = task["updated_ms"]
-                    self._persist_task_contexts_if_enabled()
-                    break
+
+            goal_id = str(metadata.get("goal_id") or "").strip()
+            contexts: list[dict[str, Any]] = []
+            if goal_id:
+                context = self._task_context_by_id(goal_id)
+                if context is not None:
+                    contexts.append(context)
+            else:
+                for context in self._task_contexts:
+                    context_metadata = context.get("metadata")
+                    if not isinstance(context_metadata, dict):
+                        continue
+                    context_request_ids = context_metadata.get("request_ids")
+                    if isinstance(context_request_ids, str):
+                        context_request_ids = [context_request_ids]
+                    if isinstance(context_request_ids, list) and request_id in context_request_ids:
+                        contexts.append(context)
+            for context in contexts:
+                context["status"] = task_status
+                context["updated_ms"] = task["updated_ms"]
+                context_metadata = context.get("metadata")
+                if not isinstance(context_metadata, dict):
+                    context_metadata = {}
+                context["metadata"] = {
+                    **context_metadata,
+                    "request_statuses": dict(statuses),
+                    "remaining_request_ids": list(remaining),
+                }
+
             self._memory_store.add_many(
                 self._memory_extractor.extract_task_outcome(
                     sid=str(task.get("sid") or ""),
                     summary=str(task.get("summary") or task.get("type") or "task"),
-                    status=str(task.get("status") or final_status),
+                    status=str(task_status),
                     trusted=True,
                 )
             )
+        if matched:
+            self._persist_task_contexts_if_enabled()
             self.last_activity_ms = _now_ms()
-            return True
-        return False
+        return matched
 
     def _record_planning_metadata(
         self,
@@ -1952,6 +2062,7 @@ class ConversationStateManager:
             "composed_plan",
             "safe_adjustment",
             "alternative_plan",
+            "mixed_plan",
         }:
             context["plan_version"] = max(0, int(context.get("plan_version") or 0)) + 1
             context["plan_status"] = "proposed"
@@ -2027,38 +2138,27 @@ class ConversationStateManager:
             self.record_assistant_turn(sid, " ".join(speech_parts), metadata={"source": "agent_result"})
 
         actions = data.get("actions", []) or data.get("skills", []) or []
-        if actions:
-            action_summaries: list[str] = []
-            request_ids: list[str] = []
-            for index, action in enumerate(actions):
-                if isinstance(action, dict):
-                    request_id = action.get("request_id")
-                    if request_id:
-                        request_ids.append(str(request_id))
-                    if index >= 3:
-                        continue
-                    action_summaries.append(
-                        str(
-                            action.get("skill_id")
-                            or action.get("type")
-                            or action.get("target")
-                            or "action"
-                        )
-                    )
-                else:
-                    request_id = getattr(action, "request_id", None)
-                    if request_id:
-                        request_ids.append(str(request_id))
-                    if index >= 3:
-                        continue
-                    action_summaries.append(
-                        str(
-                            getattr(action, "skill_id", None)
-                            or getattr(action, "type", None)
-                            or getattr(action, "target", None)
-                            or "action"
-                        )
-                    )
+        primary_actions: list[dict[str, Any]] = []
+        for action in actions:
+            if isinstance(action, dict):
+                item = dict(action)
+            else:
+                item = {
+                    "request_id": getattr(action, "request_id", None),
+                    "skill_id": getattr(action, "skill_id", None),
+                    "type": getattr(action, "type", None),
+                    "target": getattr(action, "target", None),
+                    "metadata": dict(getattr(action, "metadata", {}) or {}),
+                }
+            action_metadata = item.get("metadata")
+            if not isinstance(action_metadata, dict):
+                action_metadata = {}
+            if action_metadata.get("auxiliary_social_attention"):
+                continue
+            item["metadata"] = action_metadata
+            primary_actions.append(item)
+
+        if primary_actions:
             planning_result = (
                 str(result_metadata.get("planning_result") or "").strip()
                 if isinstance(result_metadata, dict)
@@ -2073,19 +2173,71 @@ class ConversationStateManager:
                 )
             )
             pending_status = "awaiting_confirmation" if confirmation_pending else "scheduled"
-            self.record_pending_task(
-                sid=sid,
-                task_type="robot_action",
-                status=pending_status,
-                summary=", ".join(action_summaries),
-                metadata={
-                    "action_count": len(actions),
-                    "request_ids": request_ids,
-                    "remaining_request_ids": list(request_ids),
-                    "planning_result": planning_result,
-                    "confirmation_pending": confirmation_pending,
-                },
-            )
+            by_goal: dict[str, list[dict[str, Any]]] = {}
+            unscoped: list[dict[str, Any]] = []
+            for item in primary_actions:
+                action_metadata = item.get("metadata") or {}
+                goal_ids = self._string_list(action_metadata.get("source_goal_ids"))
+                if not goal_ids:
+                    unscoped.append(item)
+                    continue
+                for goal_id in goal_ids:
+                    by_goal.setdefault(goal_id, []).append(item)
+
+            for goal_id, goal_actions in by_goal.items():
+                request_ids = [
+                    str(item.get("request_id"))
+                    for item in goal_actions
+                    if item.get("request_id")
+                ]
+                summaries = [
+                    str(item.get("skill_id") or item.get("type") or item.get("target") or "action")
+                    for item in goal_actions[:3]
+                ]
+                planned_skills = [
+                    {
+                        "skill_id": item.get("skill_id"),
+                        "request_id": item.get("request_id"),
+                        "source_goal_ids": self._string_list(
+                            (item.get("metadata") or {}).get("source_goal_ids")
+                        ),
+                    }
+                    for item in goal_actions
+                ]
+                self._record_goal_pending_execution(
+                    sid=sid,
+                    goal_id=goal_id,
+                    status=pending_status,
+                    summary=", ".join(summaries),
+                    request_ids=request_ids,
+                    planning_result=planning_result,
+                    planned_skills=planned_skills,
+                    confirmation_pending=confirmation_pending,
+                )
+
+            if unscoped:
+                request_ids = [
+                    str(item.get("request_id"))
+                    for item in unscoped
+                    if item.get("request_id")
+                ]
+                action_summaries = [
+                    str(item.get("skill_id") or item.get("type") or item.get("target") or "action")
+                    for item in unscoped[:3]
+                ]
+                self.record_pending_task(
+                    sid=sid,
+                    task_type="robot_action",
+                    status=pending_status,
+                    summary=", ".join(action_summaries),
+                    metadata={
+                        "action_count": len(unscoped),
+                        "request_ids": request_ids,
+                        "remaining_request_ids": list(request_ids),
+                        "planning_result": planning_result,
+                        "confirmation_pending": confirmation_pending,
+                    },
+                )
 
         # AgentResult exposes memory_updates at the top level. Native
         # InteractionResponse keeps them in metadata so the shared wire

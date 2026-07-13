@@ -123,6 +123,63 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("Deep planning is terminal", prompt)
         self.assertIn("never call or return to the Fast Planner", system)
 
+    def test_mixed_plan_checks_executable_goal_not_global_average(self):
+        raw = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 0.93,
+            "goal_ids": ["goal-nod", "goal-coffee"],
+            "goal_summary": "Nod and report coffee unavailable.",
+            "steps": [
+                {
+                    "step_id": "nod",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-nod"],
+                }
+            ],
+            "goal_outcomes": [
+                {
+                    "goal_id": "goal-nod",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["nod"],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": ["goal-nod"],
+                    },
+                },
+                {
+                    "goal_id": "goal-coffee",
+                    "disposition": "unavailable",
+                    "coverage": "uncertain",
+                    "response_text": "Coffee preparation is unavailable.",
+                    "satisfaction": {
+                        "score": 0.0,
+                        "status": "unsatisfied",
+                        "unmet_goal_ids": ["goal-coffee"],
+                    },
+                },
+            ],
+            "goal_satisfaction": {
+                "score": 0.5,
+                "status": "partial",
+                "satisfied_goal_ids": ["goal-nod"],
+                "unmet_goal_ids": ["goal-coffee"],
+            },
+        }
+        plan = asyncio.run(
+            DeepPlannerResolver(
+                SequencedOllama([raw]),
+                FullCatalog(),
+                min_goal_satisfaction=0.75,
+            ).resolve(request("点头并准备咖啡。"))
+        )
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual([item.disposition for item in plan.goal_outcomes], ["execute", "unavailable"])
+        self.assertEqual(plan.metadata["attempt_count"], 1)
+
 
 class OrchestratorDeepPlannerTests(unittest.TestCase):
     def test_fast_escalation_triggers_report_only_deep_planner(self):

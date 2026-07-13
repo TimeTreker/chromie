@@ -87,7 +87,7 @@ class FastPlannerResolver:
             "Decide whether the common catalog and bounded context completely cover every semantic responsibility in the user turn. "
             "Coverage means the whole goal, including all requested actions, constraints, relationships, and required parameters. "
             "Finding one matching skill is not complete coverage. If any responsibility, parameter source, condition, sequence, concurrency relation, "
-            "or required capability remains unresolved, return coverage partial or uncertain and disposition escalate with zero steps. "
+            "or required capability remains unresolved, return coverage partial or uncertain and disposition escalate with zero steps. If independent goals need different dispositions, such as executing one while clarifying another, escalate with zero steps so the Deep Planner can produce a mixed per-goal outcome. "
             "For simple chat, complete coverage may use disposition respond and response_text. For a complete direct common-skill goal, use disposition execute. "
             "Use only exact supplied capability IDs. Return compact JSON matching CanonicalPlan: planner_tier=fast, disposition, coverage, confidence, "
             "goal_ids, goal_summary, response_text, steps, escalation_reason, unresolved, parameter_resolutions, goal_satisfaction, metadata. Do not execute, authorize, or claim completion."
@@ -130,6 +130,7 @@ class FastPlannerResolver:
         out.setdefault("escalation_reason", "")
         out.setdefault("unresolved", [])
         out.setdefault("parameter_resolutions", [])
+        out.setdefault("goal_outcomes", [])
         out.setdefault("goal_satisfaction", None)
         out.setdefault("metadata", {})
         return out

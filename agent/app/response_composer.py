@@ -347,6 +347,7 @@ class ResponseComposerResolver:
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. "
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
             "For execute plans this is pre-execution composition: use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, and omit final. "
+            "For mixed plans, coordinate executable goals and waiting goals in one natural response: do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage that covers every clarify outcome. "
             "For clarify, name the actual unresolved need naturally and use waiting_for_user. For alternatives, explain the change and request approval. "
             "Social attention is auxiliary interaction behavior, never a user goal or task step; choose decision=none when stillness is more natural, safer, unsupported, or unnecessary. "
             "Return JSON with response_plan, optional social_attention_plan, confidence, and rationale only."
