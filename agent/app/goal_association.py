@@ -143,6 +143,7 @@ class GoalAssociationResolver:
             "that names the human topics, never internal IDs.\n\n"
             "Return compact JSON with turn_id, associations, new_goals, clarification, confidence, reason_summary, metadata. "
             "Each association uses relationship, target_goal_ids copied exactly from active goals, confidence, and reason_summary. "
+            "For modify, clarify, or replace relationships, include goal_update as a semantic delta such as description, constraints, object, beneficiary, or success_criteria; include resolved_gap_ids when the turn answers an existing gap, and set requires_replan when the retained goal or constraints changed. "
             "Each new goal uses open semantic description, source_text, beneficiary, constraints, and success_criteria when known. "
             "Do not output skills, plans, task IDs not supplied, authorization, execution claims, markdown, or hidden reasoning."
         )
@@ -174,6 +175,9 @@ class GoalAssociationResolver:
                 relationship=str(normalized.get("relationship") or "reference"),
                 target_goal_ids=normalized.get("target_goal_ids") or [],
             )
+            normalized.setdefault("goal_update", {})
+            normalized.setdefault("resolved_gap_ids", [])
+            normalized.setdefault("requires_replan", normalized.get("relationship") in {"modify", "clarify", "replace"})
             normalized_associations.append(normalized)
 
         goals = raw.get("new_goals")

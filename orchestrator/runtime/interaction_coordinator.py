@@ -109,6 +109,23 @@ class InteractionRuntimeCoordinator:
         )
         self._catalog_lock = asyncio.Lock()
 
+    async def ensure_skill_definitions(self, skill_ids: Iterable[str]) -> None:
+        """Refresh provider-backed definitions needed for a canonical plan.
+
+        This is a deterministic catalog operation. It does not authorize or
+        execute any requested skill.
+        """
+
+        normalized = [str(item).strip() for item in skill_ids if str(item).strip()]
+        body_ids = [item for item in normalized if item.startswith("soridormi.")]
+        if body_ids:
+            await self._ensure_soridormi_catalog(required_skill_ids=body_ids)
+        for skill_id in normalized:
+            self.registry.get(skill_id)
+
+    def skill_definition(self, skill_id: str):
+        return self.registry.get(skill_id)
+
     async def execute(
         self,
         response: InteractionResponse,

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "multi_goal_response_coverage",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "A fast terminal chat plan and composed response preserve both independent goals.",
+  "tags": ["pr7", "multi-goal", "response-composition"],
+  "input": {"text": "查天气，也告诉我今天有没有会议。", "language": "zh-CN"},
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": ["chat"],
+    "route_decision": {"route": "chat", "intent": "multi_goal_information", "language": "zh-CN"},
+    "goal_association": {
+      "turn_id": "turn-multi",
+      "new_goals": [
+        {"goal_id": "goal-weather", "description": "Report today's weather.", "source_text": "查天气。"},
+        {"goal_id": "goal-calendar", "description": "Report whether there are meetings today.", "source_text": "告诉我今天有没有会议。"}
+      ],
+      "confidence": 0.94,
+      "metadata": {"status": "resolved"}
+    },
+    "fast_plan": {
+      "plan_id": "plan-multi",
+      "planner_tier": "fast",
+      "disposition": "respond",
+      "coverage": "complete",
+      "confidence": 0.95,
+      "goal_ids": ["goal-weather", "goal-calendar"],
+      "goal_summary": "Answer both information goals.",
+      "response_text": "今天有雨，下午三点有会议。",
+      "goal_satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-weather", "goal-calendar"]}
+    },
+    "response_composition": {
+      "response_plan": {
+        "final": {
+          "text": "今天有雨，下午三点有会议。",
+          "covers_goal_ids": ["goal-weather", "goal-calendar"]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "chat",
+    "planner_tier": "fast",
+    "disposition": "respond",
+    "coverage": "complete",
+    "skill_ids": [],
+    "requires_confirmation": false,
+    "calls": ["goal_association", "fast_plan", "response_composer"]
+  }
+}

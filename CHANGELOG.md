@@ -4,7 +4,14 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
-- No changes yet.
+### Goal-driven cognitive runtime rollout
+
+- integrate Goal Association, complete-coverage Fast Planning, terminal Deep Planning, bounded trusted-validator replanning, Response Composition, and runtime adaptation behind `off`, `report_only`, and lane-gated `apply` modes;
+- apply Goal-state updates atomically only after trusted response preparation;
+- retain privacy-conscious operational evidence and classified acceptance tooling;
+- add deterministic cognitive-runtime scenarios and a cognitive text-to-MuJoCo evidence entry point;
+- preserve legacy and fail-closed rollback policies without widening physical execution authority.
+
 
 ## 0.0.1 - 2026-07-04
 

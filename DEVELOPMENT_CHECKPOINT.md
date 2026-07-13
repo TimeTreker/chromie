@@ -77,6 +77,7 @@ The `0.0.1` release implementation is present:
   deepthinking may record understood but non-executable desired abilities as
   `missing_ability` task proposals, while executable work still requires exact
   catalog skill IDs and trusted runtime validation;
+- goal-driven PR1–PR7 runtime migration with shared Goal and CanonicalPlan contracts, continuity-before-creation association, complete-coverage Fast Planning, terminal Deep Planning, parameter resolution, Goal Satisfaction, fingerprint-bound response composition, lane-gated `off`/`report_only`/`apply`, one bounded trusted-validator replan, atomic Goal-state application, classified operational evidence, and immediate per-lane rollback; maintained configuration remains report-only and retained PR7 live-text/MuJoCo evidence is still open;
 - model-authored optional social-attention plans that may choose subtle named
   behavior or `none`, use live target evidence before installation calibration,
   stay outside user task proposals, and fail closed on schema/resource/latency
@@ -209,9 +210,9 @@ dependency-light local skips for `aiohttp` client coverage
 
 Current 2026-07-12 automated regression gate:
 python scripts/check_docs.py passed
-834 current unittest cases and 20 legacy Agent tests passed with
+899 current unittest cases and 20 legacy Agent tests passed with
 `./scripts/run_tests.sh`
-369/369 adapter, Router, Router-dialogue, interaction, and dialogue scenarios
+373/373 adapter, Router, Router-dialogue, interaction, dialogue, and cognitive-runtime scenarios
 passed with `python scripts/scenario_runner.py --no-write`
 42/42 general-ability Level A representative probes passed
 The current reliability scenarios include English and Chinese walking requests,

@@ -28,13 +28,30 @@ from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentResult, AgentRunRequest
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+from orchestrator.runtime.cognitive_runtime import (
+    CanonicalPlanRuntimeAdapter,
+    CognitiveRuntimePolicy,
+    GoalDrivenRuntimeCoordinator,
+)
+from orchestrator.runtime.skill_runtime import SkillDefinition
+from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.response_composition import (
+    CoordinatedResponsePlan,
+    ResponseCompositionResolution,
+    canonical_plan_fingerprint,
+)
+from shared.chromie_contracts.semantic_task import ResponsePlan
 from router.app.capability_catalog import CapabilityCatalogResult
 from router.app.llm_router import OllamaLLMRouter
 from router.app.schema import RouteDecision, RouteRequest
 
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
-SUPPORTED_SUITES = {"router", "router_dialogue", "interaction", "dialogue", "adapter"}
+SUPPORTED_SUITES = {
+    "router", "router_dialogue", "interaction", "dialogue", "adapter",
+    "cognitive_runtime",
+}
 
 
 @dataclass(frozen=True)
@@ -248,6 +265,115 @@ class _AgentOllama:
             reply = self.replies[0]
         assert reply is not None
         return reply
+
+
+class _CognitiveScenarioRuntime:
+    def __init__(self, capabilities: list[dict[str, Any]]) -> None:
+        self.definitions: dict[str, SkillDefinition] = {}
+        for item in capabilities:
+            definition = SkillDefinition(
+                skill_id=str(item.get("skill_id") or item.get("capability_id") or ""),
+                version=str(item.get("version") or "0.1.0"),
+                provider_id=str(item.get("provider_id") or "scenario.provider"),
+                description=str(item.get("description") or ""),
+                input_schema=dict(item.get("input_schema") or {}),
+                available=bool(item.get("available", True)),
+                unavailable_reason=item.get("unavailable_reason"),
+                requires_confirmation=bool(item.get("requires_confirmation", False)),
+                interruptible=bool(item.get("interruptible", True)),
+                can_run_parallel=bool(item.get("can_run_parallel", True)),
+                exclusive_group=(str(item.get("exclusive_group") or "").strip() or None),
+                timeout_ms=int(item.get("timeout_ms", 30000)),
+                metadata={
+                    "resource_claims": list(item.get("resource_claims") or []),
+                    **dict(item.get("metadata") or {}),
+                },
+            )
+            self.definitions[definition.skill_id] = definition
+
+    async def ensure_skill_definitions(self, skill_ids: list[str]) -> None:
+        missing = [skill_id for skill_id in skill_ids if skill_id not in self.definitions]
+        if missing:
+            raise ValueError("unknown scenario skills: " + ",".join(missing))
+
+    def skill_definition(self, skill_id: str) -> SkillDefinition:
+        try:
+            return self.definitions[skill_id]
+        except KeyError as exc:
+            raise ValueError(f"unknown scenario skill {skill_id!r}") from exc
+
+
+class _CognitiveScenarioClient:
+    def __init__(self, stub: dict[str, Any]) -> None:
+        self.stub = stub
+        self.deep_plans = list(stub.get("deep_plans") or [])
+        self.calls: list[str] = []
+        self.deep_contexts: list[dict[str, Any]] = []
+
+    async def resolve_goal_association(self, *args: Any, **kwargs: Any) -> GoalAssociationResolution:
+        del args, kwargs
+        self.calls.append("goal_association")
+        return GoalAssociationResolution.model_validate(self.stub["goal_association"])
+
+    async def resolve_fast_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
+        del args, kwargs
+        self.calls.append("fast_plan")
+        return CanonicalPlan.model_validate(self.stub["fast_plan"])
+
+    async def resolve_deep_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
+        del args
+        self.calls.append("deep_plan")
+        self.deep_contexts.append(dict(kwargs.get("context") or {}))
+        if not self.deep_plans:
+            raise AssertionError("cognitive scenario deep-plan script exhausted")
+        return CanonicalPlan.model_validate(self.deep_plans.pop(0))
+
+    async def compose_response_plan(self, *args: Any, **kwargs: Any) -> ResponseCompositionResolution:
+        del args
+        self.calls.append("response_composer")
+        plan = CanonicalPlan.model_validate(kwargs["context"]["canonical_plan_resolution"])
+        raw = self.stub.get("response_composition")
+        if isinstance(raw, dict) and raw.get("status") not in {None, "resolved"}:
+            return ResponseCompositionResolution.model_validate(raw)
+        response_plan_raw = (raw or {}).get("response_plan") if isinstance(raw, dict) else None
+        if not isinstance(response_plan_raw, dict):
+            if plan.disposition == "execute":
+                response_plan_raw = {
+                    "pre_action": {
+                        "text": "好的，我先执行这个计划。",
+                        "speech_act": "inform",
+                        "commitment_state": "evaluating",
+                        "must_not_claim_completion": True,
+                        "covers_goal_ids": plan.goal_ids,
+                    }
+                }
+            elif plan.disposition == "clarify":
+                response_plan_raw = {
+                    "immediate": {
+                        "text": plan.response_text or "请补充必要信息。",
+                        "speech_act": "clarify",
+                        "commitment_state": "waiting_for_user",
+                        "must_not_claim_completion": True,
+                        "covers_goal_ids": plan.goal_ids,
+                    }
+                }
+            else:
+                response_plan_raw = {
+                    "final": {
+                        "text": plan.response_text or "好的。",
+                        "covers_goal_ids": plan.goal_ids,
+                    }
+                }
+        composition = CoordinatedResponsePlan(
+            composition_id=str((raw or {}).get("composition_id") or f"composition-{plan.plan_id}"),
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan.model_validate(response_plan_raw),
+            confidence=float((raw or {}).get("confidence", 0.9)),
+            rationale=str((raw or {}).get("rationale") or "scenario composition"),
+        )
+        return ResponseCompositionResolution(status="resolved", composition=composition)
 
 
 def _tuple_of_strings(value: Any) -> tuple[str, ...]:
@@ -1344,6 +1470,91 @@ async def evaluate_router_dialogue_scenario(
     }
 
 
+async def evaluate_cognitive_runtime_scenario(
+    scenario: BehaviorScenario,
+) -> dict[str, Any]:
+    stub = scenario.stub
+    client = _CognitiveScenarioClient(stub)
+    runtime = _CognitiveScenarioRuntime(list(stub.get("capabilities") or []))
+    mode = str(stub.get("mode") or "report_only")
+    apply_lanes = frozenset(str(item) for item in (stub.get("apply_lanes") or ["chat", "robot_action"]))
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=client,
+        adapter=CanonicalPlanRuntimeAdapter(runtime),
+        policy=CognitiveRuntimePolicy(
+            mode=mode,
+            apply_lanes=apply_lanes,
+            fallback_policy=str(stub.get("fallback_policy") or "legacy"),
+            host_replan_budget=int(stub.get("host_replan_budget", 1)),
+        ),
+    )
+    decision_raw = stub.get("route_decision") or {
+        "route": "chat",
+        "intent": "conversation",
+        "language": scenario.language or "en-US",
+    }
+    decision = type(
+        "ScenarioDecision",
+        (),
+        {
+            "route": str(decision_raw.get("route") or "chat"),
+            "intent": str(decision_raw.get("intent") or "conversation"),
+            "language": str(decision_raw.get("language") or scenario.language or "en-US"),
+        },
+    )()
+    resolution = await coordinator.resolve(
+        object(),
+        text=scenario.text,
+        sid=scenario.scenario_id,
+        route_decision=decision,
+        context=dict(stub.get("context") or {"history": []}),
+        history=list((stub.get("context") or {}).get("history") or []),
+        language=decision.language,
+    )
+    terminal = resolution.terminal_plan
+    interaction = resolution.interaction_response
+    actual = {
+        "status": resolution.status,
+        "lane": resolution.lane,
+        "fallback_reason": resolution.fallback_reason,
+        "planner_tier": terminal.planner_tier if terminal is not None else None,
+        "disposition": terminal.disposition if terminal is not None else None,
+        "coverage": terminal.coverage if terminal is not None else None,
+        "skill_ids": [item.skill_id for item in interaction.skills] if interaction else [],
+        "skill_args": [item.args for item in interaction.skills] if interaction else [],
+        "requires_confirmation": interaction.requires_confirmation if interaction else False,
+        "calls": list(client.calls),
+        "runtime_replan_count": int(resolution.metadata.get("runtime_replan_count", 0)),
+        "deep_feedback_present": any(
+            "runtime_validator_feedback" in context for context in client.deep_contexts
+        ),
+    }
+    expect = scenario.expect
+    errors: list[str] = []
+    for key in ("status", "lane", "planner_tier", "disposition", "coverage"):
+        if key in expect and actual[key] != expect[key]:
+            errors.append(f"{key}={actual[key]!r}, expected {expect[key]!r}")
+    if "skill_ids" in expect and actual["skill_ids"] != list(expect["skill_ids"]):
+        errors.append(
+            f"skill_ids={actual['skill_ids']!r}, expected {list(expect['skill_ids'])!r}"
+        )
+    if "requires_confirmation" in expect and actual["requires_confirmation"] is not bool(expect["requires_confirmation"]):
+        errors.append(
+            "requires_confirmation="
+            f"{actual['requires_confirmation']!r}, expected {bool(expect['requires_confirmation'])!r}"
+        )
+    if "runtime_replan_count" in expect and actual["runtime_replan_count"] != int(expect["runtime_replan_count"]):
+        errors.append(
+            f"runtime_replan_count={actual['runtime_replan_count']}, "
+            f"expected {int(expect['runtime_replan_count'])}"
+        )
+    if expect.get("deep_feedback_present") is True and not actual["deep_feedback_present"]:
+        errors.append("runtime validator feedback did not reach Deep Planner")
+    if "calls" in expect and actual["calls"] != list(expect["calls"]):
+        errors.append(f"calls={actual['calls']!r}, expected {list(expect['calls'])!r}")
+    return {"ok": not errors, "errors": errors, "actual": actual}
+
+
 async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
     if scenario.suite == "router":
         return await evaluate_router_scenario(scenario)
@@ -1355,6 +1566,8 @@ async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
         return await evaluate_adapter_scenario(scenario)
     if scenario.suite == "dialogue":
         return await evaluate_dialogue_scenario(scenario)
+    if scenario.suite == "cognitive_runtime":
+        return await evaluate_cognitive_runtime_scenario(scenario)
     raise ValueError(f"unsupported suite {scenario.suite!r}")
 
 

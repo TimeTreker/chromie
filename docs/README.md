@@ -38,6 +38,7 @@ When documents disagree, correct the lower-authority document.
 | What retained trace artifacts can the CLI inspect? | `docs/TRACE_SCHEMA.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` |
 | What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
+| How is the goal-driven runtime enabled, observed, evidenced, and rolled back? | `docs/COGNITIVE_RUNTIME_ROLLOUT.md` |
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
@@ -56,6 +57,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Chinese Guide](PROJECT_GUIDE.zh-CN.md)
 - [Project Charter](PROJECT_CHARTER.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [Current Status](STATUS.md)
@@ -79,6 +81,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 ## Interaction and execution
 
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)

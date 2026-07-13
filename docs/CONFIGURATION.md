@@ -242,6 +242,25 @@ configuration.
 | `ORCH_RESPONSE_COMPOSER_MODE` | `report_only` in `.env.common`; invokes composition only after a terminal Fast or Deep `CanonicalPlan` and never changes speech, routing, task state, or execution. Code fallback is `off`. |
 | `ORCH_RESPONSE_COMPOSER_TIMEOUT_MS` | `5000`; host timeout for report-only composition. |
 
+## Unified goal-driven cognitive runtime
+
+| Variable | Default or profile behavior |
+|---|---|
+| `ORCH_COGNITIVE_RUNTIME_MODE` | `report_only` in `.env.common`; `off` uses the legacy runtime only, `report_only` runs the complete Goal Association → Fast/Deep Planner → Response Composer pipeline without changing execution, and `apply` makes eligible lanes authoritative through the trusted Skill Runtime. Code fallback is `off`. |
+| `ORCH_COGNITIVE_APPLY_LANES` | `chat,robot_action`; explicit comma-separated lane allowlist used only in `apply`. A terminal plan outside this set returns to the legacy path without committing Goal state. |
+| `ORCH_COGNITIVE_FALLBACK_POLICY` | `legacy`; `legacy` rolls a failed or disabled apply lane back to the existing Router/Agent path, while `fail_closed` returns truthful no-action speech and never executes a partial plan. |
+| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast/Deep planning, bounded host replan, response composition, and runtime adaptation. |
+| `ORCH_COGNITIVE_HOST_REPLAN_BUDGET` | `1`; maximum Deep Planner revision after trusted host schema/provider/resource validation rejects a terminal plan. It never returns to Fast Planner. |
+| `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
+| `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default. Enable raw text only under an explicit privacy decision. |
+| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Goal Association, terminal plan, composition, lane, latency, fallback, and prepared-interaction summaries. |
+
+`apply` additionally requires `ORCH_ENABLE_INTERACTION_RESPONSE=1`. Effectful
+steps still pass the existing trusted registry, schema, provider, confirmation,
+resource, cancellation, and execution-evidence gates. Goal state is committed
+atomically only after the terminal plan and composed response have passed host
+preparation. A disabled lane or technical failure cannot execute a partial plan.
+
 ## Semantic task continuity
 
 | Variable | Default or profile behavior |

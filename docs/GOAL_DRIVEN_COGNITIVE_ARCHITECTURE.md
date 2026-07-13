@@ -995,21 +995,34 @@ Exit criteria:
 
 ### PR7 — Runtime migration and retained evidence
 
+Implementation status: the unified runtime, lane-gated rollout, rollback,
+operational evidence recorder, classified acceptance tooling, and cognitive
+text-to-MuJoCo entry point are implemented and automatically verified. Retained
+live-text and MuJoCo target evidence remain open and must be collected on the
+intended deployment.
+
 Deliver:
 
 - staged `off`, `report_only`, and `apply` rollout;
-- migration from task continuity to goal continuity;
-- complete scenario library from retained live failures;
-- live text evidence;
-- MuJoCo evidence;
-- operational metrics and rollback.
+- lane-gated application with compatibility and fail-closed fallback policy;
+- migration from task continuity to atomic Goal continuity application;
+- trusted host validation and one bounded same-tier Deep revision;
+- complete dependency-light cognitive runtime scenarios;
+- operational evidence classification and rollback;
+- live-text and MuJoCo evidence collection entry points.
 
 Exit criteria:
 
 - all dependency-light tests pass;
-- scenario library passes;
-- retained text and simulator evidence;
-- no release claim beyond collected evidence.
+- cognitive scenario library passes;
+- apply records are written only after trusted preparation and atomic Goal
+  state application;
+- retained live-text and simulator evidence are reviewed before target behavior
+  is claimed;
+- no release claim exceeds collected evidence.
+
+Operational details are maintained in
+[Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).
 
 ## 20. Migration strategy
 

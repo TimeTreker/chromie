@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "id": "compound_walk_blink_runtime_replan",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "A parallel walk-and-blink conflict is returned to Deep Planner once and becomes a confirmed sequential alternative.",
+  "tags": ["pr7", "compound", "replan", "rollback"],
+  "input": {"text": "往前走十五秒，同时眨眼。", "language": "zh-CN"},
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": ["robot_action"],
+    "host_replan_budget": 1,
+    "route_decision": {"route": "robot_action", "intent": "semantic_capability_planning", "language": "zh-CN"},
+    "goal_association": {
+      "turn_id": "turn-compound",
+      "new_goals": [{
+        "goal_id": "goal-compound",
+        "description": "Walk forward for fifteen seconds while blinking.",
+        "source_text": "往前走十五秒，同时眨眼。"
+      }],
+      "confidence": 0.95,
+      "metadata": {"status": "resolved"}
+    },
+    "fast_plan": {
+      "plan_id": "fast-compound",
+      "planner_tier": "fast",
+      "disposition": "escalate",
+      "coverage": "partial",
+      "confidence": 0.91,
+      "escalation_reason": "compound goal requires full-catalog planning"
+    },
+    "deep_plans": [
+      {
+        "plan_id": "deep-parallel",
+        "planner_tier": "deep",
+        "disposition": "execute",
+        "coverage": "complete",
+        "confidence": 0.91,
+        "goal_ids": ["goal-compound"],
+        "goal_summary": "Walk and blink concurrently.",
+        "steps": [
+          {"step_id": "walk", "skill_id": "soridormi.walk_forward", "args": {"duration_s": 15}, "timing": "parallel", "source_goal_ids": ["goal-compound"]},
+          {"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 4}, "timing": "parallel", "source_goal_ids": ["goal-compound"]}
+        ],
+        "goal_satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-compound"]}
+      },
+      {
+        "plan_id": "deep-sequential-alternative",
+        "planner_tier": "deep",
+        "disposition": "execute",
+        "coverage": "complete",
+        "confidence": 0.93,
+        "goal_ids": ["goal-compound"],
+        "goal_summary": "Walk first, then blink as a safe alternative.",
+        "steps": [
+          {"step_id": "walk", "skill_id": "soridormi.walk_forward", "args": {"duration_s": 15}, "timing": "sequential", "source_goal_ids": ["goal-compound"]},
+          {"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 4}, "timing": "sequential", "source_goal_ids": ["goal-compound"]}
+        ],
+        "goal_satisfaction": {"score": 0.86, "status": "substantial", "satisfied_goal_ids": ["goal-compound"], "unmet_requirements": ["concurrent timing"]},
+        "metadata": {"plan_relation": "alternative", "user_confirmation_required": true}
+      }
+    ],
+    "capabilities": [
+      {
+        "skill_id": "soridormi.walk_forward",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {"type": "object", "properties": {"duration_s": {"type": "number", "minimum": 0.1}}, "required": ["duration_s"]},
+        "can_run_parallel": false,
+        "exclusive_group": "base_motion",
+        "resource_claims": ["base_motion"],
+        "requires_confirmation": true
+      },
+      {
+        "skill_id": "soridormi.blink_eyes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {"type": "object", "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 10}}, "required": ["count"]},
+        "can_run_parallel": true,
+        "exclusive_group": "eye_expression",
+        "resource_claims": ["eye_expression"]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "pre_action": {
+          "text": "我不能确认这两个动作能安全同时进行，但可以先走十五秒，再眨四下眼睛。可以吗？",
+          "speech_act": "inform",
+          "commitment_state": "waiting_for_user",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": ["goal-compound"]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "deep",
+    "disposition": "execute",
+    "coverage": "complete",
+    "skill_ids": ["soridormi.walk_forward", "soridormi.blink_eyes"],
+    "requires_confirmation": true,
+    "runtime_replan_count": 1,
+    "deep_feedback_present": true,
+    "calls": ["goal_association", "fast_plan", "deep_plan", "deep_plan", "response_composer"]
+  }
+}

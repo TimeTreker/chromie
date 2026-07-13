@@ -352,6 +352,14 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
     os.environ["ORCH_EVENT_LOG_PATH"] = str(evidence_dir / "events.jsonl")
     os.environ["RECORDINGS_DIR"] = str(evidence_dir / "recordings")
     os.environ["ORCH_SESSION_TIMING_LOGS"] = "1"
+    if args.cognitive_runtime:
+        os.environ["ORCH_COGNITIVE_RUNTIME_MODE"] = "apply"
+        os.environ["ORCH_COGNITIVE_APPLY_LANES"] = args.cognitive_apply_lanes
+        os.environ["ORCH_COGNITIVE_FALLBACK_POLICY"] = "fail_closed"
+        os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"] = "1"
+        os.environ["ORCH_COGNITIVE_EVIDENCE_PATH"] = str(
+            evidence_dir / "cognitive_runtime_events.jsonl"
+        )
     if args.soridormi_mcp_url:
         os.environ["SORIDORMI_MCP_URL"] = args.soridormi_mcp_url
 
@@ -462,14 +470,72 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         )
 
         agent_start = time.perf_counter()
-        response = await assistant.agent_client.run_interaction(
-            session,
-            text=args.text,
-            route_decision=route,
-            sid=sid,
-            context=context,
-            history=context.get("history", []),
-        )
+        cognitive_resolution_payload: dict[str, Any] | None = None
+        if args.cognitive_runtime:
+            cognitive_resolution = await assistant._run_cognitive_runtime_pipeline(
+                session,
+                user_text=args.text,
+                session_id=sid,
+                context=context,
+                decision=route,
+                record_evidence=False,
+            )
+            cognitive_resolution_payload = cognitive_resolution.model_dump(
+                mode="json", exclude_none=True
+            )
+            _write_json(
+                evidence_dir / "cognitive_runtime_resolution.json",
+                cognitive_resolution_payload,
+            )
+            if (
+                cognitive_resolution.status != "applied"
+                or cognitive_resolution.interaction_response is None
+            ):
+                errors.append(
+                    "goal-driven runtime did not produce an applied interaction: "
+                    f"status={cognitive_resolution.status!r} "
+                    f"reason={cognitive_resolution.fallback_reason!r}"
+                )
+                response = assistant._host_speech_response(
+                    "Goal-driven runtime did not produce an executable interaction.",
+                    style="warning",
+                    source="cognitive_text_check_failure",
+                )
+            else:
+                response = cognitive_resolution.interaction_response.model_copy(deep=True)
+                response = assistant.interaction_runtime.prepare_response(
+                    response, session_id=sid
+                )
+                goal_state_results = assistant._apply_cognitive_goal_state(
+                    cognitive_resolution,
+                    session_id=sid,
+                    user_text=args.text,
+                    decision=route,
+                )
+                response.metadata = {
+                    **response.metadata,
+                    "goal_state_results": goal_state_results,
+                    "cognitive_runtime_resolution": assistant._cognitive_resolution_summary(
+                        cognitive_resolution
+                    ),
+                }
+                cognitive_resolution.goal_state_results = goal_state_results
+                cognitive_resolution.metadata = {
+                    **cognitive_resolution.metadata,
+                    "host_commit_status": "prepared_and_goal_state_committed",
+                }
+            assistant._record_cognitive_runtime_evidence(
+                cognitive_resolution, session_id=sid, user_text=args.text
+            )
+        else:
+            response = await assistant.agent_client.run_interaction(
+                session,
+                text=args.text,
+                route_decision=route,
+                sid=sid,
+                context=context,
+                history=context.get("history", []),
+            )
         agent_ms = (time.perf_counter() - agent_start) * 1000.0
         timings_ms["agent_ms"] = agent_ms
         response = response.model_copy(
@@ -593,6 +659,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             "errors": errors,
             "route": route.model_dump(mode="json"),
             "interaction_response": response.model_dump(mode="json"),
+            "cognitive_runtime": cognitive_resolution_payload,
             "execution": execution_payload,
             "status_before": status_before,
             "status_after": status_after,
@@ -626,6 +693,19 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Play Chromie TTS through the configured speaker; use --no-speaker for headless checks.",
+    )
+    parser.add_argument(
+        "--cognitive-runtime",
+        action="store_true",
+        help=(
+            "Use the PR7 goal-association, Fast/Deep Planner, response-composer, "
+            "and trusted runtime adapter instead of the legacy Agent /interaction path."
+        ),
+    )
+    parser.add_argument(
+        "--cognitive-apply-lanes",
+        default="chat,robot_action",
+        help="Comma-separated PR7 apply lanes used with --cognitive-runtime.",
     )
     parser.add_argument("--preview-only", action="store_true", help="Route and validate /interaction without executing Soridormi skills.")
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi modes. Use only under separate supervision.")

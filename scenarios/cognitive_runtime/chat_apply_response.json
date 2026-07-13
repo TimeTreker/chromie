@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "id": "chat_apply_response",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "Goal-driven apply mode composes and returns a speech-only chat response.",
+  "tags": ["pr7", "apply", "chat"],
+  "input": {"text": "你好。", "language": "zh-CN"},
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": ["chat"],
+    "route_decision": {"route": "chat", "intent": "greeting", "language": "zh-CN"},
+    "goal_association": {
+      "turn_id": "turn-chat",
+      "new_goals": [{
+        "goal_id": "goal-chat",
+        "description": "Respond to the user's greeting.",
+        "source_text": "你好。"
+      }],
+      "confidence": 0.97,
+      "metadata": {"status": "resolved"}
+    },
+    "fast_plan": {
+      "plan_id": "plan-chat",
+      "planner_tier": "fast",
+      "disposition": "respond",
+      "coverage": "complete",
+      "confidence": 0.97,
+      "goal_ids": ["goal-chat"],
+      "goal_summary": "Respond naturally to the greeting.",
+      "response_text": "你好。",
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": ["goal-chat"]
+      }
+    },
+    "response_composition": {
+      "response_plan": {
+        "final": {
+          "text": "你好，很高兴见到你。",
+          "covers_goal_ids": ["goal-chat"]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "chat",
+    "planner_tier": "fast",
+    "disposition": "respond",
+    "coverage": "complete",
+    "skill_ids": [],
+    "requires_confirmation": false,
+    "calls": ["goal_association", "fast_plan", "response_composer"]
+  }
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -11,7 +12,11 @@ from typing import Any, Deque
 from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
 
 try:
-    from chromie_contracts.goal import ActiveGoalSnapshot
+    from chromie_contracts.goal import (
+        ActiveGoalSnapshot,
+        GoalAssociationResolution,
+        stable_goal_operation_id,
+    )
     from chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -19,7 +24,11 @@ try:
         TaskContextSnapshot,
     )
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.goal import ActiveGoalSnapshot
+    from shared.chromie_contracts.goal import (
+        ActiveGoalSnapshot,
+        GoalAssociationResolution,
+        stable_goal_operation_id,
+    )
     from shared.chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -912,6 +921,216 @@ class ConversationStateManager:
             }
         )
         return result
+
+
+    def apply_goal_association_resolution(
+        self,
+        resolution: GoalAssociationResolution | dict[str, Any],
+        *,
+        sid: str | None,
+        user_text: str,
+        route: str | None = None,
+        intent: str | None = None,
+        source: str = "goal_association",
+        atomic: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Apply a validated goal-continuity result through semantic-task state.
+
+        Semantic interpretation remains model-owned. This adapter only maps
+        supported structured relationships into replay-safe state operations and
+        records continuity markers for non-mutating references. Merge and split
+        remain advisory until a dedicated multi-goal state transaction exists.
+        """
+
+        if not self.enabled:
+            return []
+        task_context_snapshot = (
+            copy.deepcopy(list(self._task_contexts)) if atomic else None
+        )
+        activity_snapshot = self.last_activity_ms
+        resolved = (
+            resolution
+            if isinstance(resolution, GoalAssociationResolution)
+            else GoalAssociationResolution.model_validate(resolution)
+        )
+        active = {
+            item["goal_id"]: item
+            for item in self.active_goal_snapshots(limit=self.max_pending_tasks)
+            if isinstance(item, dict) and item.get("goal_id")
+        }
+        operations: list[SemanticTaskOperation] = []
+        results: list[dict[str, Any]] = []
+
+        for ordinal, goal in enumerate(resolved.new_goals):
+            operation_id = stable_goal_operation_id(
+                turn_id=resolved.turn_id,
+                ordinal=len(resolved.associations) + ordinal,
+                relationship="new",
+            )
+            operations.append(
+                SemanticTaskOperation(
+                    operation_id=operation_id,
+                    operation="create",
+                    confidence=resolved.confidence,
+                    relationship="new",
+                    goal=goal,
+                    requires_replan=True,
+                    reason_summary=resolved.reason_summary,
+                    metadata={
+                        "goal_association_turn_id": resolved.turn_id,
+                        "goal_association_authority": "applied_after_validation",
+                    },
+                )
+            )
+
+        relationship_map = {
+            "modify": "modify",
+            "clarify": "clarification_answer",
+            "confirm": "confirm",
+            "reject": "reject",
+            "cancel": "cancel",
+            "pause": "pause",
+            "resume": "resume",
+            "replace": "replace",
+        }
+        for association in resolved.associations:
+            target_task_ids = [
+                str(active[goal_id].get("source_task_id") or goal_id)
+                for goal_id in association.target_goal_ids
+                if goal_id in active
+            ]
+            if len(target_task_ids) != len(association.target_goal_ids):
+                results.append(
+                    {
+                        "association_id": association.association_id,
+                        "relationship": association.relationship,
+                        "applied": False,
+                        "reason": "unknown_target_goal",
+                    }
+                )
+                continue
+            if association.relationship in {"merge", "split"}:
+                results.append(
+                    {
+                        "association_id": association.association_id,
+                        "relationship": association.relationship,
+                        "applied": False,
+                        "reason": "multi_goal_transaction_not_implemented",
+                    }
+                )
+                continue
+            if association.relationship in {"continue", "reference"}:
+                for task_id in target_task_ids:
+                    context = self._task_context_by_id(task_id)
+                    if context is None:
+                        continue
+                    metadata = context.get("metadata")
+                    if not isinstance(metadata, dict):
+                        metadata = {}
+                    context["metadata"] = {
+                        **metadata,
+                        "goal_association_id": association.association_id,
+                        "goal_relationship": association.relationship,
+                        "goal_association_confidence": association.confidence,
+                        "goal_association_reason": association.reason_summary,
+                    }
+                    context["last_meaningful_user_turn"] = self._compact_text(
+                        user_text, limit=220
+                    )
+                    context["updated_ms"] = _now_ms()
+                    if sid:
+                        related = context.get("related_sids")
+                        if not isinstance(related, list):
+                            related = []
+                        if sid not in related:
+                            related.append(sid)
+                        context["related_sids"] = related[-12:]
+                    results.append(
+                        {
+                            "association_id": association.association_id,
+                            "relationship": association.relationship,
+                            "task_id": task_id,
+                            "applied": True,
+                            "state_change": "continuity_marker",
+                        }
+                    )
+                continue
+
+            operation_name = relationship_map.get(association.relationship)
+            if operation_name is None:
+                results.append(
+                    {
+                        "association_id": association.association_id,
+                        "relationship": association.relationship,
+                        "applied": False,
+                        "reason": "unsupported_relationship",
+                    }
+                )
+                continue
+            if operation_name in {
+                "modify",
+                "clarification_answer",
+                "replace",
+            } and not (association.goal_update or association.resolved_gap_ids):
+                results.append(
+                    {
+                        "association_id": association.association_id,
+                        "relationship": association.relationship,
+                        "applied": False,
+                        "reason": "semantic_delta_required",
+                    }
+                )
+                continue
+            operations.append(
+                SemanticTaskOperation(
+                    operation_id=association.association_id,
+                    operation=operation_name,
+                    target_task_ids=target_task_ids,
+                    confidence=association.confidence,
+                    relationship=association.relationship,
+                    goal_update=association.goal_update,
+                    resolved_gap_ids=association.resolved_gap_ids,
+                    requires_replan=association.requires_replan,
+                    reason_summary=association.reason_summary,
+                    metadata={
+                        "goal_association_turn_id": resolved.turn_id,
+                        "goal_association_authority": "applied_after_validation",
+                    },
+                )
+            )
+
+        if operations:
+            results.extend(
+                self.apply_semantic_task_operations(
+                    operations,
+                    sid=sid,
+                    user_text=user_text,
+                    route=route,
+                    intent=intent,
+                    source=source,
+                )
+            )
+        if operations or results:
+            self._persist_task_contexts_if_enabled()
+        if atomic:
+            rejected = [
+                item
+                for item in results
+                if item.get("applied") is False
+                and item.get("reason") != "operation_already_applied"
+            ]
+            if rejected and task_context_snapshot is not None:
+                self._task_contexts = deque(
+                    task_context_snapshot, maxlen=max(1, self.max_pending_tasks)
+                )
+                self.last_activity_ms = activity_snapshot
+                self._persist_task_contexts_if_enabled()
+                for item in results:
+                    if item.get("applied") is True:
+                        item["applied"] = False
+                        item["reason"] = "atomic_goal_transaction_rolled_back"
+                        item["rolled_back"] = True
+        return results
 
     def apply_semantic_task_operations(
         self,

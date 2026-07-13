@@ -419,9 +419,10 @@ The architecture changes the primary planning question from “which skill match
 this utterance?” to “what existing or new user goals are present, and what
 verifiable plan completely satisfies them?”
 
-This track is being implemented incrementally. PR1 is automatically verified and
-keeps runtime behavior unchanged by default; later stages remain design-approved
-work until their own implementation and evidence gates pass.
+This track is implemented through PR7 with dependency-light automated evidence.
+The unified runtime remains `report_only` in maintained configuration, supports
+lane-gated `apply`, and preserves immediate rollback. Retained live-text and
+MuJoCo target evidence remain open.
 
 ### Delivery sequence
 
@@ -431,7 +432,9 @@ work until their own implementation and evidence gates pass.
 4. **Implemented in report-only mode (Level A):** Full-registry Deep Planner with bounded same-tier replanning.
 5. **Implemented in report-only mode (Level A):** Consequence-aware parameter resolution and goal satisfaction reporting.
 6. **Implemented in report-only mode (Level A):** Multi-goal response composition and model-driven social attention.
-7. Runtime migration, live-text evidence, and MuJoCo evidence.
+7. **Implemented with Level A evidence; target evidence open:** Unified runtime
+   migration, per-lane apply/rollback, atomic Goal-state commit, bounded host
+   replan, evidence tooling, and cognitive text-to-MuJoCo entry point.
 
 The Deep Planner does not return semantic work to the Fast Planner. Both tiers
 share capability and validation primitives and output the same canonical plan
@@ -463,15 +466,10 @@ It must preserve existing deterministic stop, authorization, provider, evidence,
 and release boundaries.
 
 
-### Goal-driven PR3 implementation note
+### Goal-driven runtime checkpoint
 
-The shared CanonicalPlan schema, Fast Planner, terminal Deep Planner, parameter-resolution/goal-satisfaction fields, and response-composition contracts are implemented in report-only mode. Partial or uncertain coverage cannot carry executable steps. Apply-mode migration remains open.
+PR1 through PR6 define and automatically verify Goal contracts, continuity-before-creation association, Canonical Plans, complete-coverage Fast Planning, terminal Deep Planning, bounded same-tier revision, parameter resolution, Goal Satisfaction, response composition, and independent Social Attention.
 
+PR7 unifies those stages under one host runtime with `off`, `report_only`, and lane-gated `apply`. All applied plans still pass existing trusted preparation, confirmation, Skill Runtime, and provider boundaries. Goal-state updates are atomic, and technical failures are classified as compatibility fallback or fail-closed error rather than hidden success. Operational details and evidence commands are maintained in [Goal-Driven Cognitive Runtime Rollout](docs/COGNITIVE_RUNTIME_ROLLOUT.md).
 
-## Goal-driven architecture PR4 checkpoint
-
-PR4 adds an advisory full-catalog Deep Planner using the shared `CanonicalPlan` contract. Fast Planner escalation is one-way; Deep Planner never returns to Fast Planner. Deterministic validation may provide structured feedback for one bounded same-tier revision. The Orchestrator integration remains report-only and does not alter routing, commitment, or execution.
-
-## Goal-driven architecture PR6 checkpoint
-
-PR6 adds advisory `ResponseCompositionResolution` and `CoordinatedResponsePlan` contracts. A terminal immutable `CanonicalPlan` is fingerprinted and coordinated with goal-scoped speech plus optional auxiliary social attention. Deterministic checks reject unknown or uncovered goals, pre-execution completion claims, invented attention targets, invalid schemas, confirmation-requiring gestures, and primary-plan resource conflicts. The Orchestrator integration remains background `report_only` and does not alter current speech or execution.
+This checkpoint is implemented and automatically verified only. Retained live-text and MuJoCo evidence must still be collected before target validation is claimed.

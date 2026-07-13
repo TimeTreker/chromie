@@ -101,14 +101,16 @@ class DeepPlannerResolver:
         fast_plan = context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
         goals = context.get("active_goal_snapshots") or []
         association = context.get("goal_association_resolution") or {}
-        feedback_section = self._bounded(feedback, 3500) if feedback else "[]"
+        runtime_feedback = context.get("runtime_validator_feedback") or []
+        combined_feedback = [*feedback, *(runtime_feedback if isinstance(runtime_feedback, list) else [])]
+        feedback_section = self._bounded(combined_feedback, 5000) if combined_feedback else "[]"
         return (
             f"User turn:\n{request.text}\n\n"
             f"Fast-plan advisory JSON:\n{self._bounded(fast_plan, 2500)}\n\n"
             f"Goal association advisory JSON:\n{self._bounded(association, 2500)}\n\n"
             f"Active goals JSON:\n{self._bounded(goals, 4500)}\n\n"
             f"Full capability catalog JSON:\n{self._bounded(capabilities, 24000)}\n\n"
-            f"Deterministic validation feedback from the previous deep-plan attempt:\n{feedback_section}\n\n"
+            f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
             "Produce the final planner-tier=deep CanonicalPlan for the complete user goal. Deep planning is terminal: never return to the Fast Planner. "
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, and concurrency. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. Exact, safe-adjusted, or alternative executable plans "

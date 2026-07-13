@@ -263,6 +263,7 @@ Target validation or Release readiness.
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Used by the current voice loop | Enabled by `.env.common` |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle | Host rollout flag off |
 | Native structured Interaction Agent | Implemented with direct `InteractionSpeech`/`SkillRequest` accumulation, review-gated robot-action planning, model-authored optional `SocialAttentionPlan` coordination, and semantic parameter resolution. A separate report-only Response Composer now binds goal-scoped speech and optional attention to an immutable fingerprinted terminal `CanonicalPlan`; it does not replace the production interaction path. Attention is selected from exact named capabilities or `none`; runtime validates target evidence, schemas, latency, confirmation policy, and conflicts, and excludes auxiliary attention from user task proposals | Native route, TaskGraph, validation, fail-closed, fallback, response-composition goal coverage/claim/immutability, social-attention selection/none/invalid/latency/target/conflict, exact-intent, and compatibility-mode tests plus file-backed interaction scenarios | Text-input MuJoCo closure evidence retained for prior task skills; social-attention behavior currently has automated evidence only and needs a retained live simulator rerun | Agent default; project-wide attention off, maintained voice-MuJoCo launcher uses `sim_only` with calibrated right-side fallback |
+| Goal-driven cognitive runtime | PR1–PR7 contracts and stages are integrated through one host coordinator: Goal Association, complete-coverage Fast Planner, terminal full-catalog Deep Planner, one bounded trusted-validator replan, fingerprint-bound Response Composition, lane-gated runtime adaptation, atomic Goal-state application, and existing confirmation/Skill Runtime execution. Modes are `off`, `report_only`, and `apply`; apply lanes and legacy/fail-closed fallback are configurable | Goal-contract, association, Fast/Deep Planner, Goal Satisfaction, response-composition, runtime-adapter, Orchestrator apply/fallback, atomic-state, evidence-tool, and four retained `cognitive_runtime` scenarios plus the full Level A gate | No retained PR7 live-text or MuJoCo target bundle has been added yet; `interaction_text_mujoco_check.py --cognitive-runtime` and `cognitive_runtime_acceptance.py` provide classified collection entry points | Code default off; maintained configuration report-only; apply is explicit and lane-gated |
 | Semantic compound capability planning | Implemented as model-authored complete-goal planning over bounded capability schemas plus provider/resource evidence. The model chooses exact execution, safe adjustment, alternative proposal, clarification, or unsupported; model-authored timing and explanation are preserved. A quick Router that cannot bind the complete effectful goal now hands the original utterance to semantic capability planning instead of declaring the ability missing. Deterministic code validates the complete plan atomically, blocks partial-skill leakage, requires confirmation for material alternatives, and performs only authorization/resource arbitration rather than natural-language action interpretation | Exact parallel composition, sequential alternative proposal, unresolved Router-to-planner handoff, unknown concurrency evidence, invalid-substep atomic rejection, confirmation-prompt override, host blocked-state stripping, repeated-step audit identity, and file-backed Chinese walk/blink regression tests | Automated dependency-light evidence only; live model/provider behavior must be rerun, and no claim is made that walking and blinking are physically compatible on a particular robot | LLM planning enabled; provider metadata remains authoritative; no normal-language action/count/speed fast-path parser |
 | Trusted host Skill Runtime | Implemented | Scheduling, confirmation, timeout, cancellation, and isolation tests | Text-to-live-MuJoCo closure evidence passed | Used only by structured path |
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean synthetic and virtual-mic approval/denial evidence passed; text-to-MuJoCo uses the same trusted runtime authorization boundary | Structured path; simulator exemption configurable |
@@ -369,13 +370,12 @@ A representative probes, and `python scripts/test_matrix.py general-ability`.
 The retained Level A summary is under
 `.chromie/acceptance/general-ability/20260709T080845Z-level-a/summary.json`.
 
-The current 2026-07-12 automated regression gate after semantic task-continuity
-stage 2, voice-log route recovery, and the July 12 runtime-reliability slice
-passes `python scripts/check_docs.py`, 828 `unittest` cases, and 20
-dependency-light legacy Agent tests through `./scripts/run_tests.sh`. The
-complete file-backed behavior library passes 369/369 adapter, Router,
-Router-dialogue, interaction, and dialogue scenarios with `--no-write`.
-General-ability Level A passes 42/42. The scenarios force the raw quick model to
+The current 2026-07-12 automated regression gate after goal-driven PR7
+runtime migration passes `python scripts/check_docs.py`, 899 `unittest` cases,
+and 20 dependency-light legacy Agent tests through `./scripts/run_tests.sh`.
+The complete file-backed behavior library passes 373/373 adapter, Router,
+Router-dialogue, interaction, dialogue, and cognitive-runtime scenarios with
+`--no-write`. General-ability Level A passes 42/42. The scenarios force the raw quick model to
 return observed stale or generic decisions for walking and compound nod/blink
 requests, then verify bounded semantic review, exact capability grounding,
 confirmation, final Agent skill output, repeated correctness after a weather
@@ -411,7 +411,8 @@ The runtime validates every proposed step before committing
 any of them, preserves model-authored parallel/sequential timing, disables
 simulator auto-confirm for material alternatives, and prevents structured
 clarification or blocked results from leaking effectful skills. The former
-normal-language count/speed/action fast-path parsers were removed. These results are
+normal-language count/speed/action fast-path parsers were removed. PR1 through PR7 additionally provide the Goal-driven contracts and unified runtime. The maintained deployment remains report-only; lane-gated apply, atomic Goal-state commit, bounded host replan, classified operational evidence, and cognitive text-to-MuJoCo entry points are automatically verified. No retained PR7 live-text or MuJoCo target evidence is claimed.
+These results are
 automated evidence; a retained Stage 6 GPU benchmark, listening check, and live
 voice or live-text rerun are still required.
 
@@ -517,37 +518,29 @@ and published. It is not a production release, physical-robot release, or human
 voice-device release. Robot execution evidence for this release is limited to
 Soridormi MuJoCo `sim`. See [Release and Packaging](RELEASE.md).
 
-## Proposed architecture - Goal-driven cognitive runtime
+## Goal-driven cognitive runtime status
 
-The project now has a proposed cognitive constitution in
-[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) and
-a companion [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
-policy.
+[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+defines the cognitive constitution, and
+[Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md) defines the
+required interaction-development method.
 
-The proposal defines goal continuity before goal creation, independent multi-goal
-segmentation, a single-direction Fast-to-Deep planning hierarchy, one canonical
-plan contract, deterministic validation authority, consequence-aware parameter
-resolution, alternative-plan confirmation, evidence-bound response claims, and
-an auxiliary social-attention layer.
+PR1 through PR6 implement and automatically verify Goal contracts,
+continuity-before-creation association, independent multi-Goal segmentation,
+Canonical Plans, complete-coverage Fast Planning, terminal full-catalog Deep
+Planning, bounded same-tier revision, consequence-aware parameter resolution,
+Goal Satisfaction, response composition, and independent Social Attention.
 
-This status is **partially implemented**. PR1 now provides shared goal contracts,
-replay-safe goal-operation IDs, compatibility mapping from current semantic-task
-snapshots, and a bounded read-only active-goal projection. These contracts are
-automatically verified but are not yet used to change Router or Agent behavior.
-Goal association, segmentation, canonical planning, and runtime migration remain
-future staged work tracked in `ROADMAP.md`.
+PR7 integrates those stages behind one host coordinator with `off`,
+`report_only`, and lane-gated `apply`. Applied plans still pass the existing
+trusted preparation, request-bound confirmation, Skill Runtime, provider, and
+evidence boundaries. Goal-state changes are atomic, and optional social
+attention is revalidated by the host for target evidence, schema correctness,
+and primary-plan resource conflicts.
 
-
-### Goal-driven architecture implementation status
-
-PR1 goal contracts and active-goal projection, PR2 report-only goal association, and PR3 report-only canonical Fast Planning are implemented with automated evidence. Fast plans do not yet replace Router/Agent behavior or commit execution; Deep Planner integration remains PR4.
-
-
-## Goal-driven architecture PR4 checkpoint
-
-PR4 adds an advisory full-catalog Deep Planner using the shared `CanonicalPlan` contract. Fast Planner escalation is one-way; Deep Planner never returns to Fast Planner. Deterministic validation may provide structured feedback for one bounded same-tier revision. The Orchestrator integration remains report-only and does not alter routing, commitment, or execution.
-
-
-### Goal-driven cognition PR5
-
-PR5 adds planner-authored parameter-resolution provenance and explicit Goal Satisfaction assessment to the shared CanonicalPlan. Fast planning requires exact satisfaction before direct delivery; Deep planning can revise a complete but insufficient plan once from deterministic feedback. This remains report-only and does not change runtime execution authority.
+This architecture is **implemented and automatically verified**. Maintained
+configuration remains `report_only`; apply is explicit and rollback-safe.
+Retained PR7 live-text and MuJoCo artifacts remain open, so target validation
+and release readiness are not claimed. Operational rollout and evidence steps
+are documented in
+[Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).

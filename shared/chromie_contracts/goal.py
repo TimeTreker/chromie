@@ -71,6 +71,9 @@ class GoalAssociation(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
     ambiguity_summary: str = ""
+    goal_update: dict[str, Any] = Field(default_factory=dict)
+    resolved_gap_ids: list[str] = Field(default_factory=list)
+    requires_replan: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("association_id", "reason_summary", "ambiguity_summary", mode="before")
@@ -80,7 +83,7 @@ class GoalAssociation(BaseModel):
             return " ".join(value.strip().split())
         return value
 
-    @field_validator("target_goal_ids", mode="before")
+    @field_validator("target_goal_ids", "resolved_gap_ids", mode="before")
     @classmethod
     def normalize_goal_ids(cls, value: Any) -> list[str]:
         if value is None:
@@ -98,7 +101,7 @@ class GoalAssociation(BaseModel):
                 out.append(text)
         return out
 
-    @field_validator("metadata")
+    @field_validator("goal_update", "metadata")
     @classmethod
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
