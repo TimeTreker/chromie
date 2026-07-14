@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from .capabilities.validator import normalize_args_for_schema, validate_args_for_schema
-from .clients.ollama_client import OllamaClient
+from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
 
 try:
@@ -99,11 +99,17 @@ class ResponseComposerResolver:
                 metadata={"authority": "advisory", "resolver": "response_composer"},
             )
         except Exception as exc:
+            failure = llm_failure_metadata(exc)
             logger.warning(
-                "response composer degraded sid=%s error_type=%s error=%s",
+                "response_composer_inference_failed sid=%s error_type=%s error=%s "
+                "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
                 request.sid,
                 type(exc).__name__,
                 exc,
+                failure["failure_class"],
+                failure["failure_domain"],
+                failure["architecture_attribution"],
+                failure["retryable"],
             )
             return ResponseCompositionResolution(
                 status="model_unavailable",
@@ -113,6 +119,7 @@ class ResponseComposerResolver:
                     "resolver": "response_composer",
                     "error_type": type(exc).__name__,
                     "error": str(exc)[:300],
+                    **failure,
                 },
             )
 

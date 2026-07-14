@@ -10,6 +10,7 @@ BUILD_IMAGES=0
 REBUILD_NO_CACHE=0
 KEEP_SERVICES=0
 START_ORCHESTRATOR=1
+ARCHITECTURE_VALIDATION=0
 
 usage() {
   cat <<'USAGE'
@@ -27,6 +28,9 @@ Options:
   --auto-confirm          Use declared simulator confirmation exemptions (default)
   --keep-services         Leave Chromie containers running after exit
   --no-orchestrator       Start/probe services, then skip the host Orchestrator
+  --architecture-validation
+                          Use long-context, long-output, long-timeout validation
+                          budgets while retaining Social Attention inference
   -h, --help              Show this help
 USAGE
 }
@@ -40,10 +44,16 @@ while [ "$#" -gt 0 ]; do
     --auto-confirm) AUTO_CONFIRM=1; shift ;;
     --keep-services) KEEP_SERVICES=1; shift ;;
     --no-orchestrator) START_ORCHESTRATOR=0; shift ;;
+    --architecture-validation) ARCHITECTURE_VALIDATION=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[chromie][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if [ "$ARCHITECTURE_VALIDATION" = "1" ]; then
+  export CHROMIE_VALIDATION_PROFILE=architecture
+  echo "[chromie] Architecture-validation budgets enabled; Social Attention remains active."
+fi
 
 for cmd in docker python3; do
   command -v "$cmd" >/dev/null 2>&1 || {
@@ -137,7 +147,10 @@ services:
       AGENT_CAPABILITY_MANIFESTS: /app/capabilities/soridormi.json
       SORIDORMI_MCP_URL: ${CONTAINER_MCP_URL}
       AGENT_EXPRESSIVE_BODY_CUES: off
-      AGENT_SOCIAL_ATTENTION_MODE: ${CHROMIE_SOCIAL_ATTENTION_MODE:-sim_only}
+      # Preserve Social Attention during architecture validation. Budget and
+      # transport failures are logged with purpose=social_attention and explicit
+      # non-architecture attribution rather than hiding the stage.
+      AGENT_SOCIAL_ATTENTION_MODE: ${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-sim_only}}
       AGENT_SOCIAL_ATTENTION_MODEL: ${AGENT_SOCIAL_ATTENTION_MODEL:-${ROUTER_MODEL:-qwen3:4b}}
       AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET: ${AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET:-calibrated_right_side}
       AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION: ${AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION:-right}

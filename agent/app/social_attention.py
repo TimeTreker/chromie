@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from .capabilities.validator import normalize_args_for_schema, validate_args_for_schema
+from .clients.ollama_client import llm_failure_metadata
 from .schema import AgentRunRequest
 
 try:
@@ -40,6 +41,17 @@ class SocialAttentionPlanner:
 
         prompt = self._prompt(request, candidates)
         started = time.perf_counter()
+        logger.info(
+            "social_attention_plan_start sid=%s mode=%s timeout_ms=%s num_ctx=%s "
+            "num_predict=%s prompt_chars=%s candidates=%s",
+            request.sid,
+            self.services.effective_social_attention_mode(),
+            getattr(client, "timeout_ms", None),
+            int(self.services.social_attention_num_ctx),
+            int(self.services.social_attention_num_predict),
+            len(prompt),
+            len(candidates),
+        )
         try:
             raw = await client.generate(
                 prompt,
@@ -57,28 +69,87 @@ class SocialAttentionPlanner:
                 response_format="json",
             )
         except Exception as exc:
+            planner_ms = (time.perf_counter() - started) * 1000.0
+            failure = {
+                **llm_failure_metadata(exc),
+                "stage": "social_attention",
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:500],
+                "elapsed_ms": round(planner_ms, 1),
+            }
+            request.context["social_attention_failure"] = failure
             logger.warning(
-                "social_attention_plan_failed sid=%s error_type=%s error=%s",
+                "social_attention_plan_failed sid=%s failure_class=%s failure_domain=%s "
+                "architecture_attribution=%s retryable=%s elapsed_ms=%.1f "
+                "error_type=%s error=%s",
                 request.sid,
+                failure.get("failure_class"),
+                failure.get("failure_domain"),
+                failure.get("architecture_attribution"),
+                str(bool(failure.get("retryable"))).lower(),
+                planner_ms,
                 type(exc).__name__,
                 exc,
             )
             return None
         if not isinstance(raw, dict):
+            planner_ms = (time.perf_counter() - started) * 1000.0
+            failure = {
+                "stage": "social_attention",
+                "failure_class": "structured_output_invalid",
+                "failure_domain": "model_contract",
+                "architecture_attribution": "not_evaluated",
+                "retryable": True,
+                "error_type": type(raw).__name__,
+                "error": "social attention model did not return a JSON object",
+                "elapsed_ms": round(planner_ms, 1),
+            }
+            request.context["social_attention_failure"] = failure
+            logger.warning(
+                "social_attention_plan_invalid sid=%s failure_class=%s failure_domain=%s "
+                "architecture_attribution=%s retryable=true elapsed_ms=%.1f error=%s",
+                request.sid,
+                failure["failure_class"],
+                failure["failure_domain"],
+                failure["architecture_attribution"],
+                planner_ms,
+                failure["error"],
+            )
             return None
         try:
             plan = SocialAttentionPlan.model_validate(raw)
         except ValidationError as exc:
+            planner_ms = (time.perf_counter() - started) * 1000.0
+            failure = {
+                **llm_failure_metadata(exc),
+                "stage": "social_attention",
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:500],
+                "elapsed_ms": round(planner_ms, 1),
+            }
+            request.context["social_attention_failure"] = failure
             logger.warning(
-                "social_attention_plan_invalid sid=%s error=%s",
+                "social_attention_plan_invalid sid=%s failure_class=%s failure_domain=%s "
+                "architecture_attribution=%s retryable=%s elapsed_ms=%.1f error=%s",
                 request.sid,
+                failure.get("failure_class"),
+                failure.get("failure_domain"),
+                failure.get("architecture_attribution"),
+                str(bool(failure.get("retryable"))).lower(),
+                planner_ms,
                 exc,
             )
             return None
         planner_ms = (time.perf_counter() - started) * 1000.0
-        plan.metadata = {**plan.metadata, "planner_ms": round(planner_ms, 1)}
+        request.context.pop("social_attention_failure", None)
+        plan.metadata = {
+            **plan.metadata,
+            "planner_ms": round(planner_ms, 1),
+            "architecture_attribution": "passed",
+        }
         logger.info(
-            "social_attention_plan_done sid=%s decision=%s behaviors=%s confidence=%.2f ms=%.1f",
+            "social_attention_plan_done sid=%s decision=%s behaviors=%s confidence=%.2f "
+            "architecture_attribution=passed ms=%.1f",
             request.sid,
             plan.decision,
             len(plan.behaviors),

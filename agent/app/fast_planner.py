@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from .capabilities.catalog import CapabilityCatalog
-from .clients.ollama_client import OllamaClient
+from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
 
 try:
@@ -58,7 +58,18 @@ class FastPlannerResolver:
             normalized = self._normalize(raw, request=request, plan_id=plan_id)
             plan = CanonicalPlan.model_validate(normalized)
         except Exception as exc:
-            logger.warning("fast planner degraded sid=%s error_type=%s error=%s", request.sid, type(exc).__name__, exc)
+            failure = llm_failure_metadata(exc)
+            logger.warning(
+                "fast_planner_inference_failed sid=%s error_type=%s error=%s "
+                "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
+                request.sid,
+                type(exc).__name__,
+                exc,
+                failure["failure_class"],
+                failure["failure_domain"],
+                failure["architecture_attribution"],
+                failure["retryable"],
+            )
             return self._escalation(plan_id, request, "fast_planner_unavailable", error=exc)
         return self._validate(plan, capability_payload=capability_payload, request=request)
 
@@ -157,7 +168,13 @@ class FastPlannerResolver:
         detail = dict(metadata or {})
         detail.update({"resolver": "fast_planner", "status": "escalate", "authority": "advisory"})
         if error is not None:
-            detail.update({"error_type": type(error).__name__, "error": str(error)[:300]})
+            detail.update(
+                {
+                    "error_type": type(error).__name__,
+                    "error": str(error)[:300],
+                    **llm_failure_metadata(error),
+                }
+            )
         return CanonicalPlan(plan_id=plan_id, planner_tier="fast", disposition="escalate", coverage="uncertain",
                              confidence=0.0, goal_summary=request.text, steps=[], escalation_reason=reason,
                              unresolved=list(unresolved or []), metadata=detail)

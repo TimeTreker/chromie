@@ -250,6 +250,40 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "report_only")
         self.assertIsNone(result.interaction_response)
         self.assertEqual(client.calls, ["association", "fast", "compose"])
+        self.assertEqual(result.metadata["architecture_attribution"], "passed")
+
+    def test_budget_failure_is_preserved_as_non_architecture_fallback(self):
+        association = GoalAssociationResolution(
+            turn_id="turn-truncated",
+            clarification="请稍后重试。",
+            confidence=0.0,
+            reason_summary="Goal association output was truncated.",
+            metadata={
+                "status": "model_unavailable",
+                "failure_class": "output_truncated",
+                "failure_domain": "llm_budget",
+                "architecture_attribution": "excluded",
+                "retryable": True,
+                "done_reason": "length",
+                "num_predict": 512,
+            },
+        )
+        client = ScriptedClient(association=association, fast_plans=[])
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="report_only"),
+        )
+
+        result = self.run_resolution(coordinator, client)
+
+        self.assertEqual(result.status, "legacy_fallback")
+        self.assertEqual(result.metadata["failure_stage"], "goal_association")
+        self.assertEqual(result.metadata["failure_class"], "output_truncated")
+        self.assertEqual(result.metadata["failure_domain"], "llm_budget")
+        self.assertEqual(result.metadata["architecture_attribution"], "excluded")
+        self.assertEqual(result.metadata["done_reason"], "length")
+        self.assertIn("goal_association:output_truncated", result.fallback_reason)
 
     def test_apply_chat_returns_speech_only_interaction(self):
         client = ScriptedClient(

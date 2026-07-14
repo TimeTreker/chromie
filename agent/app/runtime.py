@@ -21,6 +21,7 @@ from .agents import (
     ToolAgent,
     VisionAgent,
 )
+from .clients.ollama_client import llm_failure_metadata
 from .dispatcher import selected_agents
 from .interaction import InteractionDraft, NativeInteractionOutputError
 from .social_attention import SocialAttentionPlanner
@@ -425,12 +426,44 @@ class InteractionRuntime(_AgentPipeline):
     ) -> None:
         if task is None:
             return
+
+        def record_failure(values: dict[str, Any]) -> None:
+            failure = dict(values)
+            failure.setdefault("stage", "social_attention")
+            failure.setdefault("failure_class", "unclassified_model_failure")
+            failure.setdefault("failure_domain", "model_or_runtime")
+            failure.setdefault("architecture_attribution", "not_evaluated")
+            failure.setdefault("retryable", False)
+            result.metadata["social_attention_failure"] = failure
+            result.metadata["social_attention_failure_class"] = failure["failure_class"]
+            result.metadata["social_attention_failure_domain"] = failure["failure_domain"]
+            result.metadata["social_attention_architecture_attribution"] = failure[
+                "architecture_attribution"
+            ]
+
         plan = None
         if task.done():
             try:
                 plan = task.result()
             except Exception as exc:  # pragma: no cover - defensive
-                logger.warning("social attention task failed sid=%s error=%s", request.sid, exc)
+                failure = {
+                    **llm_failure_metadata(exc),
+                    "stage": "social_attention",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc)[:500],
+                }
+                record_failure(failure)
+                logger.warning(
+                    "social_attention_task_failed sid=%s failure_class=%s failure_domain=%s "
+                    "architecture_attribution=%s retryable=%s error_type=%s error=%s",
+                    request.sid,
+                    failure.get("failure_class"),
+                    failure.get("failure_domain"),
+                    failure.get("architecture_attribution"),
+                    str(bool(failure.get("retryable"))).lower(),
+                    type(exc).__name__,
+                    exc,
+                )
                 result.metadata["social_attention_status"] = "model_unavailable"
                 return
         else:
@@ -439,8 +472,20 @@ class InteractionRuntime(_AgentPipeline):
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
+                failure = {
+                    "stage": "social_attention",
+                    "failure_class": "latency_budget_exhausted",
+                    "failure_domain": "llm_budget",
+                    "architecture_attribution": "excluded",
+                    "retryable": True,
+                    "wait_after_response_ms": wait_ms,
+                }
+                record_failure(failure)
                 result.metadata["social_attention_status"] = "skipped_latency_budget"
-                result.trace.append("runtime: social attention skipped after latency budget")
+                result.trace.append(
+                    "runtime: social attention skipped after latency budget; "
+                    "architecture attribution excluded"
+                )
                 return
             try:
                 plan = await asyncio.wait_for(asyncio.shield(task), timeout=wait_ms / 1000.0)
@@ -448,17 +493,55 @@ class InteractionRuntime(_AgentPipeline):
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
+                failure = {
+                    "stage": "social_attention",
+                    "failure_class": "latency_budget_exhausted",
+                    "failure_domain": "llm_budget",
+                    "architecture_attribution": "excluded",
+                    "retryable": True,
+                    "wait_after_response_ms": wait_ms,
+                }
+                record_failure(failure)
                 result.metadata["social_attention_status"] = "skipped_latency_budget"
-                result.trace.append("runtime: social attention skipped after latency budget")
+                result.trace.append(
+                    "runtime: social attention skipped after latency budget; "
+                    "architecture attribution excluded"
+                )
                 return
             except Exception as exc:  # pragma: no cover - defensive
-                logger.warning("social attention task failed sid=%s error=%s", request.sid, exc)
+                failure = {
+                    **llm_failure_metadata(exc),
+                    "stage": "social_attention",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc)[:500],
+                }
+                record_failure(failure)
+                logger.warning(
+                    "social_attention_task_failed sid=%s failure_class=%s failure_domain=%s "
+                    "architecture_attribution=%s retryable=%s error_type=%s error=%s",
+                    request.sid,
+                    failure.get("failure_class"),
+                    failure.get("failure_domain"),
+                    failure.get("architecture_attribution"),
+                    str(bool(failure.get("retryable"))).lower(),
+                    type(exc).__name__,
+                    exc,
+                )
                 result.metadata["social_attention_status"] = "model_unavailable"
                 return
         if plan is None:
-            result.metadata["social_attention_status"] = "model_unavailable"
+            failure = request.context.get("social_attention_failure")
+            if isinstance(failure, dict):
+                record_failure(failure)
+                result.metadata["social_attention_status"] = str(
+                    failure.get("failure_class") or "model_unavailable"
+                )
+            else:
+                result.metadata["social_attention_status"] = "model_unavailable"
+                result.metadata["social_attention_architecture_attribution"] = "not_evaluated"
             return
 
+        result.metadata["social_attention_architecture_attribution"] = "passed"
         result.metadata["social_attention_plan"] = plan.model_dump(mode="json", exclude_none=True)
         mode = self.services.effective_social_attention_mode()
         if mode == "report_only":

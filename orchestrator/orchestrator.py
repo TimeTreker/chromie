@@ -2574,13 +2574,25 @@ class VoiceAssistant:
                 and self.cognitive_fallback_policy == "legacy"
                 else "error"
             )
+            is_timeout = isinstance(exc, (asyncio.TimeoutError, TimeoutError))
             resolution = CognitiveRuntimeResolution(
                 mode=self.cognitive_runtime_mode,
                 status=status,
                 lane=self._cognitive_lane_from_route(decision),
                 timings_ms={"total": round(now_ms() - started_ms, 1)},
                 fallback_reason=f"{type(exc).__name__}: {str(exc)[:500]}",
-                metadata={"outer_timeout_ms": self.cognitive_runtime_timeout_ms},
+                metadata={
+                    "outer_timeout_ms": self.cognitive_runtime_timeout_ms,
+                    "failure_stage": "cognitive_runtime_outer",
+                    "failure_class": "outer_timeout" if is_timeout else type(exc).__name__,
+                    "failure_domain": (
+                        "orchestration_budget" if is_timeout else "cognitive_runtime"
+                    ),
+                    "architecture_attribution": (
+                        "excluded" if is_timeout else "not_excluded"
+                    ),
+                    "retryable": is_timeout,
+                },
             )
 
         if record_evidence:
@@ -2589,10 +2601,16 @@ class VoiceAssistant:
             )
 
         terminal = resolution.terminal_plan
+        failure_stage = str(resolution.metadata.get("failure_stage") or "none")
+        failure_class = str(resolution.metadata.get("failure_class") or "none")
+        attribution = str(
+            resolution.metadata.get("architecture_attribution") or "not_evaluated"
+        )
         self.session_log(
             session_id,
             "cognitive_runtime_done: mode=%s status=%s lane=%s total_ms=%.1f "
-            "planner=%s disposition=%s steps=%s fallback=%s",
+            "planner=%s disposition=%s steps=%s failure_stage=%s failure_class=%s "
+            "architecture_attribution=%s fallback=%s",
             resolution.mode,
             resolution.status,
             resolution.lane,
@@ -2600,6 +2618,9 @@ class VoiceAssistant:
             terminal.planner_tier if terminal is not None else "none",
             terminal.disposition if terminal is not None else "none",
             len(terminal.steps) if terminal is not None else 0,
+            failure_stage,
+            failure_class,
+            attribution,
             resolution.fallback_reason or "none",
         )
         return resolution

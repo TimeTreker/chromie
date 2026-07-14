@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import unittest
 
+from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.goal import GoalAssociationResolution
@@ -96,6 +97,26 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.metadata["status"], "model_unavailable")
         self.assertEqual(result.associations, [])
         self.assertTrue(result.clarification)
+
+    def test_truncation_failure_is_explicitly_excluded_from_architecture_attribution(self):
+        error = OllamaGenerationError(
+            "structured JSON output was truncated",
+            failure_class="output_truncated",
+            failure_domain="llm_budget",
+            architecture_attribution="excluded",
+            retryable=True,
+            details={"done_reason": "length", "num_predict": 512},
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(FakeOllama(error)).resolve(request("继续。"))
+        )
+
+        self.assertEqual(result.metadata["status"], "model_unavailable")
+        self.assertEqual(result.metadata["failure_class"], "output_truncated")
+        self.assertEqual(result.metadata["failure_domain"], "llm_budget")
+        self.assertEqual(result.metadata["architecture_attribution"], "excluded")
+        self.assertEqual(result.metadata["done_reason"], "length")
 
     def test_resolution_contract_rejects_clarification_mixed_with_changes(self):
         with self.assertRaises(ValueError):

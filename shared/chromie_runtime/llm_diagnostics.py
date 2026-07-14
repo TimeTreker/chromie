@@ -104,6 +104,9 @@ def ollama_completion_diagnostics(
                     level=logging.ERROR,
                     fields={
                         "reason": "prompt_eval_count_reached_num_ctx",
+                        "failure_domain": "llm_budget",
+                        "architecture_attribution": "excluded",
+                        "retryable": True,
                         **prompt_fields,
                     },
                 )
@@ -139,6 +142,9 @@ def ollama_completion_diagnostics(
                         "reason": "done_reason_length"
                         if truncated_by_reason
                         else "num_predict_exhausted",
+                        "failure_domain": "llm_budget",
+                        "architecture_attribution": "excluded",
+                        "retryable": True,
                         **output_fields,
                     },
                 )
@@ -161,6 +167,9 @@ def ollama_completion_diagnostics(
                 level=logging.ERROR,
                 fields={
                     "reason": "done_reason_length",
+                    "failure_domain": "llm_budget",
+                    "architecture_attribution": "excluded",
+                    "retryable": True,
                     "done_reason": done_reason,
                     "suggestion": "increase_num_predict_or_shorten_response",
                 },

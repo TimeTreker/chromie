@@ -93,7 +93,7 @@ class Settings(BaseModel):
     social_attention_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS", "2500")),
         ge=100,
-        le=30000,
+        le=120000,
     )
     social_attention_num_ctx: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_NUM_CTX", "4096")),
@@ -102,12 +102,12 @@ class Settings(BaseModel):
     social_attention_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_NUM_PREDICT", "160")),
         ge=32,
-        le=1024,
+        le=4096,
     )
     social_attention_wait_after_response_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS", "150")),
         ge=0,
-        le=5000,
+        le=120000,
     )
     social_attention_max_behaviors: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS", "2")),
@@ -372,7 +372,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("chromie.agent")
 
-ollama_client = OllamaClient(settings.ollama_url, settings.model, timeout_ms=settings.timeout_ms)
+ollama_client = OllamaClient(
+    settings.ollama_url,
+    settings.model,
+    timeout_ms=settings.timeout_ms,
+    purpose="agent_default",
+)
 weather_client = OpenMeteoWeatherClient() if settings.weather_enabled else None
 
 response_reviewer_client = (
@@ -380,6 +385,7 @@ response_reviewer_client = (
         settings.ollama_url,
         settings.response_review_model,
         timeout_ms=settings.response_review_timeout_ms,
+        purpose="response_review",
     )
     if settings.use_llm and settings.response_review_enabled
     else None
@@ -389,6 +395,7 @@ social_attention_client = (
         settings.ollama_url,
         settings.social_attention_model,
         timeout_ms=settings.social_attention_timeout_ms,
+        purpose="social_attention",
     )
     if settings.use_llm and settings.social_attention_mode != "off"
     else None
@@ -398,6 +405,7 @@ task_continuity_client = (
         settings.ollama_url,
         settings.task_continuity_model,
         timeout_ms=settings.task_continuity_timeout_ms,
+        purpose="task_continuity",
     )
     if settings.use_llm and settings.task_continuity_enabled
     else None
@@ -518,6 +526,7 @@ goal_association_client = (
         settings.ollama_url,
         settings.goal_association_model,
         timeout_ms=settings.goal_association_timeout_ms,
+        purpose="goal_association",
     )
     if settings.use_llm and settings.goal_association_enabled
     else None
@@ -535,7 +544,12 @@ goal_association_resolver = (
 )
 
 fast_planner_client = (
-    OllamaClient(settings.ollama_url, settings.fast_planner_model, timeout_ms=settings.fast_planner_timeout_ms)
+    OllamaClient(
+        settings.ollama_url,
+        settings.fast_planner_model,
+        timeout_ms=settings.fast_planner_timeout_ms,
+        purpose="fast_planner",
+    )
     if settings.use_llm and settings.fast_planner_enabled
     else None
 )
@@ -552,7 +566,12 @@ fast_planner_resolver = (
     else None
 )
 deep_planner_client = (
-    OllamaClient(settings.ollama_url, settings.deep_planner_model, timeout_ms=settings.deep_planner_timeout_ms)
+    OllamaClient(
+        settings.ollama_url,
+        settings.deep_planner_model,
+        timeout_ms=settings.deep_planner_timeout_ms,
+        purpose="deep_planner",
+    )
     if settings.use_llm and settings.deep_planner_enabled
     else None
 )
@@ -574,6 +593,7 @@ response_composer_client = (
         settings.ollama_url,
         settings.response_composer_model,
         timeout_ms=settings.response_composer_timeout_ms,
+        purpose="response_composer",
     )
     if settings.use_llm and settings.response_composer_enabled
     else None

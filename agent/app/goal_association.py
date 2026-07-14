@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Any
 
-from .clients.ollama_client import OllamaClient
+from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
 
 try:
@@ -67,11 +67,17 @@ class GoalAssociationResolver:
                 self._normalize(raw, request=request, turn_id=turn_id)
             )
         except Exception as exc:
+            failure = llm_failure_metadata(exc)
             logger.exception(
-                "goal association model degraded sid=%s error_type=%s error=%s",
+                "goal_association_inference_failed sid=%s error_type=%s error=%s "
+                "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
                 request.sid,
                 type(exc).__name__,
                 exc,
+                failure["failure_class"],
+                failure["failure_domain"],
+                failure["architecture_attribution"],
+                failure["retryable"],
             )
             return GoalAssociationResolution(
                 turn_id=turn_id,
@@ -83,6 +89,7 @@ class GoalAssociationResolver:
                     "status": "model_unavailable",
                     "error_type": type(exc).__name__,
                     "error": str(exc)[:300],
+                    **failure,
                     "active_goal_count": len(active_goals),
                     "sid": request.sid,
                 },

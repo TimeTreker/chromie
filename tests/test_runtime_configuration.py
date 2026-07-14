@@ -176,6 +176,25 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('Skipping host Orchestrator (--no-orchestrator)', source)
         self.assertIn('ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE"', source)
 
+    def test_architecture_validation_preserves_social_attention(self) -> None:
+        source = (ROOT / "scripts" / "start_chromie.sh").read_text(
+            encoding="utf-8"
+        )
+        overlay = (ROOT / "env" / "validation" / "architecture.env").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("--architecture-validation", source)
+        self.assertIn("Social Attention remains active", source)
+        self.assertIn(
+            "${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-sim_only}}",
+            source,
+        )
+        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=sim_only", overlay)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_CTX=32768", overlay)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_PREDICT=4096", overlay)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS=120000", overlay)
+        self.assertIn("OLLAMA_NUM_PARALLEL=2", overlay)
+
     def test_start_chromie_diagnoses_soridormi_probe_failures(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(
             encoding="utf-8"

@@ -7,7 +7,7 @@ from typing import Any
 
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
-from .clients.ollama_client import OllamaClient
+from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
 
 try:
@@ -51,8 +51,19 @@ class DeepPlannerResolver:
                     raise ValueError("deep planner response is not a JSON object")
                 plan = CanonicalPlan.model_validate(self._normalize(raw, request=request, plan_id=plan_id))
             except Exception as exc:
-                logger.warning("deep planner degraded sid=%s attempt=%s error_type=%s error=%s",
-                               request.sid, attempt + 1, type(exc).__name__, exc)
+                failure = llm_failure_metadata(exc)
+                logger.warning(
+                    "deep_planner_inference_failed sid=%s attempt=%s error_type=%s error=%s "
+                    "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
+                    request.sid,
+                    attempt + 1,
+                    type(exc).__name__,
+                    exc,
+                    failure["failure_class"],
+                    failure["failure_domain"],
+                    failure["architecture_attribution"],
+                    failure["retryable"],
+                )
                 if attempt < self.max_replans:
                     feedback = [{"type": "invalid_plan_shape", "message": str(exc)[:400]}]
                     continue
@@ -224,7 +235,13 @@ class DeepPlannerResolver:
         detail.update({"resolver": "deep_planner", "status": "clarify", "authority": "advisory",
                        "attempt_count": attempts, "max_replans": self.max_replans, "reason": reason})
         if error is not None:
-            detail.update({"error_type": type(error).__name__, "error": str(error)[:300]})
+            detail.update(
+                {
+                    "error_type": type(error).__name__,
+                    "error": str(error)[:300],
+                    **llm_failure_metadata(error),
+                }
+            )
         return CanonicalPlan(plan_id=plan_id, planner_tier="deep", disposition="clarify",
                              coverage="uncertain", confidence=0.0, goal_summary=request.text,
                              response_text="", steps=[], unresolved=list(unresolved or []), metadata=detail)

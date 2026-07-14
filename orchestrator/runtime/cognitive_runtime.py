@@ -36,6 +36,22 @@ CognitiveRuntimeStatus = Literal[
 CognitiveLane = Literal["chat", "robot_action", "tool", "memory", "unsupported"]
 
 
+class CognitiveStageFailure(RuntimeError):
+    """A stage failure with explicit architecture attribution metadata."""
+
+    def __init__(self, stage: str, metadata: dict[str, Any]) -> None:
+        self.stage = stage
+        self.failure_metadata = dict(metadata)
+        failure_class = str(metadata.get("failure_class") or "stage_failure")
+        reason = str(
+            metadata.get("error")
+            or metadata.get("reason")
+            or metadata.get("reason_summary")
+            or failure_class
+        )
+        super().__init__(f"{stage}:{failure_class}:{reason}")
+
+
 class CognitiveRuntimeResolution(BaseModel):
     """One bounded goal-driven turn resolution before host execution."""
 
@@ -106,6 +122,14 @@ class CognitiveEvidenceRecorder:
         self.counters[f"status:{resolution.status}"] += 1
         self.counters[f"lane:{resolution.lane}"] += 1
         self.counters[f"mode:{resolution.mode}"] += 1
+        failure_class = str(resolution.metadata.get("failure_class") or "").strip()
+        attribution = str(
+            resolution.metadata.get("architecture_attribution") or ""
+        ).strip()
+        if failure_class:
+            self.counters[f"failure_class:{failure_class}"] += 1
+        if attribution:
+            self.counters[f"architecture_attribution:{attribution}"] += 1
         self.counters["turns"] += 1
         total_ms = float(resolution.timings_ms.get("total", 0.0))
         self.total_latency_ms += total_ms
@@ -700,6 +724,7 @@ class GoalDrivenRuntimeCoordinator:
         composition_resolution: ResponseCompositionResolution | None = None
         interaction: InteractionResponse | None = None
         goal_state_results: list[dict[str, Any]] = []
+        stage_diagnostics: list[dict[str, Any]] = []
         lane: CognitiveLane = "unsupported"
 
         try:
@@ -718,7 +743,14 @@ class GoalDrivenRuntimeCoordinator:
                 (association.metadata or {}).get("status") or "resolved"
             )
             if association_status == "model_unavailable":
-                raise RuntimeError("goal association model unavailable")
+                raise CognitiveStageFailure(
+                    "goal_association",
+                    self._stage_failure_metadata(
+                        "goal_association",
+                        association.metadata,
+                        default_failure_class="model_unavailable",
+                    ),
+                )
 
             planning_context = dict(context)
             planning_context["goal_association_resolution"] = association.model_dump(
@@ -735,6 +767,11 @@ class GoalDrivenRuntimeCoordinator:
                 timeout_ms=self.policy.fast_planner_timeout_ms,
             )
             timings["fast_planner"] = (time.perf_counter() - stage) * 1000.0
+            fast_failure = self._optional_stage_failure_metadata(
+                "fast_planner", fast_plan.metadata
+            )
+            if fast_failure is not None:
+                stage_diagnostics.append(fast_failure)
             terminal_plan = fast_plan
             if fast_plan.disposition == "escalate":
                 deep_context = dict(planning_context)
@@ -752,6 +789,11 @@ class GoalDrivenRuntimeCoordinator:
                     timeout_ms=self.policy.deep_planner_timeout_ms,
                 )
                 timings["deep_planner"] = (time.perf_counter() - stage) * 1000.0
+                deep_failure = self._optional_stage_failure_metadata(
+                    "deep_planner", terminal_plan.metadata
+                )
+                if deep_failure is not None:
+                    raise CognitiveStageFailure("deep_planner", deep_failure)
 
             lane = self.adapter.lane_for_plan(terminal_plan)
             runtime_errors = await self.adapter.validation_errors(terminal_plan)
@@ -776,6 +818,11 @@ class GoalDrivenRuntimeCoordinator:
                 timings[f"runtime_replan_{replan_count}"] = (
                     time.perf_counter() - stage
                 ) * 1000.0
+                deep_failure = self._optional_stage_failure_metadata(
+                    "deep_planner", terminal_plan.metadata
+                )
+                if deep_failure is not None:
+                    raise CognitiveStageFailure("deep_planner", deep_failure)
                 lane = self.adapter.lane_for_plan(terminal_plan)
                 runtime_errors = await self.adapter.validation_errors(terminal_plan)
             if runtime_errors:
@@ -803,8 +850,13 @@ class GoalDrivenRuntimeCoordinator:
                 composition_resolution.status != "resolved"
                 or composition_resolution.composition is None
             ):
-                raise RuntimeError(
-                    "response composer did not produce a resolved composition"
+                raise CognitiveStageFailure(
+                    "response_composer",
+                    self._stage_failure_metadata(
+                        "response_composer",
+                        composition_resolution.metadata,
+                        default_failure_class=composition_resolution.status,
+                    ),
                 )
 
             if self.policy.mode == "apply":
@@ -868,7 +920,15 @@ class GoalDrivenRuntimeCoordinator:
                     goal_state_results=goal_state_results,
                     timings=timings,
                     started=started,
-                    metadata={"runtime_replan_count": replan_count},
+                    metadata={
+                        "runtime_replan_count": replan_count,
+                        "stage_diagnostics": stage_diagnostics,
+                        "architecture_attribution": (
+                            "passed_after_infrastructure_recovery"
+                            if stage_diagnostics
+                            else "passed"
+                        ),
+                    },
                 )
 
             return self._finish(
@@ -881,7 +941,40 @@ class GoalDrivenRuntimeCoordinator:
                 composition=composition_resolution,
                 timings=timings,
                 started=started,
-                metadata={"runtime_replan_count": replan_count},
+                metadata={
+                    "runtime_replan_count": replan_count,
+                    "stage_diagnostics": stage_diagnostics,
+                    "architecture_attribution": (
+                        "passed_after_infrastructure_recovery"
+                        if stage_diagnostics
+                        else "passed"
+                    ),
+                },
+            )
+        except CognitiveStageFailure as exc:
+            failure_metadata = {
+                **exc.failure_metadata,
+                "failure_stage": exc.stage,
+                "stage_diagnostics": stage_diagnostics,
+            }
+            return self._finish(
+                mode=self.policy.mode,
+                status=(
+                    "legacy_fallback"
+                    if self.policy.fallback_policy == "legacy"
+                    else "error"
+                ),
+                lane=lane,
+                association=association,
+                fast_plan=fast_plan,
+                terminal_plan=terminal_plan,
+                composition=composition_resolution,
+                interaction=interaction,
+                goal_state_results=goal_state_results,
+                timings=timings,
+                started=started,
+                fallback_reason=str(exc)[:500],
+                metadata=failure_metadata,
             )
         except Exception as exc:
             return self._finish(
@@ -901,7 +994,69 @@ class GoalDrivenRuntimeCoordinator:
                 timings=timings,
                 started=started,
                 fallback_reason=f"{type(exc).__name__}: {str(exc)[:500]}",
+                metadata={
+                    "failure_stage": "runtime",
+                    "failure_class": type(exc).__name__,
+                    "failure_domain": "cognitive_runtime",
+                    "architecture_attribution": "not_excluded",
+                    "retryable": False,
+                    "stage_diagnostics": stage_diagnostics,
+                },
             )
+
+    @staticmethod
+    def _optional_stage_failure_metadata(
+        stage: str,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        values = dict(metadata or {})
+        if not values.get("failure_class"):
+            return None
+        return GoalDrivenRuntimeCoordinator._stage_failure_metadata(
+            stage,
+            values,
+            default_failure_class=str(values.get("failure_class")),
+        )
+
+    @staticmethod
+    def _stage_failure_metadata(
+        stage: str,
+        metadata: dict[str, Any] | None,
+        *,
+        default_failure_class: str,
+    ) -> dict[str, Any]:
+        values = dict(metadata or {})
+        result = {
+            "stage": stage,
+            "failure_class": str(
+                values.get("failure_class") or default_failure_class or "stage_failure"
+            ),
+            "failure_domain": str(
+                values.get("failure_domain") or "model_or_runtime"
+            ),
+            "architecture_attribution": str(
+                values.get("architecture_attribution") or "not_evaluated"
+            ),
+            "retryable": bool(values.get("retryable", False)),
+            "error_type": str(values.get("error_type") or ""),
+            "error": str(values.get("error") or values.get("reason_summary") or "")[:300],
+        }
+        for key in (
+            "purpose",
+            "model",
+            "timeout_ms",
+            "elapsed_ms",
+            "num_ctx",
+            "num_predict",
+            "done_reason",
+            "prompt_eval_count",
+            "eval_count",
+            "suggestion",
+            "reason",
+        ):
+            if key in values and values[key] not in {None, ""}:
+                result[key] = values[key]
+        return result
 
     @staticmethod
     def _finish(

@@ -6,6 +6,7 @@ from typing import Any
 
 from agent.app.agents.base import AgentServices
 from agent.app.capabilities.catalog import CapabilityMatch, CapabilitySearchResult
+from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.interaction import InteractionDraft
 from agent.app.runtime import InteractionRuntime
 from agent.app.social_attention import SocialAttentionPlanner
@@ -32,6 +33,26 @@ class _AttentionOllama:
         if self.delay_s:
             await asyncio.sleep(self.delay_s)
         return self.reply
+
+
+class _FailingAttentionOllama:
+    timeout_ms = 120000
+
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        del prompt, kwargs
+        raise OllamaGenerationError(
+            "structured JSON output was truncated",
+            failure_class="output_truncated",
+            failure_domain="llm_budget",
+            architecture_attribution="excluded",
+            retryable=True,
+            details={
+                "purpose": "social_attention",
+                "done_reason": "length",
+                "num_ctx": 32768,
+                "num_predict": 4096,
+            },
+        )
 
 
 class _Catalog:
@@ -173,6 +194,40 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("calibrated_right_side", attention.prompts[0])
         proposals = response.metadata["agent_task_proposals"]
         self.assertTrue(all(item.get("skill_id") != "soridormi.express_attention" for item in proposals))
+
+    async def test_truncated_social_attention_is_kept_and_attributed_to_llm_budget(self) -> None:
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ConversationOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                capability_catalog=_Catalog([self._blink()]),  # type: ignore[arg-type]
+                social_attention_mode="sim_only",
+                social_attention_ollama=_FailingAttentionOllama(),  # type: ignore[arg-type]
+                social_attention_capability_ids=("soridormi.blink_eyes",),
+                social_attention_num_ctx=32768,
+                social_attention_num_predict=4096,
+                social_attention_wait_after_response_ms=120000,
+            )
+        ).run(self._request())
+
+        self.assertEqual(response.speech[0].text, "I am here with you.")
+        self.assertEqual(response.metadata["social_attention_status"], "output_truncated")
+        self.assertEqual(
+            response.metadata["social_attention_failure_class"],
+            "output_truncated",
+        )
+        self.assertEqual(
+            response.metadata["social_attention_failure_domain"],
+            "llm_budget",
+        )
+        self.assertEqual(
+            response.metadata["social_attention_architecture_attribution"],
+            "excluded",
+        )
+        self.assertEqual(
+            response.metadata["social_attention_failure"]["done_reason"],
+            "length",
+        )
 
     async def test_model_can_choose_no_gesture(self) -> None:
         attention = _AttentionOllama(
