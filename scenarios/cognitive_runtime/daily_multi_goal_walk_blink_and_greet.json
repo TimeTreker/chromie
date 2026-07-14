@@ -1,0 +1,269 @@
+{
+  "schema_version": 1,
+  "id": "daily_multi_goal_walk_blink_and_greet",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "Three daily goals preserve two sequential robot actions, a conversational reply, and confirmation for motion.",
+  "tags": [
+    "multi-goal",
+    "daily-life",
+    "mixed",
+    "three-goal",
+    "confirmation"
+  ],
+  "input": {
+    "text": "往前走一秒，眨两下眼睛，然后跟我说早上好。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "mixed_three_goal_request",
+      "language": "zh-CN"
+    },
+    "goal_association": {
+      "turn_id": "turn-walk-blink-greet",
+      "new_goals": [
+        {
+          "goal_id": "goal-walk",
+          "description": "Walk forward for one second.",
+          "source_text": "往前走一秒。"
+        },
+        {
+          "goal_id": "goal-blink",
+          "description": "Blink twice after walking.",
+          "source_text": "眨两下眼睛。"
+        },
+        {
+          "goal_id": "goal-greet",
+          "description": "Say good morning to the user.",
+          "source_text": "然后跟我说早上好。"
+        }
+      ],
+      "confidence": 0.96,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "fast-walk-blink-greet",
+      "planner_tier": "fast",
+      "disposition": "escalate",
+      "coverage": "partial",
+      "confidence": 0.9,
+      "escalation_reason": "Three independent goals span effectful and conversational outcomes."
+    },
+    "deep_plans": [
+      {
+        "plan_id": "deep-walk-blink-greet",
+        "planner_tier": "deep",
+        "disposition": "mixed",
+        "coverage": "complete",
+        "confidence": 0.94,
+        "goal_ids": [
+          "goal-walk",
+          "goal-blink",
+          "goal-greet"
+        ],
+        "goal_summary": "Walk forward, blink twice, and greet the user.",
+        "steps": [
+          {
+            "step_id": "walk",
+            "skill_id": "soridormi.walk_forward",
+            "args": {
+              "duration_s": 1
+            },
+            "timing": "sequential",
+            "source_goal_ids": [
+              "goal-walk"
+            ]
+          },
+          {
+            "step_id": "blink",
+            "skill_id": "soridormi.blink_eyes",
+            "args": {
+              "count": 2
+            },
+            "timing": "sequential",
+            "source_goal_ids": [
+              "goal-blink"
+            ]
+          }
+        ],
+        "goal_outcomes": [
+          {
+            "goal_id": "goal-walk",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "walk"
+            ]
+          },
+          {
+            "goal_id": "goal-blink",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "blink"
+            ]
+          },
+          {
+            "goal_id": "goal-greet",
+            "disposition": "respond",
+            "coverage": "complete",
+            "response_text": "早上好！"
+          }
+        ],
+        "goal_satisfaction": {
+          "score": 1.0,
+          "status": "exact",
+          "satisfied_goal_ids": [
+            "goal-walk",
+            "goal-blink",
+            "goal-greet"
+          ]
+        }
+      }
+    ],
+    "capabilities": [
+      {
+        "skill_id": "soridormi.walk_forward",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 30
+            }
+          },
+          "required": [
+            "duration_s"
+          ]
+        },
+        "requires_confirmation": true,
+        "can_run_parallel": false,
+        "exclusive_group": "base_motion",
+        "resource_claims": [
+          "base_motion"
+        ]
+      },
+      {
+        "skill_id": "soridormi.blink_eyes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "can_run_parallel": true,
+        "exclusive_group": "eye_expression",
+        "resource_claims": [
+          "eye_expression"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "immediate": {
+          "text": "早上好！",
+          "speech_act": "inform",
+          "commitment_state": "none",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-greet"
+          ]
+        },
+        "pre_action": {
+          "text": "我会先往前走一秒，再眨两下眼睛；移动需要你确认。",
+          "speech_act": "inform",
+          "commitment_state": "waiting_for_user",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-walk",
+            "goal-blink"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "deep",
+    "disposition": "mixed",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-walk",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "walk"
+        ]
+      },
+      {
+        "goal_id": "goal-blink",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "blink"
+        ]
+      },
+      {
+        "goal_id": "goal-greet",
+        "disposition": "respond",
+        "coverage": "complete",
+        "step_ids": []
+      }
+    ],
+    "skill_ids": [
+      "soridormi.walk_forward",
+      "soridormi.blink_eyes"
+    ],
+    "skill_timings": [
+      "sequential",
+      "sequential"
+    ],
+    "skill_source_goal_ids": [
+      [
+        "goal-walk"
+      ],
+      [
+        "goal-blink"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-greet",
+      "goal-walk",
+      "goal-blink"
+    ],
+    "speech_contains_all": [
+      "早上好",
+      "走一秒",
+      "眨两下",
+      "确认"
+    ],
+    "requires_confirmation": true,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "deep_plan",
+      "response_composer"
+    ]
+  }
+}

@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "id": "daily_multi_goal_look_and_nod",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "A common social request keeps two independent robot goals and executes them sequentially.",
+  "tags": [
+    "multi-goal",
+    "daily-life",
+    "robot-action",
+    "ownership"
+  ],
+  "input": {
+    "text": "看着我两秒，然后点两下头。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "multi_goal_social_motion",
+      "language": "zh-CN"
+    },
+    "goal_association": {
+      "turn_id": "turn-look-nod",
+      "new_goals": [
+        {
+          "goal_id": "goal-look",
+          "description": "Look at the user for two seconds.",
+          "source_text": "看着我两秒。"
+        },
+        {
+          "goal_id": "goal-nod",
+          "description": "Nod twice after looking.",
+          "source_text": "然后点两下头。"
+        }
+      ],
+      "confidence": 0.96,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "plan-look-nod",
+      "planner_tier": "fast",
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 0.95,
+      "goal_ids": [
+        "goal-look",
+        "goal-nod"
+      ],
+      "goal_summary": "Look at the user, then nod twice.",
+      "steps": [
+        {
+          "step_id": "look",
+          "skill_id": "soridormi.look_at_person",
+          "args": {
+            "duration_s": 2
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-look"
+          ]
+        },
+        {
+          "step_id": "nod",
+          "skill_id": "soridormi.nod_yes",
+          "args": {
+            "count": 2
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-nod"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-look",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "look"
+          ]
+        },
+        {
+          "goal_id": "goal-nod",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "nod"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
+          "goal-look",
+          "goal-nod"
+        ]
+      }
+    },
+    "capabilities": [
+      {
+        "skill_id": "soridormi.look_at_person",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "duration_s"
+          ]
+        },
+        "can_run_parallel": false,
+        "exclusive_group": "head_motion",
+        "resource_claims": [
+          "head_motion"
+        ]
+      },
+      {
+        "skill_id": "soridormi.nod_yes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "can_run_parallel": false,
+        "exclusive_group": "head_motion",
+        "resource_claims": [
+          "head_motion"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "pre_action": {
+          "text": "好，我会先看着你两秒，再点两下头。",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-look",
+            "goal-nod"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "fast",
+    "disposition": "execute",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-look",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "look"
+        ]
+      },
+      {
+        "goal_id": "goal-nod",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "nod"
+        ]
+      }
+    ],
+    "skill_ids": [
+      "soridormi.look_at_person",
+      "soridormi.nod_yes"
+    ],
+    "skill_timings": [
+      "sequential",
+      "sequential"
+    ],
+    "skill_source_goal_ids": [
+      [
+        "goal-look"
+      ],
+      [
+        "goal-nod"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-look",
+      "goal-nod"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "response_composer"
+    ]
+  }
+}

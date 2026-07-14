@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "id": "daily_multi_goal_blink_and_joke",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "A normal mixed request performs a body action while answering an independent conversational goal.",
+  "tags": [
+    "multi-goal",
+    "daily-life",
+    "mixed",
+    "robot-and-chat"
+  ],
+  "input": {
+    "text": "眨三下眼睛，再讲个笑话。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "mixed_robot_and_chat",
+      "language": "zh-CN"
+    },
+    "goal_association": {
+      "turn_id": "turn-blink-joke",
+      "new_goals": [
+        {
+          "goal_id": "goal-blink",
+          "description": "Blink three times.",
+          "source_text": "眨三下眼睛。"
+        },
+        {
+          "goal_id": "goal-joke",
+          "description": "Tell the user a short joke.",
+          "source_text": "再讲个笑话。"
+        }
+      ],
+      "confidence": 0.96,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "fast-blink-joke",
+      "planner_tier": "fast",
+      "disposition": "escalate",
+      "coverage": "partial",
+      "confidence": 0.9,
+      "escalation_reason": "Independent effectful and conversational goals require per-goal terminal outcomes."
+    },
+    "deep_plans": [
+      {
+        "plan_id": "deep-blink-joke",
+        "planner_tier": "deep",
+        "disposition": "mixed",
+        "coverage": "complete",
+        "confidence": 0.94,
+        "goal_ids": [
+          "goal-blink",
+          "goal-joke"
+        ],
+        "goal_summary": "Blink three times and answer with a joke.",
+        "steps": [
+          {
+            "step_id": "blink",
+            "skill_id": "soridormi.blink_eyes",
+            "args": {
+              "count": 3
+            },
+            "timing": "sequential",
+            "source_goal_ids": [
+              "goal-blink"
+            ]
+          }
+        ],
+        "goal_outcomes": [
+          {
+            "goal_id": "goal-blink",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "blink"
+            ]
+          },
+          {
+            "goal_id": "goal-joke",
+            "disposition": "respond",
+            "coverage": "complete",
+            "response_text": "为什么机器人不怕冷？因为它有很多缓存。"
+          }
+        ],
+        "goal_satisfaction": {
+          "score": 1.0,
+          "status": "exact",
+          "satisfied_goal_ids": [
+            "goal-blink",
+            "goal-joke"
+          ]
+        }
+      }
+    ],
+    "capabilities": [
+      {
+        "skill_id": "soridormi.blink_eyes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "can_run_parallel": true,
+        "exclusive_group": "eye_expression",
+        "resource_claims": [
+          "eye_expression"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "immediate": {
+          "text": "为什么机器人不怕冷？因为它有很多缓存。",
+          "speech_act": "inform",
+          "commitment_state": "none",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-joke"
+          ]
+        },
+        "pre_action": {
+          "text": "我也会眨三下眼睛。",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-blink"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "deep",
+    "disposition": "mixed",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-blink",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "blink"
+        ]
+      },
+      {
+        "goal_id": "goal-joke",
+        "disposition": "respond",
+        "coverage": "complete",
+        "step_ids": []
+      }
+    ],
+    "skill_ids": [
+      "soridormi.blink_eyes"
+    ],
+    "skill_source_goal_ids": [
+      [
+        "goal-blink"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-joke",
+      "goal-blink"
+    ],
+    "speech_contains_all": [
+      "缓存",
+      "眨三下"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "deep_plan",
+      "response_composer"
+    ]
+  }
+}

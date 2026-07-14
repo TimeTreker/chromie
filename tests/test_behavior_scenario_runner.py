@@ -26,7 +26,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 373)
+        self.assertEqual(len(all_cases), 381)
         self.assertEqual(len(adapter_cases), 4)
         self.assertEqual(len(router_cases), 23)
         self.assertEqual(len(router_dialogue_cases), 2)

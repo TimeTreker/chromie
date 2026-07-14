@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "id": "daily_multi_goal_repeated_blink_sequence",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "Repeated identical skills remain separate ordered steps instead of being silently deduplicated.",
+  "tags": [
+    "multi-goal",
+    "daily-life",
+    "sequence",
+    "duplicate-skill"
+  ],
+  "input": {
+    "text": "先眨两下，停一下，再眨一下。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "ordered_repeated_gesture",
+      "language": "zh-CN"
+    },
+    "goal_association": {
+      "turn_id": "turn-repeat-blink",
+      "new_goals": [
+        {
+          "goal_id": "goal-first-blink",
+          "description": "Blink twice first.",
+          "source_text": "先眨两下。"
+        },
+        {
+          "goal_id": "goal-second-blink",
+          "description": "Blink once after a brief separation.",
+          "source_text": "再眨一下。"
+        }
+      ],
+      "confidence": 0.95,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "plan-repeat-blink",
+      "planner_tier": "fast",
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 0.95,
+      "goal_ids": [
+        "goal-first-blink",
+        "goal-second-blink"
+      ],
+      "goal_summary": "Blink twice, then blink once as a distinct second action.",
+      "steps": [
+        {
+          "step_id": "blink-first",
+          "skill_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 2
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-first-blink"
+          ]
+        },
+        {
+          "step_id": "blink-second",
+          "skill_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 1
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-second-blink"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-first-blink",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "blink-first"
+          ]
+        },
+        {
+          "goal_id": "goal-second-blink",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "blink-second"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
+          "goal-first-blink",
+          "goal-second-blink"
+        ]
+      }
+    },
+    "capabilities": [
+      {
+        "skill_id": "soridormi.blink_eyes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "can_run_parallel": true,
+        "exclusive_group": "eye_expression",
+        "resource_claims": [
+          "eye_expression"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "pre_action": {
+          "text": "好，我会先眨两下，再单独眨一下。",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-first-blink",
+            "goal-second-blink"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "fast",
+    "disposition": "execute",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-first-blink",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "blink-first"
+        ]
+      },
+      {
+        "goal_id": "goal-second-blink",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "blink-second"
+        ]
+      }
+    ],
+    "skill_ids": [
+      "soridormi.blink_eyes",
+      "soridormi.blink_eyes"
+    ],
+    "skill_args": [
+      {
+        "count": 2
+      },
+      {
+        "count": 1
+      }
+    ],
+    "skill_source_goal_ids": [
+      [
+        "goal-first-blink"
+      ],
+      [
+        "goal-second-blink"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-first-blink",
+      "goal-second-blink"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "response_composer"
+    ]
+  }
+}

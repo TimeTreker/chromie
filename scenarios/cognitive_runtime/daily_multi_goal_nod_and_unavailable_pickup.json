@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "id": "daily_multi_goal_nod_and_unavailable_pickup",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "A supported social action remains executable while an unsupported pickup request is reported truthfully.",
+  "tags": [
+    "multi-goal",
+    "daily-life",
+    "mixed",
+    "execute-and-unavailable"
+  ],
+  "input": {
+    "text": "点一下头，然后把桌上的蓝杯子拿给我。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "mixed_supported_and_unavailable_body_goals",
+      "language": "zh-CN"
+    },
+    "goal_association": {
+      "turn_id": "turn-nod-pickup",
+      "new_goals": [
+        {
+          "goal_id": "goal-nod",
+          "description": "Nod once.",
+          "source_text": "点一下头。"
+        },
+        {
+          "goal_id": "goal-pickup",
+          "description": "Pick up the blue mug from the table and bring it to the user.",
+          "source_text": "然后把桌上的蓝杯子拿给我。"
+        }
+      ],
+      "confidence": 0.95,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "fast-nod-pickup",
+      "planner_tier": "fast",
+      "disposition": "escalate",
+      "coverage": "partial",
+      "confidence": 0.88,
+      "escalation_reason": "The request combines a supported gesture with an unavailable manipulation goal."
+    },
+    "deep_plans": [
+      {
+        "plan_id": "deep-nod-pickup",
+        "planner_tier": "deep",
+        "disposition": "mixed",
+        "coverage": "complete",
+        "confidence": 0.94,
+        "goal_ids": [
+          "goal-nod",
+          "goal-pickup"
+        ],
+        "goal_summary": "Nod once and report that mug pickup is unavailable.",
+        "steps": [
+          {
+            "step_id": "nod",
+            "skill_id": "soridormi.nod_yes",
+            "args": {
+              "count": 1
+            },
+            "source_goal_ids": [
+              "goal-nod"
+            ]
+          }
+        ],
+        "goal_outcomes": [
+          {
+            "goal_id": "goal-nod",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "nod"
+            ]
+          },
+          {
+            "goal_id": "goal-pickup",
+            "disposition": "unavailable",
+            "coverage": "complete",
+            "response_text": "我现在没有可靠的拿杯子能力。",
+            "rationale": "Manipulation is not available in the trusted capability catalog."
+          }
+        ],
+        "goal_satisfaction": {
+          "score": 0.8,
+          "status": "substantial",
+          "satisfied_goal_ids": [
+            "goal-nod"
+          ],
+          "unmet_goal_ids": [
+            "goal-pickup"
+          ],
+          "unmet_requirements": [
+            "trusted mug pickup capability"
+          ]
+        }
+      }
+    ],
+    "capabilities": [
+      {
+        "skill_id": "soridormi.nod_yes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "can_run_parallel": false,
+        "exclusive_group": "head_motion",
+        "resource_claims": [
+          "head_motion"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "immediate": {
+          "text": "我现在没有可靠的拿杯子能力。",
+          "speech_act": "inform",
+          "commitment_state": "none",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-pickup"
+          ]
+        },
+        "pre_action": {
+          "text": "我可以先点一下头。",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-nod"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "deep",
+    "disposition": "mixed",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-nod",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "nod"
+        ]
+      },
+      {
+        "goal_id": "goal-pickup",
+        "disposition": "unavailable",
+        "coverage": "complete",
+        "step_ids": []
+      }
+    ],
+    "skill_ids": [
+      "soridormi.nod_yes"
+    ],
+    "skill_source_goal_ids": [
+      [
+        "goal-nod"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-pickup",
+      "goal-nod"
+    ],
+    "speech_contains_all": [
+      "没有可靠的拿杯子能力",
+      "点一下头"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "deep_plan",
+      "response_composer"
+    ]
+  }
+}

@@ -390,7 +390,28 @@ allowlist. The result is classified as legacy fallback.
 ### Multi-Goal response coverage
 
 One turn creates independent Goals, and the final coordinated response covers
-all Goal IDs without inventing or omitting a Goal.
+all Goal IDs without inventing or omitting a Goal. The trusted runtime adapter
+accepts terminal `mixed` plans when their executable subset is valid, maps them
+to a successful interaction, and preserves `source_goal_ids` on every emitted
+skill.
+
+### Daily-life multi-goal matrix
+
+Eight additional deterministic cases cover normal Chinese and English compound
+requests: look plus nod, blink plus a joke, action plus ambiguous movement,
+a supported gesture plus unavailable pickup, walk plus blink plus greeting,
+repeated blink steps, look plus blink, and a three-way execute/respond/clarify
+turn. Expectations verify per-goal outcome, arguments, timing, skill ownership,
+speech coverage, confirmation, and final status.
+
+Run them with:
+
+```bash
+python scripts/general_ability_acceptance.py \
+  --mode level-a \
+  --ability-class multi_goal_daily_life \
+  --no-write
+```
 
 These scenarios are dependency-light Level A evidence only.
 

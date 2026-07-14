@@ -166,9 +166,11 @@ attached to the original task. Immediate ResponsePlan commitments are checked
 against current task state and trusted evidence before fast-first playback. This
 is dependency-light automated evidence only: the common profile runs the dedicated
 continuity resolver in non-authoritative background `report_only` mode, while
-`apply` remains explicit. Full semantic multi-goal response composition,
-rejected-claim model repair, generalized observation planning, retained live-text
-evidence, and simulator validation remain open. See [Semantic Task Continuity and Situational
+`apply` remains explicit. Semantic multi-goal response composition is now
+implemented through per-goal outcomes and exact step ownership, including mixed
+execute/respond/clarify/unavailable turns. Rejected-claim model repair,
+generalized observation planning, retained live-text evidence, and simulator
+validation remain open. See [Semantic Task Continuity and Situational
 Planning](SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md).
 
 The July 12 voice-log reliability slice is also implemented and automatically
@@ -263,7 +265,7 @@ Target validation or Release readiness.
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Used by the current voice loop | Enabled by `.env.common` |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle | Host rollout flag off |
 | Native structured Interaction Agent | Implemented with direct `InteractionSpeech`/`SkillRequest` accumulation, review-gated robot-action planning, model-authored optional `SocialAttentionPlan` coordination, and semantic parameter resolution. A separate report-only Response Composer now binds goal-scoped speech and optional attention to an immutable fingerprinted terminal `CanonicalPlan`; it does not replace the production interaction path. Attention is selected from exact named capabilities or `none`; runtime validates target evidence, schemas, latency, confirmation policy, and conflicts, and excludes auxiliary attention from user task proposals | Native route, TaskGraph, validation, fail-closed, fallback, response-composition goal coverage/claim/immutability, social-attention selection/none/invalid/latency/target/conflict, exact-intent, and compatibility-mode tests plus file-backed interaction scenarios | Text-input MuJoCo closure evidence retained for prior task skills; social-attention behavior currently has automated evidence only and needs a retained live simulator rerun | Agent default; project-wide attention off, maintained voice-MuJoCo launcher uses `sim_only` with calibrated right-side fallback |
-| Goal-driven cognitive runtime | PR1–PR7 contracts and stages are integrated through one host coordinator: Goal Association, complete-coverage Fast Planner, terminal full-catalog Deep Planner, one bounded trusted-validator replan, fingerprint-bound Response Composition, lane-gated runtime adaptation, atomic Goal-state application, and existing confirmation/Skill Runtime execution. Modes are `off`, `report_only`, and `apply`; apply lanes and legacy/fail-closed fallback are configurable | Goal-contract, association, Fast/Deep Planner, Goal Satisfaction, response-composition, runtime-adapter, Orchestrator apply/fallback, atomic-state, evidence-tool, and four retained `cognitive_runtime` scenarios plus the full Level A gate | No retained PR7 live-text or MuJoCo target bundle has been added yet; `interaction_text_mujoco_check.py --cognitive-runtime` and `cognitive_runtime_acceptance.py` provide classified collection entry points | Code default off; maintained configuration report-only; apply is explicit and lane-gated |
+| Goal-driven cognitive runtime | PR1–PR7 contracts and stages are integrated through one host coordinator: Goal Association, complete-coverage Fast Planner, terminal full-catalog Deep Planner, one bounded trusted-validator replan, fingerprint-bound Response Composition, lane-gated runtime adaptation, atomic Goal-state application, mixed-plan execution, and existing confirmation/Skill Runtime execution. Modes are `off`, `report_only`, and `apply`; apply lanes and legacy/fail-closed fallback are configurable | Goal-contract, association, Fast/Deep Planner, Goal Satisfaction, response-composition, runtime-adapter, Orchestrator apply/fallback, atomic-state, evidence-tool, twelve retained `cognitive_runtime` scenarios, and an eight-case `multi_goal_daily_life` Level A ability class | No retained PR7 daily-life multi-goal live-text or MuJoCo target bundle has been added yet; the general-ability live runner can preview or execute the focused class with `--goal-driven-runtime apply` | Code default off; maintained configuration report-only; apply is explicit and lane-gated |
 | Semantic compound capability planning | Implemented as model-authored complete-goal planning over bounded capability schemas plus provider/resource evidence. The model chooses exact execution, safe adjustment, alternative proposal, clarification, or unsupported; model-authored timing and explanation are preserved. A quick Router that cannot bind the complete effectful goal now hands the original utterance to semantic capability planning instead of declaring the ability missing. Deterministic code validates the complete plan atomically, blocks partial-skill leakage, requires confirmation for material alternatives, and performs only authorization/resource arbitration rather than natural-language action interpretation | Exact parallel composition, sequential alternative proposal, unresolved Router-to-planner handoff, unknown concurrency evidence, invalid-substep atomic rejection, confirmation-prompt override, host blocked-state stripping, repeated-step audit identity, and file-backed Chinese walk/blink regression tests | Automated dependency-light evidence only; live model/provider behavior must be rerun, and no claim is made that walking and blinking are physically compatible on a particular robot | LLM planning enabled; provider metadata remains authoritative; no normal-language action/count/speed fast-path parser |
 | Trusted host Skill Runtime | Implemented | Scheduling, confirmation, timeout, cancellation, and isolation tests | Text-to-live-MuJoCo closure evidence passed | Used only by structured path |
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean synthetic and virtual-mic approval/denial evidence passed; text-to-MuJoCo uses the same trusted runtime authorization boundary | Structured path; simulator exemption configurable |
@@ -416,21 +418,21 @@ These results are
 automated evidence; a retained Stage 6 GPU benchmark, listening check, and live
 voice or live-text rerun are still required.
 
-The 2026-07-13 post-PR7 cognitive-architecture review passes
-`python scripts/check_docs.py`, 917 current `unittest` cases, 20 legacy Agent
-tests, 378/378 file-backed behavior scenarios, and 42/42 General Ability Level
-A probes. Five new deterministic Goal Runtime scenarios and an expanded live
-end-to-end manifest cover mixed execute-and-clarify outcomes, an alternative
-plan revised before confirmation, ambiguous cancellation, side conversation
-while waiting for input, and independent success plus unavailability. The review
-found and corrected four architecture defects: one global plan disposition could
-not represent independent goal outcomes; goal mutations could occur before host
-response preparation; provider requests were associated with only one goal and
-auxiliary attention could contaminate task lifecycle; and broad reset phrases
-such as “算了” bypassed semantic Goal Association. Active goals now preserve
-conversation continuity across idle boundaries. These are Level A automated and
-harness results only; the expanded live manifest has not yet been run against
-deployed Router, Agent, Ollama, and MuJoCo services.
+The 2026-07-14 post-PR7 cognitive-architecture and daily-life multi-goal
+review passes `python scripts/check_docs.py`, 926 current `unittest` cases, 20
+legacy Agent tests, 381/381 file-backed behavior scenarios, and 50/50 General
+Ability Level A probes. The retained cognitive-runtime family now contains
+twelve scenarios, including eight daily-life multi-goal cases that cover
+supported sequential actions, repeated identical skills, body action plus
+conversation, action plus clarification, supported action plus unavailable
+manipulation, and a three-way execute/respond/clarify turn. The review found and
+corrected the earlier architecture defects around independent outcomes, commit
+ordering, provider-goal association, auxiliary attention, broad reset phrases,
+and the trusted adapter's rejection of otherwise valid terminal `mixed` plans.
+Active goals preserve conversation continuity across idle boundaries, and every
+effectful step is asserted against its exact `source_goal_ids`. These are Level
+A automated and harness results only; the daily-life live manifest has not yet
+passed against deployed Router, Agent, Ollama, and MuJoCo services.
 
 The 2026-07-09 live text preview run against local Router, Agent, and
 Soridormi MCP is not passing yet. After fixing a headless runner blocker where

@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "id": "daily_multi_goal_blink_joke_and_ambiguous_move",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "A three-way daily request executes one goal, answers one, and clarifies one without cross-goal leakage.",
+  "tags": [
+    "multi-goal",
+    "daily-life",
+    "mixed",
+    "three-way-outcomes"
+  ],
+  "input": {
+    "text": "眨一下眼睛，讲个笑话，再把那个放好。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "mixed_three_way_request",
+      "language": "zh-CN"
+    },
+    "goal_association": {
+      "turn_id": "turn-three-way",
+      "new_goals": [
+        {
+          "goal_id": "goal-blink",
+          "description": "Blink once.",
+          "source_text": "眨一下眼睛。"
+        },
+        {
+          "goal_id": "goal-joke",
+          "description": "Tell a short joke.",
+          "source_text": "讲个笑话。"
+        },
+        {
+          "goal_id": "goal-put-away",
+          "description": "Put the referenced object away.",
+          "source_text": "再把那个放好。"
+        }
+      ],
+      "confidence": 0.94,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "fast-three-way",
+      "planner_tier": "fast",
+      "disposition": "escalate",
+      "coverage": "uncertain",
+      "confidence": 0.87,
+      "escalation_reason": "The turn contains executable, conversational, and unresolved goals."
+    },
+    "deep_plans": [
+      {
+        "plan_id": "deep-three-way",
+        "planner_tier": "deep",
+        "disposition": "mixed",
+        "coverage": "complete",
+        "confidence": 0.93,
+        "goal_ids": [
+          "goal-blink",
+          "goal-joke",
+          "goal-put-away"
+        ],
+        "goal_summary": "Blink once, tell a joke, and clarify which object should be put away.",
+        "steps": [
+          {
+            "step_id": "blink",
+            "skill_id": "soridormi.blink_eyes",
+            "args": {
+              "count": 1
+            },
+            "source_goal_ids": [
+              "goal-blink"
+            ]
+          }
+        ],
+        "parameter_resolutions": [
+          {
+            "step_id": "put-away-request",
+            "parameter": "object",
+            "strategy": "ask_user",
+            "blocking": true,
+            "confidence": 0.99,
+            "rationale": "The object reference is unresolved.",
+            "source_goal_ids": [
+              "goal-put-away"
+            ]
+          }
+        ],
+        "goal_outcomes": [
+          {
+            "goal_id": "goal-blink",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "blink"
+            ]
+          },
+          {
+            "goal_id": "goal-joke",
+            "disposition": "respond",
+            "coverage": "complete",
+            "response_text": "机器人为什么带伞？因为它怕云端下雨。"
+          },
+          {
+            "goal_id": "goal-put-away",
+            "disposition": "clarify",
+            "coverage": "uncertain",
+            "response_text": "你说的“那个”是哪件东西？",
+            "unresolved": [
+              "object"
+            ]
+          }
+        ],
+        "goal_satisfaction": {
+          "score": 0.8,
+          "status": "substantial",
+          "satisfied_goal_ids": [
+            "goal-blink",
+            "goal-joke"
+          ],
+          "unmet_goal_ids": [
+            "goal-put-away"
+          ],
+          "unmet_requirements": [
+            "object reference"
+          ]
+        }
+      }
+    ],
+    "capabilities": [
+      {
+        "skill_id": "soridormi.blink_eyes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "can_run_parallel": true,
+        "exclusive_group": "eye_expression",
+        "resource_claims": [
+          "eye_expression"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "immediate": {
+          "text": "机器人为什么带伞？因为它怕云端下雨。你说的“那个”是哪件东西？",
+          "speech_act": "clarify",
+          "commitment_state": "waiting_for_user",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-joke",
+            "goal-put-away"
+          ]
+        },
+        "pre_action": {
+          "text": "我可以先眨一下眼睛。",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-blink"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "deep",
+    "disposition": "mixed",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-blink",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "blink"
+        ]
+      },
+      {
+        "goal_id": "goal-joke",
+        "disposition": "respond",
+        "coverage": "complete",
+        "step_ids": []
+      },
+      {
+        "goal_id": "goal-put-away",
+        "disposition": "clarify",
+        "coverage": "uncertain",
+        "step_ids": []
+      }
+    ],
+    "skill_ids": [
+      "soridormi.blink_eyes"
+    ],
+    "skill_source_goal_ids": [
+      [
+        "goal-blink"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-joke",
+      "goal-put-away",
+      "goal-blink"
+    ],
+    "speech_contains_all": [
+      "云端下雨",
+      "哪件东西",
+      "眨一下"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "deep_plan",
+      "response_composer"
+    ]
+  }
+}

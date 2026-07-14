@@ -16,6 +16,7 @@ from scripts.general_ability_acceptance import (
     main,
     manifest_summary,
     run_level_a,
+    _live_case_namespace,
     select_ability_classes,
     validate_manifest,
 )
@@ -33,9 +34,12 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("composable_action_planning", ability_ids)
         self.assertIn("truthful_embodied_speech", ability_ids)
         self.assertIn("evidence_coverage_and_claim_discipline", ability_ids)
+        self.assertIn("multi_goal_daily_life", ability_ids)
         self.assertEqual(validate_manifest(manifest), [])
         self.assertGreaterEqual(len(level_a_keys(manifest.ability_classes)), 20)
-        self.assertIn("wal_forward_typo_walk", live_case_ids(manifest.ability_classes))
+        live_ids = live_case_ids(manifest.ability_classes)
+        self.assertIn("wal_forward_typo_walk", live_ids)
+        self.assertIn("multi_goal_look_then_blink", live_ids)
 
     def test_manifest_summary_labels_scope_and_counts(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)
@@ -103,6 +107,52 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertEqual(summary["case_count"], 1)
         self.assertEqual(summary["ability_classes"][0]["id"], "controls")
         self.assertEqual(summary["ability_classes"][0]["cases"][0]["key"], "router/polite_stop")
+
+
+    def test_daily_multi_goal_level_a_class_passes(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "--mode",
+                "level-a",
+                "--ability-class",
+                "multi_goal_daily_life",
+                "--no-write",
+            ]
+        )
+
+        summary = run_level_a(args)
+
+        self.assertTrue(summary["ok"], summary["errors"])
+        self.assertEqual(summary["case_count"], 8)
+        self.assertEqual(summary["passed"], 8)
+
+    def test_live_case_namespace_can_select_goal_driven_runtime(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        ability = next(
+            item for item in manifest.ability_classes
+            if item.ability_id == "multi_goal_daily_life"
+        )
+        case = ability.live_text_cases[0].case
+        args = build_parser().parse_args(
+            [
+                "--mode",
+                "live-text",
+                "--goal-driven-runtime",
+                "apply",
+                "--cognitive-apply-lanes",
+                "robot_action",
+                "--no-write",
+            ]
+        )
+
+        namespace = _live_case_namespace(args, case, Path("/tmp/multi-goal"))
+
+        self.assertTrue(namespace.cognitive_runtime)
+        self.assertEqual(namespace.cognitive_apply_lanes, "robot_action")
+        self.assertEqual(
+            namespace.expect_skill,
+            ["soridormi.look_at_person", "soridormi.blink_eyes"],
+        )
 
     def test_cli_check_mode_returns_success_for_default_manifest(self) -> None:
         with redirect_stdout(StringIO()):

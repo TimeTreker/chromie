@@ -1513,6 +1513,27 @@ async def evaluate_cognitive_runtime_scenario(
     )
     terminal = resolution.terminal_plan
     interaction = resolution.interaction_response
+    goal_outcomes = (
+        [
+            {
+                "goal_id": item.goal_id,
+                "disposition": item.disposition,
+                "coverage": item.coverage,
+                "step_ids": list(item.step_ids),
+            }
+            for item in terminal.goal_outcomes
+        ]
+        if terminal is not None
+        else []
+    )
+    speech_items = list(interaction.speech) if interaction else []
+    speech_covers_goal_ids: list[str] = []
+    for item in speech_items:
+        metadata = item.metadata if isinstance(item.metadata, dict) else {}
+        for goal_id in metadata.get("covers_goal_ids") or []:
+            goal_id = str(goal_id)
+            if goal_id and goal_id not in speech_covers_goal_ids:
+                speech_covers_goal_ids.append(goal_id)
     actual = {
         "status": resolution.status,
         "lane": resolution.lane,
@@ -1520,8 +1541,17 @@ async def evaluate_cognitive_runtime_scenario(
         "planner_tier": terminal.planner_tier if terminal is not None else None,
         "disposition": terminal.disposition if terminal is not None else None,
         "coverage": terminal.coverage if terminal is not None else None,
+        "goal_outcomes": goal_outcomes,
         "skill_ids": [item.skill_id for item in interaction.skills] if interaction else [],
         "skill_args": [item.args for item in interaction.skills] if interaction else [],
+        "skill_timings": [item.timing for item in interaction.skills] if interaction else [],
+        "skill_source_goal_ids": [
+            list(item.metadata.get("source_goal_ids") or [])
+            for item in interaction.skills
+        ] if interaction else [],
+        "interaction_status": interaction.status if interaction else None,
+        "speech_texts": [item.text for item in speech_items],
+        "speech_covers_goal_ids": speech_covers_goal_ids,
         "requires_confirmation": interaction.requires_confirmation if interaction else False,
         "calls": list(client.calls),
         "runtime_replan_count": int(resolution.metadata.get("runtime_replan_count", 0)),
@@ -1534,9 +1564,38 @@ async def evaluate_cognitive_runtime_scenario(
     for key in ("status", "lane", "planner_tier", "disposition", "coverage"):
         if key in expect and actual[key] != expect[key]:
             errors.append(f"{key}={actual[key]!r}, expected {expect[key]!r}")
+    if "goal_outcomes" in expect and actual["goal_outcomes"] != list(expect["goal_outcomes"]):
+        errors.append(
+            f"goal_outcomes={actual['goal_outcomes']!r}, "
+            f"expected {list(expect['goal_outcomes'])!r}"
+        )
     if "skill_ids" in expect and actual["skill_ids"] != list(expect["skill_ids"]):
         errors.append(
             f"skill_ids={actual['skill_ids']!r}, expected {list(expect['skill_ids'])!r}"
+        )
+    for key in (
+        "skill_args",
+        "skill_timings",
+        "skill_source_goal_ids",
+        "speech_covers_goal_ids",
+    ):
+        if key in expect and actual[key] != list(expect[key]):
+            errors.append(f"{key}={actual[key]!r}, expected {list(expect[key])!r}")
+    if "interaction_status" in expect and actual["interaction_status"] != expect["interaction_status"]:
+        errors.append(
+            f"interaction_status={actual['interaction_status']!r}, "
+            f"expected {expect['interaction_status']!r}"
+        )
+    speech_text = "\n".join(actual["speech_texts"])
+    for phrase in expect.get("speech_contains_all") or []:
+        if str(phrase).casefold() not in speech_text.casefold():
+            errors.append(f"speech missing required phrase {phrase!r}: {speech_text!r}")
+    speech_any = list(expect.get("speech_contains_any") or [])
+    if speech_any and not any(
+        str(phrase).casefold() in speech_text.casefold() for phrase in speech_any
+    ):
+        errors.append(
+            f"speech missing any expected phrase {speech_any!r}: {speech_text!r}"
         )
     if "requires_confirmation" in expect and actual["requires_confirmation"] is not bool(expect["requires_confirmation"]):
         errors.append(

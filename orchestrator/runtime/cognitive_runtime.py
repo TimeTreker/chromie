@@ -250,7 +250,7 @@ class CanonicalPlanRuntimeAdapter:
 
     async def validation_errors(self, plan: CanonicalPlan) -> list[dict[str, Any]]:
         errors: list[dict[str, Any]] = []
-        if plan.disposition != "execute":
+        if plan.disposition not in {"execute", "mixed"}:
             if plan.steps:
                 errors.append({"type": "non_execute_plan_has_steps"})
             return errors
@@ -643,6 +643,7 @@ class CanonicalPlanRuntimeAdapter:
         status_map = {
             "respond": "ok",
             "execute": "ok",
+            "mixed": "ok",
             "clarify": "clarify",
             "unavailable": "refused",
             "refused": "refused",
@@ -658,7 +659,9 @@ class CanonicalPlanRuntimeAdapter:
                 mode="json", exclude_none=True
             ),
             "planning_result": (
-                "composed_plan" if plan.disposition == "execute" else plan.disposition
+                "composed_plan"
+                if plan.disposition in {"execute", "mixed"}
+                else plan.disposition
             ),
             "capability_decision": plan.disposition,
             "goal_ids": plan.goal_ids,

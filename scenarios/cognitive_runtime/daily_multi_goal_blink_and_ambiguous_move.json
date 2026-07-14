@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "id": "daily_multi_goal_blink_and_ambiguous_move",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "An independent safe action proceeds while an ambiguous manipulation goal asks a specific clarification.",
+  "tags": [
+    "multi-goal",
+    "daily-life",
+    "mixed",
+    "execute-and-clarify"
+  ],
+  "input": {
+    "text": "先眨两下眼睛，再把那个挪到那边。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "mixed_action_and_ambiguous_manipulation",
+      "language": "zh-CN"
+    },
+    "goal_association": {
+      "turn_id": "turn-blink-move",
+      "new_goals": [
+        {
+          "goal_id": "goal-blink",
+          "description": "Blink twice.",
+          "source_text": "先眨两下眼睛。"
+        },
+        {
+          "goal_id": "goal-move",
+          "description": "Move the referenced object to the referenced place.",
+          "source_text": "再把那个挪到那边。"
+        }
+      ],
+      "confidence": 0.93,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "fast-blink-move",
+      "planner_tier": "fast",
+      "disposition": "escalate",
+      "coverage": "uncertain",
+      "confidence": 0.86,
+      "escalation_reason": "One independent goal is executable and the referential manipulation goal is unresolved."
+    },
+    "deep_plans": [
+      {
+        "plan_id": "deep-blink-move",
+        "planner_tier": "deep",
+        "disposition": "mixed",
+        "coverage": "complete",
+        "confidence": 0.92,
+        "goal_ids": [
+          "goal-blink",
+          "goal-move"
+        ],
+        "goal_summary": "Blink twice and clarify the object and destination for the move request.",
+        "steps": [
+          {
+            "step_id": "blink",
+            "skill_id": "soridormi.blink_eyes",
+            "args": {
+              "count": 2
+            },
+            "source_goal_ids": [
+              "goal-blink"
+            ]
+          }
+        ],
+        "parameter_resolutions": [
+          {
+            "step_id": "move-request",
+            "parameter": "object_and_destination",
+            "strategy": "ask_user",
+            "blocking": true,
+            "confidence": 0.98,
+            "rationale": "The object and destination are both referentially ambiguous.",
+            "source_goal_ids": [
+              "goal-move"
+            ]
+          }
+        ],
+        "goal_outcomes": [
+          {
+            "goal_id": "goal-blink",
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+              "blink"
+            ]
+          },
+          {
+            "goal_id": "goal-move",
+            "disposition": "clarify",
+            "coverage": "uncertain",
+            "response_text": "你想移动哪个东西，放到哪里？",
+            "unresolved": [
+              "object",
+              "destination"
+            ]
+          }
+        ],
+        "goal_satisfaction": {
+          "score": 0.8,
+          "status": "substantial",
+          "satisfied_goal_ids": [
+            "goal-blink"
+          ],
+          "unmet_goal_ids": [
+            "goal-move"
+          ],
+          "unmet_requirements": [
+            "object reference",
+            "destination reference"
+          ]
+        }
+      }
+    ],
+    "capabilities": [
+      {
+        "skill_id": "soridormi.blink_eyes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "can_run_parallel": true,
+        "exclusive_group": "eye_expression",
+        "resource_claims": [
+          "eye_expression"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "immediate": {
+          "text": "你想移动哪个东西，放到哪里？",
+          "speech_act": "clarify",
+          "commitment_state": "waiting_for_user",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-move"
+          ]
+        },
+        "pre_action": {
+          "text": "我可以先眨两下眼睛。",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-blink"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "deep",
+    "disposition": "mixed",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-blink",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "blink"
+        ]
+      },
+      {
+        "goal_id": "goal-move",
+        "disposition": "clarify",
+        "coverage": "uncertain",
+        "step_ids": []
+      }
+    ],
+    "skill_ids": [
+      "soridormi.blink_eyes"
+    ],
+    "skill_source_goal_ids": [
+      [
+        "goal-blink"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-move",
+      "goal-blink"
+    ],
+    "speech_contains_all": [
+      "哪个东西",
+      "放到哪里",
+      "眨两下"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "deep_plan",
+      "response_composer"
+    ]
+  }
+}

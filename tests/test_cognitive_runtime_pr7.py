@@ -687,6 +687,86 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "applied")
         self.assertEqual(applied, ["goal_driven_cognitive_runtime"])
 
+    def test_mixed_plan_executes_effectful_goal_and_preserves_ownership(self):
+        plan = CanonicalPlan(
+            plan_id="plan-mixed-runtime",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.94,
+            goal_ids=["goal-blink", "goal-joke"],
+            goal_summary="Blink twice and tell a joke.",
+            steps=[
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-blink",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+                {
+                    "goal_id": "goal-joke",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "A short joke.",
+                },
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-blink", "goal-joke"],
+            },
+        )
+        response_plan = ResponsePlan(
+            immediate=ResponseStage(
+                text="A short joke.",
+                speech_act="inform",
+                commitment_state="none",
+                must_not_claim_completion=True,
+                covers_goal_ids=["goal-joke"],
+            ),
+            pre_action=ResponseStage(
+                text="I will also blink twice.",
+                speech_act="inform",
+                commitment_state="evaluating",
+                must_not_claim_completion=True,
+                covers_goal_ids=["goal-blink"],
+            ),
+        )
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-mixed-runtime",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=response_plan,
+            confidence=0.94,
+        )
+        adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()]))
+
+        errors = asyncio.run(adapter.validation_errors(plan))
+        response = asyncio.run(
+            adapter.build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-mixed-runtime",
+                language="en-US",
+            )
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(response.status, "ok")
+        self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
+        self.assertEqual(response.skills[0].metadata["source_goal_ids"], ["goal-blink"])
+        self.assertEqual(response.metadata["planning_result"], "composed_plan")
+
+
 
 class CognitiveEvidenceTests(unittest.TestCase):
     def test_evidence_hashes_text_and_tracks_metrics(self):

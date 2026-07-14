@@ -427,6 +427,135 @@
         }
       ],
       "live_text_cases": []
+    },
+    {
+      "id": "multi_goal_daily_life",
+      "title": "Daily-Life Multi-Goal Coordination",
+      "general_rule": "Chromie should keep independent daily-life goals separate, assign every effectful step to the correct goal, execute supported goals in order, answer conversational goals, and clarify or report unavailable goals without dropping or cross-authorizing another goal.",
+      "minimum_level_a_cases": 8,
+      "root_cause_boundaries": [
+        "Goal Association",
+        "Planner contract",
+        "Response Composer",
+        "Trusted runtime adapter",
+        "Skill Runtime/provider",
+        "Test evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "cognitive_runtime/daily_multi_goal_look_and_nod",
+          "rationale": "Two supported social-motion goals keep exact sequential ownership."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_blink_and_joke",
+          "rationale": "An effectful goal and a conversational goal both survive one turn."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_blink_and_ambiguous_move",
+          "rationale": "A safe independent action can proceed while a referential goal asks a specific clarification."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_nod_and_unavailable_pickup",
+          "rationale": "An unavailable manipulation goal does not suppress or impersonate a supported gesture."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_walk_blink_and_greet",
+          "rationale": "Three goals preserve sequence, speech coverage, and motion confirmation."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_repeated_blink_sequence",
+          "rationale": "Repeated identical skills retain distinct ordered identities and goal ownership."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_english_look_and_blink",
+          "rationale": "The same ownership and sequencing contract holds for normal English phrasing."
+        },
+        {
+          "key": "cognitive_runtime/daily_multi_goal_blink_joke_and_ambiguous_move",
+          "rationale": "Execute, respond, and clarify outcomes coexist without cross-goal leakage."
+        }
+      ],
+      "live_text_cases": [
+        {
+          "id": "multi_goal_look_then_blink",
+          "text": "Look at me for two seconds, then blink twice.",
+          "expected_routes": [
+            "robot_action"
+          ],
+          "expected_skills": [
+            "soridormi.look_at_person",
+            "soridormi.blink_eyes"
+          ],
+          "expected_args": [
+            "0:duration_s=2.0",
+            "1:count=2"
+          ],
+          "expected_speech_any": [
+            "look",
+            "blink"
+          ],
+          "description": "Live goal-driven planning should preserve two independently owned social-motion goals."
+        },
+        {
+          "id": "multi_goal_nod_then_blink",
+          "text": "Nod twice, then blink once.",
+          "expected_routes": [
+            "robot_action"
+          ],
+          "expected_skills": [
+            "soridormi.nod_yes",
+            "soridormi.blink_eyes"
+          ],
+          "expected_args": [
+            "0:count=2",
+            "1:count=1"
+          ],
+          "expected_speech_any": [
+            "nod",
+            "blink"
+          ],
+          "description": "Live execution should preserve ordered gestures rather than collapsing them."
+        },
+        {
+          "id": "multi_goal_walk_then_blink",
+          "text": "Walk forward for one second, then blink twice.",
+          "expected_routes": [
+            "robot_action"
+          ],
+          "expected_skills": [
+            "soridormi.walk_forward",
+            "soridormi.blink_eyes"
+          ],
+          "expected_args": [
+            "0:duration_s=1.0",
+            "1:count=2"
+          ],
+          "expected_speech_any": [
+            "walk",
+            "blink"
+          ],
+          "description": "A bounded locomotion goal and a gesture goal should remain sequential and simulator-confirmed."
+        },
+        {
+          "id": "multi_goal_blink_and_joke",
+          "text": "Blink twice and tell me a short joke.",
+          "expected_routes": [
+            "robot_action"
+          ],
+          "expected_skills": [
+            "soridormi.blink_eyes"
+          ],
+          "expected_args": [
+            "0:count=2"
+          ],
+          "expected_speech_any": [
+            "joke",
+            "robot",
+            "why"
+          ],
+          "description": "A live mixed request should execute the body goal while also answering the conversational goal."
+        }
+      ]
     }
   ]
 }

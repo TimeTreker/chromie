@@ -122,11 +122,23 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
+Focused goal-driven daily-life multi-goal preview:
+
+```bash
+conda run -n Chromie python scripts/general_ability_acceptance.py \
+  --mode live-text \
+  --ability-class multi_goal_daily_life \
+  --goal-driven-runtime apply \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
 Execution command for supervised simulator runs:
 
 ```bash
 conda run -n Chromie python scripts/general_ability_acceptance.py \
   --mode live-text \
+  --ability-class multi_goal_daily_life \
+  --goal-driven-runtime apply \
   --execute \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
@@ -156,6 +168,7 @@ The first manifest tracks these classes:
 | `stable_capability_grounding` | Ground exact supported requests to live catalog abilities without fragile timeout-dependent repair. |
 | `natural_uncertainty_handling` | Ask about the real ambiguity instead of leaking generic missing-skill or internal fallback speech. |
 | `composable_action_planning` | Preserve ordered high-level skills for supported multi-step body requests. |
+| `multi_goal_daily_life` | Keep independent execute, respond, clarify, and unavailable outcomes separate while preserving exact step-to-goal ownership in ordinary daily requests. |
 | `truthful_embodied_speech` | Speak only what proposal, confirmation, execution, cancellation, or provider evidence supports. |
 | `tool_and_conversation_lane_discipline` | Keep conversation, memory, tools, and body actions in their proper lanes. |
 | `deterministic_safety_controls` | Keep stop, cancel, emergency, silence, and unusable-audio paths deterministic. |

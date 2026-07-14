@@ -44,6 +44,7 @@ scenarios/
   router_dialogue/  Multi-turn Router-to-Agent replay scenarios
   interaction/      InteractionRuntime scenarios
   dialogue/         Multi-turn InteractionRuntime conversation scenarios
+  cognitive_runtime/ Goal-driven planning and coordinated-response scenarios
   templates/        Authoring templates, not executed as scenarios
 ```
 
@@ -162,6 +163,43 @@ Run the manifest-level checks with:
 python scripts/general_ability_acceptance.py --mode check
 python scripts/general_ability_acceptance.py --mode level-a
 ```
+
+Run the focused daily-life multi-goal Level A suite with:
+
+```bash
+python scripts/general_ability_acceptance.py \
+  --mode level-a \
+  --ability-class multi_goal_daily_life \
+  --no-write
+```
+
+The retained cases cover supported sequential gestures, repeated identical
+skills, body action plus conversation, body action plus clarification,
+supported action plus unavailable manipulation, and three-goal
+execute/respond/clarify combinations. They assert per-goal step ownership,
+timing, arguments, speech coverage, and final interaction status.
+
+With deployed Router, Agent, Ollama, and Soridormi services, preview or execute
+the live text probes through the goal-driven runtime:
+
+```bash
+conda run -n Chromie python scripts/general_ability_acceptance.py \
+  --mode live-text \
+  --ability-class multi_goal_daily_life \
+  --goal-driven-runtime apply \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+
+conda run -n Chromie python scripts/general_ability_acceptance.py \
+  --mode live-text \
+  --ability-class multi_goal_daily_life \
+  --goal-driven-runtime apply \
+  --execute \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+```
+
+The first command is live service preview evidence only. The second is MuJoCo
+execution evidence only when Soridormi reports `sim`, every expected skill
+completes through the trusted runtime, and the retained run ends safe-idle.
 
 That runner reports the evidence level and claim scope for each run. A passing
 Level A general-ability run is deterministic regression evidence only; it does

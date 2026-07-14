@@ -578,6 +578,8 @@ def _live_case_namespace(
         skill_timeout_s=args.skill_timeout_s,
         reject_internal_speech=True,
         reject_speech_pattern=[],
+        cognitive_runtime=args.goal_driven_runtime == "apply",
+        cognitive_apply_lanes=args.cognitive_apply_lanes,
     )
 
 
@@ -784,6 +786,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=ROOT / "capabilities" / "soridormi.json",
     )
     parser.add_argument("--language", default="en-US")
+    parser.add_argument(
+        "--goal-driven-runtime",
+        choices=("off", "apply"),
+        default="off",
+        help=(
+            "Use the goal-association, Fast/Deep Planner, response-composer, "
+            "and trusted runtime adapter for live-text cases."
+        ),
+    )
+    parser.add_argument(
+        "--cognitive-apply-lanes",
+        default="chat,robot_action",
+        help="Comma-separated goal-driven apply lanes for live-text cases.",
+    )
     parser.add_argument("--execute", action="store_true", help="Execute live text skills through Soridormi/MuJoCo.")
     parser.add_argument("--speaker", action="store_true", help="Play TTS for live text runs. Default is headless.")
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi mode under separate supervision.")

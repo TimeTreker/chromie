@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "id": "daily_multi_goal_english_look_and_blink",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "An English daily-life compound request preserves two independently owned actions.",
+  "tags": [
+    "multi-goal",
+    "daily-life",
+    "english",
+    "robot-action"
+  ],
+  "input": {
+    "text": "Look at me for two seconds, then blink twice.",
+    "language": "en-US"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "robot_action",
+      "intent": "multi_goal_social_motion",
+      "language": "en-US"
+    },
+    "goal_association": {
+      "turn_id": "turn-en-look-blink",
+      "new_goals": [
+        {
+          "goal_id": "goal-look",
+          "description": "Look at the user for two seconds.",
+          "source_text": "Look at me for two seconds."
+        },
+        {
+          "goal_id": "goal-blink",
+          "description": "Blink twice afterward.",
+          "source_text": "Then blink twice."
+        }
+      ],
+      "confidence": 0.97,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "plan-en-look-blink",
+      "planner_tier": "fast",
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 0.96,
+      "goal_ids": [
+        "goal-look",
+        "goal-blink"
+      ],
+      "goal_summary": "Look at the user and then blink twice.",
+      "steps": [
+        {
+          "step_id": "look",
+          "skill_id": "soridormi.look_at_person",
+          "args": {
+            "duration_s": 2
+          },
+          "source_goal_ids": [
+            "goal-look"
+          ]
+        },
+        {
+          "step_id": "blink",
+          "skill_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 2
+          },
+          "source_goal_ids": [
+            "goal-blink"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-look",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "look"
+          ]
+        },
+        {
+          "goal_id": "goal-blink",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "blink"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
+          "goal-look",
+          "goal-blink"
+        ]
+      }
+    },
+    "capabilities": [
+      {
+        "skill_id": "soridormi.look_at_person",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "duration_s": {
+              "type": "number",
+              "minimum": 0.1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "duration_s"
+          ]
+        },
+        "can_run_parallel": false,
+        "exclusive_group": "head_motion",
+        "resource_claims": [
+          "head_motion"
+        ]
+      },
+      {
+        "skill_id": "soridormi.blink_eyes",
+        "provider_id": "soridormi.mcp",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "count"
+          ]
+        },
+        "can_run_parallel": true,
+        "exclusive_group": "eye_expression",
+        "resource_claims": [
+          "eye_expression"
+        ]
+      }
+    ],
+    "response_composition": {
+      "response_plan": {
+        "pre_action": {
+          "text": "Okay. I’ll look at you for two seconds, then blink twice.",
+          "speech_act": "inform",
+          "commitment_state": "evaluating",
+          "must_not_claim_completion": true,
+          "covers_goal_ids": [
+            "goal-look",
+            "goal-blink"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "status": "applied",
+    "lane": "robot_action",
+    "planner_tier": "fast",
+    "disposition": "execute",
+    "coverage": "complete",
+    "interaction_status": "ok",
+    "goal_outcomes": [
+      {
+        "goal_id": "goal-look",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "look"
+        ]
+      },
+      {
+        "goal_id": "goal-blink",
+        "disposition": "execute",
+        "coverage": "complete",
+        "step_ids": [
+          "blink"
+        ]
+      }
+    ],
+    "skill_ids": [
+      "soridormi.look_at_person",
+      "soridormi.blink_eyes"
+    ],
+    "skill_source_goal_ids": [
+      [
+        "goal-look"
+      ],
+      [
+        "goal-blink"
+      ]
+    ],
+    "speech_covers_goal_ids": [
+      "goal-look",
+      "goal-blink"
+    ],
+    "speech_contains_all": [
+      "look at you",
+      "blink twice"
+    ],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan",
+      "response_composer"
+    ]
+  }
+}

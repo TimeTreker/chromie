@@ -134,9 +134,9 @@ gates pass from the intended revisions.
    the shared contracts, host-applied versioned operations, active-task prompt
    projection, dedicated staged continuity endpoint, capability information-gap
    handling, immediate speech-claim validation, and non-blocking report-only
-   degradation are implemented; next collect retained report-only live-text
-   evidence, add full multi-goal response composition and
-   repair for rejected claims, then add generalized observation planning.
+   degradation and full per-goal multi-goal response composition are
+   implemented; next collect retained live-text and MuJoCo multi-goal evidence,
+   repair rejected claims, then add generalized observation planning.
 2. Continue the general ability acceptance reconstruction described in
    [docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md](docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md):
    the first manifest/runner slice is implemented, and the next work is better
@@ -208,13 +208,14 @@ Focused host Skill Runtime graph dispatch tests passed: 59 tests
 Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
-Current 2026-07-12 automated regression gate:
+Current 2026-07-14 automated regression gate:
 python scripts/check_docs.py passed
-899 current unittest cases and 20 legacy Agent tests passed with
+926 current unittest cases and 20 legacy Agent tests passed with
 `./scripts/run_tests.sh`
-373/373 adapter, Router, Router-dialogue, interaction, dialogue, and cognitive-runtime scenarios
+381/381 adapter, Router, Router-dialogue, interaction, dialogue, and cognitive-runtime scenarios
 passed with `python scripts/scenario_runner.py --no-write`
-42/42 general-ability Level A representative probes passed
+50/50 general-ability Level A representative probes passed, including 8/8
+daily-life multi-goal coordination cases
 The current reliability scenarios include English and Chinese walking requests,
 a forced stale weather intent, repeated walking after a weather turn, a Chinese
 nod-and-blink compound request misclassified as generic chat, exact capability
