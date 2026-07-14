@@ -179,6 +179,95 @@ class AtomicSemanticOperationTests(unittest.TestCase):
             ["goal-a", "goal-b"],
         )
 
+    def test_atomic_entrypoints_share_one_transaction_primitive(self) -> None:
+        operation_manager = ConversationStateManager(base_conversation_id="operations")
+        with patch.object(
+            operation_manager,
+            "_commit_semantic_state_transaction",
+            wraps=operation_manager._commit_semantic_state_transaction,
+        ) as commit:
+            operation_manager.apply_semantic_task_operations_atomically(
+                [self.create_operation("create-operation", "goal-operation")],
+                sid="s1",
+                user_text="Handle the operation goal.",
+            )
+        commit.assert_called_once()
+
+        association_manager = ConversationStateManager(base_conversation_id="association")
+        with patch.object(
+            association_manager,
+            "_commit_semantic_state_transaction",
+            wraps=association_manager._commit_semantic_state_transaction,
+        ) as commit:
+            association_manager.apply_goal_association_resolution(
+                {
+                    "turn_id": "turn-association",
+                    "new_goals": [
+                        {
+                            "goal_id": "goal-association",
+                            "description": "Handle the associated goal.",
+                            "source_text": "Handle the associated goal.",
+                        }
+                    ],
+                    "confidence": 0.9,
+                    "reason_summary": "A new independent goal.",
+                },
+                sid="s1",
+                user_text="Handle the associated goal.",
+                atomic=True,
+            )
+        commit.assert_called_once()
+
+    def test_atomic_goal_association_persists_once(self) -> None:
+        manager = ConversationStateManager(
+            base_conversation_id="association",
+            task_store_enabled=True,
+        )
+        with patch.object(manager, "persist_task_contexts", return_value=True) as persist:
+            results = manager.apply_goal_association_resolution(
+                {
+                    "turn_id": "turn-persist",
+                    "new_goals": [
+                        {
+                            "goal_id": "goal-persist",
+                            "description": "Persist this goal.",
+                            "source_text": "Persist this goal.",
+                        }
+                    ],
+                    "confidence": 0.9,
+                    "reason_summary": "A new independent goal.",
+                },
+                sid="s1",
+                user_text="Persist this goal.",
+                atomic=True,
+            )
+
+        self.assertTrue(all(item["applied"] for item in results))
+        persist.assert_called_once_with()
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-persist"],
+        )
+
+    def test_persistence_failure_rolls_back_through_shared_primitive(self) -> None:
+        manager = ConversationStateManager(
+            base_conversation_id="atomic",
+            task_store_enabled=True,
+        )
+        with patch.object(manager, "persist_task_contexts", return_value=False):
+            manager.last_task_store_error = "disk unavailable"
+            results = manager.apply_semantic_task_operations_atomically(
+                [self.create_operation("create-a", "goal-a")],
+                sid="s1",
+                user_text="Handle A.",
+            )
+
+        self.assertEqual(manager.active_goal_snapshots(), [])
+        self.assertFalse(results[0]["applied"])
+        self.assertTrue(results[0]["rolled_back"])
+        self.assertEqual(results[0]["reason"], "atomic_semantic_persistence_failed")
+        self.assertEqual(results[0]["persistence_error"], "disk unavailable")
+
 
 if __name__ == "__main__":
     unittest.main()

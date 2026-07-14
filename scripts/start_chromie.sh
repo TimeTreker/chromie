@@ -147,9 +147,9 @@ services:
       AGENT_CAPABILITY_MANIFESTS: /app/capabilities/soridormi.json
       SORIDORMI_MCP_URL: ${CONTAINER_MCP_URL}
       AGENT_EXPRESSIVE_BODY_CUES: off
-      # Preserve Social Attention during architecture validation. Budget and
-      # transport failures are logged with purpose=social_attention and explicit
-      # failure-domain facts without causal architecture attribution.
+      # Honor the resolved runtime profile: normal startup defaults Social
+      # Attention to off, while the architecture-validation overlay explicitly
+      # selects sim_only. Optional inference never delays the primary response.
       AGENT_SOCIAL_ATTENTION_MODE: ${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-off}}
       AGENT_SOCIAL_ATTENTION_MODEL: ${AGENT_SOCIAL_ATTENTION_MODEL:-${ROUTER_MODEL:-qwen3:4b}}
       AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET: ${AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET:-calibrated_right_side}

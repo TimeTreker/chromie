@@ -382,12 +382,12 @@ changes.
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
 | `AGENT_SOCIAL_ATTENTION_MODE` | Structured model-driven attention policy: `off`, `report_only`, `sim_only`, or `on`. Default `off`. `report_only` retains the advisory plan without adding skills. |
-| `CHROMIE_SOCIAL_ATTENTION_MODE` | Host launcher override used by `scripts/start_chromie.sh`; maintained voice-MuJoCo startup defaults it to `sim_only` while project-wide Agent configuration remains `off`. |
+| `CHROMIE_SOCIAL_ATTENTION_MODE` | Optional host-launcher override used by `scripts/start_chromie.sh`. Normal profiles inherit the project-wide `off` default; `--architecture-validation` selects the `architecture` overlay, which explicitly sets `sim_only`. |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
 | `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. |
 | `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `4096`. |
 | `AGENT_SOCIAL_ATTENTION_NUM_PREDICT` | JSON output budget for social-attention planning; default `160`. |
-| `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | Maximum additional wait after the main Agent response for the concurrently running optional plan; default `150`. A timeout skips attention rather than delaying speech. |
+| `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | Deprecated compatibility input retained for diagnostics; default `0`. The runtime never awaits Social Attention after the primary response, and reports an effective wait of `0`. |
 | `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Comma-separated exact catalog IDs eligible for social-attention selection. Availability does not force selection; the model may choose `none`. |
 | `AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET` | Optional installation-calibrated target reference. Default `none`; live target evidence overrides calibration. |

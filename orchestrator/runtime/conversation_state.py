@@ -7,7 +7,7 @@ import re
 import time
 from collections import deque
 from pathlib import Path
-from typing import Any, Deque
+from typing import Any, Callable, Deque
 
 from orchestrator.runtime.memory import MemoryExtractor, MemoryPromptBuilder, MemoryStore
 
@@ -912,6 +912,69 @@ class ConversationStateManager:
         return result
 
 
+    def _commit_semantic_state_transaction(
+        self,
+        mutate: Callable[[], list[dict[str, Any]]],
+        *,
+        rollback_reason: str = "atomic_semantic_transaction_rolled_back",
+        persistence_failure_reason: str = "atomic_semantic_persistence_failed",
+    ) -> list[dict[str, Any]]:
+        """Commit one semantic-state mutation as an in-memory/durable transaction.
+
+        This is the only rollback and durable-commit boundary for atomic Goal
+        Association and semantic-operation batches. Callers mutate only in memory;
+        this primitive snapshots state, rejects the whole batch on any
+        non-idempotent failure, persists once, and restores the snapshot on
+        rejection, persistence failure, or exception.
+        """
+
+        task_context_snapshot = copy.deepcopy(list(self._task_contexts))
+        activity_snapshot = self.last_activity_ms
+        store_error_snapshot = self.last_task_store_error
+
+        def restore_snapshot(*, store_error: str | None = store_error_snapshot) -> None:
+            self._task_contexts = deque(
+                task_context_snapshot, maxlen=max(1, self.max_pending_tasks)
+            )
+            self.last_activity_ms = activity_snapshot
+            self.last_task_store_error = store_error
+
+        try:
+            results = mutate()
+            rejected = [
+                item
+                for item in results
+                if item.get("applied") is False
+                and item.get("reason") != "operation_already_applied"
+            ]
+            if rejected:
+                restore_snapshot()
+                for item in results:
+                    if item.get("applied") is True:
+                        item["applied"] = False
+                        item["reason"] = rollback_reason
+                        item["rolled_back"] = True
+                return results
+
+            changed = any(item.get("applied") is True for item in results)
+            if changed:
+                self.last_activity_ms = _now_ms()
+            if changed and self.task_store_enabled and not self.persist_task_contexts():
+                persistence_error = (
+                    self.last_task_store_error or "task context persistence failed"
+                )
+                restore_snapshot(store_error=persistence_error)
+                for item in results:
+                    if item.get("applied") is True:
+                        item["applied"] = False
+                        item["reason"] = persistence_failure_reason
+                        item["rolled_back"] = True
+                        item["persistence_error"] = persistence_error
+            return results
+        except Exception:
+            restore_snapshot()
+            raise
+
     def apply_goal_association_resolution(
         self,
         resolution: GoalAssociationResolution | dict[str, Any],
@@ -923,6 +986,43 @@ class ConversationStateManager:
         source: str = "goal_association",
         atomic: bool = False,
     ) -> list[dict[str, Any]]:
+        """Apply Goal Association through the shared semantic-state boundary."""
+
+        if not self.enabled:
+            return []
+
+        def mutate() -> list[dict[str, Any]]:
+            return self._apply_goal_association_resolution_in_memory(
+                resolution,
+                sid=sid,
+                user_text=user_text,
+                route=route,
+                intent=intent,
+                source=source,
+            )
+
+        if atomic:
+            return self._commit_semantic_state_transaction(
+                mutate,
+                rollback_reason="atomic_goal_transaction_rolled_back",
+                persistence_failure_reason="atomic_goal_persistence_failed",
+            )
+
+        results = mutate()
+        if any(item.get("applied") is True for item in results):
+            self._persist_task_contexts_if_enabled()
+        return results
+
+    def _apply_goal_association_resolution_in_memory(
+        self,
+        resolution: GoalAssociationResolution | dict[str, Any],
+        *,
+        sid: str | None,
+        user_text: str,
+        route: str | None = None,
+        intent: str | None = None,
+        source: str = "goal_association",
+    ) -> list[dict[str, Any]]:
         """Apply a validated goal-continuity result through semantic-task state.
 
         Semantic interpretation remains model-owned. This adapter only maps
@@ -933,11 +1033,6 @@ class ConversationStateManager:
 
         if not self.enabled:
             return []
-        task_context_snapshot = (
-            copy.deepcopy(list(self._task_contexts)) if atomic else None
-        )
-        activity_snapshot = self.last_activity_ms
-        store_error_snapshot = self.last_task_store_error
         resolved = (
             resolution
             if isinstance(resolution, GoalAssociationResolution)
@@ -1098,46 +1193,9 @@ class ConversationStateManager:
                     route=route,
                     intent=intent,
                     source=source,
-                    persist=not atomic,
+                    persist=False,
                 )
             )
-        if (operations or results) and not atomic:
-            self._persist_task_contexts_if_enabled()
-        if atomic:
-            rejected = [
-                item
-                for item in results
-                if item.get("applied") is False
-                and item.get("reason") != "operation_already_applied"
-            ]
-            if rejected and task_context_snapshot is not None:
-                self._task_contexts = deque(
-                    task_context_snapshot, maxlen=max(1, self.max_pending_tasks)
-                )
-                self.last_activity_ms = activity_snapshot
-                self.last_task_store_error = store_error_snapshot
-                for item in results:
-                    if item.get("applied") is True:
-                        item["applied"] = False
-                        item["reason"] = "atomic_goal_transaction_rolled_back"
-                        item["rolled_back"] = True
-            elif any(item.get("applied") is True for item in results):
-                if self.task_store_enabled and not self.persist_task_contexts():
-                    persistence_error = (
-                        self.last_task_store_error or "task context persistence failed"
-                    )
-                    if task_context_snapshot is not None:
-                        self._task_contexts = deque(
-                            task_context_snapshot, maxlen=max(1, self.max_pending_tasks)
-                        )
-                    self.last_activity_ms = activity_snapshot
-                    self.last_task_store_error = persistence_error
-                    for item in results:
-                        if item.get("applied") is True:
-                            item["applied"] = False
-                            item["reason"] = "atomic_goal_persistence_failed"
-                            item["rolled_back"] = True
-                            item["persistence_error"] = persistence_error
         return results
 
     def apply_semantic_task_operations(
@@ -1264,11 +1322,8 @@ class ConversationStateManager:
                     f"invalid semantic operation at batch index {index}: {exc}"
                 ) from exc
 
-        task_context_snapshot = copy.deepcopy(list(self._task_contexts))
-        activity_snapshot = self.last_activity_ms
-        store_error_snapshot = self.last_task_store_error
-        try:
-            results = self.apply_semantic_task_operations(
+        return self._commit_semantic_state_transaction(
+            lambda: self.apply_semantic_task_operations(
                 validated,
                 sid=sid,
                 user_text=user_text,
@@ -1277,47 +1332,7 @@ class ConversationStateManager:
                 source=source,
                 persist=False,
             )
-            rejected = [
-                item
-                for item in results
-                if item.get("applied") is False
-                and item.get("reason") != "operation_already_applied"
-            ]
-            if rejected:
-                self._task_contexts = deque(
-                    task_context_snapshot, maxlen=max(1, self.max_pending_tasks)
-                )
-                self.last_activity_ms = activity_snapshot
-                self.last_task_store_error = store_error_snapshot
-                for item in results:
-                    if item.get("applied") is True:
-                        item["applied"] = False
-                        item["reason"] = "atomic_semantic_transaction_rolled_back"
-                        item["rolled_back"] = True
-                return results
-
-            changed = any(item.get("applied") is True for item in results)
-            if changed and self.task_store_enabled and not self.persist_task_contexts():
-                persistence_error = self.last_task_store_error or "task context persistence failed"
-                self._task_contexts = deque(
-                    task_context_snapshot, maxlen=max(1, self.max_pending_tasks)
-                )
-                self.last_activity_ms = activity_snapshot
-                self.last_task_store_error = persistence_error
-                for item in results:
-                    if item.get("applied") is True:
-                        item["applied"] = False
-                        item["reason"] = "atomic_semantic_persistence_failed"
-                        item["rolled_back"] = True
-                        item["persistence_error"] = persistence_error
-            return results
-        except Exception:
-            self._task_contexts = deque(
-                task_context_snapshot, maxlen=max(1, self.max_pending_tasks)
-            )
-            self.last_activity_ms = activity_snapshot
-            self.last_task_store_error = store_error_snapshot
-            raise
+        )
 
     def _looks_like_meaningful_task_text(self, text: str | None) -> bool:
         normalized = self._normalized(text)

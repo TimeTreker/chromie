@@ -990,7 +990,7 @@ async def _run_interaction_turn(
             stub.get("social_attention_fallback_confidence", 0.0)
         ),
         social_attention_wait_after_response_ms=int(
-            stub.get("social_attention_wait_after_response_ms", 150)
+            stub.get("social_attention_wait_after_response_ms", 0)
         ),
         require_capability_plan_review=bool(stub.get("require_capability_plan_review", False)),
     )

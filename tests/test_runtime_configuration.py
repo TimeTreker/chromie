@@ -196,6 +196,30 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS=120000", overlay)
         self.assertIn("OLLAMA_NUM_PARALLEL=2", overlay)
 
+
+    def test_social_attention_defaults_are_profile_specific_and_nonblocking(self) -> None:
+        common = (ROOT / ".env.common").read_text(encoding="utf-8")
+        overlay = (ROOT / "env" / "validation" / "architecture.env").read_text(
+            encoding="utf-8"
+        )
+        scenarios = (ROOT / "scripts" / "behavior_scenarios.py").read_text(
+            encoding="utf-8"
+        )
+        agent_readme = (ROOT / "agent" / "README.md").read_text(encoding="utf-8")
+        configuration = (ROOT / "docs" / "CONFIGURATION.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=off", common)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", common)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=sim_only", overlay)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", overlay)
+        self.assertIn('stub.get("social_attention_wait_after_response_ms", 0)', scenarios)
+        self.assertNotIn('stub.get("social_attention_wait_after_response_ms", 150)', scenarios)
+        self.assertIn("effective wait is always `0`", agent_readme)
+        self.assertIn("runtime never awaits Social Attention", configuration)
+        self.assertNotIn("default `150`", configuration)
+
     def test_start_chromie_diagnoses_soridormi_probe_failures(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(
             encoding="utf-8"
