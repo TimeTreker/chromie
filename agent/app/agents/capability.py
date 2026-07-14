@@ -61,6 +61,30 @@ class _CapabilityPlan(BaseModel):
             self.user_confirmation_required = True
             if self.plan_relation == "none":
                 self.plan_relation = "alternative"
+
+        seen_steps: dict[tuple[str, str], set[str]] = {}
+        for item in self.skills:
+            args = item.proposed_args if item.proposed_args else item.args
+            duplicate_key = (
+                item.skill_id,
+                json.dumps(
+                    args,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                ),
+            )
+            step_id = item.step_id.strip()
+            prior_step_ids = seen_steps.get(duplicate_key)
+            if prior_step_ids is not None and (
+                not step_id or "" in prior_step_ids or step_id in prior_step_ids
+            ):
+                raise ValueError(
+                    "intentional repeated skills with identical arguments require "
+                    "distinct non-empty step_id values"
+                )
+            seen_steps.setdefault(duplicate_key, set()).add(step_id)
         return self
 
 

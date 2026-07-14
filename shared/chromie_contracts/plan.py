@@ -288,8 +288,15 @@ class CanonicalPlan(BaseModel):
         step_id_set = set(step_ids)
         goal_id_set = set(self.goal_ids)
 
+        if self.steps and not goal_id_set:
+            raise ValueError("executable steps require at least one canonical plan goal_id")
         for step in self.steps:
-            unknown = set(step.source_goal_ids) - goal_id_set
+            source_goal_ids = set(step.source_goal_ids)
+            if not source_goal_ids:
+                raise ValueError(
+                    f"executable step {step.step_id!r} requires source_goal_ids"
+                )
+            unknown = source_goal_ids - goal_id_set
             if unknown:
                 raise ValueError("plan step references unknown goal IDs: " + ",".join(sorted(unknown)))
         for resolution in self.parameter_resolutions:
@@ -299,13 +306,26 @@ class CanonicalPlan(BaseModel):
                     "parameter resolution references unknown goal IDs: " + ",".join(sorted(unknown))
                 )
 
+        outcome_by_goal: dict[str, GoalPlanOutcome] = {}
         if self.goal_outcomes:
             outcome_ids = [item.goal_id for item in self.goal_outcomes]
             if len(outcome_ids) != len(set(outcome_ids)):
                 raise ValueError("goal outcome IDs must be unique")
             if set(outcome_ids) != goal_id_set:
                 raise ValueError("goal outcomes must cover exactly the canonical plan goal_ids")
+            outcome_by_goal = {item.goal_id: item for item in self.goal_outcomes}
+
+            outcome_dispositions = {item.disposition for item in self.goal_outcomes}
+            expected_disposition = (
+                "mixed" if len(outcome_dispositions) > 1 else next(iter(outcome_dispositions))
+            )
+            if self.disposition != expected_disposition:
+                raise ValueError(
+                    "top-level disposition must match the per-goal outcome dispositions"
+                )
+
             referenced_steps: set[str] = set()
+            executable_owners_by_step: dict[str, set[str]] = {}
             for outcome in self.goal_outcomes:
                 unknown_steps = set(outcome.step_ids) - step_id_set
                 if unknown_steps:
@@ -313,29 +333,42 @@ class CanonicalPlan(BaseModel):
                         "goal outcome references unknown step IDs: " + ",".join(sorted(unknown_steps))
                     )
                 referenced_steps.update(outcome.step_ids)
+                if outcome.disposition == "execute":
+                    for step_id in outcome.step_ids:
+                        executable_owners_by_step.setdefault(step_id, set()).add(outcome.goal_id)
             if referenced_steps != step_id_set:
                 missing = sorted(step_id_set - referenced_steps)
                 raise ValueError(
                     "every executable step must belong to at least one goal outcome: "
                     + ",".join(missing)
                 )
+            for step in self.steps:
+                expected_owners = executable_owners_by_step.get(step.step_id, set())
+                if set(step.source_goal_ids) != expected_owners:
+                    raise ValueError(
+                        f"step {step.step_id!r} source_goal_ids must exactly match "
+                        "the executable goal outcomes that reference it"
+                    )
         elif self.disposition == "mixed":
             raise ValueError("mixed plans require per-goal outcomes")
+
+        for resolution in blocking:
+            if not resolution.source_goal_ids:
+                raise ValueError("blocking parameter resolutions require source_goal_ids")
+            if outcome_by_goal:
+                invalid_goals = sorted(
+                    goal_id
+                    for goal_id in resolution.source_goal_ids
+                    if outcome_by_goal[goal_id].disposition != "clarify"
+                )
+                if invalid_goals:
+                    raise ValueError(
+                        "blocking parameter resolutions may only target clarify goal outcomes: "
+                        + ",".join(invalid_goals)
+                    )
 
         if self.disposition == "mixed":
             dispositions = {item.disposition for item in self.goal_outcomes}
             if "execute" not in dispositions:
                 raise ValueError("mixed plans require at least one executable goal outcome")
-            if dispositions == {"execute"}:
-                raise ValueError("all-executable multi-goal plans should use disposition=execute")
-            clarify_ids = {
-                item.goal_id for item in self.goal_outcomes if item.disposition == "clarify"
-            }
-            for resolution in blocking:
-                if not resolution.source_goal_ids:
-                    raise ValueError("blocking parameters in mixed plans require source_goal_ids")
-                if not set(resolution.source_goal_ids).issubset(clarify_ids):
-                    raise ValueError(
-                        "blocking parameters may only target clarify goal outcomes in mixed plans"
-                    )
         return self

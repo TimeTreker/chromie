@@ -44,7 +44,7 @@ class _FailingAttentionOllama:
             "structured JSON output was truncated",
             failure_class="output_truncated",
             failure_domain="llm_budget",
-            architecture_attribution="excluded",
+            architecture_attribution="not_evaluated",
             retryable=True,
             details={
                 "purpose": "social_attention",
@@ -222,7 +222,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             response.metadata["social_attention_architecture_attribution"],
-            "excluded",
+            "not_evaluated",
         )
         self.assertEqual(
             response.metadata["social_attention_failure"]["done_reason"],
@@ -327,12 +327,14 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 social_attention_mode="sim_only",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.blink_eyes",),
-                social_attention_wait_after_response_ms=1,
+                social_attention_wait_after_response_ms=120000,
             )
         ).run(self._request())
 
         self.assertEqual(response.skills, [])
         self.assertEqual(response.metadata["social_attention_status"], "skipped_latency_budget")
+        self.assertEqual(response.metadata["social_attention_failure"]["configured_wait_after_response_ms"], 120000)
+        self.assertEqual(response.metadata["social_attention_failure"]["effective_wait_after_response_ms"], 0)
 
 
 

@@ -111,12 +111,14 @@ class GoalSatisfactionContractTests(unittest.TestCase):
                 disposition="execute",
                 coverage="complete",
                 confidence=0.9,
-                steps=[{"step_id": "s1", "skill_id": "soridormi.walk_forward", "args": {"duration_s": 3}}],
+                goal_ids=["goal-walk"],
+                steps=[{"step_id": "s1", "skill_id": "soridormi.walk_forward", "args": {"duration_s": 3}, "source_goal_ids": ["goal-walk"]}],
                 parameter_resolutions=[{
                     "step_id": "s1",
                     "parameter": "duration_s",
                     "strategy": "ask_user",
                     "blocking": True,
+                    "source_goal_ids": ["goal-walk"],
                 }],
                 goal_satisfaction={"score": 1.0, "status": "exact"},
             )
@@ -128,6 +130,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.92,
+            "goal_ids": ["goal-blink"],
             "goal_summary": "blink naturally",
             "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 4}}],
             "parameter_resolutions": [{
@@ -156,6 +159,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "disposition": "clarify",
             "coverage": "partial",
             "confidence": 0.9,
+            "goal_ids": ["goal-walk"],
             "goal_summary": "walk forward",
             "response_text": "你希望我往前走多久？",
             "steps": [],
@@ -165,6 +169,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 "parameter": "duration_s",
                 "strategy": "ask_user",
                 "blocking": True,
+                "source_goal_ids": ["goal-walk"],
                 "confidence": 0.95,
                 "rationale": "Duration materially changes motion exposure.",
             }],
@@ -183,6 +188,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.9,
+            "goal_ids": ["goal-blink"],
             "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 1}}],
             "goal_satisfaction": {"score": 0.8, "status": "substantial", "unmet_requirements": ["requested repeated blinking"]},
         }
@@ -190,6 +196,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.92,
+            "goal_ids": ["goal-blink"],
             "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 4}}],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
@@ -210,9 +217,10 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "disposition": "clarify",
             "coverage": "partial",
             "confidence": 0.8,
+            "goal_ids": ["goal-walk"],
             "steps": [],
             "unresolved": ["duration"],
-            "parameter_resolutions": [{"step_id": "x", "parameter": "duration_s", "strategy": "ask_user", "blocking": True}],
+            "parameter_resolutions": [{"step_id": "x", "parameter": "duration_s", "strategy": "ask_user", "blocking": True, "source_goal_ids": ["goal-walk"]}],
             "goal_satisfaction": {"score": 0.3, "status": "partial", "unmet_requirements": ["duration"]},
         }
         ollama = FakeOllama([raw])

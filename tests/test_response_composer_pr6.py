@@ -37,7 +37,11 @@ def plan(*, disposition="respond", goals=None, steps=None, response_text="你好
         goal_ids=list(goals or []),
         goal_summary="coordinated response",
         response_text=response_text if disposition == "respond" else "",
-        steps=list(steps or []),
+        steps=[
+            {**item, "source_goal_ids": item.get("source_goal_ids") or list(goals or [])}
+            if isinstance(item, dict) else item
+            for item in (steps or [])
+        ],
     )
 
 

@@ -98,12 +98,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.associations, [])
         self.assertTrue(result.clarification)
 
-    def test_truncation_failure_is_explicitly_excluded_from_architecture_attribution(self):
+    def test_truncation_failure_reports_domain_without_causal_attribution(self):
         error = OllamaGenerationError(
             "structured JSON output was truncated",
             failure_class="output_truncated",
             failure_domain="llm_budget",
-            architecture_attribution="excluded",
+            architecture_attribution="not_evaluated",
             retryable=True,
             details={"done_reason": "length", "num_predict": 512},
         )
@@ -115,7 +115,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.metadata["status"], "model_unavailable")
         self.assertEqual(result.metadata["failure_class"], "output_truncated")
         self.assertEqual(result.metadata["failure_domain"], "llm_budget")
-        self.assertEqual(result.metadata["architecture_attribution"], "excluded")
+        self.assertEqual(result.metadata["architecture_attribution"], "not_evaluated")
         self.assertEqual(result.metadata["done_reason"], "length")
 
     def test_resolution_contract_rejects_clarification_mixed_with_changes(self):

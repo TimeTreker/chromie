@@ -27,7 +27,7 @@ class AgentServices:
     social_attention_num_ctx: int = 4096
     social_attention_num_predict: int = 160
     social_attention_max_behaviors: int = 2
-    social_attention_wait_after_response_ms: int = 150
+    social_attention_wait_after_response_ms: int = 0
     social_attention_capability_ids: tuple[str, ...] = ()
     social_attention_fallback_target: str = "none"
     social_attention_fallback_direction: str | None = None

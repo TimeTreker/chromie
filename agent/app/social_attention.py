@@ -145,11 +145,11 @@ class SocialAttentionPlanner:
         plan.metadata = {
             **plan.metadata,
             "planner_ms": round(planner_ms, 1),
-            "architecture_attribution": "passed",
+            "architecture_attribution": "not_evaluated",
         }
         logger.info(
             "social_attention_plan_done sid=%s decision=%s behaviors=%s confidence=%.2f "
-            "architecture_attribution=passed ms=%.1f",
+            "architecture_attribution=not_evaluated ms=%.1f",
             request.sid,
             plan.decision,
             len(plan.behaviors),

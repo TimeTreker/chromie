@@ -441,6 +441,13 @@ class InteractionRuntime(_AgentPipeline):
                 "architecture_attribution"
             ]
 
+        # Give the concurrently-started auxiliary task one event-loop turn.
+        # This admits already-ready plans without adding a wall-clock wait to the
+        # primary response path. Any plan still pending after that yield is
+        # cancelled and recorded as optional evidence only.
+        if not task.done():
+            await asyncio.sleep(0)
+
         plan = None
         if task.done():
             try:
@@ -467,68 +474,26 @@ class InteractionRuntime(_AgentPipeline):
                 result.metadata["social_attention_status"] = "model_unavailable"
                 return
         else:
-            wait_ms = max(0, int(self.services.social_attention_wait_after_response_ms))
-            if wait_ms <= 0:
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
-                failure = {
-                    "stage": "social_attention",
-                    "failure_class": "latency_budget_exhausted",
-                    "failure_domain": "llm_budget",
-                    "architecture_attribution": "excluded",
-                    "retryable": True,
-                    "wait_after_response_ms": wait_ms,
-                }
-                record_failure(failure)
-                result.metadata["social_attention_status"] = "skipped_latency_budget"
-                result.trace.append(
-                    "runtime: social attention skipped after latency budget; "
-                    "architecture attribution excluded"
-                )
-                return
-            try:
-                plan = await asyncio.wait_for(asyncio.shield(task), timeout=wait_ms / 1000.0)
-            except TimeoutError:
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
-                failure = {
-                    "stage": "social_attention",
-                    "failure_class": "latency_budget_exhausted",
-                    "failure_domain": "llm_budget",
-                    "architecture_attribution": "excluded",
-                    "retryable": True,
-                    "wait_after_response_ms": wait_ms,
-                }
-                record_failure(failure)
-                result.metadata["social_attention_status"] = "skipped_latency_budget"
-                result.trace.append(
-                    "runtime: social attention skipped after latency budget; "
-                    "architecture attribution excluded"
-                )
-                return
-            except Exception as exc:  # pragma: no cover - defensive
-                failure = {
-                    **llm_failure_metadata(exc),
-                    "stage": "social_attention",
-                    "error_type": type(exc).__name__,
-                    "error": str(exc)[:500],
-                }
-                record_failure(failure)
-                logger.warning(
-                    "social_attention_task_failed sid=%s failure_class=%s failure_domain=%s "
-                    "architecture_attribution=%s retryable=%s error_type=%s error=%s",
-                    request.sid,
-                    failure.get("failure_class"),
-                    failure.get("failure_domain"),
-                    failure.get("architecture_attribution"),
-                    str(bool(failure.get("retryable"))).lower(),
-                    type(exc).__name__,
-                    exc,
-                )
-                result.metadata["social_attention_status"] = "model_unavailable"
-                return
+            configured_wait_ms = max(
+                0, int(self.services.social_attention_wait_after_response_ms)
+            )
+            task.cancel()
+            failure = {
+                "stage": "social_attention",
+                "failure_class": "latency_budget_exhausted",
+                "failure_domain": "auxiliary_latency",
+                "architecture_attribution": "not_evaluated",
+                "retryable": True,
+                "configured_wait_after_response_ms": configured_wait_ms,
+                "effective_wait_after_response_ms": 0,
+            }
+            record_failure(failure)
+            result.metadata["social_attention_status"] = "skipped_latency_budget"
+            result.trace.append(
+                "runtime: social attention was not ready at response finalization; "
+                "primary response was not delayed"
+            )
+            return
         if plan is None:
             failure = request.context.get("social_attention_failure")
             if isinstance(failure, dict):
@@ -541,7 +506,7 @@ class InteractionRuntime(_AgentPipeline):
                 result.metadata["social_attention_architecture_attribution"] = "not_evaluated"
             return
 
-        result.metadata["social_attention_architecture_attribution"] = "passed"
+        result.metadata["social_attention_architecture_attribution"] = "not_evaluated"
         result.metadata["social_attention_plan"] = plan.model_dump(mode="json", exclude_none=True)
         mode = self.services.effective_social_attention_mode()
         if mode == "report_only":

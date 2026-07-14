@@ -105,7 +105,7 @@ class Settings(BaseModel):
         le=4096,
     )
     social_attention_wait_after_response_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS", "150")),
+        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS", "0")),
         ge=0,
         le=120000,
     )
@@ -119,7 +119,7 @@ class Settings(BaseModel):
             item.strip()
             for item in os.getenv(
                 "AGENT_SOCIAL_ATTENTION_CAPABILITIES",
-                "soridormi.express_attention,soridormi.look_at_person,soridormi.blink_eyes,soridormi.nod_yes",
+                "soridormi.express_attention,soridormi.look_at_person,soridormi.blink_eyes",
             ).split(",")
             if item.strip()
         )

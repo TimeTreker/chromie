@@ -250,9 +250,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "report_only")
         self.assertIsNone(result.interaction_response)
         self.assertEqual(client.calls, ["association", "fast", "compose"])
-        self.assertEqual(result.metadata["architecture_attribution"], "passed")
+        self.assertEqual(result.metadata["architecture_attribution"], "not_evaluated")
 
-    def test_budget_failure_is_preserved_as_non_architecture_fallback(self):
+    def test_budget_failure_is_preserved_without_causal_attribution(self):
         association = GoalAssociationResolution(
             turn_id="turn-truncated",
             clarification="请稍后重试。",
@@ -262,7 +262,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "status": "model_unavailable",
                 "failure_class": "output_truncated",
                 "failure_domain": "llm_budget",
-                "architecture_attribution": "excluded",
+                "architecture_attribution": "not_evaluated",
                 "retryable": True,
                 "done_reason": "length",
                 "num_predict": 512,
@@ -281,7 +281,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.metadata["failure_stage"], "goal_association")
         self.assertEqual(result.metadata["failure_class"], "output_truncated")
         self.assertEqual(result.metadata["failure_domain"], "llm_budget")
-        self.assertEqual(result.metadata["architecture_attribution"], "excluded")
+        self.assertEqual(result.metadata["architecture_attribution"], "not_evaluated")
         self.assertEqual(result.metadata["done_reason"], "length")
         self.assertIn("goal_association:output_truncated", result.fallback_reason)
 
@@ -394,12 +394,14 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "skill_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15},
                     "timing": "parallel",
+                    "source_goal_ids": ["goal-1"],
                 },
                 {
                     "step_id": "blink",
                     "skill_id": "soridormi.blink_eyes",
                     "args": {"count": 4},
                     "timing": "parallel",
+                    "source_goal_ids": ["goal-1"],
                 },
             ],
             goal_satisfaction={"score": 1.0, "status": "exact"},

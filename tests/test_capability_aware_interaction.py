@@ -1521,7 +1521,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("多久", response.speech[0].text)
         self.assertNotIn("不能移动", response.speech[0].text)
 
-    async def test_capability_plan_dedupes_identical_llm_skill_requests(self) -> None:
+    async def test_capability_plan_rejects_identical_requests_without_step_ids(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
                 ollama=_DuplicateWalkOllama(),  # type: ignore[arg-type]
@@ -1548,11 +1548,13 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
         response = await runtime.run(request)
 
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(response.skills[0].skill_id, "soridormi.walk_forward")
-        self.assertEqual(response.skills[0].args, {"duration_s": 1.0, "speed": "quick"})
-        self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
-        self.assertEqual(response.speech[0].text, "Walking forward.")
+        self.assertEqual(response.skills, [])
+        self.assertEqual(response.metadata["capability_decision"], "clarify")
+        self.assertEqual(response.metadata["planning_result"], "needs_clarification")
+        self.assertEqual(
+            response.speech[0].text,
+            "Please clarify what action you want me to perform.",
+        )
 
     async def test_router_selected_capability_prompt_requires_exact_skill(self) -> None:
         runtime = InteractionRuntime(

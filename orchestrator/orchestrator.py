@@ -2588,9 +2588,7 @@ class VoiceAssistant:
                     "failure_domain": (
                         "orchestration_budget" if is_timeout else "cognitive_runtime"
                     ),
-                    "architecture_attribution": (
-                        "excluded" if is_timeout else "not_excluded"
-                    ),
+                    "architecture_attribution": "not_evaluated",
                     "retryable": is_timeout,
                 },
             )

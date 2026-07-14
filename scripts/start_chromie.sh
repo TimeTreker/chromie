@@ -149,8 +149,8 @@ services:
       AGENT_EXPRESSIVE_BODY_CUES: off
       # Preserve Social Attention during architecture validation. Budget and
       # transport failures are logged with purpose=social_attention and explicit
-      # non-architecture attribution rather than hiding the stage.
-      AGENT_SOCIAL_ATTENTION_MODE: ${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-sim_only}}
+      # failure-domain facts without causal architecture attribution.
+      AGENT_SOCIAL_ATTENTION_MODE: ${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-off}}
       AGENT_SOCIAL_ATTENTION_MODEL: ${AGENT_SOCIAL_ATTENTION_MODEL:-${ROUTER_MODEL:-qwen3:4b}}
       AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET: ${AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET:-calibrated_right_side}
       AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION: ${AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION:-right}

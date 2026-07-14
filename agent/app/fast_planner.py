@@ -101,7 +101,7 @@ class FastPlannerResolver:
             "or required capability remains unresolved, return coverage partial or uncertain and disposition escalate with zero steps. If independent goals need different dispositions, such as executing one while clarifying another, escalate with zero steps so the Deep Planner can produce a mixed per-goal outcome. "
             "For simple chat, complete coverage may use disposition respond and response_text. For a complete direct common-skill goal, use disposition execute. "
             "Use only exact supplied capability IDs. Return compact JSON matching CanonicalPlan: planner_tier=fast, disposition, coverage, confidence, "
-            "goal_ids, goal_summary, response_text, steps, escalation_reason, unresolved, parameter_resolutions, goal_satisfaction, metadata. Do not execute, authorize, or claim completion."
+            "goal_ids, goal_summary, response_text, steps, escalation_reason, unresolved, parameter_resolutions, goal_satisfaction, metadata. Every executable plan must include goal_ids, and every executable step must include source_goal_ids identifying exactly the goals it serves. Do not execute, authorize, or claim completion."
         )
 
     @staticmethod

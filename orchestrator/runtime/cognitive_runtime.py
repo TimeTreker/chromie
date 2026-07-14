@@ -924,9 +924,9 @@ class GoalDrivenRuntimeCoordinator:
                         "runtime_replan_count": replan_count,
                         "stage_diagnostics": stage_diagnostics,
                         "architecture_attribution": (
-                            "passed_after_infrastructure_recovery"
+                            "not_evaluated"
                             if stage_diagnostics
-                            else "passed"
+                            else "not_evaluated"
                         ),
                     },
                 )
@@ -945,9 +945,9 @@ class GoalDrivenRuntimeCoordinator:
                     "runtime_replan_count": replan_count,
                     "stage_diagnostics": stage_diagnostics,
                     "architecture_attribution": (
-                        "passed_after_infrastructure_recovery"
+                        "not_evaluated"
                         if stage_diagnostics
-                        else "passed"
+                        else "not_evaluated"
                     ),
                 },
             )
@@ -998,7 +998,7 @@ class GoalDrivenRuntimeCoordinator:
                     "failure_stage": "runtime",
                     "failure_class": type(exc).__name__,
                     "failure_domain": "cognitive_runtime",
-                    "architecture_attribution": "not_excluded",
+                    "architecture_attribution": "not_evaluated",
                     "retryable": False,
                     "stage_diagnostics": stage_diagnostics,
                 },

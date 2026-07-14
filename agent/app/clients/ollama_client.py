@@ -29,7 +29,7 @@ ResponseFormat = Literal["text", "json"]
 
 
 class OllamaGenerationError(RuntimeError):
-    """Typed inference failure that must not be attributed to cognition design."""
+    """Typed inference failure with immediate domain facts, not causal judgment."""
 
     def __init__(
         self,
@@ -59,7 +59,7 @@ class OllamaGenerationError(RuntimeError):
 
 
 def llm_failure_metadata(exc: Exception) -> dict[str, Any]:
-    """Return stable failure attribution for resolver and runtime evidence."""
+    """Return stable failure-domain facts without assigning root cause."""
 
     if isinstance(exc, OllamaGenerationError):
         return exc.metadata()
@@ -67,14 +67,14 @@ def llm_failure_metadata(exc: Exception) -> dict[str, Any]:
         return {
             "failure_class": "timeout",
             "failure_domain": "inference_transport",
-            "architecture_attribution": "excluded",
+            "architecture_attribution": "not_evaluated",
             "retryable": True,
         }
     if isinstance(exc, httpx.HTTPError):
         return {
             "failure_class": "http_error",
             "failure_domain": "inference_transport",
-            "architecture_attribution": "excluded",
+            "architecture_attribution": "not_evaluated",
             "retryable": True,
         }
     if isinstance(exc, json.JSONDecodeError):
@@ -229,7 +229,7 @@ class OllamaClient:
                     failure_domain=(
                         "llm_budget" if context_limit else "inference_transport"
                     ),
-                    architecture_attribution="excluded",
+                    architecture_attribution="not_evaluated",
                     retryable=True,
                     details={
                         "purpose": self.purpose,
@@ -243,7 +243,7 @@ class OllamaClient:
                 )
                 logger.error(
                     "ollama_infrastructure_failure purpose=%s failure_class=%s "
-                    "failure_domain=%s architecture_attribution=excluded retryable=true "
+                    "failure_domain=%s architecture_attribution=not_evaluated retryable=true "
                     "status_code=%s num_ctx=%s num_predict=%s response_error=%r",
                     self.purpose,
                     failure.failure_class,
@@ -303,7 +303,7 @@ class OllamaClient:
                         f"structured JSON generation rejected: {blocking.render()}",
                         failure_class=failure_class,
                         failure_domain="llm_budget",
-                        architecture_attribution="excluded",
+                        architecture_attribution="not_evaluated",
                         retryable=True,
                         details={
                             "purpose": self.purpose,
@@ -335,7 +335,7 @@ class OllamaClient:
                 f"Ollama request timed out after {elapsed_ms:.1f} ms",
                 failure_class="timeout",
                 failure_domain="inference_transport",
-                architecture_attribution="excluded",
+                architecture_attribution="not_evaluated",
                 retryable=True,
                 details={
                     "purpose": self.purpose,
@@ -348,7 +348,7 @@ class OllamaClient:
             )
             logger.error(
                 "ollama_infrastructure_failure purpose=%s failure_class=timeout "
-                "failure_domain=inference_transport architecture_attribution=excluded "
+                "failure_domain=inference_transport architecture_attribution=not_evaluated "
                 "retryable=true timeout_ms=%s elapsed_ms=%.1f num_ctx=%s num_predict=%s",
                 self.purpose,
                 self.timeout_ms,

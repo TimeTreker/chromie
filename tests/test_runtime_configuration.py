@@ -186,10 +186,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("--architecture-validation", source)
         self.assertIn("Social Attention remains active", source)
         self.assertIn(
-            "${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-sim_only}}",
+            "${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-off}}",
             source,
         )
         self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=sim_only", overlay)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_CTX=32768", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_PREDICT=4096", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS=120000", overlay)

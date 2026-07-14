@@ -101,13 +101,13 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         metadata = raised.exception.metadata()
         self.assertEqual(metadata["failure_class"], "output_truncated")
         self.assertEqual(metadata["failure_domain"], "llm_budget")
-        self.assertEqual(metadata["architecture_attribution"], "excluded")
+        self.assertEqual(metadata["architecture_attribution"], "not_evaluated")
         self.assertTrue(metadata["retryable"])
         self.assertTrue(
             any("ollama_structured_output_rejected" in line for line in error_logs.output)
         )
         self.assertTrue(
-            any("architecture_attribution=excluded" in line for line in error_logs.output)
+            any("architecture_attribution=not_evaluated" in line for line in error_logs.output)
         )
 
     async def test_generate_classifies_timeout_as_infrastructure_not_architecture(
@@ -133,7 +133,7 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         metadata = raised.exception.metadata()
         self.assertEqual(metadata["failure_class"], "timeout")
         self.assertEqual(metadata["failure_domain"], "inference_transport")
-        self.assertEqual(metadata["architecture_attribution"], "excluded")
+        self.assertEqual(metadata["architecture_attribution"], "not_evaluated")
         self.assertEqual(metadata["timeout_ms"], 1234)
         self.assertTrue(
             any("ollama_infrastructure_failure" in line for line in error_logs.output)
@@ -167,7 +167,7 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         metadata = raised.exception.metadata()
         self.assertEqual(metadata["failure_class"], "context_limit_exceeded")
         self.assertEqual(metadata["failure_domain"], "llm_budget")
-        self.assertEqual(metadata["architecture_attribution"], "excluded")
+        self.assertEqual(metadata["architecture_attribution"], "not_evaluated")
         self.assertEqual(metadata["status_code"], 500)
         self.assertTrue(
             any("failure_class=context_limit_exceeded" in line for line in error_logs.output)

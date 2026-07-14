@@ -105,7 +105,7 @@ def ollama_completion_diagnostics(
                     fields={
                         "reason": "prompt_eval_count_reached_num_ctx",
                         "failure_domain": "llm_budget",
-                        "architecture_attribution": "excluded",
+                        "architecture_attribution": "not_evaluated",
                         "retryable": True,
                         **prompt_fields,
                     },
@@ -143,7 +143,7 @@ def ollama_completion_diagnostics(
                         if truncated_by_reason
                         else "num_predict_exhausted",
                         "failure_domain": "llm_budget",
-                        "architecture_attribution": "excluded",
+                        "architecture_attribution": "not_evaluated",
                         "retryable": True,
                         **output_fields,
                     },
@@ -168,7 +168,7 @@ def ollama_completion_diagnostics(
                 fields={
                     "reason": "done_reason_length",
                     "failure_domain": "llm_budget",
-                    "architecture_attribution": "excluded",
+                    "architecture_attribution": "not_evaluated",
                     "retryable": True,
                     "done_reason": done_reason,
                     "suggestion": "increase_num_predict_or_shorten_response",

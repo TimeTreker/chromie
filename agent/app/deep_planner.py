@@ -5,6 +5,8 @@ import json
 import logging
 from typing import Any
 
+from pydantic import ValidationError
+
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
@@ -64,8 +66,15 @@ class DeepPlannerResolver:
                     failure["architecture_attribution"],
                     failure["retryable"],
                 )
-                if attempt < self.max_replans:
-                    feedback = [{"type": "invalid_plan_shape", "message": str(exc)[:400]}]
+                semantic_replan = self._is_semantic_replan_error(exc)
+                if attempt < self.max_replans and semantic_replan:
+                    feedback = [
+                        {
+                            "type": "semantic_validation_failure",
+                            "error_type": type(exc).__name__,
+                            "message": str(exc)[:400],
+                        }
+                    ]
                     continue
                 return self._clarify(plan_id, request, "deep_planner_unavailable", error=exc,
                                      attempts=attempt + 1)
@@ -83,6 +92,16 @@ class DeepPlannerResolver:
                                  unresolved=[item.get("step_id") or item.get("skill_id") or item["type"] for item in errors],
                                  metadata={"validation_feedback": errors}, attempts=attempt + 1)
         raise AssertionError("unreachable")
+
+    @staticmethod
+    def _is_semantic_replan_error(exc: Exception) -> bool:
+        """Return true only when another model answer can repair the failure.
+
+        Transport, timeout, context-window, and output-budget failures are not
+        semantic plan defects and must not consume the bounded same-tier replan.
+        """
+
+        return isinstance(exc, (json.JSONDecodeError, ValidationError, ValueError))
 
     @staticmethod
     def _capability_payload(item: Any) -> dict[str, Any]:
@@ -125,7 +144,7 @@ class DeepPlannerResolver:
             "Produce the final planner-tier=deep CanonicalPlan for the complete user goal. Deep planning is terminal: never return to the Fast Planner. "
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, and concurrency. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
-            "must use coverage=complete and disposition=execute. A material alternative must be described in response_text and metadata and must require "
+            "must use coverage=complete and disposition=execute. Every executable plan must include goal_ids, and every executable step must include source_goal_ids identifying exactly the goals it serves. A material alternative must be described in response_text and metadata and must require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction with score, status, satisfied goals, and unmet requirements. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. Return JSON only."
         )

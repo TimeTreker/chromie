@@ -4,6 +4,7 @@ import asyncio
 import unittest
 
 from agent.app.capabilities.catalog import CatalogCapability
+from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -74,7 +75,7 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 class DeepPlannerResolverTests(unittest.TestCase):
     def test_full_catalog_exact_plan(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.91,"goal_summary":"walk then blink","steps":[
+        raw = {"disposition":"execute","coverage":"complete","confidence":0.91,"goal_ids":["goal-action"],"goal_summary":"walk then blink","steps":[
             {"skill_id":"soridormi.walk_forward","args":{"duration_s":15}},
             {"skill_id":"soridormi.blink_eyes","args":{"count":4}}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
@@ -86,10 +87,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.metadata["attempt_count"], 1)
 
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
-        invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"steps":[
+        invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
             {"skill_id":"soridormi.blink_eyes","args":{"count":99}}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
-        revised = {"disposition":"execute","coverage":"complete","confidence":0.93,"steps":[
+        revised = {"disposition":"execute","coverage":"complete","confidence":0.93,"goal_ids":["goal-action"],"steps":[
             {"skill_id":"soridormi.blink_eyes","args":{"count":4}}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         ollama = SequencedOllama([invalid, revised])
@@ -99,8 +100,50 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("invalid_args", ollama.prompts[1][0])
         self.assertNotIn("Fast Planner decides again", ollama.prompts[1][0])
 
+    def test_transport_failure_does_not_consume_semantic_replan(self):
+        error = OllamaGenerationError(
+            "model timed out",
+            failure_class="timeout",
+            failure_domain="inference_transport",
+            architecture_attribution="not_evaluated",
+            retryable=True,
+        )
+        ollama = SequencedOllama([error])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                request("眨眼。")
+            )
+        )
+
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.metadata["attempt_count"], 1)
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["failure_class"], "timeout")
+
+    def test_contract_validation_failure_can_replan_once(self):
+        invalid = ["not", "an", "object"]
+        revised = {
+            "disposition": "clarify",
+            "coverage": "partial",
+            "confidence": 0.8,
+            "steps": [],
+            "unresolved": ["duration"],
+        }
+        ollama = SequencedOllama([invalid, revised])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                request("往前走。")
+            )
+        )
+
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.metadata["attempt_count"], 2)
+        self.assertIn("semantic_validation_failure", ollama.prompts[1][0])
+
     def test_repeated_invalid_plan_fails_closed_without_steps(self):
-        invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"steps":[
+        invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
             {"skill_id":"invented.skill","args":{}}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(DeepPlannerResolver(SequencedOllama([invalid, invalid]), FullCatalog(), max_replans=1).resolve(request()))
@@ -193,7 +236,7 @@ class OrchestratorDeepPlannerTests(unittest.TestCase):
                 return CanonicalPlan(plan_id="fast", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.8, escalation_reason="compound", steps=[])
             async def resolve_deep_plan(self, *args, **kwargs):
                 self.deep_context = kwargs["context"]
-                return CanonicalPlan(plan_id="deep", planner_tier="deep", disposition="execute", coverage="complete", confidence=0.9, steps=[{"step_id":"s1","skill_id":"soridormi.blink_eyes","args":{"count":3}}], metadata={"attempt_count":1})
+                return CanonicalPlan(plan_id="deep", planner_tier="deep", disposition="execute", coverage="complete", confidence=0.9, goal_ids=["goal-action"], steps=[{"step_id":"s1","skill_id":"soridormi.blink_eyes","args":{"count":3},"source_goal_ids":["goal-action"]}], metadata={"attempt_count":1})
 
         async def run():
             assistant = VoiceAssistant.__new__(VoiceAssistant)

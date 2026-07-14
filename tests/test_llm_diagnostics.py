@@ -28,7 +28,7 @@ class LlmDiagnosticsTests(unittest.TestCase):
             item for item in diagnostics if item.event == "llm_output_truncated"
         )
         self.assertEqual(truncation.fields["failure_domain"], "llm_budget")
-        self.assertEqual(truncation.fields["architecture_attribution"], "excluded")
+        self.assertEqual(truncation.fields["architecture_attribution"], "not_evaluated")
         self.assertTrue(truncation.fields["retryable"])
 
     def test_prompt_eval_count_at_context_window_reports_prompt_truncated(self) -> None:
@@ -42,7 +42,7 @@ class LlmDiagnosticsTests(unittest.TestCase):
         prompt_diag = next(item for item in diagnostics if item.event == "llm_prompt_truncated")
         self.assertEqual(prompt_diag.level, logging.ERROR)
         self.assertIn("suggestion=increase_num_ctx_or_compact_prompt", prompt_diag.render())
-        self.assertEqual(prompt_diag.fields["architecture_attribution"], "excluded")
+        self.assertEqual(prompt_diag.fields["architecture_attribution"], "not_evaluated")
 
     def test_budget_pressure_warnings_are_distinct_from_truncation(self) -> None:
         diagnostics = ollama_completion_diagnostics(
