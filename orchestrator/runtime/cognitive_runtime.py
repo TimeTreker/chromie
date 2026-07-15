@@ -29,7 +29,6 @@ CognitiveRuntimeMode = Literal["off", "report_only", "apply"]
 CognitiveRuntimeStatus = Literal[
     "applied",
     "report_only",
-    "legacy_fallback",
     "skipped",
     "error",
 ]
@@ -76,7 +75,7 @@ class CognitiveRuntimeResolution(BaseModel):
 class CognitiveRuntimePolicy:
     mode: CognitiveRuntimeMode = "off"
     apply_lanes: frozenset[str] = frozenset({"chat", "robot_action"})
-    fallback_policy: str = "legacy"
+    fallback_policy: str = "fail_closed"
     max_total_ms: int = 25000
     host_replan_budget: int = 1
     goal_association_timeout_ms: int = 3500
@@ -866,7 +865,7 @@ class GoalDrivenRuntimeCoordinator:
                 if not self.policy.lane_enabled(lane):
                     return self._finish(
                         mode="apply",
-                        status="legacy_fallback",
+                        status="error",
                         lane=lane,
                         association=association,
                         fast_plan=fast_plan,
@@ -874,7 +873,15 @@ class GoalDrivenRuntimeCoordinator:
                         composition=composition_resolution,
                         timings=timings,
                         started=started,
-                        fallback_reason="lane_not_enabled_for_apply",
+                        fallback_reason="terminal_plan_lane_not_enabled_for_apply",
+                        metadata={
+                            "failure_stage": "authority_boundary",
+                            "failure_class": "terminal_plan_lane_mismatch",
+                            "failure_domain": "cognitive_runtime",
+                            "architecture_attribution": "not_evaluated",
+                            "retryable": False,
+                            "stage_diagnostics": stage_diagnostics,
+                        },
                     )
                 stage = time.perf_counter()
                 interaction = await self.adapter.build_response(
@@ -962,11 +969,7 @@ class GoalDrivenRuntimeCoordinator:
             }
             return self._finish(
                 mode=self.policy.mode,
-                status=(
-                    "legacy_fallback"
-                    if self.policy.fallback_policy == "legacy"
-                    else "error"
-                ),
+                status="error",
                 lane=lane,
                 association=association,
                 fast_plan=fast_plan,
@@ -982,11 +985,7 @@ class GoalDrivenRuntimeCoordinator:
         except Exception as exc:
             return self._finish(
                 mode=self.policy.mode,
-                status=(
-                    "legacy_fallback"
-                    if self.policy.fallback_policy == "legacy"
-                    else "error"
-                ),
+                status="error",
                 lane=lane,
                 association=association,
                 fast_plan=fast_plan,

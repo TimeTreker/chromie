@@ -246,9 +246,11 @@ configuration.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_COGNITIVE_RUNTIME_MODE` | `report_only` in `.env.common`; `off` uses the legacy runtime only, `report_only` runs the complete Goal Association → Fast/Deep Planner → Response Composer pipeline without changing execution, and `apply` makes eligible lanes authoritative through the trusted Skill Runtime. Code fallback is `off`. |
-| `ORCH_COGNITIVE_APPLY_LANES` | `chat,robot_action`; explicit comma-separated lane allowlist used only in `apply`. A terminal plan outside this set returns to the legacy path without committing Goal state. |
-| `ORCH_COGNITIVE_FALLBACK_POLICY` | `legacy`; `legacy` rolls a failed or disabled apply lane back to the existing Router/Agent path, while `fail_closed` returns truthful no-action speech and never executes a partial plan. |
+| `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the trusted Skill Runtime. Code fallback is `apply`. |
+| `ORCH_COGNITIVE_APPLY_LANES` | `chat,robot_action`; explicit comma-separated authority allowlist. A route outside the set is rejected before Goal-driven ownership is acquired. A terminal plan that changes to a disabled lane fails closed and cannot re-enter the legacy planner. |
+| `ORCH_COGNITIVE_FALLBACK_POLICY` | Deprecated compatibility input. The effective policy is always `fail_closed`: after Goal-driven authority is acquired, technical or validation failure returns truthful no-action speech and never enters another semantic planner in the same turn. |
+| `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; host-side emergency compatibility gate. It can create a legacy CapabilityAgent authority claim only on a turn that has not entered authoritative Goal-driven processing. |
+| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a valid per-turn `legacy_capability_fallback` authority claim. Exact Router actions remain adapter-only and do not require this gate. |
 | `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast/Deep planning, bounded host replan, response composition, and runtime adaptation. |
 | `ORCH_COGNITIVE_HOST_REPLAN_BUDGET` | `1`; maximum Deep Planner revision after trusted host schema/provider/resource validation rejects a terminal plan. It never returns to Fast Planner. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
@@ -259,7 +261,7 @@ configuration.
 steps still pass the existing trusted registry, schema, provider, confirmation,
 resource, cancellation, and execution-evidence gates. Goal state is committed
 atomically only after the terminal plan and composed response have passed host
-preparation. A disabled lane or technical failure cannot execute a partial plan.
+preparation. A technical failure after authority acquisition cannot execute a partial plan or widen authority through the legacy planner. See [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
 
 ## Semantic task continuity
 

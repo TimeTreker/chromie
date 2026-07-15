@@ -115,7 +115,8 @@ running.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | Return model/runtime state, loaded capability sources, feature gates, and scheduler counters. |
+| `GET` | `/health` | Return model/runtime state, loaded capability sources, feature gates, scheduler counters, and the legacy CapabilityAgent emergency gate. |
+| `GET` | `/semantic-authority` | Return the machine-readable single-authority route matrix and current Agent emergency-fallback gate. |
 | `GET` | `/agents` | List specialized agents and ownership notes. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
@@ -138,8 +139,8 @@ signals for catalog inspection endpoints, not Router execution authorization.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/run` | Established `AgentRequest -> AgentResult` compatibility path. |
-| `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; explicit adapter rollback remains configurable. |
+| `POST` | `/run` | Established `AgentRequest -> AgentResult` compatibility path. CapabilityAgent semantic planning is emergency-only; exact Router actions are adapter input. |
+| `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; exact Router actions are materialized without LLM reinterpretation, and the legacy CapabilityAgent planner requires explicit emergency authority. |
 | `POST` | `/task-continuity` | Return a validated `SemanticTaskOperationSet` proposal for the current utterance and active-task snapshot. |
 | `POST` | `/compose-response-plan` | Compose goal-scoped speech and optional auxiliary social attention around an immutable terminal `CanonicalPlan`. |
 

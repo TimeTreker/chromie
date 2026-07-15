@@ -277,7 +277,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         result = self.run_resolution(coordinator, client)
 
-        self.assertEqual(result.status, "legacy_fallback")
+        self.assertEqual(result.status, "error")
         self.assertEqual(result.metadata["failure_stage"], "goal_association")
         self.assertEqual(result.metadata["failure_class"], "output_truncated")
         self.assertEqual(result.metadata["failure_domain"], "llm_budget")
@@ -333,7 +333,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(request.args, {"count": 4})
         self.assertIn("canonical_plan_fingerprint", request.metadata)
 
-    def test_disabled_apply_lane_rolls_back_to_legacy(self):
+    def test_disabled_apply_lane_fails_closed(self):
         client = ScriptedClient(
             association=new_goal_association(),
             fast_plans=[
@@ -354,8 +354,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat"})),
         )
         result = self.run_resolution(coordinator, client, text="眨眼。")
-        self.assertEqual(result.status, "legacy_fallback")
-        self.assertEqual(result.fallback_reason, "lane_not_enabled_for_apply")
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.fallback_reason, "terminal_plan_lane_not_enabled_for_apply")
         self.assertIsNone(result.interaction_response)
 
     def test_runtime_conflict_triggers_one_deep_replan(self):
@@ -668,7 +668,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             goal_state_apply=lambda *args, **kwargs: applied.append(True) or [],
         )
         result = self.run_resolution(coordinator, client)
-        self.assertEqual(result.status, "legacy_fallback")
+        self.assertEqual(result.status, "error")
         self.assertEqual(applied, [])
 
     def test_goal_state_applies_after_successful_composition(self):

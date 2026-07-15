@@ -127,6 +127,7 @@ Risk-bearing behavior is default-off.
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | `384` | Output budget for deep-thinking replies. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
+| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0` | Emergency-only gate for the old CapabilityAgent semantic planner. It also requires a valid per-turn `legacy_capability_fallback` authority claim; exact Router actions are always adapter-only. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named skills while keeping the last known-good catalog. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | `0.16` | Minimum score for automatic native route correction. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | `8` | Bound candidates sent to capability selection. |

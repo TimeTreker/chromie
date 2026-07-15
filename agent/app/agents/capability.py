@@ -10,10 +10,12 @@ from pydantic import BaseModel, Field, ValidationError, model_validator
 try:
     from chromie_contracts.perception import live_perception_dependency_from_metadata
     from chromie_contracts.interaction import SkillRequest
+    from chromie_contracts.semantic_authority import semantic_authority_from_context
     from chromie_contracts.semantic_task import InformationGap
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
     from shared.chromie_contracts.interaction import SkillRequest
+    from shared.chromie_contracts.semantic_authority import semantic_authority_from_context
     from shared.chromie_contracts.semantic_task import InformationGap
 
 from ..capabilities.validator import (
@@ -138,10 +140,10 @@ class CapabilityAgent(BaseAgent):
             self._capability_payload(match) for match in executable
         ]
         direct_actions = list(request.route_decision.actions or [])
-        # Router actions are advisory. When semantic planning is available, the
-        # planner must consider the complete utterance and full capability
-        # surface instead of executing a possibly incomplete route fragment.
-        if direct_actions and (not self.services.use_llm or self.services.ollama is None):
+        # Exact Router actions are already-selected adapter input, not a second
+        # semantic plan. Materialize them deterministically even when an LLM is
+        # available; the CapabilityAgent must not reinterpret the utterance.
+        if direct_actions:
             allowed = {match.capability_id: match for match in executable}
             selected_ids: list[str] = []
             selected_requests: list[SkillRequest] = []
@@ -267,6 +269,8 @@ class CapabilityAgent(BaseAgent):
                     result.add_speak_immediate(speech, style="brief")
                 result.metadata["capability_handled"] = True
                 result.metadata["capability_decision"] = "execute"
+                result.metadata["semantic_authority_owner"] = "router_action_adapter"
+                result.metadata["semantic_authority_role"] = "adapter"
                 result.metadata["planning_result"] = (
                     "direct_skill" if len(selected_ids) == 1 else "composed_plan"
                 )
@@ -313,6 +317,52 @@ class CapabilityAgent(BaseAgent):
             self.trace(result, "capability match found but semantic LLM planning is unavailable")
             return result
 
+        authority = None
+        try:
+            authority = semantic_authority_from_context(request.context)
+        except ValidationError as exc:
+            result.metadata["semantic_authority_rejected"] = {
+                "reason": "invalid_claim",
+                "error": str(exc)[:500],
+            }
+        legacy_authorized = (
+            self.services.legacy_capability_fallback_enabled
+            and authority is not None
+            and authority.owner == "legacy_capability_fallback"
+            and authority.role == "authoritative"
+            and authority.emergency_fallback
+        )
+        if not legacy_authorized:
+            result.add_speak_immediate(
+                self._legacy_planner_disabled_speech(request),
+                style="warning",
+            )
+            result.metadata.update(
+                {
+                    "capability_handled": True,
+                    "capability_decision": "clarify",
+                    "planning_result": "legacy_semantic_planner_disabled",
+                    "semantic_authority_owner": (
+                        authority.owner if authority is not None else "none"
+                    ),
+                    "semantic_authority_role": (
+                        authority.role if authority is not None else "none"
+                    ),
+                    "legacy_capability_fallback_enabled": (
+                        self.services.legacy_capability_fallback_enabled
+                    ),
+                }
+            )
+            self.trace(
+                result,
+                "semantic LLM planning rejected; CapabilityAgent is adapter-only "
+                "without an explicit emergency fallback claim",
+            )
+            return result
+
+        result.metadata["semantic_authority_owner"] = authority.owner
+        result.metadata["semantic_authority_role"] = authority.role
+        result.metadata["legacy_emergency_fallback"] = True
         plan = await self._plan(request, executable)
         plan = await self._repair_unstructured_clarification(
             request,
@@ -1834,6 +1884,18 @@ class CapabilityAgent(BaseAgent):
         if self.is_zh(request):
             return "请告诉我：" + "；".join(descriptions) + "。"
         return "Please tell me: " + "; ".join(descriptions) + "."
+
+    def _legacy_planner_disabled_speech(self, request: AgentRunRequest) -> str:
+        if self.is_zh(request):
+            return (
+                "这次没有经过统一目标规划，我不会启动旧的动作规划器。"
+                "请稍后重试，或由运维显式启用应急回退。"
+            )
+        return (
+            "This turn did not pass through the unified goal planner, so I will "
+            "not start the legacy action planner. Please retry or use an "
+            "explicit operator-enabled emergency fallback."
+        )
 
     def _unsupported_action_speech(self, request: AgentRunRequest) -> str:
         if self.is_zh(request):

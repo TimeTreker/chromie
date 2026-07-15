@@ -608,12 +608,22 @@ class TaskGraphPlanningTests(unittest.IsolatedAsyncioTestCase):
                     min_score=0.10,
                 ),
                 task_graph_planner=RaisingPlanner(),  # type: ignore[arg-type]
+                legacy_capability_fallback_enabled=True,
             )
         )
         request = AgentRunRequest.model_validate(
             {
                 "sid": "walk-forward",
                 "text": "Walk forward at 0.2 speed for one second.",
+                "context": {
+                    "semantic_authority": {
+                        "owner": "legacy_capability_fallback",
+                        "role": "authoritative",
+                        "turn_id": "walk-forward",
+                        "reason": "explicit_legacy_equivalence_test",
+                        "emergency_fallback": True,
+                    }
+                },
                 "route_decision": {
                     "route": "robot_action",
                     "agents": ["capability_agent", "safety_agent", "speaker_agent"],

@@ -15,6 +15,27 @@ from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentRunRequest
 
 
+def _legacy_services(**kwargs: Any) -> AgentServices:
+    return AgentServices(legacy_capability_fallback_enabled=True, **kwargs)
+
+
+def _legacy_request(payload: Any) -> AgentRunRequest:
+    if isinstance(payload, AgentRunRequest):
+        data = payload.model_dump(mode="python")
+    else:
+        data = dict(payload)
+    context = dict(data.get("context") or {})
+    context["semantic_authority"] = {
+        "owner": "legacy_capability_fallback",
+        "role": "authoritative",
+        "turn_id": "legacy-capability-test",
+        "reason": "explicit_emergency_fallback_test",
+        "emergency_fallback": True,
+    }
+    data["context"] = context
+    return AgentRunRequest.model_validate(data)
+
+
 class _Outcome:
     status = "success"
     error = None
@@ -1221,7 +1242,7 @@ def _catalog_with_invoker(invoker: Any) -> CapabilityCatalog:
 class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
     async def test_normal_interaction_does_not_self_correct_chat_route_using_catalog(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=None,
                 use_llm=False,
                 max_speak_chars=160,
@@ -1229,7 +1250,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "catalog-route",
                 "text": "Move forward slowly for one second.",
@@ -1254,7 +1275,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_plan_normalizes_schema_enum_adverbs(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_AdverbSpeedOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1262,7 +1283,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "catalog-speed",
                 "text": "Walk forward for 1 second quickly.",
@@ -1285,7 +1306,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_agent_adjudicates_llm_proposal_with_bounded_adjustment(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ProposalAdjustedWalkOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1293,7 +1314,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "proposal-adjustment",
                 "text": "Walk forward for 15 seconds quickly.",
@@ -1338,7 +1359,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_compound_action_alternative_waits_for_confirmation_without_partial_execution(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_WalkBlinkAlternativeOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=180,
@@ -1346,7 +1367,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "walk-blink-alternative",
                 "text": "快速的往前走15秒，然后边走边眨眼睛，可以吗？",
@@ -1377,7 +1398,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_compound_action_exact_parallel_plan_preserves_every_requested_action(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_WalkBlinkParallelOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=180,
@@ -1385,7 +1406,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "walk-blink-parallel",
                 "text": "Walk forward quickly for 15 seconds while blinking twice.",
@@ -1414,7 +1435,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_compound_action_invalid_second_skill_rejects_entire_plan_atomically(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_WalkBlinkInvalidSecondSkillOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=180,
@@ -1422,7 +1443,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "walk-blink-invalid",
                 "text": "Walk forward and blink.",
@@ -1448,7 +1469,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
     async def test_low_consequence_missing_blink_count_is_repaired_with_llm_safe_default(self) -> None:
         planner = _BlinkSafeDefaultRepairOllama()
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=planner,  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=180,
@@ -1456,7 +1477,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "blink-safe-default",
                 "text": "眨眨眼睛。",
@@ -1485,7 +1506,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
     async def test_material_missing_walk_duration_asks_specific_question(self) -> None:
         planner = _ImportantWalkParameterRepairOllama()
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=planner,  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=180,
@@ -1493,7 +1514,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "walk-important-gap",
                 "text": "往前走。",
@@ -1523,7 +1544,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_plan_rejects_identical_requests_without_step_ids(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_DuplicateWalkOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1531,7 +1552,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "duplicate-walk",
                 "text": "Okay, please walk ahead for a few seconds. Please. Quickly.",
@@ -1558,7 +1579,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_router_selected_capability_prompt_requires_exact_skill(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_SelectedWalkOllama(),  # type: ignore[arg-type]
                 response_reviewer=_AcceptCapabilityReviewer(),  # type: ignore[arg-type]
                 use_llm=True,
@@ -1568,7 +1589,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 require_capability_plan_review=True,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "router-selected-omitted-skills",
                 "text": "Walk forward quickly for 3 seconds.",
@@ -1592,7 +1613,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
     async def test_capability_prompt_uses_extracted_memory_not_raw_history(self) -> None:
         ollama = _ExtractedMemoryCapabilityOllama()
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=ollama,  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1600,7 +1621,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "capability-memory-context",
                 "text": "Continue with that walking plan.",
@@ -1656,7 +1677,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_router_task_list_fast_path_executes_low_risk_blink_without_llm(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
                     {
                         "decision": "execute",
@@ -1673,7 +1694,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "router-fast-blink",
                 "text": "Please blink your eyes 5 times.",
@@ -1718,7 +1739,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_router_task_list_fast_path_extracts_chinese_blink_count(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
                     {
                         "decision": "execute",
@@ -1735,7 +1756,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "router-fast-chinese-blink",
                 "text": "请眨两小眼睛。",
@@ -1774,7 +1795,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_router_task_list_fast_path_allows_optional_defaulted_blink_fields(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
                     {
                         "decision": "execute",
@@ -1791,7 +1812,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "router-fast-blink-default-fields",
                 "text": "Please blink your eyes 5 times.",
@@ -1833,7 +1854,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_router_task_list_fast_path_batches_over_limit_blink_without_llm(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
                     {
                         "decision": "execute",
@@ -1854,7 +1875,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "router-fast-blink-over-limit",
                 "text": "Please blink your eyes 15 times.",
@@ -1903,7 +1924,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_router_task_list_fast_path_preserves_physical_confirmation(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
                     {
                         "decision": "execute",
@@ -1925,7 +1946,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "router-task-list-walk-fast-path",
                 "text": "Walk forward quickly for 3 seconds.",
@@ -1969,7 +1990,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_router_selected_capability_does_not_hide_better_candidate(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_SelectedVelocityBetterForwardOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1977,7 +1998,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "router-selected-velocity-better-forward",
                 "text": "Walk forward quickly for 15 seconds.",
@@ -2002,7 +2023,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_deep_thought_direct_motion_plans_with_catalog_context(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_RecoveredDeepThoughtWalkOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2010,7 +2031,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "deep-thought-direct-motion",
                 "text": "Walk forward for 15 seconds, quickly.",
@@ -2042,7 +2063,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_polite_chinese_head_ability_question_executes_matching_skill(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_PoliteHeadQuestionOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2050,7 +2071,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "polite-head-question",
                 "text": "你能摇头吗",
@@ -2073,7 +2094,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_plan_rejects_execute_without_llm_speech(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_EmptySpeechHeadQuestionOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2081,7 +2102,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "empty-speech-head-question",
                 "text": "你能摇头吗",
@@ -2104,7 +2125,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_plan_blocks_schema_invalid_args_before_runtime(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_InvalidWalkOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2112,7 +2133,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "invalid-walk",
                 "text": "Walk forward for five seconds.",
@@ -2140,7 +2161,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_exact_blink_request_over_limit_batches_valid_visual_skills(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_OverLimitBlinkClarifyOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2148,7 +2169,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "blink-over-limit",
                 "text": "Brink your eyes for 15 times.",
@@ -2184,7 +2205,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_exact_blink_request_over_limit_batches_silently_clamped_plan(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_OverLimitBlinkClampedExecuteOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2192,7 +2213,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "blink-over-limit-clamped",
                 "text": "Brink your eyes for 15 times.",
@@ -2225,7 +2246,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_planner_failure_returns_clarification_not_exception(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_BrokenCapabilityPlannerOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2233,7 +2254,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "planner-json-failure",
                 "text": "Walk forward for 1 second.",
@@ -2259,7 +2280,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_planner_keeps_large_mind_context_bounded(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_PromptBudgetOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2279,7 +2300,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             "core_principles": [" ".join(["be safe and honest"] * 160)],
             "prompt_summary": " ".join(["owner-approved robot mind summary"] * 100),
         }
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "large-mind-planner",
                 "text": "Walk forward for one second.",
@@ -2308,7 +2329,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_plan_reviewer_blocks_social_fallback_for_walking_request(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_BadSocialFallbackOllama(),  # type: ignore[arg-type]
                 response_reviewer=_RejectSocialFallbackReviewer(),  # type: ignore[arg-type]
                 use_llm=True,
@@ -2317,7 +2338,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "walk-not-nod",
                 "text": "Walk forward for 15 seconds, quickly.",
@@ -2356,7 +2377,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_required_robot_action_review_timeout_blocks_social_fallback(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_BadSocialFallbackOllama(),  # type: ignore[arg-type]
                 response_reviewer=_TimeoutCapabilityReviewer(),  # type: ignore[arg-type]
                 use_llm=True,
@@ -2366,7 +2387,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 require_capability_plan_review=True,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "generic-walk-not-nod-timeout",
                 "text": "Walk forward for 15 seconds, quickly.",
@@ -2392,7 +2413,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_exact_router_intent_substitution_fails_closed_without_reviewer(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ExactBadSocialFallbackOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2401,7 +2422,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 require_capability_plan_review=True,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "exact-walk-not-nod-no-reviewer",
                 "text": "Walk forward for 15 seconds, quickly.",
@@ -2427,7 +2448,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_exact_router_intent_substitution_reviewer_accept_is_not_enough(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ExactBadSocialFallbackOllama(),  # type: ignore[arg-type]
                 response_reviewer=_AcceptBadSubstitutionReviewer(),  # type: ignore[arg-type]
                 use_llm=True,
@@ -2437,7 +2458,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 require_capability_plan_review=True,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "exact-walk-not-nod-bad-reviewer",
                 "text": "Walk forward for 15 seconds, quickly.",
@@ -2463,7 +2484,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_plan_uses_task_context_for_look_forward_followup(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_LookForwardOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2471,7 +2492,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=8,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "look-followup",
                 "text": "5 seconds and blink your eyes.",
@@ -2512,7 +2533,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_plan_sees_full_api_surface_beyond_search_match(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_FullApiOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -2520,7 +2541,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
                 capability_match_limit=1,
             )
         )
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "full-api-surface",
                 "text": "Wave twice.",

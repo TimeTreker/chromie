@@ -37,7 +37,8 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         assistant.cognitive_runtime_mode = "apply"
         assistant.enable_agent = True
         assistant.enable_interaction_response = True
-        assistant.cognitive_fallback_policy = "legacy"
+        assistant.cognitive_fallback_policy = "fail_closed"
+        assistant.cognitive_apply_lanes = frozenset({"chat", "robot_action", "mixed"})
         assistant.conversation_state = _State()
         assistant.interaction_runtime = _InteractionRuntime()
         assistant.cognitive_evidence = type("Evidence", (), {"record": lambda *args, **kwargs: None})()
@@ -102,10 +103,10 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(len(assistant.conversation_state.agent_results), 1)
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
 
-    def test_lane_fallback_preserves_legacy_path(self):
+    def test_cognitive_failure_is_handled_without_legacy_reentry(self):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
-            status="legacy_fallback",
+            status="error",
             lane="robot_action",
             fallback_reason="lane_not_enabled_for_apply",
             timings_ms={"total": 15.0},
@@ -133,12 +134,16 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 decision=decision,
                 router_latency_ms=10.0,
             )
-            self.assertFalse(handled)
-            self.assertTrue(returned.metadata["fast_first_response_scheduled"])
+            self.assertTrue(handled)
+            self.assertEqual(
+                returned.metadata["cognitive_runtime_resolution"]["status"],
+                "error",
+            )
 
         asyncio.run(run())
-        self.assertEqual(assistant.conversation_state.user_turns, [])
-        self.assertEqual(assistant._launch_interaction_calls, [])
+        self.assertEqual(len(assistant.conversation_state.user_turns), 1)
+        self.assertEqual(len(assistant.conversation_state.agent_results), 1)
+        self.assertEqual(len(assistant._launch_interaction_calls), 1)
 
     def test_report_only_schedules_without_mutating_route(self):
         assistant = VoiceAssistant.__new__(VoiceAssistant)

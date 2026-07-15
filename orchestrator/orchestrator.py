@@ -69,6 +69,10 @@ from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.semantic_authority import (
+    SemanticAuthorityClaim,
+    context_with_semantic_authority,
+)
 from shared.chromie_runtime.llm_diagnostics import (
     ollama_completion_diagnostics,
     ollama_prompt_preflight_diagnostics,
@@ -222,7 +226,7 @@ class VoiceAssistant:
             minimum=100,
         )
         self.cognitive_runtime_mode = os.getenv(
-            "ORCH_COGNITIVE_RUNTIME_MODE", "off"
+            "ORCH_COGNITIVE_RUNTIME_MODE", "apply"
         ).strip().lower()
         if self.cognitive_runtime_mode not in {"off", "report_only", "apply"}:
             raise ValueError(
@@ -236,12 +240,25 @@ class VoiceAssistant:
             for item in raw_apply_lanes.split(",")
             if item.strip()
         )
-        self.cognitive_fallback_policy = os.getenv(
-            "ORCH_COGNITIVE_FALLBACK_POLICY", "legacy"
+        requested_cognitive_fallback_policy = os.getenv(
+            "ORCH_COGNITIVE_FALLBACK_POLICY", "fail_closed"
         ).strip().lower()
-        if self.cognitive_fallback_policy not in {"legacy", "fail_closed"}:
+        if requested_cognitive_fallback_policy not in {"legacy", "fail_closed"}:
             raise ValueError(
                 "ORCH_COGNITIVE_FALLBACK_POLICY must be legacy or fail_closed"
+            )
+        # Once the goal-driven pipeline starts, it owns semantic resolution for
+        # the turn. A later legacy planner would be a second authority, so the
+        # effective post-acquisition policy is always fail-closed. The legacy
+        # value is retained only as a deprecated configuration input.
+        self.cognitive_fallback_policy = "fail_closed"
+        self.legacy_semantic_fallback_enabled = env_bool(
+            "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED", False
+        )
+        if requested_cognitive_fallback_policy == "legacy":
+            logger.warning(
+                "ORCH_COGNITIVE_FALLBACK_POLICY=legacy is deprecated; "
+                "post-acquisition semantic fallback is forced to fail_closed"
             )
         self.cognitive_runtime_timeout_ms = env_int(
             "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS", 25000, minimum=1000
@@ -2541,6 +2558,63 @@ class VoiceAssistant:
                 exc,
             )
 
+    def _goal_driven_authority_context(
+        self,
+        context: dict[str, Any],
+        *,
+        session_id: str,
+        observer: bool,
+    ) -> dict[str, Any]:
+        return context_with_semantic_authority(
+            context,
+            SemanticAuthorityClaim(
+                owner="goal_driven_runtime",
+                role="observer" if observer else "authoritative",
+                turn_id=session_id,
+                reason=(
+                    "cognitive_runtime_report_only"
+                    if observer
+                    else "cognitive_runtime_apply"
+                ),
+            ),
+        )
+
+    def _legacy_agent_authority_context(
+        self,
+        context: dict[str, Any],
+        *,
+        session_id: str,
+        decision: RouteDecision,
+        reason: str,
+    ) -> dict[str, Any]:
+        if decision.route == "robot_action" and decision.actions:
+            claim = SemanticAuthorityClaim(
+                owner="router_action_adapter",
+                role="adapter",
+                turn_id=session_id,
+                reason=reason,
+            )
+        elif (
+            decision.route == "robot_action"
+            and "capability_agent" in decision.agents
+            and getattr(self, "legacy_semantic_fallback_enabled", False)
+        ):
+            claim = SemanticAuthorityClaim(
+                owner="legacy_capability_fallback",
+                role="authoritative",
+                turn_id=session_id,
+                reason=reason,
+                emergency_fallback=True,
+            )
+        else:
+            claim = SemanticAuthorityClaim(
+                owner="legacy_agent_pipeline",
+                role="authoritative",
+                turn_id=session_id,
+                reason=reason,
+            )
+        return context_with_semantic_authority(context, claim)
+
     async def _run_cognitive_runtime_pipeline(
         self,
         session: aiohttp.ClientSession,
@@ -2552,6 +2626,11 @@ class VoiceAssistant:
         record_evidence: bool = True,
     ) -> CognitiveRuntimeResolution:
         started_ms = now_ms()
+        authority_context = self._goal_driven_authority_context(
+            context,
+            session_id=session_id,
+            observer=self.cognitive_runtime_mode != "apply",
+        )
         try:
             resolution = await asyncio.wait_for(
                 self.cognitive_runtime.resolve(
@@ -2559,8 +2638,8 @@ class VoiceAssistant:
                     text=user_text,
                     sid=session_id,
                     route_decision=decision,
-                    context=context,
-                    history=context.get("history", []),
+                    context=authority_context,
+                    history=authority_context.get("history", []),
                     language=decision.language or (
                         "zh-CN" if self._looks_zh(user_text) else "en-US"
                     ),
@@ -2568,12 +2647,7 @@ class VoiceAssistant:
                 timeout=self.cognitive_runtime_timeout_ms / 1000.0,
             )
         except Exception as exc:
-            status = (
-                "legacy_fallback"
-                if self.cognitive_runtime_mode == "apply"
-                and self.cognitive_fallback_policy == "legacy"
-                else "error"
-            )
+            status = "error"
             is_timeout = isinstance(exc, (asyncio.TimeoutError, TimeoutError))
             resolution = CognitiveRuntimeResolution(
                 mode=self.cognitive_runtime_mode,
@@ -2654,6 +2728,11 @@ class VoiceAssistant:
             or not self.enable_agent
             or decision.interrupt_current
             or decision.route in {"interrupt", "ignore"}
+            or decision.route not in getattr(
+                self,
+                "cognitive_apply_lanes",
+                frozenset({"chat", "robot_action", "mixed"}),
+            )
         ):
             return decision
         task = asyncio.create_task(
@@ -2730,6 +2809,11 @@ class VoiceAssistant:
             or not self.enable_interaction_response
             or decision.interrupt_current
             or decision.route in {"interrupt", "ignore"}
+            or decision.route not in getattr(
+                self,
+                "cognitive_apply_lanes",
+                frozenset({"chat", "robot_action", "mixed"}),
+            )
         ):
             return False, decision
 
@@ -2749,26 +2833,6 @@ class VoiceAssistant:
         metadata["cognitive_runtime_resolution"] = summary
         metadata["cognitive_runtime_mode"] = "apply"
         decision = decision.model_copy(update={"metadata": metadata})
-
-        if resolution.status == "legacy_fallback":
-            fast_first_scheduled = await self._settle_fast_first_audio_hedge(
-                fast_first_hedge,
-                decision=decision,
-                session_id=session_id,
-            )
-            if fast_first_scheduled:
-                metadata = dict(decision.metadata or {})
-                metadata["fast_first_response_scheduled"] = True
-                decision = decision.model_copy(update={"metadata": metadata})
-            self.session_log(
-                session_id,
-                "cognitive_runtime_legacy_fallback: reason=%s",
-                resolution.fallback_reason or "lane_not_enabled",
-            )
-            self._record_cognitive_runtime_evidence(
-                resolution, session_id=session_id, user_text=user_text
-            )
-            return False, decision
 
         if resolution.status != "applied" or resolution.interaction_response is None:
             fast_first_scheduled = await self._settle_fast_first_audio_hedge(
@@ -2866,11 +2930,7 @@ class VoiceAssistant:
             resolution = resolution.model_copy(
                 deep=True,
                 update={
-                    "status": (
-                        "legacy_fallback"
-                        if self.cognitive_fallback_policy == "legacy"
-                        else "error"
-                    ),
+                    "status": "error",
                     "fallback_reason": f"host_commit_failed:{type(exc).__name__}:{str(exc)[:300]}",
                     "interaction_response": None,
                     "metadata": {
@@ -2879,15 +2939,6 @@ class VoiceAssistant:
                     },
                 },
             )
-            if self.cognitive_fallback_policy == "legacy":
-                if fast_first_scheduled:
-                    metadata = dict(decision.metadata or {})
-                    metadata["fast_first_response_scheduled"] = True
-                    decision = decision.model_copy(update={"metadata": metadata})
-                self._record_cognitive_runtime_evidence(
-                    resolution, session_id=session_id, user_text=user_text
-                )
-                return False, decision
             safe_response = self._agent_exception_safe_response(
                 decision, user_text=user_text
             ) or self._host_speech_response(
@@ -3605,6 +3656,12 @@ class VoiceAssistant:
             session_id,
         )
 
+        agent_context = self._legacy_agent_authority_context(
+            context,
+            session_id=session_id,
+            decision=decision,
+            reason=f"orchestrator_{self.cognitive_runtime_mode}_agent_path",
+        )
         agent_start_ms = now_ms()
         self.session_log(session_id, "agent_start: route=%s agents=%s intent=%s", decision.route, ",".join(decision.agents), decision.intent)
         try:
@@ -3614,8 +3671,8 @@ class VoiceAssistant:
                     text=user_text,
                     route_decision=decision,
                     sid=session_id,
-                    context=context,
-                    history=context.get("history", []),
+                    context=agent_context,
+                    history=agent_context.get("history", []),
                 )
                 agent_latency_ms = now_ms() - agent_start_ms
                 response = response.model_copy(
@@ -3683,8 +3740,8 @@ class VoiceAssistant:
                 text=user_text,
                 route_decision=decision,
                 sid=session_id,
-                context=context,
-                history=context.get("history", []),
+                context=agent_context,
+                history=agent_context.get("history", []),
             )
             self.session_log(
                 session_id,
@@ -3805,6 +3862,24 @@ class VoiceAssistant:
                 session_id,
             )
 
+        if self.cognitive_runtime_mode == "apply":
+            handled, decision = await self._try_apply_cognitive_runtime(
+                session,
+                user_text=user_text,
+                session_id=session_id,
+                context=context,
+                decision=decision,
+                router_latency_ms=0.0,
+            )
+            if handled:
+                return
+
+        agent_context = self._legacy_agent_authority_context(
+            context,
+            session_id=session_id,
+            decision=decision,
+            reason="post_interrupt_compatibility_path",
+        )
         agent_start_ms = now_ms()
         self.session_log(
             session_id,
@@ -3820,8 +3895,8 @@ class VoiceAssistant:
                     text=user_text,
                     route_decision=decision,
                     sid=session_id,
-                    context=context,
-                    history=context.get("history", []),
+                    context=agent_context,
+                    history=agent_context.get("history", []),
                 )
                 agent_latency_ms = now_ms() - agent_start_ms
                 response = response.model_copy(
@@ -3885,8 +3960,8 @@ class VoiceAssistant:
                 text=user_text,
                 route_decision=decision,
                 sid=session_id,
-                context=context,
-                history=context.get("history", []),
+                context=agent_context,
+                history=agent_context.get("history", []),
             )
             self.session_log(
                 session_id,

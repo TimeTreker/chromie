@@ -3,7 +3,7 @@
   "id": "robot_lane_rollback",
   "suite": "cognitive_runtime",
   "level": "integration",
-  "description": "A robot plan falls back to the legacy path when only the chat lane is enabled for apply.",
+  "description": "A robot plan fails closed when its terminal lane is outside the authoritative apply allowlist.",
   "tags": ["pr7", "rollback", "lane-gate"],
   "input": {"text": "眨四下眼睛。", "language": "zh-CN"},
   "stub": {
@@ -32,7 +32,7 @@
     }]
   },
   "expect": {
-    "status": "legacy_fallback",
+    "status": "error",
     "lane": "robot_action",
     "planner_tier": "fast",
     "disposition": "execute",

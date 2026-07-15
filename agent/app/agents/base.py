@@ -34,6 +34,7 @@ class AgentServices:
     social_attention_fallback_yaw_rad: float | None = None
     social_attention_fallback_confidence: float = 0.0
     require_capability_plan_review: bool = False
+    legacy_capability_fallback_enabled: bool = False
     task_graph_planner: "TaskGraphPlanner | None" = None
     capability_catalog: "CapabilityCatalog | None" = None
     capability_match_limit: int = 8

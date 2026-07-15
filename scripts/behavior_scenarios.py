@@ -957,6 +957,12 @@ async def _run_interaction_turn(
         stub.get("social_attention_reply"),
     )
     fallback_yaw = stub.get("social_attention_fallback_yaw_rad")
+    legacy_capability_equivalence = (
+        str(route_decision.get("route") or "") == "robot_action"
+        and "capability_agent" in list(route_decision.get("agents") or [])
+        and not list(route_decision.get("actions") or [])
+        and ollama_reply is not None
+    )
     services = AgentServices(
         ollama=_AgentOllama(ollama_reply),  # type: ignore[arg-type]
         response_reviewer=(
@@ -993,14 +999,24 @@ async def _run_interaction_turn(
             stub.get("social_attention_wait_after_response_ms", 0)
         ),
         require_capability_plan_review=bool(stub.get("require_capability_plan_review", False)),
+        legacy_capability_fallback_enabled=legacy_capability_equivalence,
     )
+    request_context = dict(context or {})
+    if legacy_capability_equivalence:
+        request_context["semantic_authority"] = {
+            "owner": "legacy_capability_fallback",
+            "role": "authoritative",
+            "turn_id": scenario_id,
+            "reason": "behavior_scenario_legacy_equivalence",
+            "emergency_fallback": True,
+        }
     request = AgentRunRequest.model_validate(
         {
             "sid": scenario_id,
             "text": text,
             "language": language,
             "route_decision": route_decision,
-            "context": context or {},
+            "context": request_context,
             "history": history or [],
         }
     )

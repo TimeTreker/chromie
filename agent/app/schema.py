@@ -296,6 +296,7 @@ class HealthResponse(BaseModel):
     physical_task_graph_execution_enabled: bool = False
     interaction_output_mode: str = "native"
     native_interaction_fallback_enabled: bool = False
+    legacy_capability_fallback_enabled: bool = False
     capability_catalog_enabled: bool = False
     capability_catalog_version: int = 0
     task_continuity_enabled: bool = False

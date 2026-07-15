@@ -11,6 +11,27 @@ from agent.app.interaction import (
 )
 from agent.app.runtime import AgentRuntime, InteractionRuntime
 from agent.app.schema import AgentResult, AgentRunRequest
+
+
+def _legacy_services(**kwargs: Any) -> AgentServices:
+    return AgentServices(legacy_capability_fallback_enabled=True, **kwargs)
+
+
+def _legacy_request(payload: Any) -> AgentRunRequest:
+    if isinstance(payload, AgentRunRequest):
+        data = payload.model_dump(mode="python")
+    else:
+        data = dict(payload)
+    context = dict(data.get("context") or {})
+    context["semantic_authority"] = {
+        "owner": "legacy_capability_fallback",
+        "role": "authoritative",
+        "turn_id": "legacy-capability-test",
+        "reason": "explicit_emergency_fallback_test",
+        "emergency_fallback": True,
+    }
+    data["context"] = context
+    return AgentRunRequest.model_validate(data)
 from shared.chromie_contracts.task_proposal import TaskProposal
 from agent.app.task_graph.models import TaskGraph, TaskNode
 
@@ -656,7 +677,7 @@ def _request(
     intent: str = "nod",
     agents: list[str] | None = None,
 ) -> AgentRunRequest:
-    return AgentRunRequest.model_validate(
+    return _legacy_request(
         {
             "sid": "native-interaction",
             "text": text,
@@ -674,7 +695,7 @@ def _request(
 
 class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_native_runtime_emits_named_skill_without_result_adapter(self) -> None:
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "native-interaction",
                 "text": "nod",
@@ -696,7 +717,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=None,
                 use_llm=False,
                 max_speak_chars=160,
@@ -730,7 +751,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_HeadDirectionOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -743,7 +764,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args["duration_s"], 2.0)
 
     async def test_speech_while_body_action_waits_for_playback_start(self) -> None:
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "native-interaction",
                 "text": "sing a song for me while walk forward for 10 seconds",
@@ -766,7 +787,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             }
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=None,
                 use_llm=False,
                 max_speak_chars=160,
@@ -780,7 +801,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_velocity")
 
     async def test_router_compound_actions_keep_speech_as_skill(self) -> None:
-        request = AgentRunRequest.model_validate(
+        request = _legacy_request(
             {
                 "sid": "native-interaction",
                 "text": "walk forward and tell me a joke",
@@ -815,7 +836,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=None,
                 use_llm=False,
                 max_speak_chars=160,
@@ -858,7 +879,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agents=["conversation_agent", "speaker_agent"],
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_AgreementOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -898,7 +919,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agents=["conversation_agent", "speaker_agent"],
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ChatOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -939,7 +960,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agents=["conversation_agent", "speaker_agent"],
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_JokeOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -979,7 +1000,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         request.route_decision.confidence = 0.45
 
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=ollama,  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1004,7 +1025,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_UnsupportedStatusThenChatOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1028,7 +1049,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agents=["conversation_agent", "speaker_agent"],
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ChatOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1053,7 +1074,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         request.route_decision.confidence = 0.72
 
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_SongOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1078,7 +1099,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         request.route_decision.confidence = 0.3
 
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ChatOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1105,7 +1126,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         request.route_decision.confidence = 0.55
 
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_CompoundMotionOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1136,7 +1157,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agents=["conversation_agent", "speaker_agent"],
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ChatOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1159,7 +1180,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agents=["conversation_agent", "speaker_agent"],
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ChatOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1179,7 +1200,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agents=["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=None,
                 use_llm=False,
                 max_speak_chars=160,
@@ -1204,7 +1225,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         request.route_decision.source = "fallback"
         request.route_decision.confidence = 0.45
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_ChatOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1220,7 +1241,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_joke_walk_identity_sequence_does_not_carry_motion_into_identity_chat(self) -> None:
         runtime = InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=_JokeWalkIdentityOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
@@ -1303,7 +1324,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agents=["capability_agent", "conversation_agent", "safety_agent", "speaker_agent"],
         )
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=None,
                 use_llm=False,
                 max_speak_chars=160,
@@ -1324,7 +1345,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         request.context["allow_legacy_rule_agents"] = True
         result = await AgentRuntime(
-            AgentServices(ollama=None, use_llm=False, max_speak_chars=160)
+            _legacy_services(ollama=None, use_llm=False, max_speak_chars=160)
         ).run(request)
 
         self.assertEqual(result.actions[0].type, "head.nod")
@@ -1333,7 +1354,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_native_task_graph_is_emitted_as_structured_skill(self) -> None:
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=None,
                 use_llm=True,
                 max_speak_chars=160,
@@ -1357,7 +1378,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_native_task_graph_propagates_graph_confirmation(self) -> None:
         response = await InteractionRuntime(
-            AgentServices(
+            _legacy_services(
                 ollama=None,
                 use_llm=True,
                 max_speak_chars=160,

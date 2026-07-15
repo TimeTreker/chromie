@@ -45,9 +45,11 @@ from .tool_invocation import McpStreamableHttpInvoker
 
 try:
     from chromie_contracts.interaction import InteractionResponse
+    from chromie_contracts.semantic_authority import semantic_authority_route_matrix
     from chromie_contracts.semantic_task import SemanticTaskOperationSet
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import InteractionResponse
+    from shared.chromie_contracts.semantic_authority import semantic_authority_route_matrix
     from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
 
 
@@ -152,6 +154,13 @@ class Settings(BaseModel):
     native_interaction_fallback: bool = Field(
         default_factory=lambda: os.getenv(
             "AGENT_NATIVE_INTERACTION_FALLBACK",
+            "0",
+        ).strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    legacy_capability_fallback_enabled: bool = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED",
             "0",
         ).strip().lower()
         not in {"0", "false", "no", "off"}
@@ -465,6 +474,7 @@ services = AgentServices(
     social_attention_fallback_yaw_rad=settings.social_attention_fallback_yaw_rad,
     social_attention_fallback_confidence=settings.social_attention_fallback_confidence,
     require_capability_plan_review=settings.require_capability_plan_review,
+    legacy_capability_fallback_enabled=settings.legacy_capability_fallback_enabled,
     task_graph_planner=task_graph_planner,
     capability_catalog=capability_catalog,
     capability_match_limit=settings.capability_match_limit,
@@ -665,6 +675,7 @@ async def health() -> HealthResponse:
         ),
         interaction_output_mode=settings.interaction_output_mode,
         native_interaction_fallback_enabled=settings.native_interaction_fallback,
+        legacy_capability_fallback_enabled=settings.legacy_capability_fallback_enabled,
         capability_catalog_enabled=True,
         capability_catalog_version=capability_catalog.version,
         task_continuity_enabled=task_continuity_resolver is not None,
@@ -686,6 +697,17 @@ async def health() -> HealthResponse:
             settings.social_attention_model if social_attention_client is not None else None
         ),
     )
+
+
+@app.get("/semantic-authority")
+async def semantic_authority() -> dict[str, object]:
+    return {
+        "single_authority_enforced": True,
+        "legacy_capability_fallback_enabled": (
+            settings.legacy_capability_fallback_enabled
+        ),
+        "route_matrix": semantic_authority_route_matrix(),
+    }
 
 
 @app.get("/agents")

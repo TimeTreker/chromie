@@ -157,26 +157,24 @@ A terminal CanonicalPlan is projected to one runtime lane:
 This classification is a runtime dispatch property. It does not infer the
 meaning of user language.
 
-## 5. Fallback policy
+## 5. Semantic authority and failure policy
 
-`ORCH_COGNITIVE_FALLBACK_POLICY` controls technical failure behavior.
+The effective technical failure policy is `fail_closed`.
+`ORCH_COGNITIVE_FALLBACK_POLICY` remains accepted as a deprecated compatibility
+input, but it cannot authorize same-turn fallback after the Goal-driven Runtime
+has acquired semantic authority.
 
-### `legacy`
+A route excluded by `ORCH_COGNITIVE_APPLY_LANES` is rejected before authority
+acquisition. Once Goal Association begins in authoritative `apply`, any model,
+composition, lane, trusted-runtime, or Goal-state commit failure produces
+truthful no-action speech and no effectful skill. It does not fall through to
+the legacy CapabilityAgent planner.
 
-A technical failure or non-enabled lane returns to the compatibility path.
-This is suitable during staged comparison.
-
-A legacy fallback is not treated as successful cognitive application in
-retained evidence.
-
-### `fail_closed`
-
-A technical failure on an enabled effectful lane produces truthful no-action
-speech and no effectful skill. It does not fall through to an unrestricted
-language-model response that could promise execution.
-
-Use this for live acceptance after the enabled lane has passed report-only
-comparison.
+The legacy CapabilityAgent semantic planner is retained only as an explicit
+emergency compatibility path. It requires disabled or non-authoritative
+Goal-driven processing, host and Agent opt-in gates, and a per-turn emergency
+authority claim. Exact Router `actions[]` use a deterministic adapter and never
+call that planner. See [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
 
 ## 6. Total and per-stage budgets
 
@@ -382,10 +380,12 @@ The Fast Planner escalates. The first Deep plan conflicts at the trusted runtime
 boundary. Structured feedback produces one revised Deep plan. The validated
 plan is adapted without partial execution.
 
-### Per-lane rollback
+### Per-lane fail-closed boundary
 
-A valid robot plan is not applied when `robot_action` is absent from the apply
-allowlist. The result is classified as legacy fallback.
+A valid robot plan is not applied when its terminal `robot_action` lane is absent
+from the apply allowlist. If the mismatch is discovered after Goal-driven
+authority has started, the result is classified as `error` and cannot re-enter
+the legacy planner.
 
 ### Multi-Goal response coverage
 
@@ -508,26 +508,31 @@ ORCH_COGNITIVE_RUNTIME_MODE=off
 Restart the host Orchestrator. No database migration or capability change is
 required.
 
-### Per-lane rollback
+### Per-lane authority gate
 
-Remove the affected lane:
+Remove the affected route before rollout:
 
 ```env
 ORCH_COGNITIVE_APPLY_LANES=chat
 ```
 
-A `robot_action` plan then returns to the compatibility path while chat remains
-on the unified path.
+A routed `robot_action` turn is then excluded before Goal-driven authority
+acquisition. If an already-started plan resolves to a disabled lane, it fails
+closed rather than entering compatibility planning.
 
-### Technical fallback during rollout
+### Explicit emergency compatibility
+
+The maintained profiles keep both legacy gates disabled. Emergency operation
+requires all of the following:
 
 ```env
-ORCH_COGNITIVE_FALLBACK_POLICY=legacy
+ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1
+AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=1
 ```
 
-Use only while comparing behavior. For a mature effectful apply lane, prefer
-`fail_closed` so a cognitive failure cannot silently widen authority through a
-less constrained fallback.
+The Orchestrator must also attach a fresh per-turn emergency authority claim.
+These settings do not reopen a turn that already entered authoritative
+Goal-driven processing.
 
 ## 17. Operational review questions
 
@@ -540,7 +545,7 @@ Before widening an apply lane, review:
 5. Are material alternatives held for request-bound approval?
 6. Does speech match the current plan and execution state?
 7. Are all applied events recorded only after host preparation and Goal commit?
-8. Are fallback causes explicit rather than hidden?
+8. Are failures explicit and prevented from widening semantic authority?
 9. Can the lane be disabled without state repair?
 10. Is the claimed evidence class supported by retained artifacts?
 
@@ -555,7 +560,7 @@ PR7 implementation is automatically verified when:
 - invalid or partial plans commit no effectful skill;
 - Goal-state application is atomic;
 - response composition is fingerprint-bound to the terminal plan;
-- evidence distinguishes applied, report-only, fallback, and error outcomes;
+- evidence distinguishes applied, report-only, skipped, and error outcomes;
 - dependency-light cognitive scenarios and the full test suite pass.
 
 Target validation remains open until retained live-text and MuJoCo artifacts

@@ -9,6 +9,15 @@ from .interaction import (
     SkillTrace,
     SkillTraceEvent,
 )
+from .semantic_authority import (
+    SEMANTIC_AUTHORITY_CONTEXT_KEY,
+    SemanticAuthorityClaim,
+    SemanticAuthorityOwner,
+    SemanticAuthorityRole,
+    context_with_semantic_authority,
+    semantic_authority_from_context,
+    semantic_authority_route_matrix,
+)
 from .task_proposal import (
     TaskProposal,
     TaskProposalLedger,
@@ -73,6 +82,13 @@ __all__ = [
     "SkillResult",
     "SkillTrace",
     "SkillTraceEvent",
+    "SEMANTIC_AUTHORITY_CONTEXT_KEY",
+    "SemanticAuthorityClaim",
+    "SemanticAuthorityOwner",
+    "SemanticAuthorityRole",
+    "context_with_semantic_authority",
+    "semantic_authority_from_context",
+    "semantic_authority_route_matrix",
     "TaskProposal",
     "TaskProposalLedger",
     "TaskProposalPreflight",
