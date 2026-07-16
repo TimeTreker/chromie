@@ -10,7 +10,9 @@ Four modes are available:
 * ``acoustic`` generates fixtures and plays them through the configured host
   output so Chromie hears them through the configured host input device.
 * ``supervised`` uses the real microphone and asks an operator to confirm
-  audible and visual behavior. Only supervised evidence is release-closing.
+  audible and visual behavior. Supervised evidence is required for a human
+  physical voice-device claim; automated modes may support a narrower
+  generated-speech claim when the release compatibility policy accepts them.
 """
 
 from __future__ import annotations
@@ -206,6 +208,7 @@ class SpokenStep:
     prompt: str
     required_term_groups: tuple[tuple[str, ...], ...] = ()
     wait_before_events: tuple[str, ...] = ()
+    wait_for_confirmation_prompt_completion: bool = False
     wait_before_label: str | None = None
     countdown_s: int | None = None
 
@@ -229,7 +232,7 @@ CASES: dict[str, AcceptanceCase] = {
         ),
         (
             "ASR emits final text.",
-            "Router and native /interaction path complete.",
+            "Router and goal-driven cognitive runtime complete.",
             "Interaction reports zero skills and TTS playback completes.",
         ),
         (SpokenStep("Tell me one short fact about the Moon.", (("moon",),)),),
@@ -246,6 +249,7 @@ CASES: dict[str, AcceptanceCase] = {
         (
             "Native interaction contains at least one skill.",
             "Host confirmation is bound to the exact named-skill request.",
+            "The confirmation prompt finishes playback before approval is injected.",
             "Soridormi catalog/plan/execute path completes.",
             "Simulator returns to safe idle.",
         ),
@@ -257,8 +261,8 @@ CASES: dict[str, AcceptanceCase] = {
             SpokenStep(
                 "Yes.",
                 (("yes",),),
-                wait_before_events=("confirmation_requested",),
-                wait_before_label="the request-bound confirmation prompt",
+                wait_for_confirmation_prompt_completion=True,
+                wait_before_label="the request-bound confirmation prompt to finish playing",
             ),
         ),
     ),
@@ -283,8 +287,8 @@ CASES: dict[str, AcceptanceCase] = {
             SpokenStep(
                 "No thanks.",
                 (("no",),),
-                wait_before_events=("confirmation_requested",),
-                wait_before_label="the request-bound confirmation prompt",
+                wait_for_confirmation_prompt_completion=True,
+                wait_before_label="the request-bound confirmation prompt to finish playing",
             ),
         ),
     ),
@@ -322,9 +326,9 @@ CASES: dict[str, AcceptanceCase] = {
             "Observe the simulator and verify safe idle afterward.",
         ),
         (
-            "The active Skill Runtime execution is cancelled.",
-            "The provider cancellation/stop path is visible in evidence.",
-            "No orphaned simulated motion remains.",
+            "Host-observed Skill Runtime cancellation is recorded.",
+            "Post-cancellation Soridormi status reports safe idle.",
+            "No active simulated task is reported afterward.",
         ),
         (
             SpokenStep(
@@ -334,8 +338,8 @@ CASES: dict[str, AcceptanceCase] = {
             SpokenStep(
                 "Yes.",
                 (("yes",),),
-                wait_before_events=("confirmation_requested",),
-                wait_before_label="the request-bound confirmation prompt",
+                wait_for_confirmation_prompt_completion=True,
+                wait_before_label="the request-bound confirmation prompt to finish playing",
             ),
             SpokenStep(
                 "Stop talking.",
@@ -861,6 +865,30 @@ def message_field(message: str, name: str) -> str | None:
     return match.group(1) if match else None
 
 
+def scheduled_tts_text(message: str) -> str:
+    match = re.search(r"(?:^|\s)text=(.+)$", message)
+    if match is None:
+        return ""
+    try:
+        value = ast.literal_eval(match.group(1))
+    except (SyntaxError, ValueError):
+        return ""
+    return value if isinstance(value, str) else ""
+
+
+def is_confirmation_prompt_text(text: str) -> bool:
+    normalized = normalize_spoken_text(text)
+    return bool(
+        normalized
+        and (
+            "confirm" in normalized
+            or "yes or no" in normalized
+            or "确认" in normalized
+            or "是否" in normalized
+        )
+    )
+
+
 def friendly_event_line(event: dict[str, Any]) -> str | None:
     """Render a concise operator-facing line for important pipeline events."""
 
@@ -875,9 +903,9 @@ def friendly_event_line(event: dict[str, Any]) -> str | None:
             f"{prefix} Router: route={message_field(message, 'route') or '?'} "
             f"intent={message_field(message, 'intent') or '?'}"
         )
-    if name == "interaction_done":
+    if name in {"interaction_done", "cognitive_interaction_ready"}:
         return (
-            f"{prefix} Agent interaction: speech={message_field(message, 'speech') or '?'} "
+            f"{prefix} Goal-driven interaction: speech={message_field(message, 'speech') or '?'} "
             f"skills={message_field(message, 'skills') or '?'} "
             "confirmation="
             f"{message_field(message, 'requires_confirmation') or '?'}"
@@ -921,6 +949,53 @@ def wait_for_any_event(
         for item in events_for_sessions(read_events(path)[marker:], session_ids):
             if item.get("event") in expected:
                 return item
+        time.sleep(poll_s)
+    return None
+
+
+def wait_for_confirmation_prompt_completion(
+    path: Path,
+    *,
+    marker: int,
+    timeout_s: float,
+    session_ids: Iterable[str] | None = None,
+    poll_s: float = 0.2,
+) -> dict[str, Any] | None:
+    """Wait for a request-bound confirmation prompt to finish playback."""
+
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        scoped = events_for_sessions(read_events(path)[marker:], session_ids)
+        for request_index, requested in enumerate(scoped):
+            if requested.get("event") != "confirmation_requested":
+                continue
+            request_sid = str(requested.get("sid") or "")
+            if not request_sid:
+                continue
+            for schedule_index in range(request_index + 1, len(scoped)):
+                schedule = scoped[schedule_index]
+                if (
+                    schedule.get("event") != "tts_schedule"
+                    or str(schedule.get("sid") or "") != request_sid
+                ):
+                    continue
+                schedule_message = str(schedule.get("message") or "")
+                order = message_field(schedule_message, "order")
+                if order is None or not is_confirmation_prompt_text(
+                    scheduled_tts_text(schedule_message)
+                ):
+                    continue
+                playback_started = False
+                for playback in scoped[schedule_index + 1 :]:
+                    if str(playback.get("sid") or "") != request_sid:
+                        continue
+                    playback_message = str(playback.get("message") or "")
+                    if message_field(playback_message, "order") != order:
+                        continue
+                    if playback.get("event") == "playback_start":
+                        playback_started = True
+                    elif playback.get("event") == "playback_end" and playback_started:
+                        return playback
         time.sleep(poll_s)
     return None
 
@@ -988,16 +1063,24 @@ def guide_spoken_step(
 ) -> SpokenCapture:
     """Guide one spoken utterance and confirm that ASR captured it."""
 
-    if step.wait_before_events:
+    if step.wait_for_confirmation_prompt_completion or step.wait_before_events:
         label = step.wait_before_label or "/".join(step.wait_before_events)
         print(f"\nWaiting for {label} before the next utterance...")
-        trigger = wait_for_any_event(
-            events_path,
-            marker=case_marker,
-            event_names=step.wait_before_events,
-            timeout_s=trigger_timeout_s,
-            session_ids=case_session_ids,
-        )
+        if step.wait_for_confirmation_prompt_completion:
+            trigger = wait_for_confirmation_prompt_completion(
+                events_path,
+                marker=case_marker,
+                timeout_s=trigger_timeout_s,
+                session_ids=case_session_ids,
+            )
+        else:
+            trigger = wait_for_any_event(
+                events_path,
+                marker=case_marker,
+                event_names=step.wait_before_events,
+                timeout_s=trigger_timeout_s,
+                session_ids=case_session_ids,
+            )
         if trigger is None:
             return SpokenCapture(
                 check=CheckResult(
@@ -1143,6 +1226,31 @@ def parse_conversation_ids(events: Iterable[dict[str, Any]]) -> list[str]:
 def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult]:
     checks: list[CheckResult] = []
 
+    def rows(event_name: str) -> list[tuple[int, dict[str, Any], str]]:
+        return [
+            (index, item, str(item.get("message", "")))
+            for index, item in enumerate(events)
+            if item.get("event") == event_name
+        ]
+
+    def field(item: dict[str, Any], name: str) -> str | None:
+        value = message_field(str(item.get("message", "")), name)
+        if value is None or value in {"", "None", "null"}:
+            return None
+        return value
+
+    def integer_field(message: str, name: str) -> int | None:
+        raw = message_field(message, name)
+        if raw is None:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+
+    def scheduled_text(message: str) -> str:
+        return scheduled_tts_text(message)
+
     def require(event: str, label: str | None = None) -> None:
         checks.append(
             CheckResult(
@@ -1152,111 +1260,644 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             )
         )
 
-    if case_id in {"speech-only", "speech-skill", "refusal", "follow-up"}:
+    def require_interaction() -> list[tuple[int, dict[str, Any], str]]:
+        interaction_rows = [
+            *rows("cognitive_interaction_ready"),
+            *rows("interaction_done"),
+        ]
+        interaction_rows.sort(key=lambda value: value[0])
+        checks.append(
+            CheckResult(
+                name="goal-driven interaction ready",
+                passed=bool(interaction_rows),
+                detail=(
+                    "required event: cognitive_interaction_ready "
+                    "(interaction_done is accepted only for compatibility evidence)"
+                ),
+            )
+        )
+        return interaction_rows
+
+    def proposed_requests(
+        skill_id: str,
+        *,
+        count: int | None = None,
+    ) -> list[tuple[int, str]]:
+        proposal_rows = [
+            *rows("cognitive_skill_proposed"),
+            *rows("skill_proposed"),
+        ]
+        proposal_rows.sort(key=lambda value: value[0])
+        matches: list[tuple[int, str]] = []
+        for index, item, message in proposal_rows:
+            if f"skill_id={skill_id}" not in message:
+                continue
+            if count is not None:
+                match = re.search(r"\bargs=(\{.*\})\s*$", message)
+                if match is None:
+                    continue
+                try:
+                    args = json.loads(match.group(1))
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(args, dict) or args.get("count") != count:
+                    continue
+            request_id = field(item, "request_id")
+            if request_id is not None:
+                matches.append((index, request_id))
+        return matches
+
+    def safe_idle_status(
+        *,
+        after_index: int = -1,
+        sid: str | None = None,
+    ) -> bool:
+        return any(
+            index > after_index
+            and (sid is None or str(item.get("sid") or "") == sid)
+            and all(
+                token in message
+                for token in (
+                    "mode=sim",
+                    "backend=runtime",
+                    "safe_idle=True",
+                    "active_task_present=False",
+                    "emergency_stop=False",
+                    "fallen=False",
+                )
+            )
+            for index, item, message in rows("soridormi_post_status")
+        )
+
+    def confirmation_chain(
+        *,
+        decision: str,
+        terminal_event: str,
+        request_ids: set[str],
+    ) -> dict[str, Any] | None:
+        """Return one ordered, request-bound confirmation chain.
+
+        The host emits both the single-use confirmation ID and the exact request
+        fingerprint at every stage. Acceptance must correlate both values; mere
+        presence of unrelated confirmation events is not sufficient.
+        """
+
+        for request_index, requested, _message in rows("confirmation_requested"):
+            confirmation_id = field(requested, "confirmation_id")
+            fingerprint = field(requested, "fingerprint")
+            bound_request_ids = set(
+                (field(requested, "request_ids") or "").split(",")
+            ) - {""}
+            if (
+                confirmation_id is None
+                or fingerprint is None
+                or not request_ids
+                or not request_ids.issubset(bound_request_ids)
+            ):
+                continue
+            for reply_index, reply, _reply_message in rows("confirmation_reply"):
+                if reply_index <= request_index:
+                    continue
+                if (
+                    field(reply, "confirmation_id") != confirmation_id
+                    or field(reply, "fingerprint") != fingerprint
+                    or field(reply, "decision") != decision
+                ):
+                    continue
+                for terminal_index, terminal, _terminal_message in rows(
+                    terminal_event
+                ):
+                    if terminal_index <= reply_index:
+                        continue
+                    if (
+                        field(terminal, "confirmation_id") != confirmation_id
+                        or field(terminal, "fingerprint") != fingerprint
+                    ):
+                        continue
+                    if (
+                        terminal_event == "confirmation_rejected"
+                        and field(terminal, "reason") != decision
+                    ):
+                        continue
+                    if terminal_event == "confirmation_authorized":
+                        authorized_ids = set(
+                            (field(terminal, "request_ids") or "").split(",")
+                        ) - {""}
+                        if not request_ids.issubset(authorized_ids):
+                            continue
+                        requested_interaction = field(requested, "interaction_id")
+                        authorized_interaction = field(terminal, "interaction_id")
+                        if (
+                            requested_interaction is None
+                            or authorized_interaction != requested_interaction
+                        ):
+                            continue
+                    return {
+                        "confirmation_id": confirmation_id,
+                        "fingerprint": fingerprint,
+                        "request_index": request_index,
+                        "request_sid": str(requested.get("sid") or ""),
+                        "reply_index": reply_index,
+                        "terminal_index": terminal_index,
+                        "terminal_sid": str(terminal.get("sid") or ""),
+                    }
+        return None
+
+    def confirmation_prompt_playback_completed(chain: dict[str, Any]) -> bool:
+        request_index = int(chain["request_index"])
+        reply_index = int(chain["reply_index"])
+        request_sid = str(chain["request_sid"])
+        for schedule_index, schedule, message in rows("tts_schedule"):
+            if not (
+                request_index < schedule_index < reply_index
+                and str(schedule.get("sid") or "") == request_sid
+            ):
+                continue
+            order = field(schedule, "order")
+            prompt_text = scheduled_text(message)
+            if order is None or not is_confirmation_prompt_text(prompt_text):
+                continue
+            playback_start_index = next(
+                (
+                    playback_index
+                    for playback_index, playback, _message in rows("playback_start")
+                    if schedule_index < playback_index < reply_index
+                    and str(playback.get("sid") or "") == request_sid
+                    and field(playback, "order") == order
+                ),
+                None,
+            )
+            if playback_start_index is None:
+                continue
+            if any(
+                playback_start_index < playback_index < reply_index
+                and str(playback.get("sid") or "") == request_sid
+                and field(playback, "order") == order
+                for playback_index, playback, _message in rows("playback_end")
+            ):
+                return True
+        return False
+
+    def completed_tts(
+        *,
+        after_index: int = -1,
+        sid: str | None = None,
+        required_word: str | None = None,
+        denial: bool = False,
+    ) -> tuple[bool, str]:
+        for schedule_index, schedule, message in rows("tts_schedule"):
+            schedule_sid = str(schedule.get("sid") or "")
+            if schedule_index <= after_index or (sid and schedule_sid != sid):
+                continue
+            order = field(schedule, "order")
+            text = scheduled_text(message)
+            normalized = normalize_spoken_text(text)
+            if order is None or not text:
+                continue
+            if required_word:
+                padded = f" {normalized} "
+                if f" {normalize_spoken_text(required_word)} " not in padded:
+                    continue
+            padded_normalized = f" {normalized} "
+            if denial and not (
+                any(
+                    marker in padded_normalized
+                    for marker in (
+                        " will not ",
+                        " won t ",
+                        " cancelled ",
+                        " canceled ",
+                    )
+                )
+                or any(marker in normalized for marker in ("不会", "不执行", "已取消"))
+            ):
+                continue
+            start_index = next(
+                (
+                    index
+                    for index, item, _ in rows("playback_start")
+                    if index > schedule_index
+                    and str(item.get("sid") or "") == schedule_sid
+                    and field(item, "order") == order
+                ),
+                None,
+            )
+            if start_index is None:
+                continue
+            end_index = next(
+                (
+                    index
+                    for index, item, _ in rows("playback_end")
+                    if index > start_index
+                    and str(item.get("sid") or "") == schedule_sid
+                    and field(item, "order") == order
+                ),
+                None,
+            )
+            if end_index is None:
+                continue
+            session_complete = any(
+                index > end_index
+                and str(item.get("sid") or "") == schedule_sid
+                and (scheduled := integer_field(done_message, "scheduled_tts"))
+                is not None
+                and (played := integer_field(done_message, "played_tts")) is not None
+                and integer_field(done_message, "failed_tts") == 0
+                and integer_field(done_message, "skipped_tts") == 0
+                and scheduled >= 1
+                and scheduled == played
+                for index, item, done_message in rows("session_done")
+            )
+            if session_complete:
+                return True, text
+        return False, ""
+
+    def interrupt_chain(*, forbid_later_work: bool) -> dict[str, Any] | None:
+        for interrupted_index, interrupted, _message in rows(
+            "session_interrupted_by_new_session"
+        ):
+            old_sid = str(interrupted.get("sid") or "")
+            new_sid = field(interrupted, "new_sid")
+            if not old_sid or new_sid is None or new_sid == old_sid:
+                continue
+            interrupt_asr = next(
+                (
+                    index
+                    for index, item, _ in rows("asr_final")
+                    if index > interrupted_index
+                    and str(item.get("sid") or "") == new_sid
+                    and any(
+                        f" {term} "
+                        in f" {normalize_spoken_text(extract_asr_text(item))} "
+                        for term in ("stop", "cancel", "停止", "取消")
+                    )
+                ),
+                None,
+            )
+            if interrupt_asr is None:
+                continue
+            interrupt_route = next(
+                (
+                    index
+                    for index, item, _ in rows("router_done")
+                    if index > interrupt_asr
+                    and str(item.get("sid") or "") == new_sid
+                    and field(item, "route") == "interrupt"
+                ),
+                None,
+            )
+            if interrupt_route is None:
+                continue
+            active_playback = False
+            for start_index, start, _ in rows("playback_start"):
+                if start_index >= interrupted_index:
+                    continue
+                if str(start.get("sid") or "") != old_sid:
+                    continue
+                order = field(start, "order")
+                if order is None:
+                    continue
+                ended_before_interrupt = any(
+                    start_index < end_index < interrupted_index
+                    and str(end.get("sid") or "") == old_sid
+                    and field(end, "order") == order
+                    for end_index, end, _ in rows("playback_end")
+                )
+                if not ended_before_interrupt:
+                    active_playback = True
+                    break
+            if not active_playback:
+                continue
+            done_index = next(
+                (
+                    index
+                    for index, item, _ in rows("interrupt_previous_audio_done")
+                    if index > interrupt_route
+                    and str(item.get("sid") or "") == new_sid
+                ),
+                None,
+            )
+            if done_index is None:
+                continue
+            forbidden_events = {"playback_start", "playback_end"}
+            if forbid_later_work:
+                forbidden_events.add("tts_schedule")
+            forbidden_sids = (
+                {old_sid, new_sid} if forbid_later_work else {old_sid}
+            )
+            stale_output = any(
+                index > done_index
+                and str(item.get("sid") or "") in forbidden_sids
+                and item.get("event") in forbidden_events
+                for index, item in enumerate(events)
+            )
+            later_completed_work = forbid_later_work and any(
+                index > done_index
+                and str(item.get("sid") or "") in forbidden_sids
+                and (
+                    (
+                        item.get("event") == "skill_result"
+                        and field(item, "status") == "completed"
+                    )
+                    or (
+                        item.get("event") == "skill_runtime_done"
+                        and field(item, "status") == "completed"
+                    )
+                )
+                for index, item in enumerate(events)
+            )
+            return {
+                "old_sid": old_sid,
+                "new_sid": new_sid,
+                "done_index": done_index,
+                "no_later_output_or_work": not stale_output
+                and not later_completed_work,
+            }
+        return None
+
+    if case_id in {
+        "speech-only",
+        "speech-skill",
+        "refusal",
+        "body-cancel",
+        "follow-up",
+    }:
         require("asr_final")
         require("router_done")
-        require("interaction_done")
+        interaction_messages = require_interaction()
+    else:
+        interaction_messages = []
 
     if case_id == "speech-only":
-        messages = event_messages(events, "interaction_done")
-        no_skills = any(re.search(r"\bskills=0\b", item) for item in messages)
+        prepared = next(
+            (
+                (index, item)
+                for index, item, message in interaction_messages
+                if (speech := re.search(r"\bspeech=(\d+)\b", message))
+                and int(speech.group(1)) > 0
+                and re.search(r"\bskills=0\b", message)
+            ),
+            None,
+        )
         checks.append(
             CheckResult(
-                "no body skill",
-                no_skills,
-                "interaction_done must report skills=0",
+                "speech prepared without body skill",
+                prepared is not None,
+                "the prepared interaction must report speech>0 and skills=0",
             )
         )
-        require("session_done", "speech playback completed")
+        output_complete = False
+        if prepared is not None:
+            prepared_index, prepared_event = prepared
+            output_complete, _ = completed_tts(
+                after_index=prepared_index,
+                sid=str(prepared_event.get("sid") or "") or None,
+            )
+        checks.append(
+            CheckResult(
+                "speech output completed",
+                output_complete,
+                "a correlated TTS schedule, playback start/end, and clean session_done are required",
+            )
+        )
     elif case_id == "speech-skill":
-        messages = event_messages(events, "interaction_done")
-        has_skill = any(
-            (match := re.search(r"\bskills=(\d+)\b", item))
-            and int(match.group(1)) > 0
-            for item in messages
-        )
+        proposals = proposed_requests("soridormi.nod_yes", count=2)
+        proposal_ids = {request_id for _index, request_id in proposals}
         checks.append(
             CheckResult(
-                "named skill proposed",
-                has_skill,
-                "interaction_done must report one or more skills",
+                "exact nod skill proposed",
+                bool(proposals),
+                "the prepared interaction must propose soridormi.nod_yes count=2",
             )
         )
-        require("confirmation_requested", "request-bound confirmation requested")
-        approved = any(
-            "decision=approved" in item
-            for item in event_messages(events, "confirmation_reply")
+        approval = confirmation_chain(
+            decision="approved",
+            terminal_event="confirmation_authorized",
+            request_ids=proposal_ids,
         )
         checks.append(
             CheckResult(
-                "spoken confirmation approved",
-                approved and has_event(events, "confirmation_authorized"),
-                "confirmation reply must approve and authorize the bound request",
+                "exact request confirmation approved",
+                approval is not None,
+                "requested, approved, and authorized events must share confirmation_id and fingerprint",
             )
         )
-        completed = any(
-            "skill_id=soridormi." in item and "status=completed" in item
-            for item in event_messages(events, "skill_result")
+        checks.append(
+            CheckResult(
+                "confirmation prompt playback completed",
+                bool(approval and confirmation_prompt_playback_completed(approval)),
+                "the bound confirmation prompt must be scheduled and finish playback before approval",
+            )
+        )
+        completed_result = next(
+            (
+                (index, item)
+                for index, item, _message in rows("skill_result")
+                if index
+                > int(approval["terminal_index"] if approval else len(events))
+                and field(item, "request_id") in proposal_ids
+                and field(item, "skill_id") == "soridormi.nod_yes"
+                and field(item, "status") == "completed"
+            ),
+            None,
         )
         checks.append(
             CheckResult(
-                "named skill completed",
-                completed,
-                "skill_result must report status=completed",
+                "exact nod skill completed",
+                completed_result is not None,
+                "soridormi.nod_yes must report status=completed",
+            )
+        )
+        completed_index = (
+            completed_result[0] if completed_result is not None else len(events)
+        )
+        completed_sid = (
+            str(completed_result[1].get("sid") or "")
+            if completed_result is not None
+            else None
+        )
+        checks.append(
+            CheckResult(
+                "simulator returned safe idle",
+                safe_idle_status(
+                    after_index=completed_index,
+                    sid=completed_sid,
+                ),
+                "post-execution Soridormi status must be sim/runtime and safe idle",
             )
         )
     elif case_id == "refusal":
-        require("confirmation_requested", "request-bound confirmation requested")
-        denied = any(
-            "decision=denied" in item
-            for item in event_messages(events, "confirmation_reply")
+        proposals = proposed_requests("soridormi.nod_yes", count=2)
+        proposal_ids = {request_id for _index, request_id in proposals}
+        checks.append(
+            CheckResult(
+                "exact nod skill proposed",
+                bool(proposals),
+                "the denied request must be soridormi.nod_yes count=2",
+            )
         )
-        body_completed = any(
-            "skill_id=soridormi." in item and "status=completed" in item
+        denial_chain = confirmation_chain(
+            decision="denied",
+            terminal_event="confirmation_rejected",
+            request_ids=proposal_ids,
+        )
+        body_invoked = any(
+            "skill_id=soridormi." in item
             for item in event_messages(events, "skill_result")
         )
         checks.append(
             CheckResult(
-                "spoken confirmation denied",
-                denied and has_event(events, "confirmation_rejected"),
-                "confirmation reply must deny and consume the bound request",
+                "exact request confirmation denied",
+                denial_chain is not None,
+                "requested, denied, and rejected events must share confirmation_id and fingerprint",
+            )
+        )
+        denial_spoken = False
+        denial_text = ""
+        if denial_chain is not None:
+            denial_spoken, denial_text = completed_tts(
+                after_index=int(denial_chain["terminal_index"]),
+                sid=str(denial_chain["terminal_sid"]),
+                denial=True,
+            )
+        checks.append(
+            CheckResult(
+                "denial speech output completed",
+                denial_spoken,
+                (
+                    f"completed denial output: {denial_text!r}"
+                    if denial_spoken
+                    else "a denial TTS schedule and correlated playback completion are required"
+                ),
             )
         )
         checks.append(
             CheckResult(
                 "body skill not executed",
-                not body_completed,
-                "no completed Soridormi skill_result may follow denial",
+                not body_invoked,
+                "no Soridormi skill_result of any status may follow denial",
             )
         )
     elif case_id == "barge-in":
-        require("session_interrupted_by_new_session", "previous session interrupted")
-        require("interrupt_previous_audio_done", "playback interruption completed")
-    elif case_id == "body-cancel":
-        require("confirmation_authorized", "body request confirmed")
-        cancelled = (
-            has_event(events, "skill_runtime_cancelled")
-            or any(
-                "status=cancelled" in item
-                for item in event_messages(events, "skill_runtime_done")
-            )
-            or any(
-                "status=cancelled" in item
-                for item in event_messages(events, "skill_result")
+        interruption = interrupt_chain(forbid_later_work=False)
+        checks.append(
+            CheckResult(
+                "active playback session interrupted",
+                interruption is not None,
+                "an active old-session playback must link to the new interrupt session",
             )
         )
         checks.append(
             CheckResult(
-                "active skill cancelled",
-                cancelled,
-                "cancelled Skill Runtime completion or cancelled skill_result is required",
+                "stale playback did not resume",
+                bool(
+                    interruption
+                    and interruption["no_later_output_or_work"]
+                ),
+                "no old-session playback_start/playback_end may follow interrupt completion",
             )
         )
-        require("interrupt_previous_audio_done", "interruption completed")
+    elif case_id == "body-cancel":
+        proposals = proposed_requests("soridormi.nod_yes", count=8)
+        proposal_ids = {request_id for _index, request_id in proposals}
+        checks.append(
+            CheckResult(
+                "exact long nod skill proposed",
+                bool(proposals),
+                "the cancellable request must be soridormi.nod_yes count=8",
+            )
+        )
+        approval = confirmation_chain(
+            decision="approved",
+            terminal_event="confirmation_authorized",
+            request_ids=proposal_ids,
+        )
+        checks.append(
+            CheckResult(
+                "exact body request confirmed",
+                approval is not None,
+                "requested, approved, and authorized events must share confirmation_id and fingerprint",
+            )
+        )
+        execution_sid = str(approval["terminal_sid"]) if approval else ""
+        cancellation_indices = [
+            index
+            for index, item, _message in rows("skill_runtime_cancelled")
+            if approval is not None
+            and index > int(approval["terminal_index"])
+            and str(item.get("sid") or "") == execution_sid
+        ] + [
+            index
+            for event_name in ("skill_runtime_done", "skill_result")
+            for index, item, _message in rows(event_name)
+            if approval is not None
+            and index > int(approval["terminal_index"])
+            and str(item.get("sid") or "") == execution_sid
+            and field(item, "status") == "cancelled"
+        ]
+        cancelled = bool(cancellation_indices)
+        cancellation_index = min(cancellation_indices, default=len(events))
+        stop_session: tuple[int, str] | None = None
+        if approval is not None:
+            for asr_index, asr, _message in rows("asr_final"):
+                asr_sid = str(asr.get("sid") or "")
+                transcript = f" {normalize_spoken_text(extract_asr_text(asr))} "
+                if asr_index <= int(approval["terminal_index"]) or not any(
+                    f" {term} " in transcript for term in ("stop", "cancel", "停止", "取消")
+                ):
+                    continue
+                route_index = next(
+                    (
+                        index
+                        for index, item, _ in rows("router_done")
+                        if index > asr_index
+                        and str(item.get("sid") or "") == asr_sid
+                        and field(item, "route") == "interrupt"
+                    ),
+                    None,
+                )
+                if route_index is not None:
+                    stop_session = (route_index, asr_sid)
+                    break
+        interrupted = bool(
+            stop_session
+            and any(
+                index > max(cancellation_index, stop_session[0])
+                and str(item.get("sid") or "") == stop_session[1]
+                for index, item, _message in rows("interrupt_previous_audio_done")
+            )
+        )
+        checks.append(
+            CheckResult(
+                "host-observed skill cancellation",
+                cancelled,
+                "host evidence must record a cancelled Skill Runtime task or result",
+            )
+        )
+        checks.append(
+            CheckResult(
+                "host interruption completed",
+                interrupted,
+                "interrupt_previous_audio_done must follow observed cancellation",
+            )
+        )
+        checks.append(
+            CheckResult(
+                "simulator returned safe idle",
+                safe_idle_status(
+                    after_index=cancellation_index,
+                    sid=execution_sid or None,
+                ),
+                "post-cancellation status must report sim/runtime safe idle with no active task",
+            )
+        )
     elif case_id == "stop":
+        interruption = interrupt_chain(forbid_later_work=True)
+        stop_sid = str(interruption["new_sid"]) if interruption else ""
         deterministic = any(
-            "route=interrupt" in item
-            for item in event_messages(events, "router_done")
+            str(item.get("sid") or "") == stop_sid
+            and field(item, "route") == "interrupt"
+            for _index, item, _message in rows("router_done")
         )
         checks.append(
             CheckResult(
@@ -1265,12 +1906,66 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 "router_done must report route=interrupt",
             )
         )
-        require("interrupt_previous_audio_done", "active work interrupted")
-    elif case_id == "follow-up":
-        conversation_ids = parse_conversation_ids(events)
-        same_conversation = (
-            len(conversation_ids) >= 2 and len(set(conversation_ids[-2:])) == 1
+        checks.append(
+            CheckResult(
+                "active work interruption completed",
+                bool(interruption),
+                "an active old session must link to the completed stop session",
+            )
         )
+        checks.append(
+            CheckResult(
+                "no stale output or completed work after stop",
+                bool(
+                    interruption
+                    and interruption["no_later_output_or_work"]
+                ),
+                "old-session TTS/playback or completed skill work may not follow stop completion",
+            )
+        )
+    elif case_id == "follow-up":
+        asr_rows = rows("asr_final")
+        utterance_pair: tuple[
+            tuple[int, dict[str, Any], str],
+            tuple[int, dict[str, Any], str],
+        ] | None = None
+        for first in asr_rows:
+            first_text = normalize_spoken_text(extract_asr_text(first[1]))
+            if " blue " not in f" {first_text} ":
+                continue
+            for second in asr_rows:
+                second_text = normalize_spoken_text(extract_asr_text(second[1]))
+                if second[0] > first[0] and any(
+                    f" {word} " in f" {second_text} "
+                    for word in ("color", "colour")
+                ):
+                    utterance_pair = (first, second)
+                    break
+            if utterance_pair is not None:
+                break
+
+        conversation_ids: list[str] = []
+        if utterance_pair is not None:
+            first, second = utterance_pair
+            for utterance, upper_bound in ((first, second[0]), (second, len(events))):
+                utterance_sid = str(utterance[1].get("sid") or "")
+                snapshot = next(
+                    (
+                        item
+                        for index, item, _message in rows("context_snapshot")
+                        if utterance[0] < index < upper_bound
+                        and str(item.get("sid") or "") == utterance_sid
+                    ),
+                    None,
+                )
+                conversation_id = (
+                    field(snapshot, "conversation_id") if snapshot else None
+                )
+                if conversation_id is not None:
+                    conversation_ids.append(conversation_id)
+        same_conversation = len(conversation_ids) == 2 and len(
+            set(conversation_ids)
+        ) == 1
         checks.append(
             CheckResult(
                 "conversation retained",
@@ -1278,12 +1973,31 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 f"observed conversation IDs: {conversation_ids}",
             )
         )
-        asr_count = sum(1 for item in events if item.get("event") == "asr_final")
         checks.append(
             CheckResult(
-                "two utterances captured",
-                asr_count >= 2,
-                f"observed {asr_count} asr_final events",
+                "two intended utterances captured",
+                utterance_pair is not None,
+                "ASR must capture the blue-memory statement and later color question",
+            )
+        )
+        recalled_blue = False
+        recalled_text = ""
+        if utterance_pair is not None:
+            second = utterance_pair[1]
+            recalled_blue, recalled_text = completed_tts(
+                after_index=second[0],
+                sid=str(second[1].get("sid") or "") or None,
+                required_word="blue",
+            )
+        checks.append(
+            CheckResult(
+                "follow-up response recalled blue",
+                recalled_blue,
+                (
+                    f"completed response: {recalled_text!r}"
+                    if recalled_blue
+                    else "the second session must complete TTS output containing 'blue'"
+                ),
             )
         )
     else:
@@ -1384,7 +2098,8 @@ def render_summary(
         f"- **Started:** {metadata['started_utc']}",
         f"- **Finished:** {metadata.get('finished_utc', 'in progress')}",
         f"- **Mode:** `{metadata.get('runner', {}).get('mode', 'supervised')}`",
-        f"- **Release-closing evidence:** `{metadata.get('runner', {}).get('release_eligible', False)}`",
+        f"- **Human-supervised input mode:** `{metadata.get('runner', {}).get('human_supervised_mode', False)}`",
+        "- **Release eligibility:** determined only by `verify_voice_evidence.py` after provenance and runtime checks",
         f"- **Operator:** {metadata['operator']}",
         f"- **Chromie revision:** `{metadata['chromie']['revision']}`",
         f"- **Chromie version candidate:** `{metadata['chromie']['version']}`",
@@ -1414,6 +2129,7 @@ def render_summary(
             "- `runtime.env.redacted` — generated runtime configuration with secret-like values redacted",
             "- `audio-devices.log` — host audio-device discovery",
             "- `events.jsonl` — correlated Orchestrator session events",
+            "- `cognitive-runtime.jsonl` — applied goal-driven runtime evidence",
             "- `orchestrator.log` — complete host Orchestrator output",
             "- `cases.json` — per-case checks and operator notes",
             "- `recordings/` — raw input/output captures when enabled",
@@ -1430,6 +2146,7 @@ def render_summary(
 def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, Any]:
     status = git_output("status", "--porcelain")
     soridormi_local_revision = "not-provided"
+    soridormi_local_dirty: bool | None = None
     if args.soridormi_repo:
         repo = Path(args.soridormi_repo).expanduser()
         try:
@@ -1438,10 +2155,17 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
                 text=True,
                 stderr=subprocess.DEVNULL,
             ).strip()
+            soridormi_status = subprocess.check_output(
+                ["git", "-C", str(repo), "status", "--porcelain"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+            soridormi_local_dirty = bool(soridormi_status)
         except Exception:
             soridormi_local_revision = "unknown"
+            soridormi_local_dirty = None
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "acceptance_id": args.acceptance_id,
         "started_utc": utc_now(),
         "operator": args.operator,
@@ -1459,11 +2183,22 @@ def build_metadata(args: argparse.Namespace, selected: list[str]) -> dict[str, A
         },
         "soridormi_manifest": load_manifest_metadata(),
         "soridormi_local_revision": soridormi_local_revision,
+        "soridormi_local_dirty": soridormi_local_dirty,
+        "soridormi_source_binding": {
+            "kind": "declared_paired_checkout",
+            "endpoint_revision": None,
+        },
         "soridormi_mcp_url": args.soridormi_mcp_url or "not-configured",
         "selected_cases": selected,
         "runner": {
             "mode": args.mode,
-            "release_eligible": args.mode == "supervised",
+            "semantic_runtime": {
+                "mode": "apply",
+                "apply_lanes": ["chat", "robot_action"],
+                "fallback_policy": "fail_closed",
+                "legacy_semantic_fallback": False,
+            },
+            "human_supervised_mode": args.mode == "supervised",
             "start_services": args.start_services,
             "dry_run": args.dry_run,
             "allow_dirty": args.allow_dirty,
@@ -1519,6 +2254,15 @@ def write_override_file(
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
         "ORCH_ENABLE_SORIDORMI_SKILLS": "1" if enable_soridormi else "0",
         "ORCH_AUTO_CONFIRM_SIM_SKILLS": "0",
+        "ORCH_COGNITIVE_RUNTIME_MODE": "apply",
+        "ORCH_COGNITIVE_APPLY_LANES": "chat,robot_action",
+        "ORCH_COGNITIVE_FALLBACK_POLICY": "fail_closed",
+        "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED": "0",
+        "ORCH_COGNITIVE_EVIDENCE_ENABLED": "1",
+        "ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT": "0",
+        "ORCH_COGNITIVE_EVIDENCE_PATH": str(
+            event_path.parent / "cognitive-runtime.jsonl"
+        ),
         "ORCH_SESSION_TIMING_LOGS": "1",
         "ORCH_EVENT_LOG_PATH": str(event_path),
         "ORCH_SAVE_AUDIO": "true",

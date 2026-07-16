@@ -103,8 +103,8 @@ Compose file explicitly.
 ## Text Input To MuJoCo
 
 Use this when you want to skip microphone and ASR while still testing routing,
-Agent `/interaction`, the trusted Skill Runtime, live Soridormi MCP, and MuJoCo
-execution.
+the maintained goal-driven runtime, the trusted Skill Runtime, live Soridormi
+MCP, and MuJoCo execution.
 
 If the paired stack is already running, the compact no-microphone wrapper is:
 
@@ -117,7 +117,8 @@ If the paired stack is already running, the compact no-microphone wrapper is:
 ```
 
 The first command also checks speaker playback; the second is better for
-headless automation.
+headless automation. The wrapper uses goal-driven apply by default; pass
+`--legacy-agent-runtime` only for an explicitly labelled compatibility check.
 
 The text request is the only input Chromie uses for routing and skill planning.
 `--expect-*` flags are optional post-run assertions for regression tests; they
@@ -127,7 +128,9 @@ operator rehearsal.
 ```bash
 conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --expect-skill soridormi.walk_velocity \
   --expect-skill soridormi.nod_yes \
   --expect-skill soridormi.turn_in_place \
@@ -150,9 +153,16 @@ Open `summary.json` first. A passing run has:
 - `ok: true`;
 - the expected ordered Soridormi skills;
 - each Soridormi result marked `completed`;
+- `status_before.safe_idle: true` and `status_after.safe_idle: true`;
 - `status_after.active_task: null`;
 - `status_after.emergency_stop: false`;
 - `status_after.fallen` absent or false.
+
+For diagnostic provenance, include `--soridormi-repo` so the summary records a
+declared paired-checkout revision and clean state in addition to the manifest
+revision. That path does not identify the source executing behind the MCP
+endpoint. Retained target validation additionally requires a matching
+endpoint-reported Soridormi revision, which the current runner does not obtain.
 
 To diagnose the failure class where a physical request is misrouted through
 deep thought and internal plan text leaks into TTS, run the same checker in
@@ -162,6 +172,7 @@ preview mode with internal speech rejection enabled:
 conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
   "Wal forward for 15 seconds, quickly." \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --preview-only \
   --no-speaker \
   --expect-skill soridormi.walk_forward \
@@ -184,6 +195,7 @@ cases, noisy ASR-like input, and Chinese/English ambiguity.
 conda run -n Chromie python scripts/general_ability_acceptance.py --list
 conda run -n Chromie python scripts/general_ability_acceptance.py --mode check
 conda run -n Chromie python scripts/general_ability_acceptance.py --mode live-text \
+  --goal-driven-runtime apply \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
@@ -198,7 +210,9 @@ removed and should not be used as behavior-quality evidence.
 
 ## Voice Modes
 
-Use voice modes when you need audio pipeline evidence:
+Use voice modes when you need audio pipeline evidence. Start the external
+Soridormi MCP endpoint separately first; `--start-services` starts Chromie
+services only.
 
 ```bash
 python scripts/voice_acceptance.py --mode synthetic \
@@ -213,9 +227,14 @@ Modes:
 |---|---|
 | `synthetic` | TTS-generated input through VAD and ASR. Good automated regression. |
 | `virtual-mic` | Pulse/PipeWire virtual microphone path. Good host audio-device regression. |
+| `acoustic` | Generated speech through the configured host output/input path. Physical audio-path regression, but not a human voice-device claim. |
 | `supervised` | Real microphone and speaker. Use only for a physical voice-device release claim. |
 
-M13 text closure does not require the supervised real-microphone run.
+All four modes require a separately running Soridormi endpoint. A supplied
+`--soridormi-repo` records a declared paired checkout but does not prove the
+endpoint executes it; current bundles remain outside release-policy evaluation
+until the endpoint reports a matching source revision. M13 text closure does
+not require the supervised real-microphone run.
 
 ## Expected Robot Semantics
 
@@ -238,9 +257,11 @@ M13 text closure does not require the supervised real-microphone run.
   speech uses a short original line and still applies the same walking safety
   normalization. Chromie waits until that speech is actually audible before
   starting the body walk, so the song and walk overlap.
-- Chat-only speech is speech-only by default. You can opt in to reviewed
-  simulator-only expressive gestures with `AGENT_EXPRESSIVE_BODY_CUES=sim_only`;
-  leave it `off` for latency-sensitive or strict behavior tests.
+- Chat-only speech is speech-only by default. Architecture validation can opt in
+  to reviewed simulator-only gestures with `AGENT_SOCIAL_ATTENTION_MODE=sim_only`;
+  leave it `off` for latency-sensitive or strict behavior tests. The older
+  `AGENT_EXPRESSIVE_BODY_CUES` name is only a compatibility alias when the main
+  setting is absent.
 - Compound requests should preserve order unless a safety or validation rule
   refuses the request.
 

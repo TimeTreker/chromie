@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 try:
     from shared.chromie_contracts.semantic_authority import (
@@ -32,11 +35,13 @@ def audit() -> dict[str, Any]:
     matrix = semantic_authority_route_matrix()
 
     expected_entrypoints = {
-        "orchestrator.handle_routed_text/apply",
+        "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
+        "orchestrator.handle_routed_text/apply (mapped lane excluded)",
         "orchestrator.handle_routed_text/report_only",
         "agent./interaction with exact Router actions",
         "agent./interaction or /run emergency compatibility",
-        "post_interrupt_correction",
+        "post_interrupt_correction/apply (mapped lane allowlisted)",
+        "post_interrupt_correction/compatibility (mapped lane excluded)",
     }
     actual_entrypoints = {str(row.get("entrypoint") or "") for row in matrix}
     if actual_entrypoints != expected_entrypoints:
@@ -56,8 +61,8 @@ def audit() -> dict[str, Any]:
         for row in matrix
         if row.get("entrypoint")
         in {
-            "orchestrator.handle_routed_text/apply",
-            "post_interrupt_correction",
+            "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
+            "post_interrupt_correction/apply (mapped lane allowlisted)",
         }
     ]
     for row in apply_rows:
@@ -68,6 +73,27 @@ def audit() -> dict[str, Any]:
         if row.get("fallback") != "fail_closed_after_authority_acquisition":
             errors.append(
                 f"apply entrypoint can widen authority after acquisition: {row.get('entrypoint')}"
+            )
+
+    excluded_rows = [
+        row
+        for row in matrix
+        if row.get("entrypoint")
+        in {
+            "orchestrator.handle_routed_text/apply (mapped lane excluded)",
+            "post_interrupt_correction/compatibility (mapped lane excluded)",
+        }
+    ]
+    for row in excluded_rows:
+        if row.get("owner") != "legacy_agent_pipeline":
+            errors.append(
+                "excluded mapped lane does not remain on the legacy Agent path: "
+                f"{row.get('entrypoint')}"
+            )
+        if row.get("fallback") != "not_applicable_before_authority_acquisition":
+            errors.append(
+                "excluded mapped lane is not identified as pre-acquisition: "
+                f"{row.get('entrypoint')}"
             )
 
     maintained_defaults = {

@@ -1,15 +1,16 @@
 # Goal-Driven Cognitive Architecture
 
-Status: Proposed architecture constitution
+Status: Maintained architecture constitution
 Scope: Chromie cognition, planning, interaction, validation, and execution
-Implementation state: Design only; this document does not claim runtime support
+Implementation state: Implemented through the unified PR1-PR8 cognitive runtime;
+retained live-text and MuJoCo evidence for that authoritative path remains open
 
 ## 1. Purpose
 
-Chromie is evolving from a skill-routed interaction system into a goal-driven
-cognitive runtime. This document defines the architectural principles and
-contracts that future Router, Agent, memory, planning, social interaction, and
-execution work must follow.
+Chromie has migrated its maintained semantic-planning path from a skill-routed
+interaction system to a goal-driven cognitive runtime. This document defines
+the architectural principles and contracts that current and future Router,
+Agent, memory, planning, social interaction, and execution work must follow.
 
 The central change is simple:
 
@@ -123,6 +124,23 @@ versions, authorization, and execution grants.
 
 The validator does not decide what the user meant or what alternative best
 preserves the user’s goal.
+
+### 3.8.1 Single semantic authority
+
+For an enabled route, one turn has one authoritative semantic planner. In
+maintained `apply` mode that owner is the unified Goal-driven Runtime. Exact
+Router actions may be consumed only as compatibility-adapter input; they do not
+form a second semantic plan, and a turn acquired by the Goal-driven Runtime
+cannot fall through to the old CapabilityAgent planner after a failure.
+
+The old CapabilityAgent semantic planner is retained only as an explicit
+emergency path. It requires the host gate, the Agent gate, and an authoritative
+emergency claim whose non-empty `turn_id` exactly matches the request turn.
+Missing, empty, or cross-turn claims fail closed before model planning. The
+claim is internal routing metadata, not caller authentication or a consumed
+single-use nonce. Emergency compatibility does not widen execution authority:
+its output still crosses the same host validation, confirmation, Skill Runtime,
+provider, and evidence boundaries.
 
 ### 3.9 Semantic choice, deterministic enforcement
 
@@ -970,10 +988,13 @@ The following patterns violate this architecture:
 - implementation-component identity replacing Chromie’s speaking identity;
 - unlimited active-goal or conversation context.
 
-## 19. Implementation roadmap
+## 19. Implementation record
 
-This RFC is implemented through staged pull requests. Each stage begins with
-retained scenarios and does not claim later-stage behavior.
+This constitution was implemented through staged PR1-PR8 work. The stage
+descriptions below are an implementation record, not a statement that the
+maintained runtime still runs those components as independent report-only
+observers. Each stage began with retained scenarios and did not claim
+later-stage behavior.
 
 ### PR1 — Goal contracts and continuity projection
 
@@ -1107,18 +1128,39 @@ Exit criteria:
 Operational details are maintained in
 [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).
 
+### PR8 — Single semantic authority and model-facing contract hardening
+
+Implementation status: the unified runtime is authoritative for configured
+lanes, exact Router actions are adapter-only, and the legacy CapabilityAgent
+planner is emergency-only behind matching per-turn authority. Goal Association
+uses the exact model-facing schema while the host constructs canonical
+persistence objects.
+
+Exit criteria:
+
+- authoritative turns do not fall through to a second semantic planner;
+- emergency fallback requires both service gates and a non-empty matching-turn
+  claim;
+- model-facing Goal Association values are schema constrained and receive at
+  most one bounded contract repair;
+- contract exhaustion fails closed;
+- automated authority and schema-boundary checks pass;
+- retained live-text and MuJoCo evidence is reviewed before target behavior is
+  claimed.
+
 ## 20. Migration strategy
 
-Current routes, route items, semantic tasks, and task proposal ledgers remain
-compatibility surfaces during migration.
+Routes, route items, semantic tasks, and task proposal ledgers remain bounded
+compatibility surfaces around the maintained Goal-driven Runtime.
 
 Migration rules:
 
 - do not delete current safety or evidence boundaries;
 - introduce goal contracts alongside existing task contracts;
-- run new association and planning in report-only mode first;
-- compare goal coverage and committed skills against current behavior;
-- enable apply mode per lane and scenario class;
+- use `report_only` only for explicit observation or rollout diagnosis, not as
+  the maintained authority mode;
+- compare goal coverage and committed skills before widening an apply lane;
+- widen `apply` only per lane and reviewed scenario class;
 - preserve rollback switches;
 - remove compatibility semantics only after retained evidence.
 

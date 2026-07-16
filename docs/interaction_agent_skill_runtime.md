@@ -323,18 +323,21 @@ No hardware motion uses simulation auto-confirm behavior.
 ## Feature gates
 
 ```env
-ORCH_ENABLE_INTERACTION_RESPONSE=0
+ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=0
 ORCH_AUTO_CONFIRM_SIM_SKILLS=0
 ORCH_CONFIRMATION_TTL_SEC=20
 ORCH_SKILL_MAX_CONCURRENCY=8
+ORCH_COGNITIVE_RUNTIME_MODE=apply
+ORCH_COGNITIVE_APPLY_LANES=chat
 AGENT_INTERACTION_OUTPUT_MODE=native
 AGENT_NATIVE_INTERACTION_FALLBACK=0
 ```
 
-Defaults remain conservative. Enable structured speech-only rollout before
-Soridormi skills, then close simulator acceptance before any supervised hardware
-work.
+The common safe base owns the `chat` lane through the unified cognitive runtime
+while leaving Soridormi skills and simulation auto-confirm off. The maintained
+Soridormi launcher widens authority to `chat,robot_action`; simulator acceptance
+must still close before any supervised hardware work.
 
 ## Acceptance
 
@@ -342,23 +345,28 @@ The behavior-quality text-driven live Soridormi preview is exercised by:
 
 ```bash
 python scripts/general_ability_acceptance.py --mode live-text \
+  --goal-driven-runtime apply \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-It covers Router, native Agent interaction output, strict contracts, live
-Soridormi preflight, and representative ability-class assertions. Use
+It covers Router, goal-driven Agent planning/composition output, strict
+contracts, live Soridormi preflight, and representative ability-class
+assertions. Use
 `scripts/interaction_text_mujoco_check.py --no-speaker` for retained
 text-to-simulator evidence. These paths deliberately do not prove microphone
 capture, real TTS playback, or hardware motion.
 
-The deployed text-to-MuJoCo check exercises the Router service, Agent
-`/interaction`, trusted Skill Runtime, live Soridormi MCP, and optional real
-speaker output while skipping microphone and ASR:
+The deployed text-to-MuJoCo check exercises the Router service, goal-driven
+association/planning/composition endpoints, trusted Skill Runtime, live
+Soridormi MCP, and optional real speaker output while skipping microphone and
+ASR. The old Agent `/interaction` path is available only with
+`--no-cognitive-runtime` for labelled compatibility diagnosis:
 
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --no-speaker
 ```
 
@@ -370,6 +378,7 @@ Router, Agent, and Soridormi have produced their outputs:
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --expect-skill soridormi.walk_velocity \
   --expect-skill soridormi.nod_yes \
   --expect-skill soridormi.turn_in_place \
@@ -396,6 +405,7 @@ the general ability live-text preview:
 ```bash
 python scripts/general_ability_acceptance.py \
   --mode live-text \
+  --goal-driven-runtime apply \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
@@ -410,7 +420,10 @@ includes real microphone and speaker operation:
 
 ```bash
 python scripts/voice_acceptance.py \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+  --mode supervised \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --start-services
 python scripts/verify_voice_evidence.py --require-clean \
   .chromie/acceptance/voice/<acceptance-id>
 ```

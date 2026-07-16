@@ -65,6 +65,16 @@ def _robot_request(
 
 
 class SemanticAuthorityContractTests(unittest.TestCase):
+    def test_authority_claim_requires_non_empty_turn_id(self) -> None:
+        for turn_id in ("", "   "):
+            with self.subTest(turn_id=turn_id), self.assertRaises(ValidationError):
+                SemanticAuthorityClaim(
+                    owner="legacy_capability_fallback",
+                    role="authoritative",
+                    turn_id=turn_id,
+                    emergency_fallback=True,
+                )
+
     def test_invalid_legacy_fallback_claim_is_rejected(self) -> None:
         with self.assertRaises(ValidationError):
             SemanticAuthorityClaim(
@@ -106,11 +116,13 @@ class SemanticAuthorityContractTests(unittest.TestCase):
         self.assertEqual(
             entrypoints,
             {
-                "orchestrator.handle_routed_text/apply",
+                "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
+                "orchestrator.handle_routed_text/apply (mapped lane excluded)",
                 "orchestrator.handle_routed_text/report_only",
                 "agent./interaction with exact Router actions",
                 "agent./interaction or /run emergency compatibility",
-                "post_interrupt_correction",
+                "post_interrupt_correction/apply (mapped lane allowlisted)",
+                "post_interrupt_correction/compatibility (mapped lane excluded)",
             },
         )
         for row in matrix:
@@ -121,8 +133,8 @@ class SemanticAuthorityContractTests(unittest.TestCase):
             for row in matrix
             if row["entrypoint"]
             in {
-                "orchestrator.handle_routed_text/apply",
-                "post_interrupt_correction",
+                "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
+                "post_interrupt_correction/apply (mapped lane allowlisted)",
             }
         ]
         self.assertTrue(
@@ -132,6 +144,25 @@ class SemanticAuthorityContractTests(unittest.TestCase):
             all(
                 row["fallback"] == "fail_closed_after_authority_acquisition"
                 for row in apply_rows
+            )
+        )
+        excluded_rows = [
+            row
+            for row in matrix
+            if row["entrypoint"]
+            in {
+                "orchestrator.handle_routed_text/apply (mapped lane excluded)",
+                "post_interrupt_correction/compatibility (mapped lane excluded)",
+            }
+        ]
+        self.assertTrue(
+            all(row["owner"] == "legacy_agent_pipeline" for row in excluded_rows)
+        )
+        self.assertTrue(
+            all(
+                row["fallback"]
+                == "not_applicable_before_authority_acquisition"
+                for row in excluded_rows
             )
         )
 
@@ -230,6 +261,9 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
             response.metadata["planning_result"],
             "legacy_semantic_planner_disabled",
         )
+        self.assertEqual(response.metadata["semantic_authority_owner"], "none")
+        self.assertEqual(response.metadata["semantic_authority_role"], "none")
+        self.assertIs(response.metadata["semantic_authority_accepted"], False)
 
     async def test_exact_router_actions_are_adapter_only_even_with_llm(self) -> None:
         ollama = _CountingCapabilityOllama()
@@ -263,6 +297,85 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
             "router_action_adapter",
         )
         self.assertEqual(response.metadata["semantic_authority_role"], "adapter")
+
+    async def test_legacy_planner_rejects_empty_turn_claim(self) -> None:
+        ollama = _CountingCapabilityOllama()
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=ollama,
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+                legacy_capability_fallback_enabled=True,
+            )
+        )
+        response = await runtime.run(
+            _robot_request(
+                context={
+                    "semantic_authority": {
+                        "owner": "legacy_capability_fallback",
+                        "role": "authoritative",
+                        "turn_id": "",
+                        "emergency_fallback": True,
+                    }
+                }
+            )
+        )
+        self.assertEqual(ollama.calls, 0)
+        self.assertEqual(response.skills, [])
+        self.assertEqual(
+            response.metadata["semantic_authority_rejected"]["reason"],
+            "invalid_claim",
+        )
+        self.assertEqual(
+            response.metadata["planning_result"],
+            "legacy_semantic_planner_disabled",
+        )
+        self.assertEqual(response.metadata["semantic_authority_owner"], "none")
+        self.assertEqual(response.metadata["semantic_authority_role"], "none")
+        self.assertIs(response.metadata["semantic_authority_accepted"], False)
+
+    async def test_legacy_planner_rejects_stale_cross_turn_claim(self) -> None:
+        ollama = _CountingCapabilityOllama()
+        runtime = InteractionRuntime(
+            AgentServices(
+                ollama=ollama,
+                use_llm=True,
+                max_speak_chars=160,
+                capability_catalog=_catalog(),
+                capability_match_limit=8,
+                legacy_capability_fallback_enabled=True,
+            )
+        )
+        stale_claim = SemanticAuthorityClaim(
+            owner="legacy_capability_fallback",
+            role="authoritative",
+            turn_id="previous-turn",
+            emergency_fallback=True,
+        )
+        response = await runtime.run(
+            _robot_request(
+                context=context_with_semantic_authority({}, stale_claim),
+            )
+        )
+        self.assertEqual(ollama.calls, 0)
+        self.assertEqual(response.skills, [])
+        self.assertEqual(
+            response.metadata["semantic_authority_rejected"],
+            {
+                "reason": "turn_mismatch",
+                "claim_turn_id": "previous-turn",
+                "request_turn_id": "authority-turn",
+            },
+        )
+        self.assertEqual(
+            response.metadata["planning_result"],
+            "legacy_semantic_planner_disabled",
+        )
+        self.assertEqual(response.metadata["semantic_authority_owner"], "none")
+        self.assertEqual(response.metadata["semantic_authority_role"], "none")
+        self.assertIs(response.metadata["semantic_authority_accepted"], False)
 
     async def test_legacy_planner_requires_both_service_gate_and_turn_claim(self) -> None:
         claim = SemanticAuthorityClaim(

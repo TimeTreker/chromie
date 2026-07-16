@@ -121,12 +121,13 @@ assume the project root.
 
 ### Compatibility voice path
 
-Use the defaults:
+Use this only for explicit rollback or compatibility diagnostics:
 
 ```env
 ORCH_ENABLE_ROUTER=1
 ORCH_ENABLE_AGENT=1
 ORCH_ENABLE_INTERACTION_RESPONSE=0
+ORCH_COGNITIVE_RUNTIME_MODE=off
 ```
 
 ### Structured speech-only path
@@ -134,6 +135,8 @@ ORCH_ENABLE_INTERACTION_RESPONSE=0
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=0
+ORCH_COGNITIVE_RUNTIME_MODE=apply
+ORCH_COGNITIVE_APPLY_LANES=chat
 ```
 
 ### Structured MuJoCo path
@@ -142,6 +145,8 @@ ORCH_ENABLE_SORIDORMI_SKILLS=0
 ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=1
 ORCH_AUTO_CONFIRM_SIM_SKILLS=1
+ORCH_COGNITIVE_RUNTIME_MODE=apply
+ORCH_COGNITIVE_APPLY_LANES=chat,robot_action
 ORCH_SORIDORMI_MANIFEST=capabilities/soridormi.json
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
@@ -166,7 +171,7 @@ simulator skills, or `--build` to rebuild repository-owned service images.
 
 ## 5.2 Text-to-MuJoCo without microphone or ASR
 
-For route, interaction, Skill Runtime, speaker, and live MuJoCo checks without
+For route, goal-driven planning, Skill Runtime, speaker, and live MuJoCo checks without
 microphone capture or ASR, start Soridormi first:
 
 ```bash
@@ -208,7 +213,9 @@ Chromie's response through the configured speaker:
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --expect-skill soridormi.walk_velocity \
   --expect-skill soridormi.nod_yes \
   --expect-skill soridormi.turn_in_place \
@@ -221,9 +228,11 @@ python scripts/interaction_text_mujoco_check.py \
 Use `--no-speaker` for headless automation. The runner sets a 120s per-skill
 diagnostic timeout for live simulator checks; pass `--skill-timeout-s 0` to use
 catalog/default timeouts unchanged. Evidence is written under
-`.chromie/acceptance/text-mujoco/<id>/`. This is the current M13 text
-interaction closure path. It is not supervised microphone evidence and does not
-prove physical audio-device quality.
+`.chromie/acceptance/text-mujoco/<id>/`. The summary records exact source,
+manifest, and semantic-runtime provenance. This is the current cognitive
+text-to-MuJoCo path; it is not supervised microphone evidence and does not prove
+physical audio-device quality. Use `--no-cognitive-runtime` only for an
+explicitly labelled legacy compatibility diagnosis.
 
 For behavior-quality text probes without executing robot motion, run the
 general ability live-text preview:
@@ -231,11 +240,12 @@ general ability live-text preview:
 ```bash
 python scripts/general_ability_acceptance.py \
   --mode live-text \
+  --goal-driven-runtime apply \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-This checks representative ability-class probes through Router and Agent
-`/interaction` in preview mode and writes evidence under
+This checks representative ability-class probes through Router and the
+goal-driven runtime in preview mode and writes evidence under
 `.chromie/acceptance/general-ability/<id>/`. Add `--execute` only for a
 supervised simulator run.
 
@@ -463,8 +473,9 @@ python scripts/provider_conformance.py --live --profile sim
 
 Run the automatic synthetic matrix first. It generates input WAV files with the
 existing TTS service and injects them through the Orchestrator's private stdin
-audio path, so the test still crosses VAD, ASR, Router, native Agent output,
-Skill Runtime, response TTS, and Soridormi without relying on a person speaking:
+audio path, so the test still crosses VAD, ASR, Router, goal-driven Agent
+planning/composition, Skill Runtime, response TTS, and Soridormi without relying
+on a person speaking:
 
 ```bash
 python scripts/voice_acceptance.py \
@@ -512,7 +523,8 @@ its monitor as the input source, and removes it during cleanup. If a PulseAudio
 run was killed before cleanup, unload the stale module with
 `pactl list short modules` followed by `pactl unload-module <id>`.
 
-Finally, commit the candidate revision and run the real reference-host matrix:
+For a later claim that includes human microphone/speaker operation, commit the
+candidate revision and run the real reference-host matrix:
 
 ```bash
 python scripts/voice_acceptance.py \
@@ -525,17 +537,19 @@ python scripts/voice_acceptance.py \
 In supervised mode, press Enter once when ready, wait for `SPEAK NOW`, and speak
 the displayed phrase. The runner prints the ASR result and session-scoped
 pipeline trace. It asks for an audible/visual verdict only after all automated
-checks pass. Verify release-closing evidence without `--allow-automated`:
+checks pass. Verify human voice-device evidence without `--allow-automated`:
 
 ```bash
 python scripts/verify_voice_evidence.py --require-clean \
   .chromie/acceptance/voice/<id>
 ```
 
-Automatic bundles are useful regression evidence but cannot close the alpha
-release gate because
-they do not prove a real microphone, speaker, human pronunciation, room
-conditions, or operator-observed simulator safety.
+Automatic bundles do not prove a real microphone, speaker, human pronunciation,
+room conditions, or operator-observed simulator safety. They therefore cannot
+close a human voice-device claim. The current narrowed `0.0.1` candidate policy
+does accept clean current-revision `synthetic`, `virtual-mic`, or `acoustic`
+voice evidence when release preparation also receives target-validated
+goal-driven text-to-MuJoCo evidence; see `docs/RELEASE.md`.
 
 ## 14. Logs
 

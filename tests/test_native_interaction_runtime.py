@@ -22,11 +22,13 @@ def _legacy_request(payload: Any) -> AgentRunRequest:
         data = payload.model_dump(mode="python")
     else:
         data = dict(payload)
+    turn_id = str(data.get("sid") or "legacy-capability-test").strip()
+    data["sid"] = turn_id
     context = dict(data.get("context") or {})
     context["semantic_authority"] = {
         "owner": "legacy_capability_fallback",
         "role": "authoritative",
-        "turn_id": "legacy-capability-test",
+        "turn_id": turn_id,
         "reason": "explicit_emergency_fallback_test",
         "emergency_fallback": True,
     }

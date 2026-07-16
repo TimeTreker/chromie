@@ -49,6 +49,41 @@ _SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([,;:.!?，。！？、])")
 _EMPTY_BRACKETS_RE = re.compile(r"\(\s*\)|\[\s*\]|\{\s*\}")
 
 
+class FastSpeech(BaseModel):
+    """Router-authored process acknowledgement preserved across services."""
+
+    text: str = ""
+    purpose: str | None = None
+    language: str | None = None
+    commitment: str | None = None
+    must_not_claim_completion: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_bare_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return {"text": value}
+        return value
+
+    @model_validator(mode="after")
+    def reject_contract_marker_as_spoken_text(self) -> "FastSpeech":
+        if self.must_not_claim_completion is not True:
+            raise ValueError("fast_speech must forbid completion claims")
+        marker = "_".join(self.text.strip().casefold().replace("-", "_").split())
+        if marker in {
+            "checking_only",
+            "prelude_only",
+            "needs_confirmation",
+            "acknowledge",
+            "acknowledge_and_check",
+            "clarify",
+            "thinking",
+            "safety_prelude",
+        }:
+            self.text = ""
+        return self
+
+
 class RouteItem(BaseModel):
     route: RouteName
     intent: str = "unknown"
@@ -59,6 +94,7 @@ class RouteItem(BaseModel):
     requires_mind: bool = False
     direct_to_tts: bool = False
     text: str | None = None
+    fast_speech: FastSpeech | None = None
     skill_id: str | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     actions: list[dict[str, Any]] = Field(default_factory=list)
@@ -125,6 +161,7 @@ class RouteDecision(BaseModel):
     needs_agent: bool = True
     should_speak: bool = True
     speak_first: str | None = None
+    fast_speech: FastSpeech | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
@@ -143,6 +180,27 @@ class RouteDecision(BaseModel):
             seen.add(agent)
             normalized.append(agent)
         return normalized
+
+    @model_validator(mode="after")
+    def populate_speak_first_from_fast_speech(self) -> "RouteDecision":
+        contract_markers = {
+            "checking_only",
+            "prelude_only",
+            "needs_confirmation",
+            "acknowledge",
+            "acknowledge_and_check",
+            "clarify",
+            "thinking",
+            "safety_prelude",
+        }
+        marker = "_".join(
+            str(self.speak_first or "").strip().casefold().replace("-", "_").split()
+        )
+        if marker in contract_markers:
+            self.speak_first = None
+        if not self.speak_first and self.fast_speech and self.fast_speech.text.strip():
+            self.speak_first = self.fast_speech.text.strip()
+        return self
 
 
 class AgentRunRequest(BaseModel):

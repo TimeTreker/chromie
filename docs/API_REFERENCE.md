@@ -68,9 +68,25 @@ multi-route surface. Route-item lanes include `immediate_speech`,
 `conversation`, `post_turn`, `deepthought`, `skill_runtime`, `tool`,
 `deterministic_control`, and `none`. Context profiles include `none`,
 `fast_minimal`, `session_compact`, `capability_safety`, and `full_mind`.
-Only short safe chat items may set `direct_to_tts=true`; those can be scheduled
-through the Orchestrator fast-first TTS lane while other items continue through
-Agent, memory, deepthought, tool, or Skill Runtime policy.
+Only short safe chat items may set `direct_to_tts=true`, but that compatibility
+marker alone cannot schedule audio. Playback additionally requires the
+default-off Router-generated FastSpeech gate and its validated structured
+contract, or an independent trusted host response-plan/cache path, while other
+items continue through Agent, memory, deepthought, tool, or Skill Runtime
+policy.
+
+Both a top-level `RouteDecision` and an individual `RouteItem` may include
+`fast_speech`. A bare string or partial object remains parseable for wire
+compatibility, and top-level `fast_speech.text` may still populate the
+compatibility `speak_first` field. Neither form is playback authority. Dynamic
+Router-authored playback is default-off behind
+`ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED=0`; when explicitly enabled it still
+requires a structured object with safe `text`, an allowed process `purpose`, a
+non-terminal `commitment`, and `must_not_claim_completion=true`. It must not
+claim a result, memory write, physical execution, or final answer. Contract
+markers such as `thinking` or `checking_only` are not spoken as literal text.
+Validated `metadata.response_plan` immediate speech and startup-cached host cues
+are separate trusted paths and do not require this compatibility gate.
 
 For ordered listed-skill work inside a robot-action route item,
 `RouteDecision.actions` may still contain an ordered list of skill proposals.
@@ -122,7 +138,10 @@ running.
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
 | `POST` | `/capabilities/search` | Rank relevant capabilities for Router and normal InteractionRuntime. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog or query-specific LLM context. |
-| `POST` | `/task-continuity` | Propose semantic create/modify/clarification/cancel and related task operations from bounded active-task context; the endpoint does not mutate host task state. |
+| `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
+| `POST` | `/fast-plan` | Produce a complete common-catalog `CanonicalPlan` or terminal Deep Planner escalation. |
+| `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`, including bounded same-tier revision. |
+| `POST` | `/compose-response-plan` | Bind goal-scoped speech and optional auxiliary attention to an immutable terminal plan. |
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
@@ -153,11 +172,11 @@ The interaction, goal-association, and task-continuity endpoints accept the same
 - `context`
 - `history`
 
-`POST /fast-plan` is available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. It returns the shared `CanonicalPlan` contract. The Fast Planner may return a complete simple response, a complete direct common-capability plan, or an escalation. Partial or uncertain coverage is contractually required to contain zero executable steps. The endpoint is advisory and uses the same deterministic validator path planned for later apply mode. The host currently supports `off` and background `report_only` observation.
+`POST /fast-plan` is available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. It returns the shared `CanonicalPlan` contract. The Fast Planner may return a complete simple response, a complete direct common-capability plan, or an escalation. Partial or uncertain coverage is contractually required to contain zero executable steps. The endpoint never executes by itself; the host uses it inside unified `report_only` observation or authoritative `apply`, where the trusted runtime revalidates every terminal plan.
 
 `POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association advisory, Fast Planner escalation, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Deterministic validation feedback may trigger at most `AGENT_DEEP_PLANNER_MAX_REPLANS` same-tier revisions.
 
-`POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. The resolved composition embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, forbids pre-execution completion claims, and may include an auxiliary `SocialAttentionPlan`. Social attention is independently validated against exact capability IDs, schemas, target evidence, confirmation policy, and primary-plan resource conflicts; invalid optional behavior is dropped without changing speech or task planning. The host currently invokes it only in background `report_only` mode after terminal Fast or Deep planning.
+`POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. The resolved composition embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, forbids pre-execution completion claims, and may include an auxiliary `SocialAttentionPlan`. Social attention is independently validated against exact capability IDs, schemas, target evidence, confirmation policy, and primary-plan resource conflicts; invalid optional behavior is dropped without changing speech or task planning. The unified host invokes this stage in both observation and authoritative apply; composition failure fails closed after authority acquisition.
 
 `POST /goal-association` is available only when
 `AGENT_GOAL_ASSOCIATION_ENABLED=1` and Agent LLM use is enabled. It applies
@@ -165,9 +184,10 @@ continuity before creation: each semantic responsibility may associate with
 existing active goals, become an independent new goal, or produce one natural
 clarification when the reference is ambiguous. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
-are rejected. The endpoint is advisory and does not mutate task state, authorize
-side effects, alter Router output, or execute plans. The host currently supports
-`off` and background `report_only` observation.
+are rejected. The endpoint itself does not mutate task state, authorize side
+effects, alter Router output, or execute plans. The unified host uses its result
+in `report_only` observation or authoritative `apply`, and only the host may
+atomically commit the validated association.
 
 `POST /task-continuity` is available only when
 `AGENT_TASK_CONTINUITY_ENABLED=1` and Agent LLM use is enabled. It treats the

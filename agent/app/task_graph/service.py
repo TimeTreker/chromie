@@ -176,6 +176,8 @@ class TaskGraphService:
         self,
         request: TaskGraphConfirmationGrantRequest,
     ) -> TaskGraphConfirmationGrantResponse:
+        if self.guarded_invoker is None:
+            raise RuntimeError("guarded TaskGraph execution is disabled")
         report = GraphValidator(self.registry).validate(request.graph)
         report.raise_for_errors()
         confirmation_nodes = {

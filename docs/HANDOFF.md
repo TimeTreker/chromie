@@ -1,240 +1,161 @@
 # Project Handoff
 
-Last updated: 2026-06-27
+Last updated: 2026-07-16
 
 This handoff records the current resume point for a developer or operator who
-needs to continue Chromie without replaying the full chat history.
+needs to continue Chromie without replaying the full history. Capability and
+evidence claims remain authoritative in [Current Status](STATUS.md).
 
 ## Current State
 
-M13 text-to-MuJoCo interaction closure is complete. The retained text evidence
-shows direct text input flowing through Router, Agent `/interaction`, the trusted
-host Skill Runtime, live Soridormi MCP, and MuJoCo `sim` execution.
+Chromie's maintained semantic-planning path is the unified Goal-driven Runtime
+implemented through PR1-PR8:
 
-The current development focus is the simulation-demo release audit across the
-Chromie/Soridormi boundary. Chromie can now represent richer embodied requests
-as structured Soridormi task goals, attach stable `client_task_ref` values,
-submit them through the planning TaskGraph executor, and monitor
-`soridormi.task.events` until Soridormi reports a terminal state. This is
-contract/no-motion preparation plus simulator evidence; it is not physical
-execution evidence.
+```text
+Router classification
+  -> Goal Association
+  -> complete-coverage Fast Planner
+  -> terminal Deep Planner when needed
+  -> trusted host validation and at most one bounded replan
+  -> fingerprint-bound Response Composition
+  -> strict InteractionResponse preparation
+  -> atomic Goal-state application
+  -> confirmation / Skill Runtime / Soridormi
+```
 
-Soridormi's no-motion task and skill surface is now declared in the paired
-capability snapshot. The next non-hardware implementation section is Chromie
-routing into those declared task types while preserving Soridormi refusal
-metadata. Navigation, approach, and delivery remain structured refusals until
-Soridormi proves the required simulator pipelines. Motion-control model
-training is deferred until task semantics, target-body evidence, calibration,
-telemetry, and safety envelopes exist.
+The common safe base enables structured interaction and authoritative
+cognitive `apply` for `chat` while leaving Soridormi disabled. The maintained
+`scripts/start_chromie.sh` Soridormi launcher enables the trusted provider and
+widens authoritative lanes to `chat,robot_action`. Both profiles use
+`fail_closed` after the Goal-driven Runtime acquires a turn. The standalone
+Goal Association, Fast Planner, Deep Planner, Response Composer, and task
+continuity observer switches are off because the unified coordinator owns
+those stages.
 
-The fast Router model is also not an execution authority. Treat
-`qwen3:4b` as an advisory classifier only: deterministic controls,
-capability-catalog constraints, low-confidence deepthought delegation, schemas,
-Skill Runtime authorization, and Soridormi provider checks must catch wrong
-model routes.
+There is one semantic authority per applied turn. Exact Router actions are
+adapter-only. The old CapabilityAgent planner is not a normal fallback: it
+requires the host gate, Agent gate, and an authoritative emergency claim with a
+non-empty `turn_id` exactly matching the request turn. Missing, empty, and
+cross-turn claims fail closed before model planning. This claim is internal
+routing metadata; it is not caller authentication or a consumed replay nonce.
 
-The temporary `demo-sim-2026-06-27` tag was withdrawn before publication during
-the paired repository audit. Recreate a demo tag only after the Chromie and
-Soridormi docs, checks, and retained simulator evidence match the intended
-claim.
+The Goal Association model boundary now uses the exact schema and receives at
+most one bounded contract-repair attempt. The host, not the model, owns turn,
+association, goal, version, and persistence identities.
 
-Retained closure evidence:
+Evidence and release tooling now checks provenance rather than treating any
+older successful bundle as current validation:
+
+- cognitive simulator validation requires an applied cognitive result,
+  completed Soridormi `sim` execution, safe idle, a clean declared paired
+  checkout, and an endpoint-reported Soridormi revision matching that checkout
+  and the manifest;
+- voice evidence compares its recorded host-checkout revision/version and
+  Soridormi declarations with the current source, capability manifest, and
+  compatibility declaration, but host `HEAD` does not yet bind the running
+  Chromie images/models to that source;
+- release preparation fails when those revisions or versions disagree.
+
+The fail-closed comparison controls are implemented and have automated
+coverage, but the current runners record `declared_paired_checkout` without an
+endpoint-reported Soridormi revision. Running Chromie image/model source
+binding and immutable release image references are also open. Retained
+live-text and MuJoCo evidence for the current multi-goal and single-authority
+path remains open. Do not claim target validation or release readiness from
+Level A results, a newly diagnostic-only bundle, or the historical M13 bundle.
+
+## Historical Evidence Boundary
+
+The M13 text-to-MuJoCo interaction closure remains valid evidence for the
+historical structured path:
 
 ```text
 .chromie/acceptance/text-mujoco/20260617T081411Z
 ```
 
-The tested request was:
+That run completed ordered `soridormi.walk_velocity`, `soridormi.nod_yes`, and
+`soridormi.turn_in_place` execution and returned MuJoCo to safe idle. It does
+not validate the current Goal-driven Runtime, physical microphone/speaker
+quality, a physical robot, Jetson packaging, or unattended operation.
 
-```text
-walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left
-```
-
-The expected ordered skills all completed:
-
-```text
-soridormi.walk_velocity
-soridormi.nod_yes
-soridormi.turn_in_place
-```
-
-The final Soridormi status was standing, with no active task and no emergency
-stop.
-
-## What M13 Does And Does Not Mean
-
-Closed:
-
-- text input routing to deterministic compound robot actions;
-- native Agent `/interaction` contract generation;
-- trusted Skill Runtime execution and ordered traces;
-- live Soridormi named-skill execution in MuJoCo;
-- safe-idle status after the text-driven run;
-- automated synthetic and virtual-microphone regression evidence.
-
-Not claimed by M13:
-
-- robust human ASR;
-- physical microphone or speaker quality;
-- physical robot support;
-- verified Jetson packaging;
-- unattended operation.
-
-Physical microphone/speaker validation is now a separate voice-device
-release-support track. Run the supervised voice matrix only when the release
-claim includes real audio devices.
-
-## Latest Validation
-
-The current task-agent routing, refusal-reporting, and host graph-dispatch
-refresh after committed base `f4bbb2f` passed:
-
-```text
-python scripts/check_docs.py
-python scripts/test_matrix.py taskgraph
-python scripts/test_matrix.py soridormi
-python -m unittest tests.test_agent_client
-python -m unittest tests.test_soridormi_acceptance
-python -m unittest tests.test_robot_candidate_verifier
-python -m unittest tests.test_interaction_control_plane
-python -m unittest tests.test_interaction_coordinator \
-  tests.test_skill_runtime \
-  tests.test_native_interaction_runtime \
-  tests.test_task_graph_planning \
-  tests.test_planning_task_graph_execution
-python -m unittest tests.test_task_graph_planning \
-  tests.test_planning_task_graph_execution \
-  tests.test_soridormi_task_client \
-  tests.test_soridormi_acceptance \
-  tests.test_capability_catalog_service \
-  tests.test_capability_aware_interaction
-SORIDORMI_MCP_URL=http://127.0.0.1:8011/mcp \
-  PYTHONPATH=/Users/chromie/github/chromie/agent:/Users/chromie/github/chromie \
-  /tmp/soridormi-m5-py313/bin/python -m app.soridormi_acceptance \
-  --manifest capabilities/soridormi.json --task-agent-bridge
-```
-
-The task-agent bridge acceptance passed against a local Soridormi dry-run MCP
-server with graph `soridormi-task-agent-acceptance-115cc864fd04`, backend
-`local_tool_dry_run`, `no_motion=true`, `safe_idle=true`, and explicit
-`capabilities`, `preview`, `submit`, and `events` nodes. This is no-motion
-contract evidence only; it does not prove physical execution.
-
-The latest full host `./scripts/run_tests.sh` attempt on 2026-07-04 passed
-`python scripts/check_docs.py`, ran 627 current `unittest` cases with `OK`, and
-then passed 20 dependency-light legacy Agent test functions. The behavior
-scenario runner also passed 353/353 adapter, Router, interaction, and dialogue scenario
-files with `--no-write`.
-
-Focused local slices also passed 46/46 after the simulation-demo documentation
-refresh:
-
-```text
-python -m unittest \
-  tests.test_ability_registry \
-  tests.test_conversation_state \
-  tests.test_deepthinking_agent \
-  tests.test_interaction_text_mujoco_check \
-  tests.test_orchestrator_tts_alignment
-python -m unittest \
-  tests.test_router_llm_prompt \
-  tests.test_contract_compatibility
-```
-
-Previously focused text/M13 tests also passed:
-
-```text
-python -m unittest \
-  tests.test_interaction_text_mujoco_check \
-  tests.test_general_ability_acceptance \
-  tests.test_m13_acceptance
-```
+The latest recorded broad automated baseline before this authority/provenance
+hardening is the 2026-07-14 checkpoint: 926 unittest cases, 20 legacy Agent
+tests, 381 file-backed scenarios, and 50 General Ability Level A probes. Treat
+those as historical counts, not a fresh pass for the current source. Rerun the
+canonical gates before making a new automated-evidence claim.
 
 ## Resume Sequence
 
-1. Keep physical-motion gates off.
-2. Continue the Developer Usability Tools phase in
-   [Developer Usability Tools Plan](DEVELOPER_USABILITY_TOOLS.md): PR0-PR6 are
-   implemented; next harden retained trace examples from real bundles.
-3. Keep `trace explain` deferred until trace identifiers and schemas are
-   documented across Router, Agent, Skill Runtime, Soridormi, TTS/playback, and
-   fallback causes; use [Trace Schema](TRACE_SCHEMA.md) for `trace view`.
-4. Route rich user requests into Soridormi-declared no-motion task types before
-   training motion-control models.
-5. Preserve model-assisted routing guardrails. Stop/cancel/ignore stay
-   deterministic, Qwen handles normal quick intent routing, low-confidence or
-   explicitly complex quick routes delegate to deepthought, and execution still
-   requires registry/runtime/provider validation.
-6. Keep the Soridormi task-agent snapshot aligned with Soridormi's
-   authoritative manifest.
-7. Continue acceptance tests for task capability inspection, preview, submit,
-   event monitoring, refusal, blocked-subsystem reporting, timeout, and
-   cancellation semantics. Use trace `outcome_summary` as the deterministic
-   result source when adding report/speech nodes.
-8. Preserve the no-motion `--task-agent-bridge` acceptance as the bridge
-   contract gate; rerun it when Soridormi's task API snapshot changes.
-9. Add Chromie routing only for Soridormi-declared task types; keep missing
-   navigation, approach, and manipulation goals as structured refusals or
-   clarifications rather than velocity recipes.
-10. Select one reference robot candidate.
-11. Fill the ignored real candidate record under `.chromie/commissioning/` using
-   `commissioning/reference_robot_candidate.schema.json`.
-12. Verify candidate identity, independent emergency stop, network, workspace,
-   software revisions, calibration ownership, referenced evidence files,
-   evidence-root containment, provider-manifest revision matching, calibration
-   hashes, and no-motion procedures.
-13. Continue with no-motion health and shadow/dry-run checks before any bounded
-   physical skill execution.
+1. Keep physical-motion and legacy-semantic-fallback gates off.
+2. Run the semantic-authority audit and focused authority tests. Confirm that a
+   claim for another turn never reaches the legacy planner model.
+3. Run documentation, canonical tests, cognitive scenarios, and General
+   Ability Level A from the candidate source. Report actual results; do not
+   copy historical test counts forward.
+4. Start the maintained Soridormi/MuJoCo profile and collect isolated live-text
+   cases through cognitive `apply`. Retain Goal Association, planner,
+   composition, trusted execution, terminal status, safe-idle, and exact source
+   provenance. First add endpoint-reported Soridormi source identity; choosing
+   a sibling checkout with `--soridormi-repo` is not execution provenance.
+5. Build a cognitive acceptance bundle from the new simulator summary and
+   require applied `chat` and `robot_action` lanes where exercised. Reject any
+   bundle with absent or mismatched revisions.
+6. Keep the checked-in Soridormi capability manifest and release compatibility
+   revision aligned before previewing release packaging.
+7. Bind the running Chromie service images and loaded models to the candidate
+   revision, and replace mutable release image references with immutable ones.
+8. Do not publish `0.0.1` or clear a release blocker until the exact supported
+   scope has matching implementation, documentation, and retained evidence.
+9. Continue physical pilot and human voice-device validation only as separate
+   tracks; neither is implied by simulator evidence.
 
 ## Useful Commands
 
-Review status and roadmap:
+Run static authority and Level A gates:
 
 ```bash
+python scripts/semantic_authority_audit.py --check
 python scripts/check_docs.py
-./scripts/show_profile.sh
+./scripts/run_tests.sh
+python scripts/cognitive_runtime_acceptance.py --mode check
+python scripts/cognitive_runtime_acceptance.py --mode level-a
+python scripts/general_ability_acceptance.py --mode check --no-write
+python scripts/general_ability_acceptance.py --mode level-a --no-write
 ```
 
-Run a natural text-to-MuJoCo rehearsal:
+Run a natural request through the maintained cognitive text-to-MuJoCo path:
 
 ```bash
 conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
+  --cognitive-runtime \
+  --cognitive-apply-lanes chat,robot_action \
   --no-speaker
 ```
 
-Add `--expect-*` flags only when the goal is a regression assertion after
-Chromie has already planned from the text:
+Check the applied event lane, then create a provenance-checked cognitive bundle
+after that new run:
 
 ```bash
-conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
-  "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --expect-skill soridormi.walk_velocity \
-  --expect-skill soridormi.nod_yes \
-  --expect-skill soridormi.turn_in_place \
-  --expect-arg 0:vx_mps=0.2 \
-  --expect-arg 0:duration_s=10 \
-  --expect-arg 1:count=2 \
-  --expect-arg 2:yaw_radps=-0.12 \
-  --no-speaker
+python scripts/cognitive_runtime_acceptance.py --mode evidence \
+  --require-applied-lane robot_action
+python scripts/cognitive_runtime_acceptance.py --mode bundle \
+  --text-mujoco-summary .chromie/acceptance/text-mujoco/<run-id>/summary.json
 ```
 
-Run the full automated suite in the container runtime:
-
-```bash
-./scripts/compose.sh run --rm --no-deps \
-  -v "$PWD:/workspace" -w /workspace \
-  chromie-agent ./scripts/run_tests.sh
-```
+Use `--no-cognitive-runtime` only for an explicitly labelled legacy
+compatibility investigation. It is not the maintained acceptance path.
 
 ## Files To Read First
 
 - [Project Charter](PROJECT_CHARTER.md)
+- [Human-like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [Current Status](STATUS.md)
 - [Roadmap](../ROADMAP.md)
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
-- [Developer Usability Tools Plan](DEVELOPER_USABILITY_TOOLS.md)
+- [Goal-driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+- [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
+- [Goal-driven Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Acceptance and Evidence](ACCEPTANCE.md)
-- [User Manual](USER_MANUAL.md)

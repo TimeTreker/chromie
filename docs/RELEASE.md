@@ -4,8 +4,11 @@
 
 The repository declares `0.0.1` in `VERSION` and includes tracked release
 notes, compatibility metadata, an evidence verifier, source-archive generation,
-a release manifest, and checksums. No official GitHub release has been
-published yet.
+a release manifest, and checksums. The compatibility declaration is currently
+`candidate` and records concrete release blockers for endpoint-reported
+Soridormi source identity, running Chromie image/model binding, immutable image
+references, and fresh current-revision goal-driven voice and MuJoCo evidence.
+No official GitHub release has been published yet.
 
 Treat `main` as a development branch. The historical M13 text-to-MuJoCo
 interaction scope is closed with retained text evidence. Clean synthetic,
@@ -17,7 +20,7 @@ required for any release that claims human voice-device support. See
 
 ## 0.0.1 Scope
 
-The supported scope is:
+The proposed candidate scope is:
 
 - one documented Linux x86_64 NVIDIA reference host profile;
 - generated-speech voice regression through `synthetic`, `virtual-mic`, or
@@ -32,7 +35,9 @@ The supported scope is:
 ## Prepare the Release Bundle
 
 For `0.0.1`, verify a clean automated evidence bundle. The current low-cost
-generated-speech device path is:
+generated-speech device path is shown below. Start the external Soridormi MCP
+endpoint separately at the pinned revision first; `--start-services` starts
+Chromie services only.
 
 ```bash
 python scripts/voice_acceptance.py \
@@ -45,20 +50,41 @@ python scripts/verify_voice_evidence.py --allow-automated --require-clean \
   .chromie/acceptance/voice/<acceptance-id>
 ```
 
-The retained M13 text-to-MuJoCo interaction scope is evidenced by
-`.chromie/acceptance/text-mujoco/20260617T081411Z`. Before tagging, rerun the
-current MuJoCo or scenario gates documented in
-[Acceptance and Evidence](ACCEPTANCE.md) from the intended revision.
+The verifier defaults to the current Git `HEAD`, `VERSION`, and the Soridormi
+revision shared by `capabilities/soridormi.json` and
+`release/compatibility.json`. A historical bundle fails provenance validation;
+it cannot be used to package a newer source revision. The current runner's
+`--soridormi-repo` argument records a `declared_paired_checkout`; it does not
+prove which source the MCP endpoint executes. Only a bundle with a matching
+`endpoint_reported_revision` can set `policy_evaluation_ready=true`, after
+which the release preparer checks the mode against
+`evidence_policy.accepted_voice_modes`. The current endpoint/runner combination
+does not provide that binding, so newly generated bundles remain outside
+release-policy evaluation. `human_voice_device_claim_eligible` is a separate
+supervised-evidence field and remains false for generated-speech modes.
+
+The retained M13 text-to-MuJoCo interaction scope is historically evidenced by
+`.chromie/acceptance/text-mujoco/20260617T081411Z`. It does not validate the
+current goal-driven authority path. Before tagging, produce a clean
+current-revision text-to-MuJoCo `summary.json`. Recording a paired Soridormi
+checkout is diagnostic only; target validation also requires a matching
+endpoint-reported source revision, which is not yet emitted by the current
+runner/endpoint path.
 
 Create a non-publishable packaging rehearsal when runtime provenance is not
 available:
 
 ```bash
 python scripts/prepare_release.py --preview --skip-runtime-provenance \
+  --skip-tests --allow-dirty \
   --allow-automated-evidence \
   --require-clean-evidence \
   --evidence-dir .chromie/acceptance/voice/<acceptance-id>
 ```
+
+`--skip-tests`, `--allow-dirty`, and `--skip-runtime-provenance` are rehearsal
+options accepted only with `--preview`. A non-preview command rejects all three.
+Preview mode never makes a bundle publishable.
 
 A publishable preparation omits `--preview`. It requires a clean committed
 revision, passing evidence, no tracked closure blockers in
@@ -69,13 +95,24 @@ full test run:
 python scripts/prepare_release.py \
   --allow-automated-evidence \
   --require-clean-evidence \
-  --evidence-dir .chromie/acceptance/voice/<acceptance-id>
+  --evidence-dir .chromie/acceptance/voice/<acceptance-id> \
+  --text-mujoco-summary \
+    .chromie/acceptance/text-mujoco/<text-run-id>/summary.json
 ```
 
 Generated files are placed below `.chromie/releases/` and include a Git source
 archive, release notes, compatibility declaration, acceptance summary,
-`model-lock.json`, `build-provenance.json`, `manifest.json`, test log, and
-`SHA256SUMS`. The command does not create or push a Git tag.
+`cognitive-runtime-acceptance.json`, `model-lock.json`,
+`build-provenance.json`, `manifest.json`, test log, and `SHA256SUMS`. The
+cognitive artifact records whether the text-to-MuJoCo summary is
+target-validated, including exact Chromie and Soridormi provenance, applied
+goal-driven execution, Soridormi `sim` mode, completion, and safe idle. The
+command does not create or push a Git tag.
+
+The retained `tests.log` is sanitized after a passing test run and before
+checksums are written: absolute candidate-repository and operator-home paths are
+replaced with `<repo>` and `<home>`. Failed runs abort preparation and are not
+publishable artifacts.
 
 `build-provenance.json` records source-input checksums, declared image
 references, resolved image IDs/repository digests, `pip freeze --all` output for
@@ -83,7 +120,12 @@ the four built Python images, the immutable ASR/TTS model lock, and installed
 Ollama model digests. A publishable preparation fails if any exact dependency
 pin is missing, an image reference uses a mutable tag, Docker images cannot be
 inspected, a built image cannot report its resolved Python environment, or a
-configured Ollama model/digest is absent.
+configured Ollama model/digest is absent. The maintained development
+configuration still uses `CHROMIE_IMAGE_TAG=latest` and
+`OLLAMA_IMAGE=ollama/ollama:latest`; those are intentionally tracked as release
+blockers rather than represented as immutable provenance. Acceptance must also
+bind the actually running Chromie service images and loaded models to the
+candidate revision; host-checkout `HEAD` alone is insufficient.
 
 ## Required Release Artifacts
 
@@ -105,12 +147,18 @@ Every release should publish a table like:
 
 | Chromie | Soridormi capability revision | Runtime mode | Support state |
 |---|---|---|---|
-| `0.0.1` | pinned commit and schema | Soridormi MuJoCo `sim` | Supported `0.0.1` scope |
+| `0.0.1` | pinned commit and schema | Soridormi MuJoCo `sim` | Proposed candidate scope; not yet published |
 | `main` | current checked-in manifest | Development | No compatibility promise |
 | Physical hardware | device-specific | `hardware` | Experimental until commissioned |
 
-The checked-in manifest’s `upstream_commit` is necessary but not sufficient.
-The release process must also probe the live endpoint and retain the result.
+The checked-in manifest’s `upstream_commit` and a clean user-selected paired
+checkout are necessary but not sufficient. The release process must retain an
+endpoint-reported executing source revision that matches both. That endpoint
+identity is not available from the current runner, so publication remains
+blocked. Compatibility validation also requires a non-empty unique
+`chromie.runtime_modes` list and currently accepts only
+`soridormi.supported_mode=sim`; an empty or unsupported release scope fails
+closed.
 
 ## Release Gate Checklist
 
@@ -133,6 +181,8 @@ The release process must also probe the live endpoint and retain the result.
   work continues.
 - Docker images build from a clean checkout using versioned base/runtime
   references.
+- Running Chromie service image identities and loaded model digests are bound
+  to the candidate Chromie revision in retained acceptance evidence.
 - All direct Python dependencies are exact `==` pins and the release provenance
   captures resolved transitive dependencies.
 - `release/model-lock.json` matches every maintained ASR profile and the
@@ -144,6 +194,8 @@ The release process must also probe the live endpoint and retain the result.
 - The selected Ollama, ASR, and TTS models are documented and obtainable.
 - Structured interaction and Soridormi compatibility are probed against the
   pinned revision.
+- The Soridormi endpoint reports its executing source revision, which matches
+  the pinned manifest and clean declared paired checkout.
 
 ### Simulator Acceptance
 
@@ -175,7 +227,8 @@ complete and verify the guided supervised reference-host run:
 python scripts/voice_acceptance.py \
   --mode supervised \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --soridormi-repo ../soridormi
+  --soridormi-repo ../soridormi \
+  --start-services
 
 python scripts/verify_voice_evidence.py --require-clean \
   .chromie/acceptance/voice/<acceptance-id>

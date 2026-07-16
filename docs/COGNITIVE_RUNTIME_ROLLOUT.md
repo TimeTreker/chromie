@@ -133,25 +133,31 @@ The unified pipeline runs in the background and records:
 - stage latency.
 
 It does not change user-visible speech, Goal state, confirmation, or execution.
-This is the maintained rollout default in `.env.common`.
+Observer routing is not filtered by the apply-lane allowlist, so tool and memory
+routes can be measured without granting them authority. This mode is available
+for diagnostics; it is not the maintained default.
 
 ### `apply`
 
-The unified pipeline may become authoritative only for lanes listed in
-`ORCH_COGNITIVE_APPLY_LANES`.
+The unified pipeline may become authoritative only for mapped semantic lanes
+listed in `ORCH_COGNITIVE_APPLY_LANES`. Router routes `chat`, `clarify`, and
+`deep_thought` map to the `chat` lane; `robot_action`, `tool`, and `memory`
+retain their lane names.
 
-A lane that is not enabled returns to the compatibility path. An enabled lane
-still applies only after all trusted validation and response-composition gates
-pass.
+A mapped lane that is not enabled remains on the existing routed Agent path,
+selected before Goal-driven authority acquisition. An enabled lane still
+applies only after all trusted validation and response-composition gates pass.
 
 Initial recommended lanes:
 
 ```env
-ORCH_COGNITIVE_APPLY_LANES=chat,robot_action
+ORCH_COGNITIVE_APPLY_LANES=chat
 ```
 
-Tool and memory lanes should remain outside apply until their own retained live
-scenarios prove authorization, result truthfulness, and rollback.
+The common safe base applies only `chat`. The maintained Soridormi launcher
+widens the set to `chat,robot_action` after enabling the trusted provider. Tool
+and memory lanes remain outside apply until their own retained live scenarios
+prove authorization, result truthfulness, and rollback.
 
 ## 4. Lane classification
 
@@ -175,17 +181,22 @@ The effective technical failure policy is `fail_closed`.
 input, but it cannot authorize same-turn fallback after the Goal-driven Runtime
 has acquired semantic authority.
 
-A route excluded by `ORCH_COGNITIVE_APPLY_LANES` is rejected before authority
+A route whose mapped semantic lane is excluded by
+`ORCH_COGNITIVE_APPLY_LANES` remains on the routed Agent path before authority
 acquisition. Once Goal Association begins in authoritative `apply`, any model,
-composition, lane, trusted-runtime, or Goal-state commit failure produces
-truthful no-action speech and no effectful skill. It does not fall through to
-the legacy CapabilityAgent planner.
+composition, terminal-lane, trusted-runtime, or Goal-state commit failure
+produces truthful no-action speech and no effectful skill. It does not fall
+through to the legacy CapabilityAgent planner.
 
 The legacy CapabilityAgent semantic planner is retained only as an explicit
 emergency compatibility path. It requires disabled or non-authoritative
 Goal-driven processing, host and Agent opt-in gates, and a per-turn emergency
 authority claim. Exact Router `actions[]` use a deterministic adapter and never
-call that planner. See [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
+call that planner. The Agent rejects an empty claim or a claim whose `turn_id`
+does not exactly match the request `sid`, which blocks cross-turn reuse. The
+claim is not stored as a consumed nonce, so this boundary does not independently
+prevent replay with the same `sid`. See
+[Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
 
 ## 6. Total and per-stage budgets
 
@@ -368,13 +379,24 @@ To build a classified bundle with optional text-to-MuJoCo evidence:
 python scripts/cognitive_runtime_acceptance.py \
   --mode bundle \
   --events .chromie/evidence/cognitive-runtime/events.jsonl \
-  --text-mujoco-summary .chromie/evidence/text-mujoco/<run>/summary.json \
+  --text-mujoco-summary .chromie/acceptance/text-mujoco/<run>/summary.json \
   --output .chromie/evidence/cognitive-runtime/bundle.json
 ```
 
 The tool reports evidence classes independently. It never turns deterministic
 scenarios into live evidence, or live text into simulator/physical validation,
-or any of those into release readiness.
+or any of those into release readiness. Simulator target validation additionally
+requires a clean run whose recorded Chromie and Soridormi revisions match the
+expected source. A user-supplied `--soridormi-repo` records only a declared
+paired checkout; it does not prove which source the MCP endpoint executes.
+Target validation therefore requires the endpoint to report its own revision
+and for that revision to match the clean paired checkout and manifest. It also
+requires explicit goal-driven `apply` selection, an `applied` cognitive
+resolution, completed Soridormi `sim` execution, and explicit safe idle before
+and after execution. The current runner records `declared_paired_checkout` with
+no endpoint-reported revision, so its new bundles remain diagnostic until that
+endpoint binding exists. Bundle-generator identity is kept separate from
+retained-run provenance.
 
 ## 13. Level A rollout scenarios
 
@@ -440,7 +462,7 @@ Retain current compatibility behavior and known scenario results.
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=report_only
-ORCH_COGNITIVE_FALLBACK_POLICY=legacy
+ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ```
 
 Run representative multi-turn text cases:
@@ -487,13 +509,15 @@ profile and retain exact Chromie/Soridormi revisions.
 
 ## 15. Cognitive text-to-MuJoCo procedure
 
-The existing text-to-MuJoCo checker can use the unified PR7 path:
+The text-to-MuJoCo checker uses the unified PR8 authority path by default:
 
 ```bash
 python scripts/interaction_text_mujoco_check.py \
-  --text "Walk forward for five seconds, then nod." \
+  "Walk forward for five seconds, then nod." \
   --cognitive-runtime \
   --cognitive-apply-lanes chat,robot_action \
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --no-speaker \
   --preview-only
 ```
@@ -541,7 +565,9 @@ ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1
 AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=1
 ```
 
-The Orchestrator must also attach a fresh per-turn emergency authority claim.
+The Orchestrator must also attach an emergency authority claim whose non-empty
+`turn_id` exactly matches the Agent request `sid`. This internal claim is not a
+caller-authentication or single-use replay mechanism.
 These settings do not reopen a turn that already entered authoritative
 Goal-driven processing.
 

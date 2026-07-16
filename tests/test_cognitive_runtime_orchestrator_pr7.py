@@ -103,6 +103,44 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(len(assistant.conversation_state.agent_results), 1)
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
 
+    def test_chat_lane_includes_clarify_and_deep_thought_routes(self):
+        for route in ("clarify", "deep_thought"):
+            with self.subTest(route=route):
+                response = InteractionResponse(
+                    speech=[{"text": "Could you clarify?", "timing": "immediate"}],
+                    metadata={"source": "goal_driven_cognitive_runtime"},
+                )
+                resolution = CognitiveRuntimeResolution(
+                    mode="apply",
+                    status="applied",
+                    lane="chat",
+                    interaction_response=response,
+                    timings_ms={"total": 12.0},
+                )
+                assistant = self._assistant(resolution)
+                assistant.cognitive_apply_lanes = frozenset({"chat"})
+                decision = RouteDecision(
+                    route=route,
+                    intent=route,
+                    confidence=0.5,
+                    source="llm",
+                    language="en-US",
+                )
+
+                async def run():
+                    handled, _ = await assistant._try_apply_cognitive_runtime(
+                        object(),
+                        user_text="Please help me work this out.",
+                        session_id=f"sid-{route}",
+                        context={"history": []},
+                        decision=decision,
+                        router_latency_ms=10.0,
+                    )
+                    self.assertTrue(handled)
+
+                asyncio.run(run())
+                self.assertEqual(len(assistant.interaction_runtime.prepared), 1)
+
     def test_cognitive_failure_is_handled_without_legacy_reentry(self):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
@@ -171,6 +209,40 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             )
             await asyncio.wait_for(completed.wait(), timeout=1.0)
             self.assertEqual(updated.route, decision.route)
+            self.assertEqual(
+                updated.metadata["cognitive_runtime_resolution"]["status"],
+                "scheduled",
+            )
+
+        asyncio.run(run())
+
+    def test_report_only_observes_routes_outside_apply_allowlist(self):
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.cognitive_runtime_mode = "report_only"
+        assistant.enable_agent = True
+        assistant.cognitive_apply_lanes = frozenset({"chat", "robot_action"})
+        assistant.cognitive_runtime_report_tasks = set()
+        assistant.session_log = lambda *args, **kwargs: None
+        completed = asyncio.Event()
+
+        async def report(*args, **kwargs):
+            completed.set()
+
+        assistant._run_cognitive_runtime_report = report
+        decision = RouteDecision(
+            route="tool", intent="weather", confidence=0.9, source="llm"
+        )
+
+        async def run():
+            updated = assistant._schedule_cognitive_runtime_report(
+                object(),
+                user_text="What is the weather?",
+                session_id="sid",
+                context={"active_goal_snapshots": []},
+                decision=decision,
+            )
+            await asyncio.wait_for(completed.wait(), timeout=1.0)
+            self.assertEqual(updated.route, "tool")
             self.assertEqual(
                 updated.metadata["cognitive_runtime_resolution"]["status"],
                 "scheduled",

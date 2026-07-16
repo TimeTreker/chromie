@@ -293,11 +293,12 @@ def collect_provenance(
         images = []
         if require_runtime:
             image_config_errors.append(str(exc))
-    # Runtime image aliases may be mutable for local development. Publishable
-    # provenance is anchored by the resolved image IDs/digests collected below.
+    # Local development may use mutable aliases, but publishable provenance
+    # rejects them before resolved image IDs/digests are collected below.
     source_errors = (
         exact_requirement_errors(root)
         + image_config_errors
+        + mutable_image_errors(images)
         + model_lock_errors(root, env)
     )
     model_lock = root / "release" / "model-lock.json"

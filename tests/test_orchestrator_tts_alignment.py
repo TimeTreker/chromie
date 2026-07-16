@@ -183,6 +183,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_low_confidence_deep_thought_schedules_model_speak_first(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.router_generated_fast_speech_enabled = True
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.order_lock = asyncio.Lock()
@@ -216,7 +217,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             agents=["deepthinking_agent", "speaker_agent"],
             intent="deep_thought_low_confidence",
             language="en-US",
-            speak_first="Give me a moment to think that through.",
+            fast_speech={
+                "text": "Give me a moment to think that through.",
+                "purpose": "thinking",
+                "commitment": "prelude_only",
+            },
             metadata={
                 "thinking_ack_allowed": True,
                 "thinking_ack_source": "quick_llm_speak_first",
@@ -242,6 +247,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     def test_fast_first_response_text_uses_router_generated_speech(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
+        assistant.router_generated_fast_speech_enabled = True
 
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -258,6 +264,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     fast_speech={
                         "text": "Let me answer that.",
                         "purpose": "acknowledge",
+                        "commitment": "prelude_only",
                     },
                 ),
                 "Hello, how are you?",
@@ -279,6 +286,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                             "context_profile": "fast_minimal",
                             "direct_to_tts": True,
                             "text": "Hi, I'm here.",
+                            "fast_speech": {
+                                "text": "Hi, I'm here.",
+                                "purpose": "acknowledge",
+                                "commitment": "prelude_only",
+                            },
                         },
                         {
                             "route": "deep_thought",
@@ -324,6 +336,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     fast_speech={
                         "text": "好的，我查一下重庆今天的天气。",
                         "purpose": "acknowledge_and_check",
+                        "commitment": "checking_only",
                     },
                     metadata={
                         "tool_name": "weather",
@@ -343,6 +356,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     fast_speech={
                         "text": "OK, I’ll check Chongqing’s weather today.",
                         "purpose": "acknowledge_and_check",
+                        "commitment": "checking_only",
                     },
                     metadata={
                         "tool_name": "weather",
@@ -368,6 +382,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     fast_speech={
                         "text": "I’ll check whether I can do that safely.",
                         "purpose": "safety_prelude",
+                        "commitment": "needs_confirmation",
                     },
                 ),
                 "Walk forward for 15 seconds.",
@@ -391,7 +406,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                     route="clarify",
                     intent="clarify_target_location",
                     language="en-US",
-                    fast_speech={"text": "Which location do you mean?"},
+                    fast_speech={
+                        "text": "Which location do you mean?",
+                        "purpose": "clarify",
+                        "commitment": "needs_confirmation",
+                    },
                 ),
                 "Move over there.",
             ),
@@ -402,6 +421,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     def test_tool_fast_first_response_is_opt_in(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
+        assistant.router_generated_fast_speech_enabled = True
         decision = RouteDecision(
             route="tool",
             intent="weather_query",
@@ -409,6 +429,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             fast_speech={
                 "text": "好的，我查一下北京今天的天气。",
                 "purpose": "acknowledge_and_check",
+                "commitment": "checking_only",
             },
             metadata={
                 "tool_name": "weather",
@@ -431,6 +452,85 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 "今天北京天气怎么样？",
             ),
             "好的，我查一下北京今天的天气。",
+        )
+
+    def test_dynamic_fast_speech_is_default_off_and_requires_full_contract(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.fast_first_response_enabled = True
+        assistant.fast_first_tool_response_enabled = True
+        decision = RouteDecision(
+            route="tool",
+            intent="weather_query",
+            fast_speech={
+                "text": "Let me check the weather.",
+                "purpose": "acknowledge_and_check",
+                "commitment": "checking_only",
+            },
+        )
+
+        self.assertIsNone(
+            assistant._fast_first_response_text(decision, "What is the weather?")
+        )
+
+        assistant.router_generated_fast_speech_enabled = True
+        self.assertEqual(
+            assistant._fast_first_response_text(decision, "What is the weather?"),
+            "Let me check the weather.",
+        )
+        self.assertIsNone(
+            assistant._fast_first_response_text(
+                RouteDecision(
+                    route="tool",
+                    intent="weather_query",
+                    fast_speech="Let me check the weather.",
+                ),
+                "What is the weather?",
+            )
+        )
+
+    def test_dynamic_fast_speech_rejects_terminal_claims(self) -> None:
+        unsafe = (
+            "I finished it.",
+            "I've finished that.",
+            "I already took care of it.",
+            "That's taken care of.",
+            "It is ready.",
+            "任务办好了。",
+            "处理好了。",
+        )
+
+        for text in unsafe:
+            with self.subTest(text=text):
+                self.assertIsNone(VoiceAssistant._safe_immediate_route_speech(text))
+
+    def test_unsafe_deep_thought_speak_first_uses_trusted_ack(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.router_generated_fast_speech_enabled = True
+        decision = RouteDecision(
+            route="deep_thought",
+            intent="plan_task",
+            language="en-US",
+            speak_first="That's taken care of.",
+        )
+
+        self.assertEqual(
+            assistant._deep_thought_ack_text(decision, "Please make a plan."),
+            "Okay, let me think about that.",
+        )
+
+    def test_incomplete_deep_thought_fast_speech_uses_trusted_ack(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.router_generated_fast_speech_enabled = True
+        decision = RouteDecision(
+            route="deep_thought",
+            intent="plan_task",
+            language="en-US",
+            fast_speech={"text": "Let me think."},
+        )
+
+        self.assertEqual(
+            assistant._deep_thought_ack_text(decision, "Please make a plan."),
+            "Okay, let me think about that.",
         )
 
     def test_validated_response_plan_uses_structured_claims_not_phrase_blocking(self) -> None:

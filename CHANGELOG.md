@@ -6,14 +6,38 @@ All notable user-visible changes should be recorded here.
 
 ### Goal-driven cognitive runtime rollout
 
-- integrate Goal Association, complete-coverage Fast Planning, terminal Deep Planning, bounded trusted-validator replanning, Response Composition, and runtime adaptation behind `off`, `report_only`, and lane-gated `apply` modes;
-- apply Goal-state updates atomically only after trusted response preparation;
-- retain privacy-conscious operational evidence and classified acceptance tooling;
-- add deterministic cognitive-runtime scenarios and a cognitive text-to-MuJoCo evidence entry point;
-- preserve legacy and fail-closed rollback policies without widening physical execution authority.
+- Integrated Goal Association, complete-coverage Fast Planning, terminal Deep
+  Planning, bounded trusted-validator replanning, Response Composition, and
+  runtime adaptation behind `off`, `report_only`, and lane-gated `apply` modes.
+- Enabled structured interaction and authoritative `chat` apply in the common
+  safe base; the maintained Soridormi launcher enables that provider and widens
+  authority to `chat,robot_action`. Both fail closed after ownership.
+- Made exact Router actions adapter-only and reduced the old CapabilityAgent
+  semantic planner to an emergency path requiring host and Agent gates plus a
+  non-empty authoritative claim whose `turn_id` matches the request.
+- Constrained Goal Association with the exact model-facing schema, one bounded
+  contract repair, and host-owned transport/persistence identities.
+- Applied Goal-state updates atomically only after trusted response preparation.
+- Added privacy-conscious operational evidence, deterministic cognitive
+  scenarios, and a cognitive text-to-MuJoCo evidence entry point.
+- Hardened cognitive, voice, and release evidence provenance: target validation
+  now requires the current Chromie revision, a clean declared Soridormi
+  checkout, matching endpoint-reported Soridormi source, and applied,
+  completed, safe-idle cognitive `sim` execution; release preparation rejects
+  source, version, manifest, compatibility, or retained-evidence revision
+  drift.
+- Returned `0.0.1` metadata to candidate state with explicit blockers for
+  endpoint-reported Soridormi source identity, running Chromie image/model
+  binding, immutable image references, and fresh current-revision Goal-driven
+  voice/MuJoCo evidence. No release-readiness or physical-execution claim is
+  added by these changes.
 
 
-## 0.0.1 - 2026-07-04
+## 0.0.1 candidate snapshot - 2026-07-04
+
+This section records the July 4 candidate snapshot; `0.0.1` has not been
+published. Current corrections remain under Unreleased and the compatibility
+declaration still blocks publication.
 
 - Prepared the first `0.0.1` release metadata, compatibility declaration, and
   release notes.
@@ -26,12 +50,13 @@ All notable user-visible changes should be recorded here.
 - Kept human microphone/speaker support, verified Jetson packaging, unattended
   deployment, and physical robot support outside the release claim.
 
-### Implemented in the current release snapshot
+### Implemented in that candidate development line
 
-- Hardened release reproducibility with versioned container references, exact
-  direct dependency pins, immutable ASR/TTS model revisions, runtime image and
-  Ollama digest capture, resolved dependency provenance, and fail-closed
-  publishable bundle generation.
+- Added release reproducibility checks for immutable container references,
+  exact direct dependency pins, immutable ASR/TTS model revisions, runtime
+  image/Ollama digest capture, resolved dependency provenance, and fail-closed
+  publishable bundle generation. The maintained `latest` development aliases
+  still block publication.
 - Added versioned provider conformance traces, recommendation-only hardware
   shadow coverage, safe-idle status checks, and a first-reference-robot
   commissioning checklist.
@@ -77,8 +102,8 @@ All notable user-visible changes should be recorded here.
   injection, PulseAudio/PipeWire virtual microphone capture, acoustic
   host-output/input capture, and final supervised real-microphone evidence.
 - Strict evidence verifier for native mode, clean revisions, all cases,
-  correlated sessions, and separation of automated from release-closing
-  supervised evidence.
+  correlated sessions, and separation of automated evidence from supervised
+  human voice-device evidence.
 - `0.0.1` version, compatibility declaration, release notes,
   source archive generation, manifest, tests log, and checksums.
 

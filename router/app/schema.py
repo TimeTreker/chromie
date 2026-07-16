@@ -88,6 +88,8 @@ class FastSpeech(BaseModel):
         downstream LLM produce natural language instead of speaking the marker.
         """
 
+        if self.must_not_claim_completion is not True:
+            raise ValueError("fast_speech must forbid completion claims")
         marker = "_".join(self.text.strip().casefold().replace("-", "_").split())
         if marker in {
             "checking_only",

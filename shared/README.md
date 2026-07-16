@@ -15,6 +15,9 @@ acceptance tools. It includes:
   `SkillResult`, and `SkillTrace` contracts;
 - shared `TaskProposal`, `TaskProposalLedger`, and preflight-summary contracts
   for Router/Agent/Orchestrator proposal merge diagnostics;
+- Goal, Goal Association, semantic task-operation, and active-goal contracts;
+- immutable `CanonicalPlan`, goal-satisfaction, response-composition, and
+  single-semantic-authority contracts;
 - hardware action and robot-state contracts;
 - conversation-state structures.
 

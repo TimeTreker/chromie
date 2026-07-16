@@ -7,10 +7,12 @@ cd "$ROOT_DIR"
 STATE_DIR="${CHROMIE_VOICE_MUJOCO_STATE_DIR:-$ROOT_DIR/.chromie/voice-mujoco}"
 EVIDENCE_ROOT="$STATE_DIR/text-cases"
 MCP_URL="${SORIDORMI_MCP_URL:-http://127.0.0.1:${SORIDORMI_MCP_PORT:-8000}${SORIDORMI_MCP_PATH:-/mcp}}"
+SORIDORMI_REPO="${SORIDORMI_REPO:-$ROOT_DIR/../soridormi}"
 SPEAKER_FLAG=--speaker
 PREVIEW_ONLY=0
 AUTO_CONFIRM=1
 SKILL_TIMEOUT_S="${CHROMIE_VOICE_MUJOCO_SKILL_TIMEOUT_S:-120}"
+SEMANTIC_RUNTIME_FLAG=--cognitive-runtime
 EXPECT_ROUTE=()
 EXPECT_NO_SKILLS=()
 EXPECT_SKILL=()
@@ -37,11 +39,14 @@ Regression assertion example:
 
 Options:
   --mcp-url URL              Soridormi MCP URL; default: http://127.0.0.1:8000/mcp
+  --soridormi-repo DIR       Declared paired checkout for diagnostic provenance; default: ../soridormi
   --speaker                  Play Chromie TTS through configured speaker; default
   --no-speaker               Headless check without speaker playback
   --preview-only             Route and validate without executing Soridormi skills
   --no-auto-confirm-sim      Do not auto-confirm simulator skills
   --skill-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
+  --goal-driven-runtime      Use the maintained goal-driven apply path; default
+  --legacy-agent-runtime     Use Agent /interaction compatibility mode explicitly
   --evidence-dir DIR         Write evidence to a specific directory
   --expect-route ROUTE       Post-run assertion for Router route: chat, deep_thought,
                              robot_action, tool, memory, clarify, interrupt,
@@ -59,11 +64,14 @@ USAGE
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --mcp-url) MCP_URL="${2:?--mcp-url requires a URL}"; shift 2 ;;
+    --soridormi-repo) SORIDORMI_REPO="${2:?--soridormi-repo requires a directory}"; shift 2 ;;
     --speaker) SPEAKER_FLAG=--speaker; shift ;;
     --no-speaker) SPEAKER_FLAG=--no-speaker; shift ;;
     --preview-only) PREVIEW_ONLY=1; shift ;;
     --no-auto-confirm-sim) AUTO_CONFIRM=0; shift ;;
     --skill-timeout-s) SKILL_TIMEOUT_S="${2:?--skill-timeout-s requires seconds}"; shift 2 ;;
+    --goal-driven-runtime) SEMANTIC_RUNTIME_FLAG=--cognitive-runtime; shift ;;
+    --legacy-agent-runtime) SEMANTIC_RUNTIME_FLAG=--no-cognitive-runtime; shift ;;
     --evidence-dir) EVIDENCE_DIR="${2:?--evidence-dir requires a directory}"; shift 2 ;;
     --expect-route) EXPECT_ROUTE+=(--expect-route "${2:?--expect-route requires a route}"); shift 2 ;;
     --expect-no-skills) EXPECT_NO_SKILLS+=(--expect-no-skills); shift ;;
@@ -123,10 +131,12 @@ fi
 
 args=(
   --soridormi-mcp-url "$MCP_URL"
+  --soridormi-repo "$SORIDORMI_REPO"
   --manifest capabilities/soridormi.json
   "$SPEAKER_FLAG"
   --require-speech
   --skill-timeout-s "$SKILL_TIMEOUT_S"
+  "$SEMANTIC_RUNTIME_FLAG"
 )
 if [ "$PREVIEW_ONLY" = "1" ]; then args+=(--preview-only); fi
 if [ "$AUTO_CONFIRM" = "1" ]; then

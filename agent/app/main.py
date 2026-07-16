@@ -145,7 +145,7 @@ class Settings(BaseModel):
         le=1.0,
     )
     require_capability_plan_review: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW", "1").strip().lower()
+        default_factory=lambda: os.getenv("AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     interaction_output_mode: Literal["native", "legacy-adapter"] = Field(
@@ -702,7 +702,9 @@ async def health() -> HealthResponse:
 @app.get("/semantic-authority")
 async def semantic_authority() -> dict[str, object]:
     return {
-        "single_authority_enforced": True,
+        "matching_turn_authority_required": True,
+        "claim_is_caller_authentication": False,
+        "claim_is_single_use_replay_protection": False,
         "legacy_capability_fallback_enabled": (
             settings.legacy_capability_fallback_enabled
         ),
@@ -885,6 +887,8 @@ async def create_task_graph_confirmation_grant(
     require_task_graph_execution_auth(authorization)
     try:
         return task_graph_service.issue_confirmation_grant(request)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

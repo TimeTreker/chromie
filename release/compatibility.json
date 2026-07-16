@@ -15,7 +15,7 @@
   "soridormi": {
     "repository": "https://github.com/TimeTreker/soridormi.git",
     "capability_schema_version": "0.1",
-    "upstream_commit": "4afb4bc6411db4a4194e97349d9466a62efd2f24",
+    "upstream_commit": "e0b310af090cf0b9451a952eb3de6440daaf530b",
     "supported_mode": "sim"
   },
   "unsupported_release_claims": [
@@ -25,7 +25,7 @@
     "cross-process scheduling guarantees outside Soridormi",
     "unattended deployment"
   ],
-  "release_state": "release",
+  "release_state": "candidate",
   "evidence_policy": {
     "accepted_voice_modes": [
       "synthetic",
@@ -35,5 +35,10 @@
     "human_supervised_voice_device_claim": false,
     "soridormi_mujoco_sim_executor_required": true
   },
-  "release_gate_blockers": []
+  "release_gate_blockers": [
+    "make the Soridormi MCP endpoint report its executing source revision and require it to match the clean declared paired checkout and pinned capability manifest",
+    "bind the running Chromie service images and loaded model digests to the candidate Chromie revision in retained acceptance and release provenance",
+    "replace the mutable CHROMIE_IMAGE_TAG=latest and OLLAMA_IMAGE=ollama/ollama:latest release inputs with immutable publishable references",
+    "retain clean current-revision goal-driven voice and MuJoCo evidence after the endpoint, service-image, model, and immutable-image provenance bindings are implemented"
+  ]
 }

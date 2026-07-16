@@ -3,7 +3,7 @@
 本指南用于日常交互运行，不是验收流程。目标是启动完整链路：
 
 ```text
-麦克风 -> Chromie ASR/Router/Agent -> Soridormi MCP -> MuJoCo
+麦克风 -> Chromie ASR/Router/Goal-driven Runtime -> Soridormi MCP -> MuJoCo
 扬声器 <- Chromie TTS
 ```
 
@@ -70,7 +70,9 @@ ORCH_OUTPUT_DEVICE=扬声器名称或编号
 2. 启动 Soridormi runtime-backed MCP 服务；
 3. 启动 Chromie ASR、TTS、Ollama、Router 和 Agent；
 4. 验证 Soridormi capability contract；
-5. 启动主机 Orchestrator，并打开麦克风和扬声器。
+5. 启动主机 Orchestrator，并打开麦克风和扬声器；
+6. 启用统一 Goal-driven Runtime，对 `chat,robot_action` 使用权威
+   `apply`，同时关闭旧 CapabilityAgent 语义回退。
 
 看到下面的信息后即可说话：
 
@@ -182,7 +184,16 @@ docker compose -f compose.sim.yaml --profile mcp-runtime logs -f mcp-runtime
 ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=1
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
+ORCH_COGNITIVE_RUNTIME_MODE=apply
+ORCH_COGNITIVE_APPLY_LANES=chat,robot_action
+ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
+ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0
 ```
+
+此启动流程用于日常 MuJoCo 交互，不会自动生成发布证据。需要保留
+当前版本证据时，请按 [ACCEPTANCE.md](ACCEPTANCE.md) 使用
+`voice_acceptance.py` 和
+`interaction_text_mujoco_check.py --soridormi-repo ...`。
 
 ### 没有听到语音
 

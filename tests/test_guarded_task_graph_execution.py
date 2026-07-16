@@ -148,6 +148,16 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             )
         ).confirmation_grant
 
+    async def test_disabled_guarded_execution_cannot_issue_grant(self) -> None:
+        service = TaskGraphService(_registry())
+        with self.assertRaisesRegex(RuntimeError, "guarded TaskGraph execution is disabled"):
+            service.issue_confirmation_grant(
+                TaskGraphConfirmationGrantRequest(
+                    graph=_confirmed_write_graph(),
+                    confirmed_node_ids={"confirm"},
+                )
+            )
+
     async def test_confirmed_low_risk_side_effect_executes(self) -> None:
         calls: list[str] = []
 

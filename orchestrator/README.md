@@ -15,41 +15,48 @@ For authoritative status and configuration, see:
 
 - ASR converts complete PCM utterances to final text.
 - Router produces deterministic or model-assisted `RouteDecision` objects.
-- Agent produces compatibility `AgentResult` or strict `InteractionResponse`.
+- Agent exposes schema-constrained Goal Association, Fast/Deep Planning, and
+  Response Composition, plus compatibility `AgentResult`/`InteractionResponse`
+  surfaces.
 - TTS streams PCM synthesis; the Orchestrator plays and interrupts it.
 - The Skill Runtime resolves and schedules trusted named skills.
 - Soridormi plans and executes embodied skills and owns physical safety.
 - `hardware/daemon.py` is a legacy mock compatibility boundary, not the alpha
   embodiment path.
 
-The Agent does not call TTS, MCP, or hardware. The language model is never the
-final authorization boundary for a side effect.
+The Agent does not call TTS or low-level hardware. Separately gated TaskGraph
+read/planning/guarded endpoints may use MCP, but normal embodied apply is
+adapted and authorized by the host Skill Runtime. The language model is never
+the final authorization boundary for a side effect.
 
 ## Current interaction paths
 
-### Structured path
+### Maintained goal-driven path
 
 ```text
 microphone -> host VAD -> ASR -> deterministic operational routing
-  -> Agent /interaction -> strict InteractionResponse
+  -> Goal Association -> Fast Planner -> terminal Deep Planner when required
+  -> Response Composer -> host-built strict InteractionResponse
   -> InteractionCoordinator -> Skill Runtime
       -> local speech provider -> TTS -> playback
       -> Soridormi provider -> MCP -> simulator/robot
 ```
 
-Enable it explicitly:
+The common safe base enables this path for `chat`. The Soridormi launcher adds
+the provider and widens authority to `robot_action`:
 
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=1
+ORCH_COGNITIVE_RUNTIME_MODE=apply
+ORCH_COGNITIVE_APPLY_LANES=chat,robot_action
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
 
-`/interaction` is a real strict API and now uses native structured Agent
-output by default. The Agent revalidates the complete wire contract and reports
-its active output mode in response metadata. Legacy-adapter mode and validation
-fallback are explicit Agent-side rollback controls; both are separate from the
-host rollout flag.
+`/interaction` remains a real strict compatibility API and uses native
+structured Agent output by default. It is not the maintained semantic planner
+when unified `apply` owns the turn. Legacy-adapter mode and validation fallback
+are explicit rollback controls.
 
 Use `ORCH_ENABLE_SORIDORMI_SKILLS=0` for speech-only rollout. Named body skills
 fail closed when their provider is disabled or unavailable.
@@ -159,9 +166,16 @@ These cues are intentionally generic low-commitment states such as “One
 moment” or “我先确认一下”. They are presentation mappings after semantic routing,
 not phrase-based intent decisions, and they never claim a tool result, memory
 commit, physical execution, or completion. The older Router-generated dynamic
-`fast_speech` path remains available for explicit compatibility use, while
-`ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED=0` keeps full generative tool preludes
-disabled.
+`fast_speech`/`speak_first` path is retained for wire compatibility but is
+default-off behind `ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED=0`. Bare strings
+and partial FastSpeech objects are parseable but not playable. An operator who
+enables the gate still gets immediate audio only from a structured object with
+an allowed `purpose`, a non-terminal `commitment`,
+`must_not_claim_completion=true`, and text that passes the completion-claim
+guard. `ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED=0` independently keeps tool-route
+fast-first scheduling off. Startup-cached cues and host-validated
+`metadata.response_plan` immediate speech remain available without enabling
+Router-generated dynamic wording.
 
 Manual development start:
 

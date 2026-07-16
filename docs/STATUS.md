@@ -4,11 +4,12 @@
 **Current release-prep base:** `0.0.1` scope with Soridormi MuJoCo `sim`
 execution; retained target evidence below records the exact revision that
 produced each bundle
-**Status refresh date:** 2026-07-12
-**Current focus:** **Freeze the `0.0.1` release across the Chromie/Soridormi
-boundary, with Soridormi executing robot work through MuJoCo `sim`; physical
-pilot preparation and human voice-device validation remain separate
-release-support tracks**
+**Status refresh date:** 2026-07-16
+**Current focus:** **Add endpoint-reported Soridormi revision identity, bind
+running Chromie images/models to the candidate source, replace mutable release
+image references, then validate the single-authority Goal-driven Runtime on the
+intended live-text/MuJoCo target; physical pilot and human voice-device
+validation remain separate release-support tracks**
 **Version:** `0.0.1` (MuJoCo-executor scope, not yet published)
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 
@@ -31,8 +32,10 @@ endpoint passed the `sim`, recommendation-only `hardware_shadow`, and no-motion
 fault scenarios. This is no-motion provider-contract evidence from macOS ARM64;
 it is not Linux/GPU MuJoCo, audio-device, or physical-robot evidence.
 
-The current top-level development layer is the Chromie/Soridormi task-agent
-boundary. Chromie now consumes a richer Soridormi task API snapshot with
+The current top-level cognitive layer is the unified Goal-driven Runtime and
+its single-semantic-authority boundary. The Chromie/Soridormi task-agent
+boundary remains the downstream embodied-planning surface. Chromie consumes a
+richer Soridormi task API snapshot with
 `soridormi.task.get_capabilities`, `preview`, `submit`, `status`, `events`, and
 `cancel`. Chromie's global TaskGraph can submit a structured embodied goal with
 a stable `client_task_ref`, monitor Soridormi task events to terminal state,
@@ -80,8 +83,8 @@ use the locally available `qwen3:4b` fast-router profile, keep it resident with
 `ROUTER_LLM_KEEP_ALIVE`, warm it during Router startup, select primary/review
 timeouts by stage rather than model name, bound quick-router output to compact
 classification JSON with `ROUTER_LLM_NUM_PREDICT=96`, and convert
-schema-invalid or narrowed quick compound `actions[]` into CapabilityAgent
-planner handoff instead of executing or narrowing them. Isolated low-information
+schema-invalid or narrowed quick compound `actions[]` into the unified
+Goal-driven Runtime instead of executing or narrowing them. Isolated low-information
 ASR fragments clarify even if the fast model calls them chat. Weather/tool
 queries with semantic weather evidence are normalized back to the tool lane when
 the weather lookup affordance is present, even if a stale route item says chat.
@@ -150,27 +153,28 @@ implemented and automatically verified; it does not execute proposed tasks,
 auto-apply learned rules, or change physical authorization policy. See
 [Orchestrator Task Proposal Merge](ORCHESTRATOR_TASK_PROPOSAL_MERGE.md).
 
-The first two semantic task-continuity slices are implemented and automatically
-verified. Shared contracts represent open semantic goals, versioned task
+Semantic task continuity is implemented inside the unified Goal-driven Runtime
+and automatically verified. Shared contracts represent open semantic goals, versioned task
 operations, active-task snapshots, information gaps, planning results, response
 plans, commitments, and speech claims. The Router may propose semantic
 create/modify/clarification and other task operations from meaning and bounded
-active-task context; a dedicated Agent task-continuity endpoint can independently
-review active-task relationships and emit stable replay-safe operations. The host
-supports `off`, `report_only`, and `apply` rollout modes, validates targets and
-confidence, applies accepted operations deterministically, protects replay,
+active-task context; Goal Association independently reviews active-goal
+relationships and emits stable replay-safe operations. The unified host
+coordinator supports `off`, `report_only`, and lane-gated `apply`, validates
+targets and confidence, applies accepted operations deterministically, protects replay,
 versions goals, supersedes stale plans, invalidates stale confirmations, and
 rejects stale planning results. Capability planning reports missing required
 parameters as structured information gaps, and clarification answers remain
 attached to the original task. Immediate ResponsePlan commitments are checked
 against current task state and trusted evidence before fast-first playback. This
-is dependency-light automated evidence only: the common profile runs the dedicated
-continuity resolver in non-authoritative background `report_only` mode, while
-`apply` remains explicit. Semantic multi-goal response composition is now
-implemented through per-goal outcomes and exact step ownership, including mixed
-execute/respond/clarify/unavailable turns. Rejected-claim model repair,
-generalized observation planning, retained live-text evidence, and simulator
-validation remain open. See [Semantic Task Continuity and Situational
+is dependency-light automated evidence only. The common safe base applies the
+unified path to `chat`; the maintained Soridormi launcher widens it to
+`chat,robot_action`. Standalone Goal Association, planner, Response Composer,
+and task-continuity observer modes are off because the coordinator owns those
+stages. Semantic multi-goal response composition covers per-goal outcomes and
+exact step ownership, including mixed execute/respond/clarify/unavailable
+turns. Generalized observation planning, retained live-text evidence, and
+simulator validation remain open. See [Semantic Task Continuity and Situational
 Planning](SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md).
 
 The July 12 voice-log reliability slice is also implemented and automatically
@@ -213,9 +217,10 @@ On June 14, 2026, the Linux x86_64 reference host with an NVIDIA GeForce RTX
 - virtual-microphone M13 `20260614T133155Z`: all seven cases passed through
   PipeWire at the same revision.
 
-Both M13 bundles pass `verify_voice_evidence.py --allow-automated --require-clean`
-with no errors or warnings. They are retained automated target-host evidence,
-not release-closing physical microphone/speaker evidence.
+At their recorded revisions, both M13 bundles passed the verifier then in use.
+The current verifier defaults to the current source and rejects them for
+current-release provenance; they remain historical automated target-host
+evidence, not current goal-driven or physical microphone/speaker evidence.
 
 On June 17, 2026, the same development line retained:
 
@@ -235,10 +240,11 @@ On July 4, 2026, the same development line retained automated acoustic voice
 evidence `20260704T114654Z` at Chromie revision `842a334`: all seven generated
 TTS prompt cases passed through host output, configured host input capture,
 VAD, ASR, Router, Agent, trusted Skill Runtime, TTS scheduling, and Soridormi
-`sim` behavior. This bundle passes `verify_voice_evidence.py
---allow-automated --require-clean` and is valid for the narrowed
-`0.0.1` generated-speech and Soridormi MuJoCo-executor claim. It remains
-`release_eligible=false` for a human-supervised physical voice-device claim.
+`sim` behavior. At revision `842a334`, this supported the then-narrowed
+generated-speech and Soridormi MuJoCo-executor candidate claim. The current
+verifier rejects it as provenance for a newer source revision, and a fresh
+goal-driven bundle is still required. It remains historical automated evidence,
+not human-supervised physical voice-device evidence.
 
 ## Status vocabulary
 
@@ -262,22 +268,22 @@ Target validation or Release readiness.
 | Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
 | Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR inference runs off the WebSocket event loop through an explicit final-utterance backend boundary; ASR decode and routed-turn execution have separate lifecycles so barge-in does not remain blocked behind Agent/TTS work; one newest VAD utterance is queued while ASR is busy instead of being dropped; `ASR_BACKEND=sherpa_onnx` and `ASR_MODE=final` are the maintained defaults; ASR startup performs a synthetic warm-up decode before accepting WebSocket requests; Faster-Whisper remains selectable for fallback/comparison; TTS playback stays ordered while complete speech can be chunked across bounded restartable service workers; startup-primed English/Chinese acknowledgement PCM uses an adaptive hedge timer; TTS health and each successful response expose the resolved and observed DAC device plus model-generation, codec-decode, PCM, queue, IPC, total, and real-time-factor metrics; `scripts/benchmark_tts.py` provides repeatable no-playback measurements | Component concurrency/cancellation, busy-ASR latest-utterance queue, routed-turn replacement, cleanup, ASR backend-selection, sherpa-onnx normalization, ASR accuracy-evaluator tests, TTS worker-pool, TTS alignment, fast-first cache load/prime/hedge/cancellation, codec-device resolution, timing-hook, rolling-summary, benchmark, and worker-startup-metadata tests, plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Local sherpa-onnx CPU and warmed CUDA evidence passed health plus English/Chinese final transcripts; clean SenseVoice A/B smoke showed 0 WER/CER for both sherpa-onnx and Faster-Whisper; no Stage 6 TTS benchmark JSON or listening-quality bundle is retained in the repository yet | Sherpa-onnx SenseVoice CUDA provider default with startup warm-up; CPU fallback configurable; cached fast-first audio enabled with a 750 ms hedge; legacy generative tool acknowledgements disabled; DAC device resolves from `TTS_AUDIO_CODEC_DEVICE=auto`; synchronized detailed timing and a 20-request health window are enabled; the RTX 4090 Laptop TTS profile uses 4096 context/max length; prompt/generated token counts are retained and max-length exhaustion is rejected so incomplete audio is not played; FP16 remains unchanged pending measured A/B evidence |
 | Deterministic Router operational controls plus quick LLM route classifier | Implemented; interrupt/ignore controls remain deterministic while normal requests use catalog context, the fast Router model, structural route/intent validation, independent semantic repair, safe clarification, or deep model handoff; catalog search does not choose ordinary intent by itself; quick routing can emit ordered unlocked common-catalog compound `RouteDecision.actions` including `chromie.speak` speech tasks with per-action confidence, low-confidence `quick_router_review_request`, and deepthinking accept/revise/supersede review metadata | Router rule, capability-routing, LLM-prompt, route-contract repair, low-confidence clarification, scripted raw-model replay, repeated weather-to-walk multi-turn Router-to-Interaction scenarios, deepthinking, interaction, and regression-scenario tests | The July 12 voice log establishes the pre-fix failure; the repair currently has Level A automated evidence only and still requires a retained live rerun | Enabled by `.env.common` |
-| Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Used by the current voice loop | Enabled by `.env.common` |
-| Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle | Host rollout flag off |
-| Native structured Interaction Agent | Implemented with direct `InteractionSpeech`/`SkillRequest` accumulation, review-gated robot-action planning, model-authored optional `SocialAttentionPlan` coordination, and semantic parameter resolution. A separate report-only Response Composer now binds goal-scoped speech and optional attention to an immutable fingerprinted terminal `CanonicalPlan`; it does not replace the production interaction path. Attention is selected from exact named capabilities or `none`; runtime validates target evidence, schemas, latency, confirmation policy, and conflicts, and excludes auxiliary attention from user task proposals | Native route, TaskGraph, validation, fail-closed, fallback, response-composition goal coverage/claim/immutability, social-attention selection/none/invalid/latency/target/conflict, exact-intent, and compatibility-mode tests plus file-backed interaction scenarios | Text-input MuJoCo closure evidence retained for prior task skills; social-attention behavior currently has automated evidence only and needs a retained live simulator rerun | Agent default; project-wide attention off, maintained voice-MuJoCo launcher uses `sim_only` with calibrated right-side fallback |
-| Goal-driven cognitive runtime and single semantic authority | PR1–PR8 contracts and stages are integrated through one host coordinator: schema-constrained Goal Association with one bounded model contract revision, complete-coverage Fast Planner, terminal full-catalog Deep Planner, one bounded trusted-validator replan, fingerprint-bound Response Composition, lane-gated runtime adaptation, atomic Goal-state application, mixed-plan execution, and existing confirmation/Skill Runtime execution. Maintained `apply` mode is authoritative for enabled routes and fails closed after ownership acquisition. Exact Router actions are adapter-only. The old CapabilityAgent semantic planner is retained only behind host, Agent, and per-turn emergency gates | Goal-contract, schema-payload, invalid-enum model-revision, repair-exhaustion fail-closed, association, Fast/Deep Planner, Goal Satisfaction, response-composition, runtime-adapter, Orchestrator fail-closed, atomic-state, semantic-authority matrix/audit, adapter-equivalence and emergency-gate tests, twelve retained `cognitive_runtime` scenarios, and an eight-case `multi_goal_daily_life` Level A ability class | A July 16 live daily-life multi-goal run reached Router, Agent, Ollama, and Soridormi preflight but stopped at Goal Association because the previous JSON-only mode emitted non-canonical relationship word forms. The boundary now uses the exact JSON Schema and requires a retained live rerun before claiming MuJoCo execution | Code and maintained configuration default to `apply`; `chat,robot_action` are authoritative lanes; legacy semantic fallback gates are off |
-| Semantic compound capability planning | Implemented as model-authored complete-goal planning over bounded capability schemas plus provider/resource evidence. The model chooses exact execution, safe adjustment, alternative proposal, clarification, or unsupported; model-authored timing and explanation are preserved. A quick Router that cannot bind the complete effectful goal now hands the original utterance to semantic capability planning instead of declaring the ability missing. Deterministic code validates the complete plan atomically, blocks partial-skill leakage, requires confirmation for material alternatives, and performs only authorization/resource arbitration rather than natural-language action interpretation | Exact parallel composition, sequential alternative proposal, unresolved Router-to-planner handoff, unknown concurrency evidence, invalid-substep atomic rejection, confirmation-prompt override, host blocked-state stripping, repeated-step audit identity, and file-backed Chinese walk/blink regression tests | Automated dependency-light evidence only; live model/provider behavior must be rerun, and no claim is made that walking and blinking are physically compatible on a particular robot | LLM planning enabled; provider metadata remains authoritative; no normal-language action/count/speed fast-path parser |
-| Trusted host Skill Runtime | Implemented | Scheduling, confirmation, timeout, cancellation, and isolation tests | Text-to-live-MuJoCo closure evidence passed | Used only by structured path |
-| Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Clean synthetic and virtual-mic approval/denial evidence passed; text-to-MuJoCo uses the same trusted runtime authorization boundary | Structured path; simulator exemption configurable |
+| Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Historical compatibility evidence only; it is not the maintained semantic-authority path | Service remains available, but common cognitive `apply` does not use it as semantic authority |
+| Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle on the historical path; it is not evidence for the current cognitive authority path | Enabled in the common safe base |
+| Native structured Interaction Agent | Implemented as the strict output and compatibility surface for `InteractionSpeech`/`SkillRequest` accumulation, TaskGraph requests, and optional `SocialAttentionPlan` coordination. Under cognitive `apply`, fingerprint-bound Response Composition is part of the authoritative Goal-driven pipeline rather than a separate background observer. Attention is selected from exact named capabilities or `none`; the host validates target evidence, schemas, latency, confirmation policy, and conflicts and excludes auxiliary attention from user task proposals | Native route, TaskGraph, validation, fail-closed, fallback, response-composition goal coverage/claim/immutability, social-attention selection/none/invalid/latency/target/conflict, exact-intent, and compatibility-mode tests plus file-backed interaction scenarios | Text-input MuJoCo closure evidence is retained for prior task skills; the current cognitive response and social-attention path still needs a retained live simulator rerun | Structured interaction enabled; normal profiles keep attention off. Only the explicit architecture-validation overlay selects `sim_only` with calibrated right-side fallback |
+| Goal-driven cognitive runtime and single semantic authority | PR1–PR8 contracts and stages are integrated through one host coordinator: schema-constrained Goal Association with one bounded model contract revision, complete-coverage Fast Planner, terminal full-catalog Deep Planner, one bounded trusted-validator replan, fingerprint-bound Response Composition, lane-gated runtime adaptation, atomic Goal-state application, mixed-plan execution, and existing confirmation/Skill Runtime execution. Maintained `apply` mode is authoritative for enabled routes and fails closed after ownership acquisition. Exact Router actions are adapter-only. The old CapabilityAgent semantic planner is retained only behind host and Agent gates plus a non-empty authoritative emergency claim whose `turn_id` exactly matches the request | Goal-contract, schema-payload, invalid-enum model-revision, repair-exhaustion fail-closed, association, Fast/Deep Planner, Goal Satisfaction, response-composition, runtime-adapter, Orchestrator fail-closed, atomic-state, semantic-authority matrix/audit, adapter-equivalence, empty/turn-mismatch rejection, and emergency-gate tests, twelve retained `cognitive_runtime` scenarios, and an eight-case `multi_goal_daily_life` Level A ability class | A July 16 live daily-life multi-goal run reached Router, Agent, Ollama, and Soridormi preflight but stopped at Goal Association because the previous JSON-only mode emitted non-canonical relationship word forms. The boundary now uses the exact JSON Schema and requires a retained live rerun before claiming MuJoCo execution | Common safe base: authoritative `chat` apply, structured interaction on, Soridormi off. Maintained Soridormi launcher: authoritative `chat,robot_action`, Soridormi on. Both fail closed; legacy semantic fallback gates are off |
+| Semantic compound capability planning | Implemented inside Fast/Deep canonical planning over bounded capability schemas plus provider/resource evidence. The model chooses exact execution, safe adjustment, alternative proposal, clarification, or unsupported; model-authored timing and explanation are preserved. A quick Router that cannot account for the complete effectful goal hands the original utterance to the unified planner instead of declaring the ability missing or invoking the legacy CapabilityAgent planner. Deterministic code validates the complete plan atomically, blocks partial-skill leakage, requires confirmation for material alternatives, and performs authorization/resource arbitration rather than natural-language action interpretation | Exact parallel composition, sequential alternative proposal, unresolved Router-to-planner handoff, unknown concurrency evidence, invalid-substep atomic rejection, confirmation-prompt override, host blocked-state stripping, repeated-step audit identity, and file-backed Chinese walk/blink regression tests | Automated dependency-light evidence only; live model/provider behavior must be rerun, and no claim is made that walking and blinking are physically compatible on a particular robot | Unified cognitive planning enabled for configured apply lanes; provider metadata remains authoritative; no normal-language action/count/speed fast-path parser |
+| Trusted host Skill Runtime | Implemented | Scheduling, confirmation, timeout, cancellation, and isolation tests | Historical text-to-live-MuJoCo closure evidence passed; the current goal-driven path still needs a retained rerun | Used only by structured path |
+| Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Historical synthetic and virtual-mic approval/denial evidence passed; the current goal-driven path still needs a clean retained rerun | Structured path; simulator exemption configurable |
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; physical speaker validation remains separate | Available in structured path |
-| Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Provider flag off |
+| Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Off in common safe base; enabled by maintained Soridormi launcher |
 | Provider failure normalization | Strict catalog/availability/plan/monitor/completion validation, stable timeout/cancellation terminal states, deterministic language-matched speech fallback, and a versioned 16-scenario replayable fault matrix with configurable latency thresholds, status snapshots, and safe-idle enforcement | Matrix, threshold and safe-idle evaluation, provider restart, unavailable skill, deterministic jitter, dropped monitor status, malformed completion, mismatched identity, disconnect-during-cancel, timeout, fallback, and completion-suppression tests | Live Soridormi-owned injection passed 16/16 scenarios; all ended safe-idle with no threshold violations | Used by Soridormi named skills |
 | Provider conformance | Shared versioned checks and replayable high-level traces for simulator, recommendation-only hardware shadow, and no-motion hardware dry-run profiles, plus manifest preflight and strict retained-evidence verification | Local three-profile parity, trace-drift detection, opaque-identity normalization, profile-specific no-motion proofs, unsafe-output rejection, manifest preflight, and complete/unsafe bundle tests | Live no-motion `sim`, `hardware_shadow`, and `hardware_dry_run` profiles passed with parity; real hardware mode remains refused | Test tooling; real hardware mode refused |
-| Conversation and semantic task state across VAD utterances | Implemented in host memory with optional local recoverable task-context store; includes extracted session/task memory, bounded active-task snapshots, open semantic goals, replay-safe structured task operations, goal/plan versioning, confirmation invalidation, planning-result freshness checks, information gaps, a dedicated goal-association and task-continuity Agent endpoints, staged report/apply integration, same-turn Router-to-Agent context refresh, and immediate ResponsePlan claim validation | Boundary, follow-up, task-context, restart-restore, extracted-memory, semantic-task contract, create/modify/clarification/replay, goal-association continuity/segmentation/ambiguity, task-continuity prompt/target/confidence/idempotency, response-claim, capability information-gap, Router prompt, task-proposal, interaction, and TTS-alignment tests | Available in the host Orchestrator; no retained live semantic-continuity evidence yet | Conversation state enabled by `.env.common`; `ORCH_GOAL_ASSOCIATION_MODE=report_only` observes continuity-before-creation without state changes; `ORCH_TASK_CONTINUITY_MODE=report_only` observes only turns with active-task snapshots without replacing Router operations; `apply` remains explicit; semantic operations remain model proposals validated by the host; goal-scoped response composition is implemented in background report-only mode, while durable personal memory and LLM-assisted extraction remain open |
+| Conversation and semantic task state across VAD utterances | Implemented in host memory with optional local recoverable task-context store; includes extracted session/task memory, bounded active-task snapshots, open semantic goals, replay-safe structured task operations, goal/plan versioning, confirmation invalidation, planning-result freshness checks, information gaps, Goal Association, same-turn Router-to-Agent context refresh, atomic operation application, and immediate response-claim validation | Boundary, follow-up, task-context, restart-restore, extracted-memory, semantic-task contract, create/modify/clarification/replay, goal-association continuity/segmentation/ambiguity, task-continuity prompt/target/confidence/idempotency, response-claim, capability information-gap, Router prompt, task-proposal, interaction, and TTS-alignment tests | Available in the host Orchestrator; no retained live semantic-continuity evidence for the current authority path yet | Conversation state and unified cognitive `apply` are enabled in `.env.common` for `chat`; standalone Goal Association, planner, Response Composer, and task-continuity observer modes are off because the unified coordinator owns those stages. Durable personal memory and LLM-assisted extraction remain open |
 | High-level Chromie self and ability model | Implemented as an owner-approved structured self model plus a host ability registry above concrete skills. Prompts bind first-person speech, perception, action, and body ownership to the self-model speaker entity, expose language/reasoning models only as internal components, and use a natural social presentation that foregrounds the name Chromie rather than volunteering system category, embodiment category, age labels, or internal architecture; capability inquiries use the supplied catalog/provider evidence semantically and do not execute actions. Stable cognition, speech, memory, social, body, manipulation, navigation, environment, task, safety, and state ability IDs remain available; broad human-like missing abilities can be recorded as `known_missing`/`planned` and surfaced as `missing_ability` proposals | Mind/self-model, conversation prompt, Router inquiry-versus-execution, DeepThinking, direct-fallback, ability-registry, capability-evidence, dialogue-scenario, task-ledger, and Orchestrator TTS-alignment tests | Automated prompt/scenario evidence only; no claim that every live model response will be correct, and only existing text/simulator paths exercise executable abilities | Registry enabled in host Orchestrator; no identity-question branch, hardcoded identity reply, or normal-language identity/capability regex was introduced; most body, social, manipulation, navigation, and environment abilities remain honest non-executable roadmap entries |
-| Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and four explicit voice modes implemented; text-MuJoCo evidence writes route, interaction, execution, status, events, and summary artifacts | Preflight, synthetic/virtual-mic/acoustic framing, isolation, text-MuJoCo, and bundle-verification tests | Clean synthetic, virtual-mic, acoustic, and text-MuJoCo evidence retained; physical supervised mode remains optional release-support evidence for human voice-device claims | Acceptance-only |
+| Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and four explicit voice modes implemented; text-MuJoCo evidence writes route, interaction, execution, status, events, and summary artifacts | Preflight, synthetic/virtual-mic/acoustic framing, isolation, text-MuJoCo, and bundle-verification tests | Historical clean synthetic, virtual-mic, acoustic, and text-MuJoCo evidence is retained for its recorded revisions; a clean current goal-driven rerun remains open. Physical supervised mode is separate support evidence for human voice-device claims | Acceptance-only |
 | Developer usability CLI | `python -m tools.chromie_cli` implements `status`, `config show`, `config validate`, `doctor`, `capability check`, `trace view`, and `evidence bundle` with plain/JSON output; `trace explain` remains future work | CLI command, output, validation, doctor, manifest-safety, retained-trace, and evidence-preflight unit tests plus full Level A gate | Local doctor can report service reachability, trace view can summarize retained local artifacts, and evidence preflight can label retained bundle pointers, but none create target evidence or release readiness | Tooling |
-| Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Manifest loading opt-in |
+| Capability registry and deployment probe | Implemented | Registry, manifest, pagination, and schema tests | Checked-in Soridormi manifest is pinned to an upstream commit | Root Compose loads the static manifest by default; live Soridormi provider use remains off in the common safe base |
 | LLM TaskGraph planning | Implemented | Planner validation and fallback tests | No automatic dispatch by design | Flag off |
 | Read-only TaskGraph execution | Implemented | Preflight, references, parallelism, retry, timeout, fallback, and cancellation tests | Live MCP acceptance can exercise it | Flag off |
 | Stateful planning-only TaskGraph execution | Implemented; `soridormi.task.submit` nodes get stable `client_task_ref` values, are monitored through `soridormi.task.events`, preserve refused/blocked metadata, populate deterministic trace outcome summaries, can activate trace-only `chromie.report` fallbacks before graph success is reported, and can be invoked from native `chromie.task_graph.execute` Skill Runtime requests | Planning policy, concurrency, task-submit monitoring, idempotency-key, terminal-event, refusal, timeout, blocked-subsystem reporting, outcome-summary, trace-only report, error/status refs, rich-goal routing, host Skill Runtime dispatch, and completion-speech suppression tests | Safe Soridormi plan creation acceptance exists; task API dry-run bridge acceptance passed locally; physical task execution evidence remains future work | Flag off |
@@ -288,7 +294,7 @@ Target validation or Release readiness.
 | Shared bounded scheduling and resource arbitration | Implemented | Agent and Orchestrator concurrency tests | MuJoCo interaction path exercises the policy | Parallel flags off |
 | Hardware profile detection and generated `.env.runtime` | Implemented | Profile-detection tests | RTX 5090 profile and CUDA arch 120 validated; Jetson packaging evidence is incomplete | Automatic |
 | Host hardware daemon | Legacy mock compatibility implementation | Hardware/control-plane tests | No production hardware claim | Optional; mock driver only |
-| Release packaging | `0.0.1` version, release notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests and full suite | M13 text scope is closed; acoustic generated-speech evidence supports the narrowed Soridormi MuJoCo-executor claim; human voice-device scope still requires supervised physical audio evidence | Release prep |
+| Release packaging | `0.0.1` version, candidate notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests | Historical M13 and acoustic evidence does not validate the current authority path. The current runners record a declared paired Soridormi checkout but no endpoint-reported executing revision; running Chromie images/models are not yet bound to host `HEAD`; maintained image references remain mutable; fresh target-validated voice and text-to-MuJoCo evidence is still required. Human voice-device scope separately requires supervised physical audio evidence | Blocked candidate preparation |
 
 ## Verified automated evidence
 
@@ -347,7 +353,7 @@ artifacts according to `docs/TRACE_SCHEMA.md`, and `evidence bundle` labels
 retained evidence pointers without creating target evidence or release
 readiness.
 
-The current task-agent routing, refusal-reporting, host graph-dispatch,
+The historical task-agent routing, refusal-reporting, host graph-dispatch,
 no-motion bridge-acceptance, and reference-candidate verifier refresh after
 committed base `f4bbb2f` passed `python scripts/check_docs.py`,
 `python scripts/test_matrix.py taskgraph soridormi`, local dry-run
@@ -356,13 +362,13 @@ focused interaction/catalog task-agent tests, focused host Skill Runtime graph
 dispatch tests, focused Soridormi acceptance tests, focused robot-candidate
 verifier tests, and dependency-complete Orchestrator AgentClient coverage. The
 retained local `./scripts/run_tests.sh` baseline on 2026-07-04 passed
-`python scripts/check_docs.py`, ran 640 current `unittest` cases with `OK`, and
+`python scripts/check_docs.py`, ran 640 `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions. The behavior
 scenario runner also passed 353/353 adapter, Router, interaction, and dialogue
 scenario files with `--no-write`.
 
-The current 2026-07-09 local gate after the general ability reconstruction and
-regression fixes passes the canonical dependency-light suite:
+The historical 2026-07-09 local gate after the general ability reconstruction
+and regression fixes passed the canonical dependency-light suite:
 `./scripts/run_tests.sh` completed `python scripts/check_docs.py`, 743
 `unittest` cases, and 20 dependency-light legacy Agent tests. Focused
 general-ability checks also pass, including
@@ -372,36 +378,37 @@ A representative probes, and `python scripts/test_matrix.py general-ability`.
 The retained Level A summary is under
 `.chromie/acceptance/general-ability/20260709T080845Z-level-a/summary.json`.
 
-The current 2026-07-12 automated regression gate after goal-driven PR7
-runtime migration passes `python scripts/check_docs.py`, 899 `unittest` cases,
+The historical 2026-07-12 automated regression gate during goal-driven PR7
+runtime migration passed `python scripts/check_docs.py`, 899 `unittest` cases,
 and 20 dependency-light legacy Agent tests through `./scripts/run_tests.sh`.
-The complete file-backed behavior library passes 373/373 adapter, Router,
+The complete file-backed behavior library passed 373/373 adapter, Router,
 Router-dialogue, interaction, dialogue, and cognitive-runtime scenarios with
-`--no-write`. General-ability Level A passes 42/42. The scenarios force the raw quick model to
+`--no-write`. General-ability Level A passed 42/42. The scenarios forced the raw quick model to
 return observed stale or generic decisions for walking and compound nod/blink
 requests, then verify bounded semantic review, exact capability grounding,
 confirmation, final Agent skill output, repeated correctness after a weather
 turn, and absence of weather or retry fallback speech. Busy-ASR lifecycle tests
 verify that only the newest pending utterance is retained and that a newer
-routed turn cancels stale turn processing. Task-continuity report-only calls are
-non-blocking and degrade to an empty advisory result on model failure; effectful
+routed turn cancels stale turn processing. At that checkpoint, standalone
+task-continuity report-only calls were non-blocking and degraded to an empty
+advisory result on model failure; effectful
 Agent disconnects fail closed instead of falling through to an unrestricted
 direct LLM. Stage 6 additionally verifies explicit DAC-device selection,
 worker-reported runtime metadata, synchronized model/codec timings, rolling
-performance summaries, and benchmark result aggregation. The self-model prompt refresh adds a retained three-turn identity/unavailable-dance/available-blink scenario and a prompt-facing social presentation that foregrounds Chromie by name without making a false human-identity claim. A retained Router scenario now verifies that an unresolved compound action is handed to CapabilityAgent planning instead of becoming a terminal missing-ability response. and verifies inquiry-versus-execution semantics without introducing an
+performance summaries, and benchmark result aggregation. The self-model prompt refresh adds a retained three-turn identity/unavailable-dance/available-blink scenario and a prompt-facing social presentation that foregrounds Chromie by name without making a false human-identity claim. A retained Router scenario verifies that an unresolved compound action preserves the original utterance for complete-goal planning instead of becoming a terminal missing-ability response, and verifies inquiry-versus-execution semantics without introducing an
 identity blacklist, fixed identity response, or phrase-matched capability
-handler. Compound capability planning now asks the model to reconstruct the
+handler. Unified Fast/Deep capability planning asks the model to reconstruct the
 complete requested outcome and choose an exact plan, safe adjustment,
 alternative proposal, clarification, or unsupported result from provider and
-resource evidence. Capability parameter completion is now semantic and schema-grounded. The
-Capability LLM sees defaults, bounds, safety class, effects, provider
+resource evidence. Capability parameter completion is semantic and schema-grounded. The
+planner sees defaults, bounds, safety class, effects, provider
 constraints, and the complete user request, then decides whether a missing field
 can use a conservative ordinary value or requires a specific user clarification.
 Low-consequence defaults are retained with parameter-grounding evidence;
 material duration, direction, target, authorization, cost, or irreversible
 fields become structured information gaps. The semantic capability-planning
-handoff is no longer redirected to generic DeepThinking solely because the
-quick Router reports zero confidence. Stage 6.6 adds retained live-interaction
+handoff is not redirected to generic DeepThinking solely because the quick
+Router reports zero confidence. Stage 6.6 adds retained live-interaction
 replays for compound walking and blinking, semantic recovery from an
 unstructured/internal placeholder clarification, and a later parameter answer
 resuming the original task. Planner-created alternative plans remain
@@ -413,13 +420,20 @@ The runtime validates every proposed step before committing
 any of them, preserves model-authored parallel/sequential timing, disables
 simulator auto-confirm for material alternatives, and prevents structured
 clarification or blocked results from leaking effectful skills. The former
-normal-language count/speed/action fast-path parsers were removed. PR1 through PR7 additionally provide the Goal-driven contracts and unified runtime. The maintained deployment remains report-only; lane-gated apply, atomic Goal-state commit, bounded host replan, classified operational evidence, and cognitive text-to-MuJoCo entry points are automatically verified. No retained PR7 live-text or MuJoCo target evidence is claimed.
+normal-language count/speed/action fast-path parsers were removed. PR1 through
+PR8 now provide the Goal-driven contracts, unified runtime, and single-authority
+boundary. The common safe base authoritatively applies `chat`; the maintained
+Soridormi launcher widens authority to `chat,robot_action`. Both use
+fail-closed behavior after ownership acquisition. Atomic Goal-state commit,
+bounded host replan, classified operational evidence, and cognitive
+text-to-MuJoCo entry points are automatically verified. No retained live-text
+or MuJoCo target evidence for this current path is claimed.
 These results are
 automated evidence; a retained Stage 6 GPU benchmark, listening check, and live
 voice or live-text rerun are still required.
 
-The 2026-07-14 post-PR7 cognitive-architecture and daily-life multi-goal
-review passes `python scripts/check_docs.py`, 926 current `unittest` cases, 20
+The historical 2026-07-14 post-PR7 cognitive-architecture and daily-life multi-goal
+review passed `python scripts/check_docs.py`, 926 `unittest` cases, 20
 legacy Agent tests, 381/381 file-backed behavior scenarios, and 50/50 General
 Ability Level A probes. The retained cognitive-runtime family now contains
 twelve scenarios, including eight daily-life multi-goal cases that cover
@@ -500,10 +514,11 @@ These legacy evidence tracks do not define the current delivery:
 
 ## Known limitations
 
-- The default structured interaction feature flags are off.
-- Native interaction output is the Agent default, but the host structured
-  rollout remains default-off unless the operator selects the `0.0.1` release
-  configuration.
+- Structured interaction and authoritative goal-driven `apply` for `chat` are
+  enabled in the common safe base. Soridormi skills, simulation auto-confirm,
+  and physical execution remain off there; the maintained Soridormi launcher
+  explicitly widens authority to `chat,robot_action` after enabling the trusted
+  provider.
 - `AGENT_NATIVE_INTERACTION_FALLBACK` is default-off so malformed native output
   fails closed unless an operator explicitly enables adapter fallback.
 - The checked-in Soridormi manifest is a pinned contract snapshot; the live
@@ -531,10 +546,15 @@ These legacy evidence tracks do not define the current delivery:
 
 ## Release classification
 
-Treat this revision as the **`0.0.1` release-prep snapshot** until it is tagged
-and published. It is not a production release, physical-robot release, or human
-voice-device release. Robot execution evidence for this release is limited to
-Soridormi MuJoCo `sim`. See [Release and Packaging](RELEASE.md).
+Treat this revision as a blocked **`0.0.1` release candidate**. Before fresh
+goal-driven voice/MuJoCo evidence can count toward publication, the Soridormi
+endpoint must report its executing revision, running Chromie images/models must
+be bound to the candidate source, and mutable release image references must be
+replaced. The release must then be tagged and published. It is not a production
+release, physical-robot release, or human voice-device release. Historical
+robot execution evidence is limited to Soridormi MuJoCo `sim` and does not
+validate the current semantic-authority path. See
+[Release and Packaging](RELEASE.md).
 
 ## Goal-driven cognitive runtime status
 
@@ -556,13 +576,30 @@ evidence boundaries. Goal-state changes are atomic, and optional social
 attention is revalidated by the host for target evidence, schema correctness,
 and primary-plan resource conflicts.
 
-The maintained profile now uses authoritative `apply` for `chat` and
-`robot_action`. A turn that enters the Goal-driven Runtime cannot fall through
-to the old CapabilityAgent planner. Exact Router actions are adapter-only, and
-the retained old semantic planner requires host, Agent, and per-turn emergency
-gates. This single-authority boundary is implemented and automatically
-verified without GPU services; see
+The common safe base now enables structured interaction and authoritative
+`apply` for `chat` while leaving the Soridormi provider off. The maintained
+Soridormi launcher enables that trusted provider and widens authority to
+`chat,robot_action`. A turn that enters the Goal-driven Runtime cannot fall
+through to the old CapabilityAgent planner. Exact Router actions are
+adapter-only, and the retained old semantic planner requires host and Agent
+gates plus a non-empty authoritative emergency claim whose `turn_id` matches
+the request. That claim is internal routing metadata, not caller authentication
+or a consumed replay nonce. This single-authority boundary is implemented and
+automatically verified without GPU services; see
 [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
+
+Evidence and release tooling now rejects provenance drift instead of relabeling
+an older bundle as validation for the current source. Cognitive simulator
+validation requires an applied cognitive result, completed Soridormi `sim`
+execution, explicit safe idle, a clean declared paired checkout, and an
+endpoint-reported Soridormi revision matching the manifest and checkout. The
+current runner records no endpoint revision, so its output is diagnostic rather
+than target-validated. Voice evidence and release preparation likewise compare
+declared revisions and version with current source, but running Chromie
+images/models are not yet bound to host `HEAD`, and maintained image references
+remain mutable. These implemented fail-closed checks do not make the current
+snapshot release ready or replace the missing provenance bindings and fresh
+retained target run.
 
 Retained live-text and MuJoCo artifacts for the new multi-goal and authority
 boundaries remain open, so target validation and release readiness are not

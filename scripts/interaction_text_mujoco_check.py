@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Text-to-MuJoCo interaction check without microphone or ASR.
 
-This runner feeds user text directly into the deployed Router and Agent
-``/interaction`` contract, executes the resulting structured response through
-the host trusted Skill Runtime, and optionally plays Chromie speech through the
-configured speaker. It is a simulator/live-integration check, not supervised
-microphone evidence.
+This runner feeds user text into the deployed Router and, by default, the
+maintained goal-driven cognitive runtime. It executes the resulting structured
+response through the host trusted Skill Runtime and optionally plays Chromie
+speech through the configured speaker. An explicit legacy Agent ``/interaction``
+compatibility mode remains available. This is a simulator/live-integration
+check, not supervised microphone evidence.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import asyncio
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -167,12 +169,14 @@ def validate_speech_contract(
 
 def safe_idle_errors(status: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if status.get("active_task") is not None:
+    if status.get("safe_idle") is not True:
+        errors.append(f"safe_idle is not true: {status.get('safe_idle')!r}")
+    if "active_task" not in status or status.get("active_task") is not None:
         errors.append(f"active_task is not idle: {status.get('active_task')!r}")
     if status.get("emergency_stop") is not False:
         errors.append(f"emergency_stop is not false: {status.get('emergency_stop')!r}")
-    if status.get("fallen") is True:
-        errors.append("robot reports fallen=true")
+    if status.get("fallen") is not False:
+        errors.append(f"fallen is not false: {status.get('fallen')!r}")
     return errors
 
 
@@ -184,6 +188,27 @@ def should_require_tts_speech(route: Any, *, require_speech: bool) -> bool:
     if getattr(route, "should_speak", True) is False:
         return False
     return True
+
+
+def should_apply_cognitive_runtime(
+    route: Any,
+    *,
+    enabled: bool,
+    apply_lanes: str,
+) -> bool:
+    lanes = {item.strip() for item in apply_lanes.split(",") if item.strip()}
+    route_name = str(getattr(route, "route", "") or "")
+    lane = (
+        "chat"
+        if route_name in {"chat", "clarify", "deep_thought"}
+        else route_name
+    )
+    return bool(
+        enabled
+        and not getattr(route, "interrupt_current", False)
+        and route_name not in {"interrupt", "ignore"}
+        and lane in lanes
+    )
 
 
 def _short_capability_id(item: dict[str, Any]) -> str:
@@ -321,6 +346,105 @@ def _exception_text(exc: BaseException) -> str:
     return f"{exc.__class__.__name__}: {str(exc) or exc.__class__.__name__}"
 
 
+def _git_text(root: Path, *args: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def _manifest_upstream_revision(path: Path) -> str | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    metadata = payload.get("metadata") if isinstance(payload, dict) else None
+    if not isinstance(metadata, dict):
+        return None
+    revision = str(metadata.get("upstream_commit") or "").strip()
+    return revision or None
+
+
+def collect_run_provenance(
+    *,
+    manifest: Path,
+    cognitive_runtime: bool,
+    cognitive_apply_lanes: str,
+    cognitive_runtime_selected: bool | None = None,
+    soridormi_repo: Path | None = None,
+    root: Path = ROOT,
+) -> dict[str, Any]:
+    """Capture the source and semantic-runtime identity for retained evidence."""
+
+    version_path = root / "VERSION"
+    try:
+        version = version_path.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        version = None
+    revision = _git_text(root, "rev-parse", "HEAD")
+    status = _git_text(root, "status", "--short")
+    manifest_path = manifest.expanduser().resolve()
+    soridormi_repo_path = soridormi_repo.expanduser().resolve() if soridormi_repo else None
+    soridormi_revision = (
+        _git_text(soridormi_repo_path, "rev-parse", "HEAD")
+        if soridormi_repo_path is not None
+        else None
+    )
+    soridormi_status = (
+        _git_text(soridormi_repo_path, "status", "--short")
+        if soridormi_repo_path is not None
+        else None
+    )
+    lanes = [item.strip() for item in cognitive_apply_lanes.split(",") if item.strip()]
+    selected = cognitive_runtime if cognitive_runtime_selected is None else bool(
+        cognitive_runtime_selected
+    )
+    return {
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "chromie": {
+            "revision": revision,
+            "version": version,
+            "dirty": None if status is None else bool(status),
+        },
+        "soridormi": {
+            "manifest": str(manifest_path),
+            "upstream_revision": _manifest_upstream_revision(manifest_path),
+            "checkout": str(soridormi_repo_path) if soridormi_repo_path else None,
+            "checkout_revision": soridormi_revision,
+            "checkout_dirty": (
+                None if soridormi_status is None else bool(soridormi_status)
+            ),
+            "source_binding": "declared_paired_checkout",
+            "endpoint_revision": None,
+        },
+        "semantic_runtime": {
+            "path": (
+                "goal_driven_cognitive_runtime"
+                if selected
+                else (
+                    "agent_interaction_outside_apply_lanes"
+                    if cognitive_runtime
+                    else "legacy_agent_interaction"
+                )
+            ),
+            "configured_cognitive_runtime_mode": (
+                "apply" if cognitive_runtime else "off"
+            ),
+            "cognitive_runtime_selected_for_route": selected,
+            "cognitive_apply_lanes": lanes if cognitive_runtime else [],
+        },
+    }
+
+
 def _apply_soridormi_skill_timeout(response: Any, timeout_s: float | None) -> Any:
     if timeout_s is None or timeout_s <= 0:
         return response
@@ -355,14 +479,18 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
     conversation_id = str(getattr(args, "conversation_id", "") or "").strip()
     if conversation_id:
         os.environ["ORCH_CONVERSATION_ID"] = conversation_id
+    os.environ["ORCH_COGNITIVE_RUNTIME_MODE"] = (
+        "apply" if args.cognitive_runtime else "off"
+    )
     if args.cognitive_runtime:
-        os.environ["ORCH_COGNITIVE_RUNTIME_MODE"] = "apply"
         os.environ["ORCH_COGNITIVE_APPLY_LANES"] = args.cognitive_apply_lanes
         os.environ["ORCH_COGNITIVE_FALLBACK_POLICY"] = "fail_closed"
         os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"] = "1"
         os.environ["ORCH_COGNITIVE_EVIDENCE_PATH"] = str(
             evidence_dir / "cognitive_runtime_events.jsonl"
         )
+    else:
+        os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"] = "0"
     if args.soridormi_mcp_url:
         os.environ["SORIDORMI_MCP_URL"] = args.soridormi_mcp_url
 
@@ -405,6 +533,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
     execution_payload: dict[str, Any] | None = None
     status_before: dict[str, Any] | None = None
     status_after: dict[str, Any] | None = None
+    cognitive_runtime_selected = False
 
     try:
         health_start = time.perf_counter()
@@ -474,7 +603,12 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
 
         agent_start = time.perf_counter()
         cognitive_resolution_payload: dict[str, Any] | None = None
-        if args.cognitive_runtime:
+        cognitive_runtime_selected = should_apply_cognitive_runtime(
+            route,
+            enabled=bool(args.cognitive_runtime),
+            apply_lanes=str(args.cognitive_apply_lanes),
+        )
+        if cognitive_runtime_selected:
             cognitive_resolution = await assistant._run_cognitive_runtime_pipeline(
                 session,
                 user_text=args.text,
@@ -629,6 +763,11 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                     time.perf_counter() - status_after_start
                 ) * 1000.0
                 _write_json(evidence_dir / "status_after.json", status_after)
+                if not args.allow_non_sim and status_after.get("mode") != "sim":
+                    errors.append(
+                        "Post-run Soridormi mode is not sim: "
+                        f"{status_after.get('mode')!r}"
+                    )
                 errors.extend(safe_idle_errors(status_after))
 
             session_state = assistant.sessions.state.get(sid) or {}
@@ -667,6 +806,15 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             "status_before": status_before,
             "status_after": status_after,
             "session_state": assistant.sessions.state.get(sid),
+            "provenance": collect_run_provenance(
+                manifest=Path(args.manifest),
+                cognitive_runtime=bool(args.cognitive_runtime),
+                cognitive_apply_lanes=str(args.cognitive_apply_lanes),
+                cognitive_runtime_selected=cognitive_runtime_selected,
+                soridormi_repo=(
+                    Path(args.soridormi_repo) if args.soridormi_repo else None
+                ),
+            ),
         }
         _write_json(evidence_dir / "summary.json", summary)
         return summary
@@ -677,8 +825,8 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run text -> Router -> Agent /interaction -> Skill Runtime -> "
-            "Soridormi/MuJoCo without microphone or ASR."
+            "Run text through the maintained goal-driven runtime and trusted "
+            "Skill Runtime to Soridormi/MuJoCo without microphone or ASR."
         )
     )
     parser.add_argument("text", nargs="?", default=DEFAULT_TEXT)
@@ -689,6 +837,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.getenv("SORIDORMI_MCP_URL", "http://127.0.0.1:8000/mcp"),
     )
     parser.add_argument("--manifest", type=Path, default=ROOT / "capabilities" / "soridormi.json")
+    parser.add_argument(
+        "--soridormi-repo",
+        default=os.getenv("SORIDORMI_REPO", ""),
+        help=(
+            "Declared paired Soridormi Git checkout recorded for diagnostic "
+            "provenance; this does not identify the source executing behind the "
+            "MCP endpoint."
+        ),
+    )
     parser.add_argument("--language", default=None)
     parser.add_argument("--evidence-dir")
     parser.add_argument(
@@ -707,10 +864,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cognitive-runtime",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help=(
-            "Use the PR7 goal-association, Fast/Deep Planner, response-composer, "
-            "and trusted runtime adapter instead of the legacy Agent /interaction path."
+            "Use goal association, Fast/Deep Planner, response composition, and "
+            "the trusted runtime adapter (default). Use --no-cognitive-runtime "
+            "only for an explicit legacy Agent /interaction compatibility check."
         ),
     )
     parser.add_argument(

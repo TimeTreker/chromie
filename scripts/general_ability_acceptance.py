@@ -33,8 +33,9 @@ LEVEL_A_CLAIM = (
     "services, microphone, speaker, simulator execution, or robot behavior."
 )
 LIVE_TEXT_PREVIEW_CLAIM = (
-    "Live text preview evidence through Router, Agent, and Soridormi status "
-    "preflight. This does not prove microphone, speaker, or executed motion."
+    "Live text preview evidence through Router, the selected semantic runtime, "
+    "and Soridormi status preflight. This does not prove microphone, speaker, "
+    "or executed motion."
 )
 LIVE_TEXT_EXECUTE_CLAIM = (
     "Live text-to-Soridormi simulator execution evidence. This does not prove "
@@ -672,6 +673,12 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "evidence_level": "C" if args.execute else "C-preview",
         "claim_scope": LIVE_TEXT_EXECUTE_CLAIM if args.execute else LIVE_TEXT_PREVIEW_CLAIM,
         "manifest": str(manifest.path),
+        "goal_driven_runtime": args.goal_driven_runtime,
+        "cognitive_apply_lanes": (
+            args.cognitive_apply_lanes
+            if args.goal_driven_runtime == "apply"
+            else ""
+        ),
         "execute": args.execute,
         "speaker": args.speaker,
         "errors": errors,
@@ -790,10 +797,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--goal-driven-runtime",
         choices=("off", "apply"),
-        default="off",
+        default="apply",
         help=(
             "Use the goal-association, Fast/Deep Planner, response-composer, "
-            "and trusted runtime adapter for live-text cases."
+            "and trusted runtime adapter for live-text cases (default: apply). "
+            "Select off only for an explicit legacy Agent compatibility run."
         ),
     )
     parser.add_argument(

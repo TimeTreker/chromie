@@ -8,14 +8,14 @@ optional Soridormi-backed simulator or robot skills.
 The long-term goal and ownership boundaries are defined in the
 [Project Charter](docs/PROJECT_CHARTER.md).
 
-> **Current state:** the historical M13 text-to-MuJoCo interaction milestone is
-> closed. Retained RTX 5090 GPU smoke, synthetic, virtual-microphone, acoustic
-> generated-speech, and text-to-MuJoCo evidence pass on the reference host.
-> The next intended release tag is `0.0.1`. Chromie is the real host control
-> plane; this release is limited to generated-speech and structured interaction
-> evidence with Soridormi executing robot work through its MuJoCo `sim` mode.
-> Real microphone/speaker validation remains a separate track before making a
-> human voice-device support claim. See
+> **Current state:** the Goal-driven Runtime is implemented as Chromie's single
+> semantic authority: Goal Association -> Fast/terminal Deep Planning ->
+> Response Composition -> trusted host adaptation. It is automatically verified
+> and defaults to authoritative chat in the common safe base; the maintained
+> Soridormi launcher widens authority to simulator robot actions. Historical M13
+> evidence remains valid only for its recorded legacy revisions. A clean live
+> rerun of the current authority path is still required before target validation
+> or publication of the blocked `0.0.1` candidate. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
@@ -24,10 +24,11 @@ The long-term goal and ownership boundaries are defined in the
 
 ```text
 Host Orchestrator
-  microphone -> VAD -> ASR -> Router -> Agent
-                             -> trusted Skill Runtime
-                                  -> speech -> TTS -> speaker
-                                  -> named skill -> Soridormi MCP
+  microphone -> VAD -> ASR -> Router
+    -> Goal Association -> Fast Planner -> terminal Deep Planner when needed
+    -> Response Composer -> strict InteractionResponse -> trusted Skill Runtime
+       -> speech -> TTS -> speaker
+       -> named skill -> Soridormi MCP
 
 Docker: ASR, Router, Agent, Ollama, TTS
 Soridormi: embodied planning, simulator/robot execution, monitoring, stop,
@@ -52,6 +53,8 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
   deepthought, tool, and skill work into route items with separate policies;
 - staged task/action proposals merged into `RouteDecision.metadata.task_list`
   and shared task proposals before Agent and Skill Runtime validation;
+- single-authority goal-driven cognition with exact turn-bound authority claims,
+  atomic Goal-state application, and fail-closed trusted adaptation;
 - native strict `POST /interaction` plus explicit compatibility rollback;
 - trusted Skill Runtime with validation, confirmation, timeout, cancellation,
   bounded scheduling, and traces;
@@ -62,8 +65,10 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 - text-to-MuJoCo, synthetic, virtual-microphone, acoustic, supervised, GPU,
   simulator, and release acceptance tooling.
 
-Physical microphone/speaker evidence, a reviewed voice-device release bundle,
-verified Jetson packaging, and physical robot support remain open.
+Endpoint-reported Soridormi source identity, running Chromie image/model source
+binding, immutable publishable image references, current-revision goal-driven
+live/MuJoCo evidence, physical microphone/speaker evidence, a reviewed release
+bundle, verified Jetson packaging, and physical robot support remain open.
 
 ## Quick start
 
@@ -115,12 +120,13 @@ For fresh-machine bootstrap, use [Chromie Deployment](docs/DEPLOYMENT.md) and
 
 | Mode | Key setting | State |
 |---|---|---|
-| Compatibility voice | `ORCH_ENABLE_INTERACTION_RESPONSE=0` | Main rollback path |
-| Structured speech | interaction on, Soridormi skills off | Implemented |
-| Structured MuJoCo | interaction and Soridormi skills on | Implemented behind flags |
+| Compatibility voice | cognitive runtime off, explicit legacy path | Emergency rollback only |
+| Goal-driven speech | cognitive apply on, `chat` lane, Soridormi skills off | Common safe base |
+| Goal-driven MuJoCo | cognitive apply on, `chat,robot_action`, Soridormi skills on | Maintained simulator launcher |
 | Physical robot | commissioned Soridormi plus physical gates | Experimental, unsupported |
 
-Risky gates remain default-off. Configuration semantics are maintained in
+Effectful providers and physical gates remain default-off in the common safe
+base. Configuration semantics are maintained in
 [Configuration Reference](docs/CONFIGURATION.md).
 
 ## Verify

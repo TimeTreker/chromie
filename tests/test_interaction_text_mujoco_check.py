@@ -12,9 +12,12 @@ from scripts.interaction_text_mujoco_check import (
     INTERNAL_SPEECH_PATTERNS,
     _apply_soridormi_skill_timeout,
     _configure_environment,
+    build_parser,
     build_debug_summary,
+    collect_run_provenance,
     parse_expected_arg,
     safe_idle_errors,
+    should_apply_cognitive_runtime,
     should_require_tts_speech,
     validate_contract,
     validate_speech_contract,
@@ -23,6 +26,122 @@ from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class InteractionTextMujocoCheckTests(unittest.TestCase):
+
+    def test_goal_driven_runtime_is_default_with_explicit_legacy_opt_out(self) -> None:
+        self.assertTrue(build_parser().parse_args([]).cognitive_runtime)
+        self.assertFalse(
+            build_parser().parse_args(["--no-cognitive-runtime"]).cognitive_runtime
+        )
+        self.assertEqual(
+            build_parser()
+            .parse_args(["--soridormi-repo", "/tmp/soridormi-checkout"])
+            .soridormi_repo,
+            "/tmp/soridormi-checkout",
+        )
+
+    def test_run_provenance_records_source_manifest_and_selected_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "VERSION").write_text("1.2.3\n", encoding="utf-8")
+            manifest = root / "soridormi.json"
+            manifest.write_text(
+                '{"metadata":{"upstream_commit":"soridormi-abc"}}',
+                encoding="utf-8",
+            )
+            soridormi_repo = root / "soridormi-checkout"
+            with patch(
+                "scripts.interaction_text_mujoco_check._git_text",
+                side_effect=[
+                    "chromie-def",
+                    " M scripts/example.py",
+                    "soridormi-abc",
+                    "",
+                ],
+            ):
+                provenance = collect_run_provenance(
+                    manifest=manifest,
+                    cognitive_runtime=True,
+                    cognitive_apply_lanes="chat, robot_action",
+                    soridormi_repo=soridormi_repo,
+                    root=root,
+                )
+
+        self.assertEqual(provenance["chromie"]["revision"], "chromie-def")
+        self.assertEqual(provenance["chromie"]["version"], "1.2.3")
+        self.assertTrue(provenance["chromie"]["dirty"])
+        self.assertEqual(
+            provenance["soridormi"]["upstream_revision"],
+            "soridormi-abc",
+        )
+        self.assertEqual(
+            provenance["soridormi"]["checkout"],
+            str(soridormi_repo.resolve()),
+        )
+        self.assertEqual(
+            provenance["soridormi"]["checkout_revision"],
+            "soridormi-abc",
+        )
+        self.assertFalse(provenance["soridormi"]["checkout_dirty"])
+        self.assertEqual(
+            provenance["semantic_runtime"],
+            {
+                "path": "goal_driven_cognitive_runtime",
+                "configured_cognitive_runtime_mode": "apply",
+                "cognitive_runtime_selected_for_route": True,
+                "cognitive_apply_lanes": ["chat", "robot_action"],
+            },
+        )
+
+    def test_cognitive_runtime_selection_matches_maintained_apply_lanes(self) -> None:
+        robot_route = RouteDecision.model_validate(
+            {
+                "route": "robot_action",
+                "intent": "robot_action",
+                "confidence": 0.9,
+                "source": "llm",
+            }
+        )
+        clarify_route = RouteDecision.model_validate(
+            {
+                "route": "clarify",
+                "intent": "clarify",
+                "confidence": 0.5,
+                "source": "llm",
+            }
+        )
+
+        self.assertTrue(
+            should_apply_cognitive_runtime(
+                robot_route,
+                enabled=True,
+                apply_lanes="chat,robot_action",
+            )
+        )
+        self.assertTrue(
+            should_apply_cognitive_runtime(
+                clarify_route,
+                enabled=True,
+                apply_lanes="chat,robot_action",
+            )
+        )
+        self.assertFalse(
+            should_apply_cognitive_runtime(
+                robot_route,
+                enabled=False,
+                apply_lanes="chat,robot_action",
+            )
+        )
+
+    def test_voice_mujoco_wrapper_exposes_runtime_selection(self) -> None:
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "scripts"
+            / "run_voice_mujoco_text_case.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("SEMANTIC_RUNTIME_FLAG=--cognitive-runtime", source)
+        self.assertIn("--legacy-agent-runtime", source)
+        self.assertIn('"$SEMANTIC_RUNTIME_FLAG"', source)
 
     def test_configure_environment_uses_isolated_conversation_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir, patch.dict(os.environ, {}, clear=True):
@@ -41,6 +160,8 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             _configure_environment(args, Path(temp_dir))
 
             self.assertEqual(os.environ["ORCH_CONVERSATION_ID"], "ga-live-case-one")
+            self.assertEqual(os.environ["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
+            self.assertEqual(os.environ["ORCH_COGNITIVE_EVIDENCE_ENABLED"], "1")
 
     def test_parse_expected_arg_accepts_json_scalars(self) -> None:
         self.assertEqual(parse_expected_arg("0:vx_mps=0.2"), (0, "vx_mps", 0.2))
@@ -345,6 +466,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertEqual(
             safe_idle_errors(
                 {
+                    "safe_idle": True,
                     "active_task": None,
                     "emergency_stop": False,
                     "fallen": False,
@@ -356,13 +478,14 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             len(
                 safe_idle_errors(
                     {
+                        "safe_idle": False,
                         "active_task": {"plan_id": "x"},
                         "emergency_stop": True,
                         "fallen": True,
                     }
                 )
             ),
-            3,
+            4,
         )
 
     def test_tts_speech_requirement_skips_interrupt_routes(self) -> None:

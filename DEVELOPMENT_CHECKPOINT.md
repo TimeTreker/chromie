@@ -2,10 +2,11 @@
 
 **Current release-prep base:** `0.0.1`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-12
-**Current focus:** Freeze `0.0.1` through the Chromie/Soridormi boundary with
-Soridormi using MuJoCo `sim` execution; physical pilot preparation and human
-voice-device validation remain separate tracks
+**Status refresh date:** 2026-07-16
+**Current focus:** Validate the single-authority Goal-driven Runtime and exact
+evidence provenance on the intended live-text/MuJoCo target before widening any
+release claim; physical pilot preparation and human voice-device validation
+remain separate tracks
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -15,6 +16,15 @@ milestone intent.
 
 The `0.0.1` release implementation is present:
 
+- unified Goal Association, complete-coverage Fast Planning, terminal Deep
+  Planning, Response Composition, atomic Goal-state application, and trusted
+  Skill Runtime adaptation behind one host coordinator;
+- a common safe base with structured interaction and authoritative `chat`
+  `apply`, plus a maintained Soridormi launcher that enables the provider and
+  widens authority to `chat,robot_action`; both fail closed after ownership;
+- a single-semantic-authority boundary: exact Router actions are adapter-only,
+  and the old CapabilityAgent planner is emergency-only behind host and Agent
+  gates plus a non-empty matching-turn authoritative claim;
 - native strict structured interaction;
 - trusted host Skill Runtime and Soridormi named skills;
 - request-bound spoken confirmation;
@@ -77,7 +87,14 @@ The `0.0.1` release implementation is present:
   deepthinking may record understood but non-executable desired abilities as
   `missing_ability` task proposals, while executable work still requires exact
   catalog skill IDs and trusted runtime validation;
-- goal-driven PR1–PR7 runtime migration with shared Goal and CanonicalPlan contracts, continuity-before-creation association, complete-coverage Fast Planning, terminal Deep Planning, parameter resolution, Goal Satisfaction, fingerprint-bound response composition, lane-gated `off`/`report_only`/`apply`, one bounded trusted-validator replan, atomic Goal-state application, classified operational evidence, and immediate per-lane rollback; maintained configuration remains report-only and retained PR7 live-text/MuJoCo evidence is still open;
+- goal-driven PR1–PR8 runtime migration with shared Goal and CanonicalPlan
+  contracts, continuity-before-creation association, complete-coverage Fast
+  Planning, terminal Deep Planning, parameter resolution, Goal Satisfaction,
+  fingerprint-bound response composition, lane-gated
+  `off`/`report_only`/`apply`, one bounded trusted-validator replan, atomic
+  Goal-state application, classified operational evidence, and immediate
+  per-lane rollback; maintained configuration uses authoritative `apply`, while
+  retained live-text/MuJoCo evidence for that path remains open;
 - model-authored optional social-attention plans that may choose subtle named
   behavior or `none`, use live target evidence before installation calibration,
   stay outside user task proposals, and fail closed on schema/resource/latency
@@ -129,60 +146,73 @@ gates pass from the intended revisions.
 
 ## Next sequence
 
-1. Continue the semantic task-continuity implementation described in
-   [docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md](docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md):
-   the shared contracts, host-applied versioned operations, active-task prompt
-   projection, dedicated staged continuity endpoint, capability information-gap
-   handling, immediate speech-claim validation, and non-blocking report-only
-   degradation and full per-goal multi-goal response composition are
-   implemented; next collect retained live-text and MuJoCo multi-goal evidence,
-   repair rejected claims, then add generalized observation planning.
-2. Continue the general ability acceptance reconstruction described in
+1. Exercise the authoritative path with retained live-text and MuJoCo
+   multi-goal cases. Confirm Goal Association, Fast/Deep Planning, Response
+   Composition, atomic Goal-state application, trusted execution, completion,
+   Soridormi `sim` mode, and safe idle from the exact recorded Chromie source,
+   manifest, clean declared paired Soridormi checkout, and a matching
+   endpoint-reported Soridormi revision. The current runner does not yet obtain
+   that endpoint revision, so do not relabel its diagnostic output or reuse the
+   historical M13 bundle as evidence for this path.
+2. Keep the single-authority boundary fail closed: the common safe base owns
+   `chat`, the maintained Soridormi launcher widens ownership to
+   `chat,robot_action`, exact Router actions remain adapter-only, and the legacy
+   CapabilityAgent planner may run only with both service gates and a fresh
+   authoritative emergency claim matching the request turn.
+3. Verify evidence and release provenance before any candidate packaging:
+   cognitive summaries must record the current revisions and an applied,
+   completed, safe-idle result; voice/release evidence must match source
+   revision, `VERSION`, the capability manifest, and compatibility declaration.
+   Bind the running Chromie service images and loaded models to that revision,
+   and replace mutable release image references before publication.
+4. Continue the general ability acceptance reconstruction described in
    [docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md](docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md):
    the first manifest/runner slice is implemented, and the next work is better
    live-runner diagnostics, root-cause classification, broader live text
    sampling, and voice-evidence integration without turning one reported
    sentence into a special-case patch.
-3. Continue the Developer Usability Tools phase described in
+5. Continue the Developer Usability Tools phase described in
    [docs/DEVELOPER_USABILITY_TOOLS.md](docs/DEVELOPER_USABILITY_TOOLS.md):
    PR0-PR6 are implemented; next harden retained trace examples from real
    bundles and keep `trace explain` deferred until causal semantics are stable.
-4. Use [docs/TRACE_SCHEMA.md](docs/TRACE_SCHEMA.md) as the trace-viewer
+6. Use [docs/TRACE_SCHEMA.md](docs/TRACE_SCHEMA.md) as the trace-viewer
    contract; avoid explanations that obscure session, interaction, TaskGraph,
    Skill Runtime, Soridormi, TTS, and fallback semantics.
-5. Treat Soridormi's high-level task and skill surface as declared for the
+7. Treat Soridormi's high-level task and skill surface as declared for the
    current no-motion contract: bounded locomotion, attention, gesture,
    sequence, stop, safe-idle, and planning-hold task types are present in the
    authoritative manifest; navigation, approach, and delivery remain
    future-blocked structured refusals.
-6. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
+8. Keep the Chromie/Soridormi task-agent boundary aligned with Soridormi's
    authoritative manifest. Use structured task goals for rich embodied requests
    and keep concrete named skills for explicit bounded body commands. Preserve
    Soridormi refusal metadata when reporting unsupported embodied tasks.
-7. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
+9. Add Chromie routing and TaskGraph acceptance for Soridormi-declared task
    types only. Missing navigation, approach, gaze, gesture, recovery, or
    manipulation goals must remain structured refusals or clarifications rather
    than velocity recipes.
-8. Keep Qwen/small-model routing advisory. Add or revise routing only with
+10. Keep Qwen/small-model routing advisory. Add or revise routing only with
    deterministic-control bypass, catalog constraints, confidence fallback,
    schema validation, Skill Runtime authorization, and Soridormi provider
    refusal/event checks.
-9. Select one reference-robot candidate and complete the identity,
+11. Select one reference-robot candidate and complete the identity,
    independent emergency-stop, software, network, and workspace sections of
    `docs/ROBOT_COMMISSIONING.md`. Record it with the versioned
    `commissioning/reference_robot_candidate.schema.json` contract and keep the
    real manifest under ignored `.chromie/commissioning/`.
-10. Keep all physical-motion gates off while validating no-motion health,
+12. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
-11. If the next supported release claims real microphone/speaker voice-device
+13. If the next supported release claims real microphone/speaker voice-device
     operation, run the full seven-case `supervised` matrix on the reference host,
     review audible output and MuJoCo safe-idle/recovery behavior, verify the
     bundle with `--require-clean`, then clear the compatibility blocker.
-12. Before publishing `0.0.1`, record the paired Chromie and Soridormi
-    revisions, rerun the Chromie documentation/test/scenario gates, rerun the
-    Soridormi task-agent and locomotion-readiness gates, and keep the tag claim
-    limited to generated-speech and Soridormi MuJoCo-executor evidence.
+14. Before publishing `0.0.1`, bind the running Chromie images/models and the
+    Soridormi endpoint-reported source to the candidate revisions, replace
+    mutable image references, rerun the Chromie documentation/test/scenario
+    gates, rerun the Soridormi task-agent and locomotion-readiness gates, and
+    keep the tag claim limited to generated-speech and Soridormi
+    MuJoCo-executor evidence.
 
 Do not start physical motion until the first reference robot satisfies the
 commissioning checklist and Soridormi has retained simulator/physical evidence
@@ -193,7 +223,7 @@ telemetry, safety envelopes, and task-level acceptance metrics exist.
 ## Verification baseline
 
 ```text
-Focused refresh after f4bbb2f:
+Historical focused refresh after f4bbb2f:
 python scripts/check_docs.py passed
 python -m unittest tests.test_robot_candidate_verifier passed: 12 tests
 python scripts/test_matrix.py taskgraph passed: 48 tests
@@ -208,50 +238,33 @@ Focused host Skill Runtime graph dispatch tests passed: 59 tests
 Widened host/task-agent focused bundle passed: 95 tests, with 2
 dependency-light local skips for `aiohttp` client coverage
 
-Current 2026-07-14 automated regression gate:
+Historical 2026-07-14 automated regression gate:
 python scripts/check_docs.py passed
-926 current unittest cases and 20 legacy Agent tests passed with
+926 unittest cases and 20 legacy Agent tests passed with
 `./scripts/run_tests.sh`
 381/381 adapter, Router, Router-dialogue, interaction, dialogue, and cognitive-runtime scenarios
 passed with `python scripts/scenario_runner.py --no-write`
 50/50 general-ability Level A representative probes passed, including 8/8
 daily-life multi-goal coordination cases
-The current reliability scenarios include English and Chinese walking requests,
-a forced stale weather intent, repeated walking after a weather turn, a Chinese
-nod-and-blink compound request misclassified as generic chat, exact capability
-grounding, confirmation, final Agent skill output, and forbidden
-weather/fallback speech checks. Task-continuity report-only work is now
-non-blocking, Agent disconnects fail closed for effectful routes, and long CJK
-responses use smaller TTS chunks. The prompt-facing self model now binds first-person speech, perception, action, and body ownership to Chromie while exposing language models as internal components and runtime capabilities as evidence. Its social presentation foregrounds Chromie's name and natural personality rather than volunteering system category, embodiment category, age labels, or internal architecture. Unresolved effectful Router outputs now hand the original utterance to CapabilityAgent semantic planning instead of ending in a generic missing-ability clarification. Identity and capability inquiries are handled by LLM semantics rather
-than question-specific branches, fixed replies, or normal-language regexes.
-Compound embodied requests are now reconstructed and planned by the Capability
-Agent as complete semantic outcomes. The model decides whether an exact plan,
-safe adjustment, alternative plan, clarification, or unsupported result is
-appropriate from capability/provider evidence. Missing parameter resolution is
-also model-driven: low-consequence reversible fields may receive an explicit or
-conservative schema-bounded default, while material fields become specific
-structured questions retained on the original task. Semantic capability-planner
-handoffs are not re-delegated to generic DeepThinking solely because the quick
-Router reported zero confidence; deterministic code only validates
-the full structured plan, commits all validated steps atomically, binds material
-alternatives to confirmation, and prevents partial or unconfirmed degraded plans
-from executing. Legacy normal-language capability fast-path parsers were removed. Stage 6.6
-retains the observed compound walk-and-blink interaction as multi-turn replay
-evidence. Unstructured model clarification is reviewed semantically against the
-complete capability surface before any user-facing question is spoken; internal
-schema placeholders are never used as dialogue. Alternative plans remain
-`awaiting_confirmation`, their structured gaps survive follow-up turns, and no
-partial skill can leak into execution. The host force-closes and discards VAD
-segments that remain open for more than 20 seconds, while valid high-energy short
-replies from 450 ms remain eligible for ASR.
-TTS unit coverage now also verifies explicit
-codec-device resolution, detailed stage timing, rolling performance summaries,
-benchmark aggregation, and restartable-worker startup metadata. This is
-automated evidence only; no Stage 6 live benchmark or listening result is
-retained yet.
+That checkpoint covered English and Chinese walking, stale weather intent,
+repeated walking after weather, compound nod/blink recovery, exact capability
+grounding, confirmation, forbidden fallback speech, bounded VAD segments,
+short replies, CJK TTS chunking, codec/timing instrumentation, and the first
+multi-goal cognitive scenarios. It predates the current PR8 authority boundary
+and is retained only as historical Level A evidence.
+
+At the current resume point, complete-goal semantics belong to the unified
+Fast/Deep pipeline. Unresolved effectful Router output preserves the original
+utterance for that planner; it does not normally invoke CapabilityAgent.
+Standalone PR2-PR6 observers are off. The old planner may run only as an
+explicit emergency path with both service gates and a non-empty matching-turn
+authority claim. The claim is internal routing metadata, not authentication or
+a consumed replay nonce. Evidence and release gates now require exact source/version
+provenance. These implementation changes still need the canonical automated
+gate and retained live-text/MuJoCo rerun before a target or release claim.
 
 Historical full Level A baseline:
-640 current unittest cases and 20 legacy Agent tests passed on 2026-07-04 with
+640 unittest cases and 20 legacy Agent tests passed on 2026-07-04 with
 `./scripts/run_tests.sh`. The behavior scenario runner also passed 344/344
 Router, interaction, and dialogue scenario files with `--no-write`.
 ```
@@ -263,6 +276,11 @@ Level A gate. Retained target-host evidence is listed in `docs/STATUS.md`.
 
 ```bash
 ./scripts/run_tests.sh
+python scripts/semantic_authority_audit.py --check
+python scripts/cognitive_runtime_acceptance.py --mode check
+python scripts/cognitive_runtime_acceptance.py --mode level-a
+python scripts/general_ability_acceptance.py --mode check --no-write
+python scripts/general_ability_acceptance.py --mode level-a --no-write
 ./scripts/show_profile.sh
 ./scripts/start_services.sh
 ./scripts/start_orchestrator.sh
@@ -304,6 +322,12 @@ First-reference-robot selection requirements are maintained in
   evidence for the exact supported scope.
 
 
+## Historical staged cognitive checkpoints
+
+The PR1-PR6 notes below record their state when each slice landed. Their
+`report_only` statements are historical and are superseded by the unified PR8
+runtime described in the resume point above.
+
 Goal-driven cognitive architecture PR1 checkpoint:
 - shared GoalAssociation, GoalSet, GoalVersionRef, and ActiveGoalSnapshot contracts added
 - stable replay-safe goal operation IDs added
@@ -340,3 +364,19 @@ Canonical plans now carry structured parameter-resolution strategies and a goal-
 ## PR6 Response Composition checkpoint
 
 Terminal Fast or Deep canonical plans can now be composed into a fingerprint-bound `CoordinatedResponsePlan` containing goal-scoped `ResponsePlan` stages and an optional auxiliary `SocialAttentionPlan`. The response composer cannot mutate task steps, pre-execution speech cannot claim completion, every canonical goal must be covered, and optional attention is dropped on target, schema, confirmation, or resource-conflict failure. Host integration is report-only and leaves the production interaction path unchanged.
+
+## Current PR7-PR8 runtime checkpoint
+
+PR7 unified Goal Association, Fast Planning, terminal Deep Planning, bounded
+trusted-validator replan, Response Composition, trusted adaptation, and atomic
+Goal-state application behind `off`, `report_only`, and lane-gated `apply`.
+PR8 established one semantic authority for applied lanes, made exact Router
+actions adapter-only, constrained Goal Association with the exact model-facing
+schema, and retained CapabilityAgent planning only as an emergency path behind
+both service gates and a non-empty authoritative claim matching the request turn.
+
+The common safe base enables structured interaction and authoritative `chat`
+apply without Soridormi. The maintained Soridormi launcher enables that
+provider and widens authority to `chat,robot_action`. Both fail closed after
+ownership acquisition. Level A coverage exists; retained live-text and MuJoCo
+target evidence for this path remains open.

@@ -9,6 +9,7 @@ route coverage in the API reference. It is not a Markdown style linter.
 from __future__ import annotations
 
 import ast
+import json
 import re
 import sys
 from pathlib import Path
@@ -185,10 +186,11 @@ def check_document_index(errors: list[str]) -> None:
 def check_current_focus(errors: list[str]) -> None:
     for path in STATUS_FILES:
         text = path.read_text(encoding="utf-8")
-        if "M13" not in text or "text-to-MuJoCo" not in text:
+        lowered = text.lower()
+        if "goal-driven" not in lowered or "authority" not in lowered:
             errors.append(
                 f"{path.relative_to(ROOT)} does not declare the current "
-                "M13 text-to-MuJoCo focus"
+                "Goal-driven single-authority focus"
             )
 
     for path in markdown_files():
@@ -218,7 +220,8 @@ def check_project_direction(errors: list[str]) -> None:
         "## Completed phase - Text-to-MuJoCo interaction closure",
         "## Open evidence track - Physical audio validation",
         "## Completed phase - Robust simulation and provider readiness",
-        "## Current phase - Physical pilot preparation",
+        "## Current checkpoint - Cognitive authority and evidence validation",
+        "## Future phase - Physical pilot preparation",
         "## Later work",
     ):
         if heading not in roadmap:
@@ -322,6 +325,39 @@ def check_configuration_reference(errors: list[str]) -> None:
             )
 
     values = common_env_values()
+    safety_default_names = (
+        "ORCH_ENABLE_INTERACTION_RESPONSE",
+        "ORCH_ENABLE_SORIDORMI_SKILLS",
+        "ORCH_AUTO_CONFIRM_SIM_SKILLS",
+        "ORCH_GOAL_ASSOCIATION_MODE",
+        "ORCH_FAST_PLANNER_MODE",
+        "ORCH_DEEP_PLANNER_MODE",
+        "ORCH_RESPONSE_COMPOSER_MODE",
+        "ORCH_TASK_CONTINUITY_MODE",
+        "ORCH_COGNITIVE_RUNTIME_MODE",
+        "ORCH_COGNITIVE_APPLY_LANES",
+        "ORCH_COGNITIVE_FALLBACK_POLICY",
+        "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
+        "AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED",
+        "ORCH_ROUTER_TIMEOUT_MS",
+    )
+    for name in safety_default_names:
+        value = values.get(name)
+        if value is None:
+            errors.append(f".env.common is missing safety-critical setting {name}")
+            continue
+        row = re.search(
+            rf"^\|\s*`{re.escape(name)}`\s*\|([^\n]+)$",
+            text,
+            flags=re.MULTILINE,
+        )
+        if row is None:
+            errors.append(f"docs/CONFIGURATION.md is missing a table row for {name}")
+        elif f"`{value}`" not in row.group(1):
+            errors.append(
+                f"docs/CONFIGURATION.md does not document {name}={value!r} "
+                "from .env.common"
+            )
     try:
         router_base_ms = int(values["ROUTER_TIMEOUT_MS"])
         router_llm_ms = int(values.get("ROUTER_LLM_TIMEOUT_MS", str(router_base_ms)))
@@ -347,6 +383,31 @@ def check_release_reproducibility(errors: list[str]) -> None:
     errors.extend(exact_requirement_errors(ROOT))
     declared_images(ROOT, source_environment(ROOT))
     errors.extend(model_lock_errors(ROOT, source_environment(ROOT)))
+    try:
+        compatibility = json.loads(
+            (ROOT / "release" / "compatibility.json").read_text(encoding="utf-8")
+        )
+        manifest = json.loads(
+            (ROOT / "capabilities" / "soridormi.json").read_text(encoding="utf-8")
+        )
+        compatibility_revision = compatibility["soridormi"]["upstream_commit"]
+        manifest_revision = manifest["metadata"]["upstream_commit"]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        errors.append(f"Cannot read Soridormi release provenance: {exc}")
+    else:
+        if compatibility_revision != manifest_revision:
+            errors.append(
+                "release/compatibility.json Soridormi revision does not match "
+                "capabilities/soridormi.json metadata.upstream_commit"
+            )
+        release_state = str(compatibility.get("release_state") or "").strip()
+        blockers = compatibility.get("release_gate_blockers") or []
+        if release_state == "candidate" and not blockers:
+            errors.append(
+                "release candidate must retain at least one explicit gate blocker"
+            )
+        if release_state == "release" and blockers:
+            errors.append("release state cannot retain unresolved gate blockers")
     release_text = (ROOT / "docs" / "RELEASE.md").read_text(encoding="utf-8")
     for required in ("build-provenance.json", "model-lock.json"):
         if required not in release_text:
@@ -371,7 +432,8 @@ def main() -> int:
     print(
         "Documentation checks passed: "
         f"{len(markdown_files())} Markdown files, project direction, "
-        "local links, current focus, API routes, runtime configuration, "
+        "local links, current focus, API routes, runtime configuration coverage "
+        "and safety defaults, "
         "and reproducible release inputs."
     )
     return 0

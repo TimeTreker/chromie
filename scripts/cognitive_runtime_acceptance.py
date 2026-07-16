@@ -61,6 +61,17 @@ def _git_revision() -> str | None:
         return None
 
 
+def _soridormi_revision() -> str | None:
+    try:
+        payload = _read_json(ROOT / "capabilities" / "soridormi.json")
+    except Exception:
+        return None
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict) or not metadata.get("upstream_commit"):
+        return None
+    return str(metadata["upstream_commit"])
+
+
 def _level_a_report() -> dict[str, Any]:
     scenarios = load_scenarios(DEFAULT_SCENARIO_ROOT, suites={"cognitive_runtime"})
     report = run_scenarios_sync(scenarios)
@@ -99,27 +110,225 @@ def _events_report(events: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _simulator_report(summary: dict[str, Any] | None) -> dict[str, Any] | None:
+def _run_provenance(summary: dict[str, Any]) -> dict[str, Any]:
+    provenance = summary.get("run_provenance") or summary.get("provenance") or {}
+    if not isinstance(provenance, dict):
+        provenance = {}
+    chromie = provenance.get("chromie") or {}
+    soridormi = provenance.get("soridormi") or {}
+    chromie_revision = (
+        provenance.get("chromie_revision")
+        or (chromie.get("revision") if isinstance(chromie, dict) else None)
+        or summary.get("chromie_revision")
+    )
+    soridormi_revision = (
+        provenance.get("soridormi_revision")
+        or (
+            soridormi.get("upstream_revision") or soridormi.get("revision")
+            if isinstance(soridormi, dict)
+            else None
+        )
+        or summary.get("soridormi_revision")
+    )
+    semantic_runtime = provenance.get("semantic_runtime") or {}
+    return {
+        "chromie_revision": str(chromie_revision) if chromie_revision else None,
+        "chromie_dirty": (
+            chromie.get("dirty") if isinstance(chromie, dict) else None
+        ),
+        "soridormi_revision": (
+            str(soridormi_revision) if soridormi_revision else None
+        ),
+        "soridormi_checkout_revision": (
+            str(soridormi.get("checkout_revision"))
+            if isinstance(soridormi, dict) and soridormi.get("checkout_revision")
+            else None
+        ),
+        "soridormi_checkout_dirty": (
+            soridormi.get("checkout_dirty")
+            if isinstance(soridormi, dict)
+            else None
+        ),
+        "soridormi_source_binding": (
+            soridormi.get("source_binding")
+            if isinstance(soridormi, dict)
+            else None
+        ),
+        "soridormi_endpoint_revision": (
+            str(soridormi.get("endpoint_revision"))
+            if isinstance(soridormi, dict) and soridormi.get("endpoint_revision")
+            else None
+        ),
+        "semantic_runtime_path": (
+            semantic_runtime.get("path")
+            if isinstance(semantic_runtime, dict)
+            else None
+        ),
+        "cognitive_runtime_mode": (
+            (
+                semantic_runtime.get("configured_cognitive_runtime_mode")
+                or semantic_runtime.get("cognitive_runtime_mode")
+            )
+            if isinstance(semantic_runtime, dict)
+            else None
+        ),
+        "cognitive_runtime_selected_for_route": (
+            semantic_runtime.get("cognitive_runtime_selected_for_route")
+            if isinstance(semantic_runtime, dict)
+            else None
+        ),
+    }
+
+
+def _simulator_report(
+    summary: dict[str, Any] | None,
+    *,
+    expected_chromie_revision: str | None,
+    expected_soridormi_revision: str | None,
+) -> dict[str, Any] | None:
     if summary is None:
         return None
     cognitive = summary.get("cognitive_runtime")
     execution = summary.get("execution")
+    status_before = summary.get("status_before")
     status_after = summary.get("status_after")
+    cognitive_status = cognitive.get("status") if isinstance(cognitive, dict) else None
+    execution_status = execution.get("status") if isinstance(execution, dict) else None
+    run_provenance = _run_provenance(summary)
+    chromie_revision = run_provenance["chromie_revision"]
+    soridormi_revision = run_provenance["soridormi_revision"]
+    provenance_errors: list[str] = []
+    if not chromie_revision:
+        provenance_errors.append("simulator run has no recorded Chromie revision")
+    elif not expected_chromie_revision:
+        provenance_errors.append("current Chromie revision could not be determined")
+    elif chromie_revision != expected_chromie_revision:
+        provenance_errors.append(
+            f"simulator Chromie revision {chromie_revision!r} does not match "
+            f"expected revision {expected_chromie_revision!r}"
+        )
+    if run_provenance["chromie_dirty"] is not False:
+        provenance_errors.append(
+            "simulator run did not record a clean Chromie worktree"
+        )
+    if not soridormi_revision:
+        provenance_errors.append("simulator run has no recorded Soridormi revision")
+    elif not expected_soridormi_revision:
+        provenance_errors.append("current Soridormi revision could not be determined")
+    elif soridormi_revision != expected_soridormi_revision:
+        provenance_errors.append(
+            f"simulator Soridormi revision {soridormi_revision!r} does not match "
+            f"expected revision {expected_soridormi_revision!r}"
+        )
+    if run_provenance["soridormi_checkout_revision"] != expected_soridormi_revision:
+        provenance_errors.append(
+            "simulator run does not bind the declared paired Soridormi checkout to "
+            f"expected revision {expected_soridormi_revision!r}"
+        )
+    if run_provenance["soridormi_checkout_dirty"] is not False:
+        provenance_errors.append(
+            "simulator run did not record a clean declared paired Soridormi checkout"
+        )
+    if run_provenance["soridormi_source_binding"] != "endpoint_reported_revision":
+        provenance_errors.append(
+            "simulator run does not bind the Soridormi endpoint to its reported source revision"
+        )
+    if run_provenance["soridormi_endpoint_revision"] != expected_soridormi_revision:
+        provenance_errors.append(
+            "simulator endpoint source revision does not match the expected Soridormi revision"
+        )
+    if run_provenance["semantic_runtime_path"] != "goal_driven_cognitive_runtime":
+        provenance_errors.append(
+            "simulator run was not recorded on the goal-driven cognitive runtime path"
+        )
+    if run_provenance["cognitive_runtime_mode"] != "apply":
+        provenance_errors.append(
+            "simulator run was not recorded with cognitive runtime mode 'apply'"
+        )
+    if run_provenance["cognitive_runtime_selected_for_route"] is not True:
+        provenance_errors.append(
+            "simulator run did not select the cognitive runtime for its route"
+        )
+    sim_status = bool(
+        isinstance(status_before, dict)
+        and isinstance(status_after, dict)
+        and status_before.get("mode") == "sim"
+        and status_after.get("mode") == "sim"
+        and status_before.get("backend") == "runtime"
+        and status_after.get("backend") == "runtime"
+    )
+    if not sim_status:
+        provenance_errors.append(
+            "simulator run does not record pre/post mode='sim' with backend='runtime'"
+        )
+    def records_safe_idle(status: Any) -> bool:
+        return bool(
+            isinstance(status, dict)
+            and status.get("safe_idle") is True
+            and "active_task" in status
+            and status.get("active_task") is None
+            and status.get("emergency_stop") is False
+            and status.get("fallen") is False
+        )
+
+    safe_idle_before = records_safe_idle(status_before)
+    safe_idle_after = records_safe_idle(status_after)
+    if not safe_idle_before:
+        provenance_errors.append(
+            "simulator run does not record an explicitly safe-idle pre-run state"
+        )
+    if not safe_idle_after:
+        provenance_errors.append(
+            "simulator run does not record an explicitly safe-idle post-run state"
+        )
+    execution_results = (
+        execution.get("results")
+        if isinstance(execution, dict) and isinstance(execution.get("results"), list)
+        else []
+    )
+    completed_soridormi_results = [
+        item
+        for item in execution_results
+        if isinstance(item, dict)
+        and str(item.get("skill_id") or "").startswith("soridormi.")
+        and item.get("status") == "completed"
+        and isinstance(item.get("output"), dict)
+        and item["output"].get("mode") == "sim"
+    ]
+    if not completed_soridormi_results:
+        provenance_errors.append(
+            "simulator run has no completed soridormi.* result with output mode='sim'"
+        )
+    target_validated = bool(
+        summary.get("ok") is True
+        and cognitive_status == "applied"
+        and execution_status == "completed"
+        and sim_status
+        and completed_soridormi_results
+        and safe_idle_before
+        and safe_idle_after
+        and not provenance_errors
+    )
     return {
-        "evidence_class": "simulator_execution",
+        "evidence_class": (
+            "simulator_execution" if sim_status else "unverified_target_execution"
+        ),
         "ok": bool(summary.get("ok")),
-        "cognitive_status": (
-            cognitive.get("status") if isinstance(cognitive, dict) else None
-        ),
-        "execution_status": (
-            execution.get("status") if isinstance(execution, dict) else None
-        ),
-        "safe_idle": bool(
-            isinstance(status_after, dict)
-            and status_after.get("active_task") is None
-            and status_after.get("emergency_stop") is False
-            and status_after.get("fallen") is not True
-        ),
+        "cognitive_status": cognitive_status,
+        "execution_status": execution_status,
+        "simulator_status_verified": sim_status,
+        "completed_soridormi_results": len(completed_soridormi_results),
+        "safe_idle_before": safe_idle_before,
+        "safe_idle_after": safe_idle_after,
+        "safe_idle": safe_idle_before and safe_idle_after,
+        "run_provenance": run_provenance,
+        "expected_provenance": {
+            "chromie_revision": expected_chromie_revision,
+            "soridormi_revision": expected_soridormi_revision,
+        },
+        "provenance_matches": not provenance_errors,
+        "provenance_errors": provenance_errors,
+        "target_validated": target_validated,
         "summary_path": summary.get("evidence_dir"),
     }
 
@@ -128,20 +337,34 @@ def build_bundle(
     *,
     events_path: Path | None,
     text_mujoco_summary: Path | None,
+    expected_chromie_revision: str | None = None,
+    expected_soridormi_revision: str | None = None,
 ) -> dict[str, Any]:
+    generator_chromie_revision = _git_revision()
+    if expected_chromie_revision is None:
+        expected_chromie_revision = generator_chromie_revision
+    if expected_soridormi_revision is None:
+        expected_soridormi_revision = _soridormi_revision()
     level_a = _level_a_report()
     events = _read_events(events_path) if events_path is not None else []
     live_text = _events_report(events) if events_path is not None else None
     simulator_summary = _read_json(text_mujoco_summary) if text_mujoco_summary else None
-    simulator = _simulator_report(simulator_summary)
+    simulator = _simulator_report(
+        simulator_summary,
+        expected_chromie_revision=expected_chromie_revision,
+        expected_soridormi_revision=expected_soridormi_revision,
+    )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "chromie_revision": _git_revision(),
+        "bundle_generator": {
+            "chromie_revision": generator_chromie_revision,
+            "soridormi_revision": _soridormi_revision(),
+        },
         "status_vocabulary": {
             "implemented": True,
             "automatically_verified": bool(level_a["ok"]),
-            "target_validated": bool(simulator and simulator["ok"] and simulator["safe_idle"]),
+            "target_validated": bool(simulator and simulator["target_validated"]),
             "release_ready": False,
         },
         "level_a": level_a,
@@ -150,6 +373,8 @@ def build_bundle(
         "limitations": [
             "Operational JSONL alone is not simulator or physical-robot evidence.",
             "A passing simulator summary is not physical-audio or hardware evidence.",
+            "Retained simulator evidence validates the current target only when its "
+            "recorded Chromie and Soridormi revisions match the expected source.",
             "This tool never declares release readiness.",
         ],
     }
@@ -162,8 +387,18 @@ def main(argv: list[str] | None = None) -> int:
         choices=["check", "level-a", "evidence", "bundle"],
         default="check",
     )
-    parser.add_argument("--events", type=Path, default=DEFAULT_EVENTS)
+    parser.add_argument(
+        "--events",
+        type=Path,
+        default=None,
+        help=(
+            "Operational JSONL to inspect. Evidence mode defaults to the global "
+            "cognitive-runtime log; bundle mode includes events only when supplied."
+        ),
+    )
     parser.add_argument("--text-mujoco-summary", type=Path)
+    parser.add_argument("--expected-chromie-revision")
+    parser.add_argument("--expected-soridormi-revision")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--require-applied-lane", action="append", default=[])
     args = parser.parse_args(argv)
@@ -172,10 +407,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode in {"check", "level-a"}:
             payload = _level_a_report()
         elif args.mode == "evidence":
-            payload = _events_report(_read_events(args.events))
+            events_path = args.events or DEFAULT_EVENTS
+            events = _read_events(events_path)
+            payload = _events_report(events)
             applied_events = [
                 item
-                for item in _read_events(args.events)
+                for item in events
                 if item.get("status") == "applied"
             ]
             applied_lanes = {str(item.get("lane")) for item in applied_events}
@@ -187,6 +424,8 @@ def main(argv: list[str] | None = None) -> int:
             payload = build_bundle(
                 events_path=args.events if args.events else None,
                 text_mujoco_summary=args.text_mujoco_summary,
+                expected_chromie_revision=args.expected_chromie_revision,
+                expected_soridormi_revision=args.expected_soridormi_revision,
             )
     except Exception as exc:
         print(f"cognitive runtime acceptance failed: {type(exc).__name__}: {exc}", file=sys.stderr)
@@ -199,6 +438,8 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True))
     if args.mode in {"check", "level-a", "evidence"}:
         return 0 if payload.get("ok", True) else 1
+    if args.text_mujoco_summary is not None:
+        return 0 if payload["status_vocabulary"]["target_validated"] else 1
     return 0
 
 

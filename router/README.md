@@ -24,7 +24,9 @@ Supported modes:
 
 - `rules_only` — hard interrupt/noise rules, then a deterministic safe fallback; it is compatibility-only and does not choose normal catalog actions;
 - `hybrid` — hard interrupt/noise rules first, then Ollama quick routing for normal intent, with deterministic validators afterward;
-- `llm_only` — send routing decisions directly to Ollama.
+- `llm_only` — use Ollama for normal routing without the hybrid compatibility
+  fallback; deterministic emergency filtering and schema/policy validation
+  still run before and after the model.
 
 `ROUTER_USE_LLM=1` selects `hybrid` unless `ROUTER_MODE` is explicitly set.
 That default uses the small `ROUTER_MODEL` as a fast semantic route classifier
@@ -110,12 +112,20 @@ greeting plus memory plus deep planning. Each route item carries its own
 uses `fast_minimal` for simple immediate speech, `session_compact` for ordinary
 chat/memory/tool work, `capability_safety` for Skill Runtime work, and
 `full_mind` when worldview, lifeview, valueview, identity principles, risk
-judgment, or long-horizon planning should be handled by deepthinking. Route items or the top-level decision may carry a short `fast_speech` object
-(`text`, `purpose`, `commitment`) for natural fast-first TTS. Chat items may
-still set `lane=immediate_speech`, `direct_to_tts=true`, and short safe `text`
-for backward compatibility. Fast speech must be a process acknowledgement only:
-it must not claim a tool result, memory commit, physical execution, or final
-answer.
+judgment, or long-horizon planning should be handled by deepthinking. Route
+items or the top-level decision may carry `fast_speech`. A bare string and
+partially structured object remain accepted only for wire compatibility; they
+do not authorize immediate playback. On the top-level decision, non-empty
+`fast_speech.text` may still fill the compatibility `speak_first` field when
+that field is absent. Dynamic playback is default-off in the Orchestrator. If
+`ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED=1`, it still requires a structured
+object containing safe `text`, an allowed process `purpose`, a non-terminal
+`commitment`, and `must_not_claim_completion=true`. It must not claim a tool
+result, memory commit, physical execution, or final answer. Compatibility chat
+items may still parse `lane=immediate_speech`, `direct_to_tts=true`, and short
+`text`, but those markers alone are not playback authority. Host-validated
+`metadata.response_plan` immediate speech and startup-cached Orchestrator cues
+use separate trusted paths.
 
 `RouteDecision.actions` remains the compatibility/execution hint for concrete
 capability actions inside robot-action work, such as ordered Soridormi skill
@@ -206,7 +216,6 @@ ROUTER_HOST=0.0.0.0
 ROUTER_PORT=8091
 ROUTER_MODE=hybrid
 ROUTER_USE_LLM=1
-ROUTER_RULES_FIRST=1
 ROUTER_OLLAMA_URL=http://chromie-llm:11434
 ROUTER_MODEL=qwen3:4b
 ROUTER_REVIEW_MODEL=gemma4:e2b
@@ -215,8 +224,8 @@ ROUTER_LLM_TIMEOUT_MS=5400
 ROUTER_LLM_NUM_PREDICT=96
 ROUTER_LLM_KEEP_ALIVE=24h
 ROUTER_WARM_LLM_ON_STARTUP=1
-ROUTER_WARM_LLM_TIMEOUT_MS=30000
-ROUTER_REVIEW_TIMEOUT_MS=100
+ROUTER_WARM_LLM_TIMEOUT_MS=60000
+ROUTER_REVIEW_TIMEOUT_MS=2500
 ROUTER_CONFIDENCE_THRESHOLD=0.55
 ROUTER_CAPABILITY_CATALOG_URL=http://chromie-agent:8092
 ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS=400
@@ -226,6 +235,9 @@ ROUTER_POST_INTERRUPT_REVIEW_ENABLED=0
 ROUTER_SLOW_REVIEW_RECOVERY_ENABLED=1
 ROUTER_LOG_LEVEL=INFO
 ```
+
+Deterministic interrupt, stop, silence, and unusable-audio handling always runs
+first and cannot be disabled by configuration.
 
 In the normal hybrid path, non-emergency natural-language understanding belongs
 to the quick Router model and low-confidence quick decisions delegate to

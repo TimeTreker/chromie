@@ -325,14 +325,28 @@ class CapabilityAgent(BaseAgent):
                 "reason": "invalid_claim",
                 "error": str(exc)[:500],
             }
+        request_turn_id = str(request.sid or "").strip()
+        if authority is not None and authority.turn_id != request_turn_id:
+            result.metadata["semantic_authority_rejected"] = {
+                "reason": "turn_mismatch",
+                "claim_turn_id": authority.turn_id,
+                "request_turn_id": request_turn_id,
+            }
         legacy_authorized = (
             self.services.legacy_capability_fallback_enabled
             and authority is not None
             and authority.owner == "legacy_capability_fallback"
             and authority.role == "authoritative"
             and authority.emergency_fallback
+            and authority.turn_id == request_turn_id
         )
         if not legacy_authorized:
+            if authority is not None and "semantic_authority_rejected" not in result.metadata:
+                result.metadata["semantic_authority_rejected"] = {
+                    "reason": "claim_not_authorized",
+                    "claim_owner": authority.owner,
+                    "claim_role": authority.role,
+                }
             result.add_speak_immediate(
                 self._legacy_planner_disabled_speech(request),
                 style="warning",
@@ -342,12 +356,9 @@ class CapabilityAgent(BaseAgent):
                     "capability_handled": True,
                     "capability_decision": "clarify",
                     "planning_result": "legacy_semantic_planner_disabled",
-                    "semantic_authority_owner": (
-                        authority.owner if authority is not None else "none"
-                    ),
-                    "semantic_authority_role": (
-                        authority.role if authority is not None else "none"
-                    ),
+                    "semantic_authority_owner": "none",
+                    "semantic_authority_role": "none",
+                    "semantic_authority_accepted": False,
                     "legacy_capability_fallback_enabled": (
                         self.services.legacy_capability_fallback_enabled
                     ),
@@ -362,6 +373,7 @@ class CapabilityAgent(BaseAgent):
 
         result.metadata["semantic_authority_owner"] = authority.owner
         result.metadata["semantic_authority_role"] = authority.role
+        result.metadata["semantic_authority_accepted"] = True
         result.metadata["legacy_emergency_fallback"] = True
         plan = await self._plan(request, executable)
         plan = await self._repair_unstructured_clarification(

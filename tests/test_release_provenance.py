@@ -50,13 +50,17 @@ class ReleaseProvenanceTests(unittest.TestCase):
         self.assertEqual(mutable_image_errors(["python:3.12.10-slim"]), [])
         self.assertTrue(mutable_image_errors(["python:latest", "local/image"]))
 
-    def test_preview_provenance_reports_missing_runtime_without_failing(self) -> None:
+    def test_preview_provenance_reports_runtime_and_mutable_image_blockers(self) -> None:
         with mock.patch("scripts.release_provenance.shutil.which", return_value=None), mock.patch(
             "scripts.release_provenance.ollama_models", side_effect=OSError("offline")
         ):
             result = collect_provenance(ROOT, require_runtime=False)
         self.assertFalse(result["complete"])
-        self.assertEqual(result["source_errors"], [])
+        self.assertTrue(result["source_errors"])
+        self.assertTrue(
+            all("mutable tag" in item for item in result["source_errors"]),
+            result["source_errors"],
+        )
         self.assertTrue(result["runtime_errors"])
         self.assertIn("model_lock", result)
 

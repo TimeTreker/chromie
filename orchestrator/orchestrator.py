@@ -137,7 +137,7 @@ class VoiceAssistant:
         )
         self.auto_confirm_sim_skills = env_bool(
             "ORCH_AUTO_CONFIRM_SIM_SKILLS",
-            True,
+            False,
         )
         self.fast_first_response_enabled = env_bool(
             "ORCH_FAST_FIRST_RESPONSE_ENABLED",
@@ -145,6 +145,10 @@ class VoiceAssistant:
         )
         self.fast_first_tool_response_enabled = env_bool(
             "ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED",
+            False,
+        )
+        self.router_generated_fast_speech_enabled = env_bool(
+            "ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED",
             False,
         )
         self.fast_first_audio_enabled = env_bool(
@@ -233,7 +237,7 @@ class VoiceAssistant:
                 "ORCH_COGNITIVE_RUNTIME_MODE must be off, report_only, or apply"
             )
         raw_apply_lanes = os.getenv(
-            "ORCH_COGNITIVE_APPLY_LANES", "chat,robot_action"
+            "ORCH_COGNITIVE_APPLY_LANES", "chat"
         )
         self.cognitive_apply_lanes = frozenset(
             item.strip()
@@ -590,13 +594,15 @@ class VoiceAssistant:
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s "
             "confirmation_ttl_s=%.1f fast_first_response=%s fast_first_tool=%s "
-            "fast_first_audio=%s hedge_ms=%s cache_dir=%s",
+            "router_generated_fast_speech=%s fast_first_audio=%s hedge_ms=%s "
+            "cache_dir=%s",
             self.enable_interaction_response,
             self.enable_soridormi_skills,
             self.auto_confirm_sim_skills,
             self.confirmation_dialogue.ttl_s,
             self.fast_first_response_enabled,
             self.fast_first_tool_response_enabled,
+            self.router_generated_fast_speech_enabled,
             self.fast_first_audio_cache.enabled,
             self.fast_first_audio_hedge_ms,
             self.fast_first_audio_cache.cache_dir,
@@ -2048,16 +2054,26 @@ class VoiceAssistant:
     ) -> str | None:
         if not self._deep_thought_prelude_allowed(decision):
             return None
-        if decision.speak_first:
-            return decision.speak_first.strip() or None
+        if decision.fast_speech is not None and getattr(
+            self,
+            "router_generated_fast_speech_enabled",
+            False,
+        ):
+            model_text = self._validated_fast_speech_payload_text(
+                decision.fast_speech
+            )
+            if model_text:
+                return model_text
 
         abilities = self._ability_registry()
         if not abilities.can_execute("speech.thinking_ack"):
             return None
-        return abilities.localized_speech(
-            "speech.thinking_ack",
-            language=decision.language,
-            user_text=user_text,
+        return self._safe_immediate_route_speech(
+            abilities.localized_speech(
+                "speech.thinking_ack",
+                language=decision.language,
+                user_text=user_text,
+            )
         )
 
     def _route_item_dicts(self, decision: RouteDecision) -> list[dict[str, Any]]:
@@ -2110,6 +2126,39 @@ class VoiceAssistant:
             return None
         return cleaned
 
+    @classmethod
+    def _validated_fast_speech_payload_text(cls, payload: Any) -> str | None:
+        """Validate the whole dynamic FastSpeech contract before playback.
+
+        Bare strings and partially structured objects remain parseable at API
+        boundaries for compatibility, but they are not sufficient authority to
+        produce immediate audio. Dynamic playback requires an explicit process
+        speech act and a non-terminal commitment, while the completion marker
+        must retain its fail-closed true value.
+        """
+
+        if hasattr(payload, "model_dump"):
+            payload = payload.model_dump(mode="json", exclude_none=True)
+        if not isinstance(payload, dict):
+            return None
+        if payload.get("must_not_claim_completion") is not True:
+            return None
+        if str(payload.get("purpose") or "").strip().casefold() not in {
+            "acknowledge",
+            "acknowledge_and_check",
+            "clarify",
+            "thinking",
+            "safety_prelude",
+        }:
+            return None
+        if str(payload.get("commitment") or "").strip().casefold() not in {
+            "checking_only",
+            "needs_confirmation",
+            "prelude_only",
+        }:
+            return None
+        return cls._safe_immediate_route_speech(str(payload.get("text") or ""))
+
     @staticmethod
     def _safe_immediate_route_speech(text: str | None) -> str | None:
         cleaned = " ".join((text or "").strip().split())
@@ -2124,6 +2173,12 @@ class VoiceAssistant:
             "next step",
             "done",
             "completed",
+            "finished",
+            "handled",
+            "took care",
+            "resolved",
+            "delivered",
+            "performed",
             "executing",
             "moving",
             "walking",
@@ -2143,11 +2198,26 @@ class VoiceAssistant:
         )
         if any(term in lowered for term in blocked_terms):
             return None
+        terminal_claim_patterns = (
+            r"\b(?:i|we)(?:['’]ve|\s+have|\s+already|\s+just|\s+successfully)*\s+"
+            r"(?:did|made|fixed|sent|saved|booked|updated|changed|created|removed|"
+            r"deleted|ordered|called|emailed|wrote|finished|completed|handled|resolved)\b",
+            r"\b(?:it|that|this)(?:['’]s|\s+is|\s+has\s+been)\s+"
+            r"(?:done|ready|fixed|sent|saved|finished|completed|handled|resolved)\b",
+            r"\b(?:taken\s+care\s+of|all\s+set)\b",
+            r"(?:任务|事情|这件事|这个请求|工作|处理).{0,6}"
+            r"(?:办好|做好|处理好|搞定|完成)了?",
+            r"(?:办好了|做好了|处理好了|搞定了)",
+        )
+        if any(re.search(pattern, lowered) for pattern in terminal_claim_patterns):
+            return None
         return cleaned
 
     def _router_fast_speech_diagnostics(self, decision: RouteDecision) -> dict[str, Any]:
         top_raw = self._fast_speech_payload_text(getattr(decision, "fast_speech", None))
-        top_safe = self._safe_immediate_route_speech(top_raw)
+        top_safe = self._validated_fast_speech_payload_text(
+            getattr(decision, "fast_speech", None)
+        )
         item_raw_count = 0
         item_safe_count = 0
         direct_item_count = 0
@@ -2155,13 +2225,16 @@ class VoiceAssistant:
             item_raw = self._fast_speech_payload_text(item.get("fast_speech"))
             if item_raw:
                 item_raw_count += 1
-                if self._safe_immediate_route_speech(item_raw):
+                if self._validated_fast_speech_payload_text(item.get("fast_speech")):
                     item_safe_count += 1
             if str(item.get("lane") or "") in {"immediate_speech", "fast_tts"} and item.get("direct_to_tts") is True:
                 direct_item_count += 1
         speak_first_raw = " ".join((decision.speak_first or "").split())
         speak_first_safe = self._safe_immediate_route_speech(speak_first_raw)
         return {
+            "router_generated_fast_speech_enabled": bool(
+                getattr(self, "router_generated_fast_speech_enabled", False)
+            ),
             "top_fast_speech_present": bool(top_raw),
             "top_fast_speech_safe": bool(top_safe),
             "route_item_fast_speech_count": item_raw_count,
@@ -2191,15 +2264,18 @@ class VoiceAssistant:
                 )
                 if planned_text:
                     return planned_text
-        text = self._safe_immediate_route_speech(
-            self._fast_speech_payload_text(getattr(decision, "fast_speech", None))
+        if not getattr(self, "router_generated_fast_speech_enabled", False):
+            return None
+
+        text = self._validated_fast_speech_payload_text(
+            getattr(decision, "fast_speech", None)
         )
         if text:
             return text
 
         for item in self._route_item_dicts(decision):
-            item_fast = self._safe_immediate_route_speech(
-                self._fast_speech_payload_text(item.get("fast_speech"))
+            item_fast = self._validated_fast_speech_payload_text(
+                item.get("fast_speech")
             )
             if item_fast:
                 return item_fast
@@ -2207,9 +2283,6 @@ class VoiceAssistant:
                 continue
             if item.get("direct_to_tts") is not True:
                 continue
-            item_text = self._safe_immediate_route_speech(str(item.get("text") or ""))
-            if item_text:
-                return item_text
         return None
 
     def _immediate_route_speech_text(self, decision: RouteDecision) -> str | None:
@@ -2329,13 +2402,10 @@ class VoiceAssistant:
         if router_text:
             return router_text
 
-        # Backward compatibility for validators that still populate speak_first
-        # directly, such as low-information clarification and low-confidence
-        # deep-thought handoff. This text still goes through the same safety
-        # filter and should remain a prelude, not a result or completion claim.
-        speak_first = self._safe_immediate_route_speech(decision.speak_first)
-        if speak_first:
-            return speak_first
+        # Raw speak_first is retained in the wire schema for compatibility but
+        # is not independently playable. When the dynamic compatibility gate is
+        # enabled it is considered only by the deep-thought path below, which
+        # still applies the completion-claim guard.
 
         if decision.route == "deep_thought":
             return self._deep_thought_ack_text(decision, user_text)
@@ -2728,11 +2798,6 @@ class VoiceAssistant:
             or not self.enable_agent
             or decision.interrupt_current
             or decision.route in {"interrupt", "ignore"}
-            or decision.route not in getattr(
-                self,
-                "cognitive_apply_lanes",
-                frozenset({"chat", "robot_action", "mixed"}),
-            )
         ):
             return decision
         task = asyncio.create_task(
@@ -2803,16 +2868,17 @@ class VoiceAssistant:
         decision: RouteDecision,
         router_latency_ms: float,
     ) -> tuple[bool, RouteDecision]:
+        cognitive_lane = self._cognitive_lane_from_route(decision)
         if (
             self.cognitive_runtime_mode != "apply"
             or not self.enable_agent
             or not self.enable_interaction_response
             or decision.interrupt_current
             or decision.route in {"interrupt", "ignore"}
-            or decision.route not in getattr(
+            or cognitive_lane not in getattr(
                 self,
                 "cognitive_apply_lanes",
-                frozenset({"chat", "robot_action", "mixed"}),
+                frozenset({"chat"}),
             )
         ):
             return False, decision
@@ -2994,11 +3060,12 @@ class VoiceAssistant:
             self.session_log(
                 session_id,
                 "cognitive_skill_proposed: request_id=%s skill_id=%s timing=%s "
-                "requires_confirmation=%s",
+                "requires_confirmation=%s args=%s",
                 request.request_id,
                 request.skill_id,
                 request.timing,
                 request.requires_confirmation,
+                json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
             )
         fast_first_scheduled = await self._settle_fast_first_audio_hedge(
             fast_first_hedge,
@@ -3707,12 +3774,13 @@ class VoiceAssistant:
                     self.session_log(
                         session_id,
                         "skill_proposed: request_id=%s skill_id=%s timing=%s "
-                        "cancellable=%s requires_confirmation=%s",
+                        "cancellable=%s requires_confirmation=%s args=%s",
                         request.request_id,
                         request.skill_id,
                         request.timing,
                         request.cancellable,
                         request.requires_confirmation,
+                        json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
                     )
                 fast_first_scheduled = await self._settle_fast_first_audio_hedge(
                     fast_first_hedge,
@@ -4442,6 +4510,9 @@ class VoiceAssistant:
         if reset_playback:
             await self.reset_playback_ordering()
         started_ms = now_ms()
+        has_soridormi_request = any(
+            request.skill_id.startswith("soridormi.") for request in response.skills
+        )
         try:
             execution = await self.interaction_runtime.execute(
                 response,
@@ -4450,10 +4521,11 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "skill_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
+                "skill_runtime_done: status=%s results=%s traces=%s provider_mode=%s runtime_ms=%.1f",
                 execution.status,
                 len(execution.results),
                 len(execution.traces),
+                getattr(self.interaction_runtime, "soridormi_mode", None) or "not-used",
                 now_ms() - started_ms,
             )
             for result in execution.results:
@@ -4470,6 +4542,8 @@ class VoiceAssistant:
                     request_id=result.request_id,
                     status=result.status,
                 )
+            if has_soridormi_request:
+                await self._record_soridormi_post_status(session_id)
             completed_request_ids = {result.request_id for result in execution.results}
             if execution.status != "completed":
                 for request in response.skills:
@@ -4500,6 +4574,8 @@ class VoiceAssistant:
                 "skill_runtime_cancelled: runtime_ms=%.1f",
                 now_ms() - started_ms,
             )
+            if has_soridormi_request:
+                await self._record_soridormi_post_status(session_id)
             raise
         except Exception as exc:
             self.session_log(
@@ -4529,6 +4605,50 @@ class VoiceAssistant:
                         0,
                     ) + sum(len(item.text) for item in response.speech)
                 self.maybe_session_done(session_id)
+
+    async def _record_soridormi_post_status(
+        self,
+        session_id: str | None,
+    ) -> dict[str, Any] | None:
+        invoker = getattr(self.interaction_runtime, "soridormi_invoker", None)
+        if invoker is None:
+            self.session_log(
+                session_id,
+                "soridormi_post_status_failed: reason=provider_unavailable",
+            )
+            return None
+        try:
+            outcome = await asyncio.wait_for(
+                invoker.invoke("soridormi.robot.get_status", {}),
+                timeout=5.0,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "soridormi_post_status_failed: reason=%s",
+                type(exc).__name__,
+            )
+            return None
+        if outcome.status != "success":
+            self.session_log(
+                session_id,
+                "soridormi_post_status_failed: reason=%s",
+                outcome.error or outcome.status,
+            )
+            return None
+        status = outcome.output if isinstance(outcome.output, dict) else {}
+        self.session_log(
+            session_id,
+            "soridormi_post_status: mode=%s backend=%s safe_idle=%s "
+            "active_task_present=%s emergency_stop=%s fallen=%s",
+            status.get("mode"),
+            status.get("backend"),
+            status.get("safe_idle"),
+            status.get("active_task") is not None,
+            status.get("emergency_stop"),
+            status.get("fallen"),
+        )
+        return status
 
     async def _maybe_stage_body_recovery_confirmation(
         self,

@@ -34,10 +34,10 @@ class Settings(BaseModel):
     mode: Literal["rules_only", "llm_only", "hybrid"] = Field(
         default_factory=router_mode_from_env
     )
-    rules_first: bool = Field(
-        default_factory=lambda: os.getenv("ROUTER_RULES_FIRST", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
+    # Deterministic interrupt, stop, silence, and unusable-audio handling is a
+    # safety invariant, not a deployment switch. Keep the health field for
+    # compatibility while making its effective value unambiguous.
+    rules_first: bool = True
     ollama_url: str = Field(default_factory=lambda: os.getenv("ROUTER_OLLAMA_URL", "http://chromie-llm:11434"))
     model: str = Field(default_factory=lambda: os.getenv("ROUTER_MODEL", "qwen3:4b"))
     review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:e2b"))

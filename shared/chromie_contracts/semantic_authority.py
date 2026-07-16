@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SEMANTIC_AUTHORITY_CONTEXT_KEY = "semantic_authority"
 
@@ -28,9 +28,17 @@ class SemanticAuthorityClaim(BaseModel):
     schema_version: int = Field(default=1, ge=1)
     owner: SemanticAuthorityOwner
     role: SemanticAuthorityRole
-    turn_id: str = ""
+    turn_id: str = Field(min_length=1)
     reason: str = ""
     emergency_fallback: bool = False
+
+    @field_validator("turn_id")
+    @classmethod
+    def normalize_turn_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("turn_id is required")
+        return normalized
 
     @model_validator(mode="after")
     def validate_role(self) -> "SemanticAuthorityClaim":
@@ -77,14 +85,38 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
 
     return [
         {
-            "entrypoint": "orchestrator.handle_routed_text/apply",
+            "entrypoint": (
+                "orchestrator.handle_routed_text/apply "
+                "(mapped lane allowlisted)"
+            ),
             "owner": "goal_driven_runtime",
             "role": "authoritative",
+            "selection": (
+                "mapped route lane is in ORCH_COGNITIVE_APPLY_LANES and the "
+                "apply preconditions pass"
+            ),
             "planner_path": (
                 "Goal Association -> Fast Planner -> terminal Deep Planner when "
                 "required -> Response Composer -> trusted runtime adapter"
             ),
             "fallback": "fail_closed_after_authority_acquisition",
+        },
+        {
+            "entrypoint": (
+                "orchestrator.handle_routed_text/apply "
+                "(mapped lane excluded)"
+            ),
+            "owner": "legacy_agent_pipeline",
+            "role": "authoritative",
+            "selection": (
+                "mapped route lane is not in ORCH_COGNITIVE_APPLY_LANES, before "
+                "Goal-driven authority acquisition"
+            ),
+            "planner_path": (
+                "existing routed Agent path; exact Router actions remain "
+                "adapter-only"
+            ),
+            "fallback": "not_applicable_before_authority_acquisition",
         },
         {
             "entrypoint": "orchestrator.handle_routed_text/report_only",
@@ -108,10 +140,34 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "fallback": "requires explicit service enablement and per-turn claim",
         },
         {
-            "entrypoint": "post_interrupt_correction",
+            "entrypoint": (
+                "post_interrupt_correction/apply "
+                "(mapped lane allowlisted)"
+            ),
             "owner": "goal_driven_runtime",
             "role": "authoritative",
+            "selection": (
+                "corrected mapped route lane is in ORCH_COGNITIVE_APPLY_LANES "
+                "and the apply preconditions pass"
+            ),
             "planner_path": "same apply coordinator as normal routed text",
             "fallback": "fail_closed_after_authority_acquisition",
+        },
+        {
+            "entrypoint": (
+                "post_interrupt_correction/compatibility "
+                "(mapped lane excluded)"
+            ),
+            "owner": "legacy_agent_pipeline",
+            "role": "authoritative",
+            "selection": (
+                "corrected mapped route lane is not in "
+                "ORCH_COGNITIVE_APPLY_LANES, before Goal-driven authority acquisition"
+            ),
+            "planner_path": (
+                "existing post-interrupt Agent path; exact Router actions remain "
+                "adapter-only and physical resume stays locked"
+            ),
+            "fallback": "not_applicable_before_authority_acquisition",
         },
     ]

@@ -161,9 +161,21 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
     def test_live_text_defaults_allow_full_qualification_pipeline(self) -> None:
         args = build_parser().parse_args(["--mode", "live-text"])
 
+        self.assertEqual(args.goal_driven_runtime, "apply")
         self.assertEqual(args.timeout_s, 600.0)
         self.assertEqual(args.case_timeout_s, 1200.0)
         self.assertGreater(args.case_timeout_s, args.timeout_s)
+
+    def test_live_text_supports_explicit_legacy_runtime_opt_out(self) -> None:
+        args = build_parser().parse_args(
+            ["--mode", "live-text", "--goal-driven-runtime", "off"]
+        )
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        case = manifest.ability_classes[0].live_text_cases[0].case
+
+        namespace = _live_case_namespace(args, case, Path("/tmp/legacy-case"))
+
+        self.assertFalse(namespace.cognitive_runtime)
 
     def test_cli_check_mode_returns_success_for_default_manifest(self) -> None:
         with redirect_stdout(StringIO()):

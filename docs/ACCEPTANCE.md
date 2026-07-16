@@ -19,7 +19,7 @@ A higher level does not replace lower-level regression tests.
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
 | Router/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
-| Interaction contracts and Skill Runtime | Yes | Text path | Live MuJoCo path | Text-to-MuJoCo closure passed; physical audio open separately |
+| Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
 | ASR/TTS GPU use | Limited | GPU smoke tooling | Not applicable | RTX 5090 smoke passed 21/21 |
@@ -35,11 +35,15 @@ Retained reference-host evidence from June 14 and June 17, 2026:
 | M13 `20260617T075825Z` | `4604a03` | 7/7 passed | Clean synthetic framed PCM through VAD, ASR, Router, Agent live Soridormi catalog, host confirmation, Skill Runtime, TTS, and MuJoCo |
 | Text-MuJoCo `20260617T081411Z` | `857c15f` | passed | Direct text input through Router, Agent `/interaction`, host Skill Runtime, live Soridormi MCP, ordered walk/nod/turn execution, and safe-idle status |
 
-The retained M13 automated bundles pass the verifier with `--require-clean`
-and `--allow-automated`, zero errors, and zero warnings. They report
-`release_eligible=false` by design. The retained Text-MuJoCo bundle closes the
-historical M13 text interaction scope. It intentionally skips microphone and
-ASR and therefore does not prove physical audio-device quality.
+The retained M13 automated bundles are historical evidence for their recorded
+revisions and legacy semantic path; they are not current goal-driven validation.
+They can be inspected by supplying their recorded revisions through the
+verifier's `--expected-*` options. The verifier defaults to the current source
+and therefore rejects them as release evidence for a newer revision. They report
+they are not eligible for a human physical voice-device claim. The retained
+Text-MuJoCo bundle closes the historical M13 text interaction scope. It
+intentionally skips microphone and ASR and therefore does not prove physical
+audio-device quality.
 
 ## Level A — automated suite
 
@@ -115,7 +119,7 @@ It groups representative scenario files by the general ability class they
 protect: robust intent understanding, stable capability grounding, natural
 uncertainty handling, composable action planning, truthful embodied speech,
 tool/conversation lane discipline, deterministic safety controls, and evidence
-claim discipline. The runner writes evidence summaries under
+claim discipline, plus multi-goal daily-life planning. The runner writes evidence summaries under
 `.chromie/acceptance/general-ability/` unless `--no-write` is supplied.
 
 A passing `--mode level-a` run is still Level A deterministic evidence only. It
@@ -129,6 +133,7 @@ Against deployed services, the same manifest can run live text probes:
 ```bash
 conda run -n Chromie python scripts/general_ability_acceptance.py \
   --mode live-text \
+  --goal-driven-runtime apply \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
@@ -265,14 +270,16 @@ calls hang. Add representative live text probes to
 instead.
 
 For a deployed text-to-MuJoCo check that skips microphone and ASR while keeping
-Router, Agent `/interaction`, the host trusted Skill Runtime, live Soridormi
+Router, the goal-driven runtime, the host trusted Skill Runtime, live Soridormi
 MCP, and optional real speaker playback, start Chromie with the Soridormi
 manifest loaded and run:
 
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --no-speaker
 ```
 
@@ -283,7 +290,9 @@ speech, and skills from the text exactly as it would after ASR. Add
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
+  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --expect-skill soridormi.walk_velocity \
   --expect-skill soridormi.nod_yes \
   --expect-skill soridormi.turn_in_place \
@@ -293,9 +302,18 @@ python scripts/interaction_text_mujoco_check.py \
   --expect-arg 2:yaw_radps=-0.12
 ```
 
-This runner writes `route.json`, `interaction_response.json`,
+This runner defaults to the maintained goal-driven path; use
+`--no-cognitive-runtime` only for an explicitly labelled compatibility run. It
+writes `route.json`, `interaction_response.json`,
 `execution.json`, status snapshots, session events, recordings when enabled,
-and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. It fails if
+and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. The summary
+records the Chromie checkout revision/version/clean state, Soridormi manifest,
+the user-supplied declared paired checkout and its clean state, selected
+semantic path, and apply lanes. `--soridormi-repo` does not prove which source
+the MCP endpoint executes. Target validation additionally requires an
+endpoint-reported Soridormi source revision matching the clean paired checkout
+and manifest; the current runner records no such endpoint revision, so its new
+summaries remain diagnostic. It fails if
 Skill Runtime execution fails, if the simulator does not return to safe idle,
 or, when assertion flags are supplied, if the ordered Soridormi skills or
 expected arguments do not match. Use `--no-speaker` for headless automation;
@@ -312,7 +330,9 @@ known ASR-style walk typo regression, run:
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "Wal forward for 15 seconds, quickly." \
+  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi \
   --preview-only \
   --no-speaker \
   --expect-skill soridormi.walk_forward \
@@ -324,10 +344,10 @@ contains internal labels such as `Task Split`, `Key Risk`, `Next Step`, or
 model-facing `soridormi.*` skill IDs. It still writes `route.json`,
 `interaction_response.json`, session events, and `summary.json` for diagnosis.
 
-The retained `20260617T081411Z` text bundle is the M13 text interaction closure
-evidence. It is the right gate when the goal is to skip microphone and ASR while
-proving the interaction contract, trusted Skill Runtime, live Soridormi
-execution, and safe-idle behavior.
+The retained `20260617T081411Z` text bundle is historical M13 `/interaction`
+closure evidence. It does not contain the provenance or cognitive status needed
+to validate the current goal-driven path. Produce a new clean goal-driven bundle
+when the claim includes the current semantic-authority boundary.
 
 The old standalone text scenario suite has been removed for behavior claims.
 Its useful cases are represented by the general ability manifest so failures
@@ -583,11 +603,11 @@ calibration artifact SHA-256 values to match.
 correlated JSONL events, exact revisions, redacted configuration, generated or
 captured audio, Orchestrator logs, and per-case checks.
 
-| Mode | Input path | Operator interaction | What it proves | Release-closing |
+| Mode | Input path | Operator interaction | What it proves | Human voice-device closure |
 |---|---|---|---|---:|
 | `synthetic` (default) | Chromie TTS WAV -> framed Orchestrator stdin -> VAD -> ASR | None | Reproducible speech/control-plane/Skill Runtime regression | No |
 | `virtual-mic` | Chromie TTS WAV -> Pulse/PipeWire null sink monitor -> normal host capture -> VAD -> ASR | None | Host audio-device capture plus the automated control path | No |
-| `acoustic` | Chromie TTS WAV -> host output -> configured host input device -> VAD -> ASR | None | Repeatable host audio-device path for generated speech; physical evidence when bound to a real speaker/microphone pair | No, unless the release claim is explicitly narrowed to automated acoustic evidence |
+| `acoustic` | Chromie TTS WAV -> host output -> configured host input device -> VAD -> ASR | None | Repeatable host audio-device path for generated speech; physical evidence when bound to a real speaker/microphone pair | No |
 | `supervised` | Real microphone -> normal host capture -> VAD -> ASR | Audible/visual verdict after machine checks pass | Reference-host microphone, speaker, pronunciation, and observed simulator behavior | Yes, for physical voice-device release claims |
 
 The `synthetic` and `virtual-mic` modes intentionally use response playback
@@ -597,6 +617,15 @@ physical speaker or risking speaker-to-microphone feedback. The `acoustic`
 mode uses host playback and configured input-device capture, so it is useful
 for low-cost microphone/speaker regression when bound to real devices, but it
 proves generated speech rather than arbitrary human pronunciation.
+
+The current narrowed `0.0.1` compatibility policy lists `synthetic`,
+`virtual-mic`, and `acoustic` as eligible generated-speech modes. That policy
+does not turn them into human voice-device evidence. Before a bundle can enter
+policy evaluation, the verifier also requires the goal-driven acceptance
+override, correlated applied `chat` and `robot_action` cognitive events,
+exclusive Soridormi `sim` provider events, clean matching checkouts, and an
+endpoint-reported Soridormi revision. The current runner records only a
+`declared_paired_checkout`, so it cannot yet produce a policy-ready bundle.
 
 Use `scripts/interaction_text_mujoco_check.py` when the goal is to skip both
 microphone and ASR but still hear Chromie through the speaker. Use
@@ -655,8 +684,16 @@ python scripts/verify_voice_evidence.py --allow-automated \
   .chromie/acceptance/voice/<id>
 ```
 
-The verifier reports the bundle as valid automated evidence but
-`release_eligible=false`.
+When its recorded Chromie version/revision and Soridormi manifest and declared
+paired-checkout revisions match the current clean source, the verifier may
+report passing diagnostic automated evidence. It sets
+`policy_evaluation_ready=true` only when the endpoint also reports the matching
+executing Soridormi revision. The current runner/endpoint path does not provide
+that binding, while
+`human_voice_device_claim_eligible=false` remains reserved for clean supervised
+evidence. Release preparation separately applies the narrowed compatibility
+policy's accepted modes. Historical inspection requires explicit
+`--expected-*` values and does not transfer evidence to a newer build.
 
 The retained reference-host synthetic run is `20260614T132934Z`; all seven
 cases passed at Chromie revision `f0e22ba`.
@@ -770,21 +807,22 @@ python scripts/voice_acceptance.py --dry-run \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-## Physical microphone acceptance matrix
+## Voice and MuJoCo acceptance matrix
 
 Run from the repository root with the structured path enabled and a live
-MuJoCo-backed Soridormi endpoint. All three modes execute these cases in the
-order below; only `supervised` adds physical audio and operator observations.
+MuJoCo-backed Soridormi endpoint. All four modes execute these cases in the
+order below; only `acoustic` and `supervised` use a physical host audio path,
+and only `supervised` adds human speech and operator observations.
 
 | Case | User input | Required evidence |
 |---|---|---|
-| Speech only | General question | ASR final text, interaction ID, speech request, TTS request ID, audible output, no body skill. |
-| Speech plus body skill | “Nod” or equivalent, then “Yes” | Action-specific prompt, exact request fingerprint, approval event, live catalog import, plan/monitor/execute results, safe idle. |
-| Refusal | Valid body request, then “No thanks” | Bound denial event, no remote physical execution, user-facing speech. |
-| Barge-in | Interrupt while speaking | Playback generation cancelled and no duplicate stale speech. |
-| Body cancellation | Confirm, then interrupt a cancellable simulated skill | Bound approval, provider cancel invoked, execution marked cancelled, safe idle verified. |
-| Stop/emergency | Explicit stop during active work | Deterministic operational route, active work stopped, retained safety state and recovery notes. |
-| Follow-up | Context-dependent second utterance | Same conversation ID when policy requires, bounded history, correct reference resolution. |
+| Speech only | General question | ASR final text, prepared speech with zero body skills, correlated TTS schedule, playback start/end, and clean session completion. Audible output is additionally judged only when the selected mode uses a physical output device. |
+| Speech plus body skill | “Nod” or equivalent, then “Yes” | Exact nod/count proposal; request-bound confirmation prompt scheduled and fully played before approval; requested, approved, and authorized events bound by confirmation ID and fingerprint; completed skill result; safe idle. |
+| Refusal | Valid body request, then “No thanks” | Requested, denied, and rejected events bound by confirmation ID and fingerprint; no Soridormi result; completed denial speech output. |
+| Barge-in | Interrupt while speaking | Active old-session playback linked to the new interrupt session, deterministic interrupt route, and no old-session playback after interruption completes. |
+| Body cancellation | Confirm, then interrupt a cancellable simulated skill | Bound approval, host-observed Skill Runtime cancellation, host interruption completion, and post-cancellation safe-idle/no-active-task status. This does not claim a provider cancel RPC unless a provider event explicitly records one. |
+| Stop/emergency | Explicit stop during active work | Deterministic operational route linked to the active prior session, with no later old-session output or completed work. |
+| Follow-up | “Remember … blue,” then ask for the color | Same conversation ID, both intended ASR utterances, and completed second-response output containing `blue`. |
 
 For every case retain:
 

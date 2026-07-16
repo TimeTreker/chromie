@@ -8,6 +8,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from agent.app import main as agent_main
+from router.app.main import Settings as RouterSettings
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,10 @@ def _common_env() -> dict[str, str]:
 
 
 class RuntimeConfigurationTests(unittest.TestCase):
+    def test_router_safety_rules_cannot_be_disabled_by_environment(self) -> None:
+        with patch.dict(os.environ, {"ROUTER_RULES_FIRST": "0"}, clear=False):
+            self.assertTrue(RouterSettings().rules_first)
+
     def test_router_host_budget_exceeds_router_internal_budget(self) -> None:
         values = _common_env()
         self.assertGreater(
@@ -53,6 +58,26 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ROUTER_GENERIC_CHAT_REVIEW_ENABLED"], "1")
         self.assertEqual(values["ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED"], "0")
 
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        for name in (
+            "ROUTER_MODE",
+            "ROUTER_CONFIDENCE_THRESHOLD",
+            "ROUTER_LOG_LEVEL",
+            "CHROMIE_ROUTER_DEBUG_RAW",
+            "CHROMIE_ROUTER_DEBUG_PROMPT",
+        ):
+            self.assertIn(f"{name}:", compose)
+
+    def test_documented_weather_controls_reach_agent_container(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        for name in (
+            "AGENT_WEATHER_ENABLED",
+            "AGENT_WEATHER_TIMEOUT_S",
+            "AGENT_WEATHER_GEOCODING_URL",
+            "AGENT_WEATHER_FORECAST_URL",
+        ):
+            self.assertIn(f"{name}:", compose)
+
     def test_ollama_keeps_router_and_agent_models_loaded_without_extra_parallelism(self) -> None:
         values = _common_env()
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
@@ -71,6 +96,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_CAPABILITY_MANIFESTS"], "")
         self.assertEqual(values["SORIDORMI_MCP_URL"], "")
 
+    def test_agent_code_fallback_does_not_enable_capability_review(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(agent_main.Settings().require_capability_plan_review)
+
     def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
         values = _common_env()
         self.assertEqual(values["AGENT_MAX_SPEAK_CHARS"], "140")
@@ -79,7 +108,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_CTX"], "8192")
         self.assertEqual(values["AGENT_DEEPTHINKING_NUM_PREDICT"], "384")
 
-    def test_tool_fast_first_is_disabled_and_task_continuity_is_report_only_in_common_profile(self) -> None:
+    def test_common_profile_uses_one_coherent_cognitive_runtime(self) -> None:
         values = _common_env()
         self.assertEqual(values["ORCH_FAST_FIRST_RESPONSE_ENABLED"], "1")
         self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_ENABLED"], "1")
@@ -91,7 +120,16 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP"], "1")
         self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS"], "120000")
         self.assertEqual(values["ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED"], "0")
-        self.assertEqual(values["ORCH_TASK_CONTINUITY_MODE"], "report_only")
+        self.assertEqual(values["ORCH_ENABLE_INTERACTION_RESPONSE"], "1")
+        self.assertEqual(values["ORCH_ENABLE_SORIDORMI_SKILLS"], "0")
+        self.assertEqual(values["ORCH_AUTO_CONFIRM_SIM_SKILLS"], "0")
+        self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
+        self.assertEqual(values["ORCH_COGNITIVE_APPLY_LANES"], "chat")
+        self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
+        self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
+        self.assertEqual(values["ORCH_DEEP_PLANNER_MODE"], "off")
+        self.assertEqual(values["ORCH_RESPONSE_COMPOSER_MODE"], "off")
+        self.assertEqual(values["ORCH_TASK_CONTINUITY_MODE"], "off")
         self.assertEqual(values["ORCH_TASK_CONTINUITY_TIMEOUT_MS"], "3500")
         self.assertEqual(values["AGENT_TASK_CONTINUITY_MODEL"], "qwen3:4b")
         self.assertEqual(values["AGENT_TASK_CONTINUITY_TIMEOUT_MS"], "3000")

@@ -30,11 +30,13 @@ turn cannot re-enter the legacy CapabilityAgent planner.
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Normal Orchestrator turn in `apply` | Goal-driven Runtime | authoritative | Goal Association → Fast Planner → terminal Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
+| Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-driven Runtime | authoritative | Goal Association → Fast Planner → terminal Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
+| Orchestrator turn in `apply`; mapped route lane is excluded | Existing routed Agent path | authoritative | The compatibility path selected before Goal-driven ownership; exact Router actions remain adapter-only | Goal-driven Runtime never acquires this turn. |
 | Orchestrator turn in `report_only` | Goal-driven Runtime | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
 | Agent `/interaction` or `/run` with exact Router `actions[]` | No new semantic planner; Router-action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
-| Post-interrupt correction in `apply` | Goal-driven Runtime | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
+| Post-interrupt correction in `apply`; corrected mapped lane is allowlisted | Goal-driven Runtime | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
+| Post-interrupt correction in `apply`; corrected mapped lane is excluded | Existing post-interrupt Agent path | authoritative | Compatibility handling selected before Goal-driven ownership; exact actions remain adapter-only and physical resume stays locked | Goal-driven Runtime never acquires this correction. |
 
 `GET /semantic-authority` exposes the same machine-readable route matrix from
 the Agent service.
@@ -52,18 +54,27 @@ emergency operation. In normal operation it is an adapter:
    - the Orchestrator has `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=1`;
    - the Agent has `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED=1`;
    - the Orchestrator attaches a valid per-turn
-     `legacy_capability_fallback` claim with `emergency_fallback=true`.
+     `legacy_capability_fallback` claim with `emergency_fallback=true` and a
+     non-empty `turn_id` exactly matching the Agent request `sid`.
 
-The two environment variables alone are not enough. The per-turn claim prevents
-a direct or stale request from silently widening authority.
+The two environment variables alone are not enough. The claim's exact turn
+binding rejects an empty or cross-turn claim from silently widening authority.
+This internal routing claim is not caller authentication and is not stored as a
+single-use nonce: replaying the same valid claim with the same `sid` is not
+independently prevented here. Keep the endpoint on its trusted network boundary
+and keep both emergency gates off during normal operation.
 
 The maintained launcher and common profiles set both gates to `0`.
 
 ## Disabled lanes versus failed authoritative turns
 
-A lane excluded by `ORCH_COGNITIVE_APPLY_LANES` is rejected before the
-Goal-driven Runtime starts. A separate compatibility path may own that turn if
-explicitly configured.
+The Orchestrator first maps Router routes to semantic lanes: `chat`, `clarify`,
+and `deep_thought` map to `chat`; `robot_action`, `tool`, and `memory` retain
+their lane names; everything else maps to `unsupported`. A mapped lane excluded
+by `ORCH_COGNITIVE_APPLY_LANES` stays on the existing routed Agent path before
+the Goal-driven Runtime starts. Exact Router actions on that path are still
+adapter-only, and the old CapabilityAgent semantic planner still needs its
+explicit emergency gates and turn claim.
 
 Once Goal Association begins under authoritative `apply`, there is no
 same-turn compatibility fallback. Technical failure, terminal-lane mismatch,
@@ -79,10 +90,12 @@ emergency-fallback tests while adding boundary tests that establish:
   available or unavailable;
 - the CapabilityAgent LLM call count remains zero on adapter-only requests;
 - neither a service gate nor a per-turn claim alone can enable the old planner;
+- empty and mismatched turn claims are rejected before any LLM call;
 - both gates plus the emergency claim enable the retained compatibility planner;
 - Goal-driven failures never emit a `legacy_fallback` status;
-- apply and post-interrupt entrypoints name Goal-driven Runtime as their only
-  authority;
+- allowlisted mapped lanes at apply and post-interrupt entrypoints name
+  Goal-driven Runtime as their only authority after acquisition, while
+  excluded mapped lanes retain the pre-acquisition Agent path;
 - maintained profiles use `apply`, `fail_closed`, and disabled legacy gates.
 
 Run the dependency-light audit with:

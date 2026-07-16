@@ -160,27 +160,45 @@ capability:
 - generalization-oriented Level A and retained live-text evidence pass;
 - `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
 
-## Current checkpoint - Simulation-demo release audit
+## Current checkpoint - Cognitive authority and evidence validation
 
-Before publishing or recreating a demo tag, the paired Chromie and Soridormi
-repositories must describe the same supported surface. The demo claim is limited
-to the simulator: text or voice input can route through Chromie's emergency
-filter, quick intent router, optional deepthought handoff, Agent validation, and
-trusted Skill Runtime into Soridormi-owned MuJoCo skills or task contracts.
+The active milestone is to validate the implemented Goal-driven Runtime as the
+single semantic authority on the intended live-text and MuJoCo target, and to
+make retained evidence provenance strong enough that an older run cannot be
+mistaken for validation of newer source.
+
+The common safe base enables structured interaction and authoritative `apply`
+for `chat` while leaving Soridormi off. The maintained Soridormi launcher
+enables that trusted provider and widens authority to `chat,robot_action`. Both
+fail closed after the Goal-driven Runtime acquires a turn. Exact Router actions
+are adapter-only; the old CapabilityAgent semantic planner is emergency-only
+behind both service gates and a non-empty matching-turn authority claim. That
+internal claim is exact turn binding, not caller authentication or a consumed
+replay nonce.
 
 This checkpoint does not claim physical microphone/speaker quality, Jetson
-packaging, real hardware support, navigation autonomy, manipulation, or
-unattended operation.
+packaging, real hardware support, navigation autonomy, manipulation,
+unattended operation, target validation of the new cognitive path, or release
+readiness.
 
 Exit criteria:
 
-- Chromie status, roadmap, runbook, and release docs match the current code and
-  retained evidence;
-- Soridormi roadmap and body-control docs agree on the current locomotion gate,
-  task-agent contract, and pre-WBC limitations;
-- exact Chromie and Soridormi revisions are retained;
-- `python scripts/check_docs.py` and the relevant automated gates pass;
-- any demo tag is created only after the audit, not before it.
+- status, architecture, rollout, configuration, acceptance, and component docs
+  describe the same authoritative lanes and fallback boundary as source;
+- empty or cross-turn legacy-planner authority claims fail closed before model
+  planning;
+- cognitive simulator evidence contains an applied cognitive result, completed
+  Soridormi `sim` execution, explicit safe idle, an exact matching Chromie
+  source, manifest, clean declared paired Soridormi checkout, and a matching
+  endpoint-reported Soridormi revision;
+- release preparation rejects evidence, capability-manifest, compatibility,
+  source-revision, or version provenance drift;
+- running Chromie images and loaded models are bound to the candidate revision,
+  and publishable image references are immutable;
+- `python scripts/check_docs.py`, `./scripts/run_tests.sh`, cognitive scenarios,
+  and General Ability Level A pass from the candidate revision;
+- retained live-text and MuJoCo runs pass through the authoritative path before
+  target behavior or release readiness is claimed.
 
 ## Open architecture track - General ability acceptance reconstruction
 
@@ -205,7 +223,7 @@ Exit criteria before using this track as the default behavior-quality gate:
   levels rather than saying only that the project was "tested";
 - `python scripts/check_docs.py` and the relevant focused test groups pass.
 
-## Next implementation phase - Developer usability tools
+## Implemented tooling track - Developer usability tools
 
 ### Objective
 
@@ -253,8 +271,9 @@ The detailed plan is maintained in
 
 ## Completed phase - Robust simulation and provider readiness
 
-This milestone is complete for the high-level provider contract. Soridormi
-revision `4afb4bc6411db4a4194e97349d9466a62efd2f24` supplies live no-motion
+This milestone is complete for the high-level provider contract. The historical
+provider-readiness evidence used Soridormi revision
+`4afb4bc6411db4a4194e97349d9466a62efd2f24`, which supplied live no-motion
 `sim`, `hardware_shadow`, and `hardware_dry_run` profiles plus test-only fault
 injection. All three profiles pass conformance and parity, and the live
 16-scenario fault matrix passes its terminal-state, latency, and safe-idle
@@ -302,7 +321,7 @@ conformance must be designed and verified together.
 - no model-facing contract contains device-specific low-level controls;
 - a commissioning checklist is sufficient to select the first reference robot.
 
-## Current phase - Physical pilot preparation
+## Future phase - Physical pilot preparation
 
 ### Objective
 
@@ -407,34 +426,40 @@ Before accepting major work, ask:
 
 If the answer is no, defer the work or revise its scope.
 
-## Open architecture track - Goal-driven cognitive runtime
+## Implemented architecture track - Goal-driven cognitive runtime
 
 ### Objective
 
-Adopt [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-as the cognitive constitution for future Router, Agent, planning, continuity,
-response, and social-interaction work.
+Maintain [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
+as the cognitive constitution for current and future Router, Agent, planning,
+continuity, response, and social-interaction work.
 
 The architecture changes the primary planning question from “which skill matches
 this utterance?” to “what existing or new user goals are present, and what
 verifiable plan completely satisfies them?”
 
-This track is implemented through PR7 with dependency-light automated evidence.
-The unified runtime remains `report_only` in maintained configuration, supports
-lane-gated `apply`, and preserves immediate rollback. Retained live-text and
-MuJoCo target evidence remain open.
+This track is implemented through PR8 with dependency-light automated evidence.
+The unified runtime is authoritative in lane-gated `apply`: the common safe
+base owns `chat`, and the maintained Soridormi launcher widens ownership to
+`chat,robot_action`. Both fail closed after ownership acquisition and preserve
+explicit rollback controls. Retained live-text and MuJoCo target evidence
+remain open.
 
 ### Delivery sequence
 
 1. **Implemented (Level A):** Goal contracts and bounded active-goal projection.
-2. **Implemented in report-only mode (Level A):** Goal association before new-goal segmentation.
-3. **Implemented in report-only mode (Level A):** Canonical plans and complete-coverage Fast Planner.
-4. **Implemented in report-only mode (Level A):** Full-registry Deep Planner with bounded same-tier replanning.
-5. **Implemented in report-only mode (Level A):** Consequence-aware parameter resolution and goal satisfaction reporting.
-6. **Implemented in report-only mode (Level A):** Multi-goal response composition and model-driven social attention.
+2. **Implemented in the unified apply pipeline (Level A):** Goal association before new-goal segmentation.
+3. **Implemented in the unified apply pipeline (Level A):** Canonical plans and complete-coverage Fast Planner.
+4. **Implemented in the unified apply pipeline (Level A):** Full-registry Deep Planner with bounded same-tier replanning.
+5. **Implemented in the unified apply pipeline (Level A):** Consequence-aware parameter resolution and goal satisfaction reporting.
+6. **Implemented in the unified apply pipeline (Level A):** Multi-goal response composition and model-driven social attention.
 7. **Implemented with Level A evidence; target evidence open:** Unified runtime
    migration, per-lane apply/rollback, atomic Goal-state commit, bounded host
    replan, evidence tooling, and cognitive text-to-MuJoCo entry point.
+8. **Implemented with Level A evidence; target evidence open:** Single semantic
+   authority, adapter-only exact Router actions, emergency-only legacy planner
+   with non-empty matching-turn claims, exact Goal Association schema, and strict
+   source/evidence provenance checks.
 
 The Deep Planner does not return semantic work to the Fast Planner. Both tiers
 share capability and validation primitives and output the same canonical plan
@@ -470,6 +495,15 @@ and release boundaries.
 
 PR1 through PR6 define and automatically verify Goal contracts, continuity-before-creation association, Canonical Plans, complete-coverage Fast Planning, terminal Deep Planning, bounded same-tier revision, parameter resolution, Goal Satisfaction, response composition, and independent Social Attention.
 
-PR7 unifies those stages under one host runtime with `off`, `report_only`, and lane-gated `apply`. All applied plans still pass existing trusted preparation, confirmation, Skill Runtime, and provider boundaries. Goal-state updates are atomic, and technical failures are classified as compatibility fallback or fail-closed error rather than hidden success. Operational details and evidence commands are maintained in [Goal-Driven Cognitive Runtime Rollout](docs/COGNITIVE_RUNTIME_ROLLOUT.md).
+PR7 unifies those stages under one host runtime with `off`, `report_only`, and
+lane-gated `apply`. PR8 makes the unified runtime the single semantic authority
+for applied lanes, constrains Goal Association at the model boundary, and
+reduces the old CapabilityAgent planner to a gated emergency path requiring a
+non-empty matching-turn claim. All applied plans still pass existing trusted
+preparation, confirmation, Skill Runtime, and provider boundaries. Goal-state
+updates are atomic, and technical failures after authority acquisition fail
+closed rather than becoming hidden success or a second semantic plan.
+Operational details and evidence commands are maintained in
+[Goal-Driven Cognitive Runtime Rollout](docs/COGNITIVE_RUNTIME_ROLLOUT.md).
 
 This checkpoint is implemented and automatically verified only. Retained live-text and MuJoCo evidence must still be collected before target validation is claimed.

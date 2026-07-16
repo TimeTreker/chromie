@@ -65,8 +65,14 @@ Core endpoints:
 - `GET /capabilities/catalog`
 - `POST /capabilities/search`
 - `GET /capabilities/llm-context?language=en&text=...`
+- `GET /semantic-authority`
 - `POST /run`
 - `POST /interaction`
+- `POST /goal-association`
+- `POST /fast-plan`
+- `POST /deep-plan`
+- `POST /compose-response-plan`
+- `POST /task-continuity`
 
 Catalog entries include `prompt_tier`, `prompt_tier_locked`,
 `prompt_tier_source`, and `prompt_tier_reason`. Unlocked `common` entries are
@@ -120,14 +126,14 @@ Risk-bearing behavior is default-off.
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named skills | Exact catalog IDs eligible for model selection; this list does not force any gesture. |
 | `AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET` | `none` | Optional installation-calibrated target used only when live perception is absent. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Deprecated compatibility alias used only when `AGENT_SOCIAL_ATTENTION_MODE` is unset. |
-| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | Fail closed when semantic review is unavailable for an executable robot action; exact Router capability substitutions require a reviewer revision. Enable for stricter review. |
+| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | When `1`, require semantic review for executable robot-action plans and fail closed if that optional reviewer is unavailable; exact Router capability substitutions also require a reviewer revision. At the default `0`, this extra review gate is skipped. |
 | `AGENT_CONVERSATION_NUM_CTX` | `2048` | Context window for normal conversation prompts. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | `64` | Output budget for normal conversation replies. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | `8192` | Context window for deep-thinking prompts with session memory. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | `384` | Output budget for deep-thinking replies. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
-| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0` | Emergency-only gate for the old CapabilityAgent semantic planner. It also requires a valid per-turn `legacy_capability_fallback` authority claim; exact Router actions are always adapter-only. |
+| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0` | Emergency-only gate for the old CapabilityAgent semantic planner. It also requires a `legacy_capability_fallback` authority claim whose non-empty `turn_id` exactly matches the request `sid`; exact Router actions are always adapter-only. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named skills while keeping the last known-good catalog. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | `0.16` | Minimum score for automatic native route correction. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | `8` | Bound candidates sent to capability selection. |
@@ -163,9 +169,9 @@ compatibility, confirmation policy, and the small latency budget.
 
 Attention skills carry `metadata.auxiliary_social_attention=true`, are excluded
 from user task proposals, and are dropped rather than delaying or conflicting
-with the primary task. Project defaults remain off. The maintained voice-MuJoCo
-launcher enables `sim_only` with a calibrated right-side fallback; a future live
-perception target overrides that calibration.
+with the primary task. Project and normal voice-MuJoCo defaults remain off. The
+architecture-validation profile explicitly enables `sim_only` with a calibrated
+right-side fallback; a future live perception target overrides that calibration.
 
 ## Capability manifests
 
@@ -179,8 +185,8 @@ registry content. This is intentional: runtime policy must not silently diverge
 from deployment configuration.
 
 The checked-in Soridormi snapshot is materialized from Soridormi's authoritative
-export and pinned to upstream commit
-`4afb4bc6411db4a4194e97349d9466a62efd2f24`. See
+export and pinned to the exact `metadata.upstream_commit` recorded in
+`capabilities/soridormi.json`. See
 [`../capabilities/README.md`](../capabilities/README.md).
 
 ## TaskGraph behavior

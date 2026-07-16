@@ -3,7 +3,7 @@
 ## Supported versions
 
 There is no published stable release in this repository snapshot. The tracked
-`0.1.0-alpha.1` material is a candidate only. Security and safety fixes currently
+`0.0.1` material is a blocked, unpublished candidate only. Security and safety fixes currently
 target the latest `main` revision; a published prerelease must add an explicit
 supported-version table here.
 

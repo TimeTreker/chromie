@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 RouteName = Literal[
     "chat",
@@ -18,6 +18,46 @@ RouteName = Literal[
 Priority = Literal["low", "normal", "high", "urgent"]
 DecisionSource = Literal["rules", "llm", "catalog", "fallback"]
 
+_FAST_SPEECH_CONTRACT_MARKERS = {
+    "checking_only",
+    "prelude_only",
+    "needs_confirmation",
+    "acknowledge",
+    "acknowledge_and_check",
+    "clarify",
+    "thinking",
+    "safety_prelude",
+}
+
+
+def _fast_speech_marker(value: str | None) -> str:
+    return "_".join(str(value or "").strip().casefold().replace("-", "_").split())
+
+
+class FastSpeech(BaseModel):
+    """Router-authored process acknowledgement preserved across services."""
+
+    text: str = ""
+    purpose: str | None = None
+    language: str | None = None
+    commitment: str | None = None
+    must_not_claim_completion: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_bare_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return {"text": value}
+        return value
+
+    @model_validator(mode="after")
+    def reject_contract_marker_as_spoken_text(self) -> "FastSpeech":
+        if self.must_not_claim_completion is not True:
+            raise ValueError("fast_speech must forbid completion claims")
+        if _fast_speech_marker(self.text) in _FAST_SPEECH_CONTRACT_MARKERS:
+            self.text = ""
+        return self
+
 
 class RouteItem(BaseModel):
     route: RouteName
@@ -29,6 +69,7 @@ class RouteItem(BaseModel):
     requires_mind: bool = False
     direct_to_tts: bool = False
     text: str | None = None
+    fast_speech: FastSpeech | None = None
     skill_id: str | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     actions: list[dict[str, Any]] = Field(default_factory=list)
@@ -55,8 +96,17 @@ class RouteDecision(BaseModel):
     needs_agent: bool = True
     should_speak: bool = True
     speak_first: str | None = None
+    fast_speech: FastSpeech | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     candidate_capabilities: list[dict[str, Any]] = Field(default_factory=list)
     reason: str | None = None
     source: DecisionSource = "fallback"
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def populate_speak_first_from_fast_speech(self) -> "RouteDecision":
+        if _fast_speech_marker(self.speak_first) in _FAST_SPEECH_CONTRACT_MARKERS:
+            self.speak_first = None
+        if not self.speak_first and self.fast_speech and self.fast_speech.text.strip():
+            self.speak_first = self.fast_speech.text.strip()
+        return self
