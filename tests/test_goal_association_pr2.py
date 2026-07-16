@@ -85,6 +85,85 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.new_goals[0].description, "Report the current weather.")
         self.assertTrue(result.new_goals[0].goal_id.startswith("goal_"))
 
+    def test_model_transport_noise_is_ignored_and_host_owns_canonical_fields(self):
+        ollama = FakeOllama({
+            "new_goals": [
+                {
+                    "id": "goal_1",
+                    "constraints": [],
+                    "source_text": "Look at me for two seconds",
+                    "success_criteria": "User is observed",
+                    "description": "Look at the user for two seconds",
+                },
+                {
+                    "id": "goal_2",
+                    "constraints": [],
+                    "description": "Blink twice",
+                },
+            ],
+            "confidence": 0.94,
+        })
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Look at me for two seconds, then blink twice.", language="en-US")
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(
+            [goal.description for goal in result.new_goals],
+            ["Look at the user for two seconds", "Blink twice"],
+        )
+        self.assertTrue(all(goal.goal_id.startswith("goal_") for goal in result.new_goals))
+        self.assertNotIn("goal_1", [goal.goal_id for goal in result.new_goals])
+        self.assertTrue(all(goal.constraints == {} for goal in result.new_goals))
+        self.assertTrue(
+            all(
+                goal.source_text == "Look at me for two seconds, then blink twice."
+                for goal in result.new_goals
+            )
+        )
+        self.assertEqual(
+            [goal.success_criteria for goal in result.new_goals],
+            [["Look at the user for two seconds"], ["Blink twice"]],
+        )
+        self.assertEqual(result.metadata["model_contract"], "GoalAssociationModelOutput")
+        self.assertTrue(result.metadata["host_generated_identifiers"])
+
+    def test_missing_minimal_description_uses_one_model_repair(self):
+        ollama = ScriptedOllama([
+            {
+                "new_goals": [
+                    {"open_semantic_description": "Walk forward for one second"},
+                    {"open_semantic_description": "Blink twice"},
+                ],
+                "confidence": 0.9,
+            },
+            {
+                "new_goals": [
+                    {"description": "Walk forward for one second"},
+                    {"description": "Blink twice"},
+                ],
+                "confidence": 0.9,
+            },
+        ])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Walk forward for one second, then blink twice.", language="en-US")
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            [goal.description for goal in result.new_goals],
+            ["Walk forward for one second", "Blink twice"],
+        )
+        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
+        self.assertIn("open_semantic_description", ollama.prompts[1][0])
+        self.assertIn("Each new_goals item contains only description", ollama.prompts[1][0])
+
     def test_ambiguous_reference_returns_natural_clarification_only(self):
         ollama = FakeOllama({"associations": [], "new_goals": [], "clarification": "你是说咖啡不用了，还是天气也不用查了？", "confidence": 0.58})
         result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("算了，不用了。", active_goals=[active_goal("goal-coffee", "Get coffee"), active_goal("goal-weather", "Check weather")])))
@@ -105,13 +184,21 @@ class GoalAssociationResolverTests(unittest.TestCase):
         prompt, kwargs = ollama.prompts[0]
         self.assertIn("Resolve continuity before creation", prompt)
         self.assertIn("Do not split implementation steps into goals", prompt)
-        self.assertIn("never internal IDs", prompt)
-        self.assertIn('canonical enum: ["continue","modify","clarify"', prompt)
+        self.assertIn("host owns all IDs", prompt)
+        self.assertIn('relationship must be copied exactly from ["continue","modify","clarify"', prompt)
         self.assertNotIn("continues, modifies", prompt)
         schema = kwargs["response_format"]
         self.assertIsInstance(schema, dict)
         self.assertEqual(
-            schema["$defs"]["GoalAssociation"]["properties"]["relationship"]["enum"],
+            set(schema["properties"]),
+            {"associations", "new_goals", "clarification", "confidence", "reason_summary"},
+        )
+        self.assertEqual(
+            set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
+            {"description"},
+        )
+        self.assertEqual(
+            schema["$defs"]["GoalAssociationModelAssociation"]["properties"]["relationship"]["enum"],
             [
                 "continue",
                 "modify",
@@ -125,7 +212,6 @@ class GoalAssociationResolverTests(unittest.TestCase):
                 "merge",
                 "split",
                 "reference",
-                "new",
             ],
         )
 
@@ -170,7 +256,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         repair_prompt, repair_kwargs = ollama.prompts[1]
         self.assertIn('"continues"', repair_prompt)
         self.assertIn("literal_error", repair_prompt)
-        self.assertIn("Exact GoalAssociationResolution JSON Schema", repair_prompt)
+        self.assertIn("GoalAssociationModelOutput JSON Schema", repair_prompt)
         self.assertIsInstance(repair_kwargs["response_format"], dict)
 
     def test_failed_model_repair_fails_closed_without_a_third_call(self):
@@ -242,7 +328,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
         )
 
         schema = ollama.prompts[0][1]["response_format"]
-        association_schema = schema["$defs"]["GoalAssociation"]
+        association_schema = schema["$defs"]["GoalAssociationModelAssociation"]
         self.assertEqual(
             association_schema["properties"]["target_goal_ids"]["items"]["enum"],
             ["goal-a"],

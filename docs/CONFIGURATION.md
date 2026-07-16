@@ -213,10 +213,14 @@ configuration.
 | `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
 | `AGENT_GOAL_ASSOCIATION_NUM_PREDICT` | `512`; compact JSON output budget for associations plus independent new goals. |
 
-Goal Association always sends `GoalAssociationResolution.model_json_schema()`
-to Ollama's `format` field. Contract validation may invoke one bounded
-schema-constrained model revision; there is no local relationship synonym or
-word-form normalization fallback.
+Goal Association sends the compact model-facing
+`GoalAssociationModelOutput.model_json_schema()` to Ollama's `format` field.
+The model returns only existing-goal relationships, independent new-goal
+descriptions, or a clarification. Chromie generates identifiers, versions,
+source text, default containers, persistence metadata, and the canonical
+`GoalAssociationResolution` after model validation. Contract validation may
+invoke one bounded schema-constrained model revision; there is no local
+relationship synonym, phrase mapping, or word-form normalization fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `report_only` in `.env.common`; schedules background diagnostics without changing Router, task, planning, or execution state. Code fallback is `off`. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |

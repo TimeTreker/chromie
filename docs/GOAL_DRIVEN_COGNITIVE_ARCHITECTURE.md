@@ -332,6 +332,23 @@ Response Plan + optional Social Attention Plan
 Experience and Scenario Mining
 ```
 
+### 5.1 Model-facing Goal Association boundary
+
+Goal Association must not expose Chromie's persistence and lifecycle objects
+directly to the language model. Its model-facing output is intentionally small:
+
+- relationships to exact active goal IDs;
+- one natural-language description per independent new goal;
+- or one natural clarification.
+
+The host owns all transport and persistence mechanics, including turn IDs,
+association IDs, goal IDs, versions, source text, default object/constraint
+containers, metadata, and construction of the canonical
+`GoalAssociationResolution`. Ignoring model-authored transport noise such as an
+extra `id` is not semantic interpretation; semantic descriptions and
+relationships still come only from the model and remain subject to schema and
+host validation.
+
 ## 6. Goal continuity
 
 ### 6.1 Association precedes segmentation

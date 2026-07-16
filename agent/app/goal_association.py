@@ -4,9 +4,9 @@ import copy
 import hashlib
 import json
 import logging
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
@@ -29,6 +29,113 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.semantic_task import SemanticGoal
 
 logger = logging.getLogger("chromie.agent.goal_association")
+
+
+GoalAssociationModelRelationship = Literal[
+    "continue",
+    "modify",
+    "clarify",
+    "confirm",
+    "reject",
+    "cancel",
+    "pause",
+    "resume",
+    "replace",
+    "merge",
+    "split",
+    "reference",
+]
+
+
+class GoalAssociationModelAssociation(BaseModel):
+    """Minimal model-facing continuity decision for an existing goal."""
+
+    # The decoder schema forbids extras. Validation intentionally ignores harmless
+    # transport noise such as model-authored IDs; the host never trusts or copies it.
+    model_config = ConfigDict(extra="ignore")
+
+    relationship: GoalAssociationModelRelationship
+    target_goal_ids: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    reason_summary: str = ""
+    updated_description: str = ""
+    resolved_gap_ids: list[str] = Field(default_factory=list)
+    requires_replan: bool = False
+
+    @field_validator("reason_summary", "updated_description", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @field_validator("target_goal_ids", "resolved_gap_ids", mode="before")
+    @classmethod
+    def normalize_ids(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("goal ID fields must be arrays")
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            normalized = " ".join(str(item or "").strip().split())
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                out.append(normalized)
+        return out
+
+    @model_validator(mode="after")
+    def validate_relationship_shape(self) -> "GoalAssociationModelAssociation":
+        if not self.target_goal_ids:
+            raise ValueError(f"relationship={self.relationship} requires target_goal_ids")
+        if self.relationship == "merge" and len(self.target_goal_ids) < 2:
+            raise ValueError("relationship=merge requires at least two target goals")
+        return self
+
+
+class GoalAssociationModelGoal(BaseModel):
+    """Minimal model-facing semantic goal. IDs and persistence fields are host-owned."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    description: str = Field(min_length=1)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def normalize_description(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+
+class GoalAssociationModelOutput(BaseModel):
+    """Small semantic DTO returned by the Goal Association model."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    associations: list[GoalAssociationModelAssociation] = Field(default_factory=list)
+    new_goals: list[GoalAssociationModelGoal] = Field(default_factory=list)
+    clarification: str = ""
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    reason_summary: str = ""
+
+    @field_validator("clarification", "reason_summary", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> "GoalAssociationModelOutput":
+        if self.clarification and (self.associations or self.new_goals):
+            raise ValueError("clarification must not be mixed with goal changes")
+        if not self.clarification and not self.associations and not self.new_goals:
+            raise ValueError("output must contain associations, new_goals, or clarification")
+        return self
 
 
 class GoalAssociationResolver:
@@ -150,7 +257,7 @@ class GoalAssociationResolver:
                 **failure,
                 "active_goal_count": len(active_goals),
                 "sid": request.sid,
-                "contract_schema": "GoalAssociationResolution",
+                "contract_schema": "GoalAssociationModelOutput",
                 "contract_repair_attempted": repair_attempted,
                 "contract_repair_succeeded": False,
             }
@@ -180,8 +287,11 @@ class GoalAssociationResolver:
         request: AgentRunRequest,
         turn_id: str,
     ) -> GoalAssociationResolution:
-        return GoalAssociationResolution.model_validate(
-            self._normalize(raw, request=request, turn_id=turn_id)
+        model_output = GoalAssociationModelOutput.model_validate(raw)
+        return self._expand_model_output(
+            model_output,
+            request=request,
+            turn_id=turn_id,
         )
 
     @staticmethod
@@ -197,7 +307,7 @@ class GoalAssociationResolver:
 
     @staticmethod
     def _response_schema(active_goals: list[dict[str, Any]]) -> dict[str, Any]:
-        schema = copy.deepcopy(GoalAssociationResolution.model_json_schema())
+        schema = copy.deepcopy(GoalAssociationModelOutput.model_json_schema())
         active_ids = [
             " ".join(str(item.get("goal_id") or "").strip().split())
             for item in active_goals
@@ -205,8 +315,11 @@ class GoalAssociationResolver:
         ]
         properties = schema.get("properties", {})
         associations = properties.get("associations")
-        if isinstance(associations, dict) and not active_ids:
-            associations["maxItems"] = 0
+        if isinstance(associations, dict):
+            associations["maxItems"] = min(8, len(active_ids)) if active_ids else 0
+        new_goals = properties.get("new_goals")
+        if isinstance(new_goals, dict):
+            new_goals["maxItems"] = 8
 
         def constrain(node: Any) -> None:
             if isinstance(node, dict):
@@ -216,6 +329,8 @@ class GoalAssociationResolver:
                     if isinstance(target_ids, dict) and active_ids:
                         target_ids["items"] = {"type": "string", "enum": active_ids}
                         target_ids["uniqueItems"] = True
+                if node.get("type") == "object":
+                    node["additionalProperties"] = False
                 for value in node.values():
                     constrain(value)
             elif isinstance(node, list):
@@ -287,30 +402,29 @@ class GoalAssociationResolver:
             ],
         }
         return (
-            "Latest user turn:\n"
-            f"{request.text}\n\n"
+            "Resolve continuity before creation using semantic reasoning. The model-facing contract is deliberately small. "
+            "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
+            "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans.\n\n"
+            "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing only description for each responsibility. "
+            "A physical action and a conversational answer are independent goals. Ordered physical actions are independent goals when either can succeed or fail separately. "
+            "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
+            "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
+            "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and optionally updated_description, resolved_gap_ids, and requires_replan. "
+            "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
+            "Associations may target only IDs from the active-goal list. When no active goals exist, associations must be empty. "
+            "If the user meaning is materially ambiguous, return only one concise clarification.\n\n"
+            "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
+            "This example is structural, not a phrase-matching rule.\n\n"
+            "Return only JSON with associations, new_goals, clarification, confidence, and reason_summary. "
+            "Each new_goals object contains exactly one field: description. The decoder enforces the exact GoalAssociationModelOutput JSON Schema.\n\n"
             "Bounded active goals JSON:\n"
-            f"{self._bounded_json(active_goals, 7000)}\n\n"
+            f"{self._bounded_json(active_goals, 6500)}\n\n"
             "Recent conversation JSON:\n"
-            f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 2600)}\n\n"
+            f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 2200)}\n\n"
             "Router output is advisory JSON:\n"
-            f"{self._bounded_json(route_advisory, 1800)}\n\n"
-            "Resolve continuity before creation. For every association, relationship must be copied exactly from this "
-            "canonical enum: [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\",\"new\"]. "
-            "Never conjugate, pluralize, translate, or invent an enum value. Associations may target only IDs present in Bounded active goals JSON. "
-            "When there are no active goals, associations must be empty; a clear user request must create new_goals rather than ask whether it is new. "
-            "Create one new goal for each independently satisfiable user responsibility that can succeed, fail, be clarified, or be answered separately. "
-            "A physical action and a conversational answer are independent goals. Two ordered physical actions are independent goals when each has its own completion criterion; ordering is preserved for the planner, not collapsed into one goal. "
-            "Do not split implementation steps into goals. In particular, do not split implementation mechanics, safety checks, status lookups, or capability calls into goals. Do not emit relationship=new as a substitute for a SemanticGoal in new_goals. "
-            "If the user's meaning itself is materially ambiguous, propose no change and ask one concise natural clarification naming human topics, never internal IDs.\n\n"
-            "Return compact JSON with turn_id, associations, new_goals, clarification, confidence, reason_summary, metadata. "
-            "Each association uses relationship, target_goal_ids copied exactly from active goals, confidence, and reason_summary. "
-            "For modify, clarify, or replace relationships, include goal_update as a semantic delta such as description, constraints, object, beneficiary, or success_criteria; include resolved_gap_ids when the turn answers an existing gap, and set requires_replan when the retained goal or constraints changed. "
-            "Each new goal uses open semantic description, source_text, beneficiary, constraints, and success_criteria when known. "
-            "Do not output skills, plans, task IDs not supplied, authorization, execution claims, markdown, or hidden reasoning. "
-            "The Ollama decoder enforces the exact dynamic GoalAssociationResolution JSON Schema out-of-band. Return JSON only.\n\n"
+            f"{self._bounded_json(route_advisory, 1400)}\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
-            f"FINAL ACTIVE GOAL IDS JSON:\n{self._bounded_json([item.get('goal_id') for item in active_goals], 1800)}"
+            f"FINAL ACTIVE GOAL IDS JSON:\n{self._bounded_json([item.get('goal_id') for item in active_goals], 1600)}"
         )
 
     def _build_repair_prompt(
@@ -324,89 +438,104 @@ class GoalAssociationResolver:
         validation_error: str,
     ) -> str:
         return (
-            "The previous Goal Association JSON failed the exact contract. Re-evaluate the semantic associations and "
+            "The previous minimal Goal Association semantic DTO failed its exact contract. Re-evaluate the semantic associations and "
             "return one corrected JSON object. Preserve valid semantic judgments, but revise every field needed to satisfy "
             "the schema and validation errors. Do not explain the correction and do not use synonym substitution rules.\n\n"
             f"Latest user turn:\n{request.text}\n\n"
-            f"Required turn_id:\n{turn_id}\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(active_goals, 7000)}\n\n"
             "Previous model output JSON:\n"
             f"{self._bounded_json(raw, 5000)}\n\n"
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
-            "The Exact GoalAssociationResolution JSON Schema is enforced by the Ollama decoder out-of-band. "
-            "Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
+            "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
+            "Return only associations, new_goals, clarification, confidence, and reason_summary. Each new_goals item contains only description. "
+            "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
 
     @staticmethod
     def _repair_system_prompt() -> str:
         return (
-            "You repair one Goal Association structured output using semantic reasoning and the supplied exact JSON Schema. "
+            "You repair one minimal Goal Association semantic DTO using semantic reasoning and the supplied exact JSON Schema. "
             "Return only the corrected JSON object. Do not add commentary, markdown, lexical mappings, or hidden reasoning."
         )
 
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "You are Chromie's Goal Association and Segmentation model. "
+            "You are Chromie's Goal Association and Segmentation model. Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
             "Apply continuity before creation. Understand references from meaning, bounded active goals, unresolved gaps, and dialogue context. "
             "Do not decide association through regexes, phrase tables, lexical overlap, or recency alone. "
             "Preserve independent user responsibilities as separate goals, but never turn plan steps into goals. "
             "You are advisory only and never execute or commit. Return JSON only."
         )
 
-    def _normalize(self, raw: dict[str, Any], *, request: AgentRunRequest, turn_id: str) -> dict[str, Any]:
-        associations = raw.get("associations")
-        if isinstance(associations, dict):
-            associations = [associations]
-        if not isinstance(associations, list):
-            associations = []
-        normalized_associations = []
-        for index, item in enumerate(associations):
-            if not isinstance(item, dict):
-                continue
-            normalized = dict(item)
-            normalized["association_id"] = stable_goal_operation_id(
-                turn_id=turn_id,
-                ordinal=index,
-                relationship=str(normalized.get("relationship") or "reference"),
-                target_goal_ids=normalized.get("target_goal_ids") or [],
+    def _expand_model_output(
+        self,
+        model_output: GoalAssociationModelOutput,
+        *,
+        request: AgentRunRequest,
+        turn_id: str,
+    ) -> GoalAssociationResolution:
+        associations: list[GoalAssociation] = []
+        for index, item in enumerate(model_output.associations):
+            goal_update: dict[str, Any] = {}
+            if item.updated_description:
+                goal_update["description"] = item.updated_description
+            associations.append(
+                GoalAssociation(
+                    association_id=stable_goal_operation_id(
+                        turn_id=turn_id,
+                        ordinal=index,
+                        relationship=item.relationship,
+                        target_goal_ids=item.target_goal_ids,
+                    ),
+                    relationship=item.relationship,
+                    target_goal_ids=item.target_goal_ids,
+                    confidence=item.confidence,
+                    reason_summary=item.reason_summary,
+                    goal_update=goal_update,
+                    resolved_gap_ids=item.resolved_gap_ids,
+                    requires_replan=(
+                        item.requires_replan
+                        or item.relationship in {"modify", "clarify", "replace", "merge", "split"}
+                    ),
+                )
             )
-            normalized.setdefault("goal_update", {})
-            normalized.setdefault("resolved_gap_ids", [])
-            normalized.setdefault("requires_replan", normalized.get("relationship") in {"modify", "clarify", "replace"})
-            normalized_associations.append(normalized)
 
-        goals = raw.get("new_goals")
-        if goals is None:
-            goals = raw.get("goals")
-        if isinstance(goals, dict):
-            goals = [goals]
-        if not isinstance(goals, list):
-            goals = []
-        normalized_goals = []
-        for index, item in enumerate(goals):
-            if not isinstance(item, dict):
-                continue
-            normalized = dict(item)
-            if not normalized.get("goal_id"):
-                digest = hashlib.sha256(f"{turn_id}|goal|{index}|{normalized.get('description','')}".encode()).hexdigest()[:20]
-                normalized["goal_id"] = f"goal_{digest}"
-            normalized.setdefault("source_text", request.text)
-            normalized_goals.append(normalized)
+        new_goals: list[SemanticGoal] = []
+        for index, item in enumerate(model_output.new_goals):
+            digest = hashlib.sha256(
+                f"{turn_id}|goal|{index}|{item.description}".encode("utf-8")
+            ).hexdigest()[:20]
+            new_goals.append(
+                SemanticGoal(
+                    goal_id=f"goal_{digest}",
+                    description=item.description,
+                    source_text=request.text,
+                    object={},
+                    constraints={},
+                    success_criteria=[item.description],
+                    metadata={
+                        "model_boundary": "GoalAssociationModelOutput",
+                        "host_generated_fields": True,
+                    },
+                )
+            )
 
-        return {
-            "schema_version": raw.get("schema_version", 1),
-            "turn_id": turn_id,
-            "associations": normalized_associations,
-            "new_goals": normalized_goals,
-            "clarification": raw.get("clarification") or "",
-            "confidence": raw.get("confidence", 0.0),
-            "reason_summary": raw.get("reason_summary") or "",
-            "metadata": raw.get("metadata") or {},
-        }
+        return GoalAssociationResolution(
+            turn_id=turn_id,
+            associations=associations,
+            new_goals=new_goals,
+            clarification=model_output.clarification,
+            confidence=model_output.confidence,
+            reason_summary=model_output.reason_summary,
+            metadata={
+                "model_contract": "GoalAssociationModelOutput",
+                "host_generated_identifiers": True,
+            },
+        )
 
     def _validate(
         self,
