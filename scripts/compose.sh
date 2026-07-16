@@ -23,9 +23,10 @@ if [ "$#" -eq 0 ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
-if [ ! -f .env.runtime ]; then
-  ./scripts/build_runtime_env.sh
-fi
+# Every supported Compose entrypoint refreshes hardware detection and the flat
+# runtime environment. This prevents a build/up on another machine from reusing
+# a stale profile generated elsewhere.
+./scripts/build_runtime_env.sh
 
 set -a
 # shellcheck disable=SC1091

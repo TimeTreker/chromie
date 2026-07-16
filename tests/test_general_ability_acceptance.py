@@ -150,9 +150,20 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertTrue(namespace.cognitive_runtime)
         self.assertEqual(namespace.cognitive_apply_lanes, "robot_action")
         self.assertEqual(
+            namespace.conversation_id,
+            "ga-live-multi_goal_look_then_blink",
+        )
+        self.assertEqual(
             namespace.expect_skill,
             ["soridormi.look_at_person", "soridormi.blink_eyes"],
         )
+
+    def test_live_text_defaults_allow_full_qualification_pipeline(self) -> None:
+        args = build_parser().parse_args(["--mode", "live-text"])
+
+        self.assertEqual(args.timeout_s, 600.0)
+        self.assertEqual(args.case_timeout_s, 1200.0)
+        self.assertGreater(args.case_timeout_s, args.timeout_s)
 
     def test_cli_check_mode_returns_success_for_default_manifest(self) -> None:
         with redirect_stdout(StringIO()):

@@ -73,21 +73,9 @@ if ! flock -n 9; then
 fi
 
 if [ "${WARM_OLLAMA_BEFORE_ORCH:-1}" = "1" ]; then
-  WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")
-  if [[ "${AGENT_RESPONSE_REVIEW_ENABLED:-0}" =~ ^(1|true|yes|on)$ ]]; then
-    WARM_MODELS+=("${AGENT_RESPONSE_REVIEW_MODEL:-gemma4:e2b}")
-  fi
-  if [[ "${ROUTER_USE_LLM:-0}" =~ ^(1|true|yes|on)$ ]]; then
-    WARM_MODELS=("${ROUTER_MODEL:-qwen3:4b}" "${WARM_MODELS[@]}")
-    if [ -n "${ROUTER_REVIEW_MODEL:-}" ] && {
-      [[ "${ROUTER_POST_INTERRUPT_REVIEW_ENABLED:-0}" =~ ^(1|true|yes|on)$ ]] ||
-        [[ "${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-1}" =~ ^(1|true|yes|on)$ ]]
-    }; then
-      WARM_MODELS+=("${ROUTER_REVIEW_MODEL}")
-    fi
-  fi
+  mapfile -t WARM_MODELS < <(./scripts/list_runtime_ollama_models.sh)
+  echo "[orchestrator] Active profile models: ${WARM_MODELS[*]}"
   ./scripts/warm_ollama.sh "${WARM_MODELS[@]}"
 fi
-
 echo "[orchestrator] Starting..."
 python -m orchestrator.orchestrator

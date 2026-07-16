@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from router.app.schema import RouteDecision
 from scripts.interaction_text_mujoco_check import (
     INTERNAL_SPEECH_PATTERNS,
     _apply_soridormi_skill_timeout,
+    _configure_environment,
     build_debug_summary,
     parse_expected_arg,
     safe_idle_errors,
@@ -18,6 +23,25 @@ from shared.chromie_contracts.interaction import InteractionResponse
 
 
 class InteractionTextMujocoCheckTests(unittest.TestCase):
+
+    def test_configure_environment_uses_isolated_conversation_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(os.environ, {}, clear=True):
+            args = argparse.Namespace(
+                router_url="http://127.0.0.1:8091",
+                agent_url="http://127.0.0.1:8092",
+                auto_confirm_sim=True,
+                speaker=False,
+                manifest=Path("capabilities/soridormi.json"),
+                cognitive_runtime=True,
+                cognitive_apply_lanes="chat,robot_action",
+                soridormi_mcp_url="http://127.0.0.1:8000/mcp",
+                conversation_id="ga-live-case-one",
+            )
+
+            _configure_environment(args, Path(temp_dir))
+
+            self.assertEqual(os.environ["ORCH_CONVERSATION_ID"], "ga-live-case-one")
+
     def test_parse_expected_arg_accepts_json_scalars(self) -> None:
         self.assertEqual(parse_expected_arg("0:vx_mps=0.2"), (0, "vx_mps", 0.2))
         self.assertEqual(parse_expected_arg("1:count=2"), (1, "count", 2))

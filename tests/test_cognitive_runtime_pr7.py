@@ -285,6 +285,82 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.metadata["done_reason"], "length")
         self.assertIn("goal_association:output_truncated", result.fallback_reason)
 
+    def test_goal_association_contract_failure_stops_before_any_planner(self):
+        association = GoalAssociationResolution(
+            turn_id="turn-contract-failed",
+            clarification="Please try again.",
+            confidence=0.0,
+            reason_summary="Invalid structured output.",
+            metadata={
+                "status": "model_contract_failed",
+                "failure_class": "structured_output_validation",
+                "failure_domain": "model_contract",
+                "architecture_attribution": "not_evaluated",
+                "retryable": True,
+            },
+        )
+        client = ScriptedClient(association=association, fast_plans=[])
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="report_only"),
+        )
+
+        result = self.run_resolution(coordinator, client, text="walk and blink")
+
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.metadata["failure_stage"], "goal_association")
+        self.assertEqual(client.calls, ["association"])
+
+    def test_goal_association_clarification_skips_planners_and_composes_directly(self):
+        association = GoalAssociationResolution(
+            turn_id="turn-needs-clarification",
+            clarification="Which direction should I move?",
+            confidence=0.8,
+            reason_summary="Direction is ambiguous.",
+            metadata={"status": "needs_clarification"},
+        )
+        client = ScriptedClient(association=association, fast_plans=[])
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat"})),
+        )
+
+        result = self.run_resolution(coordinator, client, text="move over there")
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(result.terminal_plan.disposition, "clarify")
+        self.assertEqual(result.interaction_response.speech[0].text, "Which direction should I move?")
+        self.assertEqual(client.calls, ["association", "compose"])
+
+    def test_resolved_empty_goal_set_fails_closed_before_planning(self):
+        association = GoalAssociationResolution(
+            turn_id="turn-empty",
+            associations=[
+                {
+                    "association_id": "assoc-new-without-goal",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.9,
+                }
+            ],
+            confidence=0.9,
+            metadata={"status": "resolved"},
+        )
+        client = ScriptedClient(association=association, fast_plans=[])
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="report_only"),
+        )
+
+        result = self.run_resolution(coordinator, client, text="walk and blink")
+
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.metadata["failure_class"], "empty_canonical_goal_set")
+        self.assertEqual(client.calls, ["association"])
+
     def test_apply_chat_returns_speech_only_interaction(self):
         client = ScriptedClient(
             association=new_goal_association(),

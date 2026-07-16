@@ -11,6 +11,11 @@ from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
+from .planner_contract import (
+    canonical_goal_grounding,
+    canonical_plan_response_schema,
+    expected_goal_ids,
+)
 
 try:
     from chromie_contracts.plan import CanonicalPlan
@@ -38,16 +43,48 @@ class DeepPlannerResolver:
     async def resolve(self, request: AgentRunRequest) -> CanonicalPlan:
         plan_id = self._plan_id(request)
         capabilities = await self.catalog.prompt_entries(scope="all", refresh=False)
-        payload = [self._capability_payload(item) for item in capabilities[: self.max_capabilities]]
+        executable = [
+            item
+            for item in capabilities
+            if item.available and item.interaction_executable
+        ]
+        payload = [self._capability_payload(item) for item in executable[: self.max_capabilities]]
+        expected_goal_ids_for_turn = expected_goal_ids(
+            request.context if isinstance(request.context, dict) else {}
+        )
+        response_schema = self._response_schema(
+            expected_goal_ids_for_turn,
+            allowed_skill_ids=[item["capability_id"] for item in payload],
+        )
+        generation_options = {
+            "temperature": 0,
+            "top_p": 0.9,
+            "num_ctx": self.num_ctx,
+            "num_predict": self.num_predict,
+        }
         feedback: list[dict[str, Any]] = []
+        previous_raw: Any = None
+        contract_repair_attempted = False
+        initial_validation_errors = ""
         for attempt in range(self.max_replans + 1):
+            raw: Any = None
             try:
                 raw = await self.ollama.generate(
-                    self._prompt(request, payload, feedback=feedback),
-                    system=self._system_prompt(),
-                    options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx,
-                             "num_predict": self.num_predict},
-                    response_format="json",
+                    self._prompt(
+                        request,
+                        payload,
+                        feedback=feedback,
+                        response_schema=response_schema,
+                        previous_raw=previous_raw,
+                        expected_goal_ids=expected_goal_ids_for_turn,
+                    ),
+                    system=(
+                        self._revision_system_prompt()
+                        if feedback
+                        else self._system_prompt()
+                    ),
+                    options=generation_options,
+                    response_format=response_schema,
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("deep planner response is not a JSON object")
@@ -68,25 +105,69 @@ class DeepPlannerResolver:
                 )
                 semantic_replan = self._is_semantic_replan_error(exc)
                 if attempt < self.max_replans and semantic_replan:
+                    contract_repair_attempted = True
+                    previous_raw = raw
+                    initial_validation_errors = self._validation_error_json(exc)
+                    logger.warning(
+                        "deep_planner_contract_repair_start sid=%s attempt=%s "
+                        "validation_errors=%s raw_output=%s",
+                        request.sid,
+                        attempt + 1,
+                        initial_validation_errors,
+                        self._bounded(previous_raw, 5000),
+                    )
                     feedback = [
                         {
-                            "type": "semantic_validation_failure",
+                            "type": "canonical_plan_contract_validation_failure",
                             "error_type": type(exc).__name__,
-                            "message": str(exc)[:400],
+                            "validation_errors": initial_validation_errors,
                         }
                     ]
                     continue
-                return self._clarify(plan_id, request, "deep_planner_unavailable", error=exc,
-                                     attempts=attempt + 1)
-            errors = self._validation_errors(plan, payload)
+                return self._clarify(
+                    plan_id,
+                    request,
+                    "deep_planner_model_contract_failed"
+                    if contract_repair_attempted or semantic_replan
+                    else "deep_planner_unavailable",
+                    error=exc,
+                    attempts=attempt + 1,
+                    metadata={
+                        "contract_schema": "CanonicalPlan",
+                        "contract_repair_attempted": contract_repair_attempted,
+                        "contract_repair_succeeded": False,
+                        "initial_validation_errors": initial_validation_errors,
+                        "initial_raw_output": self._bounded(previous_raw, 5000)
+                        if previous_raw is not None
+                        else "",
+                    },
+                )
+            errors = self._validation_errors(
+                plan, payload, expected_goal_ids=expected_goal_ids_for_turn
+            )
             if not errors:
                 metadata = dict(plan.metadata)
                 metadata.update({"resolver": "deep_planner", "status": "complete" if plan.coverage == "complete" else plan.disposition,
                                  "authority": "advisory", "attempt_count": attempt + 1,
-                                 "full_capability_count": len(payload), "max_replans": self.max_replans, "min_goal_satisfaction": self.min_goal_satisfaction})
+                                 "full_capability_count": len(payload), "max_replans": self.max_replans, "min_goal_satisfaction": self.min_goal_satisfaction,
+                                 "contract_schema": "CanonicalPlan",
+                                 "contract_repair_attempted": contract_repair_attempted,
+                                 "contract_repair_succeeded": contract_repair_attempted})
+                if contract_repair_attempted:
+                    metadata["contract_repair"] = {
+                        "attempted": True,
+                        "succeeded": True,
+                        "strategy": "schema_constrained_model_revision",
+                        "attempt_count": 1,
+                    }
+                    logger.info(
+                        "deep_planner_contract_repair_done sid=%s status=success",
+                        request.sid,
+                    )
                 return plan.model_copy(update={"metadata": metadata})
             if attempt < self.max_replans:
                 feedback = errors
+                previous_raw = raw
                 continue
             return self._clarify(plan_id, request, "validation_rejected_after_replan",
                                  unresolved=[item.get("step_id") or item.get("skill_id") or item["type"] for item in errors],
@@ -102,6 +183,23 @@ class DeepPlannerResolver:
         """
 
         return isinstance(exc, (json.JSONDecodeError, ValidationError, ValueError))
+
+    @staticmethod
+    def _validation_error_json(exc: Exception) -> str:
+        if isinstance(exc, ValidationError):
+            return json.dumps(
+                exc.errors(include_url=False),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )[:8000]
+        return json.dumps(
+            [{"type": type(exc).__name__, "message": str(exc)[:1000]}],
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
 
     @staticmethod
     def _capability_payload(item: Any) -> dict[str, Any]:
@@ -121,40 +219,82 @@ class DeepPlannerResolver:
         digest = hashlib.sha256(f"{request.sid or 'turn'}|deep|{request.text}".encode()).hexdigest()[:20]
         return f"plan_{digest}"
 
+    @classmethod
+    def _response_schema(
+        cls,
+        expected_goal_ids: list[str],
+        *,
+        allowed_skill_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=expected_goal_ids,
+            allowed_skill_ids=list(allowed_skill_ids or []),
+        )
+
     @staticmethod
     def _bounded(value: Any, limit: int) -> str:
         text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
         return text if len(text) <= limit else text[:limit].rstrip() + "..."
 
-    def _prompt(self, request: AgentRunRequest, capabilities: list[dict[str, Any]], *, feedback: list[dict[str, Any]]) -> str:
+    def _prompt(
+        self,
+        request: AgentRunRequest,
+        capabilities: list[dict[str, Any]],
+        *,
+        feedback: list[dict[str, Any]],
+        response_schema: dict[str, Any],
+        previous_raw: Any = None,
+        expected_goal_ids: list[str],
+    ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
         fast_plan = context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
         goals = context.get("active_goal_snapshots") or []
         association = context.get("goal_association_resolution") or {}
+        grounding = canonical_goal_grounding(context)
         runtime_feedback = context.get("runtime_validator_feedback") or []
         combined_feedback = [*feedback, *(runtime_feedback if isinstance(runtime_feedback, list) else [])]
         feedback_section = self._bounded(combined_feedback, 5000) if combined_feedback else "[]"
+        previous_section = self._bounded(previous_raw, 5000) if previous_raw is not None else "null"
         return (
-            f"User turn:\n{request.text}\n\n"
-            f"Fast-plan advisory JSON:\n{self._bounded(fast_plan, 2500)}\n\n"
-            f"Goal association advisory JSON:\n{self._bounded(association, 2500)}\n\n"
-            f"Active goals JSON:\n{self._bounded(goals, 4500)}\n\n"
-            f"Full capability catalog JSON:\n{self._bounded(capabilities, 24000)}\n\n"
+            f"Fast-plan advisory JSON:\n{self._bounded(fast_plan, 1800)}\n\n"
+            f"Goal association advisory JSON:\n{self._bounded(association, 3200)}\n\n"
+            f"Active goals JSON:\n{self._bounded(goals, 3200)}\n\n"
+            f"Executable capability catalog JSON:\n{self._bounded(capabilities, 16000)}\n\n"
+            f"Previous Deep Planner model output JSON, when revising:\n{previous_section}\n\n"
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
             "Produce the final planner-tier=deep CanonicalPlan for the complete user goal. Deep planning is terminal: never return to the Fast Planner. "
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, and concurrency. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute. Every executable plan must include goal_ids, and every executable step must include source_goal_ids identifying exactly the goals it serves. A material alternative must be described in response_text and metadata and must require "
             "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction with score, status, satisfied goals, and unmet requirements. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
-            "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. Return JSON only."
+            "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
+            "A plan step may contain only step_id, skill_id, args, timing, source_goal_ids, reason_summary, and metadata. "
+            "Do not copy catalog field names such as capability_id, input_schema, parameters, route, step_type, or effects into a plan step. "
+            "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
+            "Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one step_id; respond requires coverage=complete, non-empty response_text, and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. "
+            "Every outcome step_id must name a real plan step, every plan step must be referenced by an execute outcome when goal_outcomes are present, and each step source_goal_ids must exactly match the execute outcomes that reference it. "
+            "The Ollama decoder enforces the Exact CanonicalPlan JSON Schema supplied out-of-band. Populate only fields allowed by it and return JSON only. "
+            "The following final grounding block is authoritative and must override unrelated content in previous model output or advisory context.\n\n"
+            f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
+            f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{self._bounded(grounding, 5000)}\n\n"
+            f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 4000)}"
         )
 
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "You are Chromie's Deep Planner. Plan the complete goal with the full capability surface. "
+            "You are Chromie's Deep Planner. Plan only the final authoritative user turn and canonical goals supplied at the end of the prompt. "
             "You may revise once from structured validator feedback, but you never call or return to the Fast Planner. "
             "Skills are plan leaves, not planner ownership boundaries. Do not execute, authorize, or claim completion. Return JSON only."
+        )
+
+    @staticmethod
+    def _revision_system_prompt() -> str:
+        return (
+            "You revise one Deep Planner output using semantic reasoning, deterministic validator feedback, and the supplied exact CanonicalPlan JSON Schema. "
+            "Preserve valid planning judgments, but regenerate every field needed to satisfy the contract and capability validation. "
+            "Return only the corrected CanonicalPlan JSON object. Do not add commentary, markdown, local field mappings, or hidden reasoning."
         )
 
     def _normalize(self, raw: dict[str, Any], *, request: AgentRunRequest, plan_id: str) -> dict[str, Any]:
@@ -191,9 +331,23 @@ class DeepPlannerResolver:
         out.setdefault("metadata", {})
         return out
 
-    def _validation_errors(self, plan: CanonicalPlan, capabilities: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _validation_errors(
+        self,
+        plan: CanonicalPlan,
+        capabilities: list[dict[str, Any]],
+        *,
+        expected_goal_ids: list[str],
+    ) -> list[dict[str, Any]]:
         allowed = {item["capability_id"]: item for item in capabilities}
         errors: list[dict[str, Any]] = []
+        if expected_goal_ids and set(plan.goal_ids) != set(expected_goal_ids):
+            errors.append(
+                {
+                    "type": "goal_ids_do_not_match_goal_association",
+                    "expected_goal_ids": expected_goal_ids,
+                    "actual_goal_ids": list(plan.goal_ids),
+                }
+            )
         if plan.coverage == "complete" and plan.confidence < self.min_confidence:
             errors.append({"type": "confidence_below_threshold", "confidence": plan.confidence,
                            "required": self.min_confidence})

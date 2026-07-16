@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover - repository development path
 
 logger = logging.getLogger("chromie.agent.ollama")
 
-ResponseFormat = Literal["text", "json"]
+ResponseFormat = Literal["text", "json"] | dict[str, Any]
 
 
 class OllamaGenerationError(RuntimeError):
@@ -159,9 +159,15 @@ class OllamaClient:
         if options:
             payload["options"] = options
 
+        structured_output = response_format == "json" or isinstance(response_format, dict)
         if response_format == "json":
             payload["format"] = "json"
+        elif isinstance(response_format, dict):
+            payload["format"] = response_format
+        elif response_format != "text":
+            raise ValueError(f"Unsupported response_format: {response_format!r}")
 
+        response_format_label = "json_schema" if isinstance(response_format, dict) else response_format
         url = f"{self.base_url}/api/generate"
         timeout = httpx.Timeout(self.timeout_ms / 1000.0)
 
@@ -176,7 +182,7 @@ class OllamaClient:
             self.purpose,
             url,
             self.model,
-            response_format,
+            response_format_label,
             self.timeout_ms,
             num_ctx,
             num_predict,
@@ -283,7 +289,7 @@ class OllamaClient:
             for diagnostic in completion_diagnostics:
                 self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
 
-            if response_format == "json":
+            if structured_output:
                 blocking = next(
                     (
                         item
@@ -377,7 +383,7 @@ class OllamaClient:
         if response_format == "text":
             return text
 
-        if response_format == "json":
+        if structured_output:
             try:
                 parsed = self._parse_json(text)
             except json.JSONDecodeError as exc:

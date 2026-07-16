@@ -58,6 +58,13 @@ The main planning direction is acyclic. Deep planning never returns semantic
 work to Fast planning. The only loop is a bounded same-tier Deep Planner
 revision from structured trusted-validator feedback.
 
+Goal Association uses Ollama schema-constrained generation with the exact
+`GoalAssociationResolution` JSON Schema. The prompt names canonical enum values
+verbatim. If Pydantic contract validation still fails, the same model receives
+the original JSON, exact validation errors, and the same schema for one bounded
+revision. A second invalid result fails closed. No lexical alias table or local
+synonym rewrite changes model-authored semantic fields.
+
 ## 2. Authority boundaries
 
 ### Models may

@@ -564,6 +564,7 @@ def _live_case_namespace(
         manifest=args.soridormi_manifest,
         language=args.language,
         evidence_dir=str(evidence_dir),
+        conversation_id=f"ga-live-{case.case_id}",
         speaker=args.speaker,
         preview_only=not args.execute,
         allow_non_sim=args.allow_non_sim,
@@ -805,9 +806,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi mode under separate supervision.")
     parser.add_argument("--auto-confirm-sim", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--arg-tolerance", type=float, default=1e-6)
-    parser.add_argument("--timeout-s", type=float, default=90.0)
+    parser.add_argument(
+        "--timeout-s",
+        type=float,
+        default=600.0,
+        help=(
+            "Session-completion timeout for live qualification. The default "
+            "is intentionally long while model and architecture behavior are "
+            "being validated."
+        ),
+    )
     parser.add_argument("--skill-timeout-s", type=float, default=120.0)
-    parser.add_argument("--case-timeout-s", type=float, default=180.0)
+    parser.add_argument(
+        "--case-timeout-s",
+        type=float,
+        default=1200.0,
+        help=(
+            "Outer timeout for one live case. This must exceed the complete "
+            "Goal Association + Fast/Deep Planner + Response Composer path."
+        ),
+    )
     return parser
 
 

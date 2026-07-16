@@ -17,7 +17,8 @@ usage() {
 Usage: ./scripts/start_chromie.sh [options]
 
 Start Chromie after Soridormi is already running.
-Image names and tags come only from .env.common/.env.local -> .env.runtime -> Compose.
+Hardware is detected automatically; the selected profile generates .env.runtime before build/start.
+Image names and tags come from the generated runtime environment.
 
 Options:
   --build                 Build repository-owned images before startup
@@ -67,7 +68,7 @@ docker info >/dev/null 2>&1 || {
   exit 1
 }
 
-for path in scripts/build_runtime_env.sh scripts/start_services.sh scripts/start_orchestrator.sh docker-compose.yml capabilities/soridormi.json; do
+for path in scripts/build_runtime_env.sh scripts/generate_runtime_env.py scripts/verify_runtime_profile.sh scripts/list_runtime_ollama_models.sh scripts/start_services.sh scripts/start_orchestrator.sh docker-compose.yml capabilities/soridormi.json; do
   [ -e "$path" ] || {
     echo "[chromie][error] Missing repository file: $path" >&2
     exit 1

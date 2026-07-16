@@ -35,6 +35,43 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
 
 
 
+    async def test_generate_passes_json_schema_to_ollama_format(self) -> None:
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = '{"response":"{\"relationship\":\"continue\"}"}'
+        response.json.return_value = {
+            "response": '{"relationship":"continue"}',
+            "done_reason": "stop",
+        }
+        response.raise_for_status.return_value = None
+
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+        schema = {
+            "type": "object",
+            "properties": {
+                "relationship": {"type": "string", "enum": ["continue", "new"]}
+            },
+            "required": ["relationship"],
+            "additionalProperties": False,
+        }
+
+        with mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ):
+            result = await OllamaClient(
+                base_url="http://chromie-llm:11434",
+                model="test-model",
+                purpose="goal_association",
+            ).generate("hello", response_format=schema)
+
+        self.assertEqual(result, {"relationship": "continue"})
+        request_payload = http_client.post.call_args.kwargs["json"]
+        self.assertEqual(request_payload["format"], schema)
+
     async def test_generate_logs_colored_output_truncation_diagnostic(self) -> None:
         response = mock.Mock()
         response.status_code = 200

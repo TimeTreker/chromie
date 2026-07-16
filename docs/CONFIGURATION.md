@@ -212,6 +212,11 @@ configuration.
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
 | `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
 | `AGENT_GOAL_ASSOCIATION_NUM_PREDICT` | `512`; compact JSON output budget for associations plus independent new goals. |
+
+Goal Association always sends `GoalAssociationResolution.model_json_schema()`
+to Ollama's `format` field. Contract validation may invoke one bounded
+schema-constrained model revision; there is no local relationship synonym or
+word-form normalization fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `report_only` in `.env.common`; schedules background diagnostics without changing Router, task, planning, or execution state. Code fallback is `off`. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |

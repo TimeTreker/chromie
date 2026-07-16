@@ -98,10 +98,13 @@ BUILD=1 ./scripts/start_services.sh
 ./scripts/start_orchestrator.sh
 ```
 
-Chromie generates `.env.runtime` from committed defaults, the selected hardware
-profile, and `.env.local`. It also writes an ignored root `.env` so plain
-`docker compose ...` commands can interpolate the same values. Do not edit
-either generated file directly.
+Before every supported build/start, Chromie takes a fresh hardware snapshot,
+auto-detects the matching committed profile, and generates a flattened
+`.env.runtime`, `.env`, and `.chromie/runtime_profile.json`. Profile-owned
+model/resource values cannot be replaced from `.env.local`; stale conflicting
+local values are ignored with a warning and recorded in the runtime manifest.
+Use `CHROMIE_ENV_STRICT=1` when CI should reject such conflicts. Do not edit the
+generated files directly; use `./scripts/compose.sh` instead of plain Compose.
 
 For complete setup, model warming, audio configuration, health checks, and
 recovery, use the [Operations Runbook](CHROMIE_RUNBOOK.md).

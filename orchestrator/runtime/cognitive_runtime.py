@@ -707,6 +707,24 @@ class GoalDrivenRuntimeCoordinator:
         self.goal_state_apply = goal_state_apply
         self.context_refresh = context_refresh
 
+    @staticmethod
+    def _association_goal_ids(association: GoalAssociationResolution) -> list[str]:
+        ordered: list[str] = []
+        seen: set[str] = set()
+
+        def add(value: Any) -> None:
+            text = " ".join(str(value or "").strip().split())
+            if text and text not in seen:
+                seen.add(text)
+                ordered.append(text)
+
+        for item in association.associations:
+            for goal_id in item.target_goal_ids:
+                add(goal_id)
+        for goal in association.new_goals:
+            add(goal.goal_id)
+        return ordered
+
     async def resolve(
         self,
         session: Any,
@@ -744,64 +762,108 @@ class GoalDrivenRuntimeCoordinator:
             association_status = str(
                 (association.metadata or {}).get("status") or "resolved"
             )
-            if association_status == "model_unavailable":
+            planning_context = dict(context)
+            planning_context["goal_association_resolution"] = association.model_dump(
+                mode="json", exclude_none=True
+            )
+
+            if association_status not in {"resolved", "needs_clarification"}:
                 raise CognitiveStageFailure(
                     "goal_association",
                     self._stage_failure_metadata(
                         "goal_association",
                         association.metadata,
-                        default_failure_class="model_unavailable",
+                        default_failure_class=association_status or "stage_failure",
                     ),
                 )
 
-            planning_context = dict(context)
-            planning_context["goal_association_resolution"] = association.model_dump(
-                mode="json", exclude_none=True
-            )
-            stage = time.perf_counter()
-            fast_plan = await self.agent_client.resolve_fast_plan(
-                session,
-                text=text,
-                route_decision=route_decision,
-                sid=sid,
-                context=planning_context,
-                history=history,
-                timeout_ms=self.policy.fast_planner_timeout_ms,
-            )
-            timings["fast_planner"] = (time.perf_counter() - stage) * 1000.0
-            fast_failure = self._optional_stage_failure_metadata(
-                "fast_planner", fast_plan.metadata
-            )
-            if fast_failure is not None:
-                stage_diagnostics.append(fast_failure)
-            terminal_plan = fast_plan
-            if fast_plan.disposition == "escalate":
-                deep_context = dict(planning_context)
-                deep_context["fast_plan_resolution"] = fast_plan.model_dump(
-                    mode="json", exclude_none=True
+            association_goal_ids = self._association_goal_ids(association)
+            if association_status == "needs_clarification" or association.clarification:
+                terminal_plan = CanonicalPlan(
+                    plan_id=f"plan_goal_association_{sid}",
+                    planner_tier="deep",
+                    disposition="clarify",
+                    coverage="uncertain",
+                    confidence=association.confidence,
+                    goal_ids=association_goal_ids,
+                    goal_summary=text,
+                    response_text=(
+                        association.clarification
+                        or (
+                            "请补充你想继续或开始的具体事情。"
+                            if language.startswith("zh")
+                            else "Please clarify which goal you want to continue or start."
+                        )
+                    ),
+                    steps=[],
+                    unresolved=["goal_association_clarification"],
+                    metadata={
+                        "resolver": "goal_association",
+                        "status": "clarify",
+                        "authority": "advisory",
+                        "association_status": association_status,
+                    },
                 )
+            else:
+                if not association_goal_ids:
+                    raise CognitiveStageFailure(
+                        "goal_association",
+                        {
+                            "failure_class": "empty_canonical_goal_set",
+                            "failure_domain": "model_contract",
+                            "architecture_attribution": "not_evaluated",
+                            "retryable": True,
+                            "reason": "resolved Goal Association produced no canonical goals",
+                            "status": association_status,
+                        },
+                    )
+
                 stage = time.perf_counter()
-                terminal_plan = await self.agent_client.resolve_deep_plan(
+                fast_plan = await self.agent_client.resolve_fast_plan(
                     session,
                     text=text,
                     route_decision=route_decision,
                     sid=sid,
-                    context=deep_context,
+                    context=planning_context,
                     history=history,
-                    timeout_ms=self.policy.deep_planner_timeout_ms,
+                    timeout_ms=self.policy.fast_planner_timeout_ms,
                 )
-                timings["deep_planner"] = (time.perf_counter() - stage) * 1000.0
-                deep_failure = self._optional_stage_failure_metadata(
-                    "deep_planner", terminal_plan.metadata
+                timings["fast_planner"] = (time.perf_counter() - stage) * 1000.0
+                fast_failure = self._optional_stage_failure_metadata(
+                    "fast_planner", fast_plan.metadata
                 )
-                if deep_failure is not None:
-                    raise CognitiveStageFailure("deep_planner", deep_failure)
+                if fast_failure is not None:
+                    stage_diagnostics.append(fast_failure)
+                terminal_plan = fast_plan
+                if fast_plan.disposition == "escalate":
+                    deep_context = dict(planning_context)
+                    deep_context["fast_plan_resolution"] = fast_plan.model_dump(
+                        mode="json", exclude_none=True
+                    )
+                    stage = time.perf_counter()
+                    terminal_plan = await self.agent_client.resolve_deep_plan(
+                        session,
+                        text=text,
+                        route_decision=route_decision,
+                        sid=sid,
+                        context=deep_context,
+                        history=history,
+                        timeout_ms=self.policy.deep_planner_timeout_ms,
+                    )
+                    timings["deep_planner"] = (time.perf_counter() - stage) * 1000.0
+                    deep_failure = self._optional_stage_failure_metadata(
+                        "deep_planner", terminal_plan.metadata
+                    )
+                    if deep_failure is not None:
+                        raise CognitiveStageFailure("deep_planner", deep_failure)
 
             lane = self.adapter.lane_for_plan(terminal_plan)
             runtime_errors = await self.adapter.validation_errors(terminal_plan)
             replan_count = 0
             while runtime_errors and replan_count < self.policy.host_replan_budget:
                 replan_count += 1
+                if fast_plan is None:
+                    raise ValueError("runtime replan requires an existing fast plan")
                 deep_context = dict(planning_context)
                 deep_context["fast_plan_resolution"] = fast_plan.model_dump(
                     mode="json", exclude_none=True

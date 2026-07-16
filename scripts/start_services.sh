@@ -57,6 +57,7 @@ echo "[start] GPU: ${CHROMIE_NVIDIA_GPU_NAME:-unknown} compute=${CHROMIE_NVIDIA_
 echo "[start] CPU: ${CHROMIE_CPU_MODEL:-unknown} cores=${CHROMIE_CPU_CORES:-unknown} mem=${CHROMIE_MEM_TOTAL_MIB:-unknown}MiB"
 echo "[start] Router model: ${ROUTER_MODEL:-unset} use_llm=${ROUTER_USE_LLM:-unset}"
 echo "[start] Agent model: ${AGENT_MODEL:-unset}"
+echo "[start] Cognitive models: association=${AGENT_GOAL_ASSOCIATION_MODEL:-unset} fast=${AGENT_FAST_PLANNER_MODEL:-unset} deep=${AGENT_DEEP_PLANNER_MODEL:-unset} composer=${AGENT_RESPONSE_COMPOSER_MODEL:-unset}"
 echo "[start] Ollama: max_loaded=${OLLAMA_MAX_LOADED_MODELS:-unset} num_parallel=${OLLAMA_NUM_PARALLEL:-unset}"
 echo "[start] ASR: backend=${ASR_BACKEND:-unset} mode=${ASR_MODE:-unset} model=${ASR_MODEL:-unset}"
 echo "[start] TTS model size: ${TTS_MODEL_SIZE:-unset}"
@@ -95,6 +96,9 @@ BUILD_SERVICES=(
 
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
+echo "[start] Validating resolved Docker Compose configuration..."
+docker compose "${COMPOSE_ARGS[@]}" config --quiet
+
 if [[ "${REBUILD_NO_CACHE:-0}" == "1" ]]; then
   export BUILD=1
 fi
@@ -114,6 +118,9 @@ fi
 PULL_POLICY="${CHROMIE_PULL_POLICY:-never}"
 echo "[start] Starting containers without building (pull policy: ${PULL_POLICY})..."
 docker compose "${COMPOSE_ARGS[@]}" up -d --no-build --pull "$PULL_POLICY" "${SERVICES[@]}"
+
+echo "[start] Verifying container environment against the auto-detected profile..."
+./scripts/verify_runtime_profile.sh
 
 echo
 echo "[start] Docker service status:"

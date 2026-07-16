@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -141,20 +141,13 @@ class CanonicalPlanStep(BaseModel):
         return reject_forbidden_low_level_fields(value)
 
 
-class GoalPlanOutcome(BaseModel):
-    """Per-goal terminal planning outcome inside a multi-goal turn.
-
-    A mixed CanonicalPlan can execute independent goals while asking for
-    clarification on another goal. The outcome is semantic planning data; it
-    does not authorize execution by itself.
-    """
+class _GoalPlanOutcomeBase(BaseModel):
+    """Shared fields for one per-goal terminal planning outcome."""
 
     model_config = ConfigDict(extra="forbid")
 
     goal_id: str = Field(min_length=1)
-    disposition: GoalOutcomeDisposition
     coverage: PlanCoverage
-    step_ids: list[str] = Field(default_factory=list)
     response_text: str = ""
     unresolved: list[str] = Field(default_factory=list)
     satisfaction: GoalSatisfactionAssessment | None = None
@@ -166,7 +159,7 @@ class GoalPlanOutcome(BaseModel):
     def normalize_text(cls, value: Any) -> Any:
         return " ".join(value.strip().split()) if isinstance(value, str) else value
 
-    @field_validator("step_ids", "unresolved", mode="before")
+    @field_validator("unresolved", mode="before")
     @classmethod
     def normalize_text_list(cls, value: Any) -> list[str]:
         return _normalize_ids(value)
@@ -176,24 +169,79 @@ class GoalPlanOutcome(BaseModel):
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
 
+
+class ExecuteGoalPlanOutcome(_GoalPlanOutcomeBase):
+    disposition: Literal["execute"]
+    coverage: Literal["complete"]
+    step_ids: list[str] = Field(min_length=1)
+
+    @field_validator("step_ids", mode="before")
+    @classmethod
+    def normalize_step_ids(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+
+class RespondGoalPlanOutcome(_GoalPlanOutcomeBase):
+    disposition: Literal["respond"]
+    coverage: Literal["complete"]
+    step_ids: list[str] = Field(default_factory=list, max_length=0)
+    response_text: str = Field(min_length=1)
+
+    @field_validator("step_ids", mode="before")
+    @classmethod
+    def normalize_step_ids(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+
+class ClarifyGoalPlanOutcome(_GoalPlanOutcomeBase):
+    disposition: Literal["clarify"]
+    coverage: Literal["partial", "uncertain"]
+    step_ids: list[str] = Field(default_factory=list, max_length=0)
+
+    @field_validator("step_ids", mode="before")
+    @classmethod
+    def normalize_step_ids(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
     @model_validator(mode="after")
-    def validate_outcome(self) -> "GoalPlanOutcome":
-        if self.disposition == "execute":
-            if self.coverage != "complete":
-                raise ValueError("executable goal outcomes require complete coverage")
-            if not self.step_ids:
-                raise ValueError("executable goal outcomes require at least one step_id")
-        else:
-            if self.step_ids:
-                raise ValueError("non-executable goal outcomes must not carry step_ids")
-        if self.disposition == "respond" and not self.response_text:
-            raise ValueError("respond goal outcomes require response_text")
-        if self.disposition == "clarify":
-            if self.coverage == "complete":
-                raise ValueError("clarify goal outcomes cannot claim complete coverage")
-            if not self.unresolved and not self.response_text:
-                raise ValueError("clarify goal outcomes require an unresolved need or response_text")
+    def validate_clarification(self) -> "ClarifyGoalPlanOutcome":
+        if not self.unresolved and not self.response_text:
+            raise ValueError(
+                "clarify goal outcomes require an unresolved need or response_text"
+            )
         return self
+
+
+class UnavailableGoalPlanOutcome(_GoalPlanOutcomeBase):
+    disposition: Literal["unavailable"]
+    step_ids: list[str] = Field(default_factory=list, max_length=0)
+
+    @field_validator("step_ids", mode="before")
+    @classmethod
+    def normalize_step_ids(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+
+class RefusedGoalPlanOutcome(_GoalPlanOutcomeBase):
+    disposition: Literal["refused"]
+    step_ids: list[str] = Field(default_factory=list, max_length=0)
+
+    @field_validator("step_ids", mode="before")
+    @classmethod
+    def normalize_step_ids(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+
+GoalPlanOutcome = Annotated[
+    Union[
+        ExecuteGoalPlanOutcome,
+        RespondGoalPlanOutcome,
+        ClarifyGoalPlanOutcome,
+        UnavailableGoalPlanOutcome,
+        RefusedGoalPlanOutcome,
+    ],
+    Field(discriminator="disposition"),
+]
 
 
 class CanonicalPlan(BaseModel):

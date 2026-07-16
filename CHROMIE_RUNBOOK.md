@@ -24,17 +24,21 @@ Generated files:
 
 ```text
 .env.runtime
+.env
 .chromie/system_info.env
+.chromie/runtime_profile.json
 ```
 
-Do not hand-edit `.env.runtime`.
+Do not hand-edit generated files. Hardware profile selection is automatic; do
+not set `CHROMIE_HARDWARE_PROFILE` in `.env.local` or on a launcher command.
 
 ## 1.1 Launcher layers
 
-`./scripts/start_services.sh` is the low-level Docker service launcher. It
-builds or starts ASR, TTS, Ollama, Router, and Agent using `.env.runtime` and
-Compose overrides. It does not start the host Orchestrator and does not assume
-Soridormi is running.
+`./scripts/start_services.sh` is the low-level Docker service launcher. It first
+refreshes hardware detection and `.env.runtime`, validates Compose, builds or
+starts ASR, TTS, Ollama, Router, and Agent, and then verifies that containers
+and the TTS CUDA build match the detected profile. It does not start the host
+Orchestrator and does not assume Soridormi is running.
 
 `./scripts/start_chromie.sh` is the operator launcher. It expects Soridormi MCP
 to already be reachable, writes the Chromie/Soridormi runtime overrides, starts
@@ -72,15 +76,20 @@ Stop services:
 ## 3. Prepare Ollama
 
 ```bash
-set -a
-source .env.runtime
-set +a
-
 ./scripts/compose.sh exec chromie-llm ollama list
-./scripts/compose.sh exec chromie-llm \
-  ollama pull "$AGENT_MODEL"
+./scripts/list_runtime_ollama_models.sh
+
+# Pull every distinct model selected by the detected profile.
+while IFS= read -r model; do
+  ./scripts/compose.sh exec chromie-llm ollama pull "$model"
+done < <(./scripts/list_runtime_ollama_models.sh)
+
 ./scripts/warm_ollama.sh
 ```
+
+`start_chromie.sh` and `start_orchestrator.sh` warm the complete active model
+inventory automatically. A missing profile model stops startup before a live
+interaction can reach that stage.
 
 ## 4. Configure and start host audio
 

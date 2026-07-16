@@ -21,6 +21,21 @@ class FakeOllama:
         return self.response
 
 
+class ScriptedOllama:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.prompts = []
+
+    async def generate(self, prompt, **kwargs):
+        self.prompts.append((prompt, kwargs))
+        if not self.responses:
+            raise AssertionError("unexpected extra model call")
+        value = self.responses.pop(0)
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+
 class FakeCatalog:
     def __init__(self):
         self.items = [
@@ -32,8 +47,32 @@ class FakeCatalog:
         return self.items
 
 
-def request(text: str, route="robot_action"):
-    return AgentRunRequest(sid="sid-pr3", text=text, language="zh-CN", route_decision=RouteDecision(route=route, intent="test", confidence=0.9, source="llm"), context={"active_goal_snapshots": []}, history=[])
+def request(text: str, route="robot_action", *, goal_ids=None):
+    goal_ids = list(goal_ids or [])
+    new_goals = [
+        {
+            "goal_id": goal_id,
+            "description": f"Goal {goal_id}",
+            "source_text": text,
+            "constraints": {},
+            "success_criteria": [],
+        }
+        for goal_id in goal_ids
+    ]
+    return AgentRunRequest(
+        sid="sid-pr3",
+        text=text,
+        language="zh-CN",
+        route_decision=RouteDecision(route=route, intent="test", confidence=0.9, source="llm"),
+        context={
+            "active_goal_snapshots": [],
+            "goal_association_resolution": {
+                "associations": [],
+                "new_goals": new_goals,
+            },
+        },
+        history=[],
+    )
 
 
 class CanonicalPlanContractTests(unittest.TestCase):
@@ -90,6 +129,87 @@ class FastPlannerResolverTests(unittest.TestCase):
         prompt = ollama.prompts[0][0]
         self.assertIn("Finding one matching skill is not complete coverage", prompt)
         self.assertIn("zero steps", prompt)
+
+    def test_uses_dynamic_schema_for_goal_and_skill_ids(self):
+        ollama = FakeOllama({
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.95,
+            "goal_ids": ["goal-blink"],
+            "steps": [{
+                "step_id": "blink",
+                "skill_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": ["goal-blink"],
+            }],
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-blink"],
+            },
+        })
+
+        asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request("blink twice", goal_ids=["goal-blink"])
+            )
+        )
+
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertIsInstance(schema, dict)
+        self.assertEqual(schema["properties"]["planner_tier"]["const"], "fast")
+        self.assertEqual(schema["properties"]["goal_ids"]["minItems"], 1)
+        step_schema = schema["$defs"]["CanonicalPlanStep"]
+        self.assertEqual(
+            step_schema["properties"]["skill_id"]["enum"],
+            ["soridormi.blink_eyes", "soridormi.walk_forward"],
+        )
+        prompt = ollama.prompts[0][0]
+        self.assertIn("FINAL AUTHORITATIVE USER TURN", prompt)
+        self.assertIn("FINAL CANONICAL GOALS JSON", prompt)
+
+    def test_legacy_step_shape_requires_one_model_revision_without_local_mapping(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.95,
+            "goal_ids": ["goal-blink"],
+            "steps": [{
+                "capability_id": "soridormi.blink_eyes",
+                "parameters": {"count": 2},
+            }],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        repaired = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.95,
+            "goal_ids": ["goal-blink"],
+            "steps": [{
+                "step_id": "blink",
+                "skill_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": ["goal-blink"],
+            }],
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-blink"],
+            },
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request("blink twice", goal_ids=["goal-blink"])
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(plan.steps[0].skill_id, "soridormi.blink_eyes")
+        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertIn("capability_id", ollama.prompts[1][0])
+        self.assertIn("extra_forbidden", ollama.prompts[1][0])
 
     def test_model_failure_escalates_safely(self):
         plan = asyncio.run(FastPlannerResolver(FakeOllama(RuntimeError("offline")), FakeCatalog()).resolve(request("眨眼。")))

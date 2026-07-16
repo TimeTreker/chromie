@@ -352,6 +352,9 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
     os.environ["ORCH_EVENT_LOG_PATH"] = str(evidence_dir / "events.jsonl")
     os.environ["RECORDINGS_DIR"] = str(evidence_dir / "recordings")
     os.environ["ORCH_SESSION_TIMING_LOGS"] = "1"
+    conversation_id = str(getattr(args, "conversation_id", "") or "").strip()
+    if conversation_id:
+        os.environ["ORCH_CONVERSATION_ID"] = conversation_id
     if args.cognitive_runtime:
         os.environ["ORCH_COGNITIVE_RUNTIME_MODE"] = "apply"
         os.environ["ORCH_COGNITIVE_APPLY_LANES"] = args.cognitive_apply_lanes
@@ -688,6 +691,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", type=Path, default=ROOT / "capabilities" / "soridormi.json")
     parser.add_argument("--language", default=None)
     parser.add_argument("--evidence-dir")
+    parser.add_argument(
+        "--conversation-id",
+        default="",
+        help=(
+            "Optional isolated conversation ID. Live acceptance supplies one per case "
+            "to prevent retained goal state from leaking between cases."
+        ),
+    )
     parser.add_argument(
         "--speaker",
         action=argparse.BooleanOptionalAction,

@@ -2,6 +2,10 @@ ARG TTS_CUDA_IMAGE=nvidia/cuda:12.8.1-devel-ubuntu24.04
 FROM ${TTS_CUDA_IMAGE}
 
 ARG TTS_CUDA_ARCH=89
+ARG CHROMIE_BUILD_PROFILE=unknown
+
+LABEL org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}" \
+      org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 ARG HTTP_PROXY
 ARG HTTPS_PROXY

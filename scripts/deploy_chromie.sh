@@ -71,6 +71,9 @@ for path in \
   orchestrator/.env.local.example \
   requirements-test.txt \
   scripts/build_runtime_env.sh \
+  scripts/generate_runtime_env.py \
+  scripts/verify_runtime_profile.sh \
+  scripts/list_runtime_ollama_models.sh \
   scripts/compose.sh \
   scripts/run_tests.sh \
   scripts/start_chromie.sh; do

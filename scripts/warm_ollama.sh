@@ -4,9 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [ ! -f .env.runtime ]; then
-  ./scripts/build_runtime_env.sh
-fi
+# Direct warm-up also refreshes automatic hardware detection. When called from
+# start_orchestrator.sh, explicit model arguments preserve its already-resolved
+# inventory while this check confirms the generated files remain valid.
+./scripts/build_runtime_env.sh >/dev/null
 
 set -a
 # shellcheck disable=SC1091
@@ -26,7 +27,7 @@ restart_attempted=0
 if [ "$#" -gt 0 ]; then
   MODELS=("$@")
 else
-  MODELS=("${AGENT_MODEL:-${OLLAMA_MODEL:-gemma4:e2b}}")
+  mapfile -t MODELS < <(./scripts/list_runtime_ollama_models.sh)
 fi
 
 deduped_models=()
@@ -165,7 +166,7 @@ PY
       echo "[warm-ollama][error] Ollama model is not present locally: $model" >&2
       echo "[warm-ollama][hint] Pull it first:" >&2
       echo "[warm-ollama][hint]   docker exec chromie-llm ollama pull $model" >&2
-      echo "[warm-ollama][hint] Or set a local override such as ROUTER_MODEL=qwen3:4b in .env.local, then rerun ./scripts/build_runtime_env.sh." >&2
+      echo "[warm-ollama][hint] Pull the model selected by env/profiles/${CHROMIE_ACTIVE_PROFILE}.env, or update that committed profile deliberately." >&2
       exit 1
     fi
 

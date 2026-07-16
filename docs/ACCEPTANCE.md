@@ -138,6 +138,13 @@ motion; live text execution can support a Level C simulator claim only when the
 summary shows successful Skill Runtime execution and safe idle. Neither mode is
 microphone, speaker, or physical hardware evidence.
 
+The RTX 5090 and RTX 4090 Laptop hardware profiles currently use qualification
+time budgets: 120 seconds per Agent cognitive stage, 150 seconds per host stage,
+and 900 seconds for the complete cognitive pipeline. The live runner therefore
+defaults to a 1200-second outer case timeout. Do not reduce these values while
+validating LLM capability and end-to-end architecture; optimize latency only
+after retaining successful warm-run evidence.
+
 The reconstruction design and staged implementation plan are maintained in
 [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md).
 

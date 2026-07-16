@@ -21,6 +21,21 @@ class FakeOllama:
         return self.payload
 
 
+class ScriptedOllama:
+    def __init__(self, payloads):
+        self.payloads = list(payloads)
+        self.prompts = []
+
+    async def generate(self, prompt, **kwargs):
+        self.prompts.append((prompt, kwargs))
+        if not self.payloads:
+            raise AssertionError("unexpected extra model call")
+        payload = self.payloads.pop(0)
+        if isinstance(payload, Exception):
+            raise payload
+        return payload
+
+
 def request(text: str, *, active_goals=None, history=None, language="zh-CN"):
     return AgentRunRequest(
         sid="sid-pr2",
@@ -87,14 +102,158 @@ class GoalAssociationResolverTests(unittest.TestCase):
     def test_prompt_requires_continuity_before_creation_and_no_plan_step_goals(self):
         ollama = FakeOllama({"new_goals": [{"description": "Greet the user.", "source_text": "你好", "beneficiary": "user", "constraints": {}, "success_criteria": [], "metadata": {}}], "confidence": 0.9})
         asyncio.run(GoalAssociationResolver(ollama).resolve(request("你好")))
-        prompt = ollama.prompts[0][0]
+        prompt, kwargs = ollama.prompts[0]
         self.assertIn("Resolve continuity before creation", prompt)
         self.assertIn("Do not split implementation steps into goals", prompt)
         self.assertIn("never internal IDs", prompt)
+        self.assertIn('canonical enum: ["continue","modify","clarify"', prompt)
+        self.assertNotIn("continues, modifies", prompt)
+        schema = kwargs["response_format"]
+        self.assertIsInstance(schema, dict)
+        self.assertEqual(
+            schema["$defs"]["GoalAssociation"]["properties"]["relationship"]["enum"],
+            [
+                "continue",
+                "modify",
+                "clarify",
+                "confirm",
+                "reject",
+                "cancel",
+                "pause",
+                "resume",
+                "replace",
+                "merge",
+                "split",
+                "reference",
+                "new",
+            ],
+        )
+
+    def test_invalid_enum_uses_one_schema_constrained_model_repair(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "associations": [
+                        {
+                            "relationship": "continues",
+                            "target_goal_ids": ["goal-a"],
+                            "confidence": 0.95,
+                        }
+                    ],
+                    "confidence": 0.95,
+                },
+                {
+                    "associations": [
+                        {
+                            "relationship": "continue",
+                            "target_goal_ids": ["goal-a"],
+                            "confidence": 0.95,
+                        }
+                    ],
+                    "confidence": 0.95,
+                },
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("继续。", active_goals=[active_goal("goal-a", "Do A")])
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.associations[0].relationship, "continue")
+        self.assertEqual(
+            result.metadata["contract_repair"]["strategy"],
+            "schema_constrained_model_revision",
+        )
+        repair_prompt, repair_kwargs = ollama.prompts[1]
+        self.assertIn('"continues"', repair_prompt)
+        self.assertIn("literal_error", repair_prompt)
+        self.assertIn("Exact GoalAssociationResolution JSON Schema", repair_prompt)
+        self.assertIsInstance(repair_kwargs["response_format"], dict)
+
+    def test_failed_model_repair_fails_closed_without_a_third_call(self):
+        invalid = {
+            "associations": [
+                {
+                    "relationship": "continues",
+                    "target_goal_ids": ["goal-a"],
+                    "confidence": 0.95,
+                }
+            ],
+            "confidence": 0.95,
+        }
+        ollama = ScriptedOllama([invalid, invalid])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("继续。", active_goals=[active_goal("goal-a", "Do A")])
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.metadata["status"], "model_contract_failed")
+        self.assertEqual(result.metadata["failure_class"], "structured_output_validation")
+        self.assertTrue(result.metadata["contract_repair_attempted"])
+        self.assertFalse(result.metadata["contract_repair_succeeded"])
+        self.assertIn("continues", result.metadata["initial_raw_output"])
+        self.assertEqual(result.associations, [])
+        self.assertTrue(result.clarification)
+
+    def test_no_active_goals_schema_forbids_associations_and_requires_new_goal_or_clarification(self):
+        ollama = FakeOllama({
+            "associations": [],
+            "new_goals": [{
+                "description": "Blink twice",
+                "source_text": "Blink twice",
+                "constraints": {},
+                "success_criteria": ["Blink twice"],
+            }],
+            "clarification": "",
+            "confidence": 0.95,
+        })
+
+        asyncio.run(GoalAssociationResolver(ollama).resolve(request("Blink twice", language="en-US")))
+
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertEqual(schema["properties"]["associations"]["maxItems"], 0)
+        self.assertIn("oneOf", schema)
+        prompt = ollama.prompts[0][0]
+        self.assertIn("one new goal for each independently satisfiable user responsibility", prompt)
+        self.assertIn("physical action and a conversational answer are independent goals", prompt)
+
+    def test_dynamic_schema_limits_existing_targets_to_active_goal_ids(self):
+        ollama = FakeOllama({
+            "associations": [{
+                "relationship": "continue",
+                "target_goal_ids": ["goal-a"],
+                "confidence": 0.95,
+            }],
+            "new_goals": [],
+            "clarification": "",
+            "confidence": 0.95,
+        })
+
+        asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("continue", active_goals=[active_goal("goal-a", "Do A")], language="en-US")
+            )
+        )
+
+        schema = ollama.prompts[0][1]["response_format"]
+        association_schema = schema["$defs"]["GoalAssociation"]
+        self.assertEqual(
+            association_schema["properties"]["target_goal_ids"]["items"]["enum"],
+            ["goal-a"],
+        )
 
     def test_model_failure_is_safe_and_advisory(self):
-        result = asyncio.run(GoalAssociationResolver(FakeOllama(RuntimeError("offline"))).resolve(request("继续。", active_goals=[active_goal("goal-a", "Do A")])))
+        ollama = FakeOllama(RuntimeError("offline"))
+        result = asyncio.run(GoalAssociationResolver(ollama).resolve(request("继续。", active_goals=[active_goal("goal-a", "Do A")])))
         self.assertEqual(result.metadata["status"], "model_unavailable")
+        self.assertFalse(result.metadata["contract_repair_attempted"])
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(result.associations, [])
         self.assertTrue(result.clarification)
 

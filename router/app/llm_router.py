@@ -1217,6 +1217,16 @@ class OllamaLLMRouter:
             },
         }
 
+    @staticmethod
+    def _route_response_schema() -> dict[str, Any]:
+        schema = RouteDecision.model_json_schema()
+        properties = schema.get("properties", {})
+        source = properties.get("source")
+        if isinstance(source, dict):
+            source.clear()
+            source.update({"type": "string", "const": "llm"})
+        return schema
+
     def build_payload(self, request: RouteRequest, *, relaxed_json: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.model,
@@ -1235,7 +1245,7 @@ class OllamaLLMRouter:
         }
         if self.keep_alive:
             payload["keep_alive"] = self.keep_alive
-        payload["format"] = "json"
+        payload["format"] = self._route_response_schema()
         return payload
 
     def build_intent_review_payload(self, request: RouteRequest) -> dict[str, Any]:
@@ -1253,7 +1263,7 @@ class OllamaLLMRouter:
             "model": self.review_model or self.model,
             "stream": False,
             "think": False,
-            "format": "json",
+            "format": self._route_response_schema(),
             **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
             "messages": [
                 {
