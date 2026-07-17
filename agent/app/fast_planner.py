@@ -16,6 +16,7 @@ from .planner_contract import (
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
+    planner_contract_diagnostics,
     validate_planner_model_output,
 )
 from .schema import AgentRunRequest
@@ -85,6 +86,7 @@ class FastPlannerResolver:
             "num_predict": self.num_predict,
         }
         previous_raw: Any = None
+        initial_raw_output: Any = None
         initial_validation_errors = ""
         contract_repair_attempted = False
 
@@ -135,13 +137,22 @@ class FastPlannerResolver:
                     and isinstance(exc, (ValidationError, json.JSONDecodeError, ValueError))
                 ):
                     contract_repair_attempted = True
-                    previous_raw = raw
-                    initial_validation_errors = self._validation_error_json(exc)
+                    initial_raw_output = raw
+                    # Regenerate from authoritative grounding instead of asking
+                    # the model to edit invalid JSON in place.  In live runs,
+                    # copy-editing caused validator text to be embedded inside
+                    # rationale strings while required fields stayed missing.
+                    previous_raw = None
+                    initial_validation_errors = self._validation_error_json(
+                        exc,
+                        raw=raw,
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    )
                     logger.warning(
                         "fast_planner_contract_repair_start sid=%s validation_errors=%s raw_output=%s",
                         request.sid,
                         initial_validation_errors,
-                        self._bounded(previous_raw, 4000),
+                        self._bounded(initial_raw_output, 4000),
                     )
                     continue
                 return self._escalation(
@@ -157,8 +168,8 @@ class FastPlannerResolver:
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
-                        "initial_raw_output": self._bounded(previous_raw, 4000)
-                        if previous_raw is not None
+                        "initial_raw_output": self._bounded(initial_raw_output, 4000)
+                        if initial_raw_output is not None
                         else "",
                         "repair_raw_output": self._bounded(raw, 4000)
                         if contract_repair_attempted and raw is not None
@@ -194,21 +205,43 @@ class FastPlannerResolver:
         raise AssertionError("unreachable")
 
     @staticmethod
-    def _validation_error_json(exc: Exception) -> str:
+    def _validation_error_json(
+        exc: Exception,
+        *,
+        raw: Any,
+        expected_goal_ids_for_turn: list[str],
+    ) -> str:
         if isinstance(exc, ValidationError):
-            return json.dumps(
-                exc.errors(include_url=False),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-                default=str,
-            )[:7000]
+            feedback = list(exc.errors(include_url=False))
+        else:
+            feedback = [
+                {"type": type(exc).__name__, "message": str(exc)[:1000]}
+            ]
+        feedback.extend(
+            planner_contract_diagnostics(
+                raw,
+                planner_tier="fast",
+                expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+            )
+        )
+        unique: list[dict[str, Any]] = []
+        seen: set[tuple[str, tuple[Any, ...]]] = set()
+        for item in feedback:
+            key = (
+                str(item.get("msg") or item.get("message") or ""),
+                tuple(item.get("loc") or []),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(item)
         return json.dumps(
-            [{"type": type(exc).__name__, "message": str(exc)[:1000]}],
+            unique,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
-        )
+            default=str,
+        )[:10000]
 
     @staticmethod
     def _plan_id(request: AgentRunRequest) -> str:
@@ -250,14 +283,15 @@ class FastPlannerResolver:
             f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
             f"Router advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
             f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
-            f"Previous Fast Planner output when revising:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
+            f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
             f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
+            "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. "
             "Finding one matching skill is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, or capability is unresolved, return disposition=escalate, coverage=partial or uncertain, a non-empty escalation_reason, and zero steps. "
             "Fast Planner must not emit mixed outcomes; escalate so Deep Planner can account for them. For complete direct execution, use exact supplied skill IDs and schema-valid args. "
             "User-facing speech is owned by Response Composer, not a plan step. Represent a conversational answer as disposition=respond with response_text; if it is independent of an executable goal, escalate for a Deep Planner mixed execute/respond outcome. "
             "Every executable step must use source_goal_ids copied from the canonical goals. Do not use capability_id, parameters, action, input_schema, route, or step_type as plan-step fields. "
-            "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. "
+            "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. A score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. If steps are present, top-level disposition cannot be respond. "
             "For every complete multi-goal execute or respond result, goal_outcomes must be keyed exactly once by every supplied canonical goal ID. "
             "Use plan_relation=exact for an exact plan. A safe_adjustment or alternative must set user_confirmation_required=true so the host holds execution for approval. "
             "The Ollama decoder enforces the exact flat FastPlannerModelOutput schema out-of-band. "
@@ -279,8 +313,8 @@ class FastPlannerResolver:
     @staticmethod
     def _repair_system_prompt() -> str:
         return (
-            "You revise one Fast Planner output using the supplied authoritative goals, executable capability catalog, exact validation errors, and schema-constrained decoder. "
-            "Regenerate the flat FastPlannerModelOutput without local aliases or field mappings. Return JSON only."
+            "You regenerate one fresh Fast Planner output using the supplied authoritative goals, executable capability catalog, complete validation errors, and schema-constrained decoder. "
+            "Rebuild every required field instead of editing or splicing the invalid JSON. Regenerate the flat FastPlannerModelOutput without local aliases, annotations, or field mappings. Return JSON only."
         )
 
     def _normalize(

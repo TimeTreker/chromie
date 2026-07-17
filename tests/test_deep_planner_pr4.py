@@ -134,6 +134,139 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("invalid_args", ollama.prompts[1][0])
         self.assertNotIn("Fast Planner decides again", ollama.prompts[1][0])
 
+    def test_contract_repair_reports_hidden_multi_goal_defects_together(self):
+        goal_ids = ["goal-walk", "goal-blink"]
+        invalid = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0},
+                    "source_goal_ids": ["goal-walk"],
+                },
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                },
+            ],
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "satisfaction": {"score": 1.0, "status": "substantial"},
+                },
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "satisfaction": {"score": 1.0, "status": "substantial"},
+                },
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "substantial"},
+        }
+        repaired = {
+            **invalid,
+            "disposition": "execute",
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        ollama = SequencedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                request("Walk for one second, then blink twice.", goal_ids=goal_ids)
+            )
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual([item.step_ids for item in plan.goal_outcomes], [["walk"], ["blink"]])
+        repair_prompt = ollama.prompts[1][0]
+        self.assertIn("goal satisfaction score is inconsistent with status", repair_prompt)
+        self.assertIn("execute goal outcome requires complete coverage and step_ids", repair_prompt)
+        self.assertIn("top-level disposition must match per-goal outcome dispositions", repair_prompt)
+        self.assertIn("regenerate one fresh complete object", repair_prompt)
+        self.assertIn("Previous Deep Planner model output JSON, when doing a semantic runtime replan:\nnull", repair_prompt)
+
+    def test_contract_repair_exposes_missing_mixed_response_text(self):
+        goal_ids = ["goal-blink", "goal-joke"]
+        invalid = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                }
+            ],
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "satisfaction": {"score": 1.0, "status": "substantial"},
+                },
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "rationale": "A short joke will be provided later.",
+                    "satisfaction": {"score": 1.0, "status": "substantial"},
+                },
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "substantial"},
+        }
+        repaired = {
+            **invalid,
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "step_ids": [],
+                    "response_text": "Why did the robot nap? It needed to recharge.",
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        ollama = SequencedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                request("Blink twice and tell me a short joke.", goal_ids=goal_ids)
+            )
+        )
+
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual(plan.goal_outcomes[1].disposition, "respond")
+        repair_prompt = ollama.prompts[1][0]
+        self.assertIn("respond goal outcome requires complete coverage and response_text", repair_prompt)
+        self.assertIn("execute goal outcome requires complete coverage and step_ids", repair_prompt)
+        self.assertIn("actual answer text now", repair_prompt)
+
 
     def test_goal_outcome_schema_uses_exact_unique_goal_key_map(self):
         schema = DeepPlannerResolver._response_schema(["goal-look", "goal-blink"])

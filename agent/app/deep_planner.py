@@ -18,6 +18,7 @@ from .planner_contract import (
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
+    planner_contract_diagnostics,
     validate_planner_model_output,
 )
 
@@ -70,6 +71,7 @@ class DeepPlannerResolver:
         }
         feedback: list[dict[str, Any]] = []
         previous_raw: Any = None
+        initial_raw_output: Any = None
         contract_repair_attempted = False
         initial_validation_errors = ""
         for attempt in range(self.max_replans + 1):
@@ -119,15 +121,25 @@ class DeepPlannerResolver:
                 semantic_replan = self._is_semantic_replan_error(exc)
                 if attempt < self.max_replans and semantic_replan:
                     contract_repair_attempted = True
-                    previous_raw = raw
-                    initial_validation_errors = self._validation_error_json(exc)
+                    initial_raw_output = raw
+                    # Contract repair is a fresh schema-constrained regeneration,
+                    # not an in-place JSON edit.  Supplying the invalid object as
+                    # copy text encouraged deployed models to splice validator
+                    # fragments into rationale strings instead of rebuilding the
+                    # missing fields.
+                    previous_raw = None
+                    initial_validation_errors = self._validation_error_json(
+                        exc,
+                        raw=raw,
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    )
                     logger.warning(
                         "deep_planner_contract_repair_start sid=%s attempt=%s "
                         "validation_errors=%s raw_output=%s",
                         request.sid,
                         attempt + 1,
                         initial_validation_errors,
-                        self._bounded(previous_raw, 5000),
+                        self._bounded(initial_raw_output, 5000),
                     )
                     feedback = [
                         {
@@ -151,8 +163,8 @@ class DeepPlannerResolver:
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
-                        "initial_raw_output": self._bounded(previous_raw, 5000)
-                        if previous_raw is not None
+                        "initial_raw_output": self._bounded(initial_raw_output, 5000)
+                        if initial_raw_output is not None
                         else "",
                         "repair_raw_output": self._bounded(raw, 5000)
                         if contract_repair_attempted and raw is not None
@@ -221,21 +233,43 @@ class DeepPlannerResolver:
         return isinstance(exc, (json.JSONDecodeError, ValidationError, ValueError))
 
     @staticmethod
-    def _validation_error_json(exc: Exception) -> str:
+    def _validation_error_json(
+        exc: Exception,
+        *,
+        raw: Any,
+        expected_goal_ids_for_turn: list[str],
+    ) -> str:
         if isinstance(exc, ValidationError):
-            return json.dumps(
-                exc.errors(include_url=False),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-                default=str,
-            )[:8000]
+            feedback = list(exc.errors(include_url=False))
+        else:
+            feedback = [
+                {"type": type(exc).__name__, "message": str(exc)[:1000]}
+            ]
+        feedback.extend(
+            planner_contract_diagnostics(
+                raw,
+                planner_tier="deep",
+                expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+            )
+        )
+        unique: list[dict[str, Any]] = []
+        seen: set[tuple[str, tuple[Any, ...]]] = set()
+        for item in feedback:
+            key = (
+                str(item.get("msg") or item.get("message") or ""),
+                tuple(item.get("loc") or []),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(item)
         return json.dumps(
-            [{"type": type(exc).__name__, "message": str(exc)[:1000]}],
+            unique,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
-        )
+            default=str,
+        )[:12000]
 
     @staticmethod
     def _capability_payload(item: Any) -> dict[str, Any]:
@@ -297,8 +331,9 @@ class DeepPlannerResolver:
             f"Goal association advisory JSON:\n{self._bounded(association, 3200)}\n\n"
             f"Active goals JSON:\n{self._bounded(goals, 3200)}\n\n"
             f"Executable capability catalog JSON:\n{self._bounded(capabilities, 16000)}\n\n"
-            f"Previous Deep Planner model output JSON, when revising:\n{previous_section}\n\n"
+            f"Previous Deep Planner model output JSON, when doing a semantic runtime replan:\n{previous_section}\n\n"
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
+            "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. "
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, and concurrency. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
@@ -310,7 +345,8 @@ class DeepPlannerResolver:
             "Do not copy catalog field names such as capability_id, input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
             "Keep the plan minimal: do not add neutral-position, reset, transition, cleanup, or presentation steps unless the user explicitly requested them or a supplied capability execution constraint explicitly requires them. "
-            "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every complete multi-goal execute, respond, or mixed result must include it. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one step_id; respond requires coverage=complete, non-empty response_text, and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. In a mixed plan, every execute or respond outcome also requires its own prospective satisfaction assessment. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
+            "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every complete multi-goal execute, respond, or mixed result must include it. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. In a mixed plan, every execute or respond outcome also requires its own prospective satisfaction assessment. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
+            "Top-level disposition is the aggregate of per-goal dispositions: use mixed only when at least two different per-goal disposition values are present. Multiple goals that are all execute use top-level execute; multiple goals that are all respond use top-level respond. "
             "Every outcome step_id must name a real plan step, every plan step must be referenced by an execute outcome when goal_outcomes are present, and each step source_goal_ids must exactly match the execute outcomes that reference it. "
             "The Ollama decoder enforces the exact flat DeepPlannerModelOutput JSON Schema supplied out-of-band. The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. Populate only fields allowed by the model schema and return JSON only. "
             "The following final grounding block is authoritative and must override unrelated content in previous model output or advisory context.\n\n"
@@ -330,9 +366,9 @@ class DeepPlannerResolver:
     @staticmethod
     def _revision_system_prompt() -> str:
         return (
-            "You revise one Deep Planner output using semantic reasoning, deterministic validator feedback, and the supplied exact flat DeepPlannerModelOutput JSON Schema. "
-            "Preserve valid planning judgments, but regenerate every field needed to satisfy the contract and capability validation. "
-            "Return only the corrected DeepPlannerModelOutput JSON object. Do not add commentary, markdown, local field mappings, or hidden reasoning."
+            "You regenerate one fresh Deep Planner output using semantic reasoning, complete deterministic validator feedback, and the supplied exact flat DeepPlannerModelOutput JSON Schema. "
+            "Rebuild every required field from the authoritative user turn, goals, and capabilities; do not edit or splice the invalid JSON. "
+            "Return only the corrected DeepPlannerModelOutput JSON object. Do not add commentary, markdown, annotations, local field mappings, or hidden reasoning."
         )
 
     def _normalize(

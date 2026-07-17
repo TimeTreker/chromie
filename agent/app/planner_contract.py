@@ -444,6 +444,332 @@ def canonical_plan_response_schema(
     return schema
 
 
+def planner_contract_diagnostics(
+    raw: Any,
+    *,
+    planner_tier: PlannerTier,
+    expected_goal_ids_for_turn: list[str],
+) -> list[dict[str, Any]]:
+    """Collect independent planner-contract defects without short-circuiting.
+
+    Pydantic intentionally validates nested values before parent model validators.
+    That means one invalid nested satisfaction object can hide a missing
+    ``step_ids`` or ``response_text`` defect in the same goal outcome.  The
+    planners allow only one same-tier/schema repair, so repair feedback must
+    expose all independently observable structural defects from the original
+    model output rather than only the first validation layer that failed.
+
+    This function is diagnostic only.  It never rewrites model-authored meaning
+    or fills missing ownership/response fields.
+    """
+
+    if not isinstance(raw, dict):
+        return []
+
+    diagnostics: list[dict[str, Any]] = []
+
+    def add(
+        loc: list[str | int],
+        msg: str,
+        *,
+        value: Any = None,
+        error_type: str = "value_error",
+    ) -> None:
+        diagnostics.append(
+            {
+                "type": error_type,
+                "loc": loc,
+                "msg": msg,
+                "input": value,
+                "source": "planner_contract_diagnostics",
+            }
+        )
+
+    def satisfaction_status_for_score(score: float) -> GoalSatisfactionStatus:
+        if score >= 0.95:
+            return "exact"
+        if score >= 0.75:
+            return "substantial"
+        if score > 0.0:
+            return "partial"
+        return "unsatisfied"
+
+    def inspect_satisfaction(value: Any, loc: list[str | int]) -> None:
+        if not isinstance(value, dict):
+            return
+        score = value.get("score")
+        status = value.get("status")
+        if not isinstance(score, (int, float)) or isinstance(score, bool):
+            return
+        if not isinstance(status, str):
+            return
+        if not 0.0 <= float(score) <= 1.0:
+            return
+        expected = satisfaction_status_for_score(float(score))
+        if status != expected:
+            add(
+                loc,
+                (
+                    "goal satisfaction score is inconsistent with status; "
+                    f"score={float(score):g} requires status={expected!r}"
+                ),
+                value=value,
+            )
+
+    steps = raw.get("steps")
+    if not isinstance(steps, list):
+        steps = []
+    step_ids: set[str] = set()
+    step_sources: dict[str, set[str]] = {}
+    for index, item in enumerate(steps):
+        if not isinstance(item, dict):
+            continue
+        step_id = " ".join(str(item.get("step_id") or "").strip().split())
+        if step_id:
+            step_ids.add(step_id)
+            source_goal_ids = item.get("source_goal_ids")
+            if isinstance(source_goal_ids, str):
+                source_goal_ids = [source_goal_ids]
+            if isinstance(source_goal_ids, list):
+                for source_goal_id in source_goal_ids:
+                    goal_id = " ".join(str(source_goal_id or "").strip().split())
+                    if goal_id:
+                        step_sources.setdefault(step_id, set()).add(goal_id)
+        elif item.get("skill_id"):
+            add(
+                ["steps", index, "step_id"],
+                "executable planner step requires step_id",
+                value=item,
+                error_type="missing",
+            )
+
+    disposition = raw.get("disposition")
+    coverage = raw.get("coverage")
+    response_text = str(raw.get("response_text") or "").strip()
+    if coverage != "complete" and steps:
+        add(
+            ["steps"],
+            "non-complete planner output must not carry executable steps",
+            value=steps,
+        )
+    if disposition == "execute" and not steps:
+        add(
+            ["steps"],
+            "execute planner output requires at least one step",
+            value=steps,
+        )
+    if disposition == "mixed" and not steps:
+        add(
+            ["steps"],
+            "mixed planner output requires steps and goal_outcomes",
+            value=steps,
+        )
+    if disposition == "respond" and not response_text:
+        add(
+            ["response_text"],
+            "respond planner output requires response_text",
+            value=raw.get("response_text"),
+        )
+    if disposition not in {"execute", "mixed"} and steps:
+        add(
+            ["steps"],
+            f"{disposition} planner output must not carry executable steps",
+            value=steps,
+        )
+    if disposition in {"execute", "respond", "mixed"} and coverage != "complete":
+        add(
+            ["coverage"],
+            "execute, respond, and mixed planner output requires complete coverage",
+            value=coverage,
+        )
+    if disposition in {"execute", "respond", "mixed"} and not isinstance(
+        raw.get("goal_satisfaction"), dict
+    ):
+        add(
+            ["goal_satisfaction"],
+            "complete executable or response output requires goal_satisfaction",
+            value=raw.get("goal_satisfaction"),
+        )
+    inspect_satisfaction(raw.get("goal_satisfaction"), ["goal_satisfaction"])
+
+    outcomes = raw.get("goal_outcomes")
+    expected_goal_ids = list(dict.fromkeys(expected_goal_ids_for_turn))
+    expected_goal_set = set(expected_goal_ids)
+    if isinstance(outcomes, dict):
+        outcome_goal_set = set(outcomes)
+        if outcome_goal_set != expected_goal_set:
+            add(
+                ["goal_outcomes"],
+                (
+                    "goal_outcomes keys must cover exactly the authoritative Goal "
+                    "Association IDs"
+                ),
+                value={
+                    "expected": expected_goal_ids,
+                    "actual": list(outcomes),
+                },
+            )
+
+        outcome_dispositions: set[str] = set()
+        referenced_steps: set[str] = set()
+        executable_owners_by_step: dict[str, set[str]] = {}
+        for goal_id, outcome in outcomes.items():
+            if not isinstance(outcome, dict):
+                continue
+            outcome_disposition = outcome.get("disposition")
+            outcome_coverage = outcome.get("coverage")
+            outcome_response = str(outcome.get("response_text") or "").strip()
+            outcome_step_ids = outcome.get("step_ids")
+            if isinstance(outcome_step_ids, str):
+                outcome_step_ids = [outcome_step_ids]
+            if not isinstance(outcome_step_ids, list):
+                outcome_step_ids = []
+            normalized_outcome_step_ids = [
+                " ".join(str(item or "").strip().split())
+                for item in outcome_step_ids
+                if " ".join(str(item or "").strip().split())
+            ]
+            outcome_dispositions.add(str(outcome_disposition or ""))
+            inspect_satisfaction(
+                outcome.get("satisfaction"),
+                ["goal_outcomes", goal_id, "satisfaction"],
+            )
+
+            if outcome_disposition == "execute":
+                if outcome_coverage != "complete" or not normalized_outcome_step_ids:
+                    add(
+                        ["goal_outcomes", goal_id],
+                        "execute goal outcome requires complete coverage and step_ids",
+                        value=outcome,
+                    )
+                for step_id in normalized_outcome_step_ids:
+                    referenced_steps.add(step_id)
+                    executable_owners_by_step.setdefault(step_id, set()).add(goal_id)
+            elif outcome_disposition == "respond":
+                if outcome_coverage != "complete" or not outcome_response:
+                    add(
+                        ["goal_outcomes", goal_id],
+                        "respond goal outcome requires complete coverage and response_text",
+                        value=outcome,
+                    )
+                if normalized_outcome_step_ids:
+                    add(
+                        ["goal_outcomes", goal_id, "step_ids"],
+                        "respond goal outcome must not reference steps",
+                        value=normalized_outcome_step_ids,
+                    )
+            elif outcome_disposition == "clarify":
+                if outcome_coverage not in {"partial", "uncertain"}:
+                    add(
+                        ["goal_outcomes", goal_id, "coverage"],
+                        "clarify goal outcome requires partial or uncertain coverage",
+                        value=outcome_coverage,
+                    )
+                if normalized_outcome_step_ids:
+                    add(
+                        ["goal_outcomes", goal_id, "step_ids"],
+                        "clarify goal outcome must not reference steps",
+                        value=normalized_outcome_step_ids,
+                    )
+                unresolved = outcome.get("unresolved")
+                if not outcome_response and not unresolved:
+                    add(
+                        ["goal_outcomes", goal_id],
+                        "clarify goal outcome requires an unresolved need or response_text",
+                        value=outcome,
+                    )
+            elif normalized_outcome_step_ids:
+                add(
+                    ["goal_outcomes", goal_id, "step_ids"],
+                    "unavailable and refused goal outcomes must not reference steps",
+                    value=normalized_outcome_step_ids,
+                )
+
+            unknown_steps = set(normalized_outcome_step_ids) - step_ids
+            if unknown_steps:
+                add(
+                    ["goal_outcomes", goal_id, "step_ids"],
+                    "goal outcome references unknown step IDs: "
+                    + ",".join(sorted(unknown_steps)),
+                    value=normalized_outcome_step_ids,
+                )
+
+        normalized_dispositions = {item for item in outcome_dispositions if item}
+        if normalized_dispositions:
+            expected_disposition = (
+                "mixed"
+                if len(normalized_dispositions) > 1
+                else next(iter(normalized_dispositions))
+            )
+            if disposition != expected_disposition:
+                add(
+                    ["disposition"],
+                    "top-level disposition must match per-goal outcome dispositions",
+                    value={
+                        "actual": disposition,
+                        "expected": expected_disposition,
+                        "outcome_dispositions": sorted(normalized_dispositions),
+                    },
+                )
+
+        if step_ids and referenced_steps != step_ids:
+            add(
+                ["goal_outcomes"],
+                "every executable step must belong to at least one goal outcome: "
+                + ",".join(sorted(step_ids - referenced_steps)),
+                value=outcomes,
+            )
+        for step_id, sources in step_sources.items():
+            expected_sources = executable_owners_by_step.get(step_id, set())
+            if expected_sources and sources != expected_sources:
+                add(
+                    ["steps", step_id, "source_goal_ids"],
+                    (
+                        f"step {step_id!r} source_goal_ids must exactly match the "
+                        "executable goal outcomes that reference it"
+                    ),
+                    value={
+                        "actual": sorted(sources),
+                        "expected": sorted(expected_sources),
+                    },
+                )
+    elif (
+        len(expected_goal_set) > 1
+        and disposition in {"execute", "respond", "mixed"}
+    ):
+        add(
+            ["goal_outcomes"],
+            (
+                "complete multi-goal planner output requires goal_outcomes keyed by "
+                "every authoritative Goal Association ID"
+            ),
+            value=outcomes,
+        )
+
+    if planner_tier == "fast" and disposition == "mixed":
+        add(
+            ["disposition"],
+            "mixed multi-goal outcomes require deep planning",
+            value=disposition,
+        )
+    if planner_tier == "deep" and disposition == "escalate":
+        add(
+            ["disposition"],
+            "deep plans cannot return to the fast planner",
+            value=disposition,
+        )
+
+    unique: list[dict[str, Any]] = []
+    seen: set[tuple[str, tuple[str | int, ...]]] = set()
+    for item in diagnostics:
+        key = (str(item.get("msg") or ""), tuple(item.get("loc") or []))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
+
+
 def validate_planner_model_output(
     raw: dict[str, Any],
     *,

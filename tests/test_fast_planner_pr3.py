@@ -123,6 +123,58 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.steps, [])
 
+    def test_contract_repair_receives_all_compound_shape_defects(self):
+        invalid = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 0.95,
+            "response_text": "Done.",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0},
+                    "source_goal_ids": ["goal-walk"],
+                },
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                },
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "substantial"},
+        }
+        repaired = {
+            "disposition": "escalate",
+            "coverage": "partial",
+            "confidence": 0.95,
+            "steps": [],
+            "escalation_reason": "Compound request requires deep multi-goal accounting.",
+            "goal_satisfaction": None,
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request(
+                    "Walk for one second, then blink twice.",
+                    goal_ids=["goal-walk", "goal-blink"],
+                )
+            )
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        repair_prompt = ollama.prompts[1][0]
+        self.assertIn("goal satisfaction score is inconsistent with status", repair_prompt)
+        self.assertIn("respond planner output must not carry executable steps", repair_prompt)
+        self.assertIn("complete multi-goal planner output requires goal_outcomes", repair_prompt)
+        self.assertIn("regenerate one fresh complete object", repair_prompt)
+        self.assertIn(
+            "Previous Fast Planner output when doing a semantic replan:\nnull",
+            repair_prompt,
+        )
+
     def test_compound_walk_and_blink_escalates_without_partial_steps(self):
         raw = {"disposition":"escalate","coverage":"partial","confidence":0.88,"goal_summary":"walk while blinking","steps":[],"escalation_reason":"compound_goal_requires_full_planning","unresolved":["concurrency feasibility","blink count"]}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("往前走15秒，同时眨眼。", goal_ids=["goal-walk", "goal-blink"])))
