@@ -268,6 +268,40 @@ class DeepThinkingDelegationPolicyTest(unittest.TestCase):
 
         self.assertFalse(delegation.should_delegate)
 
+    def test_exact_capability_without_args_respects_confidence_threshold(self) -> None:
+        for confidence, should_delegate in ((1.0, False), (0.60, True)):
+            with self.subTest(confidence=confidence):
+                decision = RouteDecision(
+                    route="robot_action",
+                    agents=["capability_agent", "safety_agent", "speaker_agent"],
+                    intent="capability:soridormi.walk_forward",
+                    confidence=confidence,
+                    source="llm",
+                )
+
+                delegation = self.policy.evaluate(decision, context={})
+
+                self.assertEqual(delegation.should_delegate, should_delegate)
+                self.assertTrue(delegation.high_risk_physical)
+                self.assertEqual(delegation.threshold, 0.70)
+                if should_delegate:
+                    self.assertIn("confidence_below_0.70", delegation.reasons)
+
+    def test_clarification_intent_is_never_delegated_as_robot_action(self) -> None:
+        decision = RouteDecision(
+            route="robot_action",
+            agents=["speaker_agent"],
+            intent="clarify_insufficient_information",
+            confidence=0.0,
+            speak_first='I only heard "W.". What would you like me to do?',
+            source="llm",
+        )
+
+        delegation = self.policy.evaluate(decision, context={})
+
+        self.assertFalse(delegation.should_delegate)
+        self.assertEqual(delegation.reasons, ())
+
 
 if __name__ == "__main__":
     unittest.main()

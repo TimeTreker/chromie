@@ -346,7 +346,7 @@ For this revision:
 - 121 wider cognitive, contract, response, and semantic-authority tests pass,
   plus 13 retained subtests;
 - deterministic `multi_goal_daily_life` Level A acceptance passes 8/8;
-- the full repository suite passes 1,056 main tests and 20 legacy Agent tests;
+- the full repository suite passes 1,032 main tests and 20 legacy Agent tests;
 - documentation governance passes across 65 Markdown files;
 - Python compilation and diff checks pass.
 

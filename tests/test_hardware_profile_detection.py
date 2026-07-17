@@ -60,52 +60,50 @@ class HardwareProfileDetectionTests(unittest.TestCase):
         finally:
             Path(path).unlink()
 
-    def test_detects_rtx_4090_laptop_before_desktop_family(self) -> None:
-        self.assertEqual(
-            self._detect(
-                CHROMIE_NVIDIA_GPU_NAME="NVIDIA GeForce RTX 4090 Laptop GPU",
-                CHROMIE_NVIDIA_COMPUTE_CAP="8.9",
+    def test_detects_supported_hardware_profiles(self) -> None:
+        cases = (
+            (
+                "rtx4090_laptop",
+                {
+                    "CHROMIE_NVIDIA_GPU_NAME": "NVIDIA GeForce RTX 4090 Laptop GPU",
+                    "CHROMIE_NVIDIA_COMPUTE_CAP": "8.9",
+                },
             ),
-            "rtx4090_laptop",
+            (
+                "rtx5090",
+                {
+                    "CHROMIE_NVIDIA_GPU_NAME": "NVIDIA GeForce RTX 5090",
+                    "CHROMIE_NVIDIA_COMPUTE_CAP": "12.0",
+                },
+            ),
+            (
+                "nvidia_blackwell",
+                {
+                    "CHROMIE_NVIDIA_GPU_NAME": "NVIDIA GeForce RTX 5080",
+                    "CHROMIE_NVIDIA_COMPUTE_CAP": "12.0",
+                    "CHROMIE_NVIDIA_MEMORY_TOTAL_MIB": "16304",
+                },
+            ),
+            (
+                "nvidia_ada",
+                {
+                    "CHROMIE_NVIDIA_COMPUTE_CAP": "8.9",
+                    "CHROMIE_NVIDIA_MEMORY_TOTAL_MIB": "16384",
+                },
+            ),
+            (
+                "jetson_thor",
+                {
+                    "CHROMIE_IS_JETSON": "1",
+                    "CHROMIE_JETSON_MODEL": "NVIDIA Jetson AGX Thor Developer Kit",
+                    "CHROMIE_NVIDIA_COMPUTE_CAP": "12.0",
+                },
+            ),
         )
 
-    def test_detects_rtx_5090(self) -> None:
-        self.assertEqual(
-            self._detect(
-                CHROMIE_NVIDIA_GPU_NAME="NVIDIA GeForce RTX 5090",
-                CHROMIE_NVIDIA_COMPUTE_CAP="12.0",
-            ),
-            "rtx5090",
-        )
-
-    def test_detects_rtx_5080_as_conservative_blackwell(self) -> None:
-        self.assertEqual(
-            self._detect(
-                CHROMIE_NVIDIA_GPU_NAME="NVIDIA GeForce RTX 5080",
-                CHROMIE_NVIDIA_COMPUTE_CAP="12.0",
-                CHROMIE_NVIDIA_MEMORY_TOTAL_MIB="16304",
-            ),
-            "nvidia_blackwell",
-        )
-
-    def test_compute_capability_fallback_uses_gpu_memory(self) -> None:
-        self.assertEqual(
-            self._detect(
-                CHROMIE_NVIDIA_COMPUTE_CAP="8.9",
-                CHROMIE_NVIDIA_MEMORY_TOTAL_MIB="16384",
-            ),
-            "nvidia_ada",
-        )
-
-    def test_jetson_model_wins_over_shared_compute_capability(self) -> None:
-        self.assertEqual(
-            self._detect(
-                CHROMIE_IS_JETSON="1",
-                CHROMIE_JETSON_MODEL="NVIDIA Jetson AGX Thor Developer Kit",
-                CHROMIE_NVIDIA_COMPUTE_CAP="12.0",
-            ),
-            "jetson_thor",
-        )
+        for expected_profile, values in cases:
+            with self.subTest(expected_profile=expected_profile):
+                self.assertEqual(self._detect(**values), expected_profile)
 
     def test_collect_system_info_parses_full_gpu_query(self) -> None:
         values = self._collect_with_fake_nvidia_smi(

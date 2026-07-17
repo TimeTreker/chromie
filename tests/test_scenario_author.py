@@ -12,32 +12,58 @@ from scripts.behavior_scenarios import load_scenario_file
 
 
 class ScenarioAuthorTests(unittest.TestCase):
-    def test_new_creates_router_scenario_from_template(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            code = scenario_author.main(
-                [
-                    "new",
-                    "--suite",
-                    "router",
-                    "--id",
-                    "draft_greeting",
-                    "--text",
-                    "Hello there.",
+    def test_new_creates_scenarios_from_templates(self) -> None:
+        cases = (
+            {
+                "suite": "router",
+                "scenario_id": "draft_greeting",
+                "text": "Hello there.",
+                "extra_args": [
                     "--description",
                     "Draft greeting.",
                     "--tag",
                     "normal",
-                    "--scenario-root",
-                    temp_dir,
-                ]
-            )
-            path = Path(temp_dir) / "router" / "draft_greeting.json"
-            scenario = load_scenario_file(path)
+                ],
+            },
+            {
+                "suite": "dialogue",
+                "scenario_id": "draft_dialogue",
+                "text": "Hi Chromie.",
+                "extra_args": [],
+            },
+        )
 
-        self.assertEqual(code, 0)
-        self.assertEqual(scenario.scenario_id, "draft_greeting")
-        self.assertEqual(scenario.text, "Hello there.")
-        self.assertEqual(scenario.tags, ("normal",))
+        for case in cases:
+            with self.subTest(suite=case["suite"]), tempfile.TemporaryDirectory() as temp_dir:
+                code = scenario_author.main(
+                    [
+                        "new",
+                        "--suite",
+                        case["suite"],
+                        "--id",
+                        case["scenario_id"],
+                        "--text",
+                        case["text"],
+                        "--scenario-root",
+                        temp_dir,
+                        *case["extra_args"],
+                    ]
+                )
+                path = (
+                    Path(temp_dir)
+                    / case["suite"]
+                    / f"{case['scenario_id']}.json"
+                )
+                scenario = load_scenario_file(path)
+
+                self.assertEqual(code, 0)
+                self.assertEqual(scenario.scenario_id, case["scenario_id"])
+                self.assertEqual(scenario.suite, case["suite"])
+                if case["suite"] == "router":
+                    self.assertEqual(scenario.text, case["text"])
+                    self.assertEqual(scenario.tags, ("normal",))
+                else:
+                    self.assertEqual(scenario.turns[0]["ask"], case["text"])
 
     def test_new_rejects_invalid_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -83,29 +109,6 @@ class ScenarioAuthorTests(unittest.TestCase):
             )
 
         self.assertEqual(code, 0)
-
-    def test_new_creates_dialogue_scenario_from_template(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            code = scenario_author.main(
-                [
-                    "new",
-                    "--suite",
-                    "dialogue",
-                    "--id",
-                    "draft_dialogue",
-                    "--text",
-                    "Hi Chromie.",
-                    "--scenario-root",
-                    temp_dir,
-                ]
-            )
-            path = Path(temp_dir) / "dialogue" / "draft_dialogue.json"
-            scenario = load_scenario_file(path)
-
-        self.assertEqual(code, 0)
-        self.assertEqual(scenario.scenario_id, "draft_dialogue")
-        self.assertEqual(scenario.suite, "dialogue")
-        self.assertEqual(scenario.turns[0]["ask"], "Hi Chromie.")
 
     def test_edit_dry_run_prints_editor_command_for_existing_scenario(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -153,48 +156,51 @@ class ScenarioAuthorTests(unittest.TestCase):
 
         self.assertEqual(code, 1)
 
-    def test_prompt_mentions_deterministic_expectations_and_suite(self) -> None:
-        output = StringIO()
-        with redirect_stdout(output):
-            code = scenario_author.main(
-                [
-                    "prompt",
-                    "--suite",
-                    "router",
-                    "--count",
-                    "3",
-                    "--focus",
-                    "normal greetings and ambiguous commands",
-                ]
-            )
+    def test_prompt_mentions_suite_specific_expectations(self) -> None:
+        cases = (
+            {
+                "suite": "router",
+                "count": "3",
+                "focus": "normal greetings and ambiguous commands",
+                "expected": (
+                    "Generate 3 candidate JSON scenario files",
+                    "deterministic expectations",
+                    "scenarios/router/<id>.json",
+                ),
+            },
+            {
+                "suite": "dialogue",
+                "count": "2",
+                "focus": "follow-up task context",
+                "expected": (
+                    "turns[]",
+                    "history_contains",
+                    "extracted_memory_contains",
+                    "scenarios/dialogue/<id>.json",
+                ),
+            },
+        )
 
-        self.assertEqual(code, 0)
-        text = output.getvalue()
-        self.assertIn("Generate 3 candidate JSON scenario files", text)
-        self.assertIn("deterministic expectations", text)
-        self.assertIn("scenarios/router/<id>.json", text)
+        for case in cases:
+            with self.subTest(suite=case["suite"]):
+                output = StringIO()
+                with redirect_stdout(output):
+                    code = scenario_author.main(
+                        [
+                            "prompt",
+                            "--suite",
+                            case["suite"],
+                            "--count",
+                            case["count"],
+                            "--focus",
+                            case["focus"],
+                        ]
+                    )
 
-    def test_dialogue_prompt_mentions_multi_turn_expectations(self) -> None:
-        output = StringIO()
-        with redirect_stdout(output):
-            code = scenario_author.main(
-                [
-                    "prompt",
-                    "--suite",
-                    "dialogue",
-                    "--count",
-                    "2",
-                    "--focus",
-                    "follow-up task context",
-                ]
-            )
-
-        self.assertEqual(code, 0)
-        text = output.getvalue()
-        self.assertIn("turns[]", text)
-        self.assertIn("history_contains", text)
-        self.assertIn("extracted_memory_contains", text)
-        self.assertIn("scenarios/dialogue/<id>.json", text)
+                self.assertEqual(code, 0)
+                text = output.getvalue()
+                for expected in case["expected"]:
+                    self.assertIn(expected, text)
 
 
 if __name__ == "__main__":

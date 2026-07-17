@@ -10,7 +10,7 @@ from router.app.schema import RouteDecision, RouteRequest
 from tests.test_router_capability_routing import _Catalog, _LlmRouter
 
 
-class ForwardMotionRecovery0806Tests(unittest.IsolatedAsyncioTestCase):
+class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def test_chinese_forward_motion_ranks_live_walk_skill(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
 

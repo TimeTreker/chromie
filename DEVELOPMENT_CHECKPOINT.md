@@ -30,7 +30,7 @@ and satisfaction. The host adds only canonical identity and validation. It
 preserves mixed execute/respond support, normalized recovery observability,
 Deep-context sanitization, pending-action claim checks, and live acceptance
 assertions. Automated evidence passes focused and compatibility tests,
-deterministic multi-goal Level A 8/8, 1,056 main tests, and 20 legacy Agent
+deterministic multi-goal Level A 8/8, 1,032 main tests, and 20 legacy Agent
 tests. Resume with
 three consecutive warm live-text simulator runs; do not claim Fast target
 behavior or the latency reduction until those retained runs prove it.

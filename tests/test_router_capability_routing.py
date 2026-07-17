@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 from router.app.capability_catalog import CapabilityCatalogResult
 from router.app.schema import RouteDecision, RouteRequest
-from scripts.behavior_scenarios import load_scenarios, run_scenarios
 
 
 class _Catalog:
@@ -151,13 +150,6 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deepthinking_agent", decision.agents)
         self.assertNotIn("capability_agent", decision.agents)
         self.assertNotIn("recovered_from_route", decision.metadata)
-
-    async def test_router_behavior_scenarios_from_json(self) -> None:
-        scenarios = load_scenarios(suites={"router"})
-
-        report = await run_scenarios(scenarios)
-
-        self.assertTrue(report["ok"], report["cases"])
 
     async def test_hybrid_llm_accepts_skill_from_compact_catalog_without_search_match(self) -> None:
         from router.app import main

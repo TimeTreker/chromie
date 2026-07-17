@@ -19,7 +19,7 @@ if "scipy" not in sys.modules:
 from orchestrator.orchestrator import VoiceAssistant
 
 
-class OrchestratorBargeInQueue20260712Tests(unittest.IsolatedAsyncioTestCase):
+class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
     async def test_busy_asr_keeps_latest_utterance_instead_of_dropping_it(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         blocker = asyncio.Event()

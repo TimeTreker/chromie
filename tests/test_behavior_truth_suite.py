@@ -14,45 +14,22 @@ def _format_failures(report: dict[str, object]) -> str:
 
 
 class BehaviorTruthSuiteTests(unittest.IsolatedAsyncioTestCase):
-    async def test_adapter_behavior_scenario_files(self) -> None:
-        scenarios = load_scenarios(suites={"adapter"})
+    async def test_all_behavior_scenario_suites(self) -> None:
+        expected_counts = {
+            "adapter": 4,
+            "router": 23,
+            "router_dialogue": 2,
+            "interaction": 21,
+            "dialogue": 319,
+        }
 
-        report = await run_scenarios(scenarios)
+        for suite, expected_count in expected_counts.items():
+            with self.subTest(suite=suite):
+                scenarios = load_scenarios(suites={suite})
+                report = await run_scenarios(scenarios)
 
-        self.assertTrue(report["ok"], _format_failures(report))
-        self.assertEqual(report["case_count"], 4)
-
-    async def test_router_behavior_scenario_files(self) -> None:
-        scenarios = load_scenarios(suites={"router"})
-
-        report = await run_scenarios(scenarios)
-
-        self.assertTrue(report["ok"], _format_failures(report))
-        self.assertEqual(report["case_count"], 23)
-
-    async def test_router_dialogue_behavior_scenario_files(self) -> None:
-        scenarios = load_scenarios(suites={"router_dialogue"})
-
-        report = await run_scenarios(scenarios)
-
-        self.assertTrue(report["ok"], _format_failures(report))
-        self.assertEqual(report["case_count"], 2)
-
-    async def test_interaction_behavior_scenario_files(self) -> None:
-        scenarios = load_scenarios(suites={"interaction"})
-
-        report = await run_scenarios(scenarios)
-
-        self.assertTrue(report["ok"], _format_failures(report))
-        self.assertEqual(report["case_count"], 21)
-
-    async def test_dialogue_behavior_scenario_files(self) -> None:
-        scenarios = load_scenarios(suites={"dialogue"})
-
-        report = await run_scenarios(scenarios)
-
-        self.assertTrue(report["ok"], _format_failures(report))
-        self.assertEqual(report["case_count"], 319)
+                self.assertTrue(report["ok"], _format_failures(report))
+                self.assertEqual(report["case_count"], expected_count)
 
 
 if __name__ == "__main__":

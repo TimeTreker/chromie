@@ -19,66 +19,47 @@ def _copy_tree(src: Path, dest: Path) -> None:
 
 
 class ContainerImportPathTests(unittest.TestCase):
-    def test_agent_container_layout_imports_runtime_and_perception_helpers(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            app_root = Path(temp_dir) / "agent_app"
-            _copy_tree(ROOT / "agent" / "app", app_root / "app")
-            _copy_tree(
-                ROOT / "shared" / "chromie_contracts",
-                app_root / "chromie_contracts",
-            )
-            _copy_tree(
-                ROOT / "shared" / "chromie_runtime",
-                app_root / "chromie_runtime",
-            )
+    def test_container_layouts_import_shared_runtime_packages(self) -> None:
+        cases = (
+            (
+                "agent",
+                ROOT / "agent" / "app",
+                "import app.clients.ollama_client; "
+                "import app.agents.capability; print('ok')",
+            ),
+            (
+                "router",
+                ROOT / "router" / "app",
+                "import app.llm_router; print('ok')",
+            ),
+        )
 
-            env = os.environ.copy()
-            env["PYTHONPATH"] = str(app_root)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-c",
-                    (
-                        "import app.clients.ollama_client; "
-                        "import app.agents.capability; print('ok')"
-                    ),
-                ],
-                cwd=app_root,
-                env=env,
-                text=True,
-                capture_output=True,
-                check=False,
-            )
+        for service, source, command in cases:
+            with self.subTest(service=service), tempfile.TemporaryDirectory() as temp_dir:
+                app_root = Path(temp_dir) / f"{service}_app"
+                _copy_tree(source, app_root / "app")
+                _copy_tree(
+                    ROOT / "shared" / "chromie_contracts",
+                    app_root / "chromie_contracts",
+                )
+                _copy_tree(
+                    ROOT / "shared" / "chromie_runtime",
+                    app_root / "chromie_runtime",
+                )
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("ok", result.stdout)
+                env = os.environ.copy()
+                env["PYTHONPATH"] = str(app_root)
+                result = subprocess.run(
+                    [sys.executable, "-c", command],
+                    cwd=app_root,
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
 
-    def test_router_container_layout_imports_llm_diagnostics(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            app_root = Path(temp_dir) / "router_app"
-            _copy_tree(ROOT / "router" / "app", app_root / "app")
-            _copy_tree(
-                ROOT / "shared" / "chromie_contracts",
-                app_root / "chromie_contracts",
-            )
-            _copy_tree(
-                ROOT / "shared" / "chromie_runtime",
-                app_root / "chromie_runtime",
-            )
-
-            env = os.environ.copy()
-            env["PYTHONPATH"] = str(app_root)
-            result = subprocess.run(
-                [sys.executable, "-c", "import app.llm_router; print('ok')"],
-                cwd=app_root,
-                env=env,
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("ok", result.stdout)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("ok", result.stdout)
 
     def test_router_dockerfile_copies_runtime_package(self) -> None:
         dockerfile = (ROOT / "router" / "Dockerfile").read_text()

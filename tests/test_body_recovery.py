@@ -70,29 +70,27 @@ class BodyRecoveryTests(unittest.TestCase):
             ["Done."],
         )
 
-    def test_safety_refusal_does_not_trigger_recovery(self) -> None:
-        result = SkillResult(
-            request_id="move-1",
-            skill_id="soridormi.move_base",
-            status="refused",
-            reason_code="safety_monitor_refused",
-            output={"recoverable": True},
+    def test_terminal_body_results_do_not_trigger_recovery(self) -> None:
+        cases = (
+            SkillResult(
+                request_id="move-1",
+                skill_id="soridormi.move_base",
+                status="refused",
+                reason_code="safety_monitor_refused",
+                output={"recoverable": True},
+            ),
+            SkillResult(
+                request_id="move-1",
+                skill_id="soridormi.move_base",
+                status="failed",
+                reason_code="execute_failed_retryable",
+                output={},
+            ),
         )
 
-        self.assertFalse(is_recoverable_body_result(result))
-
-    def test_retryable_provider_fault_without_recovery_metadata_is_terminal(
-        self,
-    ) -> None:
-        result = SkillResult(
-            request_id="move-1",
-            skill_id="soridormi.move_base",
-            status="failed",
-            reason_code="execute_failed_retryable",
-            output={},
-        )
-
-        self.assertFalse(is_recoverable_body_result(result))
+        for result in cases:
+            with self.subTest(status=result.status, reason_code=result.reason_code):
+                self.assertFalse(is_recoverable_body_result(result))
 
     def test_retry_budget_exhaustion_returns_no_recovery(self) -> None:
         response = InteractionResponse(

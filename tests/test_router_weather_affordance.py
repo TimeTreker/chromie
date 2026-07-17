@@ -4,7 +4,7 @@ import unittest
 from typing import Any
 
 from router.app.llm_router import OllamaLLMRouter
-from router.app.schema import RouteDecision, RouteItem, RouteRequest, finalize_decision
+from router.app.schema import FastSpeech, RouteDecision, RouteItem, RouteRequest, finalize_decision
 
 
 WEATHER_CAPABILITY = {
@@ -22,7 +22,7 @@ class _EmptyReviewRouter(OllamaLLMRouter):
         return {"message": {"content": ""}, "done": True, "done_reason": "stop"}
 
 
-class WeatherAffordanceRecovery0806Tests(unittest.IsolatedAsyncioTestCase):
+class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
     def _router(self) -> _EmptyReviewRouter:
         return _EmptyReviewRouter(
             ollama_url="http://example.invalid",
@@ -43,6 +43,73 @@ class WeatherAffordanceRecovery0806Tests(unittest.IsolatedAsyncioTestCase):
                 "prompt_capabilities_common": [WEATHER_CAPABILITY],
             },
         )
+
+    def test_weather_tool_route_requires_explicit_weather_cue(self) -> None:
+        cases = (
+            {
+                "text": "你能查天信吗？",
+                "location": "天信",
+                "expected_route": "clarify",
+            },
+            {
+                "text": "重庆今天的天气怎么样？",
+                "location": "重庆",
+                "expected_route": "tool",
+            },
+        )
+
+        for case in cases:
+            with self.subTest(text=case["text"]):
+                request = RouteRequest(text=case["text"], language="zh-CN")
+                decision = finalize_decision(
+                    RouteDecision(
+                        route="tool",
+                        agents=["tool_agent", "speaker_agent"],
+                        intent="weather_query",
+                        confidence=0.95,
+                        language="zh-CN",
+                        fast_speech=FastSpeech(
+                            text=(
+                                "好的，我查一下重庆今天的天气。"
+                                if case["expected_route"] == "tool"
+                                else "checking_only"
+                            ),
+                            purpose="acknowledge_and_check",
+                            commitment="checking_only",
+                        ),
+                        metadata={
+                            "tool_name": "weather",
+                            "weather_query": {
+                                "location": case["location"],
+                                "date": "today",
+                                "units": "metric",
+                            },
+                        },
+                        source="llm",
+                    ),
+                    request,
+                    source="llm",
+                )
+
+                result = self._router()._reject_ambiguous_weather_tool_route(
+                    request, decision
+                )
+
+                self.assertEqual(result.route, case["expected_route"])
+                if case["expected_route"] == "clarify":
+                    self.assertEqual(result.intent, "ambiguous_tool_or_asr")
+                    self.assertIn("conversation_agent", result.agents)
+                    self.assertTrue(result.metadata.get("llm_clarification_required"))
+                    self.assertEqual(
+                        result.metadata.get("rejected_weather_route", {}).get("location"),
+                        case["location"],
+                    )
+                else:
+                    self.assertEqual(result.intent, "weather_query")
+                    self.assertEqual(
+                        result.metadata.get("weather_query", {}).get("location"),
+                        case["location"],
+                    )
 
     async def test_empty_review_recovers_weather_misroute_from_catalog_affordance(self) -> None:
         request = self._weather_request()

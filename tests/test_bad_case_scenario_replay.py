@@ -22,7 +22,7 @@ from router.app.schema import RouteDecision as RouterRouteDecision, RouteRequest
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
-class BadCaseScenarioReplay20260709Tests(unittest.TestCase):
+class BadCaseScenarioReplayTests(unittest.TestCase):
     """Replay user-visible bad cases from the July 9 robot logs.
 
     These tests are intentionally scenario-shaped: they assert the visible turn
