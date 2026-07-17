@@ -13,6 +13,7 @@ from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
     expected_goal_ids,
+    fast_multi_goal_response_schema,
     is_planner_step_skill,
     materialize_goal_outcomes,
     materialize_planner_metadata,
@@ -74,10 +75,27 @@ class FastPlannerResolver:
         ]
         context = request.context if isinstance(request.context, dict) else {}
         expected_goal_ids_for_turn = expected_goal_ids(context)
-        response_schema = canonical_plan_response_schema(
-            planner_tier="fast",
-            expected_goal_ids=expected_goal_ids_for_turn,
-            allowed_skill_ids=[item["capability_id"] for item in capability_payload],
+        multi_goal_contract = len(expected_goal_ids_for_turn) > 1
+        contract_schema = (
+            "FastPlannerMultiGoalPlanOutput"
+            if multi_goal_contract
+            else "FastPlannerModelOutput"
+        )
+        response_schema = (
+            fast_multi_goal_response_schema(
+                expected_goal_ids=expected_goal_ids_for_turn,
+                allowed_skill_ids=[
+                    item["capability_id"] for item in capability_payload
+                ],
+            )
+            if multi_goal_contract
+            else canonical_plan_response_schema(
+                planner_tier="fast",
+                expected_goal_ids=expected_goal_ids_for_turn,
+                allowed_skill_ids=[
+                    item["capability_id"] for item in capability_payload
+                ],
+            )
         )
         options = {
             "temperature": 0,
@@ -111,11 +129,20 @@ class FastPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
-                normalized = self._normalize(
-                    raw,
-                    request=request,
-                    plan_id=plan_id,
-                    expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                normalized = (
+                    self._normalize_multi_goal(
+                        raw,
+                        request=request,
+                        plan_id=plan_id,
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    )
+                    if multi_goal_contract
+                    else self._normalize(
+                        raw,
+                        request=request,
+                        plan_id=plan_id,
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    )
                 )
                 plan = CanonicalPlan.model_validate(normalized)
             except Exception as exc:
@@ -164,7 +191,7 @@ class FastPlannerResolver:
                     error=exc,
                     path_classification="contract_failure",
                     metadata={
-                        "contract_schema": "FastPlannerModelOutput",
+                        "contract_schema": contract_schema,
                         "canonical_contract": "CanonicalPlan",
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
@@ -188,7 +215,7 @@ class FastPlannerResolver:
                 metadata = dict(validated.metadata)
                 metadata.update(
                     {
-                        "contract_schema": "FastPlannerModelOutput",
+                        "contract_schema": contract_schema,
                         "canonical_contract": "CanonicalPlan",
                         "contract_repair_attempted": True,
                         "contract_repair_succeeded": True,
@@ -280,6 +307,25 @@ class FastPlannerResolver:
             "confidence": route.confidence,
         }
         grounding = canonical_goal_grounding(context)
+        if len(expected_goal_ids(context)) > 1:
+            return (
+                f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
+                f"Router advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
+                f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
+                f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
+                f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
+                "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a skill, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
+                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
+                "For a terminal plan, every per-goal outcome is execute or respond, coverage is complete, and the top-level disposition exactly aggregates the outcome dispositions. A respond outcome contains the actual answer now and references no steps. An execute outcome references every and only the model-authored steps owned by that goal. "
+                "For semantic escalation, author disposition=escalate, coverage=partial or uncertain, steps=[], a non-empty top-level escalation_reason, and one escalate outcome for every canonical goal. Each escalate outcome must explain its own unresolved need, reference no steps, carry no response_text, and include a non-exact prospective satisfaction judgment. Do not mix escalation outcomes with executable or response outcomes. "
+                "goal_satisfaction and every per-goal satisfaction are model judgments about prospective plan adequacy. A score from 0.95 through 1.0 requires status=exact. Escalation cannot claim exact satisfaction. "
+                "Response Composer owns transport speech, so chromie.speak is never a plan step. Do not replace a conversational answer with a gesture or attention action. "
+                "Use plan_relation=exact unless the plan materially changes the request; safe_adjustment or alternative requires user_confirmation_required=true and explanatory response_text. "
+                "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. Return JSON only.\n\n"
+                f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
+                f"FINAL CANONICAL GOALS JSON:\n{self._bounded(grounding, 4500)}\n\n"
+                f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}"
+            )
         return (
             f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
             f"Router advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
@@ -309,7 +355,8 @@ class FastPlannerResolver:
     def _system_prompt() -> str:
         return (
             "You are Chromie's Fast Planner. Plan only the final authoritative user turn and canonical goals at the end of the prompt. "
-            "Produce a complete simple response, common-skill plan, or simple execute-plus-respond mixed plan only when every responsibility is covered; otherwise return the explicit empty semantic-escalation shape. "
+            "Author the semantic plan from the goals and executable catalog; never use phrase-to-action rules and never delegate semantic planning to the host. "
+            "Produce a complete simple response, common-skill plan, or simple execute-plus-respond mixed plan only when every responsibility is covered; otherwise author a complete per-goal semantic escalation. "
             "Do not execute, authorize, or claim completion. Return JSON only."
         )
 
@@ -317,8 +364,49 @@ class FastPlannerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You regenerate one fresh Fast Planner output using the supplied authoritative goals, executable capability catalog, complete validation errors, and schema-constrained decoder. "
-            "Rebuild every required field instead of editing or splicing the invalid JSON. Regenerate the flat FastPlannerModelOutput without local aliases, annotations, or field mappings. Return JSON only."
+            "Rebuild every required model-authored plan field instead of editing or splicing invalid JSON. Do not rely on host-generated steps, ownership, outcomes, disposition, or satisfaction. Return JSON only."
         )
+
+    def _normalize_multi_goal(
+        self,
+        raw: dict[str, Any],
+        *,
+        request: AgentRunRequest,
+        plan_id: str,
+        expected_goal_ids_for_turn: list[str],
+    ) -> dict[str, Any]:
+        """Add only host-owned envelope fields to a model-authored plan."""
+
+        model_output = validate_planner_model_output(
+            raw,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+        )
+        out = model_output.model_dump(mode="python")
+        out.pop("plan_relation", None)
+        out.pop("user_confirmation_required", None)
+        out["goal_outcomes"] = materialize_goal_outcomes(
+            model_output,
+            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+        )
+        out["plan_id"] = plan_id
+        out["planner_tier"] = "fast"
+        out["goal_ids"] = list(expected_goal_ids_for_turn)
+        metadata = materialize_planner_metadata(model_output)
+        metadata.update(
+            {
+                "model_contract": "FastPlannerMultiGoalPlanOutput",
+                "semantic_authority": "fast_planner_model",
+                "model_authored_steps": True,
+                "model_authored_step_ids": True,
+                "model_authored_step_ownership": True,
+                "model_authored_goal_outcomes": True,
+                "model_authored_goal_satisfaction": True,
+                "host_semantic_compilation": False,
+            }
+        )
+        out["metadata"] = metadata
+        return out
 
     def _normalize(
         self,
@@ -380,6 +468,11 @@ class FastPlannerResolver:
         expected_goal_ids_for_turn: list[str],
     ) -> CanonicalPlan:
         allowed = {item["capability_id"]: item for item in capability_payload}
+        contract_schema = (
+            "FastPlannerMultiGoalPlanOutput"
+            if len(expected_goal_ids_for_turn) > 1
+            else "FastPlannerModelOutput"
+        )
         counts = {
             "authoritative_goal_count": len(expected_goal_ids_for_turn),
             "goal_outcome_count": len(plan.goal_outcomes),
@@ -406,7 +499,7 @@ class FastPlannerResolver:
                     "path_classification": "semantic_escalation",
                     "common_capability_count": len(capability_payload),
                     "min_confidence": self.min_confidence,
-                    "contract_schema": "FastPlannerModelOutput",
+                    "contract_schema": contract_schema,
                     "canonical_contract": "CanonicalPlan",
                     **counts,
                 }
@@ -470,7 +563,7 @@ class FastPlannerResolver:
                 "authority": "advisory",
                 "common_capability_count": len(capability_payload),
                 "min_confidence": self.min_confidence,
-                "contract_schema": "FastPlannerModelOutput",
+                "contract_schema": contract_schema,
                 "canonical_contract": "CanonicalPlan",
                 "path_classification": "terminal",
                 **counts,

@@ -485,8 +485,9 @@ regression gates, and state the evidence level.
 - one turn can modify existing goals and create independent new goals;
 - Fast Planner executes only complete high-confidence coverage or escalates;
 - simple common-catalog multi-goal execute, respond, and mixed requests terminate
-  at Fast Planner with exact per-goal accounting, while semantic escalation is
-  valid and distinct from contract failure;
+  at Fast Planner from a complete model-authored semantic plan, while the host
+  adds only canonical identity and validation; semantic escalation remains valid
+  and distinct from contract failure;
 - Deep Planner produces a final canonical plan without returning to Fast Planner;
 - partial or unconfirmed alternatives never execute;
 - information gaps remain attached to the original goal across turns;

@@ -75,22 +75,18 @@ state-specific schema for one bounded revision. A second invalid result fails cl
 lexical alias table, phrase mapping, or local semantic rewrite changes the
 model-authored goal descriptions or relationships.
 
-Fast and Deep Planning also use one exact, flat model-facing
+Deep Planning and single-goal Fast Planning use the flat model-facing
 `PlannerModelOutput` schema rather than asking the structured decoder to emit
-the shared `CanonicalPlan` union directly. The model supplies semantic
-disposition, coverage, prospective satisfaction, plan steps and their
-`source_goal_ids`, plus the typed `plan_relation` and
-`user_confirmation_required` decisions. The host supplies the canonical
-`schema_version`, `plan_id`, `planner_tier`, and authoritative top-level
-`goal_ids` only after model validation.
+the shared `CanonicalPlan` union directly. Multi-goal Fast Planning uses the
+decoder-tight `FastPlannerMultiGoalPlanOutput`. The model authors aggregate
+disposition, steps, step IDs, arguments, ordering, ownership, goal outcomes,
+responses, escalation judgments, and satisfaction. The host adds only canonical
+identity fields and validates the shared CanonicalPlan contract.
 
-For a complete multi-goal result, `goal_outcomes` is an exact object keyed by
-the Goal Association IDs. Its schema requires every authoritative key, forbids
-additional keys, and keeps `goal_id` out of each value, preventing duplicate or
-conflicting model-authored goal identities. The host materializes the shared
-canonical outcome list in authoritative Goal order. Satisfaction fields mean
-how adequately the proposed plan would satisfy each goal if its response and
-steps succeed; pending execution alone is not an unmet planning requirement.
+Deep Planner complete multi-goal output still uses an exact `goal_outcomes`
+object keyed by Goal Association IDs. Satisfaction fields mean how adequately
+the proposed plan would satisfy each goal if its response and steps succeed;
+pending execution alone is not an unmet planning requirement.
 
 User-facing response transport is outside task planning. `chromie.speak` is
 excluded from both planner capability schemas and rejected if a planner emits
@@ -493,17 +489,18 @@ Planner attempt recorded a model-contract failure rather than a valid
 terminal result or semantic escalation. This is successful end-to-end
 recovery, not successful Fast Planner operation.
 
-The implemented correction is documented in
-[Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
-The repository now uses one flat decoder-compatible envelope, accepts simple
-common-catalog execute/respond mixed plans, distinguishes semantic escalation
-from technical failure, records Deep invocation reason, sanitizes malformed Fast
-context before recovery, and rejects pending-action stage-direction claims.
-Automated Level A evidence is green; repeated warm live-text simulator evidence
-is still open. Rollout must preserve the existing one-way authority path and
-shared trusted validator. Existing `report_only`, lane gates, and
-`AGENT_FAST_PLANNER_ENABLED` provide observation and rollback; a new semantic
-authority or partial-execution fallback is not permitted.
+The first implementation used one plan-shaped envelope with an optional inner
+terminal map. Five warm runs produced 20/20 Fast contract failures, mandatory
+Deep recovery, a 22.87-second median cognitive runtime, and only 3.9 percent
+improvement over the 23.79-second baseline. The revised implementation in
+[Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
+requires a complete model-authored semantic plan with every authoritative goal
+outcome, step cross-reference, and satisfaction field decoder-required. The host
+no longer compiles semantic plan fields. Automated evidence is green; repeated
+warm live-text simulator evidence must be rerun. Rollout must preserve the existing
+one-way authority path and shared trusted validator. Existing `report_only`,
+lane gates, and `AGENT_FAST_PLANNER_ENABLED` provide observation and rollback;
+a new semantic authority or partial-execution fallback is not permitted.
 
 ## 14. Live-text rollout procedure
 

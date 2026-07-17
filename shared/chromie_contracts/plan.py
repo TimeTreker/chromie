@@ -17,7 +17,14 @@ PlanDisposition = Literal[
     "unavailable",
     "refused",
 ]
-GoalOutcomeDisposition = Literal["respond", "execute", "clarify", "unavailable", "refused"]
+GoalOutcomeDisposition = Literal[
+    "respond",
+    "execute",
+    "escalate",
+    "clarify",
+    "unavailable",
+    "refused",
+]
 PlanTiming = Literal["sequential", "parallel"]
 ParameterResolutionStrategy = Literal[
     "user_supplied",
@@ -193,6 +200,37 @@ class RespondGoalPlanOutcome(_GoalPlanOutcomeBase):
         return _normalize_ids(value)
 
 
+class EscalateGoalPlanOutcome(_GoalPlanOutcomeBase):
+    """Fast-tier decision that delegates one goal to Deep Planner.
+
+    This is a planner judgment, not an execution result.  It keeps semantic
+    escalation attached to the exact authoritative goal instead of forcing the
+    host to invent or discard per-goal meaning while converting model output
+    into a CanonicalPlan.
+    """
+
+    disposition: Literal["escalate"]
+    coverage: Literal["partial", "uncertain"]
+    step_ids: list[str] = Field(default_factory=list, max_length=0)
+
+    @field_validator("step_ids", mode="before")
+    @classmethod
+    def normalize_step_ids(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+    @model_validator(mode="after")
+    def validate_escalation(self) -> "EscalateGoalPlanOutcome":
+        if self.response_text:
+            raise ValueError(
+                "escalate goal outcomes must not claim a user-facing answer"
+            )
+        if not self.unresolved and not self.rationale:
+            raise ValueError(
+                "escalate goal outcomes require an unresolved need or rationale"
+            )
+        return self
+
+
 class ClarifyGoalPlanOutcome(_GoalPlanOutcomeBase):
     disposition: Literal["clarify"]
     coverage: Literal["partial", "uncertain"]
@@ -236,6 +274,7 @@ GoalPlanOutcome = Annotated[
     Union[
         ExecuteGoalPlanOutcome,
         RespondGoalPlanOutcome,
+        EscalateGoalPlanOutcome,
         ClarifyGoalPlanOutcome,
         UnavailableGoalPlanOutcome,
         RefusedGoalPlanOutcome,
@@ -386,6 +425,8 @@ class CanonicalPlan(BaseModel):
                 raise ValueError(
                     "top-level disposition must match the per-goal outcome dispositions"
                 )
+            if self.planner_tier == "deep" and "escalate" in outcome_dispositions:
+                raise ValueError("deep plans cannot contain escalate goal outcomes")
 
             referenced_steps: set[str] = set()
             executable_owners_by_step: dict[str, set[str]] = {}

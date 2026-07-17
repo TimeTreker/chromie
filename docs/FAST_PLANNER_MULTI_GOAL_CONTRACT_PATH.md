@@ -1,484 +1,412 @@
 # Fast Planner Multi-Goal Contract Path
 
-Status: Implemented with automated evidence; live Fast-terminal qualification open
+Status: model-authored plan contract implemented; supervised live requalification open
 Decision date: 2026-07-17
-Scope: Goal-driven Fast Planner model DTO, validation, escalation, observability,
-response-claim discipline, rollout, and acceptance
+Scope: Fast Planner multi-goal model DTO, semantic authority, validation,
+escalation, observability, response-claim discipline, rollout, and acceptance
 
-- **Implementation:** complete in the repository snapshot
-- **Automated verification:** complete at Level A
-- **Target validation:** prior Deep-recovery diagnostic baseline retained; Fast-terminal
-  warm simulator qualification open
-- **Release readiness:** unchanged
+- **Implementation:** model-authored multi-goal plan contract is present in the repository snapshot.
+- **Automated verification:** complete for the revised contract.
+- **Target validation:** the earlier plan-shaped contract failed 20/20 measured cases; fresh warm simulator qualification is still required for this revision.
+- **Release readiness:** unchanged.
 
 ## 1. Decision
 
-Chromie's Fast Planner will support complete, simple multi-goal turns directly
-instead of relying on a model-contract failure followed by Deep Planner
-recovery.
+Chromie's Fast Planner may terminate complete, simple multi-goal turns directly,
+but the planner model remains the sole semantic author of the Fast plan.
 
 For every Fast Planner request containing more than one authoritative Goal ID,
-the flat model-facing DTO must always include `goal_outcomes`. The field has two
-legal meanings:
+the model must author:
 
-1. **Terminal fast plan:** `goal_outcomes` is a complete object keyed exactly
-   once by every authoritative Goal ID.
-2. **Semantic escalation:** `goal_outcomes` is the empty object, `steps` is
-   empty, coverage is `partial` or `uncertain`, and `escalation_reason` is
-   non-empty.
+- top-level disposition, coverage, confidence, summary, response text, and escalation reason;
+- every executable step, including `step_id`, exact catalog `skill_id`, arguments,
+  timing, `source_goal_ids`, and rationale;
+- one outcome for every authoritative Goal ID;
+- every outcome disposition, coverage, response, unresolved need, step link,
+  satisfaction judgment, and rationale;
+- aggregate prospective goal satisfaction;
+- plan relation and confirmation requirement.
 
-The Fast Planner may return `mixed` when all independent responsibilities are
-simple, fully covered, and limited to common unlocked capabilities plus direct
-conversational responses. A conversational goal is represented by a `respond`
-outcome and `response_text`; it is never represented by `chromie.speak` or a
-substitute body gesture.
+The host adds only canonical envelope identity:
 
-A normal semantic escalation is not a contract error. A schema or semantic
-contract failure after one bounded same-tier repair remains a technical failure
-and must stay visible in diagnostics even when Deep Planner recovers the turn.
+- `plan_id`;
+- `planner_tier=fast`;
+- `schema_version`;
+- authoritative top-level `goal_ids` supplied by Goal Association.
 
-## 2. Evidence and earliest wrong boundary
+The host validates the model output and converts the goal-keyed outcome map into
+the CanonicalPlan list representation. It does **not** choose a skill, infer
+arguments from words, generate step IDs, assign step ownership, derive aggregate
+disposition, or manufacture satisfaction judgments.
 
-The July 17, 2026 operator-supplied live-text simulator diagnostic passed all
-four `multi_goal_daily_life` cases at the final interaction boundary. Goal
-Association, Deep Planner, Response Composer, the trusted runtime adapter,
-Skill Runtime, TTS scheduling, Soridormi execution, and safe-idle closure all
-worked.
+A normal semantic escalation is a model-authored Fast plan with:
 
-The Fast Planner did not successfully produce one valid multi-goal terminal or
-semantic-escalation contract in those four cases:
+- `disposition=escalate`;
+- `coverage=partial|uncertain`;
+- zero steps;
+- one `escalate` outcome for every authoritative goal;
+- per-goal unresolved reasons and non-exact satisfaction;
+- a non-empty top-level escalation reason.
 
-- initial outputs often contained correct steps and ownership but omitted the
-  entire `goal_outcomes` field;
-- the repair attempt often converted physical goals into `respond` outcomes,
-  removed all executable steps, or otherwise produced another invalid object;
-- Deep Planner then recovered the request, adding roughly ten to eleven seconds
-  of avoidable cognitive latency per case.
+A schema or semantic contract failure after one bounded same-tier repair remains
+a technical failure and stays visible even when Deep Planner recovers the turn.
+
+## 2. Why the previous repair was rejected
+
+The first post-benchmark repair replaced a plan-shaped model DTO with a
+per-goal decision map and a host decision compiler. It did not contain phrase
+branches such as `if "blink"`, but it still crossed Chromie's semantic-authority
+boundary because the host derived:
+
+- step IDs;
+- exact step ownership;
+- CanonicalPlan outcomes;
+- top-level disposition and coverage;
+- exact prospective satisfaction.
+
+That design could be described as mechanical compilation, but it was not the
+architecture this project requires. Planner models own semantic dispositions,
+step ownership, response content, and satisfaction judgments. The compiler was
+therefore removed.
+
+## 3. Evidence and earliest wrong boundary
+
+The July 17, 2026 operator-supplied simulator run passed all four final
+`multi_goal_daily_life` cases through Deep Planner recovery. Goal Association,
+Deep Planner, Response Composer, the trusted runtime adapter, Skill Runtime,
+TTS scheduling, Soridormi execution, and safe-idle closure worked.
+
+The first Fast-terminal implementation was then measured over five warm runs,
+20 cases total:
+
+- 20/20 Fast paths were `contract_failure`;
+- 20/20 invoked Deep Planner;
+- median Fast Planner time was about 3.39 seconds;
+- median cognitive runtime was 22.87 seconds;
+- the retained baseline was 23.79 seconds;
+- measured improvement was 3.9 percent instead of the required 35 percent.
+
+The failure was not a timeout or GPU-capacity problem. The model-facing JSON
+Schema allowed terminal objects with missing or incomplete nested fields that
+the deterministic validator necessarily rejected. Mocked tests supplied ideal
+complete objects and did not reproduce that live decoder gap.
 
 The earliest wrong boundary is therefore the Fast Planner model-facing contract
-and its prompt/validation interaction. It is not a Router, Soridormi, provider,
-Skill Runtime, or timeout defect.
+and its decoder/validator alignment. It is not Router, Soridormi, Skill Runtime,
+or provider execution.
 
-## 3. Goals and non-goals
+## 4. Goals and non-goals
 
-### 3.1 Goals
+### 4.1 Goals
 
-- Make simple common-catalog multi-goal planning a real Fast Planner terminal
-  path.
-- Preserve exact per-goal accounting and step ownership.
-- Permit simple `execute + respond` plans without requiring Deep Planner.
-- Make semantic escalation a valid first-class output rather than a validation
-  accident.
-- Preserve one bounded repair for genuinely malformed model output.
-- Distinguish semantic escalation, repaired output, and technical contract
-  failure in retained evidence.
-- Reduce median cognitive-runtime latency for the retained simple multi-goal
-  matrix by at least 35 percent against the July 17 baseline.
+- Make simple common-catalog multi-goal planning a real Fast terminal path.
+- Keep the LLM as semantic plan author.
+- Preserve exact per-goal accounting and exact model-authored step ownership.
+- Permit simple execute, respond, and execute-plus-respond mixed plans.
+- Make semantic escalation valid without turning it into contract failure.
+- Preserve one bounded fresh-object repair for malformed output.
+- Distinguish terminal, semantic escalation, repair, and technical failure.
+- Reduce median cognitive latency by at least 35 percent against the retained
+  23.79-second baseline.
 
-### 3.2 Non-goals
+### 4.2 Non-goals
 
-- Do not create a second semantic authority.
-- Do not let Fast Planner execute, authorize, or commit side effects.
-- Do not add action-name keyword branches, phrase tables, or hardcoded
+- Do not add keyword branches, phrase tables, intent-to-action dictionaries, or
   case-specific plans.
-- Do not expose rare, safety-locked, unavailable, or full-registry-only skills
-  to the Fast Planner terminal surface.
-- Do not remove Deep Planner or its one-way escalation role.
+- Do not let the host select actions from user wording.
+- Do not let Fast Planner execute, authorize, or commit effects.
+- Do not expose rare, locked, unavailable, or full-registry-only capabilities to
+  the Fast terminal surface.
+- Do not remove Deep Planner or weaken one-way escalation.
 - Do not weaken confirmation, provider validation, resource validation,
-  idempotency, interruption, cancellation, evidence, or safe-idle boundaries.
-- Do not use `chromie.speak` as a planner leaf.
-- Do not claim microphone, speaker, physical-hardware, or release evidence from
-  simulator text runs.
+  idempotency, cancellation, interruption, evidence, or safe-idle boundaries.
+- Do not use `chromie.speak` as a planner step.
+- Do not claim microphone, speaker, hardware, or release evidence from text-only
+  simulator qualification.
 
-## 4. Model-facing contract
+## 5. Model-facing contract
 
-The model-facing DTO remains flat. Host-owned fields such as `plan_id`,
-`planner_tier`, `schema_version`, and authoritative top-level Goal IDs remain
-outside model authority.
+The decoder-facing schema is `FastPlannerMultiGoalPlanOutput`. It remains flat
+at the top level to avoid the deployed decoder's earlier top-level union issue,
+but every semantic plan field is model-authored and decoder-required.
 
-For a multi-goal Fast Planner request, the model DTO has this conceptual shape:
-
-```json
-{
-  "disposition": "respond|execute|mixed|escalate",
-  "coverage": "complete|partial|uncertain",
-  "confidence": 0.0,
-  "response_text": "",
-  "steps": [],
-  "goal_outcomes": {},
-  "goal_satisfaction": null,
-  "escalation_reason": "",
-  "plan_relation": "exact",
-  "user_confirmation_required": false
-}
-```
-
-`steps`, `goal_outcomes`, and `goal_satisfaction` are always present at the
-multi-goal decoder boundary. Their legal content depends on `disposition`.
-
-### 4.1 Terminal execute
-
-A terminal `execute` result requires:
-
-- `coverage=complete`;
-- confidence at or above the configured Fast Planner threshold;
-- one complete `goal_outcomes` entry for every authoritative Goal ID;
-- every per-goal disposition equal to `execute`;
-- one or more executable steps;
-- every step using an exact common unlocked capability ID;
-- every step carrying non-empty `source_goal_ids`;
-- every execute outcome carrying non-empty `step_ids`;
-- exact consistency between outcome `step_ids` and step ownership;
-- non-null aggregate and per-goal prospective satisfaction.
-
-### 4.2 Terminal respond
-
-A terminal `respond` result requires:
-
-- `coverage=complete`;
-- confidence at or above threshold;
-- a complete per-goal outcome map;
-- every per-goal disposition equal to `respond`;
-- non-empty per-goal `response_text`;
-- non-empty top-level `response_text` suitable for Response Composer context;
-- zero executable steps;
-- no response transport skill in the plan;
-- non-null aggregate and per-goal prospective satisfaction.
-
-### 4.3 Terminal mixed
-
-A terminal `mixed` result is legal only when all goals are completely covered
-and each goal is independently simple. Fast terminal mixed output is limited to
-per-goal `execute` and `respond` dispositions.
-
-It requires:
-
-- at least one `execute` goal and at least one `respond` goal;
-- a complete exact outcome map;
-- one or more common unlocked executable steps;
-- no executable step for a `respond` goal;
-- non-empty response text for every `respond` goal;
-- exact step ownership for every `execute` goal;
-- non-null aggregate and per-goal prospective satisfaction.
-
-If any goal requires clarification, full-registry retrieval, an unavailable or
-refused judgment, a material alternative, safety-sensitive reasoning, or a
-capability outside the common unlocked catalog, the Fast Planner must escalate.
-
-### 4.4 Semantic escalation
-
-A legal semantic escalation requires:
-
-```json
-{
-  "disposition": "escalate",
-  "coverage": "partial",
-  "steps": [],
-  "goal_outcomes": {},
-  "goal_satisfaction": null,
-  "escalation_reason": "Specific reason Deep Planner is required"
-}
-```
-
-`coverage=uncertain` is also legal. An escalation must not contain executable
-steps, partial goal outcomes, completion claims, fabricated unavailable
-judgments, or substitute capabilities.
-
-### 4.5 Top-level disposition rule
-
-For a terminal result:
-
-- all per-goal outcomes `execute` -> top-level `execute`;
-- all per-goal outcomes `respond` -> top-level `respond`;
-- a mixture of `execute` and `respond` -> top-level `mixed`.
-
-For escalation, `goal_outcomes` is empty and top-level disposition is
-`escalate`.
-
-## 5. Decoder-compatible schema strategy
-
-The deployed structured decoder has previously mishandled a top-level `oneOf`
-by selecting a branch without applying surrounding requirements. The Fast
-Planner multi-goal contract must therefore remain one flat schema rather than a
-top-level union.
-
-The schema builder should implement these rules:
-
-1. Add `goal_outcomes` to the top-level `required` list for multi-goal Fast
-   requests.
-2. Constrain outcome property names to the authoritative Goal IDs and reject
-   additional properties.
-3. Permit the outcome object to contain either zero properties or up to the
-   exact authoritative goal count at the decoder layer.
-4. Do not mark every inner Goal ID as JSON-Schema-required for Fast Planner,
-   because a valid escalation uses `{}`.
-5. Continue to require every inner Goal ID for multi-goal Deep Planner output.
-6. Let deterministic cross-field validation enforce the only two legal Fast
-   shapes: empty escalation or complete terminal map.
-7. Continue to constrain step skills to the common unlocked catalog and
-   `source_goal_ids` to authoritative IDs.
-
-This avoids a fragile union while still preventing the model from omitting the
-entire field.
-
-## 6. Validation, repair, and escalation flow
-
-```text
-Fast model generation
-  -> decoder schema
-  -> PlannerModelOutput validation
-  -> complete non-short-circuit diagnostics
-  -> at most one fresh schema-constrained repair
-  -> valid terminal plan
-       or valid semantic escalation
-       or visible technical contract failure
-  -> Deep Planner only when escalation or failure requires it
-```
-
-Rules:
-
-- Repair regenerates a fresh object from the authoritative turn, goals,
-  catalog, and complete diagnostics. It does not splice the invalid JSON.
-- A valid semantic escalation sets normal Fast Planner status to `escalate` and
-  must not appear as `structured_output_validation` in stage diagnostics.
-- A failed contract repair may still hand the original authoritative goals to
-  Deep Planner because both tiers are inside the same semantic authority. It
-  must be labelled as technical recovery, not normal semantic escalation.
-- Deep Planner never depends on malformed Fast Planner JSON for semantic truth.
-- No Fast Planner step may be committed before the terminal plan has passed the
-  shared deterministic validator.
-
-## 7. Response Composer claim discipline
-
-Fast terminal mixed planning does not transfer speech ownership away from
-Response Composer.
-
-For a plan such as blink plus joke, this is a valid planner shape:
+A representative mixed plan has this shape:
 
 ```json
 {
   "disposition": "mixed",
   "coverage": "complete",
   "confidence": 0.98,
+  "goal_summary": "Perform the physical goal and answer the conversational goal.",
+  "response_text": "A short model-authored answer.",
   "steps": [
     {
-      "step_id": "step_blink",
-      "skill_id": "soridormi.blink_eyes",
+      "step_id": "physical-step",
+      "skill_id": "catalog.skill_id",
       "args": {"count": 2},
-      "source_goal_ids": ["goal_blink"]
+      "timing": "sequential",
+      "source_goal_ids": ["goal-action"],
+      "reason_summary": "Execute the physical goal exactly."
     }
   ],
+  "escalation_reason": "",
+  "unresolved": [],
+  "parameter_resolutions": [],
   "goal_outcomes": {
-    "goal_blink": {
+    "goal-action": {
       "disposition": "execute",
       "coverage": "complete",
-      "step_ids": ["step_blink"],
-      "satisfaction": {"score": 1.0, "status": "exact"}
+      "response_text": "",
+      "unresolved": [],
+      "step_ids": ["physical-step"],
+      "satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": ["goal-action"],
+        "unmet_goal_ids": [],
+        "unmet_requirements": [],
+        "rationale": "The step fully plans this goal."
+      },
+      "rationale": "The physical step owns this goal."
     },
-    "goal_joke": {
+    "goal-answer": {
       "disposition": "respond",
       "coverage": "complete",
-      "response_text": "Why did the robot cross the road? Because it was programmed by the chicken!",
+      "response_text": "A short model-authored answer.",
+      "unresolved": [],
       "step_ids": [],
-      "satisfaction": {"score": 1.0, "status": "exact"}
+      "satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": ["goal-answer"],
+        "unmet_goal_ids": [],
+        "unmet_requirements": [],
+        "rationale": "The response fully answers this goal."
+      },
+      "rationale": "Answer the conversational goal directly."
     }
   },
-  "goal_satisfaction": {"score": 1.0, "status": "exact"}
+  "goal_satisfaction": {
+    "score": 1.0,
+    "status": "exact",
+    "satisfied_goal_ids": ["goal-action", "goal-answer"],
+    "unmet_goal_ids": [],
+    "unmet_requirements": [],
+    "rationale": "Every goal is fully planned."
+  },
+  "plan_relation": "exact",
+  "user_confirmation_required": false
 }
 ```
 
-Before execution evidence exists, Response Composer may say:
+No production code interprets the words in the user turn to create this object.
+The model selects from the dynamic executable catalog and returns the plan.
 
-> I’ll blink twice. Here’s a quick one: Why did the robot cross the road?
+## 6. Decoder-compatible schema strategy
 
-It must not say or stage-direct:
+The schema closes the live decoder gap without transferring semantic authority
+to the host:
 
-> *Blinks twice* ...
+1. Every top-level plan field is required.
+2. `goal_outcomes` is required.
+3. Every authoritative Goal ID is required inside `goal_outcomes`.
+4. Additional Goal IDs are forbidden.
+5. Every outcome field is required.
+6. Every satisfaction field is required.
+7. Every step field is required, including non-empty model-authored `step_id`,
+   timing, ownership, and rationale.
+8. Skill IDs are constrained to the exact executable common catalog.
+9. Goal references are constrained to the exact authoritative Goal IDs.
+10. Per-goal dispositions are limited to `execute`, `respond`, or `escalate`.
+11. Cross-field semantic invariants are validated after decoding.
+12. One fresh schema-constrained repair is permitted; the host never fills a
+    missing semantic field.
 
-when the blink has not yet completed. Stage directions that narrate a pending
-physical action count as unsupported completion claims. Exact user-requested
-ordering must be represented through plan timing and response phases rather
-than fabricated narration.
+The schema contains no user-utterance examples that act as dispatch rules. The
+capability catalog and canonical goals are dynamic request inputs.
 
-## 8. Observability contract
+## 7. Semantic invariants
 
-The implementation must make the Fast path measurable without parsing error
-strings.
+### 7.1 Terminal plan
 
-Every Fast Planner result should expose a normalized path classification:
+- Outcomes cover every authoritative goal exactly once.
+- Every execute outcome references at least one real model-authored step.
+- Every respond outcome has non-empty response text and no step IDs.
+- Every step's `source_goal_ids` exactly match the execute outcomes that
+  reference it.
+- Every executable step is referenced by at least one execute outcome.
+- Aggregate disposition exactly matches outcome dispositions.
+- Aggregate and per-goal satisfaction are exact for terminal Fast plans.
+- `chromie.speak` and other response transport are not planner leaves.
+
+### 7.2 Semantic escalation
+
+- All per-goal outcomes are `escalate`; escalation cannot be mixed with execute
+  or respond outcomes.
+- Coverage is partial or uncertain.
+- Steps are empty.
+- Every goal has a model-authored unresolved reason or rationale.
+- Aggregate and per-goal satisfaction are non-exact.
+- The top-level escalation reason is non-empty.
+
+### 7.3 Host responsibilities
+
+The host may:
+
+- add canonical envelope identity;
+- verify schema and semantic invariants;
+- verify catalog membership and arguments;
+- apply confidence, confirmation, safety, provider, and runtime gates;
+- fail closed or invoke Deep Planner with explicit reason.
+
+The host may not:
+
+- choose a skill from user words;
+- generate or repair plan steps locally;
+- generate step IDs for multi-goal Fast output;
+- assign goal ownership;
+- convert a physical goal into a response or vice versa;
+- derive model satisfaction or aggregate disposition.
+
+## 8. Proof against phrase-to-action hardcoding
+
+The focused regression suite includes a test that submits the **same user text
+and the same authoritative Goal IDs** twice while changing only the mocked LLM
+output. The two resulting CanonicalPlans preserve the different model-authored
+skills, arguments, step IDs, and ownership. This proves the host does not map the
+utterance to a fixed action plan.
+
+A second regression supplies a missing multi-goal `step_id` with contract repair
+disabled. The host fails closed instead of generating an ID. This protects the
+model-authored plan boundary.
+
+Source audit for the Fast multi-goal path must also remain free of:
+
+- checks for words such as action names or conversational topics;
+- case IDs;
+- fixed capability selection by utterance;
+- hardcoded production plans.
+
+Concrete action names are permitted in tests and capability manifests only as
+fixtures or catalog data.
+
+## 9. Validation, repair, and escalation flow
 
 ```text
-terminal
-semantic_escalation
-contract_failure
+Fast model generation
+  -> FastPlannerMultiGoalPlanOutput decoder schema
+  -> complete non-short-circuit diagnostics
+  -> at most one fresh schema-constrained model repair
+  -> shared semantic plan validation
+  -> host adds identity-only CanonicalPlan envelope
+  -> shared CanonicalPlan validation
+  -> valid Fast terminal plan
+       or valid Fast semantic escalation
+       or visible technical contract failure
+  -> Deep Planner only when escalation or technical failure requires it
 ```
 
-Retained metadata should include:
+Malformed Fast semantics are not copied into Deep Planner as an authoritative
+plan. The original user turn, Goal Association output, and capability catalog
+remain available because they belong to the same goal-driven semantic authority.
 
-- whether contract repair was attempted and succeeded;
-- whether Deep Planner was invoked;
-- why Deep Planner was invoked: `semantic_escalation`,
-  `fast_contract_failure`, or later host replan;
+## 10. Observability
+
+Each retained turn should record:
+
+- Fast path classification: terminal, semantic escalation, repaired terminal,
+  repaired escalation, or contract failure;
+- whether Deep Planner ran and why;
 - terminal planner tier;
-- number of authoritative goals, outcome entries, and executable steps;
-- Fast and Deep stage timings;
-- whether a contract failure appeared in stage diagnostics.
+- authoritative goal count;
+- outcome count;
+- executable step count;
+- contract repair attempt and result;
+- Fast, Deep, Response Composer, cognitive total, and end-to-end timings.
 
-Required counters or equivalent trace aggregates:
+A successful Deep recovery must not erase a Fast contract failure.
 
-- Fast terminal multi-goal count;
-- Fast semantic escalation count;
-- Fast contract repair count;
-- Fast contract failure count;
-- Deep Planner invocation count by reason;
-- Deep Planner avoided count;
-- Fast terminal latency and end-to-end cognitive latency.
+## 11. Implementation map
 
-A successful turn recovered by Deep Planner does not erase a Fast Planner
-contract failure from evidence.
-
-## 9. Implementation map
-
-| Component | Required change |
+| Component | Responsibility |
 |---|---|
-| `agent/app/planner_contract.py` | Make multi-goal Fast `goal_outcomes` top-level-required; permit empty-or-complete decoder shape; retain complete Deep requirements; allow Fast terminal `mixed`; enforce empty escalation versus complete terminal map deterministically. |
-| `agent/app/fast_planner.py` | Update system and user prompts to describe the two legal shapes; permit simple common-catalog `mixed`; require explicit `{}` on escalation; preserve fresh-object repair. |
-| `orchestrator/runtime/cognitive_runtime.py` | Distinguish semantic escalation from Fast contract failure; record Deep invocation reason; keep one-way authority and no partial execution. |
-| `agent/app/response_composer.py` | Treat physical stage directions as completion claims before evidence and keep mixed-plan wording prospective. |
-| `tests/test_fast_planner_pr3.py` | Add schema, terminal execute/respond/mixed, semantic escalation, ownership, unknown-key, and repair regressions. |
-| `tests/test_cognitive_runtime_pr7.py` and `tests/test_cognitive_runtime_acceptance_pr7.py` | Prove Fast terminal plans skip Deep Planner and technical failure remains visible while recovering safely. |
-| `tests/test_response_composer_pr6.py` and `tests/test_response_plan_claims.py` | Reject premature stage-direction completion claims for pending physical steps. |
-| `scripts/general_ability_acceptance.py` and scenario expectations | Assert terminal planner tier, Deep invocation reason, absence of Fast contract failure, correct skills, truthful speech, and latency evidence. |
+| `agent/app/planner_contract.py` | Build the decoder-tight model-authored plan schema, validate exact goal coverage and cross-references, and materialize only the goal-keyed map into the CanonicalPlan list form. |
+| `agent/app/fast_planner.py` | Select the multi-goal plan schema, prompt the model as semantic author, add identity-only envelope fields, retain fresh-object repair, and classify terminal/escalation/failure paths. |
+| `shared/chromie_contracts/plan.py` | Represent model-authored Fast per-goal escalation outcomes without forcing the host to discard per-goal semantics. |
+| `orchestrator/runtime/cognitive_runtime.py` | Distinguish semantic escalation from technical failure, record Deep invocation reason, and prevent partial execution. |
+| `agent/app/response_composer.py` | Keep pending-action speech prospective and reject unsupported stage-direction completion claims. |
+| Tests and general-ability acceptance | Prove semantic authority, exact ownership, Fast terminal bypass, visible recovery, truthful speech, execution, and latency. |
 
-## 10. Implementation evidence
+## 12. Automated evidence
 
-The repository now implements the accepted contract path:
+For this revision:
 
-- the flat Fast schema requires the multi-goal `goal_outcomes` envelope while
-  permitting only `{}` escalation or a deterministically complete terminal map;
-- Fast Planner accepts simple common-catalog `execute`, `respond`, and
-  `execute + respond` mixed plans;
-- valid semantic escalation is classified separately from repaired or failed
-  contracts;
-- the coordinator records Fast path classification, Deep invocation reason,
-  terminal planner tier, and goal/outcome/step counts;
-- malformed Fast semantics are removed from Deep Planner context while the
-  authoritative turn, goals, and catalog remain available;
-- Response Composer rejects marked stage directions that narrate a still-pending
-  physical skill as already performed;
-- the live acceptance manifest now requires Fast terminal output, no Deep
-  invocation, no Fast contract failure, and no pending-action stage direction
-  for the four retained simple multi-goal cases.
+- focused Fast Planner tests pass, including same-text/different-model-plan and
+  no-host-step-ID regressions;
+- 121 wider cognitive, contract, response, and semantic-authority tests pass,
+  plus 13 retained subtests;
+- deterministic `multi_goal_daily_life` Level A acceptance passes 8/8;
+- the full repository suite passes 1,056 main tests and 20 legacy Agent tests;
+- documentation governance passes across 65 Markdown files;
+- Python compilation and diff checks pass.
 
-Automated evidence from the implementation revision:
+This is deterministic repository evidence. It does not prove the deployed Fast
+model now satisfies the contract. Fresh supervised warm simulator runs remain
+required.
 
-- 79 focused Fast Planner, coordinator, Response Composer, claim, and acceptance
-  tests passed;
-- 67 wider Deep Planner, cognitive-runtime, satisfaction, architecture-invariant,
-  and semantic-authority tests passed;
-- deterministic `multi_goal_daily_life` Level A acceptance passed 8/8;
-- the full repository suite passed 1,054 main tests and 20 legacy Agent tests;
-- documentation governance passed across 65 Markdown files.
+## 13. Acceptance matrix
 
-This evidence proves the implementation and deterministic boundaries only. It
-does not prove that the deployed Fast model will terminate the retained live
-matrix or meet the latency target. That remains the next supervised simulator
-qualification.
-
-## 11. Implementation sequence
-
-### Phase 1 — contract and unit evidence
-
-- Implement the decoder-compatible schema shape.
-- Add Fast terminal `mixed` to the model enum and validators.
-- Add deterministic empty-escalation versus complete-terminal enforcement.
-- Add focused unit tests before prompt changes.
-
-### Phase 2 — prompt and repair behavior
-
-- Update Fast Planner instructions with the exact two-shape contract.
-- Include one concise valid execute, mixed, and escalation example.
-- Keep invalid previous JSON out of the repair prompt body.
-- Verify that semantic escalation succeeds without invoking contract repair.
-
-### Phase 3 — coordinator and observability
-
-- Record terminal, semantic escalation, and contract failure separately.
-- Record Deep invocation reason.
-- Prove that Fast terminal output bypasses Deep Planner and still crosses the
-  same validator, Response Composer, trusted adapter, and Skill Runtime.
-
-### Phase 4 — response claim regression
-
-- Reject unsupported stage directions for pending physical actions.
-- Retain prospective wording and exact goal coverage.
-
-### Phase 5 — deterministic and live qualification
-
-- Run focused tests and the full repository suite.
-- Run the Level A multi-goal ability class.
-- Run supervised live-text simulator qualification with repeated warm cases.
-- Update `STATUS.md`, `ROADMAP.md`, `DEVELOPMENT_CHECKPOINT.md`, API/configuration
-  references, and retained evidence only after implementation and validation
-  exist.
-
-## 12. Acceptance matrix
-
-### 12.1 Fast terminal cases
+### 13.1 Fast terminal cases
 
 | User turn | Expected Fast result | Deep Planner |
 |---|---|---|
-| Look at me for two seconds, then blink twice. | `execute`, two complete outcomes, two owned steps | Not invoked |
-| Nod twice, then blink once. | `execute`, two complete outcomes, two owned steps | Not invoked |
-| Walk forward for one second, then blink twice. | `execute`, two complete outcomes, two owned steps | Not invoked |
-| Blink twice and tell me a short joke. | `mixed`, one execute outcome, one respond outcome, one blink step | Not invoked |
+| Look at me for two seconds, then blink twice. | `execute`, two complete outcomes, two model-authored owned steps | Not invoked |
+| Nod twice, then blink once. | `execute`, two complete outcomes, two model-authored owned steps | Not invoked |
+| Walk forward for one second, then blink twice. | `execute`, two complete outcomes, two model-authored owned steps | Not invoked |
+| Blink twice and tell me a short joke. | `mixed`, one execute outcome, one respond outcome, one model-authored step | Not invoked |
 
-For all four cases:
+For every retained terminal case:
 
-- Fast Planner must not report `structured_output_validation`;
-- contract repair should not be required in the retained warm qualification;
-- the terminal plan must have `planner_tier=fast`;
-- response speech must cover every Goal ID;
-- no speech may claim a pending physical action already completed;
-- emitted skills and arguments must match the user request;
-- Skill Runtime and Soridormi must complete successfully in `sim` mode;
-- post-execution status must be standing and safe idle.
+- `planner_tier=fast`;
+- Fast path is terminal;
+- Deep Planner is not invoked;
+- no Fast contract failure is hidden;
+- every step ID and ownership relation originates in model output;
+- skills and arguments match the request and catalog;
+- speech covers every Goal ID without claiming pending physical completion;
+- Skill Runtime and Soridormi complete in `sim` mode;
+- post-execution status is standing and safe idle.
 
-### 12.2 Semantic escalation cases
+### 13.2 Semantic escalation cases
 
-Retain cases where Fast Planner must escalate cleanly:
-
-- one goal needs a rare or safety-locked capability;
-- one goal is unsupported by the common catalog;
-- one goal needs clarification or material alternative reasoning;
-- ordering, concurrency, or consequence cannot be decided from bounded Fast
-  context;
-- provider or environment state required for planning is unavailable.
+Retain cases where the common Fast context is insufficient, including rare or
+locked capabilities, unsupported goals, clarification, material alternatives,
+resource-sensitive concurrency, uncertain parameters, or missing trusted state.
 
 Expected result:
 
-- `disposition=escalate`;
+- model-authored `disposition=escalate`;
 - `coverage=partial|uncertain`;
 - `steps=[]`;
-- `goal_outcomes={}`;
-- non-empty specific `escalation_reason`;
+- one `escalate` outcome per authoritative goal;
+- non-exact model-authored satisfaction;
+- non-empty specific escalation reason;
 - no contract repair and no contract-failure diagnostic;
 - Deep Planner invoked with reason `semantic_escalation`.
 
-### 12.3 Technical failure case
+### 13.3 Technical failure case
 
-Inject two invalid Fast model outputs and prove:
+Inject invalid output twice and prove:
 
 - one repair attempt occurs;
 - Fast result is classified as `contract_failure`;
+- the host does not generate missing semantic fields;
 - no partial step is committed;
-- Deep Planner receives the authoritative turn and goals, not malformed Fast
+- Deep Planner receives authoritative goals and catalog, not malformed Fast
   semantics;
-- Deep recovery, if successful, does not erase the Fast failure diagnostic.
+- successful Deep recovery does not erase the Fast failure diagnostic.
 
-## 13. Required commands
-
-Focused deterministic evidence:
+## 14. Required commands
 
 ```bash
 PYTHONPATH=agent:. python -m unittest -v \
@@ -508,30 +436,30 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
   --router-url http://127.0.0.1:8091 \
   --agent-url http://127.0.0.1:8092 \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --evidence-dir .chromie/acceptance/gpu-live/multi-goal-fast \
+  --evidence-dir .chromie/acceptance/gpu-live/multi-goal-fast-model-plan \
   --json
 ```
 
-Target qualification should retain at least three consecutive warm runs. The
-median cognitive-runtime latency should improve by at least 35 percent relative
-to the retained July 17 diagnostic baseline while preserving execution and
-safe-idle evidence.
+Retain at least three consecutive warm runs. The target median cognitive runtime
+is at most 15.46 seconds, corresponding to at least 35 percent improvement over
+the retained 23.79-second baseline.
 
-## 14. Exit criteria
+## 15. Exit criteria
 
 ### Implementation
 
-- The two-shape Fast multi-goal contract is implemented without a top-level
-  schema union.
-- Simple execute, respond, and mixed multi-goal plans can terminate at Fast
-  Planner.
-- Normal semantic escalation is valid and distinct from contract failure.
+- The LLM authors the complete Fast multi-goal semantic plan.
+- The host adds only canonical identity and performs validation/gating.
+- No utterance-specific production rule chooses actions.
+- Simple execute, respond, and mixed plans can terminate at Fast Planner.
+- Semantic escalation is valid and distinct from contract failure.
 
 ### Automated verification
 
-- Focused planner, coordinator, response-claim, and full regression tests pass.
-- Level A `multi_goal_daily_life` passes with explicit Fast-tier assertions.
-- Documentation checks pass.
+- Focused planner and anti-hardcoding regressions pass.
+- Wider cognitive and semantic-authority suites pass.
+- Level A `multi_goal_daily_life` passes 8/8.
+- Full repository and documentation checks pass.
 
 ### Target validation
 
@@ -540,11 +468,11 @@ safe-idle evidence.
 - No retained terminal-simple case invokes Deep Planner.
 - No retained case hides a Fast contract failure.
 - Soridormi execution and safe-idle evidence remain valid.
-- Median cognitive-runtime latency improves by at least 35 percent.
+- Median cognitive runtime is at most 15.46 seconds.
 
 ### Release readiness
 
 This work alone does not close release readiness. Endpoint-reported Soridormi
-revision identity, source-bound running images/models, immutable release inputs,
-and the separately claimed audio or physical-hardware evidence remain governed
-by `STATUS.md` and `RELEASE.md`.
+revision identity, source-bound images/models, immutable release inputs, and
+separately claimed audio or physical-hardware evidence remain governed by
+`STATUS.md` and `RELEASE.md`.

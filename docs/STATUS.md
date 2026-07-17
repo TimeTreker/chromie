@@ -5,9 +5,10 @@
 execution; retained target evidence below records the exact revision that
 produced each bundle
 **Status refresh date:** 2026-07-17
-**Current focus:** **Qualify the implemented Fast Planner multi-goal terminal
-path with repeated warm simulator runs, truthful response wording, and retained
-latency evidence; then resume endpoint-reported
+**Current focus:** **Qualify the revised model-authored Fast Planner multi-goal
+plan contract with repeated warm simulator runs after the first implementation
+failed 20/20 measured cases; retain truthful response wording and latency
+evidence, then resume endpoint-reported
 Soridormi revision identity, source-bound running images/models, and immutable
 release inputs. Physical pilot and human voice-device validation remain separate
 release-support tracks.**
@@ -662,14 +663,15 @@ Deep Planner recovery. Endpoint-reported Soridormi revision identity was still
 absent, so the run does not close release provenance or release readiness. The
 repository implementation now follows
 [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
-The flat Fast schema distinguishes a complete terminal outcome map from an
-explicit empty semantic escalation, permits simple common-catalog mixed
-execute/respond plans, records Fast-path and Deep-invocation reasons, strips
-malformed Fast semantics before technical Deep recovery, and rejects premature
-physical stage-direction claims. Automated evidence passes 79 focused tests, 67
-wider cognitive/authority tests, deterministic multi-goal Level A 8/8, the full
-1,054-test repository suite, and 20 legacy Agent tests. This is implementation
-and Level A evidence only; repeated warm live-text runs must still prove
+A five-run warm benchmark of that first Fast implementation produced 20/20
+`contract_failure` results, invoked Deep Planner for every case, measured a
+22.87-second median cognitive runtime, and improved only 3.9 percent against the
+23.79-second baseline. The decoder schema allowed empty or partial terminal maps
+and optional nested fields that deterministic validation rejected. The revised implementation now requires the model to author the complete
+multi-goal semantic plan, including step IDs, ownership, outcomes, aggregate
+disposition, and satisfaction. The host adds only canonical identity and
+validates the plan. Automated tests cover the revised contract, but fresh warm
+live-text runs must still prove
 `planner_tier=fast`, no Deep invocation, no hidden contract failure, and at
 least 35 percent median cognitive-latency reduction. Operational rollout remains
 governed by [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).

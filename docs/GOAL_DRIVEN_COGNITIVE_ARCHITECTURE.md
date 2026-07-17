@@ -593,14 +593,15 @@ top-level Goal IDs are host-owned. Model-authored steps must name the exact
 Goal IDs they serve through `source_goal_ids`.
 
 For a Fast Planner request containing multiple authoritative goals, the model
-DTO must always include `goal_outcomes`. A complete terminal result uses an
-exact map keyed once by every Goal ID; a valid semantic escalation uses an
-empty map, zero steps, partial or uncertain coverage, and a specific
-escalation reason. Simple common-catalog `execute + respond` combinations
-may terminate as `mixed`; goals requiring clarification, unavailable or
-refused judgment, material alternatives, rare capabilities, or broader
-context escalate. Contract failure is not a semantic escalation. The
-implemented contract and qualification matrix are defined in
+emits one required decision record per Goal ID rather than a CanonicalPlan-shaped
+step/outcome graph. Each decision selects exactly one common-catalog skill, a
+direct conversational response, or semantic escalation. The host generates
+step IDs and compiles ownership mechanically from the keyed decisions before
+shared CanonicalPlan validation. Simple common-catalog `execute + respond`
+combinations may terminate as `mixed`; goals requiring more than one skill,
+clarification, unavailable or refused judgment, material alternatives, rare
+capabilities, or broader context escalate. Contract failure is not semantic
+escalation. The implemented contract and qualification matrix are defined in
 [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
 
 ### 8.2 Deep Planner
@@ -627,11 +628,19 @@ It may produce:
 - unavailable;
 - refused.
 
-Both planner tiers use the same flat model-facing contract. For complete
-multi-goal planning, per-goal outcomes form an exact object keyed by every
-authoritative Goal Association ID. The key is the identity; an outcome value
-cannot repeat or replace it. The host converts the object to the ordered
-canonical outcome list after validation.
+Deep Planner and single-goal Fast Planner use the shared flat
+`PlannerModelOutput` boundary. Multi-goal Fast Planner uses the decoder-tight
+`FastPlannerMultiGoalPlanOutput` boundary. In every case, the planner model owns
+all semantic plan fields: disposition, coverage, steps, step identifiers,
+skill selection, arguments, ordering, goal ownership, per-goal outcomes,
+response content, and satisfaction judgments.
+
+For complete multi-goal planning, per-goal outcomes form an exact object keyed
+by every authoritative Goal Association ID. The key is the identity; an outcome
+value cannot repeat or replace it. After validation, the host may only add the
+canonical identity envelope and convert the goal-keyed object to the ordered
+canonical outcome list. It must not compile, infer, or repair semantic plan
+content from the user utterance.
 
 `plan_relation` and `user_confirmation_required` are typed semantic decisions
 at the model boundary. A safe adjustment or alternative must be executable and

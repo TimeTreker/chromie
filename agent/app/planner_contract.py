@@ -131,6 +131,21 @@ class PlannerModelGoalOutcome(BaseModel):
                 )
             if self.step_ids:
                 raise ValueError("respond goal outcome must not reference steps")
+        elif self.disposition == "escalate":
+            if self.coverage not in {"partial", "uncertain"}:
+                raise ValueError(
+                    "escalate goal outcome requires partial or uncertain coverage"
+                )
+            if self.step_ids:
+                raise ValueError("escalate goal outcome must not reference steps")
+            if self.response_text.strip():
+                raise ValueError(
+                    "escalate goal outcome must not claim a conversational answer"
+                )
+            if not self.unresolved and not self.rationale.strip():
+                raise ValueError(
+                    "escalate goal outcome requires an unresolved need or rationale"
+                )
         elif self.disposition == "clarify":
             if self.coverage not in {"partial", "uncertain"}:
                 raise ValueError(
@@ -463,6 +478,172 @@ def canonical_plan_response_schema(
     return schema
 
 
+def fast_multi_goal_response_schema(
+    *,
+    expected_goal_ids: list[str],
+    allowed_skill_ids: list[str],
+) -> dict[str, Any]:
+    """Return a decoder-tight, model-authored multi-goal plan schema.
+
+    The Fast Planner model authors the semantic plan itself: aggregate
+    disposition and coverage, executable steps, exact step ownership,
+    per-goal outcomes, response text, escalation judgments, and prospective
+    satisfaction.  The host adds only envelope identity fields after validation.
+
+    Every field needed by deterministic validation is required at the JSON
+    decoder boundary.  Semantic escalation is represented by model-authored
+    per-goal ``escalate`` outcomes rather than an empty host-interpreted map.
+    This avoids phrase-to-action rules and avoids the previous gap where the
+    decoder accepted an object that the planner contract necessarily rejected.
+    """
+
+    schema = copy.deepcopy(PlannerModelOutput.model_json_schema())
+    schema["title"] = "FastPlannerMultiGoalPlanOutput"
+    properties = schema.setdefault("properties", {})
+    required = schema.setdefault("required", [])
+    for field_name in (
+        "disposition",
+        "coverage",
+        "confidence",
+        "goal_summary",
+        "response_text",
+        "steps",
+        "escalation_reason",
+        "unresolved",
+        "parameter_resolutions",
+        "goal_outcomes",
+        "goal_satisfaction",
+        "plan_relation",
+        "user_confirmation_required",
+    ):
+        if field_name not in required:
+            required.append(field_name)
+
+    disposition = properties.get("disposition")
+    if isinstance(disposition, dict):
+        disposition["enum"] = ["respond", "execute", "mixed", "escalate"]
+
+    allowed_goals = list(dict.fromkeys(expected_goal_ids))
+    allowed_skills = list(dict.fromkeys(allowed_skill_ids))
+
+    goal_outcomes = properties.get("goal_outcomes")
+    if isinstance(goal_outcomes, dict):
+        goal_outcomes.clear()
+        goal_outcomes.update(
+            {
+                "type": "object",
+                "properties": {
+                    goal_id: {
+                        "$ref": "#/$defs/PlannerModelGoalOutcome",
+                        "description": (
+                            "The Fast Planner's complete semantic outcome for "
+                            "this exact authoritative goal."
+                        ),
+                    }
+                    for goal_id in allowed_goals
+                },
+                "required": allowed_goals,
+                "additionalProperties": False,
+                "minProperties": len(allowed_goals),
+                "maxProperties": len(allowed_goals),
+            }
+        )
+
+    # Fast multi-goal output always carries a model-authored satisfaction
+    # judgment, including an unsatisfied/partial judgment when escalating.
+    goal_satisfaction = properties.get("goal_satisfaction")
+    if isinstance(goal_satisfaction, dict):
+        goal_satisfaction.clear()
+        goal_satisfaction.update({"$ref": "#/$defs/PlannerGoalSatisfaction"})
+
+    outcome_schema = schema.get("$defs", {}).get("PlannerModelGoalOutcome")
+    if isinstance(outcome_schema, dict):
+        outcome_required = outcome_schema.setdefault("required", [])
+        for field_name in (
+            "disposition",
+            "coverage",
+            "response_text",
+            "unresolved",
+            "step_ids",
+            "satisfaction",
+            "rationale",
+        ):
+            if field_name not in outcome_required:
+                outcome_required.append(field_name)
+        outcome_properties = outcome_schema.get("properties", {})
+        outcome_disposition = outcome_properties.get("disposition")
+        if isinstance(outcome_disposition, dict):
+            outcome_disposition["enum"] = ["respond", "execute", "escalate"]
+        satisfaction = outcome_properties.get("satisfaction")
+        if isinstance(satisfaction, dict):
+            satisfaction.clear()
+            satisfaction.update({"$ref": "#/$defs/PlannerGoalSatisfaction"})
+
+    satisfaction_schema = schema.get("$defs", {}).get("PlannerGoalSatisfaction")
+    if isinstance(satisfaction_schema, dict):
+        satisfaction_required = satisfaction_schema.setdefault("required", [])
+        for field_name in (
+            "score",
+            "status",
+            "satisfied_goal_ids",
+            "unmet_goal_ids",
+            "unmet_requirements",
+            "rationale",
+        ):
+            if field_name not in satisfaction_required:
+                satisfaction_required.append(field_name)
+
+    step_schema = schema.get("$defs", {}).get("PlannerModelStep")
+    if isinstance(step_schema, dict):
+        step_required = step_schema.setdefault("required", [])
+        for field_name in (
+            "step_id",
+            "skill_id",
+            "args",
+            "timing",
+            "source_goal_ids",
+            "reason_summary",
+        ):
+            if field_name not in step_required:
+                step_required.append(field_name)
+        step_id = step_schema.get("properties", {}).get("step_id")
+        if isinstance(step_id, dict):
+            step_id["minLength"] = 1
+
+    goal_list_fields = {
+        "goal_ids",
+        "source_goal_ids",
+        "satisfied_goal_ids",
+        "unmet_goal_ids",
+    }
+
+    def constrain(node: Any) -> None:
+        if isinstance(node, dict):
+            node_properties = node.get("properties")
+            if isinstance(node_properties, dict):
+                skill_id = node_properties.get("skill_id")
+                if isinstance(skill_id, dict) and allowed_skills:
+                    skill_id["enum"] = allowed_skills
+                for field_name in goal_list_fields:
+                    field = node_properties.get(field_name)
+                    if isinstance(field, dict) and allowed_goals:
+                        field["items"] = {
+                            "type": "string",
+                            "enum": allowed_goals,
+                        }
+                        field["uniqueItems"] = True
+                        if field_name == "source_goal_ids":
+                            field["minItems"] = 1
+            for value in node.values():
+                constrain(value)
+        elif isinstance(node, list):
+            for value in node:
+                constrain(value)
+
+    constrain(schema)
+    return schema
+
+
 def planner_contract_diagnostics(
     raw: Any,
     *,
@@ -631,21 +812,36 @@ def planner_contract_diagnostics(
                 "fast semantic escalation requires partial or uncertain coverage",
                 value=coverage,
             )
-        if isinstance(outcomes, dict) and outcomes:
-            add(
-                ["goal_outcomes"],
-                "fast semantic escalation requires goal_outcomes={}",
-                value=outcomes,
-            )
-        if raw.get("goal_satisfaction") is not None:
-            add(
-                ["goal_satisfaction"],
-                "fast semantic escalation requires goal_satisfaction=null",
-                value=raw.get("goal_satisfaction"),
-            )
+        if multi_goal_fast:
+            satisfaction = raw.get("goal_satisfaction")
+            if not isinstance(satisfaction, dict):
+                add(
+                    ["goal_satisfaction"],
+                    "multi-goal fast escalation requires model-authored goal_satisfaction",
+                    value=satisfaction,
+                )
+            elif satisfaction.get("status") == "exact":
+                add(
+                    ["goal_satisfaction", "status"],
+                    "fast semantic escalation cannot claim exact goal satisfaction",
+                    value=satisfaction.get("status"),
+                )
+        else:
+            if isinstance(outcomes, dict) and outcomes:
+                add(
+                    ["goal_outcomes"],
+                    "single-goal fast semantic escalation requires goal_outcomes={}",
+                    value=outcomes,
+                )
+            if raw.get("goal_satisfaction") is not None:
+                add(
+                    ["goal_satisfaction"],
+                    "single-goal fast semantic escalation requires goal_satisfaction=null",
+                    value=raw.get("goal_satisfaction"),
+                )
     if isinstance(outcomes, dict):
         outcome_goal_set = set(outcomes)
-        require_complete_outcome_map = not fast_escalation
+        require_complete_outcome_map = not fast_escalation or multi_goal_fast
         if require_complete_outcome_map and outcome_goal_set != expected_goal_set:
             add(
                 ["goal_outcomes"],
@@ -682,10 +878,11 @@ def planner_contract_diagnostics(
             if planner_tier == "fast" and outcome_disposition not in {
                 "execute",
                 "respond",
+                "escalate",
             }:
                 add(
                     ["goal_outcomes", goal_id, "disposition"],
-                    "fast terminal goal outcomes may only execute or respond",
+                    "fast goal outcomes may only execute, respond, or escalate",
                     value=outcome_disposition,
                 )
             inspect_satisfaction(
@@ -715,6 +912,33 @@ def planner_contract_diagnostics(
                         ["goal_outcomes", goal_id, "step_ids"],
                         "respond goal outcome must not reference steps",
                         value=normalized_outcome_step_ids,
+                    )
+            elif outcome_disposition == "escalate":
+                if outcome_coverage not in {"partial", "uncertain"}:
+                    add(
+                        ["goal_outcomes", goal_id, "coverage"],
+                        "escalate goal outcome requires partial or uncertain coverage",
+                        value=outcome_coverage,
+                    )
+                if normalized_outcome_step_ids:
+                    add(
+                        ["goal_outcomes", goal_id, "step_ids"],
+                        "escalate goal outcome must not reference steps",
+                        value=normalized_outcome_step_ids,
+                    )
+                if outcome_response:
+                    add(
+                        ["goal_outcomes", goal_id, "response_text"],
+                        "escalate goal outcome must not claim a conversational answer",
+                        value=outcome_response,
+                    )
+                if not outcome.get("unresolved") and not str(
+                    outcome.get("rationale") or ""
+                ).strip():
+                    add(
+                        ["goal_outcomes", goal_id],
+                        "escalate goal outcome requires an unresolved need or rationale",
+                        value=outcome,
                     )
             elif outcome_disposition == "clarify":
                 if outcome_coverage not in {"partial", "uncertain"}:
@@ -902,12 +1126,15 @@ def validate_planner_model_output(
             raise ValueError(
                 "fast semantic escalation requires partial or uncertain coverage"
             )
-        if output.goal_outcomes:
-            raise ValueError("fast semantic escalation requires goal_outcomes={}")
-        if output.goal_satisfaction is not None:
-            raise ValueError(
-                "fast semantic escalation requires goal_satisfaction=null"
-            )
+        if len(expected_goal_id_set) <= 1:
+            if output.goal_outcomes:
+                raise ValueError(
+                    "single-goal fast semantic escalation requires goal_outcomes={}"
+                )
+            if output.goal_satisfaction is not None:
+                raise ValueError(
+                    "single-goal fast semantic escalation requires goal_satisfaction=null"
+                )
     if (
         len(expected_goal_id_set) > 1
         and output.disposition in {"execute", "respond", "mixed"}
@@ -919,7 +1146,7 @@ def validate_planner_model_output(
         )
     if (
         goal_outcomes_were_supplied
-        and output.disposition != "escalate"
+        and len(expected_goal_id_set) > 1
         and outcome_goal_ids != expected_goal_id_set
     ):
         raise ValueError(
@@ -930,11 +1157,36 @@ def validate_planner_model_output(
         outcome_dispositions = {
             outcome.disposition for outcome in output.goal_outcomes.values()
         }
-        unsupported = outcome_dispositions - {"execute", "respond"}
+        unsupported = outcome_dispositions - {"execute", "respond", "escalate"}
         if unsupported:
             raise ValueError(
-                "fast terminal goal outcomes may only execute or respond: "
+                "fast goal outcomes may only execute, respond, or escalate: "
                 + ",".join(sorted(unsupported))
+            )
+        if "escalate" in outcome_dispositions:
+            if outcome_dispositions != {"escalate"}:
+                raise ValueError(
+                    "fast semantic escalation must not mix escalate outcomes "
+                    "with execute or respond outcomes"
+                )
+            if output.disposition != "escalate":
+                raise ValueError(
+                    "all-escalate goal outcomes require top-level disposition=escalate"
+                )
+            if output.steps:
+                raise ValueError("fast semantic escalation must not carry steps")
+            if output.goal_satisfaction is None:
+                raise ValueError(
+                    "multi-goal fast semantic escalation requires model-authored "
+                    "goal_satisfaction"
+                )
+            if output.goal_satisfaction.status == "exact":
+                raise ValueError(
+                    "fast semantic escalation cannot claim exact goal satisfaction"
+                )
+        elif output.disposition == "escalate":
+            raise ValueError(
+                "multi-goal fast escalation requires one escalate outcome per goal"
             )
         if output.disposition == "mixed" and outcome_dispositions != {
             "execute",
@@ -944,11 +1196,14 @@ def validate_planner_model_output(
                 "fast mixed output requires at least one execute and one respond goal"
             )
     for goal_id, outcome in output.goal_outcomes.items():
-        if outcome.satisfaction is None:
-            continue
+        if planner_tier == "fast" and len(expected_goal_id_set) > 1:
+            if outcome.satisfaction is None:
+                raise ValueError(
+                    "multi-goal fast outcomes require model-authored satisfaction"
+                )
         referenced_goal_ids = {
-            *outcome.satisfaction.satisfied_goal_ids,
-            *outcome.satisfaction.unmet_goal_ids,
+            *(outcome.satisfaction.satisfied_goal_ids if outcome.satisfaction else []),
+            *(outcome.satisfaction.unmet_goal_ids if outcome.satisfaction else []),
         }
         foreign_goal_ids = referenced_goal_ids - {goal_id}
         if foreign_goal_ids:
@@ -956,6 +1211,11 @@ def validate_planner_model_output(
                 "per-goal outcome satisfaction may reference only its enclosing "
                 f"authoritative goal ID {goal_id!r}; found "
                 + ",".join(sorted(foreign_goal_ids))
+            )
+    if planner_tier == "fast" and len(expected_goal_id_set) > 1:
+        if output.goal_satisfaction is None:
+            raise ValueError(
+                "multi-goal fast output requires model-authored goal_satisfaction"
             )
     if output.goal_satisfaction is not None:
         referenced_goal_ids = {

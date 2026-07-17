@@ -3,12 +3,13 @@
 **Current release-prep base:** `0.0.1`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 **Status refresh date:** 2026-07-17
-**Current focus:** Qualify the implemented Fast Planner multi-goal terminal path
-with repeated warm simulator runs, prove simple common-catalog multi-goal turns
-terminate without Deep Planner, and retain latency and truthful-speech evidence
-before returning to release
-provenance work; physical pilot and human voice-device validation remain separate
-tracks
+**Current focus:** Qualify the revised model-authored Fast Planner multi-goal
+plan contract with repeated warm simulator runs after the first plan-shaped
+contract failed
+20/20 measured cases; prove simple common-catalog multi-goal turns terminate
+without Deep Planner and retain latency and truthful-speech evidence before
+returning to release provenance work. Physical pilot and human voice-device
+validation remain separate tracks.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -19,15 +20,20 @@ milestone intent.
 The immediate engineering topic is
 [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
 The July 17 live-text diagnostic passed 4/4 final cases through Deep Planner
-recovery, but every Fast Planner attempt failed its model contract. The repository
-now implements the decoder-compatible empty-escalation versus complete-terminal
-schema, Fast mixed execute/respond support, normalized recovery observability,
+recovery, but every Fast Planner attempt failed its model contract. The first
+Fast-terminal implementation then failed all 20 cases across five warm benchmark
+runs: every path was `contract_failure`, median cognitive runtime was 22.87
+seconds, and improvement was only 3.9 percent. The revised repository contract
+requires the model to author the complete multi-goal plan: step IDs, catalog
+skills, arguments, ordering, ownership, goal outcomes, aggregate disposition,
+and satisfaction. The host adds only canonical identity and validation. It
+preserves mixed execute/respond support, normalized recovery observability,
 Deep-context sanitization, pending-action claim checks, and live acceptance
-assertions. Automated evidence passes 79 focused tests, 67 wider cognitive and
-authority tests, deterministic multi-goal Level A 8/8, 1,054 main tests, and 20
-legacy Agent tests. Resume with three consecutive warm live-text simulator runs;
-do not claim Fast target behavior or the latency reduction until those retained
-runs prove it.
+assertions. Automated evidence passes focused and compatibility tests,
+deterministic multi-goal Level A 8/8, 1,056 main tests, and 20 legacy Agent
+tests. Resume with
+three consecutive warm live-text simulator runs; do not claim Fast target
+behavior or the latency reduction until those retained runs prove it.
 
 The `0.0.1` release implementation is present:
 
