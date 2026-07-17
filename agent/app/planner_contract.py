@@ -375,6 +375,20 @@ def canonical_plan_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
 
+    # Deep Planner is the tier that can author heterogeneous per-goal outcomes
+    # (for example execute + respond => mixed).  Require the complete outcome
+    # map at the decoder boundary for multi-goal deep plans so the decoder cannot
+    # legally omit the field and leave the single repair attempt to recover it.
+    # Fast Planner must keep goal_outcomes optional because its legal compound
+    # fallback is top-level ``escalate`` and per-goal outcomes have no escalate
+    # disposition that could satisfy the top-level consistency invariant.
+    if (
+        planner_tier == "deep"
+        and len(allowed_goals) > 1
+        and "goal_outcomes" not in required
+    ):
+        required.append("goal_outcomes")
+
     goal_outcomes = properties.get("goal_outcomes")
     if isinstance(goal_outcomes, dict):
         outcome_properties = {

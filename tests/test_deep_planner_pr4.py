@@ -268,6 +268,65 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("actual answer text now", repair_prompt)
 
 
+    def test_missing_goal_outcomes_mixed_plan_repairs_under_required_schema(self):
+        goal_ids = ["goal-blink", "goal-joke"]
+        invalid = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                    "reason_summary": "Execute the requested physical blink action.",
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+        repaired = {
+            **invalid,
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "Why did the robot take a break? It needed to recharge.",
+                    "step_ids": [],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+            },
+        }
+        ollama = SequencedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                request("Blink twice and tell me a short joke.", goal_ids=goal_ids)
+            )
+        )
+
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual(
+            [item.disposition for item in plan.goal_outcomes],
+            ["execute", "respond"],
+        )
+        self.assertEqual(len(ollama.prompts), 2)
+        for _, kwargs in ollama.prompts:
+            schema = kwargs["response_format"]
+            self.assertIn("goal_outcomes", schema["required"])
+            self.assertEqual(
+                schema["properties"]["goal_outcomes"]["required"],
+                goal_ids,
+            )
+
     def test_goal_outcome_schema_uses_exact_unique_goal_key_map(self):
         schema = DeepPlannerResolver._response_schema(["goal-look", "goal-blink"])
 
@@ -286,6 +345,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("goal_ids", schema["properties"])
         self.assertIn("confidence", schema["required"])
         self.assertIn("goal_satisfaction", schema["required"])
+        self.assertIn("goal_outcomes", schema["required"])
         satisfaction_schema = schema["$defs"]["PlannerGoalSatisfaction"]
         self.assertIn(
             "not a measurement of whether execution has already happened",

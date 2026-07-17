@@ -182,6 +182,30 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps, [])
         self.assertIn("concurrency feasibility", plan.unresolved)
 
+    def test_multi_goal_fast_schema_keeps_goal_outcomes_optional_for_escalation(self):
+        raw = {
+            "disposition": "escalate",
+            "coverage": "partial",
+            "confidence": 0.9,
+            "steps": [],
+            "escalation_reason": "heterogeneous multi-goal request requires deep planning",
+            "goal_satisfaction": None,
+        }
+        ollama = FakeOllama(raw)
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request(
+                    "Blink twice and tell me a short joke.",
+                    goal_ids=["goal-blink", "goal-joke"],
+                )
+            )
+        )
+
+        self.assertEqual(plan.disposition, "escalate")
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertNotIn("goal_outcomes", schema["required"])
+
     def test_low_confidence_complete_claim_is_forced_to_escalate(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"goal_ids":["goal-blink"],"steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":3}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog(), min_confidence=0.8).resolve(request("眨眼。", goal_ids=["goal-blink"])))
