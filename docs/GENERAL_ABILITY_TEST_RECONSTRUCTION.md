@@ -119,7 +119,8 @@ Preview command:
 ```bash
 conda run -n Chromie python scripts/general_ability_acceptance.py \
   --mode live-text \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 ```
 
 Focused goal-driven daily-life multi-goal preview:
@@ -129,7 +130,8 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
   --mode live-text \
   --ability-class multi_goal_daily_life \
   --goal-driven-runtime apply \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 ```
 
 Execution command for supervised simulator runs:
@@ -140,12 +142,15 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
   --ability-class multi_goal_daily_life \
   --goal-driven-runtime apply \
   --execute \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 ```
 
 Preview mode is not execution evidence. Execution mode is simulator evidence
 only when Soridormi is in `sim` mode and the retained summary shows successful
 Skill Runtime completion and safe idle.
+The declared `--soridormi-repo` is diagnostic provenance only; it does not bind
+the MCP endpoint to that checkout.
 
 ### Layer 5 - Voice And Target Evidence
 

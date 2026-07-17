@@ -158,6 +158,12 @@ coordinated but must not be conflated.
 A blink selected to express attention is not automatically part of the user’s
 goal. An explicit user request to blink is.
 
+Likewise, response transport is not a user-task step. In the maintained
+Goal-driven Runtime, a conversational goal is a `respond` outcome and the
+Response Composer owns its speech plan. A transport capability such as
+`chromie.speak` may remain available to legacy/native interaction surfaces, but
+it is not a Fast or Deep Planner leaf.
+
 ### 3.11 Truth over guessing
 
 Chromie may use bounded ordinary defaults when the model judges a missing value
@@ -581,6 +587,11 @@ complete | partial | uncertain
 Only complete, high-confidence, structurally valid coverage may proceed to
 validation.
 
+The planner model emits a flat semantic DTO, not the canonical transport
+envelope. Plan identity, schema version, planner tier, and authoritative
+top-level Goal IDs are host-owned. Model-authored steps must name the exact
+Goal IDs they serve through `source_goal_ids`.
+
 ### 8.2 Deep Planner
 
 The Deep Planner receives:
@@ -604,6 +615,17 @@ It may produce:
 - specific clarification;
 - unavailable;
 - refused.
+
+Both planner tiers use the same flat model-facing contract. For complete
+multi-goal planning, per-goal outcomes form an exact object keyed by every
+authoritative Goal Association ID. The key is the identity; an outcome value
+cannot repeat or replace it. The host converts the object to the ordered
+canonical outcome list after validation.
+
+`plan_relation` and `user_confirmation_required` are typed semantic decisions
+at the model boundary. A safe adjustment or alternative must be executable and
+must require confirmation. They are validated before being transferred to the
+host-owned canonical envelope.
 
 ### 8.3 No planner loop
 
@@ -672,6 +694,13 @@ Suggested output:
 
 A numeric score may be useful diagnostically but must not replace semantic
 explanation of what is covered, changed, or unresolved.
+
+Planner satisfaction is prospective plan adequacy: it evaluates what the
+proposed response and steps would satisfy if they complete successfully. It is
+not execution progress. A fully covering plan may therefore be `exact` before
+execution, while pending execution by itself is not an unmet planning
+requirement. Completion speech and terminal Goal state still require trusted
+runtime evidence.
 
 Partial satisfaction is not authorization to execute a degraded plan.
 
@@ -920,6 +949,13 @@ The response composer may combine updates naturally:
 > 我已经记住你只喝美式。咖啡我先看看怎么拿，天气也在查。
 
 The individual goals remain separately tracked even when speech is consolidated.
+
+The model-facing composer contract contains only response stages, optional
+social attention, confidence, and rationale, with response coverage constrained
+to the immutable plan's Goal IDs. The host owns composition identity, the
+embedded canonical plan, and its fingerprint. Invalid model output may receive
+one bounded repair in the same composer stage using the exact schema and
+validation errors; it cannot trigger another semantic planner.
 
 ## 16. Scenario-driven development
 

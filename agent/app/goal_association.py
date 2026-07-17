@@ -111,6 +111,35 @@ class GoalAssociationModelGoal(BaseModel):
         return value
 
 
+class GoalSegmentationModelOutput(BaseModel):
+    """Semantic goal segmentation used when no association target exists."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    new_goals: list[GoalAssociationModelGoal] = Field(
+        default_factory=list,
+        max_length=8,
+    )
+    clarification: str = ""
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    reason_summary: str = ""
+
+    @field_validator("clarification", "reason_summary", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return " ".join(value.strip().split())
+        return value
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> "GoalSegmentationModelOutput":
+        if self.clarification and self.new_goals:
+            raise ValueError("clarification must not be mixed with new goals")
+        if not self.clarification and not self.new_goals:
+            raise ValueError("output must contain new_goals or clarification")
+        return self
+
+
 class GoalAssociationModelOutput(BaseModel):
     """Small semantic DTO returned by the Goal Association model."""
 
@@ -159,7 +188,14 @@ class GoalAssociationResolver:
     async def resolve(self, request: AgentRunRequest) -> GoalAssociationResolution:
         active_goals = self._active_goals(request)
         turn_id = self._turn_id(request)
-        response_schema = self._response_schema(active_goals)
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ) = (
+            GoalAssociationModelOutput
+            if active_goals
+            else GoalSegmentationModelOutput
+        )
+        response_schema = self._response_schema(output_type, active_goals)
         generation_options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -173,8 +209,8 @@ class GoalAssociationResolver:
 
         try:
             raw = await self.ollama.generate(
-                self._build_prompt(request, active_goals, response_schema=response_schema),
-                system=self._system_prompt(),
+                self._build_prompt(request, active_goals, output_type=output_type),
+                system=self._system_prompt(output_type),
                 options=generation_options,
                 response_format=response_schema,
             )
@@ -183,7 +219,10 @@ class GoalAssociationResolver:
             initial_raw = raw
             try:
                 resolution = self._validate_contract_output(
-                    raw, request=request, turn_id=turn_id
+                    raw,
+                    request=request,
+                    turn_id=turn_id,
+                    output_type=output_type,
                 )
             except ValidationError as exc:
                 repair_attempted = True
@@ -200,11 +239,11 @@ class GoalAssociationResolver:
                         request=request,
                         active_goals=active_goals,
                         turn_id=turn_id,
-                        response_schema=response_schema,
+                        output_type=output_type,
                         raw=raw,
                         validation_error=initial_validation_error,
                     ),
-                    system=self._repair_system_prompt(),
+                    system=self._repair_system_prompt(output_type),
                     options=generation_options,
                     response_format=response_schema,
                 )
@@ -212,7 +251,10 @@ class GoalAssociationResolver:
                     raise ValueError("goal-association repair response is not a JSON object")
                 repair_raw = repaired
                 resolution = self._validate_contract_output(
-                    repaired, request=request, turn_id=turn_id
+                    repaired,
+                    request=request,
+                    turn_id=turn_id,
+                    output_type=output_type,
                 )
                 repair_metadata = dict(resolution.metadata)
                 repair_metadata["contract_repair"] = {
@@ -257,7 +299,7 @@ class GoalAssociationResolver:
                 **failure,
                 "active_goal_count": len(active_goals),
                 "sid": request.sid,
-                "contract_schema": "GoalAssociationModelOutput",
+                "contract_schema": output_type.__name__,
                 "contract_repair_attempted": repair_attempted,
                 "contract_repair_succeeded": False,
             }
@@ -269,7 +311,10 @@ class GoalAssociationResolver:
                 metadata["repair_raw_output"] = self._bounded_json(repair_raw, 4000)
             return GoalAssociationResolution(
                 turn_id=turn_id,
-                clarification=self._safe_clarification(request),
+                clarification=self._safe_clarification(
+                    request,
+                    has_active_goals=bool(active_goals),
+                ),
                 confidence=0.0,
                 reason_summary=(
                     "Goal association output did not satisfy the schema after one model repair attempt; no goal operation was accepted."
@@ -286,8 +331,11 @@ class GoalAssociationResolver:
         *,
         request: AgentRunRequest,
         turn_id: str,
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
     ) -> GoalAssociationResolution:
-        model_output = GoalAssociationModelOutput.model_validate(raw)
+        model_output = output_type.model_validate(raw)
         return self._expand_model_output(
             model_output,
             request=request,
@@ -306,17 +354,19 @@ class GoalAssociationResolver:
 
 
     @staticmethod
-    def _response_schema(active_goals: list[dict[str, Any]]) -> dict[str, Any]:
-        schema = copy.deepcopy(GoalAssociationModelOutput.model_json_schema())
+    def _response_schema(
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+        active_goals: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        schema = copy.deepcopy(output_type.model_json_schema())
         active_ids = [
             " ".join(str(item.get("goal_id") or "").strip().split())
             for item in active_goals
             if " ".join(str(item.get("goal_id") or "").strip().split())
         ]
         properties = schema.get("properties", {})
-        associations = properties.get("associations")
-        if isinstance(associations, dict):
-            associations["maxItems"] = min(8, len(active_ids)) if active_ids else 0
         new_goals = properties.get("new_goals")
         if isinstance(new_goals, dict):
             new_goals["maxItems"] = 8
@@ -338,6 +388,9 @@ class GoalAssociationResolver:
                     constrain(value)
 
         constrain(schema)
+        if output_type is GoalSegmentationModelOutput:
+            return schema
+
         schema["oneOf"] = [
             {
                 "properties": {
@@ -388,7 +441,9 @@ class GoalAssociationResolver:
         request: AgentRunRequest,
         active_goals: list[dict[str, Any]],
         *,
-        response_schema: dict[str, Any],
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
         route = request.route_decision
@@ -401,22 +456,40 @@ class GoalAssociationResolver:
                 for item in route.routes[:8]
             ],
         }
+        if output_type is GoalSegmentationModelOutput:
+            state_instructions = (
+                "There are no active Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
+                "Segment the authoritative user turn into independent new Goals, or return a clarification if the meaning is materially ambiguous. "
+            )
+            output_instructions = (
+                "Return only JSON with new_goals, clarification, confidence, and reason_summary. "
+                "The decoder enforces the exact GoalSegmentationModelOutput JSON Schema. "
+            )
+        else:
+            state_instructions = (
+                "Resolve continuity before creation using semantic reasoning. "
+                "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and optionally updated_description, resolved_gap_ids, and requires_replan. "
+                "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
+                "Associations may target only IDs from the active-goal list. "
+            )
+            output_instructions = (
+                "Return only JSON with associations, new_goals, clarification, confidence, and reason_summary. "
+                "The decoder enforces the exact GoalAssociationModelOutput JSON Schema. "
+            )
         return (
-            "Resolve continuity before creation using semantic reasoning. The model-facing contract is deliberately small. "
+            state_instructions
+            + "The model-facing contract is deliberately small. "
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing only description for each responsibility. "
             "A physical action and a conversational answer are independent goals. Ordered physical actions are independent goals when either can succeed or fail separately. "
             "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
-            "For continuity with an existing goal, emit an associations item with relationship, target_goal_ids, confidence, reason_summary, and optionally updated_description, resolved_gap_ids, and requires_replan. "
-            "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"replace\",\"merge\",\"split\",\"reference\"]. "
-            "Associations may target only IDs from the active-goal list. When no active goals exist, associations must be empty. "
             "If the user meaning is materially ambiguous, return only one concise clarification.\n\n"
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "
             "This example is structural, not a phrase-matching rule.\n\n"
-            "Return only JSON with associations, new_goals, clarification, confidence, and reason_summary. "
-            "Each new_goals object contains exactly one field: description. The decoder enforces the exact GoalAssociationModelOutput JSON Schema.\n\n"
+            + output_instructions
+            + "Each new_goals object contains exactly one field: description.\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(active_goals, 6500)}\n\n"
             "Recent conversation JSON:\n"
@@ -433,14 +506,39 @@ class GoalAssociationResolver:
         request: AgentRunRequest,
         active_goals: list[dict[str, Any]],
         turn_id: str,
-        response_schema: dict[str, Any],
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
         raw: dict[str, Any],
         validation_error: str,
     ) -> str:
+        if output_type is GoalSegmentationModelOutput:
+            contract_name = "Goal Segmentation"
+            revision_action = "Re-evaluate the independent goal segmentation"
+            state_instructions = (
+                "There are no active Goals. Existing-goal associations are structurally invalid and must not appear. "
+                "Re-segment every independently satisfiable responsibility into new_goals, or return only a clarification when the meaning is materially ambiguous. "
+            )
+            output_instructions = (
+                "The exact GoalSegmentationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
+                "Return only new_goals, clarification, confidence, and reason_summary. "
+            )
+        else:
+            contract_name = "Goal Association"
+            revision_action = "Re-evaluate the semantic associations"
+            state_instructions = (
+                "Re-evaluate continuity against only the supplied active Goal IDs. "
+            )
+            output_instructions = (
+                "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
+                "Return only associations, new_goals, clarification, confidence, and reason_summary. "
+            )
         return (
-            "The previous minimal Goal Association semantic DTO failed its exact contract. Re-evaluate the semantic associations and "
+            f"The previous minimal {contract_name} semantic DTO failed its exact contract. {revision_action} and "
             "return one corrected JSON object. Preserve valid semantic judgments, but revise every field needed to satisfy "
             "the schema and validation errors. Do not explain the correction and do not use synonym substitution rules.\n\n"
+            + state_instructions
+            + "\n\n"
             f"Latest user turn:\n{request.text}\n\n"
             "Bounded active goals JSON:\n"
             f"{self._bounded_json(active_goals, 7000)}\n\n"
@@ -448,21 +546,41 @@ class GoalAssociationResolver:
             f"{self._bounded_json(raw, 5000)}\n\n"
             "Exact validation errors JSON:\n"
             f"{validation_error}\n\n"
-            "The exact GoalAssociationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "
-            "Return only associations, new_goals, clarification, confidence, and reason_summary. Each new_goals item contains only description. "
+            + output_instructions
+            + "Each new_goals item contains only description. "
             "The host owns every ID and persistence field. Re-segment every independently satisfiable responsibility from the authoritative user turn; do not preserve an invalid merge merely because it appeared in the previous output.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}"
         )
 
     @staticmethod
-    def _repair_system_prompt() -> str:
+    def _repair_system_prompt(
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+    ) -> str:
+        contract_name = (
+            "Goal Segmentation"
+            if output_type is GoalSegmentationModelOutput
+            else "Goal Association"
+        )
         return (
-            "You repair one minimal Goal Association semantic DTO using semantic reasoning and the supplied exact JSON Schema. "
+            f"You repair one minimal {contract_name} semantic DTO using semantic reasoning and the supplied exact JSON Schema. "
             "Return only the corrected JSON object. Do not add commentary, markdown, lexical mappings, or hidden reasoning."
         )
 
     @staticmethod
-    def _system_prompt() -> str:
+    def _system_prompt(
+        output_type: (
+            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
+        ),
+    ) -> str:
+        if output_type is GoalSegmentationModelOutput:
+            return (
+                "You are Chromie's Goal Segmentation model. No active Goal IDs exist, so association with existing work is impossible. "
+                "Use semantic reasoning to preserve independently satisfiable user responsibilities as separate new Goals, but never turn plan steps into goals. "
+                "Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
+                "You are advisory only and never execute or commit. Return JSON only."
+            )
         return (
             "You are Chromie's Goal Association and Segmentation model. Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
             "Apply continuity before creation. Understand references from meaning, bounded active goals, unresolved gaps, and dialogue context. "
@@ -473,13 +591,18 @@ class GoalAssociationResolver:
 
     def _expand_model_output(
         self,
-        model_output: GoalAssociationModelOutput,
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
         *,
         request: AgentRunRequest,
         turn_id: str,
     ) -> GoalAssociationResolution:
         associations: list[GoalAssociation] = []
-        for index, item in enumerate(model_output.associations):
+        model_associations = (
+            model_output.associations
+            if isinstance(model_output, GoalAssociationModelOutput)
+            else []
+        )
+        for index, item in enumerate(model_associations):
             goal_update: dict[str, Any] = {}
             if item.updated_description:
                 goal_update["description"] = item.updated_description
@@ -518,7 +641,7 @@ class GoalAssociationResolver:
                     constraints={},
                     success_criteria=[item.description],
                     metadata={
-                        "model_boundary": "GoalAssociationModelOutput",
+                        "model_boundary": type(model_output).__name__,
                         "host_generated_fields": True,
                     },
                 )
@@ -532,7 +655,7 @@ class GoalAssociationResolver:
             confidence=model_output.confidence,
             reason_summary=model_output.reason_summary,
             metadata={
-                "model_contract": "GoalAssociationModelOutput",
+                "model_contract": type(model_output).__name__,
                 "host_generated_identifiers": True,
             },
         )
@@ -581,7 +704,10 @@ class GoalAssociationResolver:
         if not accepted and not new_goals and not resolution.clarification:
             return GoalAssociationResolution(
                 turn_id=resolution.turn_id,
-                clarification=self._safe_clarification(request),
+                clarification=self._safe_clarification(
+                    request,
+                    has_active_goals=bool(active_goals),
+                ),
                 confidence=0.0,
                 reason_summary="No sufficiently grounded goal association or new goal was accepted.",
                 metadata={**metadata, "status": "needs_clarification"},
@@ -589,5 +715,19 @@ class GoalAssociationResolver:
         return resolution.model_copy(update={"associations": accepted, "new_goals": new_goals, "metadata": metadata})
 
     @staticmethod
-    def _safe_clarification(request: AgentRunRequest) -> str:
-        return "你是在继续刚才的事情，还是想开始一件新的事情？" if (request.language or "").startswith("zh") else "Is this about what we were already doing, or is it a new request?"
+    def _safe_clarification(
+        request: AgentRunRequest,
+        *,
+        has_active_goals: bool,
+    ) -> str:
+        if has_active_goals:
+            return (
+                "你是在继续刚才的事情，还是想开始一件新的事情？"
+                if (request.language or "").startswith("zh")
+                else "Is this about what we were already doing, or is it a new request?"
+            )
+        return (
+            "我还没能可靠地分清你想完成的事情，可以换一种说法吗？"
+            if (request.language or "").startswith("zh")
+            else "I couldn't reliably separate the things you want done. Could you rephrase the request?"
+        )

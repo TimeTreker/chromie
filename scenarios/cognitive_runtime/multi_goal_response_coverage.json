@@ -28,6 +28,20 @@
       "goal_ids": ["goal-weather", "goal-calendar"],
       "goal_summary": "Answer both information goals.",
       "response_text": "今天有雨，下午三点有会议。",
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-weather",
+          "disposition": "respond",
+          "coverage": "complete",
+          "response_text": "今天有雨。"
+        },
+        {
+          "goal_id": "goal-calendar",
+          "disposition": "respond",
+          "coverage": "complete",
+          "response_text": "下午三点有会议。"
+        }
+      ],
       "goal_satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-weather", "goal-calendar"]}
     },
     "response_composition": {

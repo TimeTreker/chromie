@@ -150,9 +150,12 @@ Router uses unlocked `common` entries for the fast compact Qwen prompt as
 entries remain visible in the full catalog but are excluded from the fast
 common prompt even when an experience overlay requests `common`. The initial
 preset is data in `capabilities/prompt_tiers.json`, not a Python skill list.
-`chromie.speak` is common and interaction-executable so mixed speech/body
-requests can stay in the same task proposal list. Search scores are relevance
-signals for catalog inspection endpoints, not Router execution authorization.
+`chromie.speak` remains common and interaction-executable for legacy/native
+`InteractionResponse` compatibility, but the Goal-driven Fast and Deep Planner
+schemas exclude it as response transport. A mixed conversational/body turn uses
+a goal-scoped `respond` outcome plus executable body steps; the Response
+Composer owns the speech plan. Search scores are relevance signals for catalog
+inspection endpoints, not Router execution authorization.
 
 ### Conversation and interaction
 
@@ -172,11 +175,11 @@ The interaction, goal-association, and task-continuity endpoints accept the same
 - `context`
 - `history`
 
-`POST /fast-plan` is available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. It returns the shared `CanonicalPlan` contract. The Fast Planner may return a complete simple response, a complete direct common-capability plan, or an escalation. Partial or uncertain coverage is contractually required to contain zero executable steps. The endpoint never executes by itself; the host uses it inside unified `report_only` observation or authoritative `apply`, where the trusted runtime revalidates every terminal plan.
+`POST /fast-plan` is available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. It returns the shared `CanonicalPlan` contract. Ollama itself receives an exact flat semantic DTO schema; the host adds `schema_version`, `plan_id`, `planner_tier`, and the authoritative Goal Association IDs after model validation. The Fast Planner may return a complete simple response, a complete direct common-capability plan, or an escalation. Partial or uncertain coverage is contractually required to contain zero executable steps. The endpoint never executes by itself; the host uses it inside unified `report_only` observation or authoritative `apply`, where the trusted runtime revalidates every terminal plan.
 
-`POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association advisory, Fast Planner escalation, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Deterministic validation feedback may trigger at most `AGENT_DEEP_PLANNER_MAX_REPLANS` same-tier revisions.
+`POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association advisory, Fast Planner escalation, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. Typed `plan_relation` and `user_confirmation_required` fields enforce confirmation for safe adjustments and alternatives before the host transfers those judgments to canonical metadata. Deterministic validation feedback may trigger at most `AGENT_DEEP_PLANNER_MAX_REPLANS` same-tier revisions.
 
-`POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. The resolved composition embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, forbids pre-execution completion claims, and may include an auxiliary `SocialAttentionPlan`. Social attention is independently validated against exact capability IDs, schemas, target evidence, confirmation policy, and primary-plan resource conflicts; invalid optional behavior is dropped without changing speech or task planning. The unified host invokes this stage in both observation and authoritative apply; composition failure fails closed after authority acquisition.
+`POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, optional `SocialAttentionPlan`, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. The host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One invalid schema result may receive a bounded same-stage repair using the original JSON and exact validation errors; a second invalid result fails closed. Social attention is independently validated against exact capability IDs, schemas, target evidence, confirmation policy, and primary-plan resource conflicts; invalid optional behavior is dropped without changing speech or task planning. The unified host invokes this stage in both observation and authoritative apply; composition failure fails closed after authority acquisition.
 
 `POST /goal-association` is available only when
 `AGENT_GOAL_ASSOCIATION_ENABLED=1` and Agent LLM use is enabled. It applies

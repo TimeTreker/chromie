@@ -196,7 +196,8 @@ conda run -n Chromie python scripts/general_ability_acceptance.py --list
 conda run -n Chromie python scripts/general_ability_acceptance.py --mode check
 conda run -n Chromie python scripts/general_ability_acceptance.py --mode live-text \
   --goal-driven-runtime apply \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 ```
 
 By default `--mode live-text` is preview-only, headless, and no-microphone. The
@@ -204,6 +205,9 @@ scenario text is the only user input. Expected routes, skills, and speech
 snippets are checked after Chromie has already planned its response. Use
 `--execute` only when you intentionally want emitted Soridormi skills to run in
 the supervised simulator.
+The optional `--soridormi-repo` value is recorded as a declared paired checkout
+for diagnostics; it does not identify the source running behind the MCP
+endpoint.
 
 The old standalone text scenario suite and text skill sweep commands have been
 removed and should not be used as behavior-quality evidence.

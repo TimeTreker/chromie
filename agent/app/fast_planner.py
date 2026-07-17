@@ -13,6 +13,10 @@ from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
     expected_goal_ids,
+    is_planner_step_skill,
+    materialize_goal_outcomes,
+    materialize_planner_metadata,
+    validate_planner_model_output,
 )
 from .schema import AgentRunRequest
 
@@ -52,7 +56,9 @@ class FastPlannerResolver:
         executable = [
             item
             for item in capabilities
-            if item.available and item.interaction_executable
+            if item.available
+            and item.interaction_executable
+            and is_planner_step_skill(item.capability_id)
         ]
         capability_payload = [
             {
@@ -103,7 +109,12 @@ class FastPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
-                normalized = self._normalize(raw, request=request, plan_id=plan_id)
+                normalized = self._normalize(
+                    raw,
+                    request=request,
+                    plan_id=plan_id,
+                    expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                )
                 plan = CanonicalPlan.model_validate(normalized)
             except Exception as exc:
                 failure = llm_failure_metadata(exc)
@@ -141,12 +152,16 @@ class FastPlannerResolver:
                     else "fast_planner_unavailable",
                     error=exc,
                     metadata={
-                        "contract_schema": "CanonicalPlan",
+                        "contract_schema": "FastPlannerModelOutput",
+                        "canonical_contract": "CanonicalPlan",
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
                         "initial_raw_output": self._bounded(previous_raw, 4000)
                         if previous_raw is not None
+                        else "",
+                        "repair_raw_output": self._bounded(raw, 4000)
+                        if contract_repair_attempted and raw is not None
                         else "",
                     },
                 )
@@ -161,7 +176,8 @@ class FastPlannerResolver:
                 metadata = dict(validated.metadata)
                 metadata.update(
                     {
-                        "contract_schema": "CanonicalPlan",
+                        "contract_schema": "FastPlannerModelOutput",
+                        "canonical_contract": "CanonicalPlan",
                         "contract_repair_attempted": True,
                         "contract_repair_succeeded": True,
                         "contract_repair": {
@@ -239,8 +255,14 @@ class FastPlannerResolver:
             "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. "
             "Finding one matching skill is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, or capability is unresolved, return disposition=escalate, coverage=partial or uncertain, a non-empty escalation_reason, and zero steps. "
             "Fast Planner must not emit mixed outcomes; escalate so Deep Planner can account for them. For complete direct execution, use exact supplied skill IDs and schema-valid args. "
+            "User-facing speech is owned by Response Composer, not a plan step. Represent a conversational answer as disposition=respond with response_text; if it is independent of an executable goal, escalate for a Deep Planner mixed execute/respond outcome. "
             "Every executable step must use source_goal_ids copied from the canonical goals. Do not use capability_id, parameters, action, input_schema, route, or step_type as plan-step fields. "
-            "The Ollama decoder enforces the exact CanonicalPlan schema out-of-band. Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
+            "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. "
+            "For every complete multi-goal execute or respond result, goal_outcomes must be keyed exactly once by every supplied canonical goal ID. "
+            "Use plan_relation=exact for an exact plan. A safe_adjustment or alternative must set user_confirmation_required=true so the host holds execution for approval. "
+            "The Ollama decoder enforces the exact flat FastPlannerModelOutput schema out-of-band. "
+            "The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. "
+            "Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
             f"FINAL CANONICAL GOALS JSON:\n{self._bounded(grounding, 4500)}\n\n"
             f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}"
@@ -258,7 +280,7 @@ class FastPlannerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Fast Planner output using the supplied authoritative goals, executable capability catalog, exact validation errors, and schema-constrained decoder. "
-            "Regenerate the CanonicalPlan without local aliases or field mappings. Return JSON only."
+            "Regenerate the flat FastPlannerModelOutput without local aliases or field mappings. Return JSON only."
         )
 
     def _normalize(
@@ -267,10 +289,23 @@ class FastPlannerResolver:
         *,
         request: AgentRunRequest,
         plan_id: str,
+        expected_goal_ids_for_turn: list[str],
     ) -> dict[str, Any]:
-        out = dict(raw)
+        model_output = validate_planner_model_output(
+            raw,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+        )
+        out = model_output.model_dump(mode="python")
+        out.pop("plan_relation", None)
+        out.pop("user_confirmation_required", None)
+        out["goal_outcomes"] = materialize_goal_outcomes(
+            model_output,
+            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+        )
         out["plan_id"] = plan_id
         out["planner_tier"] = "fast"
+        out["goal_ids"] = list(expected_goal_ids_for_turn)
         steps = out.get("steps")
         if isinstance(steps, dict):
             steps = [steps]
@@ -281,16 +316,14 @@ class FastPlannerResolver:
             if not isinstance(item, dict):
                 continue
             step = dict(item)
-            step.setdefault("step_id", f"{plan_id}:step:{index}")
-            step.setdefault("args", {})
+            if not step.get("step_id"):
+                step["step_id"] = f"{plan_id}:step:{index}"
             step.setdefault("timing", "sequential")
-            step.setdefault("source_goal_ids", out.get("goal_ids") or [])
             normalized_steps.append(step)
         out["steps"] = normalized_steps
         out.setdefault("coverage", "uncertain")
         out.setdefault("disposition", "escalate")
         out.setdefault("confidence", 0.0)
-        out.setdefault("goal_ids", [])
         out.setdefault("goal_summary", request.text)
         out.setdefault("response_text", "")
         out.setdefault("escalation_reason", "")
@@ -298,7 +331,7 @@ class FastPlannerResolver:
         out.setdefault("parameter_resolutions", [])
         out.setdefault("goal_outcomes", [])
         out.setdefault("goal_satisfaction", None)
-        out.setdefault("metadata", {})
+        out["metadata"] = materialize_planner_metadata(model_output)
         return out
 
     def _validate(
@@ -362,7 +395,8 @@ class FastPlannerResolver:
                 "authority": "advisory",
                 "common_capability_count": len(capability_payload),
                 "min_confidence": self.min_confidence,
-                "contract_schema": "CanonicalPlan",
+                "contract_schema": "FastPlannerModelOutput",
+                "canonical_contract": "CanonicalPlan",
             }
         )
         return plan.model_copy(update={"metadata": metadata})
@@ -393,12 +427,14 @@ class FastPlannerResolver:
                     **llm_failure_metadata(error),
                 }
             )
+        context = request.context if isinstance(request.context, dict) else {}
         return CanonicalPlan(
             plan_id=plan_id,
             planner_tier="fast",
             disposition="escalate",
             coverage="uncertain",
             confidence=0.0,
+            goal_ids=expected_goal_ids(context),
             goal_summary=request.text,
             steps=[],
             escalation_reason=reason,

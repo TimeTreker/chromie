@@ -2,11 +2,11 @@
 
 **Current release-prep base:** `0.0.1`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-16
-**Current focus:** Validate the single-authority Goal-driven Runtime and exact
-evidence provenance on the intended live-text/MuJoCo target before widening any
-release claim; physical pilot preparation and human voice-device validation
-remain separate tracks
+**Status refresh date:** 2026-07-17
+**Current focus:** Complete a fresh live-text/MuJoCo diagnostic rerun after the
+multi-goal model-contract fixes, then validate exact evidence provenance before
+widening any release claim; physical pilot preparation and human voice-device
+validation remain separate tracks
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -95,6 +95,20 @@ The `0.0.1` release implementation is present:
   Goal-state application, classified operational evidence, and immediate
   per-lane rollback; maintained configuration uses authoritative `apply`, while
   retained live-text/MuJoCo evidence for that path remains open;
+- exact model boundaries for that pipeline: Goal Association selects a
+  state-specific schema that omits association when no active goals exist;
+  Fast/Deep Planning uses a flat exact DTO with host-owned plan identity, tier,
+  canonical goal order, and metadata; per-goal model outcomes are keyed exactly
+  once by authoritative goal ID; Goal Satisfaction is prospective; Response
+  Composer uses an exact DTO while the host constructs its canonical envelope;
+  and each model stage permits only one bounded same-stage/schema repair;
+- response-transport separation: planner-visible catalogs exclude
+  `chromie.speak`, conversational work is represented as a `respond` outcome,
+  and Response Composer owns the single user-facing response instead of the
+  planner scheduling speech as a physical step;
+- acceptance provenance forwarding: `general_ability_acceptance.py` accepts
+  `--soridormi-repo` and passes it to the standalone live-text runner, while
+  endpoint-reported executing revision identity remains open;
 - model-authored optional social-attention plans that may choose subtle named
   behavior or `none`, use live target evidence before installation calibration,
   stay outside user task proposals, and fail closed on schema/resource/latency
@@ -151,9 +165,13 @@ gates pass from the intended revisions.
    Composition, atomic Goal-state application, trusted execution, completion,
    Soridormi `sim` mode, and safe idle from the exact recorded Chromie source,
    manifest, clean declared paired Soridormi checkout, and a matching
-   endpoint-reported Soridormi revision. The current runner does not yet obtain
-   that endpoint revision, so do not relabel its diagnostic output or reuse the
-   historical M13 bundle as evidence for this path.
+   endpoint-reported Soridormi revision. Pass the declared paired checkout with
+   `--soridormi-repo ../soridormi`; the runner still does not obtain the
+   endpoint executing revision, so do not relabel its diagnostic output or
+   reuse the historical M13 bundle as evidence for this path. The immediate
+   resume action is a fresh post-fix rerun; the prior attempt to start it was
+   interrupted by execution-platform approval for localhost access, not by a
+   product or release blocker.
 2. Keep the single-authority boundary fail closed: the common safe base owns
    `chat`, the maintained Soridormi launcher widens ownership to
    `chat,robot_action`, exact Router actions remain adapter-only, and the legacy
@@ -223,6 +241,19 @@ telemetry, safety envelopes, and task-level acceptance metrics exist.
 ## Verification baseline
 
 ```text
+Current 2026-07-17 focused root-cause refresh:
+./scripts/run_tests.sh passed: 1040 primary tests plus 20 legacy Agent tests
+python scripts/check_docs.py passed: 64 Markdown files
+multi_goal_daily_life Level A passed: 8/8
+Focused Goal Association, Planner, Goal Satisfaction, Response Composer, and
+runtime-adapter regressions also passed during the repair sequence.
+Diagnostic live execute progressed through 3/4 daily-life cases before the
+mixed blink-and-joke case exposed the response-transport/outcome-shape defects.
+Those structural fixes are implemented and focused-tested; a fresh post-fix
+localhost run is still pending because execution-platform command approval was
+denied. This is not target validation, release readiness, or a product/release
+blocker.
+
 Historical focused refresh after f4bbb2f:
 python scripts/check_docs.py passed
 python -m unittest tests.test_robot_candidate_verifier passed: 12 tests
@@ -374,6 +405,24 @@ PR8 established one semantic authority for applied lanes, made exact Router
 actions adapter-only, constrained Goal Association with the exact model-facing
 schema, and retained CapabilityAgent planning only as an emergency path behind
 both service gates and a non-empty authoritative claim matching the request turn.
+
+The July 17 model-contract repair makes Goal Association state-specific for the
+zero-active-goal case, keeps planner output flat and exact, keys every
+model-facing outcome by its authoritative goal, interprets satisfaction
+prospectively, and keeps plan identity/tier/order/metadata host-owned. Response
+Composer has a separate exact DTO and host-owned envelope. `chromie.speak` is
+not a planner-executable capability; conversational goals flow through
+`respond` outcomes and Response Composer. Each model stage gets at most one
+same-stage/schema repair. The general-ability wrapper also forwards
+`--soridormi-repo` to record the declared paired checkout.
+
+The required test suite passed 1040 primary tests plus 20 legacy Agent tests,
+the documentation check passed 64 Markdown files, and the daily-life Level A
+class passed 8/8. A diagnostic execute run progressed through three of four
+daily-life cases before the final mixed case exposed the now-fixed boundaries. A fresh
+post-fix localhost rerun remains pending because the execution platform denied
+command approval. That session limitation is not a product or release blocker,
+and no Target validation or Release readiness is claimed.
 
 The common safe base enables structured interaction and authoritative `chat`
 apply without Soridormi. The maintained Soridormi launcher enables that

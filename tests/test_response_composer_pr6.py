@@ -27,21 +27,62 @@ class FakeOllama:
         return self.response
 
 
+class ScriptedOllama:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.prompts = []
+
+    async def generate(self, prompt, **kwargs):
+        self.prompts.append((prompt, kwargs))
+        if not self.responses:
+            raise AssertionError("unexpected extra model call")
+        return self.responses.pop(0)
+
+
 def plan(*, disposition="respond", goals=None, steps=None, response_text="你好。"):
+    goal_ids = list(goals or [])
+    normalized_steps = [
+        {**item, "source_goal_ids": item.get("source_goal_ids") or goal_ids}
+        if isinstance(item, dict) else item
+        for item in (steps or [])
+    ]
+    goal_outcomes = []
+    if len(goal_ids) > 1 and disposition == "respond":
+        goal_outcomes = [
+            {
+                "goal_id": goal_id,
+                "disposition": "respond",
+                "coverage": "complete",
+                "response_text": response_text,
+            }
+            for goal_id in goal_ids
+        ]
+    elif len(goal_ids) > 1 and disposition == "execute":
+        goal_outcomes = [
+            {
+                "goal_id": goal_id,
+                "disposition": "execute",
+                "coverage": "complete",
+                "step_ids": [
+                    item["step_id"]
+                    for item in normalized_steps
+                    if isinstance(item, dict)
+                    and goal_id in item.get("source_goal_ids", [])
+                ],
+            }
+            for goal_id in goal_ids
+        ]
     return CanonicalPlan(
         plan_id="plan-pr6",
         planner_tier="fast" if disposition == "respond" else "deep",
         disposition=disposition,
         coverage="complete",
         confidence=0.92,
-        goal_ids=list(goals or []),
+        goal_ids=goal_ids,
         goal_summary="coordinated response",
         response_text=response_text if disposition == "respond" else "",
-        steps=[
-            {**item, "source_goal_ids": item.get("source_goal_ids") or list(goals or [])}
-            if isinstance(item, dict) else item
-            for item in (steps or [])
-        ],
+        steps=normalized_steps,
+        goal_outcomes=goal_outcomes,
     )
 
 
@@ -151,6 +192,165 @@ class ResponseCompositionContractTests(unittest.TestCase):
 
 
 class ResponseComposerResolverTests(unittest.TestCase):
+    def test_live_bare_response_stage_list_repairs_under_exact_schema(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-look", "goal-blink"],
+            steps=[
+                {
+                    "step_id": "look",
+                    "skill_id": "soridormi.look_at_person",
+                    "args": {"duration_s": 2.0, "target_ref": "person"},
+                    "source_goal_ids": ["goal-look"],
+                },
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                },
+            ],
+        )
+        live_malformed_stage = {
+            "covers_goal_ids": ["goal-look", "goal-blink"],
+            "decision": "execute",
+            "must_not_claim_completion": True,
+            "response_text": "I'll look at you for two seconds and then blink twice.",
+        }
+        repaired_stage = {
+            "text": "I'll look at you for two seconds and then blink twice.",
+            "speech_act": "inform",
+            "commitment_state": "evaluating",
+            "must_not_claim_completion": True,
+            "covers_goal_ids": ["goal-look", "goal-blink"],
+        }
+        invalid = {
+            "response_plan": [live_malformed_stage],
+            "social_attention_plan": None,
+            "confidence": 0.9,
+            "rationale": "Pre-action acknowledgement.",
+        }
+        repaired = {
+            **invalid,
+            "response_plan": {"pre_action": repaired_stage},
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+
+        result = asyncio.run(
+            ResponseComposerResolver(ollama).resolve(request(canonical))
+        )
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(
+            result.composition.response_plan.pre_action.covers_goal_ids,  # type: ignore[union-attr]
+            ["goal-look", "goal-blink"],
+        )
+        self.assertTrue(result.metadata["contract_repair_succeeded"])
+        self.assertEqual(len(ollama.prompts), 2)
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertEqual(schema["title"], "ResponseComposerModelOutput")
+        self.assertFalse(schema["additionalProperties"])
+        self.assertIn("response_plan", schema["required"])
+        self.assertEqual(schema["$defs"]["ResponsePlan"]["type"], "object")
+        self.assertIn("SocialAttentionPlan", schema["$defs"])
+        self.assertEqual(ollama.prompts[1][1]["response_format"], schema)
+        self.assertEqual(
+            schema["$defs"]["ResponseStage"]["properties"]["covers_goal_ids"]["items"]["enum"],
+            ["goal-look", "goal-blink"],
+        )
+        self.assertIn(
+            "covers_goal_ids",
+            schema["$defs"]["ResponseStage"]["required"],
+        )
+        repair_prompt = ollama.prompts[1][0]
+        self.assertIn('"response_text"', repair_prompt)
+        self.assertIn("model_type", repair_prompt)
+
+    def test_repeated_bare_response_stage_list_fails_closed_with_both_raw_outputs(self):
+        canonical = plan(goals=["goal-chat"])
+        invalid = {
+            "response_plan": [
+                {"text": "Hello.", "covers_goal_ids": ["goal-chat"]}
+            ]
+        }
+        ollama = ScriptedOllama([invalid, invalid])
+        result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
+
+        self.assertEqual(result.status, "model_unavailable")
+        self.assertTrue(result.metadata["contract_repair_attempted"])
+        self.assertTrue(result.metadata["initial_raw_output"])
+        self.assertTrue(result.metadata["repair_raw_output"])
+        self.assertEqual(len(ollama.prompts), 2)
+
+    def test_coordination_invariant_failure_gets_one_bounded_repair(self):
+        canonical = plan(
+            disposition="execute",
+            goals=["goal-look", "goal-blink"],
+            steps=[
+                {
+                    "step_id": "look",
+                    "skill_id": "soridormi.look_at_person",
+                    "args": {"duration_s": 2.0, "target_ref": "person"},
+                    "source_goal_ids": ["goal-look"],
+                },
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                },
+            ],
+        )
+        invalid = {
+            "response_plan": {
+                "final": {
+                    "text": "Done.",
+                    "commitment_state": "completed",
+                    "must_not_claim_completion": False,
+                    "covers_goal_ids": ["goal-look"],
+                }
+            }
+        }
+        repaired = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "I'll look at you for two seconds, then blink twice.",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-look", "goal-blink"],
+                }
+            }
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+
+        result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn("does not cover all plan goals", ollama.prompts[1][0])
+
+    def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
+        canonical = plan(goals=["goal-chat"])
+        response_plan = {
+            "final": {"text": "Hello.", "covers_goal_ids": ["goal-chat"]}
+        }
+        invalid = {
+            "composition_id": "model-owned",
+            "canonical_plan": canonical.model_dump(mode="json"),
+            "canonical_plan_fingerprint": "model-owned",
+            "metadata": {"authority": "model"},
+            "response_plan": response_plan,
+        }
+        repaired = {"response_plan": response_plan}
+        ollama = ScriptedOllama([invalid, repaired])
+
+        result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertNotEqual(result.composition.composition_id, "model-owned")  # type: ignore[union-attr]
+        self.assertEqual(result.composition.canonical_plan, canonical)  # type: ignore[union-attr]
+
     def test_mixed_execute_and_clarify_composes_one_truthful_response(self):
         canonical = CanonicalPlan(
             plan_id="plan-mixed-response",

@@ -10,6 +10,107 @@ from shared.chromie_contracts.plan import CanonicalPlan
 
 
 class CanonicalPlanOwnershipTests(unittest.TestCase):
+    def test_complete_multi_goal_execute_requires_per_goal_outcomes(self) -> None:
+        with self.assertRaisesRegex(
+            ValidationError,
+            "multi-goal execute or respond plans require per-goal outcomes",
+        ):
+            CanonicalPlan(
+                plan_id="under-covered",
+                planner_tier="deep",
+                disposition="execute",
+                coverage="complete",
+                confidence=1.0,
+                goal_ids=["goal-a", "goal-b"],
+                steps=[
+                    {
+                        "step_id": "step-a",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 1},
+                        "source_goal_ids": ["goal-a"],
+                    }
+                ],
+                goal_satisfaction={
+                    "score": 1.0,
+                    "status": "exact",
+                    "satisfied_goal_ids": ["goal-a", "goal-b"],
+                },
+            )
+
+    def test_goal_satisfaction_cannot_reference_unknown_goal(self) -> None:
+        with self.assertRaisesRegex(
+            ValidationError,
+            "goal satisfaction references unknown goal IDs",
+        ):
+            CanonicalPlan(
+                plan_id="foreign-satisfaction",
+                planner_tier="deep",
+                disposition="execute",
+                coverage="complete",
+                confidence=1.0,
+                goal_ids=["goal-a"],
+                steps=[
+                    {
+                        "step_id": "step-a",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 1},
+                        "source_goal_ids": ["goal-a"],
+                    }
+                ],
+                goal_satisfaction={
+                    "score": 1.0,
+                    "status": "exact",
+                    "satisfied_goal_ids": ["goal-foreign"],
+                },
+            )
+
+    def test_per_goal_satisfaction_cannot_reference_sibling_goal(self) -> None:
+        with self.assertRaisesRegex(
+            ValidationError,
+            "per-goal outcome satisfaction may reference only its own goal ID",
+        ):
+            CanonicalPlan(
+                plan_id="foreign-outcome-satisfaction",
+                planner_tier="deep",
+                disposition="execute",
+                coverage="complete",
+                confidence=1.0,
+                goal_ids=["goal-a", "goal-b"],
+                steps=[
+                    {
+                        "step_id": "step-a",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 1},
+                        "source_goal_ids": ["goal-a"],
+                    },
+                    {
+                        "step_id": "step-b",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 1},
+                        "source_goal_ids": ["goal-b"],
+                    },
+                ],
+                goal_outcomes=[
+                    {
+                        "goal_id": "goal-a",
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "step_ids": ["step-a"],
+                        "satisfaction": {
+                            "score": 1.0,
+                            "status": "exact",
+                            "satisfied_goal_ids": ["goal-b"],
+                        },
+                    },
+                    {
+                        "goal_id": "goal-b",
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "step_ids": ["step-b"],
+                    },
+                ],
+            )
+
     def test_heterogeneous_goal_outcomes_require_mixed_top_level_disposition(self) -> None:
         with self.assertRaises(ValidationError):
             CanonicalPlan(

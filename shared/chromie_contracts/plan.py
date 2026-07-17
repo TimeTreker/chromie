@@ -316,6 +316,10 @@ class CanonicalPlan(BaseModel):
             raise ValueError("mixed disposition requires at least one executable step")
         if self.disposition == "respond" and not self.response_text:
             raise ValueError("respond disposition requires response_text")
+        if self.disposition not in {"execute", "mixed"} and self.steps:
+            raise ValueError(
+                f"{self.disposition} disposition must not carry executable steps"
+            )
         if self.disposition in {"execute", "respond", "mixed"} and self.coverage != "complete":
             raise ValueError("respond, execute, and mixed plans require complete accounting coverage")
 
@@ -326,16 +330,29 @@ class CanonicalPlan(BaseModel):
         if self.disposition == "execute" and blocking:
             raise ValueError("executable plans cannot retain blocking parameter resolutions")
 
-        if self.coverage == "complete" and self.goal_satisfaction is not None:
-            if self.disposition != "mixed" and self.goal_satisfaction.status in {"partial", "unsatisfied"}:
+        goal_id_set = set(self.goal_ids)
+        if self.goal_satisfaction is not None:
+            if (
+                self.coverage == "complete"
+                and self.disposition != "mixed"
+                and self.goal_satisfaction.status in {"partial", "unsatisfied"}
+            ):
                 raise ValueError("complete non-mixed plans cannot report partial or unsatisfied goal coverage")
+            satisfaction_goal_ids = {
+                *self.goal_satisfaction.satisfied_goal_ids,
+                *self.goal_satisfaction.unmet_goal_ids,
+            }
+            unknown_satisfaction_goals = satisfaction_goal_ids - goal_id_set
+            if unknown_satisfaction_goals:
+                raise ValueError(
+                    "goal satisfaction references unknown goal IDs: "
+                    + ",".join(sorted(unknown_satisfaction_goals))
+                )
 
         step_ids = [step.step_id for step in self.steps]
         if len(step_ids) != len(set(step_ids)):
             raise ValueError("canonical plan step_id values must be unique")
         step_id_set = set(step_ids)
-        goal_id_set = set(self.goal_ids)
-
         if self.steps and not goal_id_set:
             raise ValueError("executable steps require at least one canonical plan goal_id")
         for step in self.steps:
@@ -375,6 +392,20 @@ class CanonicalPlan(BaseModel):
             referenced_steps: set[str] = set()
             executable_owners_by_step: dict[str, set[str]] = {}
             for outcome in self.goal_outcomes:
+                if outcome.satisfaction is not None:
+                    outcome_satisfaction_goal_ids = {
+                        *outcome.satisfaction.satisfied_goal_ids,
+                        *outcome.satisfaction.unmet_goal_ids,
+                    }
+                    foreign_satisfaction_goals = outcome_satisfaction_goal_ids - {
+                        outcome.goal_id
+                    }
+                    if foreign_satisfaction_goals:
+                        raise ValueError(
+                            "per-goal outcome satisfaction may reference only its "
+                            f"own goal ID {outcome.goal_id!r}: "
+                            + ",".join(sorted(foreign_satisfaction_goals))
+                        )
                 unknown_steps = set(outcome.step_ids) - step_id_set
                 if unknown_steps:
                     raise ValueError(
@@ -399,6 +430,10 @@ class CanonicalPlan(BaseModel):
                     )
         elif self.disposition == "mixed":
             raise ValueError("mixed plans require per-goal outcomes")
+        elif len(goal_id_set) > 1 and self.disposition in {"execute", "respond"}:
+            raise ValueError(
+                "complete multi-goal execute or respond plans require per-goal outcomes"
+            )
 
         for resolution in blocking:
             if not resolution.source_goal_ids:

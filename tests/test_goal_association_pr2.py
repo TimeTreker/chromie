@@ -128,7 +128,7 @@ class GoalAssociationResolverTests(unittest.TestCase):
             [goal.success_criteria for goal in result.new_goals],
             [["Look at the user for two seconds"], ["Blink twice"]],
         )
-        self.assertEqual(result.metadata["model_contract"], "GoalAssociationModelOutput")
+        self.assertEqual(result.metadata["model_contract"], "GoalSegmentationModelOutput")
         self.assertTrue(result.metadata["host_generated_identifiers"])
 
     def test_missing_minimal_description_uses_one_model_repair(self):
@@ -179,8 +179,12 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertEqual(result.metadata["status"], "needs_clarification")
 
     def test_prompt_requires_continuity_before_creation_and_no_plan_step_goals(self):
-        ollama = FakeOllama({"new_goals": [{"description": "Greet the user.", "source_text": "你好", "beneficiary": "user", "constraints": {}, "success_criteria": [], "metadata": {}}], "confidence": 0.9})
-        asyncio.run(GoalAssociationResolver(ollama).resolve(request("你好")))
+        ollama = FakeOllama({"associations": [{"relationship": "continue", "target_goal_ids": ["goal-a"], "confidence": 0.9}], "new_goals": [], "confidence": 0.9})
+        asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("继续。", active_goals=[active_goal("goal-a", "Do A")])
+            )
+        )
         prompt, kwargs = ollama.prompts[0]
         self.assertIn("Resolve continuity before creation", prompt)
         self.assertIn("Do not split implementation steps into goals", prompt)
@@ -289,7 +293,6 @@ class GoalAssociationResolverTests(unittest.TestCase):
 
     def test_no_active_goals_schema_forbids_associations_and_requires_new_goal_or_clarification(self):
         ollama = FakeOllama({
-            "associations": [],
             "new_goals": [{
                 "description": "Blink twice",
                 "source_text": "Blink twice",
@@ -303,11 +306,110 @@ class GoalAssociationResolverTests(unittest.TestCase):
         asyncio.run(GoalAssociationResolver(ollama).resolve(request("Blink twice", language="en-US")))
 
         schema = ollama.prompts[0][1]["response_format"]
-        self.assertEqual(schema["properties"]["associations"]["maxItems"], 0)
-        self.assertIn("oneOf", schema)
+        self.assertNotIn("associations", schema["properties"])
+        self.assertNotIn("GoalAssociationModelAssociation", schema.get("$defs", {}))
+        self.assertFalse(schema["additionalProperties"])
         prompt = ollama.prompts[0][0]
+        self.assertIn("contract intentionally has no associations field", prompt)
         self.assertIn("one new goal for each independently satisfiable user responsibility", prompt)
         self.assertIn("physical action and a conversational answer are independent goals", prompt)
+        self.assertNotIn("Apply continuity before creation", ollama.prompts[0][1]["system"])
+        self.assertIn("association with existing work is impossible", ollama.prompts[0][1]["system"])
+
+    def test_no_active_goal_fabricated_association_repairs_under_segmentation_contract(self):
+        invalid_live_output = {
+            "associations": [
+                {
+                    "relationship": "continue",
+                    "target_goal_ids": [],
+                    "confidence": 1.0,
+                    "reason_summary": "Continuity with no active goals",
+                }
+            ]
+        }
+        ollama = ScriptedOllama(
+            [
+                invalid_live_output,
+                {
+                    "new_goals": [
+                        {"description": "Look at the user for two seconds"},
+                        {"description": "Blink twice"},
+                    ],
+                    "clarification": "",
+                    "confidence": 0.96,
+                    "reason_summary": "Two independent requested actions.",
+                },
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Look at me for two seconds, then blink twice.",
+                    language="en-US",
+                )
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
+        self.assertEqual(result.associations, [])
+        self.assertEqual(
+            [goal.description for goal in result.new_goals],
+            ["Look at the user for two seconds", "Blink twice"],
+        )
+        for _, kwargs in ollama.prompts:
+            self.assertNotIn("associations", kwargs["response_format"]["properties"])
+        self.assertIn("Existing-goal associations are structurally invalid", ollama.prompts[1][0])
+
+    def test_no_active_goal_repeated_fabrication_fails_closed_with_relevant_clarification(self):
+        invalid_live_output = {
+            "associations": [
+                {
+                    "relationship": "continue",
+                    "target_goal_ids": [],
+                    "confidence": 1.0,
+                }
+            ]
+        }
+        ollama = ScriptedOllama([invalid_live_output, invalid_live_output])
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Nod twice, then blink once.", language="en-US")
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.metadata["status"], "model_contract_failed")
+        self.assertEqual(
+            result.metadata["contract_schema"],
+            "GoalSegmentationModelOutput",
+        )
+        self.assertEqual(result.associations, [])
+        self.assertEqual(result.new_goals, [])
+        self.assertNotIn("already doing", result.clarification)
+        self.assertIn("rephrase", result.clarification)
+
+    def test_no_active_goal_can_return_clarification_without_association(self):
+        ollama = FakeOllama(
+            {
+                "new_goals": [],
+                "clarification": "Which object should I look at?",
+                "confidence": 0.55,
+                "reason_summary": "The target is ambiguous.",
+            }
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Look at it.", language="en-US")
+            )
+        )
+
+        self.assertEqual(result.associations, [])
+        self.assertEqual(result.new_goals, [])
+        self.assertEqual(result.clarification, "Which object should I look at?")
 
     def test_dynamic_schema_limits_existing_targets_to_active_goal_ids(self):
         ollama = FakeOllama({

@@ -3,9 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import copy
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, SkipValidation, ValidationError
 
 from .capabilities.validator import normalize_args_for_schema, validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
@@ -39,6 +40,19 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger("chromie.agent.response_composer")
 
 
+class ResponseComposerModelOutput(BaseModel):
+    """Small model-facing DTO; composition identity remains host-owned."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    response_plan: ResponsePlan
+    # Keep the real model-facing schema while preserving the existing fail-soft
+    # deterministic validation of optional social attention below.
+    social_attention_plan: SkipValidation[SocialAttentionPlan | None] = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    rationale: str = ""
+
+
 class ResponseComposerResolver:
     """Advisory composition of truthful speech and optional social attention."""
 
@@ -56,72 +70,162 @@ class ResponseComposerResolver:
                 metadata={"authority": "advisory", "resolver": "response_composer"},
             )
         composition_id = self._composition_id(request, plan)
-        try:
-            raw = await self.ollama.generate(
-                self._prompt(request, plan),
-                system=self._system_prompt(),
-                options={
-                    "temperature": 0.2,
-                    "top_p": 0.9,
-                    "num_ctx": self.num_ctx,
-                    "num_predict": self.num_predict,
-                },
-                response_format="json",
-            )
-            if not isinstance(raw, dict):
-                raise ValueError("response composer output is not a JSON object")
-            response_plan = ResponsePlan.model_validate(raw.get("response_plan") or {})
-            social_plan, social_reasons = self._validated_social_plan(
-                raw.get("social_attention_plan"),
-                plan=plan,
-                context=request.context,
-            )
-            composition = CoordinatedResponsePlan(
-                composition_id=composition_id,
-                canonical_plan_id=plan.plan_id,
-                canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
-                canonical_plan=plan,
-                response_plan=response_plan,
-                social_attention_plan=social_plan,
-                confidence=float(raw.get("confidence") or 0.0),
-                rationale=str(raw.get("rationale") or ""),
-                metadata={
-                    "authority": "advisory",
-                    "resolver": "response_composer",
-                    "task_plan_immutable": True,
-                    "social_attention_validation_reasons": social_reasons,
-                },
-            )
-            return ResponseCompositionResolution(
-                status="resolved",
-                composition=composition,
-                reason_summary="Task, speech, and optional attention plans were coordinated.",
-                metadata={"authority": "advisory", "resolver": "response_composer"},
-            )
-        except Exception as exc:
-            failure = llm_failure_metadata(exc)
-            logger.warning(
-                "response_composer_inference_failed sid=%s error_type=%s error=%s "
-                "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
-                request.sid,
-                type(exc).__name__,
-                exc,
-                failure["failure_class"],
-                failure["failure_domain"],
-                failure["architecture_attribution"],
-                failure["retryable"],
-            )
-            return ResponseCompositionResolution(
-                status="model_unavailable",
-                reason_summary="Response composition model output was unavailable or invalid.",
-                metadata={
-                    "authority": "advisory",
-                    "resolver": "response_composer",
-                    "error_type": type(exc).__name__,
-                    "error": str(exc)[:300],
-                    **failure,
-                },
-            )
+        response_schema = self._response_schema(plan)
+        previous_raw: Any = None
+        initial_validation_errors = ""
+        contract_repair_attempted = False
+        for attempt in range(2):
+            raw: Any = None
+            try:
+                raw = await self.ollama.generate(
+                    self._prompt(
+                        request,
+                        plan,
+                        previous_raw=previous_raw,
+                        validation_errors=initial_validation_errors,
+                    ),
+                    system=(
+                        self._repair_system_prompt()
+                        if contract_repair_attempted
+                        else self._system_prompt()
+                    ),
+                    options={
+                        "temperature": 0.2,
+                        "top_p": 0.9,
+                        "num_ctx": self.num_ctx,
+                        "num_predict": self.num_predict,
+                    },
+                    response_format=response_schema,
+                )
+                if not isinstance(raw, dict):
+                    raise ValueError("response composer output is not a JSON object")
+                model_output = ResponseComposerModelOutput.model_validate(raw)
+                social_plan, social_reasons = self._validated_social_plan(
+                    model_output.social_attention_plan,
+                    plan=plan,
+                    context=request.context,
+                )
+                composition = CoordinatedResponsePlan(
+                    composition_id=composition_id,
+                    canonical_plan_id=plan.plan_id,
+                    canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+                    canonical_plan=plan,
+                    response_plan=model_output.response_plan,
+                    social_attention_plan=social_plan,
+                    confidence=model_output.confidence,
+                    rationale=model_output.rationale,
+                    metadata={
+                        "authority": "advisory",
+                        "resolver": "response_composer",
+                        "task_plan_immutable": True,
+                        "social_attention_validation_reasons": social_reasons,
+                        "contract_schema": "ResponseComposerModelOutput",
+                        "contract_repair_attempted": contract_repair_attempted,
+                        "contract_repair_succeeded": contract_repair_attempted,
+                    },
+                )
+                return ResponseCompositionResolution(
+                    status="resolved",
+                    composition=composition,
+                    reason_summary="Task, speech, and optional attention plans were coordinated.",
+                    metadata={
+                        "authority": "advisory",
+                        "resolver": "response_composer",
+                        "contract_schema": "ResponseComposerModelOutput",
+                        "contract_repair_attempted": contract_repair_attempted,
+                        "contract_repair_succeeded": contract_repair_attempted,
+                    },
+                )
+            except Exception as exc:
+                failure = llm_failure_metadata(exc)
+                logger.warning(
+                    "response_composer_inference_failed sid=%s attempt=%s error_type=%s error=%s "
+                    "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
+                    request.sid,
+                    attempt + 1,
+                    type(exc).__name__,
+                    exc,
+                    failure["failure_class"],
+                    failure["failure_domain"],
+                    failure["architecture_attribution"],
+                    failure["retryable"],
+                )
+                if attempt == 0 and isinstance(
+                    exc, (ValidationError, json.JSONDecodeError, ValueError)
+                ):
+                    contract_repair_attempted = True
+                    previous_raw = raw
+                    initial_validation_errors = self._validation_error_json(exc)
+                    continue
+                return ResponseCompositionResolution(
+                    status="model_unavailable",
+                    reason_summary="Response composition model output was unavailable or invalid.",
+                    metadata={
+                        "authority": "advisory",
+                        "resolver": "response_composer",
+                        "error_type": type(exc).__name__,
+                        "error": str(exc)[:300],
+                        "contract_schema": "ResponseComposerModelOutput",
+                        "contract_repair_attempted": contract_repair_attempted,
+                        "contract_repair_succeeded": False,
+                        "initial_validation_errors": initial_validation_errors,
+                        "initial_raw_output": self._bounded(previous_raw, 5000)
+                        if contract_repair_attempted and previous_raw is not None
+                        else "",
+                        "repair_raw_output": self._bounded(raw, 5000)
+                        if contract_repair_attempted and raw is not None
+                        else "",
+                        **failure,
+                    },
+                )
+        raise AssertionError("unreachable")
+
+    @staticmethod
+    def _validation_error_json(exc: Exception) -> str:
+        if isinstance(exc, ValidationError):
+            return json.dumps(
+                exc.errors(include_url=False),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )[:8000]
+        return json.dumps(
+            [{"type": type(exc).__name__, "message": str(exc)[:1000]}],
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+    @staticmethod
+    def _response_schema(plan: CanonicalPlan) -> dict[str, Any]:
+        schema = copy.deepcopy(ResponseComposerModelOutput.model_json_schema())
+        schema["title"] = "ResponseComposerModelOutput"
+        goal_ids = list(dict.fromkeys(plan.goal_ids))
+
+        def constrain(node: Any) -> None:
+            if isinstance(node, dict):
+                properties = node.get("properties")
+                if isinstance(properties, dict):
+                    covers_goal_ids = properties.get("covers_goal_ids")
+                    if isinstance(covers_goal_ids, dict) and goal_ids:
+                        covers_goal_ids["items"] = {
+                            "type": "string",
+                            "enum": goal_ids,
+                        }
+                        covers_goal_ids["minItems"] = 1
+                        covers_goal_ids["uniqueItems"] = True
+                        required = node.setdefault("required", [])
+                        if "covers_goal_ids" not in required:
+                            required.append("covers_goal_ids")
+                for value in node.values():
+                    constrain(value)
+            elif isinstance(node, list):
+                for value in node:
+                    constrain(value)
+
+        constrain(schema)
+        return schema
 
     @staticmethod
     def _canonical_plan(context: dict[str, Any]) -> CanonicalPlan | None:
@@ -342,7 +446,14 @@ class ResponseComposerResolver:
                 return True
         return False
 
-    def _prompt(self, request: AgentRunRequest, plan: CanonicalPlan) -> str:
+    def _prompt(
+        self,
+        request: AgentRunRequest,
+        plan: CanonicalPlan,
+        *,
+        previous_raw: Any = None,
+        validation_errors: str = "",
+    ) -> str:
         context = request.context if isinstance(request.context, dict) else {}
         return (
             f"User turn:\n{request.text}\n\n"
@@ -350,6 +461,8 @@ class ResponseComposerResolver:
             f"Active goals JSON:\n{self._bounded(context.get('active_goal_snapshots') or [], 4500)}\n\n"
             f"Social-attention candidates JSON:\n{self._bounded(context.get('social_attention_candidates') or [], 8000)}\n\n"
             f"Attention target evidence JSON:\n{self._bounded(context.get('social_attention_target_evidence') or {'available': False}, 2500)}\n\n"
+            f"Previous Response Composer output when revising:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
+            f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
             "Compose one ResponsePlan and, only when socially useful and evidence-supported, an optional SocialAttentionPlan. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. "
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
@@ -357,7 +470,8 @@ class ResponseComposerResolver:
             "For mixed plans, coordinate executable goals and waiting goals in one natural response: do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage that covers every clarify outcome. "
             "For clarify, name the actual unresolved need naturally and use waiting_for_user. For alternatives, explain the change and request approval. "
             "Social attention is auxiliary interaction behavior, never a user goal or task step; choose decision=none when stillness is more natural, safer, unsupported, or unnecessary. "
-            "Return JSON with response_plan, optional social_attention_plan, confidence, and rationale only."
+            "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
+            "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, optional social_attention_plan, confidence, and rationale only."
         )
 
     @staticmethod
@@ -365,4 +479,11 @@ class ResponseComposerResolver:
         return (
             "You are Chromie's Response Composer. Coordinate truthful speech and optional social presence around an immutable CanonicalPlan. "
             "You do not plan tasks, mutate goals, execute, authorize, or claim unobserved completion. Return JSON only."
+        )
+
+    @staticmethod
+    def _repair_system_prompt() -> str:
+        return (
+            "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
+            "Preserve truthful wording and goal coverage, but correct the JSON structure and coordination invariants. Return only the corrected JSON object."
         )

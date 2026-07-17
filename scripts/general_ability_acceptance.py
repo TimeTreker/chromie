@@ -562,6 +562,7 @@ def _live_case_namespace(
         router_url=args.router_url,
         agent_url=args.agent_url,
         soridormi_mcp_url=args.soridormi_mcp_url,
+        soridormi_repo=args.soridormi_repo,
         manifest=args.soridormi_manifest,
         language=args.language,
         evidence_dir=str(evidence_dir),
@@ -792,6 +793,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--soridormi-manifest",
         type=Path,
         default=ROOT / "capabilities" / "soridormi.json",
+    )
+    parser.add_argument(
+        "--soridormi-repo",
+        default=os.getenv("SORIDORMI_REPO", ""),
+        help=(
+            "Declared paired Soridormi Git checkout recorded for diagnostic "
+            "provenance; this does not identify the source executing behind the "
+            "MCP endpoint."
+        ),
     )
     parser.add_argument("--language", default="en-US")
     parser.add_argument(

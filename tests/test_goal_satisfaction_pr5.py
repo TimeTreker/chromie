@@ -59,7 +59,7 @@ class Catalog:
         ]
 
 
-def request(text: str) -> AgentRunRequest:
+def request(text: str, *, goal_ids: list[str]) -> AgentRunRequest:
     return AgentRunRequest(
         sid="sid-pr5",
         text=text,
@@ -70,7 +70,15 @@ def request(text: str) -> AgentRunRequest:
             confidence=0.0,
             source="llm",
         ),
-        context={},
+        context={
+            "goal_association_resolution": {
+                "associations": [],
+                "new_goals": [
+                    {"goal_id": goal_id, "description": f"Goal {goal_id}"}
+                    for goal_id in goal_ids
+                ],
+            }
+        },
         history=[],
     )
 
@@ -150,7 +158,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 "rationale": "The requested blink is fully covered.",
             },
         }
-        plan = asyncio.run(DeepPlannerResolver(FakeOllama([raw]), Catalog()).resolve(request("眨眨眼睛。")))
+        plan = asyncio.run(DeepPlannerResolver(FakeOllama([raw]), Catalog()).resolve(request("眨眨眼睛。", goal_ids=["goal-blink"])))
         self.assertEqual(plan.parameter_resolutions[0].strategy, "safe_default")
         self.assertEqual(plan.goal_satisfaction.status, "exact")
 
@@ -179,7 +187,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 "unmet_requirements": ["walking duration"],
             },
         }
-        plan = asyncio.run(DeepPlannerResolver(FakeOllama([raw]), Catalog()).resolve(request("往前走。")))
+        plan = asyncio.run(DeepPlannerResolver(FakeOllama([raw]), Catalog()).resolve(request("往前走。", goal_ids=["goal-walk"])))
         self.assertEqual(plan.disposition, "clarify")
         self.assertEqual(plan.parameter_resolutions[0].strategy, "ask_user")
 
@@ -207,7 +215,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 Catalog(),
                 min_goal_satisfaction=0.95,
                 max_replans=1,
-            ).resolve(request("多眨几下眼睛。"))
+            ).resolve(request("多眨几下眼睛。", goal_ids=["goal-blink"]))
         )
         self.assertEqual(plan.steps[0].args["count"], 4)
         self.assertIn("goal_satisfaction_below_threshold", ollama.prompts[1])
@@ -224,7 +232,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "goal_satisfaction": {"score": 0.3, "status": "partial", "unmet_requirements": ["duration"]},
         }
         ollama = FakeOllama([raw])
-        asyncio.run(DeepPlannerResolver(ollama, Catalog()).resolve(request("往前走。")))
+        asyncio.run(DeepPlannerResolver(ollama, Catalog()).resolve(request("往前走。", goal_ids=["goal-walk"])))
         self.assertIn("low-consequence", ollama.prompts[0])
         self.assertIn("goal_satisfaction", ollama.prompts[0])
 

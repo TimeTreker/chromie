@@ -187,19 +187,23 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
   --mode live-text \
   --ability-class multi_goal_daily_life \
   --goal-driven-runtime apply \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 
 conda run -n Chromie python scripts/general_ability_acceptance.py \
   --mode live-text \
   --ability-class multi_goal_daily_life \
   --goal-driven-runtime apply \
   --execute \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 ```
 
 The first command is live service preview evidence only. The second is MuJoCo
 execution evidence only when Soridormi reports `sim`, every expected skill
 completes through the trusted runtime, and the retained run ends safe-idle.
+The declared Soridormi checkout is recorded for diagnostic provenance only and
+does not identify the source executing behind the MCP endpoint.
 
 That runner reports the evidence level and claim scope for each run. A passing
 Level A general-ability run is deterministic regression evidence only; it does

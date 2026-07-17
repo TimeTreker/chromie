@@ -134,7 +134,8 @@ Against deployed services, the same manifest can run live text probes:
 conda run -n Chromie python scripts/general_ability_acceptance.py \
   --mode live-text \
   --goal-driven-runtime apply \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp
+  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
+  --soridormi-repo ../soridormi
 ```
 
 Use `--execute` only for supervised simulator runs. Live text preview checks the
@@ -142,6 +143,9 @@ Router, Agent, and Soridormi status/preflight boundary but does not execute
 motion; live text execution can support a Level C simulator claim only when the
 summary shows successful Skill Runtime execution and safe idle. Neither mode is
 microphone, speaker, or physical hardware evidence.
+`--soridormi-repo` records a declared paired checkout for diagnostic
+provenance; it does not prove which source revision is executing behind the MCP
+endpoint.
 
 The RTX 5090 and RTX 4090 Laptop hardware profiles currently use qualification
 time budgets: 120 seconds per Agent cognitive stage, 150 seconds per host stage,

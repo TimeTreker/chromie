@@ -171,6 +171,7 @@ generated prompts must use a specific speaker.
 | `AGENT_URL` | `http://127.0.0.1:8092` |
 | `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
 | `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
+| `SORIDORMI_REPO` | Optional paired Soridormi Git checkout used by acceptance tools to record diagnostic source provenance. It does not identify or bind the source executing behind `SORIDORMI_MCP_URL`. |
 
 Inside Docker, use Compose service names such as
 `http://chromie-llm:11434`; do not copy host loopback URLs into container
@@ -224,14 +225,18 @@ not selected by phrase rules.
 | `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
 | `AGENT_GOAL_ASSOCIATION_NUM_PREDICT` | `512`; compact JSON output budget for associations plus independent new goals. |
 
-Goal Association sends the compact model-facing
-`GoalAssociationModelOutput.model_json_schema()` to Ollama's `format` field.
-The model returns only existing-goal relationships, independent new-goal
-descriptions, or a clarification. Chromie generates identifiers, versions,
+Goal Association sends a compact state-specific model schema to Ollama's
+`format` field. With active Goal IDs it uses
+`GoalAssociationModelOutput.model_json_schema()` for existing-goal
+relationships, independent new-goal descriptions, or a clarification. With no
+active Goal IDs it uses `GoalSegmentationModelOutput.model_json_schema()`,
+which contains no association property or definition and permits only new-goal
+descriptions or a clarification. Chromie generates identifiers, versions,
 source text, default containers, persistence metadata, and the canonical
 `GoalAssociationResolution` after model validation. Contract validation may
-invoke one bounded schema-constrained model revision; there is no local
-relationship synonym, phrase mapping, or word-form normalization fallback.
+invoke one bounded schema-constrained model revision using the same selected
+schema; there is no local relationship synonym, phrase mapping, or word-form
+normalization fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified `ORCH_COGNITIVE_RUNTIME_MODE=off`. Goal Association is an integrated stage in unified `apply`/`report_only`. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
@@ -239,7 +244,7 @@ relationship synonym, phrase mapping, or word-form normalization fallback.
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `2500`; Fast Planner model timeout. |
 | `AGENT_FAST_PLANNER_MIN_CONFIDENCE` | `0.80`; complete plans below this threshold are converted to escalation. |
 | `AGENT_FAST_PLANNER_NUM_CTX` | `4096`; bounded Fast Planner context. |
-| `AGENT_FAST_PLANNER_NUM_PREDICT` | `512`; canonical-plan JSON budget. |
+| `AGENT_FAST_PLANNER_NUM_PREDICT` | `512`; flat semantic planner-DTO JSON budget. |
 | `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
 | `ORCH_FAST_PLANNER_TIMEOUT_MS` | `3000`; host timeout for report-only planning. |
@@ -249,7 +254,7 @@ relationship synonym, phrase mapping, or word-form normalization fallback.
 | `AGENT_DEEP_PLANNER_MIN_CONFIDENCE` | `0.65`; complete deep plans below this threshold receive bounded same-tier revision. |
 | `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; complete deep plans below this semantic goal-satisfaction score receive bounded same-tier revision. |
 | `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. |
-| `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; canonical-plan JSON budget. |
+| `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
 | `AGENT_DEEP_PLANNER_MAX_REPLANS` | `1`; maximum validator-feedback revisions within the Deep Planner. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
@@ -261,6 +266,27 @@ relationship synonym, phrase mapping, or word-form normalization fallback.
 | `AGENT_RESPONSE_COMPOSER_NUM_PREDICT` | `640`; structured response/social-plan JSON budget. |
 | `ORCH_RESPONSE_COMPOSER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Unified `apply` requires a validated composition bound to the terminal plan. |
 | `ORCH_RESPONSE_COMPOSER_TIMEOUT_MS` | `5000`; host timeout for report-only composition. |
+
+Fast and Deep Planning send an exact flat `PlannerModelOutput` schema to
+Ollama. The model does not author the canonical plan identity, schema version,
+planner tier, or authoritative top-level Goal IDs. Complete multi-goal output
+uses a `goal_outcomes` object with exactly one property per Goal Association ID;
+unknown, missing, duplicate, or value-embedded Goal identities are rejected.
+The model-facing `plan_relation` (`exact`, `safe_adjustment`, or `alternative`)
+and `user_confirmation_required` boolean are typed fields, not values hidden in
+an open metadata object. The host validates them, then records them in the
+canonical metadata used by the existing runtime. Goal satisfaction describes
+prospective plan adequacy if the proposed response and steps succeed, not
+already-completed execution.
+
+The planners exclude response-transport skills such as `chromie.speak` from
+their capability schemas. Conversational goals use `respond` outcomes and
+model-authored response text; the Response Composer turns those outcomes into
+the user-facing `ResponsePlan`. The composer sends the exact
+`ResponseComposerModelOutput` schema and constrains response-stage Goal IDs to
+the immutable canonical plan. It may make one bounded same-stage repair with
+the original output and exact validation errors. Composition identity, the
+canonical plan copy, and its fingerprint remain host-owned.
 
 ## Unified goal-driven cognitive runtime
 
@@ -545,6 +571,7 @@ confirmation before any new action can run.
 | `ORCH_SKILL_MAX_CONCURRENCY` | `8`. |
 | `ORCH_SORIDORMI_MANIFEST` | `capabilities/soridormi.json`. |
 | `SORIDORMI_MCP_URL` | Required when the manifest is materialized and live calls are enabled. |
+| `SORIDORMI_REPO` | Optional checkout path recorded by live-text and voice/MuJoCo acceptance. Checkout revision and dirty state are diagnostic declarations only; endpoint-reported source identity is separate. |
 
 The Skill Runtime uses a process-local scheduler. Imported Soridormi named
 skills share the exclusive group `soridormi.robot_motion`; Soridormi remains

@@ -521,6 +521,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
     evidence_dir = evidence_dir.expanduser().resolve()
     evidence_dir.mkdir(parents=True, exist_ok=True)
     _configure_environment(args, evidence_dir)
+    raw_soridormi_repo = str(getattr(args, "soridormi_repo", "") or "").strip()
 
     # Import after environment defaults are set; the Orchestrator module loads
     # .env.runtime on import but does not override already-exported values.
@@ -812,7 +813,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                 cognitive_apply_lanes=str(args.cognitive_apply_lanes),
                 cognitive_runtime_selected=cognitive_runtime_selected,
                 soridormi_repo=(
-                    Path(args.soridormi_repo) if args.soridormi_repo else None
+                    Path(raw_soridormi_repo) if raw_soridormi_repo else None
                 ),
             ),
         }

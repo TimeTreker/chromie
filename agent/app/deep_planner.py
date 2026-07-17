@@ -15,6 +15,10 @@ from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
     expected_goal_ids,
+    is_planner_step_skill,
+    materialize_goal_outcomes,
+    materialize_planner_metadata,
+    validate_planner_model_output,
 )
 
 try:
@@ -46,7 +50,9 @@ class DeepPlannerResolver:
         executable = [
             item
             for item in capabilities
-            if item.available and item.interaction_executable
+            if item.available
+            and item.interaction_executable
+            and is_planner_step_skill(item.capability_id)
         ]
         payload = [self._capability_payload(item) for item in executable[: self.max_capabilities]]
         expected_goal_ids_for_turn = expected_goal_ids(
@@ -88,7 +94,14 @@ class DeepPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("deep planner response is not a JSON object")
-                plan = CanonicalPlan.model_validate(self._normalize(raw, request=request, plan_id=plan_id))
+                plan = CanonicalPlan.model_validate(
+                    self._normalize(
+                        raw,
+                        request=request,
+                        plan_id=plan_id,
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    )
+                )
             except Exception as exc:
                 failure = llm_failure_metadata(exc)
                 logger.warning(
@@ -133,12 +146,16 @@ class DeepPlannerResolver:
                     error=exc,
                     attempts=attempt + 1,
                     metadata={
-                        "contract_schema": "CanonicalPlan",
+                        "contract_schema": "DeepPlannerModelOutput",
+                        "canonical_contract": "CanonicalPlan",
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": False,
                         "initial_validation_errors": initial_validation_errors,
                         "initial_raw_output": self._bounded(previous_raw, 5000)
                         if previous_raw is not None
+                        else "",
+                        "repair_raw_output": self._bounded(raw, 5000)
+                        if contract_repair_attempted and raw is not None
                         else "",
                     },
                 )
@@ -150,7 +167,8 @@ class DeepPlannerResolver:
                 metadata.update({"resolver": "deep_planner", "status": "complete" if plan.coverage == "complete" else plan.disposition,
                                  "authority": "advisory", "attempt_count": attempt + 1,
                                  "full_capability_count": len(payload), "max_replans": self.max_replans, "min_goal_satisfaction": self.min_goal_satisfaction,
-                                 "contract_schema": "CanonicalPlan",
+                                 "contract_schema": "DeepPlannerModelOutput",
+                                 "canonical_contract": "CanonicalPlan",
                                  "contract_repair_attempted": contract_repair_attempted,
                                  "contract_repair_succeeded": contract_repair_attempted})
                 if contract_repair_attempted:
@@ -169,9 +187,27 @@ class DeepPlannerResolver:
                 feedback = errors
                 previous_raw = raw
                 continue
-            return self._clarify(plan_id, request, "validation_rejected_after_replan",
-                                 unresolved=[item.get("step_id") or item.get("skill_id") or item["type"] for item in errors],
-                                 metadata={"validation_feedback": errors}, attempts=attempt + 1)
+            return self._clarify(
+                plan_id,
+                request,
+                "validation_rejected_after_replan",
+                unresolved=[
+                    item.get("step_id") or item.get("skill_id") or item["type"]
+                    for item in errors
+                ],
+                metadata={
+                    "validation_feedback": errors,
+                    "contract_schema": "DeepPlannerModelOutput",
+                    "canonical_contract": "CanonicalPlan",
+                    "initial_raw_output": self._bounded(previous_raw, 5000)
+                    if previous_raw is not None
+                    else "",
+                    "repair_raw_output": self._bounded(raw, 5000)
+                    if raw is not None
+                    else "",
+                },
+                attempts=attempt + 1,
+            )
         raise AssertionError("unreachable")
 
     @staticmethod
@@ -263,18 +299,20 @@ class DeepPlannerResolver:
             f"Executable capability catalog JSON:\n{self._bounded(capabilities, 16000)}\n\n"
             f"Previous Deep Planner model output JSON, when revising:\n{previous_section}\n\n"
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
-            "Produce the final planner-tier=deep CanonicalPlan for the complete user goal. Deep planning is terminal: never return to the Fast Planner. "
+            "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. "
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, and concurrency. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
-            "must use coverage=complete and disposition=execute. Every executable plan must include goal_ids, and every executable step must include source_goal_ids identifying exactly the goals it serves. A material alternative must be described in response_text and metadata and must require "
-            "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction with score, status, satisfied goals, and unmet requirements. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
+            "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
+            "confirmation downstream. For every missing parameter, return parameter_resolutions with a semantic strategy, concrete value when resolved, confidence, and rationale. Use safe_default only for low-consequence reversible values inside schema bounds. Use ask_user for material or risky values. Also return goal_satisfaction as prospective plan adequacy: planned steps count as satisfying their goals if successful, and pending execution alone is never an unmet requirement. An exact complete plan therefore uses status=exact with score at least 0.95 and lists the goals it is designed to satisfy. If essential information remains missing, use coverage=partial or uncertain with disposition=clarify and zero steps. "
             "If unavailable or refused, use zero steps. Use exact supplied capability IDs and schema-valid args. "
-            "A plan step may contain only step_id, skill_id, args, timing, source_goal_ids, reason_summary, and metadata. "
+            "User-facing speech is owned by Response Composer and is never an executable plan step. A conversational answer, joke, explanation, or greeting uses a respond outcome with non-empty response_text and zero step_ids. Combine that outcome with physical execution as disposition=mixed; do not create a speech transport step. "
+            "A plan step may contain only step_id, skill_id, args, timing, source_goal_ids, and reason_summary. "
             "Do not copy catalog field names such as capability_id, input_schema, parameters, route, step_type, or effects into a plan step. "
             "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
-            "Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one step_id; respond requires coverage=complete, non-empty response_text, and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. "
+            "Keep the plan minimal: do not add neutral-position, reset, transition, cleanup, or presentation steps unless the user explicitly requested them or a supplied capability execution constraint explicitly requires them. "
+            "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every complete multi-goal execute, respond, or mixed result must include it. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one step_id; respond requires coverage=complete, non-empty response_text, and zero step_ids; clarify requires coverage=partial or uncertain, an unresolved need or response_text, and zero step_ids; unavailable and refused require zero step_ids. In a mixed plan, every execute or respond outcome also requires its own prospective satisfaction assessment. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
             "Every outcome step_id must name a real plan step, every plan step must be referenced by an execute outcome when goal_outcomes are present, and each step source_goal_ids must exactly match the execute outcomes that reference it. "
-            "The Ollama decoder enforces the Exact CanonicalPlan JSON Schema supplied out-of-band. Populate only fields allowed by it and return JSON only. "
+            "The Ollama decoder enforces the exact flat DeepPlannerModelOutput JSON Schema supplied out-of-band. The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. Populate only fields allowed by the model schema and return JSON only. "
             "The following final grounding block is authoritative and must override unrelated content in previous model output or advisory context.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
             f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{self._bounded(grounding, 5000)}\n\n"
@@ -292,15 +330,34 @@ class DeepPlannerResolver:
     @staticmethod
     def _revision_system_prompt() -> str:
         return (
-            "You revise one Deep Planner output using semantic reasoning, deterministic validator feedback, and the supplied exact CanonicalPlan JSON Schema. "
+            "You revise one Deep Planner output using semantic reasoning, deterministic validator feedback, and the supplied exact flat DeepPlannerModelOutput JSON Schema. "
             "Preserve valid planning judgments, but regenerate every field needed to satisfy the contract and capability validation. "
-            "Return only the corrected CanonicalPlan JSON object. Do not add commentary, markdown, local field mappings, or hidden reasoning."
+            "Return only the corrected DeepPlannerModelOutput JSON object. Do not add commentary, markdown, local field mappings, or hidden reasoning."
         )
 
-    def _normalize(self, raw: dict[str, Any], *, request: AgentRunRequest, plan_id: str) -> dict[str, Any]:
-        out = dict(raw)
+    def _normalize(
+        self,
+        raw: dict[str, Any],
+        *,
+        request: AgentRunRequest,
+        plan_id: str,
+        expected_goal_ids_for_turn: list[str],
+    ) -> dict[str, Any]:
+        model_output = validate_planner_model_output(
+            raw,
+            planner_tier="deep",
+            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+        )
+        out = model_output.model_dump(mode="python")
+        out.pop("plan_relation", None)
+        out.pop("user_confirmation_required", None)
+        out["goal_outcomes"] = materialize_goal_outcomes(
+            model_output,
+            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+        )
         out["plan_id"] = plan_id
         out["planner_tier"] = "deep"
+        out["goal_ids"] = list(expected_goal_ids_for_turn)
         steps = out.get("steps")
         if isinstance(steps, dict):
             steps = [steps]
@@ -311,16 +368,14 @@ class DeepPlannerResolver:
             if not isinstance(item, dict):
                 continue
             step = dict(item)
-            step.setdefault("step_id", f"{plan_id}:step:{index}")
-            step.setdefault("args", {})
+            if not step.get("step_id"):
+                step["step_id"] = f"{plan_id}:step:{index}"
             step.setdefault("timing", "sequential")
-            step.setdefault("source_goal_ids", out.get("goal_ids") or [])
             normalized.append(step)
         out["steps"] = normalized
         out.setdefault("coverage", "uncertain")
         out.setdefault("disposition", "clarify")
         out.setdefault("confidence", 0.0)
-        out.setdefault("goal_ids", [])
         out.setdefault("goal_summary", request.text)
         out.setdefault("response_text", "")
         out.setdefault("escalation_reason", "")
@@ -328,7 +383,7 @@ class DeepPlannerResolver:
         out.setdefault("parameter_resolutions", [])
         out.setdefault("goal_outcomes", [])
         out.setdefault("goal_satisfaction", None)
-        out.setdefault("metadata", {})
+        out["metadata"] = materialize_planner_metadata(model_output)
         return out
 
     def _validation_errors(
@@ -415,6 +470,8 @@ class DeepPlannerResolver:
                     **llm_failure_metadata(error),
                 }
             )
+        context = request.context if isinstance(request.context, dict) else {}
         return CanonicalPlan(plan_id=plan_id, planner_tier="deep", disposition="clarify",
                              coverage="uncertain", confidence=0.0, goal_summary=request.text,
+                             goal_ids=expected_goal_ids(context),
                              response_text="", steps=[], unresolved=list(unresolved or []), metadata=detail)

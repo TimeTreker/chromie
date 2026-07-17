@@ -17,6 +17,13 @@ All notable user-visible changes should be recorded here.
   non-empty authoritative claim whose `turn_id` matches the request.
 - Constrained Goal Association with the exact model-facing schema, one bounded
   contract repair, and host-owned transport/persistence identities.
+- Hardened Fast and Deep Planning around an exact flat semantic DTO: canonical
+  identity remains host-owned, multi-goal outcomes are keyed exactly once by
+  authoritative Goal IDs, satisfaction is prospective plan adequacy, and typed
+  plan-relation/confirmation fields reject unsafe alternatives.
+- Moved response-transport speech out of goal-driven task steps: conversational
+  goals use `respond` outcomes, while Response Composition uses its own exact
+  schema, host-owned coordination envelope, and one bounded same-stage repair.
 - Applied Goal-state updates atomically only after trusted response preparation.
 - Added privacy-conscious operational evidence, deterministic cognitive
   scenarios, and a cognitive text-to-MuJoCo evidence entry point.

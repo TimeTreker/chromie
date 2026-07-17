@@ -6,6 +6,7 @@ import unittest
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.deep_planner import DeepPlannerResolver
+from agent.app.planner_contract import validate_planner_model_output
 from agent.app.schema import AgentRunRequest, RouteDecision
 from shared.chromie_contracts.plan import CanonicalPlan
 
@@ -43,10 +44,33 @@ class FullCatalog:
                 exclusive_group="eye_expression", resource_claims=["eye_expression"],
             ),
             CatalogCapability(
+                capability_id="soridormi.look_at_person", agent_id="capability_agent",
+                description="Look at a person", route="robot_action", available=True,
+                interaction_executable=True, prompt_tier="common",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "duration_s": {"type": "number", "minimum": 0.1},
+                        "target_ref": {"type": "string"},
+                    },
+                    "required": ["duration_s", "target_ref"],
+                },
+            ),
+            CatalogCapability(
                 capability_id="rare.observe_doorway", agent_id="capability_agent",
                 description="Observe doorway", route="tool", available=True,
                 interaction_executable=True, prompt_tier="rare",
                 input_schema={"type":"object","properties":{}},
+            ),
+            CatalogCapability(
+                capability_id="chromie.speak", agent_id="capability_agent",
+                description="Speak text", route="chat", available=True,
+                interaction_executable=True, prompt_tier="common",
+                input_schema={
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                },
             ),
         ]
         self.scopes = []
@@ -56,11 +80,21 @@ class FullCatalog:
         return self.items
 
 
-def request(text="往前走15秒，然后眨眼。"):
+def request(text="往前走15秒，然后眨眼。", *, goal_ids=None):
+    goal_ids = list(goal_ids or ["goal-action"])
     return AgentRunRequest(
         sid="sid-pr4", text=text, language="zh-CN",
         route_decision=RouteDecision(route="robot_action", intent="semantic_capability_planning", confidence=0.0, source="llm"),
-        context={"fast_plan_resolution":{"disposition":"escalate","coverage":"partial","steps":[]}}, history=[])
+        context={
+            "fast_plan_resolution":{"disposition":"escalate","coverage":"partial","steps":[]},
+            "goal_association_resolution": {
+                "associations": [],
+                "new_goals": [
+                    {"goal_id": goal_id, "description": f"Goal {goal_id}"}
+                    for goal_id in goal_ids
+                ],
+            },
+        }, history=[])
 
 
 class CanonicalDeepPlanContractTests(unittest.TestCase):
@@ -101,23 +135,584 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("Fast Planner decides again", ollama.prompts[1][0])
 
 
-    def test_goal_outcome_schema_encodes_execute_step_ownership(self):
+    def test_goal_outcome_schema_uses_exact_unique_goal_key_map(self):
         schema = DeepPlannerResolver._response_schema(["goal-look", "goal-blink"])
 
-        execute = schema["$defs"]["ExecuteGoalPlanOutcome"]
-        self.assertEqual(execute["properties"]["step_ids"]["minItems"], 1)
+        outcomes = schema["properties"]["goal_outcomes"]
+        self.assertEqual(outcomes["type"], "object")
+        self.assertFalse(outcomes["additionalProperties"])
+        self.assertEqual(outcomes["required"], ["goal-look", "goal-blink"])
         self.assertEqual(
-            schema["properties"]["goal_ids"]["items"]["enum"],
+            list(outcomes["properties"]),
             ["goal-look", "goal-blink"],
         )
-        self.assertEqual(schema["properties"]["goal_ids"]["minItems"], 2)
-        self.assertEqual(schema["properties"]["goal_ids"]["maxItems"], 2)
-        for name, definition in schema["$defs"].items():
-            if name.endswith("GoalPlanOutcome"):
-                self.assertEqual(
-                    definition["properties"]["goal_id"]["enum"],
-                    ["goal-look", "goal-blink"],
+        self.assertEqual(outcomes["minProperties"], 2)
+        self.assertEqual(outcomes["maxProperties"], 2)
+        self.assertEqual(schema["title"], "DeepPlannerModelOutput")
+        self.assertNotIn("oneOf", schema)
+        self.assertNotIn("goal_ids", schema["properties"])
+        self.assertIn("confidence", schema["required"])
+        self.assertIn("goal_satisfaction", schema["required"])
+        satisfaction_schema = schema["$defs"]["PlannerGoalSatisfaction"]
+        self.assertIn(
+            "not a measurement of whether execution has already happened",
+            satisfaction_schema["properties"]["score"]["description"],
+        )
+        self.assertNotIn("goal_id", schema["$defs"]["PlannerModelGoalOutcome"]["properties"])
+        self.assertNotIn("metadata", schema["properties"])
+        self.assertNotIn(
+            "metadata",
+            schema["$defs"]["PlannerModelGoalOutcome"]["properties"],
+        )
+        self.assertNotIn(
+            "metadata",
+            schema["$defs"]["PlannerModelStep"]["properties"],
+        )
+        self.assertIn("plan_relation", schema["properties"])
+        self.assertIn("user_confirmation_required", schema["properties"])
+
+    def test_exact_live_branch_minimal_plan_repairs_and_host_materializes_goal_ids(self):
+        goal_ids = ["goal_2691cf9a52bfcaf9eefd", "goal_b027e0b6aae39d61e48f"]
+        steps = [
+            {
+                "step_id": "step_look_at_user",
+                "skill_id": "soridormi.look_at_person",
+                "args": {"duration_s": 2.0, "target_ref": "person"},
+                "source_goal_ids": [goal_ids[0]],
+                "reason_summary": "Look at the user for two seconds.",
+            },
+            {
+                "step_id": "step_blink_twice",
+                "skill_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": [goal_ids[1]],
+                "reason_summary": "Blink twice.",
+            },
+        ]
+        branch_minimal = {
+            "planner_tier": "deep",
+            "disposition": "execute",
+            "coverage": "complete",
+            "steps": steps,
+        }
+        repaired = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.95,
+            "steps": steps,
+            "goal_outcomes": {
+                goal_ids[0]: {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step_look_at_user"],
+                },
+                goal_ids[1]: {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step_blink_twice"],
+                },
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+            },
+        }
+        ollama = SequencedOllama([branch_minimal, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(
+                request(
+                    "Look at me for two seconds, then blink twice.",
+                    goal_ids=goal_ids,
                 )
+            )
+        )
+
+        self.assertEqual(plan.goal_ids, goal_ids)
+        self.assertEqual(
+            [step.source_goal_ids for step in plan.steps],
+            [[goal_ids[0]], [goal_ids[1]]],
+        )
+        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertEqual(len(ollama.prompts), 2)
+        response_schema = ollama.prompts[0][1]["response_format"]
+        self.assertNotIn("oneOf", response_schema)
+        self.assertEqual(ollama.prompts[1][1]["response_format"], response_schema)
+
+    def test_multi_goal_step_ownership_is_never_filled_from_all_host_goals(self):
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.95,
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                }
+            ],
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        plan = asyncio.run(
+            DeepPlannerResolver(
+                SequencedOllama([invalid, invalid]),
+                FullCatalog(),
+                max_replans=1,
+            ).resolve(
+                request(
+                    "Walk and blink.",
+                    goal_ids=["goal-walk", "goal-blink"],
+                )
+            )
+        )
+
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.steps, [])
+        self.assertIn("source_goal_ids", plan.metadata["initial_validation_errors"])
+        self.assertTrue(plan.metadata["repair_raw_output"])
+        self.assertNotIn("source_goal_ids", plan.metadata["repair_raw_output"])
+
+    def test_live_blink_and_joke_speech_step_repairs_to_mixed_respond_outcome(self):
+        goal_ids = ["goal-blink", "goal-joke"]
+        invalid = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [
+                {
+                    "step_id": "step_blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                },
+                {
+                    "step_id": "step_joke",
+                    "skill_id": "chromie.speak",
+                    "args": {"text": "Why don't robots panic? They keep their cache."},
+                    "source_goal_ids": ["goal-joke"],
+                },
+            ],
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step_blink"],
+                },
+                "goal-joke": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step_joke"],
+                },
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+            },
+        }
+        outcome_satisfaction = lambda goal_id: {
+            "score": 1.0,
+            "status": "exact",
+            "satisfied_goal_ids": [goal_id],
+        }
+        repaired = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [invalid["steps"][0]],
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step_blink"],
+                    "satisfaction": outcome_satisfaction("goal-blink"),
+                },
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "step_ids": [],
+                    "response_text": "Why don't robots panic? They keep their cache.",
+                    "satisfaction": outcome_satisfaction("goal-joke"),
+                },
+            },
+            "goal_satisfaction": invalid["goal_satisfaction"],
+        }
+        ollama = SequencedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog()).resolve(
+                request(
+                    "Blink twice and tell me a short joke.",
+                    goal_ids=goal_ids,
+                )
+            )
+        )
+
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual([step.skill_id for step in plan.steps], ["soridormi.blink_eyes"])
+        self.assertEqual(
+            [outcome.disposition for outcome in plan.goal_outcomes],
+            ["execute", "respond"],
+        )
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn("owned by Response Composer", ollama.prompts[1][0])
+        skill_enum = ollama.prompts[0][1]["response_format"]["$defs"][
+            "PlannerModelStep"
+        ]["properties"]["skill_id"]["enum"]
+        self.assertNotIn("chromie.speak", skill_enum)
+
+    def test_live_blink_and_joke_nested_metadata_repairs_to_minimal_keyed_outcomes(self):
+        goal_ids = ["goal-joke", "goal-blink"]
+        satisfaction = lambda goal_id: {
+            "score": 1.0,
+            "status": "exact",
+            "satisfied_goal_ids": [goal_id],
+        }
+        invalid = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [
+                {
+                    "step_id": "step_blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                },
+                {
+                    "step_id": "step_neutral",
+                    "skill_id": "soridormi.look_at_person",
+                    "args": {"duration_s": 2.0, "target_ref": "person"},
+                    "source_goal_ids": ["goal-blink"],
+                },
+            ],
+            "goal_outcomes": {
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "Why did the robot cross the road? To recharge its batteries.",
+                    "metadata": {"step_ids": []},
+                    "satisfaction": satisfaction("goal-joke"),
+                },
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "metadata": {"step_ids": ["step_blink", "step_neutral"]},
+                    "satisfaction": satisfaction("goal-blink"),
+                },
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+            },
+        }
+        repaired = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [invalid["steps"][0]],
+            # Intentionally reverse insertion order. The host must materialize
+            # canonical outcomes in Goal Association's authoritative order.
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step_blink"],
+                    "satisfaction": satisfaction("goal-blink"),
+                },
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "step_ids": [],
+                    "response_text": "Why did the robot cross the road? To recharge its batteries.",
+                    "satisfaction": satisfaction("goal-joke"),
+                },
+            },
+            "goal_satisfaction": invalid["goal_satisfaction"],
+        }
+        ollama = SequencedOllama([invalid, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog()).resolve(
+                request(
+                    "Blink twice and tell me a short joke.",
+                    goal_ids=goal_ids,
+                )
+            )
+        )
+
+        self.assertEqual([outcome.goal_id for outcome in plan.goal_outcomes], goal_ids)
+        self.assertEqual([step.step_id for step in plan.steps], ["step_blink"])
+        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertIn("extra_forbidden", ollama.prompts[1][0])
+        self.assertIn("Keep the plan minimal", ollama.prompts[1][0])
+
+    def test_per_goal_satisfaction_cannot_claim_another_goal(self):
+        goal_ids = ["goal-blink", "goal-joke"]
+        invalid = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [
+                {
+                    "step_id": "step_blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                }
+            ],
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["step_blink"],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": ["goal-joke"],
+                    },
+                },
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "A short joke.",
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": ["goal-joke"],
+                    },
+                },
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+            },
+        }
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "per-goal outcome satisfaction may reference only",
+        ):
+            validate_planner_model_output(
+                invalid,
+                planner_tier="deep",
+                expected_goal_ids_for_turn=goal_ids,
+            )
+
+    def test_supplied_goal_outcome_map_must_match_authoritative_keys(self):
+        goal_ids = ["goal-blink", "goal-joke"]
+        base = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": [
+                {
+                    "step_id": "step_blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                }
+            ],
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+            },
+        }
+        execute_outcome = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": ["step_blink"],
+        }
+        invalid_maps = {
+            "empty": {},
+            "partial": {"goal-blink": execute_outcome},
+            "unknown": {
+                "goal-blink": execute_outcome,
+                "goal-invented": execute_outcome,
+            },
+            "legacy-list": [
+                {"goal_id": "goal-blink", **execute_outcome},
+                {"goal_id": "goal-joke", **execute_outcome},
+            ],
+            "embedded-goal-id": {
+                "goal-blink": {"goal_id": "goal-blink", **execute_outcome},
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "A short joke.",
+                    "goal_id": "goal-joke",
+                },
+            },
+        }
+
+        for label, goal_outcomes in invalid_maps.items():
+            with self.subTest(label=label), self.assertRaises((ValueError, TypeError)):
+                validate_planner_model_output(
+                    {**base, "goal_outcomes": goal_outcomes},
+                    planner_tier="deep",
+                    expected_goal_ids_for_turn=goal_ids,
+                )
+
+    def test_pending_execution_is_not_treated_as_an_unmet_planning_requirement(self):
+        goal_ids = ["goal-look", "goal-blink"]
+        steps = [
+            {
+                "step_id": "look",
+                "skill_id": "soridormi.look_at_person",
+                "args": {"duration_s": 2.0, "target_ref": "person"},
+                "source_goal_ids": ["goal-look"],
+            },
+            {
+                "step_id": "blink",
+                "skill_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": ["goal-blink"],
+            },
+        ]
+        misunderstood = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "steps": steps,
+            "goal_outcomes": {
+                "goal-look": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["look"],
+                },
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "partial",
+                "satisfied_goal_ids": [],
+                "unmet_requirements": ["All goals are pending execution of steps."],
+            },
+        }
+        repaired = {
+            **misunderstood,
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": goal_ids,
+                "unmet_requirements": [],
+            },
+        }
+        ollama = SequencedOllama([misunderstood, repaired])
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog()).resolve(
+                request("Look at me, then blink.", goal_ids=goal_ids)
+            )
+        )
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.goal_satisfaction.status, "exact")
+        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertIn("prospective plan adequacy", ollama.prompts[1][0])
+
+    def test_typed_material_alternative_is_host_materialized_for_confirmation(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.96,
+            "response_text": "I can do the safe adjusted version. Shall I proceed?",
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-action"],
+            },
+            "plan_relation": "safe_adjustment",
+            "user_confirmation_required": True,
+        }
+
+        plan = asyncio.run(
+            DeepPlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(
+                request("Blink safely.")
+            )
+        )
+
+        self.assertEqual(plan.metadata["plan_relation"], "safe_adjustment")
+        self.assertTrue(plan.metadata["user_confirmation_required"])
+        self.assertNotIn("plan_relation", type(plan).model_fields)
+
+    def test_material_alternative_without_confirmation_is_rejected(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.96,
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+            "plan_relation": "alternative",
+            "user_confirmation_required": False,
+        }
+
+        with self.assertRaisesRegex(ValueError, "require user confirmation"):
+            validate_planner_model_output(
+                raw,
+                planner_tier="deep",
+                expected_goal_ids_for_turn=["goal-action"],
+            )
+
+    def test_material_alternative_without_explanation_is_rejected(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.96,
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-action"],
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+            "plan_relation": "alternative",
+            "user_confirmation_required": True,
+        }
+
+        with self.assertRaisesRegex(ValueError, "require response_text"):
+            validate_planner_model_output(
+                raw,
+                planner_tier="deep",
+                expected_goal_ids_for_turn=["goal-action"],
+            )
 
     def test_empty_execute_outcome_is_repaired_by_model_not_host(self):
         context = {
@@ -142,26 +737,24 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
-            "goal_outcomes": [
-                {
-                    "goal_id": "goal-blink",
+            "goal_outcomes": {
+                "goal-blink": {
                     "disposition": "execute",
                     "coverage": "complete",
                     "step_ids": [],
                 }
-            ],
+            },
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         revised = {
             **invalid,
-            "goal_outcomes": [
-                {
-                    "goal_id": "goal-blink",
+            "goal_outcomes": {
+                "goal-blink": {
                     "disposition": "execute",
                     "coverage": "complete",
                     "step_ids": ["blink"],
                 }
-            ],
+            },
         }
         ollama = SequencedOllama([invalid, revised])
 
@@ -171,7 +764,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(plan.goal_outcomes[0].step_ids, ["blink"])
         self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn("at least 1 item", ollama.prompts[1][0])
+        self.assertIn(
+            "execute goal outcome requires complete coverage and step_ids",
+            ollama.prompts[1][0],
+        )
         self.assertTrue(plan.metadata["contract_repair_succeeded"])
 
     def test_invented_internal_goal_is_rejected_and_revised(self):
@@ -203,20 +799,18 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-check-status"],
                 },
             ],
-            "goal_outcomes": [
-                {
-                    "goal_id": "goal-look",
+            "goal_outcomes": {
+                "goal-look": {
                     "disposition": "execute",
                     "coverage": "complete",
                     "step_ids": ["look"],
                 },
-                {
-                    "goal_id": "goal-check-status",
+                "goal-check-status": {
                     "disposition": "execute",
                     "coverage": "complete",
                     "step_ids": ["status"],
                 },
-            ],
+            },
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         revised = {
@@ -232,14 +826,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-look"],
                 }
             ],
-            "goal_outcomes": [
-                {
-                    "goal_id": "goal-look",
+            "goal_outcomes": {
+                "goal-look": {
                     "disposition": "execute",
                     "coverage": "complete",
                     "step_ids": ["look"],
                 }
-            ],
+            },
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = SequencedOllama([invalid, revised])
@@ -340,11 +933,11 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 2)
         response_schema = ollama.prompts[0][1]["response_format"]
         self.assertIsInstance(response_schema, dict)
-        self.assertEqual(response_schema.get("title"), "CanonicalPlan")
+        self.assertEqual(response_schema.get("title"), "DeepPlannerModelOutput")
         self.assertEqual(ollama.prompts[1][1]["response_format"], response_schema)
         self.assertIn('"capability_id"', ollama.prompts[1][0])
         self.assertIn("extra_forbidden", ollama.prompts[1][0])
-        self.assertIn("Exact CanonicalPlan JSON Schema", ollama.prompts[1][0])
+        self.assertIn("DeepPlannerModelOutput JSON Schema", ollama.prompts[1][0])
 
     def test_legacy_step_shape_is_not_locally_rewritten(self):
         invalid = {
@@ -413,9 +1006,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-nod"],
                 }
             ],
-            "goal_outcomes": [
-                {
-                    "goal_id": "goal-nod",
+            "goal_outcomes": {
+                "goal-nod": {
                     "disposition": "execute",
                     "coverage": "complete",
                     "step_ids": ["nod"],
@@ -425,8 +1017,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                         "satisfied_goal_ids": ["goal-nod"],
                     },
                 },
-                {
-                    "goal_id": "goal-coffee",
+                "goal-coffee": {
                     "disposition": "unavailable",
                     "coverage": "uncertain",
                     "response_text": "Coffee preparation is unavailable.",
@@ -436,7 +1027,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                         "unmet_goal_ids": ["goal-coffee"],
                     },
                 },
-            ],
+            },
             "goal_satisfaction": {
                 "score": 0.5,
                 "status": "partial",
@@ -449,7 +1040,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 SequencedOllama([raw]),
                 FullCatalog(),
                 min_goal_satisfaction=0.75,
-            ).resolve(request("点头并准备咖啡。"))
+            ).resolve(request("点头并准备咖啡。", goal_ids=["goal-nod", "goal-coffee"]))
         )
         self.assertEqual(plan.disposition, "mixed")
         self.assertEqual([item.disposition for item in plan.goal_outcomes], ["execute", "unavailable"])

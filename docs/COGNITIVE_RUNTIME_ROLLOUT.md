@@ -58,16 +58,45 @@ The main planning direction is acyclic. Deep planning never returns semantic
 work to Fast planning. The only loop is a bounded same-tier Deep Planner
 revision from structured trusted-validator feedback.
 
-Goal Association uses Ollama schema-constrained generation with a small
-model-facing `GoalAssociationModelOutput` DTO. The model decides only semantic
-relationships, independent new-goal descriptions, or a natural clarification.
+Goal Association uses Ollama schema-constrained generation with state-specific
+small model-facing DTOs. When active Goal IDs exist,
+`GoalAssociationModelOutput` permits semantic relationships, independent
+new-goal descriptions, or a natural clarification. When no association target
+exists, `GoalSegmentationModelOutput` omits the association field and its schema
+definition entirely, so the model decides only independent new-goal
+descriptions or a clarification. This avoids relying on decoder enforcement of
+composed `maxItems`/`oneOf` constraints to represent the host-known fact that an
+association is impossible.
 The host generates turn IDs, association IDs, goal IDs, versions, source text,
 default containers, canonical `SemanticGoal` objects, and the final
 `GoalAssociationResolution`. If model DTO validation still fails, the same
 model receives the original JSON, exact validation errors, and the same compact
-schema for one bounded revision. A second invalid result fails closed. No
+state-specific schema for one bounded revision. A second invalid result fails closed. No
 lexical alias table, phrase mapping, or local semantic rewrite changes the
 model-authored goal descriptions or relationships.
+
+Fast and Deep Planning also use one exact, flat model-facing
+`PlannerModelOutput` schema rather than asking the structured decoder to emit
+the shared `CanonicalPlan` union directly. The model supplies semantic
+disposition, coverage, prospective satisfaction, plan steps and their
+`source_goal_ids`, plus the typed `plan_relation` and
+`user_confirmation_required` decisions. The host supplies the canonical
+`schema_version`, `plan_id`, `planner_tier`, and authoritative top-level
+`goal_ids` only after model validation.
+
+For a complete multi-goal result, `goal_outcomes` is an exact object keyed by
+the Goal Association IDs. Its schema requires every authoritative key, forbids
+additional keys, and keeps `goal_id` out of each value, preventing duplicate or
+conflicting model-authored goal identities. The host materializes the shared
+canonical outcome list in authoritative Goal order. Satisfaction fields mean
+how adequately the proposed plan would satisfy each goal if its response and
+steps succeed; pending execution alone is not an unmet planning requirement.
+
+User-facing response transport is outside task planning. `chromie.speak` is
+excluded from both planner capability schemas and rejected if a planner emits
+it as a step. A conversational part of a mixed goal is represented by a
+goal-scoped `respond` outcome and `response_text`; the Response Composer owns
+its user-facing speech plan.
 
 ## 2. Authority boundaries
 
@@ -311,6 +340,14 @@ is retained separately.
 The Response Composer receives an immutable fingerprinted terminal
 CanonicalPlan. It may organize goal-scoped speech and optional auxiliary social
 attention, but it cannot change user-task steps.
+
+Ollama receives the exact `ResponseComposerModelOutput` schema, containing only
+the model-owned `response_plan`, optional `social_attention_plan`, confidence,
+and rationale. Goal coverage IDs are constrained to the immutable plan's Goal
+IDs. The host creates the `CoordinatedResponsePlan` envelope, composition ID,
+canonical plan copy, and SHA-256 plan fingerprint after validation. A malformed
+model result receives its original JSON, exact validation errors, and the same
+schema for one bounded same-stage repair; a second invalid result fails closed.
 
 Trusted checks ensure:
 

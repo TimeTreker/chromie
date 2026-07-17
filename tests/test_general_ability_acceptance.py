@@ -20,6 +20,7 @@ from scripts.general_ability_acceptance import (
     select_ability_classes,
     validate_manifest,
 )
+from scripts.interaction_text_mujoco_check import build_parser as build_text_check_parser
 
 
 class GeneralAbilityAcceptanceTests(unittest.TestCase):
@@ -141,6 +142,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "apply",
                 "--cognitive-apply-lanes",
                 "robot_action",
+                "--soridormi-repo",
+                "/tmp/soridormi-checkout",
                 "--no-write",
             ]
         )
@@ -149,6 +152,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         self.assertTrue(namespace.cognitive_runtime)
         self.assertEqual(namespace.cognitive_apply_lanes, "robot_action")
+        self.assertEqual(namespace.soridormi_repo, "/tmp/soridormi-checkout")
         self.assertEqual(
             namespace.conversation_id,
             "ga-live-multi_goal_look_then_blink",
@@ -156,6 +160,20 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertEqual(
             namespace.expect_skill,
             ["soridormi.look_at_person", "soridormi.blink_eyes"],
+        )
+
+    def test_live_case_namespace_matches_text_checker_argument_contract(self) -> None:
+        args = build_parser().parse_args(["--mode", "live-text"])
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        case = manifest.ability_classes[0].live_text_cases[0].case
+
+        namespace = _live_case_namespace(args, case, Path("/tmp/contract-check"))
+        checker_defaults = build_text_check_parser().parse_args([])
+
+        self.assertEqual(args.soridormi_repo, "")
+        self.assertEqual(
+            set(vars(checker_defaults)) - set(vars(namespace)),
+            set(),
         )
 
     def test_live_text_defaults_allow_full_qualification_pipeline(self) -> None:
