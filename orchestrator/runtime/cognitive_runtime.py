@@ -129,6 +129,30 @@ class CognitiveEvidenceRecorder:
             self.counters[f"failure_class:{failure_class}"] += 1
         if attribution:
             self.counters[f"architecture_attribution:{attribution}"] += 1
+        fast_path = str(resolution.metadata.get("fast_planner_path") or "").strip()
+        if fast_path:
+            self.counters[f"fast_planner_path:{fast_path}"] += 1
+        if (
+            fast_path == "terminal"
+            and resolution.fast_plan is not None
+            and len(resolution.fast_plan.goal_ids) > 1
+        ):
+            self.counters["fast_terminal_multi_goal"] += 1
+        if fast_path == "semantic_escalation":
+            self.counters["fast_semantic_escalation"] += 1
+        if fast_path == "contract_failure":
+            self.counters["fast_contract_failure"] += 1
+        if resolution.fast_plan is not None and bool(
+            resolution.fast_plan.metadata.get("contract_repair_attempted")
+        ):
+            self.counters["fast_contract_repair"] += 1
+        if bool(resolution.metadata.get("deep_planner_invoked")):
+            reason = str(
+                resolution.metadata.get("deep_planner_invocation_reason") or "unknown"
+            )
+            self.counters[f"deep_planner_invoked:{reason}"] += 1
+        elif fast_path == "terminal":
+            self.counters["deep_planner_avoided"] += 1
         self.counters["turns"] += 1
         total_ms = float(resolution.timings_ms.get("total", 0.0))
         self.total_latency_ms += total_ms
@@ -725,6 +749,46 @@ class GoalDrivenRuntimeCoordinator:
             add(goal.goal_id)
         return ordered
 
+    @staticmethod
+    def _fast_plan_path(plan: CanonicalPlan | None) -> str:
+        if plan is None:
+            return ""
+        value = str(plan.metadata.get("path_classification") or "").strip()
+        if value in {"terminal", "semantic_escalation", "contract_failure"}:
+            return value
+        if plan.metadata.get("failure_class"):
+            return "contract_failure"
+        if plan.disposition == "escalate":
+            return "semantic_escalation"
+        return "terminal"
+
+    @staticmethod
+    def _fast_plan_context_for_deep(
+        plan: CanonicalPlan,
+        *,
+        path_classification: str,
+    ) -> dict[str, Any]:
+        payload = plan.model_dump(mode="json", exclude_none=True)
+        if path_classification != "contract_failure":
+            return payload
+        metadata = dict(payload.get("metadata") or {})
+        payload["metadata"] = {
+            key: metadata[key]
+            for key in (
+                "resolver",
+                "status",
+                "authority",
+                "path_classification",
+                "failure_class",
+                "failure_domain",
+                "architecture_attribution",
+                "retryable",
+                "error_type",
+            )
+            if key in metadata
+        }
+        return payload
+
     async def resolve(
         self,
         session: Any,
@@ -745,7 +809,42 @@ class GoalDrivenRuntimeCoordinator:
         interaction: InteractionResponse | None = None
         goal_state_results: list[dict[str, Any]] = []
         stage_diagnostics: list[dict[str, Any]] = []
+        fast_planner_path = ""
+        deep_planner_invocation_reasons: list[str] = []
         lane: CognitiveLane = "unsupported"
+
+        def path_metadata() -> dict[str, Any]:
+            first_deep_reason = (
+                deep_planner_invocation_reasons[0]
+                if deep_planner_invocation_reasons
+                else ""
+            )
+            return {
+                "fast_planner_path": fast_planner_path,
+                "deep_planner_invoked": bool(deep_planner_invocation_reasons),
+                "deep_planner_invocation_reason": first_deep_reason,
+                "deep_planner_invocation_reasons": list(
+                    deep_planner_invocation_reasons
+                ),
+                "deep_planner_avoided": bool(
+                    fast_planner_path == "terminal"
+                    and not deep_planner_invocation_reasons
+                ),
+                "terminal_planner_tier": (
+                    terminal_plan.planner_tier if terminal_plan is not None else ""
+                ),
+                "authoritative_goal_count": (
+                    len(self._association_goal_ids(association))
+                    if association is not None
+                    else 0
+                ),
+                "fast_goal_outcome_count": (
+                    len(fast_plan.goal_outcomes) if fast_plan is not None else 0
+                ),
+                "fast_executable_step_count": (
+                    len(fast_plan.steps) if fast_plan is not None else 0
+                ),
+            }
 
         try:
             stage = time.perf_counter()
@@ -835,11 +934,22 @@ class GoalDrivenRuntimeCoordinator:
                 if fast_failure is not None:
                     stage_diagnostics.append(fast_failure)
                 terminal_plan = fast_plan
+                fast_planner_path = self._fast_plan_path(fast_plan)
                 if fast_plan.disposition == "escalate":
-                    deep_context = dict(planning_context)
-                    deep_context["fast_plan_resolution"] = fast_plan.model_dump(
-                        mode="json", exclude_none=True
+                    deep_reason = (
+                        "fast_contract_failure"
+                        if fast_planner_path == "contract_failure"
+                        else "semantic_escalation"
                     )
+                    deep_planner_invocation_reasons.append(deep_reason)
+                    deep_context = dict(planning_context)
+                    deep_context["fast_plan_resolution"] = (
+                        self._fast_plan_context_for_deep(
+                            fast_plan,
+                            path_classification=fast_planner_path,
+                        )
+                    )
+                    deep_context["deep_planner_invocation_reason"] = deep_reason
                     stage = time.perf_counter()
                     terminal_plan = await self.agent_client.resolve_deep_plan(
                         session,
@@ -865,10 +975,13 @@ class GoalDrivenRuntimeCoordinator:
                 if fast_plan is None:
                     raise ValueError("runtime replan requires an existing fast plan")
                 deep_context = dict(planning_context)
-                deep_context["fast_plan_resolution"] = fast_plan.model_dump(
-                    mode="json", exclude_none=True
+                deep_context["fast_plan_resolution"] = self._fast_plan_context_for_deep(
+                    fast_plan,
+                    path_classification=fast_planner_path,
                 )
                 deep_context["runtime_validator_feedback"] = runtime_errors
+                deep_context["deep_planner_invocation_reason"] = "host_replan"
+                deep_planner_invocation_reasons.append("host_replan")
                 stage = time.perf_counter()
                 terminal_plan = await self.agent_client.resolve_deep_plan(
                     session,
@@ -943,6 +1056,7 @@ class GoalDrivenRuntimeCoordinator:
                             "architecture_attribution": "not_evaluated",
                             "retryable": False,
                             "stage_diagnostics": stage_diagnostics,
+                            **path_metadata(),
                         },
                     )
                 stage = time.perf_counter()
@@ -1000,6 +1114,7 @@ class GoalDrivenRuntimeCoordinator:
                             if stage_diagnostics
                             else "not_evaluated"
                         ),
+                        **path_metadata(),
                     },
                 )
 
@@ -1021,6 +1136,7 @@ class GoalDrivenRuntimeCoordinator:
                         if stage_diagnostics
                         else "not_evaluated"
                     ),
+                    **path_metadata(),
                 },
             )
         except CognitiveStageFailure as exc:
@@ -1028,6 +1144,7 @@ class GoalDrivenRuntimeCoordinator:
                 **exc.failure_metadata,
                 "failure_stage": exc.stage,
                 "stage_diagnostics": stage_diagnostics,
+                **path_metadata(),
             }
             return self._finish(
                 mode=self.policy.mode,
@@ -1065,6 +1182,7 @@ class GoalDrivenRuntimeCoordinator:
                     "architecture_attribution": "not_evaluated",
                     "retryable": False,
                     "stage_diagnostics": stage_diagnostics,
+                    **path_metadata(),
                 },
             )
 

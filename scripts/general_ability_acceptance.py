@@ -25,6 +25,9 @@ if str(ROOT) not in sys.path:
 
 from scripts.behavior_scenarios import load_scenarios, run_scenarios_sync  # noqa: E402
 from scripts.interaction_text_mujoco_check import parse_expected_arg, run_check  # noqa: E402
+from shared.chromie_contracts.semantic_task import (  # noqa: E402
+    pending_action_stage_direction_claims,
+)
 
 DEFAULT_MANIFEST = ROOT / "scenarios" / "general_ability_acceptance.json"
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "general-ability"
@@ -57,6 +60,11 @@ class TextScenarioCase:
     forbidden_skills: tuple[str, ...] = field(default_factory=tuple)
     allow_expressive_cues: bool = True
     require_speech: bool = True
+    expected_terminal_planner_tier: str = ""
+    expected_fast_planner_path: str = ""
+    expect_deep_planner_invoked: bool | None = None
+    expect_no_fast_contract_failure: bool = False
+    forbid_pending_action_stage_directions: bool = False
     description: str = ""
 
 
@@ -204,6 +212,64 @@ def validate_live_text_result(
     bad_skills = sorted(skills & set(case.forbidden_skills))
     if bad_skills:
         errors.append("forbidden skills emitted: " + ", ".join(bad_skills))
+
+    cognitive = summary.get("cognitive_runtime")
+    if not isinstance(cognitive, dict):
+        cognitive = {}
+    terminal_plan = cognitive.get("terminal_plan")
+    if not isinstance(terminal_plan, dict):
+        terminal_plan = {}
+    runtime_metadata = cognitive.get("metadata")
+    if not isinstance(runtime_metadata, dict):
+        runtime_metadata = {}
+    timings = cognitive.get("timings_ms")
+    if not isinstance(timings, dict):
+        timings = {}
+
+    if case.expected_terminal_planner_tier:
+        actual_tier = str(terminal_plan.get("planner_tier") or "")
+        if actual_tier != case.expected_terminal_planner_tier:
+            errors.append(
+                "terminal planner tier mismatch: "
+                f"expected {case.expected_terminal_planner_tier!r}, got {actual_tier!r}"
+            )
+    if case.expected_fast_planner_path:
+        actual_path = str(runtime_metadata.get("fast_planner_path") or "")
+        if actual_path != case.expected_fast_planner_path:
+            errors.append(
+                "Fast Planner path mismatch: "
+                f"expected {case.expected_fast_planner_path!r}, got {actual_path!r}"
+            )
+    if case.expect_deep_planner_invoked is not None:
+        actual_invoked = bool(
+            runtime_metadata.get("deep_planner_invoked")
+            or "deep_planner" in timings
+        )
+        if actual_invoked is not case.expect_deep_planner_invoked:
+            errors.append(
+                "Deep Planner invocation mismatch: "
+                f"expected {case.expect_deep_planner_invoked}, got {actual_invoked}"
+            )
+    if case.expect_no_fast_contract_failure:
+        stage_diagnostics = runtime_metadata.get("stage_diagnostics")
+        if not isinstance(stage_diagnostics, list):
+            stage_diagnostics = []
+        fast_failures = [
+            item
+            for item in stage_diagnostics
+            if isinstance(item, dict)
+            and item.get("stage") == "fast_planner"
+            and item.get("failure_class")
+        ]
+        if runtime_metadata.get("fast_planner_path") == "contract_failure" or fast_failures:
+            errors.append("Fast Planner contract failure remained in retained evidence")
+    if case.forbid_pending_action_stage_directions:
+        claims = pending_action_stage_direction_claims(speech, task_skills)
+        if claims:
+            errors.append(
+                "speech narrated pending physical action as completed stage direction: "
+                + ",".join(claims)
+            )
     return errors
 
 
@@ -246,6 +312,23 @@ def _live_case(raw: dict[str, Any]) -> LiveCaseRef:
         forbidden_skills=_tuple_of_strings(raw.get("forbidden_skills")),
         allow_expressive_cues=bool(raw.get("allow_expressive_cues", True)),
         require_speech=bool(raw.get("require_speech", True)),
+        expected_terminal_planner_tier=str(
+            raw.get("expected_terminal_planner_tier") or ""
+        ).strip(),
+        expected_fast_planner_path=str(
+            raw.get("expected_fast_planner_path") or ""
+        ).strip(),
+        expect_deep_planner_invoked=(
+            bool(raw.get("expect_deep_planner_invoked"))
+            if "expect_deep_planner_invoked" in raw
+            else None
+        ),
+        expect_no_fast_contract_failure=bool(
+            raw.get("expect_no_fast_contract_failure", False)
+        ),
+        forbid_pending_action_stage_directions=bool(
+            raw.get("forbid_pending_action_stage_directions", False)
+        ),
         description=str(raw.get("description") or ""),
     )
     return LiveCaseRef(case=case, rationale=str(raw.get("rationale") or ""))

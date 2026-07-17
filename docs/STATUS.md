@@ -5,11 +5,12 @@
 execution; retained target evidence below records the exact revision that
 produced each bundle
 **Status refresh date:** 2026-07-17
-**Current focus:** **Complete a fresh live-text/MuJoCo diagnostic rerun after
-the multi-goal model-contract fixes, then add endpoint-reported Soridormi
-revision identity, bind running Chromie images/models to the candidate source,
-and replace mutable release image references; physical pilot and human
-voice-device validation remain separate release-support tracks**
+**Current focus:** **Qualify the implemented Fast Planner multi-goal terminal
+path with repeated warm simulator runs, truthful response wording, and retained
+latency evidence; then resume endpoint-reported
+Soridormi revision identity, source-bound running images/models, and immutable
+release inputs. Physical pilot and human voice-device validation remain separate
+release-support tracks.**
 **Version:** `0.0.1` (MuJoCo-executor scope, not yet published)
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 
@@ -651,10 +652,24 @@ remain mutable. These implemented fail-closed checks do not make the current
 snapshot release ready or replace the missing provenance bindings and fresh
 retained target run.
 
-Fresh passing live-text and MuJoCo artifacts for the new multi-goal and
-authority boundaries remain open. The July 17 diagnostic run reached three of
-four cases, but the post-fix rerun remains pending after the execution platform
-denied approval for a localhost command. That interruption is not classified
-as a product/release blocker, and target validation and release readiness are
-not claimed. Operational rollout and evidence steps are documented in
-[Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).
+An operator-supplied July 17 live-text simulator rerun at Chromie revision
+`27ed13b6114f0a0fa7fd72078012c34b4ddf0712` passed all four
+`multi_goal_daily_life` cases with completed Soridormi `sim` execution and safe
+idle. This closes the immediate mixed-plan correctness defect at diagnostic
+Level C, but it does not establish successful Fast Planner operation: all four
+Fast attempts recorded model-contract failure and the final success came from
+Deep Planner recovery. Endpoint-reported Soridormi revision identity was still
+absent, so the run does not close release provenance or release readiness. The
+repository implementation now follows
+[Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
+The flat Fast schema distinguishes a complete terminal outcome map from an
+explicit empty semantic escalation, permits simple common-catalog mixed
+execute/respond plans, records Fast-path and Deep-invocation reasons, strips
+malformed Fast semantics before technical Deep recovery, and rejects premature
+physical stage-direction claims. Automated evidence passes 79 focused tests, 67
+wider cognitive/authority tests, deterministic multi-goal Level A 8/8, the full
+1,054-test repository suite, and 20 legacy Agent tests. This is implementation
+and Level A evidence only; repeated warm live-text runs must still prove
+`planner_tier=fast`, no Deep invocation, no hidden contract failure, and at
+least 35 percent median cognitive-latency reduction. Operational rollout remains
+governed by [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).

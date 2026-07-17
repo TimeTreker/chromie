@@ -460,6 +460,12 @@ remain open.
    authority, adapter-only exact Router actions, emergency-only legacy planner
    with non-empty matching-turn claims, exact Goal Association schema, and strict
    source/evidence provenance checks.
+9. **Implemented with Level A evidence; live qualification open:** Fast Planner
+   multi-goal terminal contract with decoder-compatible empty escalation versus
+   complete outcome-map semantics, simple common-catalog mixed planning,
+   explicit recovery diagnostics, pending-action claim discipline, and retained
+   latency qualification. See
+   [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
 
 The Deep Planner does not return semantic work to the Fast Planner. Both tiers
 share capability and validation primitives and output the same canonical plan
@@ -478,6 +484,9 @@ regression gates, and state the evidence level.
 - goal association occurs before creation of new goals;
 - one turn can modify existing goals and create independent new goals;
 - Fast Planner executes only complete high-confidence coverage or escalates;
+- simple common-catalog multi-goal execute, respond, and mixed requests terminate
+  at Fast Planner with exact per-goal accounting, while semantic escalation is
+  valid and distinct from contract failure;
 - Deep Planner produces a final canonical plan without returning to Fast Planner;
 - partial or unconfirmed alternatives never execute;
 - information gaps remain attached to the original goal across turns;

@@ -360,7 +360,7 @@ def canonical_plan_response_schema(
     disposition = properties.get("disposition")
     if isinstance(disposition, dict):
         disposition["enum"] = (
-            ["respond", "execute", "escalate"]
+            ["respond", "execute", "mixed", "escalate"]
             if planner_tier == "fast"
             else [
                 "respond",
@@ -375,16 +375,11 @@ def canonical_plan_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
 
-    # Deep Planner is the tier that can author heterogeneous per-goal outcomes
-    # (for example execute + respond => mixed).  Require the complete outcome
-    # map at the decoder boundary for multi-goal deep plans so the decoder cannot
-    # legally omit the field and leave the single repair attempt to recover it.
-    # Fast Planner must keep goal_outcomes optional because its legal compound
-    # fallback is top-level ``escalate`` and per-goal outcomes have no escalate
-    # disposition that could satisfy the top-level consistency invariant.
+    # Both tiers must emit the multi-goal outcome envelope.  Deep Planner always
+    # emits a complete map.  Fast Planner uses one flat decoder-compatible shape:
+    # either an empty map for semantic escalation or a complete terminal map.
     if (
-        planner_tier == "deep"
-        and len(allowed_goals) > 1
+        len(allowed_goals) > 1
         and "goal_outcomes" not in required
     ):
         required.append("goal_outcomes")
@@ -410,13 +405,23 @@ def canonical_plan_response_schema(
                 "maxProperties": len(allowed_goals),
             }
         )
-        if allowed_goals:
+        if allowed_goals and planner_tier == "deep":
             goal_outcomes.update(
                 {
                     "required": allowed_goals,
                     "minProperties": len(allowed_goals),
                 }
             )
+        elif allowed_goals and planner_tier == "fast":
+            goal_outcomes["minProperties"] = 0
+
+    outcome_schema = schema.get("$defs", {}).get("PlannerModelGoalOutcome")
+    if isinstance(outcome_schema, dict):
+        outcome_disposition = (
+            outcome_schema.get("properties", {}).get("disposition")
+        )
+        if isinstance(outcome_disposition, dict) and planner_tier == "fast":
+            outcome_disposition["enum"] = ["respond", "execute"]
 
     goal_list_fields = {
         "goal_ids",
@@ -609,9 +614,39 @@ def planner_contract_diagnostics(
     outcomes = raw.get("goal_outcomes")
     expected_goal_ids = list(dict.fromkeys(expected_goal_ids_for_turn))
     expected_goal_set = set(expected_goal_ids)
+    multi_goal_fast = planner_tier == "fast" and len(expected_goal_set) > 1
+    fast_escalation = planner_tier == "fast" and disposition == "escalate"
+
+    if multi_goal_fast and "goal_outcomes" not in raw:
+        add(
+            ["goal_outcomes"],
+            "multi-goal fast planner output requires an explicit goal_outcomes object",
+            value=None,
+            error_type="missing",
+        )
+    if fast_escalation:
+        if coverage not in {"partial", "uncertain"}:
+            add(
+                ["coverage"],
+                "fast semantic escalation requires partial or uncertain coverage",
+                value=coverage,
+            )
+        if isinstance(outcomes, dict) and outcomes:
+            add(
+                ["goal_outcomes"],
+                "fast semantic escalation requires goal_outcomes={}",
+                value=outcomes,
+            )
+        if raw.get("goal_satisfaction") is not None:
+            add(
+                ["goal_satisfaction"],
+                "fast semantic escalation requires goal_satisfaction=null",
+                value=raw.get("goal_satisfaction"),
+            )
     if isinstance(outcomes, dict):
         outcome_goal_set = set(outcomes)
-        if outcome_goal_set != expected_goal_set:
+        require_complete_outcome_map = not fast_escalation
+        if require_complete_outcome_map and outcome_goal_set != expected_goal_set:
             add(
                 ["goal_outcomes"],
                 (
@@ -644,6 +679,15 @@ def planner_contract_diagnostics(
                 if " ".join(str(item or "").strip().split())
             ]
             outcome_dispositions.add(str(outcome_disposition or ""))
+            if planner_tier == "fast" and outcome_disposition not in {
+                "execute",
+                "respond",
+            }:
+                add(
+                    ["goal_outcomes", goal_id, "disposition"],
+                    "fast terminal goal outcomes may only execute or respond",
+                    value=outcome_disposition,
+                )
             inspect_satisfaction(
                 outcome.get("satisfaction"),
                 ["goal_outcomes", goal_id, "satisfaction"],
@@ -760,12 +804,6 @@ def planner_contract_diagnostics(
             value=outcomes,
         )
 
-    if planner_tier == "fast" and disposition == "mixed":
-        add(
-            ["disposition"],
-            "mixed multi-goal outcomes require deep planning",
-            value=disposition,
-        )
     if planner_tier == "deep" and disposition == "escalate":
         add(
             ["disposition"],
@@ -829,7 +867,7 @@ def validate_planner_model_output(
 
     output = PlannerModelOutput.model_validate(model_raw)
     allowed_dispositions = (
-        {"respond", "execute", "escalate"}
+        {"respond", "execute", "mixed", "escalate"}
         if planner_tier == "fast"
         else {"respond", "execute", "mixed", "clarify", "unavailable", "refused"}
     )
@@ -840,6 +878,36 @@ def validate_planner_model_output(
     goal_outcomes_were_supplied = "goal_outcomes" in model_raw
     outcome_goal_ids = set(output.goal_outcomes)
     expected_goal_id_set = set(expected_goal_ids_for_turn)
+    if planner_tier == "fast" and len(expected_goal_id_set) > 1:
+        missing_envelope_fields = [
+            field_name
+            for field_name in ("steps", "goal_outcomes", "goal_satisfaction")
+            if field_name not in model_raw
+        ]
+        if missing_envelope_fields:
+            raise ValueError(
+                "multi-goal fast planner output requires explicit fields: "
+                + ",".join(missing_envelope_fields)
+            )
+    if (
+        planner_tier == "fast"
+        and len(expected_goal_id_set) > 1
+        and not goal_outcomes_were_supplied
+    ):
+        raise ValueError(
+            "multi-goal fast planner output requires an explicit goal_outcomes object"
+        )
+    if planner_tier == "fast" and output.disposition == "escalate":
+        if output.coverage not in {"partial", "uncertain"}:
+            raise ValueError(
+                "fast semantic escalation requires partial or uncertain coverage"
+            )
+        if output.goal_outcomes:
+            raise ValueError("fast semantic escalation requires goal_outcomes={}")
+        if output.goal_satisfaction is not None:
+            raise ValueError(
+                "fast semantic escalation requires goal_satisfaction=null"
+            )
     if (
         len(expected_goal_id_set) > 1
         and output.disposition in {"execute", "respond", "mixed"}
@@ -849,11 +917,32 @@ def validate_planner_model_output(
             "complete multi-goal planner output requires goal_outcomes keyed by "
             "every authoritative Goal Association ID"
         )
-    if goal_outcomes_were_supplied and outcome_goal_ids != expected_goal_id_set:
+    if (
+        goal_outcomes_were_supplied
+        and output.disposition != "escalate"
+        and outcome_goal_ids != expected_goal_id_set
+    ):
         raise ValueError(
             "goal_outcomes keys must cover exactly the authoritative Goal "
             "Association IDs"
         )
+    if planner_tier == "fast" and output.goal_outcomes:
+        outcome_dispositions = {
+            outcome.disposition for outcome in output.goal_outcomes.values()
+        }
+        unsupported = outcome_dispositions - {"execute", "respond"}
+        if unsupported:
+            raise ValueError(
+                "fast terminal goal outcomes may only execute or respond: "
+                + ",".join(sorted(unsupported))
+            )
+        if output.disposition == "mixed" and outcome_dispositions != {
+            "execute",
+            "respond",
+        }:
+            raise ValueError(
+                "fast mixed output requires at least one execute and one respond goal"
+            )
     for goal_id, outcome in output.goal_outcomes.items():
         if outcome.satisfaction is None:
             continue

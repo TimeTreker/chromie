@@ -6,7 +6,11 @@ from orchestrator.runtime.response_plan import (
     validate_immediate_response_plan,
     validate_response_stage,
 )
-from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
+from shared.chromie_contracts.semantic_task import (
+    ResponsePlan,
+    ResponseStage,
+    pending_action_stage_direction_claims,
+)
 
 
 class ResponsePlanClaimValidationTests(unittest.TestCase):
@@ -146,6 +150,19 @@ class ResponsePlanClaimValidationTests(unittest.TestCase):
 
         self.assertTrue(result.accepted)
         self.assertEqual(result.stage.text, "I am checking that.")  # type: ignore[union-attr]
+
+    def test_pending_action_stage_direction_is_derived_from_skill_id(self) -> None:
+        claims = pending_action_stage_direction_claims(
+            "*Blinks twice* Here is a joke.",
+            ["soridormi.blink_eyes"],
+        )
+        prospective = pending_action_stage_direction_claims(
+            "I will blink twice. Here is a joke.",
+            ["soridormi.blink_eyes"],
+        )
+
+        self.assertEqual(claims, ["blink"])
+        self.assertEqual(prospective, [])
 
 
 if __name__ == "__main__":

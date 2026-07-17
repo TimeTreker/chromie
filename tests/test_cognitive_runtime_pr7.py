@@ -92,6 +92,24 @@ class ScriptedClient:
                     covers_goal_ids=plan.goal_ids,
                 )
             )
+        elif plan.disposition == "mixed":
+            response_texts = [
+                item.response_text
+                for item in plan.goal_outcomes
+                if item.disposition == "respond" and item.response_text
+            ]
+            response_plan = ResponsePlan(
+                pre_action=ResponseStage(
+                    text=(
+                        "I will carry out the requested action. "
+                        + " ".join(response_texts)
+                    ).strip(),
+                    speech_act="inform",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=plan.goal_ids,
+                )
+            )
         elif plan.disposition == "clarify":
             response_plan = ResponsePlan(
                 immediate=ResponseStage(
@@ -138,6 +156,23 @@ def new_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
         ],
         confidence=0.95,
         reason_summary="A new independent user goal.",
+        metadata={"status": "resolved"},
+    )
+
+
+def multi_goal_association(*goal_ids: str) -> GoalAssociationResolution:
+    return GoalAssociationResolution(
+        turn_id="turn-multi",
+        new_goals=[
+            SemanticGoal(
+                goal_id=goal_id,
+                description=f"Goal {goal_id}",
+                source_text="multi goal request",
+            )
+            for goal_id in goal_ids
+        ],
+        confidence=0.95,
+        reason_summary="Independent goals.",
         metadata={"status": "resolved"},
     )
 
@@ -376,6 +411,155 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.lane, "chat")
         self.assertEqual(result.interaction_response.skills, [])
         self.assertEqual(result.interaction_response.speech[0].text, "你好。")
+        self.assertEqual(result.metadata["fast_planner_path"], "terminal")
+        self.assertFalse(result.metadata["deep_planner_invoked"])
+        self.assertTrue(result.metadata["deep_planner_avoided"])
+
+    def test_fast_terminal_multi_goal_mixed_plan_skips_deep_planner(self):
+        fast = CanonicalPlan(
+            plan_id="fast-mixed",
+            planner_tier="fast",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.97,
+            goal_ids=["goal-blink", "goal-joke"],
+            steps=[{
+                "step_id": "blink",
+                "skill_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": ["goal-blink"],
+            }],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-blink",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+                {
+                    "goal_id": "goal-joke",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "A short joke.",
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+            ],
+            goal_satisfaction={"score": 1.0, "status": "exact"},
+            metadata={"path_classification": "terminal"},
+        )
+        client = ScriptedClient(
+            association=multi_goal_association("goal-blink", "goal-joke"),
+            fast_plans=[fast],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"robot_action"}),
+            ),
+        )
+
+        result = self.run_resolution(
+            coordinator,
+            client,
+            text="Blink twice and tell me a short joke.",
+        )
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(client.calls, ["association", "fast", "compose"])
+        self.assertEqual(result.terminal_plan.planner_tier, "fast")
+        self.assertEqual(result.metadata["fast_planner_path"], "terminal")
+        self.assertFalse(result.metadata["deep_planner_invoked"])
+        self.assertEqual(result.metadata["fast_goal_outcome_count"], 2)
+        self.assertEqual(result.metadata["fast_executable_step_count"], 1)
+
+    def test_semantic_escalation_records_normal_deep_invocation_reason(self):
+        fast = CanonicalPlan(
+            plan_id="fast-semantic-escalation",
+            planner_tier="fast",
+            disposition="escalate",
+            coverage="partial",
+            confidence=0.9,
+            goal_ids=["goal-1"],
+            escalation_reason="rare capability requires full planning",
+            metadata={"path_classification": "semantic_escalation"},
+        )
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[fast],
+            deep_plans=[execute_plan()],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
+            policy=CognitiveRuntimePolicy(
+                mode="apply", apply_lanes=frozenset({"robot_action"})
+            ),
+        )
+
+        result = self.run_resolution(coordinator, client, text="眨眼。")
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(
+            result.metadata["deep_planner_invocation_reason"],
+            "semantic_escalation",
+        )
+        self.assertEqual(result.metadata["stage_diagnostics"], [])
+        self.assertEqual(
+            client.deep_contexts[0]["deep_planner_invocation_reason"],
+            "semantic_escalation",
+        )
+
+    def test_fast_contract_failure_stays_visible_and_is_sanitized_for_deep(self):
+        fast = CanonicalPlan(
+            plan_id="fast-contract-failure",
+            planner_tier="fast",
+            disposition="escalate",
+            coverage="uncertain",
+            confidence=0.0,
+            goal_ids=["goal-1"],
+            escalation_reason="fast_planner_model_contract_failed",
+            metadata={
+                "resolver": "fast_planner",
+                "status": "escalate",
+                "path_classification": "contract_failure",
+                "failure_class": "structured_output_validation",
+                "failure_domain": "model_contract",
+                "initial_raw_output": '{"bad":true}',
+                "repair_raw_output": '{"still_bad":true}',
+            },
+        )
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[fast],
+            deep_plans=[execute_plan()],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
+            policy=CognitiveRuntimePolicy(
+                mode="apply", apply_lanes=frozenset({"robot_action"})
+            ),
+        )
+
+        result = self.run_resolution(coordinator, client, text="眨眼。")
+
+        self.assertEqual(result.status, "applied")
+        self.assertEqual(
+            result.metadata["deep_planner_invocation_reason"],
+            "fast_contract_failure",
+        )
+        self.assertEqual(
+            result.metadata["stage_diagnostics"][0]["failure_class"],
+            "structured_output_validation",
+        )
+        deep_fast_metadata = client.deep_contexts[0]["fast_plan_resolution"][
+            "metadata"
+        ]
+        self.assertNotIn("initial_raw_output", deep_fast_metadata)
+        self.assertNotIn("repair_raw_output", deep_fast_metadata)
 
     def test_apply_robot_action_uses_runtime_confirmation_contract(self):
         client = ScriptedClient(

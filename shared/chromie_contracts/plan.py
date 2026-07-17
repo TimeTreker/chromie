@@ -308,8 +308,6 @@ class CanonicalPlan(BaseModel):
                 raise ValueError("non-complete deep plans must clarify, report unavailable, or refuse")
         if self.planner_tier == "deep" and self.disposition == "escalate":
             raise ValueError("deep plans cannot return to the fast planner")
-        if self.planner_tier == "fast" and self.disposition == "mixed":
-            raise ValueError("mixed multi-goal outcomes require deep planning")
         if self.disposition == "execute" and not self.steps:
             raise ValueError("execute disposition requires at least one step")
         if self.disposition == "mixed" and not self.steps:
@@ -454,4 +452,11 @@ class CanonicalPlan(BaseModel):
             dispositions = {item.disposition for item in self.goal_outcomes}
             if "execute" not in dispositions:
                 raise ValueError("mixed plans require at least one executable goal outcome")
+            if self.planner_tier == "fast":
+                unsupported = dispositions - {"execute", "respond"}
+                if unsupported:
+                    raise ValueError(
+                        "fast mixed plans may contain only execute and respond outcomes: "
+                        + ",".join(sorted(unsupported))
+                    )
         return self

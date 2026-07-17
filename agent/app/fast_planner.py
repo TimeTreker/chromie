@@ -162,6 +162,7 @@ class FastPlannerResolver:
                     if contract_repair_attempted
                     else "fast_planner_unavailable",
                     error=exc,
+                    path_classification="contract_failure",
                     metadata={
                         "contract_schema": "FastPlannerModelOutput",
                         "canonical_contract": "CanonicalPlan",
@@ -287,12 +288,14 @@ class FastPlannerResolver:
             f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
             "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. "
-            "Finding one matching skill is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, or capability is unresolved, return disposition=escalate, coverage=partial or uncertain, a non-empty escalation_reason, and zero steps. "
-            "Fast Planner must not emit mixed outcomes; escalate so Deep Planner can account for them. For complete direct execution, use exact supplied skill IDs and schema-valid args. "
-            "User-facing speech is owned by Response Composer, not a plan step. Represent a conversational answer as disposition=respond with response_text; if it is independent of an executable goal, escalate for a Deep Planner mixed execute/respond outcome. "
+            "For a multi-goal turn there are exactly two legal output shapes. A terminal plan uses coverage=complete and goal_outcomes keyed exactly once by every canonical goal ID. A semantic escalation uses disposition=escalate, coverage=partial or uncertain, steps=[], goal_outcomes={}, goal_satisfaction=null, and a specific non-empty escalation_reason. "
+            "Finding one matching skill is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, safety judgment, or capability is unresolved, use the semantic-escalation shape with zero steps, an empty outcome map, and no partial outcomes. "
+            "Fast Planner may emit disposition=mixed only for a completely covered simple combination of common unlocked execute goals and direct conversational respond goals. A mixed plan requires at least one execute outcome, at least one respond outcome, complete per-goal satisfaction, and exact step ownership. "
+            "For complete direct execution, use exact supplied skill IDs and schema-valid args. User-facing speech is owned by Response Composer, not a plan step. Represent each conversational responsibility with disposition=respond and an actual response_text now; never substitute chromie.speak or a body gesture. "
             "Every executable step must use source_goal_ids copied from the canonical goals. Do not use capability_id, parameters, action, input_schema, route, or step_type as plan-step fields. "
             "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. A score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. If steps are present, top-level disposition cannot be respond. "
-            "For every complete multi-goal execute or respond result, goal_outcomes must be keyed exactly once by every supplied canonical goal ID. "
+            "For every complete multi-goal execute, respond, or mixed result, goal_outcomes must be keyed exactly once by every supplied canonical goal ID. Each execute outcome needs its real step_ids; each respond outcome needs non-empty response_text and step_ids=[]. "
+            "Valid multi-goal examples: execute uses two owned steps and two execute outcomes; mixed uses one owned step plus one respond outcome; escalation uses steps=[], goal_outcomes={}, and goal_satisfaction=null. "
             "Use plan_relation=exact for an exact plan. A safe_adjustment or alternative must set user_confirmation_required=true so the host holds execution for approval. "
             "The Ollama decoder enforces the exact flat FastPlannerModelOutput schema out-of-band. "
             "The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. "
@@ -306,7 +309,7 @@ class FastPlannerResolver:
     def _system_prompt() -> str:
         return (
             "You are Chromie's Fast Planner. Plan only the final authoritative user turn and canonical goals at the end of the prompt. "
-            "Produce a complete simple response or complete common-skill plan only when every responsibility is covered; otherwise escalate. "
+            "Produce a complete simple response, common-skill plan, or simple execute-plus-respond mixed plan only when every responsibility is covered; otherwise return the explicit empty semantic-escalation shape. "
             "Do not execute, authorize, or claim completion. Return JSON only."
         )
 
@@ -377,6 +380,11 @@ class FastPlannerResolver:
         expected_goal_ids_for_turn: list[str],
     ) -> CanonicalPlan:
         allowed = {item["capability_id"]: item for item in capability_payload}
+        counts = {
+            "authoritative_goal_count": len(expected_goal_ids_for_turn),
+            "goal_outcome_count": len(plan.goal_outcomes),
+            "executable_step_count": len(plan.steps),
+        }
         if expected_goal_ids_for_turn and set(plan.goal_ids) != set(expected_goal_ids_for_turn):
             return self._escalation(
                 plan.plan_id,
@@ -385,8 +393,25 @@ class FastPlannerResolver:
                 metadata={
                     "expected_goal_ids": expected_goal_ids_for_turn,
                     "actual_goal_ids": list(plan.goal_ids),
+                    **counts,
                 },
             )
+        if plan.disposition == "escalate":
+            metadata = dict(plan.metadata)
+            metadata.update(
+                {
+                    "resolver": "fast_planner",
+                    "status": "escalate",
+                    "authority": "advisory",
+                    "path_classification": "semantic_escalation",
+                    "common_capability_count": len(capability_payload),
+                    "min_confidence": self.min_confidence,
+                    "contract_schema": "FastPlannerModelOutput",
+                    "canonical_contract": "CanonicalPlan",
+                    **counts,
+                }
+            )
+            return plan.model_copy(update={"metadata": metadata})
         if plan.coverage != "complete" or plan.confidence < self.min_confidence:
             return self._escalation(
                 plan.plan_id,
@@ -396,6 +421,7 @@ class FastPlannerResolver:
                 metadata={
                     "proposed_coverage": plan.coverage,
                     "proposed_confidence": plan.confidence,
+                    **counts,
                 },
             )
         if plan.goal_satisfaction is None or plan.goal_satisfaction.score < 0.95:
@@ -409,8 +435,22 @@ class FastPlannerResolver:
                         plan.goal_satisfaction.model_dump(mode="json")
                         if plan.goal_satisfaction
                         else None
-                    )
+                    ),
+                    **counts,
                 },
+            )
+        incomplete_outcomes = [
+            outcome.goal_id
+            for outcome in plan.goal_outcomes
+            if outcome.satisfaction is None or outcome.satisfaction.score < 0.95
+        ]
+        if incomplete_outcomes:
+            return self._escalation(
+                plan.plan_id,
+                request,
+                "per_goal_satisfaction_not_exact",
+                unresolved=incomplete_outcomes,
+                metadata={**counts},
             )
         for step in plan.steps:
             capability = allowed.get(step.skill_id)
@@ -420,6 +460,7 @@ class FastPlannerResolver:
                     request,
                     "step_not_in_executable_common_catalog",
                     unresolved=[step.skill_id],
+                    metadata={**counts},
                 )
         metadata = dict(plan.metadata)
         metadata.update(
@@ -431,6 +472,8 @@ class FastPlannerResolver:
                 "min_confidence": self.min_confidence,
                 "contract_schema": "FastPlannerModelOutput",
                 "canonical_contract": "CanonicalPlan",
+                "path_classification": "terminal",
+                **counts,
             }
         )
         return plan.model_copy(update={"metadata": metadata})
@@ -444,6 +487,7 @@ class FastPlannerResolver:
         unresolved: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
         error: Exception | None = None,
+        path_classification: str = "semantic_escalation",
     ) -> CanonicalPlan:
         detail = dict(metadata or {})
         detail.update(
@@ -451,6 +495,7 @@ class FastPlannerResolver:
                 "resolver": "fast_planner",
                 "status": "escalate",
                 "authority": "advisory",
+                "path_classification": path_classification,
             }
         )
         if error is not None:

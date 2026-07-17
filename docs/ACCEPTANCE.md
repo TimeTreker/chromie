@@ -147,6 +147,25 @@ microphone, speaker, or physical hardware evidence.
 provenance; it does not prove which source revision is executing behind the MCP
 endpoint.
 
+### Fast Planner multi-goal qualification
+
+The repository implements the accepted
+[Fast Planner multi-goal contract](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
+Its next `multi_goal_daily_life` live-text summary must prove more than 4/4 final
+case success. The simple retained matrix must terminate with
+`planner_tier=fast`, omit Deep Planner invocation, contain no Fast
+`structured_output_validation` diagnostic, preserve exact per-goal outcomes
+and skill ownership, avoid premature physical-completion speech, and finish
+Soridormi simulation in safe idle. Clean semantic-escalation scenarios must
+show empty steps and outcomes plus a specific escalation reason without
+contract repair. Technical Fast failures must remain visible even if Deep
+Planner recovers the turn.
+
+Target qualification retains at least three consecutive warm simulator runs
+and compares cognitive-runtime latency with the July 17 diagnostic baseline.
+The target is at least a 35 percent median reduction without weakening any
+execution or evidence boundary.
+
 The RTX 5090 and RTX 4090 Laptop hardware profiles currently use qualification
 time budgets: 120 seconds per Agent cognitive stage, 150 seconds per host stage,
 and 900 seconds for the complete cognitive pipeline. The live runner therefore

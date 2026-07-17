@@ -1,10 +1,67 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .interaction import reject_forbidden_low_level_fields
+
+
+_STAGE_DIRECTION_PATTERN = re.compile(r"\*([^*]+)\*|\[([^\]]+)\]|\(([^)]+)\)")
+_SKILL_TOKEN_STOPWORDS = {
+    "soridormi",
+    "chromie",
+    "skill",
+    "eyes",
+    "eye",
+    "person",
+    "direction",
+    "forward",
+    "place",
+    "head",
+    "neutral",
+    "attention",
+    "express",
+    "yes",
+    "no",
+    "the",
+    "and",
+    "with",
+}
+
+
+def pending_action_stage_direction_claims(
+    text: str,
+    skill_ids: list[str] | tuple[str, ...],
+) -> list[str]:
+    """Return pending plan-action tokens narrated as completed stage directions.
+
+    Response Composer runs before effectful steps execute.  A marked direction
+    such as ``*Blinks twice*`` therefore counts as an unsupported completion
+    claim when the plan still contains ``soridormi.blink_eyes``.  Tokens are
+    derived from the actual pending skill IDs rather than a case-specific phrase
+    table.
+    """
+
+    normalized_text = str(text or "")
+    if not normalized_text or not skill_ids:
+        return []
+    tokens: set[str] = set()
+    for skill_id in skill_ids:
+        for token in re.findall(r"[a-z0-9]+", str(skill_id or "").casefold()):
+            if len(token) >= 3 and token not in _SKILL_TOKEN_STOPWORDS:
+                tokens.add(token)
+    if not tokens:
+        return []
+
+    claims: set[str] = set()
+    for match in _STAGE_DIRECTION_PATTERN.finditer(normalized_text):
+        segment = " ".join(part for part in match.groups() if part).casefold()
+        for token in tokens:
+            if re.search(rf"\b{re.escape(token)}(?:s|ed|ing)?\b", segment):
+                claims.add(token)
+    return sorted(claims)
 
 
 TaskOperationName = Literal[

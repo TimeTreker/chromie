@@ -485,6 +485,26 @@ python scripts/general_ability_acceptance.py \
 
 These scenarios are dependency-light Level A evidence only.
 
+### Fast Planner multi-goal contract optimization
+
+The July 17, 2026 operator-supplied live-text simulator diagnostic passed
+the four-case daily-life matrix only after Deep Planner recovery. Every Fast
+Planner attempt recorded a model-contract failure rather than a valid
+terminal result or semantic escalation. This is successful end-to-end
+recovery, not successful Fast Planner operation.
+
+The implemented correction is documented in
+[Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
+The repository now uses one flat decoder-compatible envelope, accepts simple
+common-catalog execute/respond mixed plans, distinguishes semantic escalation
+from technical failure, records Deep invocation reason, sanitizes malformed Fast
+context before recovery, and rejects pending-action stage-direction claims.
+Automated Level A evidence is green; repeated warm live-text simulator evidence
+is still open. Rollout must preserve the existing one-way authority path and
+shared trusted validator. Existing `report_only`, lane gates, and
+`AGENT_FAST_PLANNER_ENABLED` provide observation and rollback; a new semantic
+authority or partial-execution fallback is not permitted.
+
 ## 14. Live-text rollout procedure
 
 ### Phase 0 — baseline

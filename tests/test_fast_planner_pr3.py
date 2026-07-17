@@ -107,6 +107,38 @@ class CanonicalPlanContractTests(unittest.TestCase):
         plan = CanonicalPlan(plan_id="p", planner_tier="fast", disposition="respond", coverage="complete", confidence=0.9, response_text="你好。")
         self.assertEqual(plan.response_text, "你好。")
 
+    def test_fast_mixed_plan_is_valid_for_execute_and_respond_outcomes(self):
+        plan = CanonicalPlan(
+            plan_id="p-fast-mixed",
+            planner_tier="fast",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.95,
+            goal_ids=["goal-blink", "goal-joke"],
+            steps=[{
+                "step_id": "blink",
+                "skill_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": ["goal-blink"],
+            }],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-blink",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+                {
+                    "goal_id": "goal-joke",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "A short joke.",
+                },
+            ],
+            goal_satisfaction={"score": 1.0, "status": "exact"},
+        )
+        self.assertEqual(plan.disposition, "mixed")
+
 
 class FastPlannerResolverTests(unittest.TestCase):
     def test_simple_blink_produces_complete_direct_plan(self):
@@ -150,6 +182,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "coverage": "partial",
             "confidence": 0.95,
             "steps": [],
+            "goal_outcomes": {},
             "escalation_reason": "Compound request requires deep multi-goal accounting.",
             "goal_satisfaction": None,
         }
@@ -176,18 +209,20 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
     def test_compound_walk_and_blink_escalates_without_partial_steps(self):
-        raw = {"disposition":"escalate","coverage":"partial","confidence":0.88,"goal_summary":"walk while blinking","steps":[],"escalation_reason":"compound_goal_requires_full_planning","unresolved":["concurrency feasibility","blink count"]}
+        raw = {"disposition":"escalate","coverage":"partial","confidence":0.88,"goal_summary":"walk while blinking","steps":[],"goal_outcomes":{},"goal_satisfaction":None,"escalation_reason":"compound_goal_requires_full_planning","unresolved":["concurrency feasibility","blink count"]}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("往前走15秒，同时眨眼。", goal_ids=["goal-walk", "goal-blink"])))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.steps, [])
         self.assertIn("concurrency feasibility", plan.unresolved)
+        self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
 
-    def test_multi_goal_fast_schema_keeps_goal_outcomes_optional_for_escalation(self):
+    def test_multi_goal_fast_schema_requires_explicit_empty_goal_outcomes_for_escalation(self):
         raw = {
             "disposition": "escalate",
             "coverage": "partial",
             "confidence": 0.9,
             "steps": [],
+            "goal_outcomes": {},
             "escalation_reason": "heterogeneous multi-goal request requires deep planning",
             "goal_satisfaction": None,
         }
@@ -204,7 +239,106 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(plan.disposition, "escalate")
         schema = ollama.prompts[0][1]["response_format"]
-        self.assertNotIn("goal_outcomes", schema["required"])
+        self.assertIn("goal_outcomes", schema["required"])
+        self.assertNotIn("required", schema["properties"]["goal_outcomes"])
+        self.assertEqual(schema["properties"]["goal_outcomes"]["minProperties"], 0)
+        self.assertIn("mixed", schema["properties"]["disposition"]["enum"])
+
+    def test_multi_goal_fast_execute_terminates_without_repair(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.97,
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0},
+                    "source_goal_ids": ["goal-walk"],
+                },
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-blink"],
+                },
+            ],
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["walk"],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        ollama = FakeOllama(raw)
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request(
+                    "Walk forward for one second, then blink twice.",
+                    goal_ids=["goal-walk", "goal-blink"],
+                )
+            )
+        )
+
+        self.assertEqual(plan.planner_tier, "fast")
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.metadata["path_classification"], "terminal")
+        self.assertEqual(len(ollama.prompts), 1)
+
+    def test_multi_goal_fast_mixed_terminates_without_deep_planning(self):
+        raw = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 0.98,
+            "steps": [{
+                "step_id": "blink",
+                "skill_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": ["goal-blink"],
+            }],
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+                "goal-joke": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "Why did the robot cross the road?",
+                    "step_ids": [],
+                    "satisfaction": {"score": 1.0, "status": "exact"},
+                },
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        ollama = FakeOllama(raw)
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request(
+                    "Blink twice and tell me a short joke.",
+                    goal_ids=["goal-blink", "goal-joke"],
+                )
+            )
+        )
+
+        self.assertEqual(plan.planner_tier, "fast")
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual(plan.goal_outcomes[1].response_text, "Why did the robot cross the road?")
+        self.assertEqual(plan.metadata["path_classification"], "terminal")
+        self.assertEqual(len(ollama.prompts), 1)
 
     def test_low_confidence_complete_claim_is_forced_to_escalate(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"goal_ids":["goal-blink"],"steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":3}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
@@ -323,6 +457,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "coverage": "partial",
             "confidence": 0.9,
             "steps": [],
+            "goal_outcomes": {},
             "escalation_reason": "compound request requires deep planning",
             "goal_satisfaction": None,
         }
@@ -392,6 +527,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         plan = asyncio.run(FastPlannerResolver(FakeOllama(RuntimeError("offline")), FakeCatalog()).resolve(request("眨眼。")))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.metadata["status"], "escalate")
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
 
 class OrchestratorFastPlannerTests(unittest.TestCase):

@@ -19,7 +19,10 @@ try:
         ResponseCompositionResolution,
         canonical_plan_fingerprint,
     )
-    from chromie_contracts.semantic_task import ResponsePlan
+    from chromie_contracts.semantic_task import (
+        ResponsePlan,
+        pending_action_stage_direction_claims,
+    )
     from chromie_contracts.social_attention import (
         SocialAttentionBehavior,
         SocialAttentionPlan,
@@ -31,7 +34,10 @@ except ImportError:  # pragma: no cover
         ResponseCompositionResolution,
         canonical_plan_fingerprint,
     )
-    from shared.chromie_contracts.semantic_task import ResponsePlan
+    from shared.chromie_contracts.semantic_task import (
+        ResponsePlan,
+        pending_action_stage_direction_claims,
+    )
     from shared.chromie_contracts.social_attention import (
         SocialAttentionBehavior,
         SocialAttentionPlan,
@@ -100,6 +106,12 @@ class ResponseComposerResolver:
                 if not isinstance(raw, dict):
                     raise ValueError("response composer output is not a JSON object")
                 model_output = ResponseComposerModelOutput.model_validate(raw)
+                premature_claims = self._pending_action_claim_errors(
+                    model_output.response_plan,
+                    plan=plan,
+                )
+                if premature_claims:
+                    raise ValueError("; ".join(premature_claims))
                 social_plan, social_reasons = self._validated_social_plan(
                     model_output.social_attention_plan,
                     plan=plan,
@@ -226,6 +238,36 @@ class ResponseComposerResolver:
 
         constrain(schema)
         return schema
+
+    @staticmethod
+    def _pending_action_claim_errors(
+        response_plan: ResponsePlan,
+        *,
+        plan: CanonicalPlan,
+    ) -> list[str]:
+        if not plan.steps:
+            return []
+        pending_skill_ids = [step.skill_id for step in plan.steps]
+        stage_items = [
+            ("immediate", response_plan.immediate),
+            ("pre_action", response_plan.pre_action),
+            *[("progress", stage) for stage in response_plan.progress],
+            ("final", response_plan.final),
+        ]
+        errors: list[str] = []
+        for phase, stage in stage_items:
+            if stage is None or not stage.must_not_claim_completion:
+                continue
+            claims = pending_action_stage_direction_claims(
+                stage.text,
+                pending_skill_ids,
+            )
+            if claims:
+                errors.append(
+                    "pending physical action stage direction claims completion: "
+                    f"{phase}:" + ",".join(claims)
+                )
+        return errors
 
     @staticmethod
     def _canonical_plan(context: dict[str, Any]) -> CanonicalPlan | None:
@@ -467,7 +509,7 @@ class ResponseComposerResolver:
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. "
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
             "For execute plans this is pre-execution composition: use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, and omit final. "
-            "For mixed plans, coordinate executable goals and waiting goals in one natural response: do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage that covers every clarify outcome. "
+            "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, name the actual unresolved need naturally and use waiting_for_user. For alternatives, explain the change and request approval. "
             "Social attention is auxiliary interaction behavior, never a user goal or task step; choose decision=none when stillness is more natural, safer, unsupported, or unnecessary. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "

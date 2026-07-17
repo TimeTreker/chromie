@@ -592,6 +592,17 @@ envelope. Plan identity, schema version, planner tier, and authoritative
 top-level Goal IDs are host-owned. Model-authored steps must name the exact
 Goal IDs they serve through `source_goal_ids`.
 
+For a Fast Planner request containing multiple authoritative goals, the model
+DTO must always include `goal_outcomes`. A complete terminal result uses an
+exact map keyed once by every Goal ID; a valid semantic escalation uses an
+empty map, zero steps, partial or uncertain coverage, and a specific
+escalation reason. Simple common-catalog `execute + respond` combinations
+may terminate as `mixed`; goals requiring clarification, unavailable or
+refused judgment, material alternatives, rare capabilities, or broader
+context escalate. Contract failure is not a semantic escalation. The
+implemented contract and qualification matrix are defined in
+[Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
+
 ### 8.2 Deep Planner
 
 The Deep Planner receives:

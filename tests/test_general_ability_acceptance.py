@@ -18,6 +18,7 @@ from scripts.general_ability_acceptance import (
     run_level_a,
     _live_case_namespace,
     select_ability_classes,
+    validate_live_text_result,
     validate_manifest,
 )
 from scripts.interaction_text_mujoco_check import build_parser as build_text_check_parser
@@ -161,6 +162,53 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             namespace.expect_skill,
             ["soridormi.look_at_person", "soridormi.blink_eyes"],
         )
+        self.assertEqual(case.expected_terminal_planner_tier, "fast")
+        self.assertEqual(case.expected_fast_planner_path, "terminal")
+        self.assertFalse(case.expect_deep_planner_invoked)
+        self.assertTrue(case.expect_no_fast_contract_failure)
+
+    def test_live_validation_enforces_fast_terminal_path(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        ability = next(
+            item
+            for item in manifest.ability_classes
+            if item.ability_id == "multi_goal_daily_life"
+        )
+        case = ability.live_text_cases[-1].case
+        summary = {
+            "route": {"route": "robot_action"},
+            "interaction_response": {
+                "skills": [
+                    {
+                        "skill_id": "soridormi.blink_eyes",
+                        "metadata": {},
+                    }
+                ],
+                "speech": [{"text": "*Blinks twice* Why did the robot laugh?"}],
+            },
+            "cognitive_runtime": {
+                "terminal_plan": {"planner_tier": "deep"},
+                "timings_ms": {"deep_planner": 10000.0},
+                "metadata": {
+                    "fast_planner_path": "contract_failure",
+                    "deep_planner_invoked": True,
+                    "stage_diagnostics": [
+                        {
+                            "stage": "fast_planner",
+                            "failure_class": "structured_output_validation",
+                        }
+                    ],
+                },
+            },
+        }
+
+        errors = validate_live_text_result(case, summary)
+
+        self.assertTrue(any("terminal planner tier mismatch" in item for item in errors))
+        self.assertTrue(any("Fast Planner path mismatch" in item for item in errors))
+        self.assertTrue(any("Deep Planner invocation mismatch" in item for item in errors))
+        self.assertTrue(any("Fast Planner contract failure" in item for item in errors))
+        self.assertTrue(any("stage direction" in item for item in errors))
 
     def test_live_case_namespace_matches_text_checker_argument_contract(self) -> None:
         args = build_parser().parse_args(["--mode", "live-text"])

@@ -494,7 +494,12 @@
             "look",
             "blink"
           ],
-          "description": "Live goal-driven planning should preserve two independently owned social-motion goals."
+          "description": "Live goal-driven planning should preserve two independently owned social-motion goals.",
+          "expected_terminal_planner_tier": "fast",
+          "expected_fast_planner_path": "terminal",
+          "expect_deep_planner_invoked": false,
+          "expect_no_fast_contract_failure": true,
+          "forbid_pending_action_stage_directions": true
         },
         {
           "id": "multi_goal_nod_then_blink",
@@ -514,7 +519,12 @@
             "nod",
             "blink"
           ],
-          "description": "Live execution should preserve ordered gestures rather than collapsing them."
+          "description": "Live execution should preserve ordered gestures rather than collapsing them.",
+          "expected_terminal_planner_tier": "fast",
+          "expected_fast_planner_path": "terminal",
+          "expect_deep_planner_invoked": false,
+          "expect_no_fast_contract_failure": true,
+          "forbid_pending_action_stage_directions": true
         },
         {
           "id": "multi_goal_walk_then_blink",
@@ -534,7 +544,12 @@
             "walk",
             "blink"
           ],
-          "description": "A bounded locomotion goal and a gesture goal should remain sequential and simulator-confirmed."
+          "description": "A bounded locomotion goal and a gesture goal should remain sequential and simulator-confirmed.",
+          "expected_terminal_planner_tier": "fast",
+          "expected_fast_planner_path": "terminal",
+          "expect_deep_planner_invoked": false,
+          "expect_no_fast_contract_failure": true,
+          "forbid_pending_action_stage_directions": true
         },
         {
           "id": "multi_goal_blink_and_joke",
@@ -553,7 +568,12 @@
             "robot",
             "why"
           ],
-          "description": "A live mixed request should execute the body goal while also answering the conversational goal."
+          "description": "A live mixed request should execute the body goal while also answering the conversational goal.",
+          "expected_terminal_planner_tier": "fast",
+          "expected_fast_planner_path": "terminal",
+          "expect_deep_planner_invoked": false,
+          "expect_no_fast_contract_failure": true,
+          "forbid_pending_action_stage_directions": true
         }
       ]
     }

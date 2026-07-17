@@ -351,6 +351,71 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertNotEqual(result.composition.composition_id, "model-owned")  # type: ignore[union-attr]
         self.assertEqual(result.composition.canonical_plan, canonical)  # type: ignore[union-attr]
 
+    def test_pending_physical_stage_direction_gets_one_truthful_repair(self):
+        canonical = CanonicalPlan(
+            plan_id="plan-fast-mixed-claim",
+            planner_tier="fast",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.97,
+            goal_ids=["goal-blink", "goal-joke"],
+            steps=[{
+                "step_id": "blink",
+                "skill_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": ["goal-blink"],
+            }],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-blink",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                },
+                {
+                    "goal_id": "goal-joke",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "Why do robots avoid water?",
+                },
+            ],
+            goal_satisfaction={"score": 1.0, "status": "exact"},
+        )
+        invalid = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "*Blinks twice* Why do robots avoid water?",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-blink", "goal-joke"],
+                }
+            }
+        }
+        repaired = {
+            "response_plan": {
+                "pre_action": {
+                    "text": "I'll blink twice. Why do robots avoid water?",
+                    "commitment_state": "evaluating",
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": ["goal-blink", "goal-joke"],
+                }
+            }
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+
+        result = asyncio.run(ResponseComposerResolver(ollama).resolve(request(canonical)))
+
+        self.assertEqual(result.status, "resolved")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn(
+            "pending physical action stage direction claims completion",
+            ollama.prompts[1][0],
+        )
+        self.assertEqual(
+            result.composition.response_plan.pre_action.text,  # type: ignore[union-attr]
+            "I'll blink twice. Why do robots avoid water?",
+        )
+
     def test_mixed_execute_and_clarify_composes_one_truthful_response(self):
         canonical = CanonicalPlan(
             plan_id="plan-mixed-response",
