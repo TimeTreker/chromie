@@ -437,12 +437,12 @@ changes.
 | `AGENT_SOCIAL_ATTENTION_MODE` | Structured model-driven attention policy: `off`, `report_only`, `sim_only`, or `on`. Default `off`. `report_only` retains the advisory plan without adding skills. |
 | `CHROMIE_SOCIAL_ATTENTION_MODE` | Optional host-launcher override used by `scripts/start_chromie.sh`. Normal profiles inherit the project-wide `off` default; `--architecture-validation` selects the `architecture` overlay, which explicitly sets `sim_only`. |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
-| `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. |
+| `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. The architecture-validation overlay raises it to `120000` so qualification tests model capability before latency tuning. |
 | `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `4096`. |
 | `AGENT_SOCIAL_ATTENTION_NUM_PREDICT` | JSON output budget for social-attention planning; default `160`. |
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | Deprecated compatibility input retained for diagnostics; default `0`. The runtime never awaits Social Attention after the primary response, and reports an effective wait of `0`. |
 | `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
-| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Comma-separated exact catalog IDs eligible for social-attention selection. Availability does not force selection; the model may choose `none`. |
+| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Optional comma-separated exact catalog IDs added to behavior-domain discovery. Default empty. Normal candidates are available interaction-executable catalog entries tagged `social_attention`; availability never forces selection. |
 | `AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET` | Optional installation-calibrated target reference. Default `none`; live target evidence overrides calibration. |
 | `AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION` | Optional calibrated relative direction associated with the fallback target. |
 | `AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD` | Optional calibrated yaw supplied as target evidence for compatible schemas. |

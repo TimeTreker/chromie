@@ -467,6 +467,13 @@ remain open.
    latency qualification. See
    [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
 
+10. **Implemented with Level A evidence; target evidence open:** User-outcome
+    acceptance with stable observable behavior events and hard LLM integrity
+    gates, plus a model-authored Social Attention behavior domain that can
+    coordinate contextual language and auxiliary body expression. See
+    [User-Outcome Acceptance Framework](docs/USER_OUTCOME_ACCEPTANCE.md) and
+    [Social Attention Behavior Domain](docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
+
 The Deep Planner does not return semantic work to the Fast Planner. Both tiers
 share capability and validation primitives and output the same canonical plan
 contract.
@@ -491,9 +498,10 @@ regression gates, and state the evidence level.
 - Deep Planner produces a final canonical plan without returning to Fast Planner;
 - partial or unconfirmed alternatives never execute;
 - information gaps remain attached to the original goal across turns;
-- speech, social attention, and user-task plans remain distinct;
+- explicit user tasks remain authoritative while response language and auxiliary Social Attention expression are coherently coordinated;
 - all execution passes the same deterministic validator;
-- retained Level A scenario coverage passes;
+- retained Level A scenario coverage and user-outcome observation checks pass;
+- critical LLM timeout or truncation cannot be hidden by fallback;
 - live-text and MuJoCo evidence are retained before target behavior is claimed.
 
 This track does not replace the current physical pilot or audio evidence tracks.

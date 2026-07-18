@@ -78,6 +78,14 @@ class _Catalog:
         )
 
 
+class _DomainCatalog(_Catalog):
+    async def refresh_live_named_skills(self) -> None:
+        return None
+
+    def entries(self) -> list[CapabilityMatch]:
+        return list(self.capabilities)
+
+
 class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
     def _request(self, *, route: str = "chat", intent: str = "general_conversation") -> AgentRunRequest:
         return AgentRunRequest.model_validate(
@@ -505,6 +513,87 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                         }
                     ],
                     "confidence": 1.0,
+                }
+            )
+
+
+
+    async def test_domain_discovery_does_not_require_fixed_capability_ids(self) -> None:
+        blink = self._blink().model_copy(
+            update={"behavior_domains": ["social_attention", "facial_expression"]}
+        )
+        attention = _AttentionOllama(
+            {
+                "behavior_domain": "social_attention",
+                "interaction_role": "auxiliary_expression",
+                "purpose": "acknowledge",
+                "decision": "express",
+                "target": {"target_ref": "none", "source": "none"},
+                "speech_expression": {"mode": "none"},
+                "behaviors": [
+                    {
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 1},
+                        "timing": "parallel",
+                        "social_function": "acknowledge_presence",
+                    }
+                ],
+                "confidence": 0.8,
+            }
+        )
+        response = await InteractionRuntime(
+            AgentServices(
+                ollama=_ConversationOllama(),  # type: ignore[arg-type]
+                use_llm=True,
+                capability_catalog=_DomainCatalog([blink]),  # type: ignore[arg-type]
+                social_attention_mode="sim_only",
+                social_attention_ollama=attention,  # type: ignore[arg-type]
+                social_attention_capability_ids=(),
+            )
+        ).run(self._request())
+
+        self.assertEqual(response.metadata["social_attention_status"], "applied")
+        self.assertEqual(response.skills[0].skill_id, "soridormi.blink_eyes")
+        self.assertEqual(
+            response.skills[0].metadata["behavior_domain"],
+            "social_attention",
+        )
+
+
+
+class SocialAttentionDomainContractTests(unittest.TestCase):
+    def test_speech_only_social_attention_expression_is_valid(self) -> None:
+        plan = SocialAttentionPlan.model_validate(
+            {
+                "behavior_domain": "social_attention",
+                "interaction_role": "auxiliary_expression",
+                "purpose": "empathy",
+                "decision": "express",
+                "speech_expression": {
+                    "mode": "adapt",
+                    "style": "empathetic",
+                    "pacing": "slower",
+                    "reason": "The user sounds upset.",
+                },
+                "behaviors": [],
+                "confidence": 0.9,
+            }
+        )
+
+        self.assertEqual(plan.purpose, "empathy")
+        self.assertEqual(plan.speech_expression.style, "empathetic")
+        self.assertEqual(plan.behaviors, [])
+
+    def test_none_decision_rejects_hidden_expression(self) -> None:
+        with self.assertRaises(ValueError):
+            SocialAttentionPlan.model_validate(
+                {
+                    "decision": "none",
+                    "speech_expression": {
+                        "mode": "adapt",
+                        "style": "warm",
+                        "pacing": "normal",
+                    },
                 }
             )
 

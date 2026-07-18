@@ -22,12 +22,14 @@ logger = logging.getLogger("chromie.agent.social_attention")
 
 
 class SocialAttentionPlanner:
-    """Model-driven optional social-attention planning.
+    """Model-driven auxiliary body-expression planning.
 
-    The model decides whether a subtle nonverbal behavior would improve the
-    interaction. Deterministic code only supplies eligible named skills and
-    validates the resulting plan against schemas, provider evidence, target
-    evidence, and resource conflicts.
+    Social attention is a high-level behavior domain. The model decides whether
+    a body expression would improve the current interaction and selects exact
+    catalog skills for the scene. In the goal-driven path, Response Composer
+    coordinates language expression and body expression together. This native
+    compatibility path plans body expression only; deterministic code validates
+    schemas, evidence, safety, and resource conflicts without choosing actions.
     """
 
     def __init__(self, services: Any) -> None:
@@ -56,9 +58,10 @@ class SocialAttentionPlanner:
             raw = await client.generate(
                 prompt,
                 system=(
-                    "You are Chromie's social-attention planner. Decide whether a subtle, optional, "
-                    "nonverbal attention behavior would improve this interaction. Use only supplied "
-                    "named skills and evidence. Return JSON only."
+                    "You are Chromie's auxiliary social-attention body planner. Treat social "
+                    "attention as a high-level interaction purpose, then choose scene-appropriate "
+                    "body expressions from the supplied catalog. Do not use phrase-to-skill rules, "
+                    "do not author speech in this compatibility path, and return JSON only."
                 ),
                 options={
                     "temperature": 0.2,
@@ -275,8 +278,12 @@ class SocialAttentionPlanner:
                 "source": "social_attention_plan",
                 "auxiliary_social_attention": True,
                 "attention_target": plan.target.model_dump(mode="json", exclude_none=True),
+                "behavior_domain": plan.behavior_domain,
+                "interaction_role": plan.interaction_role,
+                "social_attention_purpose": plan.purpose,
                 "plan_confidence": plan.confidence,
                 "plan_reason": plan.reason,
+                "social_function": behavior.social_function,
                 "behavior_reason": behavior.reason,
                 "catalog_version": request.context.get("capability_catalog_version"),
                 "catalog_score": candidate.get("score"),

@@ -304,16 +304,47 @@ class InteractionRuntime(_AgentPipeline):
         catalog = self.services.capability_catalog
         if catalog is None:
             return
-        configured_ids = tuple(
+
+        # Social attention is a behavior domain, not a fixed action list. Refresh
+        # the live catalog first, then discover every capability that declares
+        # the domain. Explicit IDs remain an operator override for providers that
+        # have not yet published domain metadata.
+        if hasattr(catalog, "refresh_live_named_skills"):
+            try:
+                await catalog.refresh_live_named_skills()
+            except Exception as exc:  # pragma: no cover - defensive service boundary
+                logger.warning("social attention catalog refresh failed error=%s", exc)
+
+        configured_ids = {
             capability_id
             for capability_id in self.services.social_attention_capability_ids
             if capability_id
-        )
-        if not configured_ids:
-            return
+        }
+        candidate_ids: list[str] = []
+        seen_ids: set[str] = set()
+
+        entries = catalog.entries() if hasattr(catalog, "entries") else []
+        for entry in entries:
+            capability_id = str(getattr(entry, "capability_id", "") or "").strip()
+            domains = {
+                str(value).strip().lower()
+                for value in (getattr(entry, "behavior_domains", None) or [])
+                if str(value).strip()
+            }
+            if capability_id and (
+                "social_attention" in domains or capability_id in configured_ids
+            ):
+                if capability_id not in seen_ids:
+                    seen_ids.add(capability_id)
+                    candidate_ids.append(capability_id)
+
+        for capability_id in sorted(configured_ids):
+            if capability_id not in seen_ids:
+                seen_ids.add(capability_id)
+                candidate_ids.append(capability_id)
 
         candidates: list[dict[str, Any]] = []
-        for capability_id in configured_ids:
+        for capability_id in candidate_ids:
             item = None
             if hasattr(catalog, "get_capability"):
                 try:
@@ -325,11 +356,15 @@ class InteractionRuntime(_AgentPipeline):
                         exc,
                     )
                     continue
-            if item is None and hasattr(catalog, "entries"):
-                for entry in catalog.entries():
-                    if str(getattr(entry, "capability_id", "")) == capability_id:
-                        item = entry
-                        break
+            if item is None:
+                item = next(
+                    (
+                        entry
+                        for entry in entries
+                        if str(getattr(entry, "capability_id", "")) == capability_id
+                    ),
+                    None,
+                )
             if item is None:
                 continue
             payload = (
@@ -345,13 +380,29 @@ class InteractionRuntime(_AgentPipeline):
                 continue
             if payload.get("interaction_executable") is not True:
                 continue
-            if not allow_when_off and mode == "sim_only" and str((payload.get("metadata") or {}).get("mode") or "") != "sim":
+            if (
+                not allow_when_off
+                and mode == "sim_only"
+                and str((payload.get("metadata") or {}).get("mode") or "") != "sim"
+            ):
+                continue
+            domains = {
+                str(value).strip().lower()
+                for value in payload.get("behavior_domains") or []
+                if str(value).strip()
+            }
+            if capability_id not in configured_ids and "social_attention" not in domains:
                 continue
             candidates.append(payload)
 
         if candidates:
             request.context["social_attention_candidates"] = candidates
-            request.context["social_attention_target_evidence"] = self._social_attention_target_evidence(request)
+            request.context["social_attention_candidate_source"] = (
+                "behavior_domain_catalog"
+            )
+            request.context["social_attention_target_evidence"] = (
+                self._social_attention_target_evidence(request)
+            )
 
     async def prepare_response_composition_context(
         self,

@@ -158,8 +158,21 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             namespace.conversation_id,
             "ga-live-multi_goal_look_then_blink",
         )
+        self.assertEqual(args.assertion_scope, "user-outcome")
+        self.assertEqual(namespace.expect_skill, [])
         self.assertEqual(
-            namespace.expect_skill,
+            [item["type"] for item in case.expected_observations],
+            ["social_attention.gaze", "social_attention.blink"],
+        )
+
+        full_args = build_parser().parse_args(
+            ["--mode", "live-text", "--assertion-scope", "full"]
+        )
+        full_namespace = _live_case_namespace(
+            full_args, case, Path("/tmp/multi-goal-full")
+        )
+        self.assertEqual(
+            full_namespace.expect_skill,
             ["soridormi.look_at_person", "soridormi.blink_eyes"],
         )
         self.assertEqual(case.expected_terminal_planner_tier, "fast")
@@ -202,13 +215,123 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             },
         }
 
-        errors = validate_live_text_result(case, summary)
+        errors = validate_live_text_result(case, summary, assertion_scope="full")
 
         self.assertTrue(any("terminal planner tier mismatch" in item for item in errors))
         self.assertTrue(any("Fast Planner path mismatch" in item for item in errors))
         self.assertTrue(any("Deep Planner invocation mismatch" in item for item in errors))
         self.assertTrue(any("Fast Planner contract failure" in item for item in errors))
         self.assertTrue(any("stage direction" in item for item in errors))
+
+    def test_user_outcome_scope_retains_internal_path_mismatch_as_diagnostic(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        ability = next(
+            item for item in manifest.ability_classes
+            if item.ability_id == "multi_goal_daily_life"
+        )
+        case = ability.live_text_cases[0].case
+        summary = {
+            "route": {"route": "chat"},
+            "interaction_response": {
+                "skills": [
+                    {
+                        "request_id": "look",
+                        "skill_id": "soridormi.look_at_person",
+                        "args": {"duration_s": 2.0},
+                        "metadata": {"source_goal_ids": ["goal-look"]},
+                    },
+                    {
+                        "request_id": "blink",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "metadata": {"source_goal_ids": ["goal-blink"]},
+                    },
+                ],
+                "speech": [{"id": "speech", "text": "I will look and blink."}],
+            },
+            "execution": {
+                "results": [
+                    {"request_id": "look", "status": "completed"},
+                    {"request_id": "blink", "status": "completed"},
+                    {"request_id": "speech", "status": "completed"},
+                ]
+            },
+            "cognitive_runtime": {
+                "terminal_plan": {"planner_tier": "deep"},
+                "timings_ms": {"deep_planner": 1000.0},
+                "metadata": {
+                    "fast_planner_path": "contract_failure",
+                    "deep_planner_invoked": True,
+                },
+            },
+        }
+
+        errors = validate_live_text_result(case, summary)
+
+        self.assertEqual(errors, [])
+        self.assertTrue(summary["user_outcome"]["ok"])
+        self.assertTrue(summary["user_outcome"]["internal_diagnostics"])
+
+    def test_failed_execution_receipt_cannot_satisfy_user_outcome(self) -> None:
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        ability = next(
+            item for item in manifest.ability_classes
+            if item.ability_id == "multi_goal_daily_life"
+        )
+        case = ability.live_text_cases[0].case
+        summary = {
+            "route": {"route": "robot_action"},
+            "interaction_response": {
+                "skills": [
+                    {
+                        "request_id": "look",
+                        "skill_id": "soridormi.look_at_person",
+                        "args": {"duration_s": 2.0},
+                        "metadata": {"source_goal_ids": ["goal-look"]},
+                    },
+                    {
+                        "request_id": "blink",
+                        "skill_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "metadata": {"source_goal_ids": ["goal-blink"]},
+                    },
+                ],
+                "speech": [],
+            },
+            "execution": {
+                "results": [
+                    {"request_id": "look", "status": "completed"},
+                    {"request_id": "blink", "status": "failed"},
+                ]
+            },
+            "cognitive_runtime": {"metadata": {}},
+        }
+
+        errors = validate_live_text_result(case, summary)
+
+        self.assertTrue(any("social_attention.blink" in item for item in errors))
+        self.assertFalse(summary["user_outcome"]["ok"])
+
+    def test_llm_truncation_fails_user_outcome_even_when_actions_complete(self) -> None:
+        case = load_manifest(DEFAULT_MANIFEST).ability_classes[-1].live_text_cases[0].case
+        summary = {
+            "route": {"route": "robot_action"},
+            "interaction_response": {"skills": [], "speech": [{"text": "Done."}]},
+            "session_state": {
+                "workflow_events": [
+                    {
+                        "event": "llm_output_truncated",
+                        "severity": "error",
+                        "message": "llm_output_truncated: done_reason=length",
+                    }
+                ]
+            },
+        }
+
+        errors = validate_live_text_result(case, summary)
+
+        self.assertTrue(any("LLM integrity gate failed" in item for item in errors))
+        self.assertFalse(summary["user_outcome"]["llm_integrity"]["ok"])
 
     def test_live_case_namespace_matches_text_checker_argument_contract(self) -> None:
         args = build_parser().parse_args(["--mode", "live-text"])

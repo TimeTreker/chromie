@@ -649,6 +649,13 @@ class CanonicalPlanRuntimeAdapter:
                                 metadata={
                                     "source": "social_attention_plan",
                                     "auxiliary_social_attention": True,
+                                    "behavior_domain": attention.behavior_domain,
+                                    "interaction_role": attention.interaction_role,
+                                    "social_attention_purpose": attention.purpose,
+                                    "speech_expression": attention.speech_expression.model_dump(
+                                        mode="json", exclude_none=True
+                                    ),
+                                    "social_function": behavior.social_function,
                                     "canonical_plan_id": plan.plan_id,
                                     "target": attention.target.model_dump(
                                         mode="json", exclude_none=True

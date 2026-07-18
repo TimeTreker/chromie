@@ -25,6 +25,13 @@ if str(ROOT) not in sys.path:
 
 from scripts.behavior_scenarios import load_scenarios, run_scenarios_sync  # noqa: E402
 from scripts.interaction_text_mujoco_check import parse_expected_arg, run_check  # noqa: E402
+from scripts.outcome_observations import (  # noqa: E402
+    collect_llm_integrity_violations,
+    collect_observations,
+    load_behavior_map,
+    observation_type_for_skill,
+    validate_expected_observations,
+)
 from shared.chromie_contracts.semantic_task import (  # noqa: E402
     pending_action_stage_direction_claims,
 )
@@ -65,6 +72,9 @@ class TextScenarioCase:
     expect_deep_planner_invoked: bool | None = None
     expect_no_fast_contract_failure: bool = False
     forbid_pending_action_stage_directions: bool = False
+    expected_observations: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+    expected_observation_sequence: tuple[str, ...] = field(default_factory=tuple)
+    require_llm_integrity: bool = True
     description: str = ""
 
 
@@ -164,14 +174,39 @@ def _task_skill_ids(summary: dict[str, Any], *, allow_expressive_cues: bool) -> 
 def validate_live_text_result(
     case: TextScenarioCase,
     summary: dict[str, Any],
+    *,
+    assertion_scope: str = "user-outcome",
 ) -> list[str]:
     errors: list[str] = []
+    behavior_map = load_behavior_map()
+    observations = collect_observations(summary, behavior_map=behavior_map)
+    summary["user_outcome"] = {
+        "assertion_scope": assertion_scope,
+        "observations": observations,
+    }
+    if case.require_llm_integrity:
+        violations = collect_llm_integrity_violations(summary)
+        summary["user_outcome"]["llm_integrity"] = {
+            "ok": not violations,
+            "violations": violations,
+        }
+        if violations:
+            errors.append(
+                "LLM integrity gate failed: "
+                + ", ".join(
+                    str(item.get("event") or item.get("failure_class") or "unknown")
+                    for item in violations
+                )
+            )
     route = summary.get("route")
     actual_route = route.get("route") if isinstance(route, dict) else None
+    internal_diagnostics: list[str] = []
     if case.expected_routes and actual_route not in case.expected_routes:
-        errors.append(
-            f"route={actual_route!r}, expected one of {list(case.expected_routes)!r}"
-        )
+        message = f"route={actual_route!r}, expected one of {list(case.expected_routes)!r}"
+        if assertion_scope == "full":
+            errors.append(message)
+        else:
+            internal_diagnostics.append(message)
 
     speech = _speech_text(summary)
     speech_lower = speech.lower()
@@ -213,6 +248,30 @@ def validate_live_text_result(
     if bad_skills:
         errors.append("forbidden skills emitted: " + ", ".join(bad_skills))
 
+    expected_observations = [dict(item) for item in case.expected_observations]
+    if not expected_observations and case.expected_skills:
+        expected_arg_by_index: dict[int, dict[str, Any]] = {}
+        for index, key, value in case.expected_args:
+            expected_arg_by_index.setdefault(index, {})[key] = value
+        expected_observations = [
+            {
+                "type": observation_type_for_skill(skill_id, behavior_map),
+                "args": expected_arg_by_index.get(index, {}),
+                "min_occurrences": 1,
+            }
+            for index, skill_id in enumerate(case.expected_skills)
+        ]
+    if not bool(summary.get("preview_only")):
+        for expected in expected_observations:
+            expected.setdefault("status", "completed")
+    errors.extend(
+        validate_expected_observations(
+            observations,
+            expected_observations,
+            sequence=list(case.expected_observation_sequence),
+        )
+    )
+
     cognitive = summary.get("cognitive_runtime")
     if not isinstance(cognitive, dict):
         cognitive = {}
@@ -226,17 +285,23 @@ def validate_live_text_result(
     if not isinstance(timings, dict):
         timings = {}
 
+    def record_internal(message: str) -> None:
+        if assertion_scope == "full":
+            errors.append(message)
+        else:
+            internal_diagnostics.append(message)
+
     if case.expected_terminal_planner_tier:
         actual_tier = str(terminal_plan.get("planner_tier") or "")
         if actual_tier != case.expected_terminal_planner_tier:
-            errors.append(
+            record_internal(
                 "terminal planner tier mismatch: "
                 f"expected {case.expected_terminal_planner_tier!r}, got {actual_tier!r}"
             )
     if case.expected_fast_planner_path:
         actual_path = str(runtime_metadata.get("fast_planner_path") or "")
         if actual_path != case.expected_fast_planner_path:
-            errors.append(
+            record_internal(
                 "Fast Planner path mismatch: "
                 f"expected {case.expected_fast_planner_path!r}, got {actual_path!r}"
             )
@@ -246,7 +311,7 @@ def validate_live_text_result(
             or "deep_planner" in timings
         )
         if actual_invoked is not case.expect_deep_planner_invoked:
-            errors.append(
+            record_internal(
                 "Deep Planner invocation mismatch: "
                 f"expected {case.expect_deep_planner_invoked}, got {actual_invoked}"
             )
@@ -262,7 +327,7 @@ def validate_live_text_result(
             and item.get("failure_class")
         ]
         if runtime_metadata.get("fast_planner_path") == "contract_failure" or fast_failures:
-            errors.append("Fast Planner contract failure remained in retained evidence")
+            record_internal("Fast Planner contract failure remained in retained evidence")
     if case.forbid_pending_action_stage_directions:
         claims = pending_action_stage_direction_claims(speech, task_skills)
         if claims:
@@ -270,6 +335,8 @@ def validate_live_text_result(
                 "speech narrated pending physical action as completed stage direction: "
                 + ",".join(claims)
             )
+    summary["user_outcome"]["internal_diagnostics"] = internal_diagnostics
+    summary["user_outcome"]["ok"] = not errors
     return errors
 
 
@@ -329,6 +396,15 @@ def _live_case(raw: dict[str, Any]) -> LiveCaseRef:
         forbid_pending_action_stage_directions=bool(
             raw.get("forbid_pending_action_stage_directions", False)
         ),
+        expected_observations=tuple(
+            dict(item)
+            for item in raw.get("expected_observations", [])
+            if isinstance(item, dict)
+        ),
+        expected_observation_sequence=_tuple_of_strings(
+            raw.get("expected_observation_sequence")
+        ),
+        require_llm_integrity=bool(raw.get("require_llm_integrity", True)),
         description=str(raw.get("description") or ""),
     )
     return LiveCaseRef(case=case, rationale=str(raw.get("rationale") or ""))
@@ -655,10 +731,10 @@ def _live_case_namespace(
         allow_non_sim=args.allow_non_sim,
         auto_confirm_sim=args.auto_confirm_sim,
         require_speech=case.require_speech,
-        expect_route=expected_route,
+        expect_route=expected_route if args.assertion_scope == "full" else None,
         expect_no_skills=case.expect_no_skills and not case.allow_expressive_cues,
-        expect_skill=list(case.expected_skills),
-        expect_arg=list(case.expected_args),
+        expect_skill=list(case.expected_skills) if args.assertion_scope == "full" else [],
+        expect_arg=list(case.expected_args) if args.assertion_scope == "full" else [],
         arg_tolerance=args.arg_tolerance,
         timeout_s=args.timeout_s,
         skill_timeout_s=args.skill_timeout_s,
@@ -696,7 +772,9 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
                 run_check(_live_case_namespace(args, case, case_dir)),
                 timeout=args.case_timeout_s,
             )
-            scenario_errors = validate_live_text_result(case, result)
+            scenario_errors = validate_live_text_result(
+                case, result, assertion_scope=args.assertion_scope
+            )
             if scenario_errors:
                 result["errors"] = list(result.get("errors") or []) + scenario_errors
                 result["ok"] = False
@@ -758,6 +836,7 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "claim_scope": LIVE_TEXT_EXECUTE_CLAIM if args.execute else LIVE_TEXT_PREVIEW_CLAIM,
         "manifest": str(manifest.path),
         "goal_driven_runtime": args.goal_driven_runtime,
+        "assertion_scope": args.assertion_scope,
         "cognitive_apply_lanes": (
             args.cognitive_apply_lanes
             if args.goal_driven_runtime == "apply"
@@ -901,6 +980,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--cognitive-apply-lanes",
         default="chat,robot_action",
         help="Comma-separated goal-driven apply lanes for live-text cases.",
+    )
+    parser.add_argument(
+        "--assertion-scope",
+        choices=("user-outcome", "full"),
+        default="user-outcome",
+        help=(
+            "user-outcome validates observable behavior and LLM integrity while "
+            "retaining internal routes/planners as diagnostics; full also enforces "
+            "implementation-path expectations."
+        ),
     )
     parser.add_argument("--execute", action="store_true", help="Execute live text skills through Soridormi/MuJoCo.")
     parser.add_argument("--speaker", action="store_true", help="Play TTS for live text runs. Default is headless.")

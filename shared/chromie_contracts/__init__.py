@@ -44,6 +44,7 @@ from .response_composition import (
 from .social_attention import (
     SocialAttentionBehavior,
     SocialAttentionPlan,
+    SocialAttentionSpeechExpression,
     SocialAttentionTarget,
 )
 from .goal import (
@@ -108,6 +109,7 @@ __all__ = [
     "canonical_plan_fingerprint",
     "SocialAttentionBehavior",
     "SocialAttentionPlan",
+    "SocialAttentionSpeechExpression",
     "SocialAttentionTarget",
     "ActiveGoalSnapshot",
     "GoalAssociation",

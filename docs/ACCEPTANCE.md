@@ -128,6 +128,18 @@ or physical robot behavior. When it fails, the retained summary marks
 `root_cause_report_required=true`; the next patch must identify the earliest
 wrong boundary before changing prompts or wording.
 
+The live general-ability runner defaults to `--assertion-scope user-outcome`.
+This scope evaluates stable observable behaviors, speech truthfulness, execution
+receipts, final safety, and LLM-call integrity while retaining route and planner
+path differences as diagnostics. Use `--assertion-scope full` only when the
+internal path itself is the claim. See
+[User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md).
+
+Any critical LLM timeout, input/output truncation, incomplete stream, or
+incomplete structured output is a hard case failure even when a later fallback
+produces a correct final action. Architecture-validation timeouts remain long so
+qualification first answers whether the complete workflow can succeed.
+
 Against deployed services, the same manifest can run live text probes:
 
 ```bash
@@ -151,8 +163,8 @@ endpoint.
 
 The repository implements the accepted
 [Fast Planner multi-goal contract](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
-Its next `multi_goal_daily_life` live-text summary must prove more than 4/4 final
-case success. The simple retained matrix must terminate with
+Its component-specific `multi_goal_daily_life` qualification uses
+`--assertion-scope full` and must prove more than 4/4 user-outcome success. The simple retained matrix must terminate with
 `planner_tier=fast`, omit Deep Planner invocation, contain no Fast
 `structured_output_validation` diagnostic, preserve exact per-goal outcomes
 and skill ownership, avoid premature physical-completion speech, and finish

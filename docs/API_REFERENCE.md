@@ -217,14 +217,19 @@ refined entry into prompt-facing session memory.
 contracts reject unknown fields and recursively reject low-level motor, joint,
 torque, and actuator fields. Native mode is the Agent default. The response
 metadata includes `interaction_output_mode` (`native`, `legacy-adapter`, or
-`legacy-fallback`) for operator diagnostics. When `AGENT_SOCIAL_ATTENTION_MODE` allows it, the native runtime may attach an
-advisory model-authored `social_attention_plan` to response metadata and add
-validated auxiliary named skills. The model may also choose `none`. Applied
-skills carry `metadata.source=social_attention_plan` and
-`metadata.auxiliary_social_attention=true`; they are excluded from user task
-proposals. Runtime validation checks exact catalog membership, schemas, target
-evidence, resource conflicts, confirmation policy, and a bounded latency budget.
-Installation calibration is only a fallback when live target evidence is absent. Body and tool requests are routed through the model-assisted
+`legacy-fallback`) for operator diagnostics. When `AGENT_SOCIAL_ATTENTION_MODE` allows it, the runtime may attach an
+advisory model-authored `social_attention_plan`. The plan identifies the
+`social_attention` behavior domain, the `auxiliary_expression` role, a social
+purpose, optional speech style/pacing adaptation, and zero or more model-selected
+catalog behaviors. Response Composer coordinates the actual response text with
+this plan; the native compatibility planner remains body-only. Applied skills
+carry `metadata.source=social_attention_plan`,
+`metadata.auxiliary_social_attention=true`, and purpose/function metadata; they
+are excluded from user task proposals. Runtime validation checks exact catalog
+membership, schemas, target evidence, resource conflicts, confirmation policy,
+and a bounded latency budget. Installation calibration is only a fallback when
+live target evidence is absent. Concrete user-requested actions remain primary
+CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and tool requests are routed through the model-assisted
 Router, capability catalog, Agent capability planner, schemas, and Skill
 Runtime validation rather than hidden phrase parsers. Plain walking requests
 use a normal safe forward speed of `0.18 m/s`;

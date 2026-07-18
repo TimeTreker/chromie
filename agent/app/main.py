@@ -121,7 +121,7 @@ class Settings(BaseModel):
             item.strip()
             for item in os.getenv(
                 "AGENT_SOCIAL_ATTENTION_CAPABILITIES",
-                "soridormi.express_attention,soridormi.look_at_person,soridormi.blink_eyes",
+                "",
             ).split(",")
             if item.strip()
         )

@@ -473,6 +473,29 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("interaction-executable", context)
         self.assertIn("never invent capabilities", context.lower())
 
+    async def test_behavior_domain_preset_classifies_social_attention_skills(self) -> None:
+        catalog = CapabilityCatalog(
+            _registry(),
+            live_invoker=_Invoker(),
+            min_score=0.10,
+        )
+
+        snapshot = await catalog.snapshot()
+        by_id = {item["capability_id"]: item for item in snapshot["capabilities"]}
+
+        self.assertIn(
+            "social_attention",
+            by_id["soridormi.blink_eyes"]["behavior_domains"],
+        )
+        self.assertIn(
+            "social_attention",
+            by_id["soridormi.nod_yes"]["behavior_domains"],
+        )
+        self.assertNotIn(
+            "social_attention",
+            by_id["soridormi.walk_forward"]["behavior_domains"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

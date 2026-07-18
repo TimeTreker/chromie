@@ -159,19 +159,30 @@ See [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md) for all settings.
 
 ## Model-driven social attention
 
-The native interaction runtime may start a dedicated social-attention planner in
-parallel with the main response. The planner receives eligible named social
-skills, the dialogue act, recent context, and evidence for the active user
-target. It may select subtle gaze, blink, nod, another supplied expression, or
-`none`. The plan is advisory until deterministic validation confirms exact
-skill IDs, argument schemas, target evidence, availability, resource
-compatibility, confirmation policy, and the small latency budget.
+Social Attention is a behavior domain rather than a fixed gesture list. In the
+goal-driven path, Response Composer coordinates the actual response language and
+an optional auxiliary body-expression plan under one model-authored social
+purpose. It may adapt language style or pacing, select zero or more exact
+catalog capabilities tagged `social_attention`, combine both, or choose `none`.
+The native compatibility planner remains body-only and runs independently of the
+primary response.
 
-Attention skills carry `metadata.auxiliary_social_attention=true`, are excluded
-from user task proposals, and are dropped rather than delaying or conflicting
-with the primary task. Project and normal voice-MuJoCo defaults remain off. The
-architecture-validation profile explicitly enables `sim_only` with a calibrated
-right-side fallback; a future live perception target overrides that calibration.
+Candidate discovery uses catalog behavior-domain metadata supplemented by
+`capabilities/behavior_domains.json`; `AGENT_SOCIAL_ATTENTION_CAPABILITIES` is
+only an optional operator override. Deterministic code does not map utterances to
+gestures. It validates exact skill IDs, argument schemas, target evidence,
+availability, resource compatibility, confirmation policy, and latency.
+
+Auxiliary skills carry `metadata.auxiliary_social_attention=true` and
+`metadata.interaction_role=auxiliary_expression`. They are excluded from user
+task proposals and are dropped rather than delaying or conflicting with the
+primary task. A concrete user request such as "blink twice" remains a normal,
+non-droppable CanonicalPlan goal even though its observable behavior belongs to
+the same domain. Project and normal voice-MuJoCo defaults remain off. The
+architecture-validation profile explicitly enables `sim_only`; live target
+evidence overrides installation calibration.
+
+See [Social Attention Behavior Domain](../docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
 
 ## Capability manifests
 

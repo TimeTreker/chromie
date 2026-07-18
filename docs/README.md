@@ -36,7 +36,7 @@ When documents disagree, correct the lower-authority document.
 | What does an environment variable mean? | `docs/CONFIGURATION.md` |
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
 | What retained trace artifacts can the CLI inspect? | `docs/TRACE_SCHEMA.md` |
-| What validation supports a claim? | `docs/ACCEPTANCE.md` |
+| What validation supports a claim? | `docs/ACCEPTANCE.md` and `docs/USER_OUTCOME_ACCEPTANCE.md` |
 | What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How is the goal-driven runtime enabled, observed, evidenced, and rolled back? | `docs/COGNITIVE_RUNTIME_ROLLOUT.md` |
 | What is the implementation contract for terminal Fast Planner multi-goal planning? | `docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md` |
@@ -44,6 +44,7 @@ When documents disagree, correct the lower-authority document.
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | How is the automated suite kept free of stale wrappers and duplicate coverage? | `docs/TEST_SUITE_MAINTENANCE.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
+| How are contextual language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
 | How are semantic goals preserved and revised across turns? | `docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
@@ -66,6 +67,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
+- [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)
+- [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
 - [Current Status](STATUS.md)
 - [Roadmap](../ROADMAP.md)
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
@@ -94,6 +97,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)
+- [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)
+- [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
 - [Interaction Agent and Skill Runtime](interaction_agent_skill_runtime.md)
 - [Chromie High-Level Ability Registry](chromie_ability_registry.md)
 - [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md)

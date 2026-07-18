@@ -675,3 +675,19 @@ live-text runs must still prove
 `planner_tier=fast`, no Deep invocation, no hidden contract failure, and at
 least 35 percent median cognitive-latency reduction. Operational rollout remains
 governed by [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).
+
+The user-outcome acceptance layer is now implemented. Live general-ability
+probes default to architecture-independent observable behavior assertions while
+retaining route and planner details as diagnostics. Timeout, prompt/input
+truncation, output truncation, incomplete stream, and incomplete structured
+output are hard failures that fallback cannot hide. A declarative observation
+map translates execution receipts into stable behavior types and is never read
+by production planning.
+
+Social Attention is now represented as a high-level behavior domain. Response
+Composer may model-author coordinated language style/pacing and auxiliary body
+expression under one social purpose. Candidate body behaviors are discovered
+from catalog behavior-domain metadata instead of a fixed production list. The
+host validates and may drop auxiliary behavior; concrete user-requested actions
+remain primary CanonicalPlan goals. Automated verification exists, while fresh
+live interaction evidence for contextual appropriateness remains open.

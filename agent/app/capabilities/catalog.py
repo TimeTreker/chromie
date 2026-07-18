@@ -22,6 +22,9 @@ CapabilityPromptTier = Literal["common", "rare"]
 DEFAULT_PROMPT_TIER_PRESET_PATH = (
     Path(__file__).resolve().parents[3] / "capabilities" / "prompt_tiers.json"
 )
+DEFAULT_BEHAVIOR_DOMAIN_PRESET_PATH = (
+    Path(__file__).resolve().parents[3] / "capabilities" / "behavior_domains.json"
+)
 
 SAFETY_LOCKED_PROMPT_TIER_SAFETY_CLASSES = {
     "guarded_operation",
@@ -156,6 +159,7 @@ class CatalogCapability(BaseModel):
     prompt_tier_source: str = "preset"
     prompt_tier_reason: str | None = None
     tags: list[str] = Field(default_factory=list)
+    behavior_domains: list[str] = Field(default_factory=list)
     hints: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     can_run_parallel: bool | None = None
@@ -172,6 +176,7 @@ class CatalogCapability(BaseModel):
                 self.description,
                 " ".join(self.effects),
                 " ".join(self.tags),
+                " ".join(self.behavior_domains),
                 " ".join(str(value) for value in self.hints.values()),
                 _schema_terms(self.input_schema),
             ]
@@ -222,6 +227,7 @@ class CapabilityCatalog:
         min_score: float = 0.16,
         prompt_tier_preset: Mapping[str, Any] | None = None,
         prompt_tier_overrides: Mapping[str, Any] | None = None,
+        behavior_domain_preset: Mapping[str, Any] | None = None,
     ) -> None:
         self.registry = registry
         self.live_invoker = live_invoker
@@ -231,6 +237,11 @@ class CapabilityCatalog:
             prompt_tier_preset = self.load_prompt_tier_preset(None)
         self.prompt_tier_presets = self._normalize_prompt_tier_entries(prompt_tier_preset)
         self.prompt_tier_overrides = self._normalize_prompt_tier_overrides(prompt_tier_overrides)
+        if behavior_domain_preset is None:
+            behavior_domain_preset = self.load_behavior_domain_preset(None)
+        self.behavior_domain_presets = self._normalize_behavior_domain_entries(
+            behavior_domain_preset
+        )
         self._static = self._static_entries(registry)
         self._live: dict[str, CatalogCapability] = {}
         self._refresh_lock = asyncio.Lock()
@@ -503,6 +514,13 @@ class CapabilityCatalog:
                         prompt_tier_reason=self._prompt_tier_reason_from(item)
                         or self._preset_prompt_tier_reason(capability_id),
                         tags=["soridormi", "robot", "named_skill"],
+                        behavior_domains=self._behavior_domains_for(
+                            capability_id,
+                            item.get("behavior_domains"),
+                            (item.get("metadata") or {}).get("behavior_domains")
+                            if isinstance(item.get("metadata"), dict)
+                            else None,
+                        ),
                         hints={
                             "when_to_use": item.get("when_to_use"),
                             "examples": item.get("examples"),
@@ -568,6 +586,10 @@ class CapabilityCatalog:
                 prompt_tier_source=self._prompt_tier_source_for_tool(tool),
                 prompt_tier_reason=self._prompt_tier_reason_from(tool.llm_hints),
                 tags=[*agent.tags],
+                behavior_domains=self._behavior_domains_for(
+                    tool.name,
+                    tool.llm_hints.get("behavior_domains"),
+                ),
                 hints=dict(tool.llm_hints),
                 metadata={"version": tool.version},
                 can_run_parallel=(
@@ -634,6 +656,61 @@ class CapabilityCatalog:
             return "provider"
         preset = self.prompt_tier_presets.get(tool.name)
         return str(preset.get("prompt_tier_source") or "preset") if preset else "preset"
+
+    @classmethod
+    def load_behavior_domain_preset(cls, path: str | Path | None) -> dict[str, Any]:
+        raw = str(path or "").strip()
+        source = Path(raw).expanduser() if raw else DEFAULT_BEHAVIOR_DOMAIN_PRESET_PATH
+        if not source.exists():
+            if raw:
+                raise FileNotFoundError(
+                    f"behavior domain preset file does not exist: {source}"
+                )
+            logger.warning("default behavior domain preset not found: %s", source)
+            return {}
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("behavior domain preset file must contain a JSON object")
+        return payload
+
+    @staticmethod
+    def _normalize_behavior_domain_entries(
+        payload: Mapping[str, Any] | None,
+    ) -> dict[str, list[str]]:
+        if not payload:
+            return {}
+        raw: Any = payload.get("behavior_domains") if isinstance(
+            payload.get("behavior_domains"), Mapping
+        ) else payload
+        if not isinstance(raw, Mapping):
+            return {}
+        normalized: dict[str, list[str]] = {}
+        for capability_id, value in raw.items():
+            if not isinstance(capability_id, str) or not capability_id.strip():
+                continue
+            values = value if isinstance(value, (list, tuple, set)) else [value]
+            domains: list[str] = []
+            seen: set[str] = set()
+            for item in values:
+                domain = str(item or "").strip().lower()
+                if domain and domain not in seen:
+                    seen.add(domain)
+                    domains.append(domain)
+            if domains:
+                normalized[capability_id.strip()] = domains
+        return normalized
+
+    def _behavior_domains_for(self, capability_id: str, *values: Any) -> list[str]:
+        domains: list[str] = []
+        seen: set[str] = set()
+        for value in (*values, self.behavior_domain_presets.get(capability_id, [])):
+            items = value if isinstance(value, (list, tuple, set)) else [value]
+            for item in items:
+                domain = str(item or "").strip().lower()
+                if domain and domain not in seen:
+                    seen.add(domain)
+                    domains.append(domain)
+        return domains
 
     @classmethod
     def load_prompt_tier_preset(cls, path: str | Path | None) -> dict[str, Any]:

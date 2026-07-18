@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "behaviors": {
+    "soridormi.blink_eyes": {
+      "type": "social_attention.blink",
+      "domain": "social_attention",
+      "arg_fields": ["count", "closed_duration_s", "open_duration_s", "intensity"]
+    },
+    "soridormi.express_attention": {
+      "type": "social_attention.posture",
+      "domain": "social_attention",
+      "arg_fields": ["style", "duration_s", "hold_fraction"]
+    },
+    "soridormi.look_at_person": {
+      "type": "social_attention.gaze",
+      "domain": "social_attention",
+      "arg_fields": ["target_ref", "duration_s", "end_mode"]
+    },
+    "soridormi.look_direction": {
+      "type": "social_attention.orientation",
+      "domain": "social_attention",
+      "arg_fields": ["head_yaw_rad", "head_pitch_rad", "duration_s"]
+    },
+    "soridormi.nod_yes": {
+      "type": "social_attention.nod",
+      "domain": "social_attention",
+      "arg_fields": ["count", "amplitude", "duration_s"]
+    },
+    "soridormi.shake_no": {
+      "type": "social_attention.head_shake",
+      "domain": "social_attention",
+      "arg_fields": ["count", "amplitude", "duration_s"]
+    },
+    "soridormi.neutral_head": {
+      "type": "social_attention.neutral_posture",
+      "domain": "social_attention",
+      "arg_fields": ["duration_s"]
+    },
+    "soridormi.bow": {
+      "type": "social_attention.bow",
+      "domain": "social_attention",
+      "arg_fields": ["depth", "duration_s", "hold_fraction"]
+    },
+    "soridormi.walk_forward": {
+      "type": "locomotion.walk_forward",
+      "domain": "locomotion",
+      "arg_fields": ["duration_s", "speed"]
+    },
+    "soridormi.walk_velocity": {
+      "type": "locomotion.velocity",
+      "domain": "locomotion",
+      "arg_fields": ["vx_mps", "vy_mps", "yaw_radps", "duration_s"]
+    },
+    "soridormi.turn_in_place": {
+      "type": "locomotion.turn",
+      "domain": "locomotion",
+      "arg_fields": ["yaw_radps", "duration_s"]
+    },
+    "soridormi.sidestep": {
+      "type": "locomotion.sidestep",
+      "domain": "locomotion",
+      "arg_fields": ["vy_mps", "duration_s"]
+    },
+    "soridormi.stand_idle": {
+      "type": "posture.stand_idle",
+      "domain": "posture",
+      "arg_fields": []
+    },
+    "soridormi.stop": {
+      "type": "safety.stop",
+      "domain": "safety",
+      "arg_fields": []
+    }
+  }
+}

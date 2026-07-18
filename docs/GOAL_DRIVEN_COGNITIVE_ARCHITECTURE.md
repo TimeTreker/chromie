@@ -840,54 +840,73 @@ lifecycle.
 
 ## 12. Social interaction layer
 
-### 12.1 Three coordinated plans
+### 12.1 Social Attention is a behavior domain
 
-A turn may produce:
+A turn coordinates an immutable user task plan with response language and an
+optional Social Attention expression plan. Social Attention is not one skill and
+not a deterministic utterance-to-gesture mapping. It is a model-authored
+interaction objective that may be expressed through language, body behavior,
+both, or deliberate stillness.
+
+The coordinated shapes are:
 
 ```text
-Speech Plan
-Social Attention Plan
-User Task Plan
+Canonical User Task Plan
+Response Plan
+Auxiliary Social Attention Plan
 ```
 
-They share turn context but have separate semantics and commitment rules.
+### 12.2 Explicit goals and auxiliary expression
 
-### 12.2 Attention is an objective
+A concrete user request such as "blink twice" or "look at me" remains an
+explicit CanonicalPlan goal. It is non-droppable and cannot be replaced with a
+more convenient gesture.
 
-The social planner decides whether and how to express attention. Blinking is one
-possible behavior, not a mandatory response rule.
+Autonomous interaction expression uses
+`interaction_role=auxiliary_expression`. It may support acknowledgement,
+listening, engagement, empathy, turn taking, deference, neutral presence, or
+another model-stated purpose. It cannot satisfy, replace, authorize, or claim
+completion of a user goal.
 
-Possible outcomes include:
+### 12.3 Model authority
 
-- look toward the active user;
-- maintain relaxed gaze;
-- blink naturally;
-- nod subtly;
-- shift head orientation;
-- remain still;
-- suppress gestures due to task conflict.
+Response Composer sees the immutable terminal plan, actual response stages,
+turn context, target evidence, and catalog candidates tagged with the
+`social_attention` behavior domain. The model owns:
 
-### 12.3 Target evidence
+- whether expression is useful;
+- the social purpose;
+- speech style and pacing adaptation;
+- exact candidate skill IDs, arguments, timing, social function, and target;
+- the choice to use body expression, language adaptation, both, or neither.
 
-Target priority:
+The host does not map purposes or user phrases to actions. It validates catalog
+membership, schemas, target evidence, resource conflicts, confirmation and
+safety policy, low-level-field exclusion, auxiliary limits, and execution
+evidence.
+
+### 12.4 Capability taxonomy is not planning
+
+Capabilities may declare multiple behavior domains. Gaze, blink, nod, head
+orientation, posture, and bow are current Social Attention candidates, but the
+same underlying motion can serve perception, navigation, or another domain in a
+different plan. `capabilities/behavior_domains.json` supplements provider
+metadata; it does not choose behavior.
+
+### 12.5 Target evidence and conflict policy
+
+Target priority is:
 
 1. live perceived user;
 2. structured conversational target;
 3. calibrated installation fallback;
 4. no targeted behavior.
 
-A calibrated right-side position is a prior, not a permanent truth.
+Invalid or conflicting auxiliary body behaviors are dropped. A speech-only
+adaptation may remain when body behavior is rejected. Auxiliary expression never
+delays the primary task.
 
-### 12.4 Auxiliary status
-
-Social attention skills are marked auxiliary and excluded from user-goal
-creation, task-continuity proposals, and primary task completion claims.
-
-### 12.5 Failure isolation
-
-Optional social behavior may be dropped for latency, target uncertainty,
-resource conflicts, safety, invalid schema, or provider unavailability without
-changing the user’s main task.
+See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
 
 ## 13. Deterministic validation and commitment
 

@@ -60,7 +60,13 @@ class ResponseComposerModelOutput(BaseModel):
 
 
 class ResponseComposerResolver:
-    """Advisory composition of truthful speech and optional social attention."""
+    """Advisory composition of truthful speech and scene-aware social attention.
+
+    The model coordinates the actual ResponsePlan language with optional body
+    expression under one high-level social-attention purpose. Deterministic code
+    never chooses the gesture or rewrites the response; it only validates the
+    model-authored plan against evidence, capability schemas, and resource gates.
+    """
 
     def __init__(self, ollama: OllamaClient, *, num_ctx: int = 4096, num_predict: int = 640) -> None:
         self.ollama = ollama
@@ -328,7 +334,18 @@ class ResponseComposerResolver:
             return None, [f"invalid_social_attention_plan:{type(exc).__name__}"]
 
         metadata = dict(proposed.metadata)
-        metadata.update({"authority": "advisory", "auxiliary_social_attention": True})
+        metadata.update(
+            {
+                "authority": "advisory",
+                "auxiliary_social_attention": True,
+                "behavior_domain": proposed.behavior_domain,
+                "interaction_role": proposed.interaction_role,
+                "purpose": proposed.purpose,
+                "speech_expression": proposed.speech_expression.model_dump(
+                    mode="json", exclude_none=True
+                ),
+            }
+        )
         if proposed.decision == "none":
             return proposed.model_copy(update={"metadata": metadata}), []
 
@@ -375,8 +392,12 @@ class ResponseComposerResolver:
             validated_behaviors.append(behavior.model_copy(update={"args": args}))
             seen.add(behavior.skill_id)
 
-        if target_reason or not validated_behaviors:
+        speech_adaptation_selected = proposed.speech_expression.mode == "adapt"
+        if target_reason:
+            validated_behaviors = []
+        if not validated_behaviors and not speech_adaptation_selected:
             none_plan = SocialAttentionPlan(
+                purpose=proposed.purpose,
                 decision="none",
                 confidence=proposed.confidence,
                 reason="Optional attention was omitted after deterministic validation.",
@@ -505,13 +526,13 @@ class ResponseComposerResolver:
             f"Attention target evidence JSON:\n{self._bounded(context.get('social_attention_target_evidence') or {'available': False}, 2500)}\n\n"
             f"Previous Response Composer output when revising:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
             f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
-            "Compose one ResponsePlan and, only when socially useful and evidence-supported, an optional SocialAttentionPlan. "
+            "Compose one ResponsePlan and, only when socially useful, an optional SocialAttentionPlan that coordinates language expression and body expression under one scene-specific purpose. "
             "The CanonicalPlan is immutable: do not alter, replace, add, remove, reorder, authorize, or execute its steps. "
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
             "For execute plans this is pre-execution composition: use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, and omit final. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, name the actual unresolved need naturally and use waiting_for_user. For alternatives, explain the change and request approval. "
-            "Social attention is auxiliary interaction behavior, never a user goal or task step; choose decision=none when stillness is more natural, safer, unsupported, or unnecessary. "
+            "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Infer a purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any speech_expression adaptation; do not put a second answer inside SocialAttentionPlan. Select body behaviors only from the supplied social-attention candidates, and choose decision=none when neutral language and stillness are more natural, safer, unsupported, or unnecessary. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
             "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, optional social_attention_plan, confidence, and rationale only."
         )
@@ -519,7 +540,7 @@ class ResponseComposerResolver:
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "You are Chromie's Response Composer. Coordinate truthful speech and optional social presence around an immutable CanonicalPlan. "
+            "You are Chromie's Response Composer. Coordinate truthful language expression and optional body expression around an immutable CanonicalPlan using a scene-specific social-attention purpose. "
             "You do not plan tasks, mutate goals, execute, authorize, or claim unobserved completion. Return JSON only."
         )
 

@@ -499,7 +499,25 @@
           "expected_fast_planner_path": "terminal",
           "expect_deep_planner_invoked": false,
           "expect_no_fast_contract_failure": true,
-          "forbid_pending_action_stage_directions": true
+          "forbid_pending_action_stage_directions": true,
+          "expected_observations": [
+            {
+              "type": "social_attention.gaze",
+              "args": {
+                "duration_s": 2.0
+              }
+            },
+            {
+              "type": "social_attention.blink",
+              "args": {
+                "count": 2
+              }
+            }
+          ],
+          "expected_observation_sequence": [
+            "social_attention.gaze",
+            "social_attention.blink"
+          ]
         },
         {
           "id": "multi_goal_nod_then_blink",
@@ -524,7 +542,25 @@
           "expected_fast_planner_path": "terminal",
           "expect_deep_planner_invoked": false,
           "expect_no_fast_contract_failure": true,
-          "forbid_pending_action_stage_directions": true
+          "forbid_pending_action_stage_directions": true,
+          "expected_observations": [
+            {
+              "type": "social_attention.nod",
+              "args": {
+                "count": 2
+              }
+            },
+            {
+              "type": "social_attention.blink",
+              "args": {
+                "count": 1
+              }
+            }
+          ],
+          "expected_observation_sequence": [
+            "social_attention.nod",
+            "social_attention.blink"
+          ]
         },
         {
           "id": "multi_goal_walk_then_blink",
@@ -549,7 +585,25 @@
           "expected_fast_planner_path": "terminal",
           "expect_deep_planner_invoked": false,
           "expect_no_fast_contract_failure": true,
-          "forbid_pending_action_stage_directions": true
+          "forbid_pending_action_stage_directions": true,
+          "expected_observations": [
+            {
+              "type": "locomotion.walk_forward",
+              "args": {
+                "duration_s": 1.0
+              }
+            },
+            {
+              "type": "social_attention.blink",
+              "args": {
+                "count": 2
+              }
+            }
+          ],
+          "expected_observation_sequence": [
+            "locomotion.walk_forward",
+            "social_attention.blink"
+          ]
         },
         {
           "id": "multi_goal_blink_and_joke",
@@ -573,7 +627,18 @@
           "expected_fast_planner_path": "terminal",
           "expect_deep_planner_invoked": false,
           "expect_no_fast_contract_failure": true,
-          "forbid_pending_action_stage_directions": true
+          "forbid_pending_action_stage_directions": true,
+          "expected_observations": [
+            {
+              "type": "social_attention.blink",
+              "args": {
+                "count": 2
+              }
+            },
+            {
+              "type": "speech.output"
+            }
+          ]
         }
       ]
     }

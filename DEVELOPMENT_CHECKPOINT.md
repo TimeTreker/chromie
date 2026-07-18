@@ -29,11 +29,21 @@ skills, arguments, ordering, ownership, goal outcomes, aggregate disposition,
 and satisfaction. The host adds only canonical identity and validation. It
 preserves mixed execute/respond support, normalized recovery observability,
 Deep-context sanitization, pending-action claim checks, and live acceptance
-assertions. Automated evidence passes focused and compatibility tests,
-deterministic multi-goal Level A 8/8, 1,032 main tests, and 20 legacy Agent
-tests. Resume with
+assertions. Automated evidence passes focused and compatibility tests and deterministic
+multi-goal Level A 8/8. Exact current suite counts must come from the latest
+command output. Resume with
 three consecutive warm live-text simulator runs; do not claim Fast target
 behavior or the latency reduction until those retained runs prove it.
+
+The current branch also implements the first user-outcome acceptance layer and
+Social Attention behavior-domain model. The default live acceptance scope now
+asserts normalized user-observable behavior, truthful speech, execution
+receipts, final safety, and complete LLM calls without binding release behavior
+to a specific planner path. Timeout or truncation remains a hard failure even
+when fallback succeeds. Response Composer may model-author contextual language
+style and auxiliary body expression under one Social Attention purpose;
+candidate actions are discovered from catalog behavior-domain metadata rather
+than a fixed gesture list. Explicit user-requested actions remain primary goals.
 
 The `0.0.1` release implementation is present:
 
@@ -437,9 +447,9 @@ not a planner-executable capability; conversational goals flow through
 same-stage/schema repair. The general-ability wrapper also forwards
 `--soridormi-repo` to record the declared paired checkout.
 
-The required test suite passed 1040 primary tests plus 20 legacy Agent tests,
-the documentation check passed 64 Markdown files, and the daily-life Level A
-class passed 8/8. A diagnostic execute run progressed through three of four
+The required automated suite, documentation governance check, and daily-life
+Level A class passed at the recorded implementation checkpoint. Exact current
+counts must be taken from the latest command output rather than this document. A diagnostic execute run progressed through three of four
 daily-life cases before the final mixed case exposed the now-fixed boundaries. A fresh
 post-fix localhost rerun remains pending because the execution platform denied
 command approval. That session limitation is not a product or release blocker,

@@ -161,7 +161,12 @@ class CoordinatedResponsePlan(BaseModel):
                 raise ValueError("unavailable or refused plans cannot claim execution or completion")
 
         if self.social_attention_plan is not None:
-            metadata = self.social_attention_plan.metadata
+            social = self.social_attention_plan
+            if social.behavior_domain != "social_attention":
+                raise ValueError("social attention plan must use social_attention behavior domain")
+            if social.interaction_role != "auxiliary_expression":
+                raise ValueError("social attention plan must remain auxiliary expression")
+            metadata = social.metadata
             if metadata.get("auxiliary_social_attention") is not True:
                 raise ValueError("social attention plan must be explicitly auxiliary")
 

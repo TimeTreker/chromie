@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "behavior_domains": {
+    "soridormi.blink_eyes": [
+      "social_attention",
+      "facial_expression"
+    ],
+    "soridormi.express_attention": [
+      "social_attention",
+      "posture_expression"
+    ],
+    "soridormi.look_at_person": [
+      "social_attention",
+      "orientation"
+    ],
+    "soridormi.look_direction": [
+      "social_attention",
+      "orientation"
+    ],
+    "soridormi.nod_yes": [
+      "social_attention",
+      "acknowledgement"
+    ],
+    "soridormi.shake_no": [
+      "social_attention",
+      "acknowledgement"
+    ],
+    "soridormi.neutral_head": [
+      "social_attention",
+      "posture_expression"
+    ],
+    "soridormi.bow": [
+      "social_attention",
+      "deference"
+    ]
+  }
+}

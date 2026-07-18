@@ -521,6 +521,50 @@ class ResponseComposerResolverTests(unittest.TestCase):
             result.composition.social_attention_plan.metadata["auxiliary_social_attention"]  # type: ignore[union-attr]
         )
 
+    def test_speech_only_social_attention_is_preserved_and_model_coordinated(self):
+        canonical = plan(goals=["goal-chat"])
+        raw = {
+            "response_plan": {
+                "final": {
+                    "text": "我理解这让你有些难受，我们慢慢来。",
+                    "speech_act": "support",
+                    "commitment_state": "none",
+                    "covers_goal_ids": ["goal-chat"],
+                }
+            },
+            "social_attention_plan": {
+                "behavior_domain": "social_attention",
+                "interaction_role": "auxiliary_expression",
+                "purpose": "empathy",
+                "decision": "express",
+                "speech_expression": {
+                    "mode": "adapt",
+                    "style": "empathetic",
+                    "pacing": "slower",
+                    "reason": "Match the user's emotional state without adding body motion.",
+                },
+                "behaviors": [],
+                "confidence": 0.91,
+            },
+            "confidence": 0.93,
+        }
+
+        result = asyncio.run(
+            ResponseComposerResolver(FakeOllama(raw)).resolve(request(canonical))
+        )
+
+        self.assertEqual(result.status, "resolved")
+        composition = result.composition
+        self.assertIsNotNone(composition)
+        attention = composition.social_attention_plan
+        self.assertEqual(attention.decision, "express")
+        self.assertEqual(attention.purpose, "empathy")
+        self.assertEqual(attention.behaviors, [])
+        self.assertEqual(attention.speech_expression.mode, "adapt")
+        self.assertEqual(attention.speech_expression.style, "empathetic")
+        self.assertEqual(attention.metadata["behavior_domain"], "social_attention")
+        self.assertEqual(attention.metadata["interaction_role"], "auxiliary_expression")
+
     def test_resource_conflicting_attention_is_dropped_without_losing_speech(self):
         canonical = plan(
             disposition="execute",
