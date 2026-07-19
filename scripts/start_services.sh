@@ -59,7 +59,7 @@ echo "[start] Router model: ${ROUTER_MODEL:-unset} use_llm=${ROUTER_USE_LLM:-uns
 echo "[start] Agent model: ${AGENT_MODEL:-unset}"
 echo "[start] Cognitive models: association=${AGENT_GOAL_ASSOCIATION_MODEL:-unset} fast=${AGENT_FAST_PLANNER_MODEL:-unset} deep=${AGENT_DEEP_PLANNER_MODEL:-unset} composer=${AGENT_RESPONSE_COMPOSER_MODEL:-unset}"
 echo "[start] Ollama: max_loaded=${OLLAMA_MAX_LOADED_MODELS:-unset} num_parallel=${OLLAMA_NUM_PARALLEL:-unset}"
-echo "[start] ASR: backend=${ASR_BACKEND:-unset} mode=${ASR_MODE:-unset} model=${ASR_MODEL:-unset}"
+echo "[start] ASR: backend=sherpa_onnx mode=${ASR_MODE:-unset} model=${ASR_MODEL:-unset}"
 echo "[start] TTS model size: ${TTS_MODEL_SIZE:-unset}"
 
 COMPOSE_ARGS=(--env-file .env.runtime -f docker-compose.yml)

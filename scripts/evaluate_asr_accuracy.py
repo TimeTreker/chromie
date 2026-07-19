@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare final ASR backend accuracy on a manifest of reference audio."""
+"""Evaluate Chromie's SenseVoice final-utterance ASR on reference audio."""
 
 from __future__ import annotations
 
@@ -143,80 +143,33 @@ def load_audio(path: Path, sample_rate: int) -> tuple[Any, float]:
     return audio, len(audio) / sample_rate
 
 
-def create_backend(args: argparse.Namespace, backend_name: str) -> Any:
+def create_backend(args: argparse.Namespace) -> Any:
     try:
         from asr.backends import ASRBackendConfig, create_final_asr_backend
     except ImportError:
         from backends import ASRBackendConfig, create_final_asr_backend
 
-    if backend_name == "sherpa_onnx":
-        sherpa_model = args.sherpa_model or args.audio_root
-        return create_final_asr_backend(
-            ASRBackendConfig(
-                backend="sherpa_onnx",
-                mode="final",
-                model_name=str(sherpa_model),
-                model_revision=args.sherpa_revision,
-                device=args.sherpa_device,
-                compute_type=args.sherpa_compute_type,
-                sample_rate=args.sample_rate,
-                sherpa_model_type=args.sherpa_model_type,
-                sherpa_provider=args.sherpa_provider,
-                sherpa_num_threads=args.sherpa_num_threads,
-                sherpa_language=args.sherpa_language,
-                sherpa_use_itn=args.sherpa_use_itn,
-                sherpa_debug=args.sherpa_debug,
-            )
+    model = args.model or args.audio_root
+    return create_final_asr_backend(
+        ASRBackendConfig(
+            mode="final",
+            model_name=str(model),
+            model_revision=args.revision,
+            device=args.device,
+            sample_rate=args.sample_rate,
+            sherpa_model_type="sense_voice",
+            sherpa_provider=args.provider,
+            sherpa_num_threads=args.num_threads,
+            sherpa_language=args.language,
+            sherpa_use_itn=args.use_itn,
+            sherpa_debug=args.debug,
         )
-
-    if backend_name == "faster_whisper":
-        return create_final_asr_backend(
-            ASRBackendConfig(
-                backend="faster_whisper",
-                mode="final",
-                model_name=args.faster_whisper_model,
-                model_revision=args.faster_whisper_revision,
-                device=args.faster_whisper_device,
-                compute_type=args.faster_whisper_compute_type,
-                sample_rate=args.sample_rate,
-            )
-        )
-
-    raise ValueError(f"Unsupported evaluator backend: {backend_name}")
-
-
-def transcribe_sample(
-    backend: Any,
-    backend_name: str,
-    sample: EvalSample,
-    audio: Any,
-    args: argparse.Namespace,
-) -> str:
-    if backend_name != "faster_whisper":
-        text, _ = backend.transcribe_final(audio)
-        return text
-
-    language = sample.language
-    if args.faster_whisper_language != "sample":
-        language = None if args.faster_whisper_language == "auto" else args.faster_whisper_language
-    text, _ = backend.transcribe_final(
-        audio,
-        language=language,
-        beam_size=args.faster_whisper_beam_size,
-        vad_filter=args.faster_whisper_vad_filter,
-        condition_on_previous_text=False,
-        temperature=0.0,
     )
-    return text
 
 
-def evaluate_backend(
-    args: argparse.Namespace,
-    backend_name: str,
-    samples: list[EvalSample],
-) -> dict[str, Any]:
+def evaluate(args: argparse.Namespace, samples: list[EvalSample]) -> dict[str, Any]:
     started = time.perf_counter()
-    backend = create_backend(args, backend_name)
+    backend = create_backend(args)
     load_s = time.perf_counter() - started
 
     word_edits = 0
@@ -230,7 +183,7 @@ def evaluate_backend(
     for sample in samples:
         audio, duration = load_audio(sample.audio_path, args.sample_rate)
         started = time.perf_counter()
-        hypothesis = transcribe_sample(backend, backend_name, sample, audio, args)
+        hypothesis, _ = backend.transcribe_final(audio)
         sample_decode_s = time.perf_counter() - started
 
         ref_words = word_tokens(sample.text)
@@ -262,7 +215,10 @@ def evaluate_backend(
         )
 
     return {
-        "backend": backend_name,
+        "backend": backend.name,
+        "model": backend.model_name,
+        "model_revision": backend.model_revision,
+        "provider": getattr(backend, "provider", None),
         "load_s": load_s,
         "samples_count": len(samples),
         "wer": word_edits / word_count if word_count else 0.0,
@@ -274,27 +230,24 @@ def evaluate_backend(
     }
 
 
-def print_table(results: list[dict[str, Any]]) -> None:
-    print("backend           samples  WER     CER     RTF     decode_s  load_s")
-    for result in results:
-        print(
-            f"{result['backend']:<17} "
-            f"{result['samples_count']:>7} "
-            f"{result['wer']:.4f}  "
-            f"{result['cer']:.4f}  "
-            f"{result['rtf']:.4f}  "
-            f"{result['decode_s']:.3f}     "
-            f"{result['load_s']:.3f}"
-        )
+def print_report(result: dict[str, Any]) -> None:
+    print("backend       samples  WER     CER     RTF     decode_s  load_s")
+    print(
+        f"{result['backend']:<13} "
+        f"{result['samples_count']:>7} "
+        f"{result['wer']:.4f}  "
+        f"{result['cer']:.4f}  "
+        f"{result['rtf']:.4f}  "
+        f"{result['decode_s']:.3f}     "
+        f"{result['load_s']:.3f}"
+    )
     print()
-    for result in results:
-        print(f"[{result['backend']}]")
-        for sample in result["samples"]:
-            print(
-                f"- {sample['id']}: WER={sample['wer']:.4f} "
-                f"CER={sample['cer']:.4f} RTF={sample['rtf']:.4f} "
-                f"text={sample['hypothesis']!r}"
-            )
+    for sample in result["samples"]:
+        print(
+            f"- {sample['id']}: WER={sample['wer']:.4f} "
+            f"CER={sample['cer']:.4f} RTF={sample['rtf']:.4f} "
+            f"text={sample['hypothesis']!r}"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -311,67 +264,43 @@ def parse_args() -> argparse.Namespace:
         help="Built-in sample set to use when --manifest is omitted.",
     )
     parser.add_argument("--audio-root", type=Path, default=Path(DEFAULT_SENSEVOICE_ROOT))
-    parser.add_argument(
-        "--backend",
-        action="append",
-        choices=("faster_whisper", "sherpa_onnx"),
-        help="Backend to evaluate. Repeat to set order. Defaults to both.",
-    )
     parser.add_argument("--sample-rate", type=int, default=SAMPLE_RATE)
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     parser.add_argument("--fail-wer-above", type=float)
     parser.add_argument("--fail-cer-above", type=float)
-
-    parser.add_argument("--faster-whisper-model", default="Systran/faster-whisper-small")
-    parser.add_argument(
-        "--faster-whisper-revision",
-        default="536b0662742c02347bc0e980a01041f333bce120",
-    )
-    parser.add_argument("--faster-whisper-device", default="cpu")
-    parser.add_argument("--faster-whisper-compute-type", default="int8")
-    parser.add_argument("--faster-whisper-language", default="auto")
-    parser.add_argument("--faster-whisper-beam-size", type=int, default=1)
-    parser.add_argument("--faster-whisper-vad-filter", action="store_true")
-
-    parser.add_argument("--sherpa-model", type=Path)
-    parser.add_argument("--sherpa-revision", default=SENSEVOICE_MODEL_ID)
-    parser.add_argument("--sherpa-device", default="cpu")
-    parser.add_argument("--sherpa-compute-type", default="int8")
-    parser.add_argument("--sherpa-model-type", default="sense_voice")
-    parser.add_argument("--sherpa-provider", default="cpu")
-    parser.add_argument("--sherpa-num-threads", type=int, default=1)
-    parser.add_argument("--sherpa-language", default="auto")
-    parser.add_argument("--sherpa-use-itn", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--sherpa-debug", action="store_true")
+    parser.add_argument("--model", type=Path)
+    parser.add_argument("--revision", default=SENSEVOICE_MODEL_ID)
+    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--provider", default="cpu")
+    parser.add_argument("--num-threads", type=int, default=1)
+    parser.add_argument("--language", default="auto")
+    parser.add_argument("--use-itn", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--debug", action="store_true")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     samples = read_manifest(args.manifest) if args.manifest else sensevoice_smoke_samples(args.audio_root)
-    backends = args.backend or ["sherpa_onnx", "faster_whisper"]
-    results = [evaluate_backend(args, backend, samples) for backend in backends]
+    result = evaluate(args, samples)
     if args.json:
-        print(json.dumps(results, ensure_ascii=False, indent=2))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
-        print_table(results)
+        print_report(result)
 
     failed = False
-    for result in results:
-        if args.fail_wer_above is not None and result["wer"] > args.fail_wer_above:
-            print(
-                f"{result['backend']} WER {result['wer']:.4f} exceeds "
-                f"{args.fail_wer_above:.4f}",
-                file=sys.stderr,
-            )
-            failed = True
-        if args.fail_cer_above is not None and result["cer"] > args.fail_cer_above:
-            print(
-                f"{result['backend']} CER {result['cer']:.4f} exceeds "
-                f"{args.fail_cer_above:.4f}",
-                file=sys.stderr,
-            )
-            failed = True
+    if args.fail_wer_above is not None and result["wer"] > args.fail_wer_above:
+        print(
+            f"WER {result['wer']:.4f} exceeds {args.fail_wer_above:.4f}",
+            file=sys.stderr,
+        )
+        failed = True
+    if args.fail_cer_above is not None and result["cer"] > args.fail_cer_above:
+        print(
+            f"CER {result['cer']:.4f} exceeds {args.fail_cer_above:.4f}",
+            file=sys.stderr,
+        )
+        failed = True
     return 1 if failed else 0
 
 

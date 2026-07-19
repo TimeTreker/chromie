@@ -29,25 +29,16 @@ DEFAULT_SENSEVOICE_MODEL_PATH = (
     f"{DEFAULT_SENSEVOICE_MODEL_ID}"
 )
 
-ASR_BACKEND = os.getenv("ASR_BACKEND", "sherpa_onnx")
 SHERPA_ONNX_MODEL_TYPE = os.getenv("SHERPA_ONNX_MODEL_TYPE", "sense_voice")
 SHERPA_ONNX_PROVIDER = os.getenv("SHERPA_ONNX_PROVIDER") or None
 SHERPA_ONNX_MODEL_FILE = os.getenv("SHERPA_ONNX_MODEL_FILE") or None
 SHERPA_ONNX_TOKENS_FILE = os.getenv("SHERPA_ONNX_TOKENS_FILE") or None
 ASR_MODE = os.getenv("ASR_MODE", "final")
 MODEL_NAME = os.getenv("ASR_MODEL", DEFAULT_SENSEVOICE_MODEL_PATH)
-MODEL_REVISION = os.getenv("ASR_MODEL_REVISION") or (
-    DEFAULT_SENSEVOICE_MODEL_REVISION
-    if ASR_BACKEND.strip().lower().replace("-", "_") == "sherpa_onnx"
-    else None
-)
+MODEL_REVISION = os.getenv("ASR_MODEL_REVISION") or DEFAULT_SENSEVOICE_MODEL_REVISION
 DEVICE = os.getenv("ASR_DEVICE", "cuda")
-COMPUTE_TYPE = os.getenv("ASR_COMPUTE_TYPE", "int8")
 SAMPLE_RATE = int(os.getenv("ASR_SAMPLE_RATE", "16000"))
 ASR_LANGUAGE = os.getenv("ASR_LANGUAGE") or None
-ASR_BEAM_SIZE = int(os.getenv("ASR_BEAM_SIZE", "1"))
-ASR_VAD_FILTER = os.getenv("ASR_VAD_FILTER", "false").lower() in {"1", "true", "yes", "on"}
-ASR_CONDITION_ON_PREVIOUS_TEXT = os.getenv("ASR_CONDITION_ON_PREVIOUS_TEXT", "false").lower() in {"1", "true", "yes", "on"}
 SHERPA_ONNX_NUM_THREADS = max(1, int(os.getenv("SHERPA_ONNX_NUM_THREADS", "1")))
 SHERPA_ONNX_LANGUAGE = os.getenv("SHERPA_ONNX_LANGUAGE") or ASR_LANGUAGE or "auto"
 SHERPA_ONNX_USE_ITN = os.getenv("SHERPA_ONNX_USE_ITN", "true").lower() in {"1", "true", "yes", "on"}
@@ -60,27 +51,21 @@ ASR_STARTUP_WARMUP_AUDIO_SECONDS = max(0.01, float(os.getenv("ASR_STARTUP_WARMUP
 
 logger.info(
     (
-        "ASR config: backend=%s mode=%s model=%s revision=%s device=%s "
-        "compute_type=%s language=%s beam_size=%s vad_filter=%s"
+        "ASR config: backend=sherpa_onnx mode=%s model=%s revision=%s device=%s "
+        "language=%s"
     ),
-    ASR_BACKEND,
     ASR_MODE,
     MODEL_NAME,
     MODEL_REVISION or "unpinned",
     DEVICE,
-    COMPUTE_TYPE,
     ASR_LANGUAGE or "auto",
-    ASR_BEAM_SIZE,
-    ASR_VAD_FILTER,
 )
 asr_backend = create_final_asr_backend(
     ASRBackendConfig(
-        backend=ASR_BACKEND,
         mode=ASR_MODE,
         model_name=MODEL_NAME,
         model_revision=MODEL_REVISION,
         device=DEVICE,
-        compute_type=COMPUTE_TYPE,
         sample_rate=SAMPLE_RATE,
         sherpa_model_type=SHERPA_ONNX_MODEL_TYPE,
         sherpa_provider=SHERPA_ONNX_PROVIDER,
@@ -163,11 +148,6 @@ async def handle_client(ws):
             text, info = await transcription_executor.transcribe(
                 asr_backend,
                 audio,
-                language=ASR_LANGUAGE,
-                beam_size=ASR_BEAM_SIZE,
-                vad_filter=ASR_VAD_FILTER,
-                condition_on_previous_text=ASR_CONDITION_ON_PREVIOUS_TEXT,
-                temperature=0.0,
             )
             elapsed = time.time() - start
             logger.info("ASR done in %.2fs text=%s", elapsed, text)

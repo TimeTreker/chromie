@@ -73,29 +73,28 @@ release evidence that cover microphone choice, room noise, ASR recognition,
 audible output, barge-in, request-bound approval and denial, cancellation, stop,
 and simulator recovery.
 
-## Open evidence track - ASR backend hardening
+## Open evidence track - SenseVoice ASR hardening
 
-The current supported ASR path is sherpa-onnx SenseVoice final-utterance
-transcription with `ASR_BACKEND=sherpa_onnx` and `ASR_MODE=final`.
-Faster-Whisper remains installed and selectable as a fallback and comparison
-path. The explicit ASR backend boundary preserves the current WebSocket
-protocol, Orchestrator VAD ownership, and release-claim separation.
+The supported ASR path is sherpa-onnx SenseVoice final-utterance
+transcription with `ASR_MODE=final`. The Orchestrator continues to own
+microphone capture, VAD, utterance boundaries, timeout handling, and barge-in.
+The ASR service owns only complete-utterance transcription.
 
-The objective is better local realtime speech operation for Chromie, not
-unbounded ASR scope growth. The staged plan is maintained in
-[ASR Backend Migration Plan](docs/ASR_BACKEND_MIGRATION.md).
+The objective is reliable local realtime speech operation for Chromie, not
+unbounded ASR scope growth. The maintained architecture and evidence plan are
+documented in [SenseVoice ASR](docs/SENSEVOICE_ASR.md).
 
 Exit criteria before widening voice-device or profile support:
 
-- `ASR_BACKEND=sherpa_onnx` continues to pass the same final-utterance protocol
-  tests as `ASR_BACKEND=faster_whisper`;
-- selected sherpa-onnx dependencies and models have immutable provenance and
+- the pinned SenseVoice dependency and model have immutable provenance and
   maintained-profile coverage;
 - English, Chinese, mixed-command, noisy-room, and physical-microphone
   benchmarks show acceptable recognition quality and latency for the intended
   deployment profile;
-- stop, cancel, emergency, silence, unusable-audio, confirmation, timeout,
-  fallback, and barge-in semantics remain unchanged;
+- stop, cancel, emergency, silence, unusable-audio, confirmation, timeout, and
+  barge-in semantics remain unchanged;
+- CPU fallback and maintained CUDA profiles fail clearly when model files or
+  providers are unavailable;
 - retained evidence uses the four-axis status vocabulary and does not turn a
   benchmark into release readiness.
 

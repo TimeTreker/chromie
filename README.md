@@ -41,9 +41,8 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 ## What works
 
 - realtime microphone, VAD, ASR, routing, TTS, playback, and barge-in;
-- ASR backend boundary with sherpa-onnx SenseVoice as the supported
-  final-utterance default and Faster-Whisper retained as a selectable fallback
-  and comparison path;
+- sherpa-onnx SenseVoice as the single supported final-utterance ASR runtime,
+  with immutable model provenance, CUDA/CPU providers, and startup warm-up;
 - deterministic stop, cancel, emergency, ignore, and silence handling;
 - three-stage route flow: emergency filter, Qwen quick intent routing, and
   larger-model deepthought handoff when quick confidence is low or planning is
@@ -181,8 +180,8 @@ documented in
 - [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
 - [Status](docs/STATUS.md): what exists and what is evidenced
 - [Roadmap](ROADMAP.md): milestone order and exit criteria
-- [ASR Backend Migration](docs/ASR_BACKEND_MIGRATION.md): sherpa-onnx goal,
-  gates, and implementation sequence
+- [SenseVoice ASR](docs/SENSEVOICE_ASR.md): runtime contract, model provenance,
+  evaluation, and release evidence
 - [User Manual](docs/USER_MANUAL.md): current simulator operation
 - [Project Handoff](docs/HANDOFF.md): resume point for the next developer
 - [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point

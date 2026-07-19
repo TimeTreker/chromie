@@ -118,7 +118,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Chromie/Soridormi Task-Agent Plan](CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md)
 - [Chromie/Soridormi Proposal Boundary Plan](CHROMIE_SORIDORMI_PROPOSAL_BOUNDARY_PLAN.md)
 - [Developer Usability Tools Plan](DEVELOPER_USABILITY_TOOLS.md)
-- [ASR Backend Migration Plan](ASR_BACKEND_MIGRATION.md)
+- [SenseVoice ASR](SENSEVOICE_ASR.md)
 - [TaskGraph Concurrency Decision](task_graph_concurrency_decision.md)
 - [Conversation State](conversation_state.md)
 

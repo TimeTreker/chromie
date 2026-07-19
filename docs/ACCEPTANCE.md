@@ -242,14 +242,14 @@ round trip, ASR/TTS WebSockets, Ollama generation, model GPU placement, and
 optional non-empty TTS PCM generation. It does not evaluate microphone or
 speaker quality.
 
-ASR backend migration work starts at Level A with backend-selection and
-fail-closed tests, then Level B service health that reports `backend`, `mode`,
-`model`, and `model_revision`. A backend benchmark is not release readiness by
-itself. Changing the supported default requires retained evidence for
-recognition quality, latency, resource use, timeout/fallback clarity, and
-unchanged stop, cancel, emergency, silence, unusable-audio, confirmation, and
-barge-in semantics. The staged criteria are maintained in
-[ASR Backend Migration Plan](ASR_BACKEND_MIGRATION.md).
+SenseVoice ASR verification starts at Level A with model-file resolution,
+normalization, mode validation, and bounded executor tests. Level B service
+health reports `backend=sherpa_onnx`, `mode`, `model`, and `model_revision`. An
+accuracy benchmark is not release readiness by itself. Voice release evidence
+must cover recognition quality, latency, resource use, provider/model failure
+clarity, and unchanged stop, cancel, emergency, silence, unusable-audio,
+confirmation, and barge-in semantics. The maintained criteria are documented
+in [SenseVoice ASR](SENSEVOICE_ASR.md).
 
 ## Level C — Soridormi contract and simulator
 

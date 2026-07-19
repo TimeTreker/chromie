@@ -8,14 +8,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ComposeConfigurationTests(unittest.TestCase):
-    def test_asr_service_passes_backend_and_mode(self) -> None:
+    def test_asr_service_passes_sensevoice_configuration(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         asr_block = compose.split("  chromie-asr:", 1)[1].split(
             "  chromie-tts:",
             1,
         )[0]
 
-        self.assertIn("ASR_BACKEND: ${ASR_BACKEND:-sherpa_onnx}", asr_block)
+        self.assertNotIn("ASR_BACKEND:", asr_block)
         self.assertIn("ASR_MODE: ${ASR_MODE:-final}", asr_block)
         self.assertIn("SHERPA_ONNX_MODEL_TYPE: ${SHERPA_ONNX_MODEL_TYPE:-sense_voice}", asr_block)
         self.assertIn("SHERPA_ONNX_PROVIDER: ${SHERPA_ONNX_PROVIDER:-cuda}", asr_block)

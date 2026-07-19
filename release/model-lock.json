@@ -1,21 +1,9 @@
 {
   "asr": {
-    "Systran/faster-whisper-base": {
-      "repository": "Systran/faster-whisper-base",
-      "revision": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
-    },
-    "Systran/faster-whisper-small": {
-      "repository": "Systran/faster-whisper-small",
-      "revision": "536b0662742c02347bc0e980a01041f333bce120"
-    },
-    "Systran/faster-whisper-tiny": {
-      "repository": "Systran/faster-whisper-tiny",
-      "revision": "d90ca5fe260221311c53c58e660288d3deb8d356"
-    },
     "/root/.cache/huggingface/sherpa-onnx/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17": {
       "backend": "sherpa_onnx",
-      "model_type": "sense_voice",
       "model_id": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "model_type": "sense_voice",
       "repository": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
       "revision": "asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
       "source": "k2-fsa/sherpa-onnx release asset"
