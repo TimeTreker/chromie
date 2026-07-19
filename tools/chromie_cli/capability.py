@@ -438,15 +438,13 @@ def _check_tool_contract(tool: dict[str, Any], tool_name: str) -> list[Diagnosti
             )
         )
 
-    if tool.get("interaction_executable") is True:
-        if "physical_motion" in effects and not _confirmation_required(tool):
-            diagnostics.append(
-                Diagnostic(
-                    "failure",
-                    "executable_motion_without_confirmation",
-                    f"{tool_name} is interaction-executable physical motion without confirmation",
-                )
-            )
+    diagnostics.extend(
+        _check_policy_contract(
+            tool,
+            tool_name,
+            effects=effects,
+        )
+    )
     return diagnostics
 
 
@@ -477,6 +475,114 @@ def _confirmation_required(tool: dict[str, Any]) -> bool:
     if isinstance(confirmation, dict):
         return confirmation.get("required") is True or bool(confirmation.get("required_in_modes"))
     return False
+
+
+def _check_policy_contract(
+    tool: dict[str, Any],
+    tool_name: str,
+    *,
+    effects: set[str],
+) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    boolean_fields = {
+        "availability": ("available",),
+        "execution": ("can_run_parallel", "idempotent", "side_effect_free"),
+        "confirmation": ("required",),
+        "monitoring": ("requires_safety_monitor",),
+    }
+    for policy_name, field_names in boolean_fields.items():
+        policy = tool.get(policy_name)
+        if not isinstance(policy, dict):
+            continue
+        for field_name in field_names:
+            if not isinstance(policy.get(field_name), bool):
+                diagnostics.append(
+                    Diagnostic(
+                        "failure",
+                        f"invalid_{policy_name}_{field_name}",
+                        f"{tool_name}.{policy_name}.{field_name} must be a boolean",
+                    )
+                )
+
+    failure_policy = tool.get("default_failure_policy")
+    if isinstance(failure_policy, dict) and not str(
+        failure_policy.get("strategy") or ""
+    ).strip():
+        diagnostics.append(
+            Diagnostic(
+                "failure",
+                "missing_failure_strategy",
+                f"{tool_name}.default_failure_policy.strategy must be non-empty",
+            )
+        )
+
+    if "physical_motion" not in effects:
+        return diagnostics
+
+    execution = tool.get("execution")
+    side_effect_free = (
+        execution.get("side_effect_free") if isinstance(execution, dict) else None
+    )
+    if side_effect_free is not False:
+        diagnostics.append(
+            Diagnostic(
+                "failure",
+                "physical_motion_declared_side_effect_free",
+                f"{tool_name} declares physical_motion but execution.side_effect_free is not false",
+            )
+        )
+
+    if "safety_control" in effects:
+        if _confirmation_required(tool):
+            diagnostics.append(
+                Diagnostic(
+                    "failure",
+                    "safety_control_confirmation_forbidden",
+                    f"{tool_name} is a safety control and must remain immediately executable",
+                )
+            )
+        return diagnostics
+
+    if not _confirmation_required(tool):
+        diagnostics.append(
+            Diagnostic(
+                "failure",
+                "physical_motion_confirmation_missing",
+                f"{tool_name} declares physical_motion without a confirmation policy",
+            )
+        )
+
+    monitoring = tool.get("monitoring")
+    requires_monitor = (
+        monitoring.get("requires_safety_monitor") is True
+        if isinstance(monitoring, dict)
+        else False
+    )
+    if not requires_monitor:
+        diagnostics.append(
+            Diagnostic(
+                "failure",
+                "physical_motion_monitoring_missing",
+                f"{tool_name} declares physical_motion without required safety monitoring",
+            )
+        )
+
+    recommended_tools = (
+        monitoring.get("recommended_monitor_tools")
+        if isinstance(monitoring, dict)
+        else None
+    )
+    if not isinstance(recommended_tools, list) or not any(
+        str(item).strip() for item in recommended_tools
+    ):
+        diagnostics.append(
+            Diagnostic(
+                "failure",
+                "physical_motion_monitor_tool_missing",
+                f"{tool_name} must name at least one safety monitor tool",
+            )
+        )
+    return diagnostics
 
 
 def _check_feature_gate_alignment(root: Path, manifest_path: Path) -> list[Diagnostic]:

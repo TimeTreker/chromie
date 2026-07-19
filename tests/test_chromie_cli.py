@@ -697,6 +697,109 @@ class ChromieCliTests(unittest.TestCase):
         self.assertIn("physical_effect_safety_mismatch", codes)
         self.assertEqual(stderr, "")
 
+    def test_capability_check_rejects_invalid_policy_booleans(self) -> None:
+        manifest = self.safe_manifest()
+        tool = manifest["agents"][0]["tools"][0]
+        tool["confirmation"]["required"] = "false"
+        tool["execution"]["side_effect_free"] = 0
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(Path(directory), "ORCH_ACTION_DRY_RUN=true\n")
+            self.write_manifest(root, manifest)
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "capability",
+                "check",
+            )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("invalid_confirmation_required", codes)
+        self.assertIn("invalid_execution_side_effect_free", codes)
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_rejects_unguarded_physical_motion(self) -> None:
+        manifest = self.safe_manifest()
+        tool = manifest["agents"][0]["tools"][0]
+        tool["effects"] = ["physical_motion"]
+        tool["safety_class"] = "physical_motion"
+        tool["execution"]["side_effect_free"] = True
+        tool["confirmation"] = {"required": False}
+        tool["monitoring"] = {
+            "requires_safety_monitor": False,
+            "recommended_monitor_tools": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(Path(directory), "ORCH_ACTION_DRY_RUN=true\n")
+            self.write_manifest(root, manifest)
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "capability",
+                "check",
+            )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("physical_motion_declared_side_effect_free", codes)
+        self.assertIn("physical_motion_confirmation_missing", codes)
+        self.assertIn("physical_motion_monitoring_missing", codes)
+        self.assertIn("physical_motion_monitor_tool_missing", codes)
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_allows_unconfirmed_safety_control(self) -> None:
+        manifest = self.safe_manifest()
+        tool = manifest["agents"][0]["tools"][0]
+        tool["effects"] = ["physical_motion", "safety_control"]
+        tool["safety_class"] = "safety_critical"
+        tool["execution"]["side_effect_free"] = False
+        tool["confirmation"] = {"required": False}
+        tool["monitoring"] = {
+            "requires_safety_monitor": False,
+            "recommended_monitor_tools": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(Path(directory), "ORCH_ACTION_DRY_RUN=true\n")
+            self.write_manifest(root, manifest)
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "capability",
+                "check",
+            )
+        self.assertEqual(code, int(ExitCode.OK))
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_rejects_confirmed_safety_control(self) -> None:
+        manifest = self.safe_manifest()
+        tool = manifest["agents"][0]["tools"][0]
+        tool["effects"] = ["physical_motion", "safety_control"]
+        tool["safety_class"] = "safety_critical"
+        tool["execution"]["side_effect_free"] = False
+        tool["confirmation"] = {"required": True}
+        tool["monitoring"] = {
+            "requires_safety_monitor": False,
+            "recommended_monitor_tools": [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(Path(directory), "ORCH_ACTION_DRY_RUN=true\n")
+            self.write_manifest(root, manifest)
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "capability",
+                "check",
+            )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("safety_control_confirmation_forbidden", codes)
+        self.assertEqual(stderr, "")
+
     def test_capability_check_live_probe_reports_ready_contract(self) -> None:
         result = SimpleNamespace(
             url="http://robot:8000/mcp",
