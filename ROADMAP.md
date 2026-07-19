@@ -268,6 +268,17 @@ The detailed plan is maintained in
   readiness;
 - `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
 
+### Selective ecosystem alignment
+
+Chromie will absorb external Agent-framework ideas only when they solve a concrete
+project problem. The current plan does not add capability-package scanning,
+`SKILL.md` execution, arbitrary script plugins, automatic provider registration, or
+a package-install command. Optional descriptive conventions may be documented next
+to existing manifests, but the manifest/provider contract and trusted execution
+path remain authoritative. Revisit packaging or installation only after a real
+interoperability use case demonstrates value that cannot be achieved with the
+current registry and MCP/provider model.
+
 ## Completed phase - Robust simulation and provider readiness
 
 This milestone is complete for the high-level provider contract. The historical

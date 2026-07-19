@@ -70,6 +70,20 @@ when adding a new Chromie-side Agent or read-only tool such as weather lookup.
 The capability must be exposed through the Agent catalog and prompt-tier policy
 before the Router can reliably ground natural language to it.
 
+## Selective ecosystem alignment
+
+Chromie may borrow useful descriptive conventions from external Agent ecosystems,
+including prose-oriented formats such as `SKILL.md`, when they make a capability
+easier for contributors to understand. Such material is documentation only unless
+a separate architecture decision explicitly promotes it into a machine contract.
+
+The existing typed manifest, live provider schema, capability registry, Trusted
+Skill Runtime, and Soridormi validation remain the only execution-authoritative
+path. Do not add a second registry, directory scanner, script entrypoint, automatic
+registration hook, or install mechanism merely to resemble another framework.
+Adopt an external convention only for a demonstrated integration need and only
+when it preserves the current authority and safety boundaries.
+
 ## Prompt-tier preset
 
 [`prompt_tiers.json`](prompt_tiers.json) is the owner-editable initial
@@ -83,9 +97,35 @@ under `.chromie/experience/` and loaded with
 `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`. The safety locker still wins after
 both files are merged.
 
-## Verify a live capability server
+## Audit the capability contract
 
-Prefer the deployed Agent container from the repository root:
+Run the static, read-only manifest audit from the repository root:
+
+```bash
+python -m tools.chromie_cli capability check
+```
+
+The command validates manifest provenance, semantic versions, transport
+metadata, schema roots, side-effect declarations, safety classes, confirmation
+and monitoring policy, forbidden low-level fields, and duplicate identities. It
+does not register tools, import provider implementations, or execute capability
+content.
+
+When the configured MCP provider is already running, compare its advertised
+`tools/list` schemas with the same checked-in manifest:
+
+```bash
+python -m tools.chromie_cli capability check --live --timeout-s 10
+```
+
+The live audit fails when a declared tool is missing or its advertised input
+schema is weaker than the manifest. Provider tools absent from the manifest are
+reported as drift warnings because they are not part of Chromie's registered
+execution contract. Connection failures, static failures, and skipped live
+checks have separate machine-readable reason codes.
+
+The lower-level Agent-container probe remains available when debugging the exact
+deployed MCP SDK environment:
 
 ```bash
 ./scripts/build_runtime_env.sh
@@ -97,11 +137,7 @@ docker compose --env-file .env.runtime exec -T \
   --manifest /app/capabilities/soridormi.json
 ```
 
-For host-only development, install `agent/requirements.txt` and run the module
-with `PYTHONPATH=agent`.
-
-The probe compares the declared manifest with the live MCP surface. Safe
-acceptance commands are documented in
+Safe acceptance commands are documented in
 [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md).
 
 ## Two registries with different purposes

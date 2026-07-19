@@ -24,6 +24,20 @@ User request
 
 The Router may generate a short process acknowledgement such as “好的，我查一下重庆今天的天气。” It must not invent the final answer. The Agent/tool owns the grounded result.
 
+## One authoritative capability contract
+
+Keep contributor guidance separate from execution authority. A capability may have
+additional prose, examples, or an external ecosystem description beside it, but
+Chromie runtime behavior must continue to come from the existing typed manifest or
+registered provider schema. Descriptive files do not register a provider, grant a
+tool permission, authorize physical motion, or replace runtime validation.
+
+Do not introduce package scanning, automatic script loading, or another capability
+registry unless a concrete interoperability requirement cannot be met through the
+current manifest and MCP/provider path. Any future adoption must be incremental,
+optional, and reviewed as an authority-boundary change rather than a convenience
+feature.
+
 ## Registration checklist
 
 1. **Create or select the Agent implementation.**
@@ -77,6 +91,15 @@ The Router may generate a short process acknowledgement such as “好的，我�
    - Search/routing test: representative user requests match the capability.
    - Agent test: metadata and LLM-extracted parameters are handled correctly.
    - Prompt/review test: review stages preserve the same route contract.
+
+8. **Audit the authoritative contract.**
+   - Run `python -m tools.chromie_cli capability check` for static validation.
+   - When the provider is available, run
+     `python -m tools.chromie_cli capability check --live` and review missing,
+     extra, and schema-drift findings.
+   - Do not treat a provider's extra advertised tools as registered Chromie
+     abilities. The manifest and live provider must be intentionally aligned
+     before those tools can enter planning or execution.
 
 ## Weather lookup example
 

@@ -41,7 +41,13 @@ def _run_config_validate(command: str, args: argparse.Namespace) -> CommandResul
 
 
 def _run_capability_check(command: str, args: argparse.Namespace) -> CommandResult:
-    return capability_check(args.root, args.manifest)
+    return capability_check(
+        args.root,
+        args.manifest,
+        live=args.live,
+        timeout_s=args.timeout_s,
+        excluded_effects=frozenset(args.exclude_effect),
+    )
 
 
 def _run_evidence_bundle(command: str, args: argparse.Namespace) -> CommandResult:
@@ -63,6 +69,16 @@ def _run_trace_view(command: str, args: argparse.Namespace) -> CommandResult:
         trace=args.trace,
         limit=args.limit,
     )
+
+
+def _positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a number") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return parsed
 
 
 def _positive_int(value: str) -> int:
@@ -127,13 +143,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     capability_check_parser = capability_subparsers.add_parser(
         "check",
-        help="validate capability manifests and forbidden fields",
+        help="audit a capability manifest and optionally compare its live MCP schema",
     )
     capability_check_parser.add_argument(
         "--manifest",
         type=Path,
         default=None,
         help="manifest path relative to --root; default capabilities/soridormi.json",
+    )
+    capability_check_parser.add_argument(
+        "--live",
+        action="store_true",
+        help="probe the configured MCP endpoint and compare its advertised schemas",
+    )
+    capability_check_parser.add_argument(
+        "--timeout-s",
+        type=_positive_float,
+        default=10.0,
+        help="live MCP probe timeout in seconds; default 10",
+    )
+    capability_check_parser.add_argument(
+        "--exclude-effect",
+        action="append",
+        default=[],
+        help="exclude manifest tools with this effect from the live comparison",
     )
     capability_check_parser.set_defaults(
         handler=_run_capability_check,

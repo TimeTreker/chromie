@@ -33,9 +33,12 @@ PR0 through PR6 are implemented and automatically verified at Level A:
   positive numeric budgets, and fail-closed gate combinations;
 - `doctor` classifies environment, file, service reachability, optional
   Soridormi, and host audio checks as ok, warning, failure, or skipped;
-- `capability check` verifies Soridormi manifest provenance, duplicate
-  identities, tool/agent alignment, and forbidden low-level fields in
-  model-facing schemas;
+- `capability check` performs a read-only audit of manifest provenance,
+  semantic versions, transport metadata, schemas, effects, safety policy,
+  duplicate identities, and forbidden low-level fields; optional `--live`
+  reuses the existing MCP probe to report missing tools, schema drift, extra
+  provider tools, connection failures, and skipped checks with stable reason
+  codes;
 - `evidence bundle` assembles git/config/evidence metadata and labels evidence
   levels without turning local or automated output into release readiness;
 - `trace view` reads retained local JSONL and JSON artifacts, filters by
@@ -185,20 +188,33 @@ python -m tools.chromie_cli capability check
 The command should inspect the checked-in manifest and fail closed on unsafe or
 model-facing low-level controls.
 
-Validation should cover:
+Validation covers:
 
 - manifest parseability and expected top-level metadata;
-- duplicate capability IDs;
+- semantic versions and duplicate capability identities;
 - provenance fields for Soridormi snapshots;
+- transport metadata and object-rooted input/output schemas;
+- non-empty effects plus safety-class, confirmation, monitoring, execution, and
+  failure-policy metadata;
 - forbidden low-level motor, joint, actuator, torque, controller-array, or
   `action_14d` style fields;
 - feature-gate consistency for executable interaction capabilities;
-- clear reporting for unsupported task types that should remain refusals.
+- optional live MCP comparison for missing tools, incompatible schemas, extra
+  provider tools, and connection failures.
+
+The live mode is explicit rather than automatic:
+
+```bash
+python -m tools.chromie_cli capability check --live --timeout-s 10
+```
 
 Exit criteria:
 
-- Level A tests include safe, malformed, duplicate, and forbidden-field
-  manifests;
+- Level A tests include safe, malformed, duplicate, missing-policy,
+  safety-mismatch, live-match, live-drift, and connection-failure cases;
+- static and live results use stable reason codes;
+- the command remains read-only and does not alter the capability registry or
+  execution authority;
 - output is useful enough for release preflight and code review.
 
 ### PR 5 - Evidence Bundle Preflight

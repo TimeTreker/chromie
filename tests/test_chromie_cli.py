@@ -5,6 +5,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from tools.chromie_cli.__main__ import main
 from tools.chromie_cli.output import CommandResult, ExitCode, write_result
@@ -652,6 +654,266 @@ class ChromieCliTests(unittest.TestCase):
         self.assertIn("forbidden_low_level_field", codes)
         self.assertEqual(stderr, "")
 
+    def test_capability_check_rejects_missing_safety_metadata(self) -> None:
+        manifest = self.safe_manifest()
+        tool = manifest["agents"][0]["tools"][0]
+        tool.pop("confirmation")
+        tool.pop("monitoring")
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(Path(directory), "ORCH_ACTION_DRY_RUN=true\n")
+            self.write_manifest(root, manifest)
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "capability",
+                "check",
+            )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("missing_confirmation", codes)
+        self.assertIn("missing_monitoring", codes)
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_rejects_effect_and_safety_class_mismatch(self) -> None:
+        manifest = self.safe_manifest()
+        tool = manifest["agents"][0]["tools"][0]
+        tool["effects"] = ["physical_motion"]
+        tool["safety_class"] = "safe_read"
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(Path(directory), "ORCH_ACTION_DRY_RUN=true\n")
+            self.write_manifest(root, manifest)
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "capability",
+                "check",
+            )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("physical_effect_safety_mismatch", codes)
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_live_probe_reports_ready_contract(self) -> None:
+        result = SimpleNamespace(
+            url="http://robot:8000/mcp",
+            expected_schemas={"soridormi.robot.get_status": {}},
+            advertised_schemas={"soridormi.robot.get_status": {}},
+            missing_tools=frozenset(),
+            extra_tools=frozenset(),
+            schema_mismatches=frozenset(),
+            schema_mismatch_details={},
+            schema_warnings={},
+            ok=True,
+        )
+        runner = AsyncMock(return_value=[result])
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(
+                Path(directory),
+                "ORCH_ACTION_DRY_RUN=true\nSORIDORMI_MCP_URL=http://robot:8000/mcp\n",
+            )
+            self.write_manifest(root, self.safe_manifest())
+            with patch(
+                "tools.chromie_cli.capability._probe_live_registry",
+                new=runner,
+            ):
+                code, stdout, stderr = self.run_cli(
+                    "--root",
+                    str(root),
+                    "--json",
+                    "capability",
+                    "check",
+                    "--live",
+                    "--timeout-s",
+                    "12",
+                    "--exclude-effect",
+                    "test_control",
+                )
+        self.assertEqual(code, int(ExitCode.OK))
+        payload = json.loads(stdout)
+        live = payload["details"]["live_probe"]
+        self.assertEqual(live["status"], "ready")
+        self.assertEqual(live["reason_code"], "live_contract_ready")
+        self.assertEqual(live["excluded_effects"], ["test_control"])
+        self.assertEqual(live["endpoints"][0]["expected_tool_count"], 1)
+        runner.assert_awaited_once()
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_live_probe_fails_on_missing_tool(self) -> None:
+        result = SimpleNamespace(
+            url="http://robot:8000/mcp",
+            expected_schemas={"soridormi.robot.get_status": {}},
+            advertised_schemas={},
+            missing_tools=frozenset({"soridormi.robot.get_status"}),
+            extra_tools=frozenset(),
+            schema_mismatches=frozenset(),
+            schema_mismatch_details={},
+            schema_warnings={},
+            ok=False,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(
+                Path(directory),
+                "ORCH_ACTION_DRY_RUN=true\nSORIDORMI_MCP_URL=http://robot:8000/mcp\n",
+            )
+            self.write_manifest(root, self.safe_manifest())
+            with patch(
+                "tools.chromie_cli.capability._probe_live_registry",
+                new=AsyncMock(return_value=[result]),
+            ):
+                code, stdout, stderr = self.run_cli(
+                    "--root",
+                    str(root),
+                    "--json",
+                    "capability",
+                    "check",
+                    "--live",
+                )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        self.assertEqual(payload["details"]["live_probe"]["status"], "failure")
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("live_tool_missing", codes)
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_live_probe_fails_on_schema_drift(self) -> None:
+        result = SimpleNamespace(
+            url="http://robot:8000/mcp",
+            expected_schemas={"soridormi.robot.get_status": {"type": "object"}},
+            advertised_schemas={"soridormi.robot.get_status": {}},
+            missing_tools=frozenset(),
+            extra_tools=frozenset(),
+            schema_mismatches=frozenset({"soridormi.robot.get_status"}),
+            schema_mismatch_details={
+                "soridormi.robot.get_status": ("input_schema.type: missing",),
+            },
+            schema_warnings={},
+            ok=False,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(
+                Path(directory),
+                "ORCH_ACTION_DRY_RUN=true\nSORIDORMI_MCP_URL=http://robot:8000/mcp\n",
+            )
+            self.write_manifest(root, self.safe_manifest())
+            with patch(
+                "tools.chromie_cli.capability._probe_live_registry",
+                new=AsyncMock(return_value=[result]),
+            ):
+                code, stdout, stderr = self.run_cli(
+                    "--root",
+                    str(root),
+                    "--json",
+                    "capability",
+                    "check",
+                    "--live",
+                )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("live_schema_mismatch", codes)
+        details = payload["details"]["live_probe"]["endpoints"][0]
+        self.assertIn("soridormi.robot.get_status", details["schema_mismatch_details"])
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_live_probe_warns_on_unregistered_provider_tool(self) -> None:
+        result = SimpleNamespace(
+            url="http://robot:8000/mcp",
+            expected_schemas={"soridormi.robot.get_status": {}},
+            advertised_schemas={
+                "soridormi.robot.get_status": {},
+                "soridormi.robot.experimental": {},
+            },
+            missing_tools=frozenset(),
+            extra_tools=frozenset({"soridormi.robot.experimental"}),
+            schema_mismatches=frozenset(),
+            schema_mismatch_details={},
+            schema_warnings={},
+            ok=True,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(
+                Path(directory),
+                "ORCH_ACTION_DRY_RUN=true\nSORIDORMI_MCP_URL=http://robot:8000/mcp\n",
+            )
+            self.write_manifest(root, self.safe_manifest())
+            with patch(
+                "tools.chromie_cli.capability._probe_live_registry",
+                new=AsyncMock(return_value=[result]),
+            ):
+                code, stdout, stderr = self.run_cli(
+                    "--root",
+                    str(root),
+                    "--json",
+                    "capability",
+                    "check",
+                    "--live",
+                )
+        self.assertEqual(code, int(ExitCode.WARNING))
+        payload = json.loads(stdout)
+        self.assertEqual(payload["details"]["live_probe"]["status"], "warning")
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("live_tool_unregistered", codes)
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_live_probe_reports_connection_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(
+                Path(directory),
+                "ORCH_ACTION_DRY_RUN=true\nSORIDORMI_MCP_URL=http://robot:8000/mcp\n",
+            )
+            self.write_manifest(root, self.safe_manifest())
+            with patch(
+                "tools.chromie_cli.capability._probe_live_registry",
+                new=AsyncMock(side_effect=TimeoutError("probe deadline exceeded")),
+            ):
+                code, stdout, stderr = self.run_cli(
+                    "--root",
+                    str(root),
+                    "--json",
+                    "capability",
+                    "check",
+                    "--live",
+                )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        live = payload["details"]["live_probe"]
+        self.assertEqual(live["reason_code"], "live_probe_failed")
+        self.assertEqual(live["error_type"], "TimeoutError")
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("live_probe_failed", codes)
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_skips_live_probe_after_static_failure(self) -> None:
+        manifest = self.safe_manifest()
+        manifest["agents"][0]["tools"][0].pop("effects")
+        runner = AsyncMock()
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(Path(directory), "ORCH_ACTION_DRY_RUN=true\n")
+            self.write_manifest(root, manifest)
+            with patch(
+                "tools.chromie_cli.capability._probe_live_registry",
+                new=runner,
+            ):
+                code, stdout, stderr = self.run_cli(
+                    "--root",
+                    str(root),
+                    "--json",
+                    "capability",
+                    "check",
+                    "--live",
+                )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        live = payload["details"]["live_probe"]
+        self.assertEqual(live["status"], "skipped")
+        self.assertEqual(live["reason_code"], "live_probe_skipped_static_failure")
+        runner.assert_not_awaited()
+        self.assertEqual(stderr, "")
+
     def test_evidence_bundle_discovers_metadata_and_writes_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = self.write_repo_env(
@@ -773,10 +1035,16 @@ class ChromieCliTests(unittest.TestCase):
             "agents": [
                 {
                     "agent_id": "soridormi.robot",
+                    "version": "0.1.0",
+                    "transport": {
+                        "kind": "mcp_streamable_http",
+                        "url": "${SORIDORMI_MCP_URL}",
+                    },
                     "tools": [
                         {
                             "name": "soridormi.robot.get_status",
                             "agent_id": "soridormi.robot",
+                            "version": "0.1.0",
                             "input_schema": {"type": "object", "properties": {}},
                             "output_schema": {
                                 "type": "object",
@@ -784,6 +1052,15 @@ class ChromieCliTests(unittest.TestCase):
                             },
                             "effects": ["read_only"],
                             "safety_class": "safe_read",
+                            "availability": {"available": True},
+                            "execution": {
+                                "can_run_parallel": True,
+                                "idempotent": True,
+                                "side_effect_free": True,
+                            },
+                            "confirmation": {"required": False},
+                            "monitoring": {"requires_safety_monitor": False},
+                            "default_failure_policy": {"strategy": "abort_task"},
                         }
                     ],
                 }
