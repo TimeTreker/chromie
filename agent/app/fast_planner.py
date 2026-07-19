@@ -23,6 +23,11 @@ from .planner_contract import (
 from .schema import AgentRunRequest
 
 try:
+    from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+except ImportError:  # pragma: no cover
+    from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+
+try:
     from chromie_contracts.plan import CanonicalPlan
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.plan import CanonicalPlan
@@ -182,6 +187,7 @@ class FastPlannerResolver:
                         self._bounded(initial_raw_output, 4000),
                     )
                     continue
+                integrity_metadata = cognitive_integrity_metadata(stage="fast_planner", exc=exc, request=request)
                 return self._escalation(
                     plan_id,
                     request,
@@ -202,6 +208,7 @@ class FastPlannerResolver:
                         "repair_raw_output": self._bounded(raw, 4000)
                         if contract_repair_attempted and raw is not None
                         else "",
+                        **integrity_metadata,
                     },
                 )
 

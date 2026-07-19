@@ -1080,16 +1080,22 @@ def validate_planner_model_output(
             )
 
     raw_steps = model_raw.get("steps")
-    if isinstance(raw_steps, list) and len(expected_goal_ids_for_turn) == 1:
-        sole_goal_id = expected_goal_ids_for_turn[0]
-        normalized_steps: list[Any] = []
-        for item in raw_steps:
-            if isinstance(item, dict) and not item.get("source_goal_ids"):
-                item = {**item, "source_goal_ids": [sole_goal_id]}
-            normalized_steps.append(item)
-        model_raw["steps"] = normalized_steps
-
     output = PlannerModelOutput.model_validate(model_raw)
+
+    if isinstance(raw_steps, list):
+        for index, item in enumerate(raw_steps):
+            if not isinstance(item, dict):
+                continue
+            missing_authority_fields = [
+                field_name
+                for field_name in ("step_id", "source_goal_ids")
+                if field_name not in item
+            ]
+            if missing_authority_fields:
+                raise ValueError(
+                    f"planner step {index} requires explicit model-authored authority fields: "
+                    + ",".join(missing_authority_fields)
+                )
     allowed_dispositions = (
         {"respond", "execute", "mixed", "escalate"}
         if planner_tier == "fast"

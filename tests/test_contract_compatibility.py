@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from agent.app.planner_contract import validate_planner_model_output
 from agent.app.schema import AgentResult as ServiceAgentResult
 from agent.app.schema import AgentRunRequest as ServiceAgentRequest
 from hardware.schema import ActionCommand as HardwareActionCommand
@@ -101,6 +102,29 @@ class ContractCompatibilityTests(unittest.TestCase):
         self.assertEqual(hardware_command.type, "head.turn")
         self.assertEqual(hardware_command.timeout_ms, 1200)
         self.assertEqual(shared_command.type, "head.turn")
+
+
+    def test_single_goal_step_ownership_must_be_model_authored(self) -> None:
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 0.95,
+            "steps": [
+                {
+                    "step_id": "blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                }
+            ],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+
+        with self.assertRaisesRegex(ValueError, "source_goal_ids"):
+            validate_planner_model_output(
+                raw,
+                planner_tier="fast",
+                expected_goal_ids_for_turn=["goal-blink"],
+            )
 
     def test_hardware_result_is_parseable_by_orchestrator(self) -> None:
         hardware_result = HardwareActionResult(

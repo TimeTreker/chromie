@@ -12,6 +12,11 @@ from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
 
 try:
+    from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+except ImportError:  # pragma: no cover
+    from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+
+try:
     from chromie_contracts.goal import (
         ActiveGoalSnapshot,
         GoalAssociation,
@@ -291,6 +296,7 @@ class GoalAssociationResolver:
                 self._bounded_json(initial_raw, 4000) if initial_raw is not None else "",
                 self._bounded_json(repair_raw, 4000) if repair_raw is not None else "",
             )
+            integrity_metadata = cognitive_integrity_metadata(stage="goal_association", exc=exc, request=request)
             metadata: dict[str, Any] = {
                 "resolver": "goal_association_agent",
                 "status": status,
@@ -302,6 +308,7 @@ class GoalAssociationResolver:
                 "contract_schema": output_type.__name__,
                 "contract_repair_attempted": repair_attempted,
                 "contract_repair_succeeded": False,
+                **integrity_metadata,
             }
             if initial_validation_error:
                 metadata["initial_validation_errors"] = initial_validation_error

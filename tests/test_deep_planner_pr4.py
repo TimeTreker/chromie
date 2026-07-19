@@ -110,8 +110,8 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 class DeepPlannerResolverTests(unittest.TestCase):
     def test_full_catalog_exact_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.91,"goal_ids":["goal-action"],"goal_summary":"walk then blink","steps":[
-            {"skill_id":"soridormi.walk_forward","args":{"duration_s":15}},
-            {"skill_id":"soridormi.blink_eyes","args":{"count":4}}
+            {"step_id":"walk","skill_id":"soridormi.walk_forward","args":{"duration_s":15},"source_goal_ids":["goal-action"]},
+            {"step_id":"blink","skill_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         catalog = FullCatalog()
         plan = asyncio.run(DeepPlannerResolver(SequencedOllama([raw]), catalog).resolve(request()))
@@ -122,10 +122,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
-            {"skill_id":"soridormi.blink_eyes","args":{"count":99}}
+            {"step_id":"blink","skill_id":"soridormi.blink_eyes","args":{"count":99},"source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         revised = {"disposition":"execute","coverage":"complete","confidence":0.93,"goal_ids":["goal-action"],"steps":[
-            {"skill_id":"soridormi.blink_eyes","args":{"count":4}}
+            {"step_id":"blink","skill_id":"soridormi.blink_eyes","args":{"count":4},"source_goal_ids":["goal-action"]}
         ],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         ollama = SequencedOllama([invalid, revised])
         plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog(), max_replans=1).resolve(request("眨眼。")))

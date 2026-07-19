@@ -13,10 +13,7 @@ from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
 
 try:
-    from chromie_runtime.cognitive_integrity_events import (
-        capture_cognitive_integrity_event,
-        cognitive_integrity_user_message,
-    )
+    from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
     from chromie_contracts.plan import CanonicalPlan
     from chromie_contracts.response_composition import (
         CoordinatedResponsePlan,
@@ -32,10 +29,7 @@ try:
         SocialAttentionPlan,
     )
 except ImportError:  # pragma: no cover
-    from shared.chromie_runtime.cognitive_integrity_events import (
-        capture_cognitive_integrity_event,
-        cognitive_integrity_user_message,
-    )
+    from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.response_composition import (
         CoordinatedResponsePlan,
@@ -177,27 +171,7 @@ class ResponseComposerResolver:
                     failure["architecture_attribution"],
                     failure["retryable"],
                 )
-                if failure.get("failure_class") in {
-                    "output_truncated",
-                    "prompt_truncated",
-                }:
-                    incident_evidence = (
-                        exc.incident_evidence()
-                        if hasattr(exc, "incident_evidence")
-                        else {}
-                    )
-                    incident = capture_cognitive_integrity_event(
-                        stage="response_composer",
-                        failure=failure,
-                        session_id=request.sid,
-                        user_text=request.text,
-                        language=request.language,
-                        route_decision=request.route_decision.model_dump(
-                            mode="json", exclude_none=True
-                        ),
-                        runtime_context=request.context,
-                        model_exchange=incident_evidence,
-                    )
+                integrity_metadata = cognitive_integrity_metadata(stage="response_composer", exc=exc, request=request)
                 if attempt == 0 and isinstance(
                     exc, (ValidationError, json.JSONDecodeError, ValueError)
                 ):
@@ -223,16 +197,7 @@ class ResponseComposerResolver:
                         "repair_raw_output": self._bounded(raw, 5000)
                         if contract_repair_attempted and raw is not None
                         else "",
-                        "incident": incident,
-                        "user_notification_required": bool(incident),
-                        "user_notification": (
-                            cognitive_integrity_user_message(
-                                language=request.language,
-                                trigger_status=str(incident.get("trigger_status") or ""),
-                            )
-                            if incident
-                            else ""
-                        ),
+                        **integrity_metadata,
                         **failure,
                     },
                 )

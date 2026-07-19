@@ -11,6 +11,11 @@ from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import OllamaClient, llm_failure_metadata
 from .schema import AgentRunRequest
+
+try:
+    from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+except ImportError:  # pragma: no cover
+    from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
 from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
@@ -149,6 +154,7 @@ class DeepPlannerResolver:
                         }
                     ]
                     continue
+                integrity_metadata = cognitive_integrity_metadata(stage="deep_planner", exc=exc, request=request)
                 return self._clarify(
                     plan_id,
                     request,
@@ -169,6 +175,7 @@ class DeepPlannerResolver:
                         "repair_raw_output": self._bounded(raw, 5000)
                         if contract_repair_attempted and raw is not None
                         else "",
+                        **integrity_metadata,
                     },
                 )
             errors = self._validation_errors(
