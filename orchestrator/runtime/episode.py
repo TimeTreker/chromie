@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.mind import MindProfile
+from shared.chromie_runtime.runtime_events import persist_runtime_event
 
 from .skill_runtime import SkillRuntimeResult
 
@@ -200,11 +201,17 @@ class EpisodeRecorder:
         log_path: Path,
         max_turns: int = 12,
         source: str = "voice_runtime",
+        emit_runtime_events: bool = False,
+        event_root: Path | None = None,
+        trigger_root: Path | None = None,
     ) -> None:
         self.enabled = enabled
         self.log_path = log_path
         self.max_turns = max(1, int(max_turns))
         self.source = source
+        self.emit_runtime_events = bool(emit_runtime_events)
+        self.event_root = event_root
+        self.trigger_root = trigger_root
         self._episodes: dict[str, EpisodeRecord] = {}
 
     @classmethod
@@ -222,7 +229,21 @@ class EpisodeRecorder:
         else:
             log_path = project_root / ".chromie" / "experience" / "episodes.jsonl"
         max_turns = int(os.getenv("ORCH_EPISODE_MAX_TURNS", "12"))
-        return cls(enabled=enabled, log_path=log_path, max_turns=max_turns)
+        emit_runtime_events = os.getenv(
+            "ORCH_EMIT_EPISODE_RUNTIME_EVENTS", "0"
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        event_root = cls._optional_env_path("CHROMIE_RUNTIME_EVENT_ROOT", project_root)
+        trigger_root = cls._optional_env_path(
+            "CHROMIE_DATA_LOOP_TRIGGER_ROOT", project_root
+        )
+        return cls(
+            enabled=enabled,
+            log_path=log_path,
+            max_turns=max_turns,
+            emit_runtime_events=emit_runtime_events,
+            event_root=event_root,
+            trigger_root=trigger_root,
+        )
 
     def record_interaction(
         self,
@@ -278,10 +299,68 @@ class EpisodeRecorder:
         )
         self._episodes[conversation_id] = episode
         self._append_jsonl(self.log_path, episode.model_dump(mode="json"))
+        self._emit_episode_event(
+            episode=episode,
+            response=response,
+            session_id=session_id,
+        )
         return episode
 
     def reset_thread(self, conversation_id: str) -> None:
         self._episodes.pop(conversation_id, None)
+
+    def _emit_episode_event(
+        self,
+        *,
+        episode: EpisodeRecord,
+        response: InteractionResponse,
+        session_id: str | None,
+    ) -> None:
+        if not self.emit_runtime_events:
+            return
+        try:
+            latest_turn = episode.turns[-1] if episode.turns else None
+            persist_runtime_event(
+                event_type="chromie.experience_episode",
+                event_subtype="episode_snapshot",
+                severity="info",
+                producer="chromie.episode_recorder",
+                event_root=self.event_root,
+                trigger_root=self.trigger_root,
+                correlations={
+                    "episode_id": episode.episode_id,
+                    "conversation_id": episode.conversation_id,
+                    "session_id": session_id or "",
+                    "interaction_id": response.interaction_id,
+                    "turn_index": latest_turn.turn_index if latest_turn else 0,
+                },
+                attributes={
+                    "source": episode.source,
+                    "turn_count": len(episode.turns),
+                    "agent_status": latest_turn.agent.status if latest_turn else "unknown",
+                    "execution_status": (
+                        latest_turn.execution.status if latest_turn else "not_executed"
+                    ),
+                    "has_errors": bool(latest_turn.errors) if latest_turn else False,
+                },
+                derivation={
+                    "scenario_candidate_eligible": True,
+                    "scenario_auto_promotion_allowed": False,
+                    "offline_evaluation_supported": True,
+                },
+                payloads={"episode.json": episode.model_dump(mode="json")},
+            )
+        except Exception:
+            # Evidence emission is best-effort and must never break the realtime path.
+            return
+
+    @staticmethod
+    def _optional_env_path(name: str, project_root: Path) -> Path | None:
+        raw = os.getenv(name, "").strip()
+        if not raw:
+            return None
+        path = Path(raw).expanduser()
+        return path if path.is_absolute() else project_root / path
 
     def _turn_from_response(
         self,

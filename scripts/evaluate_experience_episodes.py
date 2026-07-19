@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from orchestrator.runtime.episode import EpisodeEvaluation, EpisodeOfflineReview, EpisodeRecord
 from shared.chromie_contracts.mind import MindUpdateProposal
+from shared.chromie_runtime.scenario_candidates import persist_scenario_candidate_event
 
 
 SOCIAL_FALLBACK_SKILLS = {
@@ -452,6 +453,9 @@ def write_candidate_scenarios(
     episodes: list[EpisodeRecord],
     evaluations: list[EpisodeEvaluation],
     output_dir: Path,
+    emit_runtime_events: bool = False,
+    event_root: Path | None = None,
+    trigger_root: Path | None = None,
 ) -> list[Path]:
     by_id = {episode.episode_id: episode for episode in episodes}
     written: list[Path] = []
@@ -467,6 +471,21 @@ def write_candidate_scenarios(
         path = run_dir / f"{candidate['id']}.json"
         path.write_text(json.dumps(candidate, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         written.append(path)
+        if emit_runtime_events:
+            result = persist_scenario_candidate_event(
+                candidate=candidate,
+                episode=episode.model_dump(mode="json"),
+                evaluation=evaluation.model_dump(mode="json"),
+                candidate_path=path,
+                event_root=event_root,
+                trigger_root=trigger_root,
+            )
+            if result.get("capture_status") != "complete":
+                print(
+                    f"[experience-eval][warn] scenario candidate event capture "
+                    f"failed for {candidate['id']}: {result}",
+                    file=sys.stderr,
+                )
     return written
 
 
@@ -526,10 +545,20 @@ def scenario_candidate_from_episode(
         "description": f"Candidate mined from episode {episode.episode_id}: {evaluation.summary}",
         "tags": ["candidate", "experience-mined", *evaluation.failure_tags],
         "review": {
+            "status": "pending_human_review",
             "source_episode_id": episode.episode_id,
             "source_evaluation_id": evaluation.evaluation_id,
+            "source_conversation_id": episode.conversation_id,
             "score": evaluation.overall_score,
             "requires_human_review": True,
+            "reviewed_by": None,
+            "reviewed_at": None,
+        },
+        "promotion": {
+            "regression_allowed": False,
+            "training_allowed": False,
+            "auto_promotion_allowed": False,
+            "required_review_status": "approved",
         },
         "turns": turns,
     }
@@ -657,6 +686,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--episodes", type=Path, default=ROOT / ".chromie" / "experience" / "episodes.jsonl")
     parser.add_argument("--output", type=Path, default=ROOT / ".chromie" / "experience" / "evaluations.jsonl")
     parser.add_argument("--candidate-dir", type=Path, default=None)
+    parser.add_argument(
+        "--emit-candidate-events",
+        action="store_true",
+        help="Persist mined candidates as runtime events for the external data loop.",
+    )
+    parser.add_argument(
+        "--runtime-event-root",
+        type=Path,
+        default=None,
+        help="Override CHROMIE_RUNTIME_EVENT_ROOT for candidate events.",
+    )
+    parser.add_argument(
+        "--data-loop-trigger-root",
+        type=Path,
+        default=None,
+        help="Override CHROMIE_DATA_LOOP_TRIGGER_ROOT for candidate events.",
+    )
     parser.add_argument("--review-output", type=Path, default=None)
     parser.add_argument("--proposal-output", type=Path, default=None)
     parser.add_argument("--use-llm", action="store_true", help="Ask the deepthinking Ollama model to score episodes.")
@@ -707,6 +753,9 @@ def main(argv: list[str] | None = None) -> int:
             episodes=episodes,
             evaluations=evaluations,
             output_dir=args.candidate_dir,
+            emit_runtime_events=args.emit_candidate_events,
+            event_root=args.runtime_event_root,
+            trigger_root=args.data_loop_trigger_root,
         )
         print(f"Wrote {len(written)} candidate scenario file(s).")
         for path in written:

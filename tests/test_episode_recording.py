@@ -137,5 +137,47 @@ class EpisodeRecorderTests(unittest.TestCase):
             self.assertEqual(episode.turns[0].turn_index, 1)
 
 
+    def test_episode_snapshot_can_emit_runtime_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            recorder = EpisodeRecorder(
+                enabled=True,
+                log_path=root / "episodes.jsonl",
+                emit_runtime_events=True,
+                event_root=root / "events",
+                trigger_root=root / "inbox",
+            )
+            response = InteractionResponse(
+                metadata={
+                    "experience_context": {
+                        "conversation_id": "conv-event",
+                        "user_text": "Hello.",
+                    }
+                },
+                speech=[{"text": "Hello!"}],
+            )
+            episode = recorder.record_interaction(
+                response=response,
+                execution=None,
+                session_id="sid-event",
+                mind_profile=default_mind_profile(),
+            )
+
+            self.assertIsNotNone(episode)
+            ready = list((root / "events" / "ready").iterdir())
+            self.assertEqual(len(ready), 1)
+            manifest = json.loads((ready[0] / "event.json").read_text())
+            self.assertEqual(manifest["event_type"], "chromie.experience_episode")
+            self.assertEqual(manifest["event_subtype"], "episode_snapshot")
+            self.assertEqual(
+                manifest["correlations"]["episode_id"], episode.episode_id
+            )
+            self.assertEqual(
+                manifest["correlations"]["conversation_id"], "conv-event"
+            )
+            self.assertTrue((ready[0] / "episode.json").is_file())
+            self.assertTrue((root / "inbox" / f'{manifest["event_id"]}.json').is_file())
+
+
 if __name__ == "__main__":
     unittest.main()

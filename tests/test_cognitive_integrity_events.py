@@ -44,10 +44,13 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
             self.assertEqual(result["capture_status"], "complete")
             self.assertEqual(result["trigger_status"], "accepted")
             manifest = json.loads(Path(result["manifest_path"]).read_text())
-            self.assertEqual(manifest["stage"], "fast_planner")
-            self.assertEqual(manifest["conversation_id"], "conv-1")
+            self.assertEqual(manifest["attributes"]["stage"], "fast_planner")
+            self.assertEqual(manifest["correlations"]["conversation_id"], "conv-1")
             self.assertTrue(manifest["derivation"]["scenario_candidate_eligible"])
-            self.assertFalse(manifest["integrity_policy"]["automatic_retry_allowed"])
+            failure = json.loads(
+                (Path(result["payload_root"]) / "failure.json").read_text()
+            )
+            self.assertFalse(failure["automatic_retry_allowed"])
             self.assertTrue((root / "inbox" / f'{result["event_id"]}.json').is_file())
 
     def test_common_metadata_for_any_cognitive_stage(self) -> None:
