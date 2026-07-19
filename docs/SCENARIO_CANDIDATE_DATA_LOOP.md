@@ -26,8 +26,11 @@ experience episode┘
              regression scenario          curated training data
 ```
 
-Original incidents and episodes remain immutable evidence. The scenario
-candidate is a separate derived artifact and references its source IDs.
+Original incidents, Runtime Traces, and episodes remain immutable evidence. The
+scenario candidate is a separate derived artifact and references its source IDs.
+Runtime Trace contributes execution topology and latency, while the Episode
+contributes semantic history. See
+[Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md).
 
 ## Runtime event
 

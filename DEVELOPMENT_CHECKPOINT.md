@@ -45,6 +45,17 @@ style and auxiliary body expression under one Social Attention purpose;
 candidate actions are discovered from catalog behavior-domain metadata rather
 than a fixed gesture list. Explicit user-requested actions remain primary goals.
 
+A Runtime Observability architecture is now documented for the next
+cross-cutting implementation track. It defines architecture-independent Runtime
+Trace items, module-owned trace identity, basic/debug collection policy,
+monotonic duration measurement, user-observable milestones, topology-aware
+latency summaries, and integration with Runtime Events, Episodes, and Scenario
+Candidates. This is documentation status only; broad Runtime Trace
+instrumentation is not yet an implementation or evidence claim. See
+[Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md),
+[Runtime Trace Contract](docs/RUNTIME_TRACE.md), and
+[Runtime Trace Instrumentation Guide](docs/RUNTIME_TRACE_INSTRUMENTATION.md).
+
 The `0.0.1` release implementation is present:
 
 - unified Goal Association, complete-coverage Fast Planning, terminal Deep

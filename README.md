@@ -8,6 +8,13 @@ optional Soridormi-backed simulator or robot skills.
 The long-term goal and ownership boundaries are defined in the
 [Project Charter](docs/PROJECT_CHARTER.md).
 
+Chromie also adopts a Runtime Observability architecture. Runtime Trace records
+architecture-independent execution topology and timing; Runtime Events package
+immutable evidence for the external data loop; Experience Episodes preserve
+semantic interaction history; and Scenario Candidates are derived offline under
+human review. See
+[Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md).
+
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
 > semantic authority: Goal Association -> Fast/terminal Deep Planning ->
 > Response Composition -> trusted host adaptation. It is automatically verified
@@ -178,6 +185,8 @@ documented in
 ## Read next
 
 - [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
+- [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md): trace, event, episode, and scenario relationships
+- [Runtime Trace Contract](docs/RUNTIME_TRACE.md): architecture-independent trace-item schema and lifecycle
 - [Status](docs/STATUS.md): what exists and what is evidenced
 - [Roadmap](ROADMAP.md): milestone order and exit criteria
 - [SenseVoice ASR](docs/SENSEVOICE_ASR.md): runtime contract, model provenance,

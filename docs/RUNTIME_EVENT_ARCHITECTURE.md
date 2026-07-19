@@ -9,9 +9,16 @@ preserving the semantics of each producer.
 
 The first supported producers are:
 
-- Cognitive Integrity, which captures immutable failure-boundary evidence; and
+- Cognitive Integrity, which captures immutable failure-boundary evidence;
 - Episode Recorder, which captures longitudinal interaction snapshots for
-  offline evaluation and scenario mining.
+  offline evaluation and scenario mining; and
+- Scenario Candidate mining, which emits review-gated derived artifacts.
+
+Runtime Trace is execution evidence that may be carried by a Runtime Event. It
+is defined separately because tracing describes runtime topology and timing,
+while Runtime Events define durable packaging and data-loop notification. See
+[Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md) and
+[Runtime Trace Contract](RUNTIME_TRACE.md).
 
 A Runtime Event is a durable local evidence package. It is not a cloud upload
 receipt and it is not automatically a training example.
@@ -143,6 +150,24 @@ the external data-loop resource policy is available.
 
 `CHROMIE_EVENT_ROOT` remains a compatibility fallback for Cognitive Integrity.
 New deployments should use `CHROMIE_RUNTIME_EVENT_ROOT`.
+
+## Runtime Trace payloads
+
+A completed trace may contribute these payloads to an event package:
+
+```text
+trace.json
+trace-summary.json
+```
+
+Critical incidents should include or reference the correlated completed trace
+when available. Normal interactions may later emit sampled
+`chromie.interaction_trace` events. The trace schema must remain independent of
+any fixed Router, Planner, ASR, TTS, or execution pipeline.
+
+Trace collection, finalization, and instrumentation rules are owned by
+[Runtime Trace Contract](RUNTIME_TRACE.md). Runtime Event packaging remains the
+source of truth for local durable capture.
 
 ## Scenario derivation
 

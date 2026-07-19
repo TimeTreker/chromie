@@ -36,6 +36,9 @@ When documents disagree, correct the lower-authority document.
 | What does an environment variable mean? | `docs/CONFIGURATION.md` |
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
 | What retained trace artifacts can the CLI inspect? | `docs/TRACE_SCHEMA.md` |
+| How do Runtime Trace, Runtime Events, Episodes, and Scenario Candidates relate? | `docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md` |
+| What common contract must runtime trace items obey? | `docs/RUNTIME_TRACE.md` |
+| How should a module add trace instrumentation? | `docs/RUNTIME_TRACE_INSTRUMENTATION.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` and `docs/USER_OUTCOME_ACCEPTANCE.md` |
 | What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How is the goal-driven runtime enabled, observed, evidenced, and rolled back? | `docs/COGNITIVE_RUNTIME_ROLLOUT.md` |
@@ -60,6 +63,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Project README](../README.md)
 - [Chinese Guide](PROJECT_GUIDE.zh-CN.md)
 - [Project Charter](PROJECT_CHARTER.md)
+- [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
+- [Runtime Trace Contract](RUNTIME_TRACE.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
@@ -77,6 +82,12 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 ## Architecture and runtime
 
+- [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
+- [Runtime Trace Contract](RUNTIME_TRACE.md)
+- [Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md)
+- [Runtime Event Architecture](RUNTIME_EVENT_ARCHITECTURE.md)
+- [Cognitive Integrity Events](COGNITIVE_INTEGRITY_EVENTS.md)
+- [Scenario Candidate Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md)
 - [Agent](../agent/README.md)
 - [Orchestrator](../orchestrator/README.md)
 - [Router](../router/README.md)

@@ -518,6 +518,42 @@ This track does not replace the current physical pilot or audio evidence tracks.
 It must preserve existing deterministic stop, authorization, provider, evidence,
 and release boundaries.
 
+## Planned architecture track - Runtime observability
+
+### Objective
+
+Establish [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
+as the common contract for architecture-independent execution timing, incident
+scene reconstruction, and data-loop evidence correlation.
+
+Runtime Trace must describe the modules that actually participated in an
+interaction rather than encoding a fixed Router/Planner/Execution pipeline.
+Each module declares stable metadata and emits generic trace items through a
+shared framework. Completed traces retain raw timing evidence and reproducible
+summaries for critical-path, inclusive/exclusive-time, parallelism, and
+user-observable latency analysis.
+
+### Delivery sequence
+
+1. **Documented, implementation open:** Common Runtime Trace envelope, module
+   descriptor, item lifecycle, timing, hierarchy, links, modes, privacy, and
+   summary contracts.
+2. **Open:** Shared tracing library with monotonic timing, wall-clock
+   correlation, context propagation, sync/async spans, bounded attributes, and
+   immutable finalization.
+3. **Open:** Incremental instrumentation of goal-driven cognitive stages and
+   model-client calls without changing semantic behavior.
+4. **Open:** Execution, audio, TTS, provider, queue, and user-observable
+   milestone instrumentation.
+5. **Open:** Topology-aware summary generation and critical incident trace
+   attachment through Runtime Events.
+6. **Open:** Sampled normal interaction-trace events, latency-threshold capture,
+   session summaries, and abandoned-session recovery.
+
+Exit criteria require the trace schema to remain independent of the current
+module graph, disabled tracing to preserve behavior with negligible overhead,
+critical failures to retain correlated timing evidence, and data-loop status to
+remain truthful about local capture versus cloud delivery.
 
 ### Goal-driven runtime checkpoint
 
