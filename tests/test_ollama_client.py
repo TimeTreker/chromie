@@ -72,35 +72,27 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         request_payload = http_client.post.call_args.kwargs["json"]
         self.assertEqual(request_payload["format"], schema)
 
-    async def test_generate_logs_colored_output_truncation_diagnostic(self) -> None:
+    async def test_generate_rejects_truncated_text_output_and_retains_incident_evidence(self) -> None:
         response = mock.Mock()
         response.status_code = 200
         response.text = '{"response":"partial","done_reason":"length","eval_count":8}'
-        response.json.return_value = {
-            "response": "partial",
-            "done_reason": "length",
-            "eval_count": 8,
-        }
+        response.json.return_value = {"response": "partial", "done_reason": "length", "eval_count": 8}
         response.raise_for_status.return_value = None
-
-        http_client = mock.AsyncMock()
-        http_client.post.return_value = response
-        context = mock.AsyncMock()
-        context.__aenter__.return_value = http_client
-
-        with mock.patch(
-            "agent.app.clients.ollama_client.httpx.AsyncClient",
-            return_value=context,
-        ), mock.patch.dict("os.environ", {"CHROMIE_CLI_COLOR": "1"}, clear=False):
+        http_client = mock.AsyncMock(); http_client.post.return_value = response
+        context = mock.AsyncMock(); context.__aenter__.return_value = http_client
+        with mock.patch("agent.app.clients.ollama_client.httpx.AsyncClient", return_value=context), mock.patch.dict("os.environ", {"CHROMIE_CLI_COLOR": "1"}, clear=False):
             with self.assertLogs("chromie.agent.ollama", level="ERROR") as error_logs:
-                result = await OllamaClient(
-                    base_url="http://chromie-llm:11434",
-                    model="test-model",
-                ).generate("hello", options={"num_predict": 8})
-
-        self.assertEqual(result, "partial")
-        self.assertTrue(any("llm_output_truncated" in line for line in error_logs.output))
-        self.assertTrue(any("\033[31m" in line for line in error_logs.output))
+                with self.assertRaises(OllamaGenerationError) as raised:
+                    await OllamaClient(base_url="http://chromie-llm:11434", model="test-model", purpose="response_composer").generate("hello", options={"num_predict": 8})
+        metadata = raised.exception.metadata()
+        self.assertEqual(metadata["failure_class"], "output_truncated")
+        self.assertFalse(metadata["retryable"])
+        self.assertFalse(metadata["automatic_retry_allowed"])
+        self.assertFalse(metadata["context_reduction_allowed"])
+        self.assertFalse(metadata["result_trusted"])
+        self.assertNotIn("_incident_evidence", metadata)
+        self.assertEqual(raised.exception.incident_evidence()["request"]["prompt"], "hello")
+        self.assertTrue(any("ollama_text_output_rejected" in line for line in error_logs.output))
 
     async def test_generate_rejects_truncated_structured_output_with_explicit_attribution(
         self,
@@ -139,7 +131,9 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(metadata["failure_class"], "output_truncated")
         self.assertEqual(metadata["failure_domain"], "llm_budget")
         self.assertEqual(metadata["architecture_attribution"], "not_evaluated")
-        self.assertTrue(metadata["retryable"])
+        self.assertFalse(metadata["retryable"])
+        self.assertFalse(metadata["automatic_retry_allowed"])
+        self.assertFalse(metadata["context_reduction_allowed"])
         self.assertTrue(
             any("ollama_structured_output_rejected" in line for line in error_logs.output)
         )

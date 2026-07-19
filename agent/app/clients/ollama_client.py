@@ -49,13 +49,22 @@ class OllamaGenerationError(RuntimeError):
         self.details = dict(details or {})
 
     def metadata(self) -> dict[str, Any]:
+        public_details = {
+            key: value
+            for key, value in self.details.items()
+            if not str(key).startswith("_")
+        }
         return {
             "failure_class": self.failure_class,
             "failure_domain": self.failure_domain,
             "architecture_attribution": self.architecture_attribution,
             "retryable": self.retryable,
-            **self.details,
+            **public_details,
         }
+
+    def incident_evidence(self) -> dict[str, Any]:
+        value = self.details.get("_incident_evidence")
+        return dict(value) if isinstance(value, dict) else {}
 
 
 def llm_failure_metadata(exc: Exception) -> dict[str, Any]:
@@ -289,49 +298,72 @@ class OllamaClient:
             for diagnostic in completion_diagnostics:
                 self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
 
-            if structured_output:
-                blocking = next(
-                    (
-                        item
-                        for item in completion_diagnostics
-                        if item.event in {"llm_output_truncated", "llm_prompt_truncated"}
-                        and item.level >= logging.ERROR
-                    ),
-                    None,
+            blocking = next(
+                (
+                    item
+                    for item in completion_diagnostics
+                    if item.event in {"llm_output_truncated", "llm_prompt_truncated"}
+                    and item.level >= logging.ERROR
+                ),
+                None,
+            )
+            if blocking is not None:
+                failure_class = (
+                    "output_truncated"
+                    if blocking.event == "llm_output_truncated"
+                    else "prompt_truncated"
                 )
-                if blocking is not None:
-                    failure_class = (
-                        "output_truncated"
-                        if blocking.event == "llm_output_truncated"
-                        else "prompt_truncated"
-                    )
-                    failure = OllamaGenerationError(
-                        f"structured JSON generation rejected: {blocking.render()}",
-                        failure_class=failure_class,
-                        failure_domain="llm_budget",
-                        architecture_attribution="not_evaluated",
-                        retryable=True,
-                        details={
-                            "purpose": self.purpose,
-                            "model": self.model,
-                            "timeout_ms": self.timeout_ms,
-                            **blocking.fields,
+                generation_kind = "structured JSON" if structured_output else "text"
+                failure = OllamaGenerationError(
+                    f"{generation_kind} generation rejected: {blocking.render()}",
+                    failure_class=failure_class,
+                    failure_domain="llm_budget",
+                    architecture_attribution="not_evaluated",
+                    retryable=False,
+                    details={
+                        "purpose": self.purpose,
+                        "model": self.model,
+                        "response_format": response_format_label,
+                        "timeout_ms": self.timeout_ms,
+                        **blocking.fields,
+                        "retryable": False,
+                        "automatic_retry_allowed": False,
+                        "context_reduction_allowed": False,
+                        "result_trusted": False,
+                        "new_execution_allowed": False,
+                        "_incident_evidence": {
+                            "request": {
+                                "model": self.model,
+                                "purpose": self.purpose,
+                                "prompt": prompt,
+                                "system": system,
+                                "options": request_options,
+                                "response_format": response_format,
+                            },
+                            "response": data,
                         },
-                    )
-                    logger.error(
-                        "ollama_structured_output_rejected purpose=%s failure_class=%s "
-                        "failure_domain=%s architecture_attribution=%s retryable=%s "
-                        "done_reason=%s num_ctx=%s num_predict=%s",
-                        self.purpose,
-                        failure.failure_class,
-                        failure.failure_domain,
-                        failure.architecture_attribution,
-                        failure.retryable,
-                        data.get("done_reason") or data.get("finish_reason") or "unknown",
-                        num_ctx,
-                        num_predict,
-                    )
-                    raise failure
+                    },
+                )
+                rejection_event = (
+                    "ollama_structured_output_rejected"
+                    if structured_output
+                    else "ollama_text_output_rejected"
+                )
+                logger.error(
+                    "%s purpose=%s failure_class=%s "
+                    "failure_domain=%s architecture_attribution=%s retryable=%s "
+                    "done_reason=%s num_ctx=%s num_predict=%s",
+                    rejection_event,
+                    self.purpose,
+                    failure.failure_class,
+                    failure.failure_domain,
+                    failure.architecture_attribution,
+                    failure.retryable,
+                    data.get("done_reason") or data.get("finish_reason") or "unknown",
+                    num_ctx,
+                    num_predict,
+                )
+                raise failure
 
         except OllamaGenerationError:
             raise
