@@ -65,6 +65,7 @@ from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
 from orchestrator.runtime.response_plan import validate_immediate_response_plan
 from orchestrator.runtime.session import SessionTracker, now_ms
+from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
@@ -83,6 +84,43 @@ logging.basicConfig(
     format="[%(levelname)s] %(asctime)s - %(threadName)s - %(funcName)s - %(message)s",
 )
 logger = logging.getLogger("chromie-orchestrator")
+
+TTS_TRACE_MODULE = TraceModule(
+    name="orchestrator.tts",
+    component_type="audio",
+    implementation="ChromieOrchestrator",
+)
+PLAYBACK_TRACE_MODULE = TraceModule(
+    name="orchestrator.audio_playback",
+    component_type="audio",
+    implementation="ChromieOrchestrator",
+)
+
+
+
+def trace_session_async(module: TraceModule, operation: str, session_arg: str):
+    """Instrument an async orchestrator method on its detached session trace."""
+
+    def decorate(function):
+        async def wrapped(self, *args, **kwargs):
+            import inspect
+
+            bound = inspect.signature(function).bind(self, *args, **kwargs)
+            bound.apply_defaults()
+            session_id = bound.arguments.get(session_arg)
+            with self.sessions.trace_context(session_id):
+                async with runtime_tracer.span(
+                    module=module,
+                    operation=operation,
+                    attributes={"session_id": session_id or ""},
+                ):
+                    return await function(self, *args, **kwargs)
+
+        wrapped.__name__ = function.__name__
+        wrapped.__doc__ = function.__doc__
+        return wrapped
+
+    return decorate
 
 
 def _sounddevice() -> Any:
@@ -1375,6 +1413,7 @@ class VoiceAssistant:
                 else:
                     break
 
+    @trace_session_async(PLAYBACK_TRACE_MODULE, "play_one_order", "session_id")
     async def play_one_order(self, generation: int, order: int, audio: bytes, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
         key = self.playback_start_key(generation, order, session_id)
         cancelled_orders = getattr(self, "cancelled_playback_orders", set())
@@ -1417,6 +1456,14 @@ class VoiceAssistant:
             return True
 
         audio_ms = (len(audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
+        self.sessions.trace_mark(
+            session_id,
+            "first_audio_playback" if not state or not state.get("trace_first_audio_marked") else "audio_playback_started",
+            kind="user_observable",
+            attributes={"order": order, "audio_ms": round(audio_ms, 3)},
+        )
+        if state is not None:
+            state["trace_first_audio_marked"] = True
         self.session_log(
             session_id,
             "playback_start: order=%s source_rate=%s output_rate=%s audio_ms=%.1f generation=%s",
@@ -1463,6 +1510,7 @@ class VoiceAssistant:
         self.maybe_session_done(session_id)
         return True
 
+    @trace_session_async(TTS_TRACE_MODULE, "synthesize_one", "session_id")
     async def synthesize_one(self, text: str, order: int, session_id: Optional[str], generation: int):
         text = self.normalize_tts_candidate(text)
         if not self.is_valid_tts_text(text):
@@ -1496,6 +1544,11 @@ class VoiceAssistant:
                             msg_type = data.get("type")
                             if msg_type == "start":
                                 source_rate = int(data.get("sample_rate") or self.default_tts_rate)
+                                self.sessions.trace_mark(
+                                    session_id,
+                                    "tts_stream_started",
+                                    attributes={"order": order, "attempt": attempt, "source_rate": source_rate},
+                                )
                                 self.session_log(session_id, "tts_stream_start: order=%s attempt=%s/%s source_rate=%s output_rate=%s generation=%s", order, attempt, max_attempts, source_rate, self.output_rate, generation)
                                 continue
                             if msg_type == "error":
@@ -1504,6 +1557,18 @@ class VoiceAssistant:
                                 self.maybe_session_done(session_id)
                                 return
                             if msg_type == "end":
+                                self.sessions.trace_mark(
+                                    session_id,
+                                    "tts_stream_finished",
+                                    attributes={
+                                        "order": order,
+                                        "attempt": attempt,
+                                        "audio_bytes": len(audio_buffer),
+                                        "source_rate": source_rate,
+                                        "queue_wait_seconds": float(data.get("queue_wait_seconds") or 0.0),
+                                        "generate_seconds": float(data.get("generate_seconds") or 0.0),
+                                    },
+                                )
                                 self.session_log(session_id, "tts_stream_end: order=%s attempt=%s/%s tts_ms=%.1f bytes=%s source_rate=%s generation=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, len(audio_buffer), source_rate, generation)
                                 self.session_log(
                                     session_id,

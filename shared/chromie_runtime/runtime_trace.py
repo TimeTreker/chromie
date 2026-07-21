@@ -555,6 +555,11 @@ class RuntimeTracer:
             )
         )
 
+    def activate(self, trace: RuntimeTrace | None) -> TraceScope:
+        """Activate an existing trace in the current sync/async context."""
+
+        return TraceScope(trace)
+
     def continue_from_context(self, context: Mapping[str, Any] | None) -> TraceScope:
         carrier = (context or {}).get(TRACE_CARRIER_KEY)
         if not isinstance(carrier, Mapping):

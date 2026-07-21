@@ -703,3 +703,11 @@ from catalog behavior-domain metadata instead of a fixed production list. The
 host validates and may drop auxiliary behavior; concrete user-requested actions
 remain primary CanonicalPlan goals. Automated verification exists, while fresh
 live interaction evidence for contextual appropriateness remains open.
+
+## Runtime Observability Step 7
+
+Session lifecycle, action execution, TTS, playback, and first audible response
+are now instrumented with generic Runtime Trace items. Coverage remains partial:
+ASR/VAD spans, first physical motion, resource sampling, crash recovery, and
+retained live latency qualification are still open. See
+[Step 7: Session, Execution, and Audio Runtime Trace](STEP7_SESSION_EXECUTION_AUDIO_TRACE.md).

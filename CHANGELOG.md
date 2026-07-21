@@ -170,3 +170,12 @@ declaration still blocks publication.
   voice-device support.
 - A future release must declare physical voice-device compatibility separately;
   `0.0.1` intentionally does not include that claim.
+
+## Runtime Trace Step 7
+
+- Added detached per-session Runtime Traces so TTS and playback can remain
+  observable after cognitive interaction traces finish.
+- Added execution, action-provider, TTS, playback, session lifecycle, and first
+  audible response instrumentation using module-owned descriptors.
+- Added complete and abandoned session finalization plus optional Runtime Event
+  packaging.

@@ -12,6 +12,13 @@ from pathlib import Path
 from typing import Any
 
 from shared.chromie_runtime.log_colors import colorize_for_cli
+from shared.chromie_runtime.runtime_trace import (
+    RuntimeTrace,
+    TraceModule,
+    TracePolicy,
+    TraceScope,
+    runtime_tracer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +77,12 @@ class SessionEventWriter:
 
 
 class SessionTracker:
+    TRACE_MODULE = TraceModule(
+        name="orchestrator.session",
+        component_type="session",
+        implementation="SessionTracker",
+    )
+
     _WORKFLOW_EVENT_PREFIXES = (
         "session_start",
         "session_interrupted_by_new_session",
@@ -136,14 +149,68 @@ class SessionTracker:
             "response_chars": 0,
             "interrupted": False,
             "workflow_events": [],
+            "runtime_trace": self._create_runtime_trace(sid),
+            "runtime_trace_event": {},
         }
         if previous and previous != sid:
             prev = self.state.get(previous)
             if prev and not prev.get("done_logged"):
                 prev["interrupted"] = True
                 self.log(previous, "session_interrupted_by_new_session: new_sid=%s", sid)
+                self._finalize_runtime_trace(previous, state="abandoned")
         self.log(sid, "session_start")
+        self.trace_mark(sid, "session_started", kind="session", attributes={"sid": sid})
         return sid
+
+    def _create_runtime_trace(self, sid: str) -> RuntimeTrace | None:
+        policy = TracePolicy.from_env()
+        if policy.mode == "off":
+            return None
+        return RuntimeTrace(
+            policy=policy,
+            correlations={"session_id": sid},
+            attributes={"trace_scope": "voice_session"},
+            sampling_reason="session_lifecycle",
+        )
+
+    def trace_context(self, sid: str | None) -> TraceScope:
+        state = self.state.get(sid or "") or {}
+        trace = state.get("runtime_trace")
+        return runtime_tracer.activate(trace if isinstance(trace, RuntimeTrace) else None)
+
+    def trace_mark(
+        self,
+        sid: str | None,
+        name: str,
+        *,
+        kind: str = "event",
+        attributes: dict[str, Any] | None = None,
+    ) -> str | None:
+        with self.trace_context(sid):
+            return runtime_tracer.mark(
+                module=self.TRACE_MODULE,
+                name=name,
+                kind=kind,
+                attributes=attributes,
+            )
+
+    def _finalize_runtime_trace(self, sid: str, *, state: str) -> None:
+        session = self.state.get(sid)
+        if not session or session.get("runtime_trace_finalized"):
+            return
+        trace = session.get("runtime_trace")
+        if not isinstance(trace, RuntimeTrace):
+            return
+        session["runtime_trace_finalized"] = True
+        snapshot = trace.finish(state=state)
+        session["runtime_trace_snapshot"] = snapshot
+        if trace.policy.emit_events:
+            session["runtime_trace_event"] = runtime_tracer.persist_snapshot(
+                snapshot,
+                event_subtype="voice_session",
+                producer="chromie.orchestrator",
+                severity="warning" if state == "abandoned" else "info",
+            )
 
     def elapsed_ms(self, sid: str | None) -> float:
         state = self.state.get(sid or "")
@@ -205,6 +272,19 @@ class SessionTracker:
                 summary = self._workflow_timing_summary(graph)
                 if summary:
                     self.log(sid, "session_workflow_summary: %s", summary)
+            self.trace_mark(
+                sid,
+                "session_finished",
+                kind="session",
+                attributes={
+                    "scheduled_tts": scheduled,
+                    "played_tts": played,
+                    "failed_tts": failed,
+                    "skipped_tts": skipped,
+                    "response_chars": int(s.get("response_chars", 0)),
+                },
+            )
+            self._finalize_runtime_trace(sid, state="complete")
 
     def _render_message(self, message: str, args: tuple[Any, ...]) -> str:
         try:
