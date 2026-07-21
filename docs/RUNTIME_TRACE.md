@@ -7,8 +7,10 @@ The implementation exists in `shared/chromie_runtime/runtime_trace.py` and now
 covers the goal-driven cognitive/model path, detached voice sessions, VAD/ASR,
 action execution/providers, TTS/playback, user-observable milestones, bounded
 resource observations, idle abandonment, active-trace checkpoint recovery, and
-configurable retention. Coverage remains partial because GPU telemetry and
-retained simulator/hardware latency evidence remain open.
+configurable retention. Optional non-blocking accelerator observations and
+retained latency report/gate tooling are implemented. Coverage remains partial
+until representative simulator/hardware traces and approved thresholds are
+retained for the claimed environment.
 
 ## Trace envelope
 

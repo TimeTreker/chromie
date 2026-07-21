@@ -191,6 +191,10 @@ closed.
   digests.
 - `START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh` passes on
   the reference host when the release claims target GPU performance.
+- When a release claims latency stability, a retained target-environment Runtime
+  Trace baseline and candidate report pass an enabled, reviewed latency policy
+  through `python scripts/runtime_trace_latency.py gate`. A disabled example
+  policy or automated/simulator-only report is not target latency evidence.
 - The selected Ollama, ASR, and TTS models are documented and obtainable.
 - Structured interaction and Soridormi compatibility are probed against the
   pinned revision.

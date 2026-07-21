@@ -162,12 +162,10 @@ The defaults preserve previous behavior: tracing and event emission remain off
 unless explicitly enabled, and configured event emission retains all traces
 unless operators reduce the sample rate or set thresholds.
 
-## Remaining work
+## Follow-on status
 
-Still open:
-
-- GPU and accelerator telemetry through a non-blocking provider;
-- provider-independent first-motion evidence;
-- retained simulator and hardware latency distributions;
-- release regression thresholds based on retained evidence;
-- cloud-side trace clustering and fleet-level performance analysis.
+[Step 10](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md) implements non-blocking
+accelerator telemetry plus retained latency distributions and evidence-qualified
+regression gates. Provider-independent first-motion truth still belongs to the
+body telemetry source, and cloud-side clustering/fleet analytics remain future
+data-loop work.

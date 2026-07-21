@@ -65,6 +65,10 @@ from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
 from orchestrator.runtime.response_plan import validate_immediate_response_plan
 from orchestrator.runtime.session import SessionTracker, now_ms
+from shared.chromie_runtime.accelerator_telemetry import (
+    ACCELERATOR_SAMPLE_MODULE,
+    AcceleratorTelemetrySampler,
+)
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
@@ -409,7 +413,13 @@ class VoiceAssistant:
 
         self.asr_ws = None
         self.http_session: aiohttp.ClientSession | None = None
+        self.accelerator_sampler = AcceleratorTelemetrySampler.from_env()
         self.sessions = SessionTracker(enabled=self.enable_session_timing)
+        self.sessions.register_resource_snapshot_provider(
+            module=ACCELERATOR_SAMPLE_MODULE,
+            name="accelerator_resource_sample",
+            provider=self.accelerator_sampler.cached_sample,
+        )
         self.conversation_state = ConversationStateManager.from_env()
         self.mind = MindManager.from_env(project_root=PROJECT_ROOT)
         self.experience = ExperienceManager.from_env(PROJECT_ROOT)
@@ -453,6 +463,7 @@ class VoiceAssistant:
         self.task_continuity_report_tasks: set[asyncio.Task] = set()
         self.goal_association_report_tasks: set[asyncio.Task] = set()
         self.fast_planner_report_tasks: set[asyncio.Task] = set()
+        self.observability_tasks: set[asyncio.Task] = set()
         self.deep_planner_report_tasks: set[asyncio.Task] = set()
         self.cognitive_runtime_report_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
@@ -954,7 +965,66 @@ class VoiceAssistant:
         return True
 
     def create_session(self) -> str:
-        return self.sessions.create()
+        sid = self.sessions.create()
+        self._schedule_accelerator_sample(reason="session_start", session_ids=[sid])
+        return sid
+
+    def _track_observability_task(self, task: asyncio.Task) -> None:
+        tasks = getattr(self, "observability_tasks", None)
+        if tasks is None:
+            tasks = set()
+            self.observability_tasks = tasks
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
+
+    def _schedule_accelerator_sample(
+        self,
+        *,
+        reason: str,
+        session_ids: list[str] | None = None,
+    ) -> None:
+        sampler = getattr(self, "accelerator_sampler", None)
+        if sampler is None or not sampler.should_sample(reason):
+            return
+        try:
+            task = asyncio.get_running_loop().create_task(
+                self._sample_accelerator_resources(
+                    reason=reason,
+                    session_ids=session_ids,
+                )
+            )
+        except RuntimeError:
+            return
+        self._track_observability_task(task)
+
+    async def _sample_accelerator_resources(
+        self,
+        *,
+        reason: str,
+        session_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        sampler = getattr(self, "accelerator_sampler", None)
+        sessions = getattr(self, "sessions", None)
+        if sampler is None or sessions is None:
+            return {}
+        payload = await sampler.sample(reason=reason)
+        if not payload:
+            return {}
+        if session_ids is None:
+            sessions.record_active_resource_sample(
+                module=ACCELERATOR_SAMPLE_MODULE,
+                name="accelerator_resource_sample",
+                attributes=payload,
+            )
+        else:
+            for sid in session_ids:
+                sessions.record_resource_sample(
+                    sid,
+                    module=ACCELERATOR_SAMPLE_MODULE,
+                    name="accelerator_resource_sample",
+                    attributes=payload,
+                )
+        return payload
 
     def normalize_tts_candidate(self, text: str) -> str:
         text = (text or "").strip()
@@ -5233,6 +5303,7 @@ class VoiceAssistant:
                     "active_synthesis_tasks": len(self.active_synthesis_tasks),
                 },
             )
+            await self._sample_accelerator_resources(reason="periodic")
             self.sessions.checkpoint_active_traces()
             self.sessions.finalize_idle_sessions(idle_timeout_ms=idle_timeout_ms)
 
@@ -5286,6 +5357,13 @@ class VoiceAssistant:
     async def cleanup(self):
         sessions = getattr(self, "sessions", None)
         if sessions is not None:
+            try:
+                await self._sample_accelerator_resources(reason="session_finish")
+            except Exception as exc:
+                logger.debug(
+                    "Final accelerator telemetry sample failed: %s",
+                    type(exc).__name__,
+                )
             sessions.finalize_active_sessions(reason="orchestrator_cleanup")
         self.resolve_all_playback_start_waiters(
             started=False,
@@ -5303,6 +5381,9 @@ class VoiceAssistant:
         sweeper = getattr(self, "session_idle_sweeper_task", None)
         if sweeper is not None and not sweeper.done():
             sweeper.cancel()
+        for task in list(getattr(self, "observability_tasks", set())):
+            if not task.done():
+                task.cancel()
         if self.playback_task and not self.playback_task.done():
             await self.playback_queue.put((None, None, None, None, None, None))
             self.playback_task.cancel()

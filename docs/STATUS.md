@@ -731,3 +731,17 @@ traces gain conversation, cognitive-trace, interaction, and episode correlation
 IDs as those artifacts become available. Coverage remains partial: GPU
 telemetry and retained simulator/hardware latency baselines are still open. See
 [Step 9: Resource, Recovery, and Trace Retention](STEP9_RESOURCE_RECOVERY_RETENTION.md).
+
+## Runtime Observability Step 10
+
+Chromie now supports optional non-blocking accelerator telemetry through a
+bounded worker-thread provider, represented as generic `resource_sample` trace
+items. Retained Runtime Trace event packages can be summarized into reproducible
+latency distributions with provenance, environment labels, source digests,
+module/resource breakdowns, and p50/p90/p95/p99 statistics. An explicit
+baseline-versus-candidate gate verifies sample counts, evidence class,
+environment identity, clean revisions, and configured absolute/relative
+thresholds. The repository example gate is disabled and is not release
+evidence. Real simulator/hardware baselines and approved environment-specific
+thresholds remain open operational evidence. See
+[Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md).

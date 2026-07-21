@@ -39,6 +39,7 @@ When documents disagree, correct the lower-authority document.
 | How do Runtime Trace, Runtime Events, Episodes, and Scenario Candidates relate? | `docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md` |
 | What common contract must runtime trace items obey? | `docs/RUNTIME_TRACE.md` |
 | How should a module add trace instrumentation? | `docs/RUNTIME_TRACE_INSTRUMENTATION.md` |
+| How are accelerator observations, retained latency reports, and regression gates produced? | `docs/STEP10_ACCELERATOR_LATENCY_EVIDENCE.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` and `docs/USER_OUTCOME_ACCEPTANCE.md` |
 | What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How is the goal-driven runtime enabled, observed, evidenced, and rolled back? | `docs/COGNITIVE_RUNTIME_ROLLOUT.md` |
@@ -65,6 +66,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Project Charter](PROJECT_CHARTER.md)
 - [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
 - [Runtime Trace Contract](RUNTIME_TRACE.md)
+- [Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)

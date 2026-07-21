@@ -8,8 +8,11 @@ VAD/ASR, action execution/providers, TTS/playback, first audible and optional
 provider-reported first-motion milestones, bounded CPU/memory/queue/event-loop
 resource observations, idle abandonment, active-trace checkpoint recovery,
 late-bound artifact correlation, and configurable latency/sampling retention.
-Cognitive-integrity incidents attach active trace scenes when available. GPU
-telemetry and retained simulator/hardware latency evidence remain open.
+Cognitive-integrity incidents attach active trace scenes when available.
+Optional accelerator telemetry and retained-trace latency report/gate tooling
+are implemented. Representative simulator/hardware evidence and approved
+environment-specific thresholds remain open and cannot be inferred from the
+implementation alone.
 
 ## Purpose
 

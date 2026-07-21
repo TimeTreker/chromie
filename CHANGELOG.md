@@ -23,6 +23,16 @@ All notable user-visible changes should be recorded here.
   trace attachment to cognitive-integrity incidents; execution, audio, TTS,
   provider/resource, session-recovery, and retained live latency evidence remain
   open.
+- Added default-off non-blocking accelerator telemetry with bounded NVIDIA GPU
+  utilization, memory, temperature, and power observations represented as
+  ordinary Runtime Trace resource items.
+- Added retained Runtime Trace latency reports with environment/provenance
+  binding, p50/p90/p95/p99 distributions, module/resource breakdowns, source
+  digests, and per-trace correlations.
+- Added an evidence-qualified baseline-versus-candidate latency gate that fails
+  invalid when sample counts, evidence class, environment, or clean revision
+  requirements are not satisfied. The bundled example policy remains disabled
+  until a real target baseline is approved.
 
 ### Goal-driven cognitive runtime rollout
 

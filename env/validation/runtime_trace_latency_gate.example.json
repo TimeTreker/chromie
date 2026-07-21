@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "label": "example-only-enable-after-retained-target-baseline",
+  "minimum_baseline_samples": 20,
+  "minimum_candidate_samples": 20,
+  "required_evidence_class": "target",
+  "require_same_environment": true,
+  "require_clean_revision": true,
+  "gates": [
+    {
+      "scope": "metrics",
+      "metric": "total_duration_ms",
+      "statistic": "p95",
+      "minimum_metric_samples": 20,
+      "max_regression_percent": 10.0,
+      "max_regression_ms": 500.0
+    },
+    {
+      "scope": "metrics",
+      "metric": "first_user_observable_latency_ms",
+      "statistic": "p95",
+      "minimum_metric_samples": 20,
+      "max_regression_percent": 10.0,
+      "max_regression_ms": 300.0
+    }
+  ]
+}

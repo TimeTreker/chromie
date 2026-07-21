@@ -19,7 +19,10 @@ trace fragments, topology-aware summaries, detached voice-session traces,
 VAD/ASR and execution/audio milestones, bounded resource samples, active-trace
 restart recovery, configurable latency/sampling retention, optional Runtime
 Events, and active-trace attachment to cognitive-integrity incidents. GPU
-telemetry and retained simulator/hardware latency qualification remain open.
+telemetry is now collected through an optional non-blocking provider, and
+retained trace reports can be evaluated by explicit evidence-qualified latency
+gates. Real simulator/hardware baselines and approved thresholds remain
+environment-specific evidence work rather than inferred release claims.
 
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
 > semantic authority: Goal Association -> Fast/terminal Deep Planning ->

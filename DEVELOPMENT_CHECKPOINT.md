@@ -55,11 +55,13 @@ cognitive-integrity incidents. Current instrumentation covers the goal-driven co
 cognitive Agent calls and resolvers, Ollama, detached voice sessions, VAD/ASR,
 action execution/providers, TTS/playback, user-observable milestones, bounded
 resource samples, idle abandonment, checkpoint restart recovery, retention
-policy, and artifact correlation. GPU telemetry and retained simulator/hardware
-latency evidence remain open; coverage is therefore reported as `partial`. See
+policy, artifact correlation, optional non-blocking accelerator telemetry, and
+retained-trace latency report/gate tooling. Coverage remains `partial` until
+representative simulator/hardware traces and environment-approved thresholds
+are retained; code does not manufacture that evidence. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md),
 [Runtime Trace Contract](docs/RUNTIME_TRACE.md), and
-[Runtime Trace Instrumentation Guide](docs/RUNTIME_TRACE_INSTRUMENTATION.md).
+[Step 10: Accelerator Telemetry and Latency Evidence Gates](docs/STEP10_ACCELERATOR_LATENCY_EVIDENCE.md).
 
 The `0.0.1` release implementation is present:
 

@@ -889,3 +889,34 @@ text and operator-visible context may contain private speech.
 - Do not publish logs containing execution tokens or private environment data.
 - Record failure evidence as well as successful reruns; otherwise regressions are
   difficult to diagnose.
+
+## Runtime Trace Latency Evidence
+
+Runtime Trace latency reports are derived from immutable completed trace event
+packages. Build a report for one declared environment with:
+
+```bash
+python scripts/runtime_trace_latency.py summarize \
+  --source .chromie/runtime-events \
+  --evidence-class target \
+  --environment <exact-target-label> \
+  --label <candidate-label> \
+  --output .chromie/latency/candidate.json
+```
+
+Compare it with a retained baseline only after an explicit policy has been
+reviewed and enabled:
+
+```bash
+python scripts/runtime_trace_latency.py gate \
+  --baseline .chromie/latency/baseline.json \
+  --candidate .chromie/latency/candidate.json \
+  --policy env/validation/runtime_trace_latency_gate.json \
+  --output .chromie/latency/gate-result.json
+```
+
+The gate returns invalid rather than pass when evidence class, environment,
+sample count, revision cleanliness, or required metric samples are not
+qualified. The committed `.example.json` policy is disabled and carries no
+release authority. See
+[Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md).

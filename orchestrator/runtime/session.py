@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from shared.chromie_runtime.log_colors import colorize_for_cli
 from shared.chromie_runtime.resource_sampling import (
@@ -139,6 +139,9 @@ class SessionTracker:
         self.state: dict[str, dict[str, Any]] = {}
         self.event_writer = SessionEventWriter(event_log_path)
         self.resource_sampler = SystemResourceSampler.from_env()
+        self.external_resource_snapshot_providers: list[
+            tuple[TraceModule, str, Callable[..., dict[str, Any]]]
+        ] = []
         self.checkpoint_store = TraceCheckpointStore()
         self.recovered_runtime_traces = self._recover_abandoned_runtime_traces()
 
@@ -171,6 +174,7 @@ class SessionTracker:
         self.log(sid, "session_start")
         self.trace_mark(sid, "session_started", kind="session", attributes={"sid": sid})
         self.sample_resources(sid, reason="session_start")
+        self._record_external_resource_snapshots(sid, reason="session_start")
         self._checkpoint_runtime_trace(sid)
         return sid
 
@@ -213,15 +217,86 @@ class SessionTracker:
         )
         if not payload:
             return None
+        return self.record_resource_sample(
+            sid,
+            module=RESOURCE_SAMPLE_MODULE,
+            name="runtime_resource_sample",
+            attributes=payload,
+        )
+
+    def register_resource_snapshot_provider(
+        self,
+        *,
+        module: TraceModule,
+        name: str,
+        provider: Callable[..., dict[str, Any]],
+    ) -> None:
+        """Register a non-blocking cached resource snapshot provider.
+
+        Providers are invoked synchronously only for their latest cached value;
+        they must not perform I/O, subprocess work, or network access here.
+        """
+
+        self.external_resource_snapshot_providers.append((module, str(name), provider))
+
+    def record_resource_sample(
+        self,
+        sid: str | None,
+        *,
+        module: TraceModule,
+        name: str,
+        attributes: dict[str, Any],
+    ) -> str | None:
+        if not attributes:
+            return None
         with self.trace_context(sid):
             item_id = runtime_tracer.mark(
-                module=RESOURCE_SAMPLE_MODULE,
-                name="runtime_resource_sample",
+                module=module,
+                name=name,
                 kind="resource_sample",
-                attributes=payload,
+                attributes=attributes,
             )
         self._checkpoint_runtime_trace(str(sid or ""))
         return item_id
+
+    def record_active_resource_sample(
+        self,
+        *,
+        module: TraceModule,
+        name: str,
+        attributes: dict[str, Any],
+    ) -> list[str]:
+        recorded: list[str] = []
+        for sid, session in list(self.state.items()):
+            if session.get("runtime_trace_finalized"):
+                continue
+            if self.record_resource_sample(
+                sid,
+                module=module,
+                name=name,
+                attributes=attributes,
+            ):
+                recorded.append(sid)
+        return recorded
+
+    def _record_external_resource_snapshots(self, sid: str, *, reason: str) -> None:
+        for module, name, provider in self.external_resource_snapshot_providers:
+            try:
+                payload = provider(reason=reason)
+            except Exception as exc:
+                logger.debug(
+                    "Cached resource snapshot provider failed: module=%s error=%s",
+                    module.name,
+                    type(exc).__name__,
+                )
+                continue
+            if payload:
+                self.record_resource_sample(
+                    sid,
+                    module=module,
+                    name=name,
+                    attributes=payload,
+                )
 
     def sample_active_resources(
         self,
@@ -345,6 +420,10 @@ class SessionTracker:
         if not isinstance(trace, RuntimeTrace):
             return
         self.sample_resources(
+            sid,
+            reason="session_abandoned" if state == "abandoned" else "session_finish",
+        )
+        self._record_external_resource_snapshots(
             sid,
             reason="session_abandoned" if state == "abandoned" else "session_finish",
         )

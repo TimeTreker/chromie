@@ -440,6 +440,10 @@ with `off` does not continue a received carrier. Existing stage-specific
 | `CHROMIE_RUNTIME_TRACE_EVENT_MIN_FIRST_OBSERVABLE_MS` | `0`; first user-observable latency threshold for warning-level retention. `0` disables this threshold. |
 | `CHROMIE_RUNTIME_TRACE_EVENT_ALWAYS_EMIT_ABANDONED` | `1`; retain abandoned traces when event emission is enabled, independently of normal sampling. |
 | `CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING` | `off`; accepted values are `off`, `session`, and `periodic`. `session` samples lifecycle boundaries; `periodic` also samples active sessions from the idle sweeper. |
+| `CHROMIE_RUNTIME_TRACE_ACCELERATOR_SAMPLING` | `off`; accepted values are `off`, `session`, and `periodic`. Collection runs outside the realtime event loop and produces generic accelerator resource items. |
+| `CHROMIE_RUNTIME_TRACE_ACCELERATOR_PROVIDER` | `auto`; accepted values are `auto`, `nvidia_smi`, and `off`. The initial built-in provider uses a bounded no-units NVIDIA CSV query. |
+| `CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS` | `1000`; provider collection timeout, bounded to `50..30000` milliseconds. |
+| `CHROMIE_RUNTIME_TRACE_ACCELERATOR_MIN_INTERVAL_S` | `5`; minimum refresh interval used to prevent redundant provider calls across concurrent sessions. |
 | `CHROMIE_RUNTIME_TRACE_CHECKPOINT_DIR` | Empty by default. When set, active voice-session traces are atomically checkpointed for process-restart recovery. |
 | `CHROMIE_RUNTIME_EVENT_ROOT` | Optional durable Runtime Event root used by interaction traces, incidents, episode snapshots, and scenario candidates. Packages are finalized under `ready/<event_id>/`. |
 | `CHROMIE_DATA_LOOP_TRIGGER_ROOT` | Optional external data-loop filesystem inbox. A trigger file confirms local handoff only; it does not prove cloud upload. |
@@ -447,12 +451,14 @@ with `off` does not continue a received carrier. Existing stage-specific
 Current coverage includes the goal-driven cognitive/model path, detached voice
 sessions, VAD/ASR, execution/action providers, TTS/playback, first audible and
 provider-reported first-motion milestones, bounded CPU/memory/queue/event-loop
-resource samples, idle abandonment, active-trace checkpoint recovery, and
-latency/sampling retention policy. Coverage remains partial because GPU
-telemetry and retained simulator/hardware latency baselines are still open. See
+resource samples, optional non-blocking accelerator telemetry, idle abandonment,
+active-trace checkpoint recovery, latency/sampling retention policy, and
+retained-trace latency report/gate tooling. Coverage remains partial until real
+simulator/hardware baselines and approved environment-specific thresholds are
+retained. See
 [Runtime Trace Contract](RUNTIME_TRACE.md),
 [Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md), and
-[Step 9: Resource, Recovery, and Trace Retention](STEP9_RESOURCE_RECOVERY_RETENTION.md).
+[Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md).
 
 ## Agent and TaskGraph
 

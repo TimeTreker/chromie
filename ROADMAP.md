@@ -553,10 +553,15 @@ user-observable latency analysis.
    Runtime Events, and active trace attachment to cognitive-integrity incidents.
    Critical-path output is an explicitly versioned interval/topology
    approximation until broader dependency instrumentation exists.
-6. **Implemented except retained target evidence:** Deterministic normal-path
+6. **Implemented:** Deterministic normal-path
    sampling, latency-threshold escalation, detached session summaries, idle and
-   process-restart abandonment recovery, and cross-artifact correlation. GPU
-   telemetry and retained simulator/hardware latency evidence remain open.
+   process-restart abandonment recovery, cross-artifact correlation, and
+   non-blocking accelerator resource observations.
+7. **Implemented; environment evidence open:** Reproducible retained-trace
+   latency distributions and explicit baseline-versus-candidate regression
+   gates with evidence-class, environment, revision-cleanliness, and sample-count
+   qualification. Real simulator/hardware baselines and approved thresholds must
+   still be collected on the claimed target.
 
 Exit criteria require the trace schema to remain independent of the current
 module graph, disabled tracing to preserve behavior with negligible overhead,
