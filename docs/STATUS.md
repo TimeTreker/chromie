@@ -719,3 +719,15 @@ action-provider acknowledgements, optional provider-reported first physical
 motion, and idle-timeout abandonment of unfinished voice sessions. Runtime Trace
 coverage remains partial: resource sampling, persisted process-restart recovery,
 and retained hardware latency baselines are still open.
+## Runtime Observability Step 9
+
+Runtime Trace now records optional generic process/host-memory, queue-depth, and
+event-loop-lag resource samples. Active voice-session traces can be atomically
+checkpointed and recovered after process restart as truthful abandoned evidence.
+Normal interaction/session trace Runtime Events support abandoned-trace
+retention, latency thresholds, and deterministic sampling, while critical
+cognitive-integrity incidents remain independent of normal sampling. Session
+traces gain conversation, cognitive-trace, interaction, and episode correlation
+IDs as those artifacts become available. Coverage remains partial: GPU
+telemetry and retained simulator/hardware latency baselines are still open. See
+[Step 9: Resource, Recovery, and Trace Retention](STEP9_RESOURCE_RECOVERY_RETENTION.md).

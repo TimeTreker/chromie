@@ -434,17 +434,25 @@ with `off` does not continue a received carrier. Existing stage-specific
 | `CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTES` | `32`; maximum attributes retained per trace object or item, bounded to `4..256`. |
 | `CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTE_CHARS` | `512`; maximum retained characters for one string attribute, bounded to `64..8192`. |
 | `CHROMIE_RUNTIME_TRACE_COVERAGE` | `partial`; truthful coverage label written into snapshots until all relevant runtime paths are instrumented. |
-| `CHROMIE_RUNTIME_TRACE_EMIT_EVENTS` | `0`; when enabled, a completed goal-driven interaction may produce one `chromie.interaction_trace` Runtime Event package containing `trace.json` and `trace-summary.json`. |
+| `CHROMIE_RUNTIME_TRACE_EMIT_EVENTS` | `0`; master gate for normal completed/abandoned trace Runtime Event packages. Retention thresholds and sampling are applied only when this gate is enabled. |
+| `CHROMIE_RUNTIME_TRACE_EVENT_SAMPLE_RATE` | `1.0`; deterministic trace-ID sampling rate in `0..1` after abandoned/latency-threshold rules. Set `0` to retain only threshold-selected or configured abandoned traces. |
+| `CHROMIE_RUNTIME_TRACE_EVENT_MIN_TOTAL_MS` | `0`; total-duration threshold for warning-level trace retention. `0` disables this threshold. |
+| `CHROMIE_RUNTIME_TRACE_EVENT_MIN_FIRST_OBSERVABLE_MS` | `0`; first user-observable latency threshold for warning-level retention. `0` disables this threshold. |
+| `CHROMIE_RUNTIME_TRACE_EVENT_ALWAYS_EMIT_ABANDONED` | `1`; retain abandoned traces when event emission is enabled, independently of normal sampling. |
+| `CHROMIE_RUNTIME_TRACE_RESOURCE_SAMPLING` | `off`; accepted values are `off`, `session`, and `periodic`. `session` samples lifecycle boundaries; `periodic` also samples active sessions from the idle sweeper. |
+| `CHROMIE_RUNTIME_TRACE_CHECKPOINT_DIR` | Empty by default. When set, active voice-session traces are atomically checkpointed for process-restart recovery. |
 | `CHROMIE_RUNTIME_EVENT_ROOT` | Optional durable Runtime Event root used by interaction traces, incidents, episode snapshots, and scenario candidates. Packages are finalized under `ready/<event_id>/`. |
 | `CHROMIE_DATA_LOOP_TRIGGER_ROOT` | Optional external data-loop filesystem inbox. A trigger file confirms local handoff only; it does not prove cloud upload. |
 
-Initial implementation coverage includes the goal-driven coordinator, canonical
-plan adapter, Orchestrator-to-Agent cognitive calls, Goal Association, Fast and
-Deep Planning, Response Composer, and Ollama model calls. Cognitive-integrity
-incidents attach the active trace snapshot when available. Execution, audio,
-TTS, provider, resource, and user-observable milestone coverage remains open.
-See [Runtime Trace Contract](RUNTIME_TRACE.md) and
-[Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md).
+Current coverage includes the goal-driven cognitive/model path, detached voice
+sessions, VAD/ASR, execution/action providers, TTS/playback, first audible and
+provider-reported first-motion milestones, bounded CPU/memory/queue/event-loop
+resource samples, idle abandonment, active-trace checkpoint recovery, and
+latency/sampling retention policy. Coverage remains partial because GPU
+telemetry and retained simulator/hardware latency baselines are still open. See
+[Runtime Trace Contract](RUNTIME_TRACE.md),
+[Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md), and
+[Step 9: Resource, Recovery, and Trace Retention](STEP9_RESOURCE_RECOVERY_RETENTION.md).
 
 ## Agent and TaskGraph
 

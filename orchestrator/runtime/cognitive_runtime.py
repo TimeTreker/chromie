@@ -956,12 +956,19 @@ class GoalDrivenRuntimeCoordinator:
         metadata = dict(resolution.metadata)
         metadata["runtime_trace"] = snapshot.reference()
         metadata["runtime_trace_summary"] = snapshot.summary
-        if trace_scope.policy.emit_events:
+        retention = trace_scope.policy.retention_decision(snapshot)
+        metadata["runtime_trace_retention"] = retention.as_dict()
+        if retention.emit:
             metadata["runtime_trace_event"] = runtime_tracer.persist_snapshot(
                 snapshot,
                 event_subtype="goal_driven_interaction",
                 producer="chromie.orchestrator.cognitive_runtime",
-                severity="warning" if resolution.status == "error" else "info",
+                severity=(
+                    "warning"
+                    if resolution.status == "error"
+                    else retention.severity
+                ),
+                retention_reason=retention.reason,
             )
         return resolution.model_copy(update={"metadata": metadata})
 

@@ -2,14 +2,14 @@
 
 ## Implementation status
 
-The initial default-off Runtime Trace foundation and cognitive/model-path
-instrumentation are implemented. Current coverage includes the goal-driven
-coordinator, canonical adapter, cognitive Agent service calls and resolvers, and
-Ollama model calls. Completed traces can produce summaries and optional Runtime
-Event packages, and cognitive-integrity incidents attach an active trace snapshot
-when available. Execution, audio, TTS, provider/resource observations,
-user-observable milestones, session recovery, sampling policy, and retained live
-latency evidence remain open.
+The default-off Runtime Trace foundation is implemented across the goal-driven
+cognitive/model path and detached voice-session path. Current coverage includes
+VAD/ASR, action execution/providers, TTS/playback, first audible and optional
+provider-reported first-motion milestones, bounded CPU/memory/queue/event-loop
+resource observations, idle abandonment, active-trace checkpoint recovery,
+late-bound artifact correlation, and configurable latency/sampling retention.
+Cognitive-integrity incidents attach active trace scenes when available. GPU
+telemetry and retained simulator/hardware latency evidence remain open.
 
 ## Purpose
 

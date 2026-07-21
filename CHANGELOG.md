@@ -187,3 +187,13 @@ declaration still blocks publication.
 - Added configurable idle-timeout finalization for unfinished session traces.
 - Preserved the architecture-independent trace contract and avoided invented
   physical-motion timing when the action provider supplies no evidence.
+### Runtime Observability Step 9
+
+- Added generic process CPU, process/system memory, load, queue-depth, and
+  event-loop-lag Runtime Trace resource samples.
+- Added atomic active-session trace checkpoints and process-restart recovery as
+  abandoned Runtime Event evidence.
+- Added latency-threshold, abandoned-trace, and deterministic-sampling retention
+  decisions for normal trace Runtime Events.
+- Added late-bound session trace correlation with cognitive traces, interactions,
+  conversations, and experience episodes.

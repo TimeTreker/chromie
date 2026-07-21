@@ -2013,6 +2013,12 @@ class VoiceAssistant:
         session_id: str | None,
         errors: list[str] | None = None,
     ) -> None:
+        conversation_state = getattr(self, "conversation_state", None)
+        self.sessions.update_trace_correlations(
+            session_id,
+            conversation_id=getattr(conversation_state, "conversation_id", None),
+            interaction_id=response.interaction_id,
+        )
         record = None
         try:
             record = self.experience.record_interaction(
@@ -2046,6 +2052,12 @@ class VoiceAssistant:
             self.session_log(session_id, "episode_record_failed: error=%s", exc)
             return
         if episode is not None:
+            self.sessions.update_trace_correlations(
+                session_id,
+                episode_id=episode.episode_id,
+                conversation_id=episode.conversation_id,
+                interaction_id=response.interaction_id,
+            )
             self.session_log(
                 session_id,
                 "episode_recorded: episode_id=%s conversation_id=%s turns=%s",
@@ -2813,6 +2825,13 @@ class VoiceAssistant:
                 },
             )
 
+        trace_reference = resolution.metadata.get("runtime_trace")
+        if isinstance(trace_reference, dict):
+            self.sessions.update_trace_correlations(
+                session_id,
+                cognitive_trace_id=trace_reference.get("trace_id"),
+            )
+
         if record_evidence:
             self._record_cognitive_runtime_evidence(
                 resolution, session_id=session_id, user_text=user_text
@@ -3578,6 +3597,10 @@ class VoiceAssistant:
 
         session = await self.get_http_session()
         context = self.build_context(session_id)
+        self.sessions.update_trace_correlations(
+            session_id,
+            conversation_id=context.get("conversation_id"),
+        )
         self.session_log(
             session_id,
             "context_snapshot: conversation_id=%s history_turns=%s pending_tasks=%s",
@@ -5195,8 +5218,22 @@ class VoiceAssistant:
     async def _session_idle_sweeper(self) -> None:
         interval_s = max(1.0, float(os.getenv("ORCH_SESSION_IDLE_SWEEP_S", "5")))
         idle_timeout_ms = max(1000.0, float(os.getenv("ORCH_SESSION_IDLE_TIMEOUT_MS", "120000")))
+        loop = asyncio.get_running_loop()
+        expected_wake = loop.time() + interval_s
         while True:
             await asyncio.sleep(interval_s)
+            actual_wake = loop.time()
+            event_loop_lag_ms = max(0.0, (actual_wake - expected_wake) * 1000.0)
+            expected_wake = actual_wake + interval_s
+            self.sessions.sample_active_resources(
+                event_loop_lag_ms=event_loop_lag_ms,
+                attributes={
+                    "playback_queue_depth": self.playback_queue.qsize(),
+                    "mic_queue_depth": self.mic_queue.qsize(),
+                    "active_synthesis_tasks": len(self.active_synthesis_tasks),
+                },
+            )
+            self.sessions.checkpoint_active_traces()
             self.sessions.finalize_idle_sessions(idle_timeout_ms=idle_timeout_ms)
 
     async def run(self):
@@ -5247,6 +5284,9 @@ class VoiceAssistant:
             await self.mic_stream()
 
     async def cleanup(self):
+        sessions = getattr(self, "sessions", None)
+        if sessions is not None:
+            sessions.finalize_active_sessions(reason="orchestrator_cleanup")
         self.resolve_all_playback_start_waiters(
             started=False,
             reason="cleanup",

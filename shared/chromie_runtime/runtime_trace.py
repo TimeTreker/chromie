@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import hashlib
 import json
 import os
+import tempfile
 import threading
 import time
 import uuid
@@ -23,6 +25,7 @@ TRACE_SUMMARY_SCHEMA_VERSION = 1
 TRACE_CARRIER_SCHEMA_VERSION = 1
 TRACE_CARRIER_KEY = "_chromie_runtime_trace"
 TRACE_FRAGMENT_KEY = "_runtime_trace_fragment"
+TRACE_CHECKPOINT_SCHEMA_VERSION = 1
 _TRACE_MODES = {"off": 0, "basic": 1, "debug": 2}
 _TRACE_STATES = {"active", "finishing", "complete", "abandoned"}
 
@@ -56,6 +59,14 @@ def _env_bool(name: str, default: bool = False) -> bool:
 def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
     try:
         value = int(str(os.getenv(name, default)).strip())
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+def _env_float(name: str, default: float, minimum: float, maximum: float) -> float:
+    try:
+        value = float(str(os.getenv(name, default)).strip())
     except (TypeError, ValueError):
         value = default
     return max(minimum, min(maximum, value))
@@ -107,6 +118,20 @@ class TraceModule:
 
 
 @dataclass(frozen=True)
+class TraceRetentionDecision:
+    emit: bool
+    reason: str
+    severity: str = "info"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "emit": self.emit,
+            "reason": self.reason,
+            "severity": self.severity,
+        }
+
+
+@dataclass(frozen=True)
 class TracePolicy:
     mode: str = "off"
     module_allowlist: frozenset[str] = frozenset()
@@ -115,6 +140,10 @@ class TracePolicy:
     max_attributes: int = 32
     max_attribute_chars: int = 512
     emit_events: bool = False
+    event_sample_rate: float = 1.0
+    event_min_total_ms: float = 0.0
+    event_min_first_observable_ms: float = 0.0
+    event_always_emit_abandoned: bool = True
     coverage: str = "partial"
 
     def __post_init__(self) -> None:
@@ -142,6 +171,21 @@ class TracePolicy:
                 "CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTE_CHARS", 512, 64, 8192
             ),
             emit_events=_env_bool("CHROMIE_RUNTIME_TRACE_EMIT_EVENTS", False),
+            event_sample_rate=_env_float(
+                "CHROMIE_RUNTIME_TRACE_EVENT_SAMPLE_RATE", 1.0, 0.0, 1.0
+            ),
+            event_min_total_ms=_env_float(
+                "CHROMIE_RUNTIME_TRACE_EVENT_MIN_TOTAL_MS", 0.0, 0.0, 86400000.0
+            ),
+            event_min_first_observable_ms=_env_float(
+                "CHROMIE_RUNTIME_TRACE_EVENT_MIN_FIRST_OBSERVABLE_MS",
+                0.0,
+                0.0,
+                86400000.0,
+            ),
+            event_always_emit_abandoned=_env_bool(
+                "CHROMIE_RUNTIME_TRACE_EVENT_ALWAYS_EMIT_ABANDONED", True
+            ),
             coverage=str(
                 os.getenv("CHROMIE_RUNTIME_TRACE_COVERAGE", "partial")
             ).strip()
@@ -156,6 +200,36 @@ class TracePolicy:
         if self.mode == "debug" or module.name in self.debug_modules:
             return "debug"
         return "basic"
+
+    def retention_decision(self, snapshot: "TraceSnapshot") -> TraceRetentionDecision:
+        if not self.emit_events:
+            return TraceRetentionDecision(False, "event_emission_disabled")
+        state = str(snapshot.trace.get("state") or "")
+        if state == "abandoned" and self.event_always_emit_abandoned:
+            return TraceRetentionDecision(True, "abandoned_trace", "warning")
+        first_observable = snapshot.summary.get("first_user_observable_latency_ms")
+        if (
+            self.event_min_first_observable_ms > 0
+            and first_observable is not None
+            and float(first_observable) >= self.event_min_first_observable_ms
+        ):
+            return TraceRetentionDecision(
+                True, "first_user_observable_latency_threshold", "warning"
+            )
+        total = float(snapshot.summary.get("total_duration_ms") or 0.0)
+        if self.event_min_total_ms > 0 and total >= self.event_min_total_ms:
+            return TraceRetentionDecision(True, "total_latency_threshold", "warning")
+        if self.event_sample_rate >= 1.0:
+            return TraceRetentionDecision(True, "configured_full_retention")
+        if self.event_sample_rate <= 0.0:
+            return TraceRetentionDecision(False, "not_sampled")
+        digest = hashlib.sha256(
+            str(snapshot.trace.get("trace_id") or "").encode("utf-8")
+        ).digest()
+        fraction = int.from_bytes(digest[:8], "big") / float(2**64 - 1)
+        if fraction < self.event_sample_rate:
+            return TraceRetentionDecision(True, "deterministic_sample")
+        return TraceRetentionDecision(False, "not_sampled")
 
 
 @dataclass(frozen=True)
@@ -177,6 +251,71 @@ class TraceSnapshot:
                 "first_user_observable_latency_ms"
             ),
         }
+
+
+class TraceCheckpointStore:
+    """Atomic active-trace checkpoints for process-restart recovery."""
+
+    def __init__(self, root: str | Path | None = None) -> None:
+        raw = str(root or os.getenv("CHROMIE_RUNTIME_TRACE_CHECKPOINT_DIR") or "").strip()
+        self.root = Path(raw).expanduser().resolve() if raw else None
+        if self.root is not None:
+            (self.root / "active").mkdir(parents=True, exist_ok=True)
+
+    @property
+    def enabled(self) -> bool:
+        return self.root is not None
+
+    def write(self, snapshot: TraceSnapshot) -> str:
+        if self.root is None:
+            return ""
+        trace_id = _token(snapshot.trace.get("trace_id"), "checkpoint trace_id")
+        path = self.root / "active" / f"{trace_id}.json"
+        _atomic_write_json(
+            path,
+            {
+                "schema_version": TRACE_CHECKPOINT_SCHEMA_VERSION,
+                "checkpointed_at": _iso(_utc_now()),
+                "trace": snapshot.trace,
+                "summary": snapshot.summary,
+            },
+        )
+        return str(path)
+
+    def remove(self, trace_id: str) -> None:
+        if self.root is None:
+            return
+        (self.root / "active" / f"{trace_id}.json").unlink(missing_ok=True)
+
+    def pending(self) -> list[tuple[Path, dict[str, Any]]]:
+        if self.root is None:
+            return []
+        pending: list[tuple[Path, dict[str, Any]]] = []
+        for path in sorted((self.root / "active").glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                if int(payload.get("schema_version") or 0) != TRACE_CHECKPOINT_SCHEMA_VERSION:
+                    raise ValueError("unsupported checkpoint schema")
+                if not isinstance(payload.get("trace"), Mapping):
+                    raise ValueError("checkpoint trace is missing")
+                if not isinstance(payload.get("summary"), Mapping):
+                    raise ValueError("checkpoint summary is missing")
+            except Exception:
+                self.archive(path, category="corrupt")
+                continue
+            pending.append((path, payload))
+        return pending
+
+    def archive(self, path: Path, *, category: str = "recovered") -> str:
+        if self.root is None or not path.exists():
+            return ""
+        target_root = self.root / str(category or "recovered")
+        target_root.mkdir(parents=True, exist_ok=True)
+        target = target_root / path.name
+        if target.exists():
+            target = target_root / f"{path.stem}-{uuid.uuid4().hex[:8]}{path.suffix}"
+        os.replace(path, target)
+        return str(target)
 
 
 @dataclass
@@ -253,6 +392,13 @@ class RuntimeTrace:
         self._lock = threading.RLock()
         self._finished_snapshot: TraceSnapshot | None = None
         self.dropped_items = 0
+
+    def update_correlations(self, values: Mapping[str, Any]) -> None:
+        safe = _safe_mapping(values, self.policy)
+        with self._lock:
+            for key, value in safe.items():
+                if value not in (None, ""):
+                    self.correlations[str(key)] = value
 
     def start_item(
         self,
@@ -584,6 +730,10 @@ class RuntimeTracer:
             max_attributes=local.max_attributes,
             max_attribute_chars=local.max_attribute_chars,
             emit_events=False,
+            event_sample_rate=0.0,
+            event_min_total_ms=0.0,
+            event_min_first_observable_ms=0.0,
+            event_always_emit_abandoned=False,
             coverage=str(carrier.get("coverage") or local.coverage),
         )
         return TraceScope(
@@ -692,6 +842,7 @@ class RuntimeTracer:
         event_subtype: str,
         producer: str,
         severity: str = "info",
+        retention_reason: str = "configured",
         event_root: str | Path | None = None,
         trigger_root: str | Path | None = None,
     ) -> dict[str, Any]:
@@ -712,6 +863,10 @@ class RuntimeTracer:
                 "coverage": (snapshot.trace.get("collection") or {}).get("coverage"),
                 "item_count": snapshot.summary.get("item_count"),
                 "total_duration_ms": snapshot.summary.get("total_duration_ms"),
+                "first_user_observable_latency_ms": snapshot.summary.get(
+                    "first_user_observable_latency_ms"
+                ),
+                "retention_reason": retention_reason,
             },
             correlations=snapshot.trace.get("correlations") or {},
             derivation={
@@ -726,6 +881,29 @@ class RuntimeTracer:
 
 
 runtime_tracer = RuntimeTracer()
+
+
+def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary_path = Path(temporary)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, sort_keys=True, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        if os.name != "nt":
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def _safe_mapping(values: Mapping[str, Any], policy: TracePolicy) -> dict[str, Any]:

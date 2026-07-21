@@ -12,8 +12,14 @@ from pathlib import Path
 from typing import Any
 
 from shared.chromie_runtime.log_colors import colorize_for_cli
+from shared.chromie_runtime.resource_sampling import (
+    RESOURCE_SAMPLE_MODULE,
+    SystemResourceSampler,
+)
+from shared.chromie_runtime.runtime_events import persist_runtime_event
 from shared.chromie_runtime.runtime_trace import (
     RuntimeTrace,
+    TraceCheckpointStore,
     TraceModule,
     TracePolicy,
     TraceScope,
@@ -132,6 +138,9 @@ class SessionTracker:
         self.current_sid: str | None = None
         self.state: dict[str, dict[str, Any]] = {}
         self.event_writer = SessionEventWriter(event_log_path)
+        self.resource_sampler = SystemResourceSampler.from_env()
+        self.checkpoint_store = TraceCheckpointStore()
+        self.recovered_runtime_traces = self._recover_abandoned_runtime_traces()
 
     def create(self) -> str:
         previous = self.current_sid
@@ -161,6 +170,8 @@ class SessionTracker:
                 self._finalize_runtime_trace(previous, state="abandoned")
         self.log(sid, "session_start")
         self.trace_mark(sid, "session_started", kind="session", attributes={"sid": sid})
+        self.sample_resources(sid, reason="session_start")
+        self._checkpoint_runtime_trace(sid)
         return sid
 
     def _create_runtime_trace(self, sid: str) -> RuntimeTrace | None:
@@ -179,6 +190,58 @@ class SessionTracker:
         trace = state.get("runtime_trace")
         return runtime_tracer.activate(trace if isinstance(trace, RuntimeTrace) else None)
 
+    def update_trace_correlations(self, sid: str | None, **values: Any) -> None:
+        session = self.state.get(sid or "") or {}
+        trace = session.get("runtime_trace")
+        if not isinstance(trace, RuntimeTrace) or session.get("runtime_trace_finalized"):
+            return
+        trace.update_correlations(values)
+        self._checkpoint_runtime_trace(str(sid or ""))
+
+    def sample_resources(
+        self,
+        sid: str | None,
+        *,
+        reason: str,
+        event_loop_lag_ms: float | None = None,
+        attributes: dict[str, Any] | None = None,
+    ) -> str | None:
+        payload = self.resource_sampler.sample(
+            reason=reason,
+            event_loop_lag_ms=event_loop_lag_ms,
+            attributes=attributes,
+        )
+        if not payload:
+            return None
+        with self.trace_context(sid):
+            item_id = runtime_tracer.mark(
+                module=RESOURCE_SAMPLE_MODULE,
+                name="runtime_resource_sample",
+                kind="resource_sample",
+                attributes=payload,
+            )
+        self._checkpoint_runtime_trace(str(sid or ""))
+        return item_id
+
+    def sample_active_resources(
+        self,
+        *,
+        event_loop_lag_ms: float | None = None,
+        attributes: dict[str, Any] | None = None,
+    ) -> list[str]:
+        sampled: list[str] = []
+        for sid, session in list(self.state.items()):
+            if session.get("runtime_trace_finalized"):
+                continue
+            if self.sample_resources(
+                sid,
+                reason="periodic",
+                event_loop_lag_ms=event_loop_lag_ms,
+                attributes=attributes,
+            ):
+                sampled.append(sid)
+        return sampled
+
     def trace_mark(
         self,
         sid: str | None,
@@ -188,12 +251,91 @@ class SessionTracker:
         attributes: dict[str, Any] | None = None,
     ) -> str | None:
         with self.trace_context(sid):
-            return runtime_tracer.mark(
+            item_id = runtime_tracer.mark(
                 module=self.TRACE_MODULE,
                 name=name,
                 kind=kind,
                 attributes=attributes,
             )
+        self._checkpoint_runtime_trace(str(sid or ""))
+        return item_id
+
+    def _checkpoint_runtime_trace(self, sid: str) -> str:
+        session = self.state.get(sid) or {}
+        trace = session.get("runtime_trace")
+        if (
+            not self.checkpoint_store.enabled
+            or not isinstance(trace, RuntimeTrace)
+            or session.get("runtime_trace_finalized")
+        ):
+            return ""
+        path = self.checkpoint_store.write(trace.snapshot(state="active"))
+        if path:
+            session["runtime_trace_checkpoint"] = path
+        return path
+
+    def checkpoint_active_traces(self) -> list[str]:
+        checkpointed: list[str] = []
+        for sid in list(self.state):
+            if self._checkpoint_runtime_trace(sid):
+                checkpointed.append(sid)
+        return checkpointed
+
+    def _recover_abandoned_runtime_traces(self) -> list[dict[str, Any]]:
+        recovered: list[dict[str, Any]] = []
+        if not self.checkpoint_store.enabled:
+            return recovered
+        policy = TracePolicy.from_env()
+        recovered_at = datetime.now(timezone.utc).isoformat()
+        for path, payload in self.checkpoint_store.pending():
+            trace = dict(payload.get("trace") or {})
+            summary = dict(payload.get("summary") or {})
+            checkpointed_at = str(payload.get("checkpointed_at") or recovered_at)
+            trace["state"] = "abandoned"
+            trace["finished_at"] = checkpointed_at
+            trace_attributes = dict(trace.get("attributes") or {})
+            trace_attributes.update(
+                {
+                    "recovery_reason": "process_restart",
+                    "recovered_from_checkpoint": True,
+                    "recovery_detected_at": recovered_at,
+                }
+            )
+            trace["attributes"] = trace_attributes
+            collection = dict(trace.get("collection") or {})
+            collection["checkpoint_recovered"] = True
+            trace["collection"] = collection
+            summary["status"] = "abandoned"
+            result: dict[str, Any] = {
+                "trace_id": trace.get("trace_id"),
+                "checkpoint_path": str(path),
+                "event": {},
+            }
+            if policy.emit_events:
+                result["event"] = persist_runtime_event(
+                    event_type="chromie.interaction_trace",
+                    event_subtype="voice_session_restart_recovery",
+                    severity="warning",
+                    producer="chromie.orchestrator.session",
+                    payloads={
+                        "trace.json": trace,
+                        "trace-summary.json": summary,
+                    },
+                    attributes={
+                        "trace_state": "abandoned",
+                        "retention_reason": "process_restart_recovery",
+                        "checkpointed_at": checkpointed_at,
+                    },
+                    correlations=trace.get("correlations") or {},
+                    derivation={
+                        "latency_analysis_supported": True,
+                        "scenario_candidate_eligible": True,
+                        "scenario_auto_promotion_allowed": False,
+                    },
+                )
+            result["archive_path"] = self.checkpoint_store.archive(path)
+            recovered.append(result)
+        return recovered
 
     def _finalize_runtime_trace(self, sid: str, *, state: str) -> None:
         session = self.state.get(sid)
@@ -202,16 +344,24 @@ class SessionTracker:
         trace = session.get("runtime_trace")
         if not isinstance(trace, RuntimeTrace):
             return
+        self.sample_resources(
+            sid,
+            reason="session_abandoned" if state == "abandoned" else "session_finish",
+        )
         session["runtime_trace_finalized"] = True
         snapshot = trace.finish(state=state)
         session["runtime_trace_snapshot"] = snapshot
-        if trace.policy.emit_events:
+        retention = trace.policy.retention_decision(snapshot)
+        session["runtime_trace_retention"] = retention.as_dict()
+        if retention.emit:
             session["runtime_trace_event"] = runtime_tracer.persist_snapshot(
                 snapshot,
                 event_subtype="voice_session",
                 producer="chromie.orchestrator",
-                severity="warning" if state == "abandoned" else "info",
+                severity=retention.severity,
+                retention_reason=retention.reason,
             )
+        self.checkpoint_store.remove(trace.trace_id)
 
     def elapsed_ms(self, sid: str | None) -> float:
         state = self.state.get(sid or "")
@@ -289,6 +439,22 @@ class SessionTracker:
                 },
             )
             self._finalize_runtime_trace(sid, state="complete")
+
+    def finalize_active_sessions(self, *, reason: str) -> list[str]:
+        finalized: list[str] = []
+        for sid, session in list(self.state.items()):
+            if session.get("runtime_trace_finalized"):
+                continue
+            session["interrupted"] = True
+            self.trace_mark(
+                sid,
+                "session_abandoned",
+                kind="session",
+                attributes={"reason": str(reason or "shutdown")},
+            )
+            self._finalize_runtime_trace(sid, state="abandoned")
+            finalized.append(sid)
+        return finalized
 
     def finalize_idle_sessions(
         self,

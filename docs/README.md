@@ -185,3 +185,6 @@ python scripts/check_docs.py
   first audible user-observable latency.
 
 - [Step 8: Input, Action, and Idle Trace Coverage](STEP8_INPUT_ACTION_IDLE_TRACE.md)
+- [Step 9: Resource, Recovery, and Trace Retention](STEP9_RESOURCE_RECOVERY_RETENTION.md)
+  documents generic resource samples, crash-recovery checkpoints, trace
+  retention policy, and cross-artifact correlation.

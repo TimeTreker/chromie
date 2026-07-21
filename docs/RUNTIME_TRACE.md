@@ -3,11 +3,12 @@
 ## Status
 
 This document is the normative contract for Chromie's Runtime Trace subsystem.
-The initial implementation exists in
-`shared/chromie_runtime/runtime_trace.py` and currently instruments the
-goal-driven cognitive/model path with partial coverage. Execution, audio, TTS,
-provider/resource observations, user-observable milestones, session lifecycle
-recovery, and retained live latency evidence remain open.
+The implementation exists in `shared/chromie_runtime/runtime_trace.py` and now
+covers the goal-driven cognitive/model path, detached voice sessions, VAD/ASR,
+action execution/providers, TTS/playback, user-observable milestones, bounded
+resource observations, idle abandonment, active-trace checkpoint recovery, and
+configurable retention. Coverage remains partial because GPU telemetry and
+retained simulator/hardware latency evidence remain open.
 
 ## Trace envelope
 
@@ -288,6 +289,29 @@ Derived analysis should distinguish:
 For overlapping children, exclusive time cannot be calculated by simply
 subtracting the sum of child durations. The analyzer must operate on interval
 unions and dependency topology.
+
+
+## Checkpoint and restart-recovery contract
+
+Active trace checkpoints are optional durable recovery evidence. A checkpoint
+must be written atomically, must retain both raw trace and summary, and must not
+be presented as a completed trace. Process-restart recovery converts the last
+durable checkpoint into an `abandoned` snapshot and records the recovery reason.
+It must not fabricate time for work that occurred after the final checkpoint.
+
+Invalid checkpoint data must be quarantined rather than uploaded as valid trace
+evidence. Normal complete/abandoned finalization removes the active checkpoint.
+
+## Runtime Event retention contract
+
+Normal trace event selection is policy-controlled and reproducible. The initial
+policy supports abandoned-trace retention, total-latency thresholds, first
+user-observable latency thresholds, and deterministic trace-ID sampling.
+Threshold selection takes precedence over normal sampling.
+
+The retention decision and reason must be observable separately from the trace
+execution status. Event selection must not mutate semantic results or suppress
+critical incident trace attachment.
 
 ## Runtime Event integration
 

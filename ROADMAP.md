@@ -545,15 +545,18 @@ user-observable latency analysis.
    plan adapter, Orchestrator-to-Agent cognitive calls, Goal Association, Fast
    and Deep Planning, Response Composer, and Ollama model calls emit generic
    module-owned trace items without changing semantic behavior.
-4. **Open:** Execution, audio, TTS, provider, queue, resource, and
-   user-observable milestone instrumentation.
+4. **Implemented with focused automated evidence:** Execution, action-provider,
+   VAD/ASR, TTS/playback, queue/resource, session lifecycle, first audible, and
+   optional provider-reported first-motion instrumentation.
 5. **Implemented for the initial cognitive path:** Topology-aware summaries,
    inclusive/exclusive module time, parallelism, optional interaction-trace
    Runtime Events, and active trace attachment to cognitive-integrity incidents.
    Critical-path output is an explicitly versioned interval/topology
    approximation until broader dependency instrumentation exists.
-6. **Open:** Normal-path sampling policy, latency-threshold escalation, session
-   summaries, abandoned-session recovery, and retained live latency evidence.
+6. **Implemented except retained target evidence:** Deterministic normal-path
+   sampling, latency-threshold escalation, detached session summaries, idle and
+   process-restart abandonment recovery, and cross-artifact correlation. GPU
+   telemetry and retained simulator/hardware latency evidence remain open.
 
 Exit criteria require the trace schema to remain independent of the current
 module graph, disabled tracing to preserve behavior with negligible overhead,

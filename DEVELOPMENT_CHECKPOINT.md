@@ -51,11 +51,12 @@ module-owned identity, `off`/`basic`/`debug` collection, monotonic duration
 measurement, nested sync/async spans, cross-service carriers and mergeable
 fragments, bounded attributes, topology-aware summaries, optional
 `chromie.interaction_trace` Runtime Events, and active-trace attachment to
-cognitive-integrity incidents. Current instrumentation covers the goal-driven
-coordinator, canonical adapter, cognitive Agent calls and resolvers, and Ollama.
-Execution, audio, TTS, provider/resource observations, user-observable
-milestones, session lifecycle recovery, and retained live latency evidence remain
-open; coverage is therefore reported as `partial`. See
+cognitive-integrity incidents. Current instrumentation covers the goal-driven coordinator, canonical adapter,
+cognitive Agent calls and resolvers, Ollama, detached voice sessions, VAD/ASR,
+action execution/providers, TTS/playback, user-observable milestones, bounded
+resource samples, idle abandonment, checkpoint restart recovery, retention
+policy, and artifact correlation. GPU telemetry and retained simulator/hardware
+latency evidence remain open; coverage is therefore reported as `partial`. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md),
 [Runtime Trace Contract](docs/RUNTIME_TRACE.md), and
 [Runtime Trace Instrumentation Guide](docs/RUNTIME_TRACE_INSTRUMENTATION.md).
