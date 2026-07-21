@@ -95,6 +95,16 @@ PLAYBACK_TRACE_MODULE = TraceModule(
     component_type="audio",
     implementation="ChromieOrchestrator",
 )
+VAD_TRACE_MODULE = TraceModule(
+    name="orchestrator.vad",
+    component_type="audio_input",
+    implementation="ChromieOrchestrator",
+)
+ASR_TRACE_MODULE = TraceModule(
+    name="orchestrator.asr",
+    component_type="speech_recognition",
+    implementation="ChromieOrchestrator",
+)
 
 
 
@@ -1723,6 +1733,7 @@ class VoiceAssistant:
         playback_task = getattr(self, "playback_task", None)
         if playback_task is None or playback_task.done():
             self.playback_task = asyncio.create_task(self.playback_worker())
+        self.session_idle_sweeper_task = asyncio.create_task(self._session_idle_sweeper())
 
     async def reset_playback_ordering(self):
         async with self.order_lock:
@@ -4955,42 +4966,77 @@ class VoiceAssistant:
             return
 
         session_id = self.create_session()
-        self.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
-        self.save_audio(audio, "input", session_id=session_id)
-        await self.interrupt_output(new_session_id=session_id)
+        with self.sessions.trace_context(session_id):
+            runtime_tracer.mark(
+                module=VAD_TRACE_MODULE,
+                name="vad_validated",
+                kind="audio_input",
+                attributes={
+                    "audio_duration_ms": round(duration_ms, 3),
+                    "audio_bytes": len(audio),
+                    "rms": round(rms, 3),
+                    "playing_audio": bool(self.is_playing_audio),
+                },
+            )
+            self.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
+            self.save_audio(audio, "input", session_id=session_id)
+            await self.interrupt_output(new_session_id=session_id)
 
-        try:
-            if self.asr_ws is None or getattr(self.asr_ws, "close_code", None) is not None:
-                reconnect_start_ms = now_ms()
-                await self.connect_services()
-                self.session_log(session_id, "asr_reconnect_done: reconnect_ms=%.1f", now_ms() - reconnect_start_ms)
-
-            asr_start_ms = now_ms()
-            self.session_log(session_id, "asr_send_start: audio_ms=%.1f bytes=%s", duration_ms, len(audio))
-            await self.asr_ws.send(audio)
-            self.session_log(session_id, "asr_send_done: send_ms=%.1f", now_ms() - asr_start_ms)
-            resp = await asyncio.wait_for(self.asr_ws.recv(), timeout=self.asr_timeout_s)
-            asr_done_ms = now_ms()
-            result = json.loads(resp)
-            if result.get("type") == "error":
-                self.session_log(session_id, "asr_error: asr_ms=%.1f error=%s", asr_done_ms - asr_start_ms, result)
-                return
-            if result.get("type") == "final":
-                user_text = result.get("text", "").strip()
-                self.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
-                if user_text:
-                    self._launch_routed_turn(user_text, session_id)
-                else:
-                    self.session_log(session_id, "asr_empty_text")
-        except Exception as exc:
-            self.session_log(session_id, "asr_exception: error=%s", exc)
-            logger.error("%s ASR error: %s", session_id, exc, exc_info=True)
             try:
-                if self.asr_ws:
-                    await self.asr_ws.close()
-            except Exception:
-                pass
-            self.asr_ws = None
+                async with runtime_tracer.span(
+                    module=ASR_TRACE_MODULE,
+                    operation="transcribe",
+                    kind="model_call",
+                    attributes={
+                        "audio_duration_ms": round(duration_ms, 3),
+                        "audio_bytes": len(audio),
+                        "timeout_ms": round(self.asr_timeout_s * 1000.0, 3),
+                    },
+                ) as asr_span:
+                    if self.asr_ws is None or getattr(self.asr_ws, "close_code", None) is not None:
+                        reconnect_start_ms = now_ms()
+                        await self.connect_services()
+                        reconnect_ms = now_ms() - reconnect_start_ms
+                        asr_span.set_attribute("reconnect_ms", round(reconnect_ms, 3))
+                        self.session_log(session_id, "asr_reconnect_done: reconnect_ms=%.1f", reconnect_ms)
+
+                    asr_start_ms = now_ms()
+                    self.session_log(session_id, "asr_send_start: audio_ms=%.1f bytes=%s", duration_ms, len(audio))
+                    await self.asr_ws.send(audio)
+                    send_ms = now_ms() - asr_start_ms
+                    asr_span.set_attribute("send_ms", round(send_ms, 3))
+                    self.session_log(session_id, "asr_send_done: send_ms=%.1f", send_ms)
+                    resp = await asyncio.wait_for(self.asr_ws.recv(), timeout=self.asr_timeout_s)
+                    asr_done_ms = now_ms()
+                    result = json.loads(resp)
+                    asr_span.set_attribute("result_type", str(result.get("type") or "unknown"))
+                    if result.get("type") == "error":
+                        asr_span.set_status("error")
+                        self.session_log(session_id, "asr_error: asr_ms=%.1f error=%s", asr_done_ms - asr_start_ms, result)
+                        return
+                    if result.get("type") == "final":
+                        user_text = result.get("text", "").strip()
+                        asr_span.set_attribute("text_chars", len(user_text))
+                        runtime_tracer.mark(
+                            module=ASR_TRACE_MODULE,
+                            name="asr_final_available",
+                            kind="milestone",
+                            attributes={"text_chars": len(user_text)},
+                        )
+                        self.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
+                        if user_text:
+                            self._launch_routed_turn(user_text, session_id)
+                        else:
+                            self.session_log(session_id, "asr_empty_text")
+            except Exception as exc:
+                self.session_log(session_id, "asr_exception: error=%s", exc)
+                logger.error("%s ASR error: %s", session_id, exc, exc_info=True)
+                try:
+                    if self.asr_ws:
+                        await self.asr_ws.close()
+                except Exception:
+                    pass
+                self.asr_ws = None
 
     def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
         previous = getattr(self, "active_turn_task", None)
@@ -5146,6 +5192,13 @@ class VoiceAssistant:
             )
             await self._feed_vad_pcm16(silence)
 
+    async def _session_idle_sweeper(self) -> None:
+        interval_s = max(1.0, float(os.getenv("ORCH_SESSION_IDLE_SWEEP_S", "5")))
+        idle_timeout_ms = max(1000.0, float(os.getenv("ORCH_SESSION_IDLE_TIMEOUT_MS", "120000")))
+        while True:
+            await asyncio.sleep(interval_s)
+            self.sessions.finalize_idle_sessions(idle_timeout_ms=idle_timeout_ms)
+
     async def run(self):
         gate = ServiceReadinessGate(
             asr_url=self.asr_url,
@@ -5207,6 +5260,9 @@ class VoiceAssistant:
         if self.active_turn_task and not self.active_turn_task.done():
             self.active_turn_task.cancel()
         self._pending_vad_audio = None
+        sweeper = getattr(self, "session_idle_sweeper_task", None)
+        if sweeper is not None and not sweeper.done():
+            sweeper.cancel()
         if self.playback_task and not self.playback_task.done():
             await self.playback_queue.put((None, None, None, None, None, None))
             self.playback_task.cancel()

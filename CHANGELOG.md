@@ -179,3 +179,11 @@ declaration still blocks publication.
   audible response instrumentation using module-owned descriptors.
 - Added complete and abandoned session finalization plus optional Runtime Event
   packaging.
+
+### Runtime Observability Step 8
+
+- Added generic VAD and ASR trace items on detached voice-session traces.
+- Added provider acknowledgement and optional first-physical-motion milestones.
+- Added configurable idle-timeout finalization for unfinished session traces.
+- Preserved the architecture-independent trace contract and avoided invented
+  physical-motion timing when the action provider supplies no evidence.

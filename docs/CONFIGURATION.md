@@ -754,3 +754,15 @@ variables are not a supported production-selection mechanism in this revision.
   generated bundles live below `.chromie/releases/`.
 - Host dependency installation: `ORCH_AUTO_INSTALL_DEPS`,
   `ORCH_FORCE_INSTALL_DEPS`, `ORCH_PIP_CHECK`, `ORCH_REQUIREMENTS_FILE`.
+
+### Voice-session trace idle finalization
+
+```text
+ORCH_SESSION_IDLE_TIMEOUT_MS=120000
+ORCH_SESSION_IDLE_SWEEP_S=5
+```
+
+`ORCH_SESSION_IDLE_TIMEOUT_MS` marks an unfinished voice-session trace as
+`abandoned` after the configured period without recorded session activity.
+`ORCH_SESSION_IDLE_SWEEP_S` controls how often the orchestrator checks for idle
+sessions. These settings do not change normal completed-session behavior.

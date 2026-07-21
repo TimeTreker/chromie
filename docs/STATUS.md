@@ -711,3 +711,11 @@ are now instrumented with generic Runtime Trace items. Coverage remains partial:
 ASR/VAD spans, first physical motion, resource sampling, crash recovery, and
 retained live latency qualification are still open. See
 [Step 7: Session, Execution, and Audio Runtime Trace](STEP7_SESSION_EXECUTION_AUDIO_TRACE.md).
+
+## Runtime Observability Step 8
+
+Input and operational coverage now includes valid VAD utterances, ASR calls,
+action-provider acknowledgements, optional provider-reported first physical
+motion, and idle-timeout abandonment of unfinished voice sessions. Runtime Trace
+coverage remains partial: resource sampling, persisted process-restart recovery,
+and retained hardware latency baselines are still open.

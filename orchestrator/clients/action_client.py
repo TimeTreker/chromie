@@ -57,6 +57,26 @@ class ActionClient:
                     )
                 result = ActionResult.model_validate_json(body)
                 span.set_attribute("result_status", result.status)
+                runtime_tracer.mark(
+                    module=self.TRACE_MODULE,
+                    name="action_acknowledged",
+                    kind="milestone",
+                    attributes={
+                        "action_id": action.id,
+                        "status": result.status,
+                    },
+                )
+                first_motion_ms = result.result.get("first_motion_ms")
+                if first_motion_ms is not None:
+                    runtime_tracer.mark(
+                        module=self.TRACE_MODULE,
+                        name="first_physical_motion",
+                        kind="user_observable",
+                        attributes={
+                            "action_id": action.id,
+                            "provider_first_motion_ms": first_motion_ms,
+                        },
+                    )
                 return result
 
     async def health(self, session: aiohttp.ClientSession) -> dict:

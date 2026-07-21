@@ -183,3 +183,5 @@ python scripts/check_docs.py
 - [Step 7: Session, Execution, and Audio Runtime Trace](STEP7_SESSION_EXECUTION_AUDIO_TRACE.md)
   documents detached session tracing, execution/audio producer coverage, and
   first audible user-observable latency.
+
+- [Step 8: Input, Action, and Idle Trace Coverage](STEP8_INPUT_ACTION_IDLE_TRACE.md)

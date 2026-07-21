@@ -139,6 +139,7 @@ class SessionTracker:
         self.current_sid = sid
         self.state[sid] = {
             "t0_ms": now_ms(),
+            "last_activity_ms": now_ms(),
             "scheduled_tts": 0,
             "queued_tts": 0,
             "played_tts": 0,
@@ -217,9 +218,12 @@ class SessionTracker:
         return 0.0 if not state else now_ms() - float(state["t0_ms"])
 
     def log(self, sid: str | None, message: str, *args: Any) -> None:
+        sid = sid or "unknown"
+        state = self.state.get(sid)
+        if state is not None:
+            state["last_activity_ms"] = now_ms()
         if not self.enabled:
             return
-        sid = sid or "unknown"
         elapsed = self.elapsed_ms(sid)
         rendered = self._render_message(message, args)
         level = self._event_log_level(rendered)
@@ -286,6 +290,42 @@ class SessionTracker:
             )
             self._finalize_runtime_trace(sid, state="complete")
 
+    def finalize_idle_sessions(
+        self,
+        *,
+        idle_timeout_ms: float,
+        now_ms_value: float | None = None,
+    ) -> list[str]:
+        """Finalize unfinished sessions whose activity has exceeded the idle limit."""
+
+        current = now_ms() if now_ms_value is None else float(now_ms_value)
+        finalized: list[str] = []
+        for sid, session in list(self.state.items()):
+            if session.get("done_logged") or session.get("runtime_trace_finalized"):
+                continue
+            last_activity = float(session.get("last_activity_ms", session.get("t0_ms", current)))
+            if current - last_activity < float(idle_timeout_ms):
+                continue
+            session["interrupted"] = True
+            self.log(
+                sid,
+                "session_idle_timeout: idle_ms=%.1f timeout_ms=%.1f",
+                current - last_activity,
+                idle_timeout_ms,
+            )
+            self.trace_mark(
+                sid,
+                "session_idle_timeout",
+                kind="session",
+                attributes={
+                    "idle_ms": round(current - last_activity, 3),
+                    "timeout_ms": round(float(idle_timeout_ms), 3),
+                },
+            )
+            self._finalize_runtime_trace(sid, state="abandoned")
+            finalized.append(sid)
+        return finalized
+
     def _render_message(self, message: str, args: tuple[Any, ...]) -> str:
         try:
             return message % args if args else message
@@ -298,6 +338,7 @@ class SessionTracker:
         state = self.state.get(sid)
         if not state:
             return
+        state["last_activity_ms"] = now_ms()
         event_name = rendered.split(":", 1)[0].strip()
         if event_name not in self._WORKFLOW_EVENT_PREFIXES:
             return
