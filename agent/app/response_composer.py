@@ -14,6 +14,7 @@ from .schema import AgentRunRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
     from chromie_contracts.plan import CanonicalPlan
     from chromie_contracts.response_composition import (
         CoordinatedResponsePlan,
@@ -30,6 +31,7 @@ try:
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.response_composition import (
         CoordinatedResponsePlan,
@@ -70,12 +72,47 @@ class ResponseComposerResolver:
     model-authored plan against evidence, capability schemas, and resource gates.
     """
 
+    TRACE_MODULE = TraceModule(
+        name="agent.response_composer",
+        component_type="response_composer",
+        implementation="ResponseComposerResolver",
+        schema_version=1,
+    )
+
     def __init__(self, ollama: OllamaClient, *, num_ctx: int = 4096, num_predict: int = 640) -> None:
         self.ollama = ollama
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
 
     async def resolve(self, request: AgentRunRequest) -> ResponseCompositionResolution:
+        trace_scope = runtime_tracer.continue_from_context(request.context)
+        if not trace_scope.enabled:
+            return await self._resolve(request)
+        try:
+            async with trace_scope:
+                async with runtime_tracer.span(
+                    module=self.TRACE_MODULE,
+                    operation="resolve",
+                    attributes={
+                        "num_ctx": self.num_ctx,
+                        "num_predict": self.num_predict,
+                    },
+                ) as span:
+                    result = await self._resolve(request)
+                    span.set_attribute("result_status", result.status)
+                    span.set_attribute(
+                        "composition_available", result.composition is not None
+                    )
+                    if result.status != "resolved":
+                        span.set_status("error")
+        except BaseException:
+            trace_scope.finish(state="abandoned")
+            raise
+        trace_scope.finish(state="complete")
+        runtime_tracer.attach_fragment(result.metadata, trace_scope)
+        return result
+
+    async def _resolve(self, request: AgentRunRequest) -> ResponseCompositionResolution:
         plan = self._canonical_plan(request.context)
         if plan is None or plan.disposition == "escalate":
             return ResponseCompositionResolution(

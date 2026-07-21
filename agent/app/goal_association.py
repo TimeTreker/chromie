@@ -13,8 +13,10 @@ from .schema import AgentRunRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 try:
     from chromie_contracts.goal import (
@@ -175,6 +177,13 @@ class GoalAssociationModelOutput(BaseModel):
 class GoalAssociationResolver:
     """Resolve continuity before creation without mutating runtime state."""
 
+    TRACE_MODULE = TraceModule(
+        name="agent.goal_association",
+        component_type="goal_association",
+        implementation="GoalAssociationResolver",
+        schema_version=1,
+    )
+
     def __init__(
         self,
         ollama: OllamaClient,
@@ -191,6 +200,35 @@ class GoalAssociationResolver:
         self.num_predict = max(128, int(num_predict))
 
     async def resolve(self, request: AgentRunRequest) -> GoalAssociationResolution:
+        trace_scope = runtime_tracer.continue_from_context(request.context)
+        if not trace_scope.enabled:
+            return await self._resolve(request)
+        try:
+            async with trace_scope:
+                async with runtime_tracer.span(
+                    module=self.TRACE_MODULE,
+                    operation="resolve",
+                    attributes={
+                        "active_goal_count": len(self._active_goals(request)),
+                        "num_ctx": self.num_ctx,
+                        "num_predict": self.num_predict,
+                    },
+                ) as span:
+                    result = await self._resolve(request)
+                    status = str((result.metadata or {}).get("status") or "resolved")
+                    span.set_attribute("result_status", status)
+                    span.set_attribute("association_count", len(result.associations))
+                    span.set_attribute("new_goal_count", len(result.new_goals))
+                    if status not in {"resolved", "needs_clarification"}:
+                        span.set_status("error")
+        except BaseException:
+            trace_scope.finish(state="abandoned")
+            raise
+        trace_scope.finish(state="complete")
+        runtime_tracer.attach_fragment(result.metadata, trace_scope)
+        return result
+
+    async def _resolve(self, request: AgentRunRequest) -> GoalAssociationResolution:
         active_goals = self._active_goals(request)
         turn_id = self._turn_id(request)
         output_type: (

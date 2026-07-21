@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,6 +12,7 @@ from shared.chromie_runtime.cognitive_integrity_events import (
     capture_cognitive_integrity_event,
     cognitive_integrity_metadata,
 )
+from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 
 class _Failure(RuntimeError):
@@ -53,6 +56,45 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
             self.assertFalse(failure["automatic_retry_allowed"])
             self.assertTrue((root / "inbox" / f'{result["event_id"]}.json').is_file())
 
+
+    def test_active_runtime_trace_is_attached_to_incident_package(self) -> None:
+        module = TraceModule(
+            name="tests.cognitive_stage",
+            component_type="test",
+            implementation="CognitiveIntegrityEventTests",
+        )
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
+            os.environ,
+            {"CHROMIE_RUNTIME_TRACE_MODE": "basic"},
+            clear=False,
+        ):
+            root = Path(directory)
+            scope = runtime_tracer.start_trace(
+                correlations={"session_id": "sid-trace"}
+            )
+            with scope:
+                with runtime_tracer.span(module=module, operation="resolve"):
+                    result = capture_cognitive_integrity_event(
+                        stage="fast_planner",
+                        failure=_Failure().metadata(),
+                        session_id="sid-trace",
+                        user_text="walk forward",
+                        language="en",
+                        route_decision={"route": "robot_action"},
+                        runtime_context={},
+                        model_exchange={},
+                        event_root=root / "events",
+                        trigger_root=root / "inbox",
+                    )
+            scope.finish()
+
+            payload_root = Path(result["payload_root"])
+            self.assertTrue((payload_root / "trace.json").is_file())
+            self.assertTrue((payload_root / "trace-summary.json").is_file())
+            manifest = json.loads((payload_root / "event.json").read_text())
+            self.assertTrue(manifest["attributes"]["trace_attached"])
+            self.assertTrue(manifest["correlations"]["trace_id"].startswith("trace_"))
+
     def test_common_metadata_for_any_cognitive_stage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             request = SimpleNamespace(
@@ -62,7 +104,6 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
                 route_decision={},
                 context={},
             )
-            import os
             old = os.environ.get("CHROMIE_EVENT_ROOT")
             os.environ["CHROMIE_EVENT_ROOT"] = str(Path(directory) / "events")
             try:

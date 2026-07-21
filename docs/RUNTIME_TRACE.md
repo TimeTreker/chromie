@@ -2,9 +2,12 @@
 
 ## Status
 
-This document is the normative design contract for Chromie's planned Runtime
-Trace subsystem. It defines the stable observation format before broad runtime
-instrumentation is implemented.
+This document is the normative contract for Chromie's Runtime Trace subsystem.
+The initial implementation exists in
+`shared/chromie_runtime/runtime_trace.py` and currently instruments the
+goal-driven cognitive/model path with partial coverage. Execution, audio, TTS,
+provider/resource observations, user-observable milestones, session lifecycle
+recovery, and retained live latency evidence remain open.
 
 ## Trace envelope
 

@@ -4,6 +4,26 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Runtime observability
+
+- Added a default-off, architecture-independent Runtime Trace foundation with
+  stable module descriptors, nested synchronous/asynchronous spans, monotonic
+  duration measurement, wall-clock correlation, bounded attributes,
+  `contextvars` propagation, and immutable complete or abandoned snapshots.
+- Added cross-service trace carriers and mergeable Agent fragments so the
+  Orchestrator can reconstruct the actual cognitive/model topology without a
+  fixed Router/Planner schema.
+- Instrumented the goal-driven coordinator, canonical plan adapter, cognitive
+  Agent service calls, Goal Association, Fast and Deep Planning, Response
+  Composer, and Ollama model calls while retaining existing `timings_ms` fields.
+- Added reproducible trace summaries with inclusive/exclusive module time,
+  largest items, user-observable latency support, parallel leaf-work analysis,
+  and a versioned interval/topology critical-path approximation.
+- Added optional `chromie.interaction_trace` Runtime Event packages and active
+  trace attachment to cognitive-integrity incidents; execution, audio, TTS,
+  provider/resource, session-recovery, and retained live latency evidence remain
+  open.
+
 ### Goal-driven cognitive runtime rollout
 
 - Integrated Goal Association, complete-coverage Fast Planning, terminal Deep

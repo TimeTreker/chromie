@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .runtime_events import persist_runtime_event
+from .runtime_trace import runtime_tracer
 
 EVENT_TYPE = "chromie.cognitive_integrity_failure"
 TRUNCATION_FAILURES = frozenset({"output_truncated", "prompt_truncated"})
@@ -77,6 +78,7 @@ def capture_cognitive_integrity_event(
         if isinstance(experience, Mapping):
             conversation_id = str(experience.get("conversation_id") or "")
     subtype = f"llm_{failure_class}"
+    trace_snapshot = runtime_tracer.current_snapshot()
     failure_payload = {
         **dict(failure),
         "retryable": False,
@@ -85,6 +87,28 @@ def capture_cognitive_integrity_event(
         "result_trusted": False,
         "new_execution_allowed": False,
     }
+    payloads = {
+        "failure.json": failure_payload,
+        "runtime.json": {
+            "stage": stage,
+            "session_id": session_id or "",
+            "conversation_id": conversation_id,
+            "language": language,
+            "route_decision": route_decision,
+            "runtime_context": runtime_context,
+        },
+        "model_exchange.json": model_exchange,
+        "user_interaction.json": {
+            "user_text": user_text,
+            "user_text_sha256": hashlib.sha256(user_text.encode("utf-8")).hexdigest(),
+            "notification_required": True,
+            "execution_prevented": True,
+        },
+    }
+    if trace_snapshot is not None:
+        payloads["trace.json"] = trace_snapshot.trace
+        payloads["trace-summary.json"] = trace_snapshot.summary
+
     return persist_runtime_event(
         event_type=EVENT_TYPE,
         event_subtype=subtype,
@@ -95,6 +119,11 @@ def capture_cognitive_integrity_event(
         correlations={
             "session_id": session_id or "",
             "conversation_id": conversation_id,
+            "trace_id": (
+                trace_snapshot.trace.get("trace_id")
+                if trace_snapshot is not None
+                else ""
+            ),
         },
         attributes={
             "stage": stage,
@@ -107,30 +136,14 @@ def capture_cognitive_integrity_event(
             "num_predict": failure.get("num_predict"),
             "execution_prevented": True,
             "safe_state_requested": True,
+            "trace_attached": trace_snapshot is not None,
         },
         derivation={
             "episode_correlation_supported": True,
             "scenario_candidate_eligible": True,
             "scenario_auto_promotion_allowed": False,
         },
-        payloads={
-            "failure.json": failure_payload,
-            "runtime.json": {
-                "stage": stage,
-                "session_id": session_id or "",
-                "conversation_id": conversation_id,
-                "language": language,
-                "route_decision": route_decision,
-                "runtime_context": runtime_context,
-            },
-            "model_exchange.json": model_exchange,
-            "user_interaction.json": {
-                "user_text": user_text,
-                "user_text_sha256": hashlib.sha256(user_text.encode("utf-8")).hexdigest(),
-                "notification_required": True,
-                "execution_prevented": True,
-            },
-        },
+        payloads=payloads,
     )
 
 def cognitive_integrity_user_message(*, language: str, trigger_status: str) -> str:

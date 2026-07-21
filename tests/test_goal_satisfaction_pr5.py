@@ -140,7 +140,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "confidence": 0.92,
             "goal_ids": ["goal-blink"],
             "goal_summary": "blink naturally",
-            "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 4}}],
+            "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 4}, "source_goal_ids": ["goal-blink"]}],
             "parameter_resolutions": [{
                 "step_id": "blink",
                 "parameter": "count",
@@ -197,7 +197,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 0.9,
             "goal_ids": ["goal-blink"],
-            "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 1}}],
+            "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 1}, "source_goal_ids": ["goal-blink"]}],
             "goal_satisfaction": {"score": 0.8, "status": "substantial", "unmet_requirements": ["requested repeated blinking"]},
         }
         exact = {
@@ -205,7 +205,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 0.92,
             "goal_ids": ["goal-blink"],
-            "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 4}}],
+            "steps": [{"step_id": "blink", "skill_id": "soridormi.blink_eyes", "args": {"count": 4}, "source_goal_ids": ["goal-blink"]}],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = FakeOllama([low, exact])

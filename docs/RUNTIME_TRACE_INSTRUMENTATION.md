@@ -2,10 +2,11 @@
 
 ## Purpose
 
-This guide defines how Chromie modules should participate in Runtime Trace once
-the shared implementation is introduced. It applies to classes, module-level
+This guide defines how Chromie modules participate in Runtime Trace through the
+shared `runtime_tracer` implementation. It applies to classes, module-level
 functions, service adapters, model clients, audio components, and execution
-providers.
+providers. The initial cognitive/model instrumentation is implemented; later
+modules should follow the same contract rather than creating a second profiler.
 
 The authoritative schema is [Runtime Trace Contract](RUNTIME_TRACE.md). The
 system-level rationale is
@@ -43,7 +44,7 @@ request values, user identity, model output, or process-local object identity.
 Synchronous operation:
 
 ```python
-with tracer.span(
+with runtime_tracer.span(
     module=TRACE_MODULE,
     operation="validate",
     attributes={"step_count": len(plan.steps)},
@@ -55,7 +56,7 @@ with tracer.span(
 Asynchronous operation:
 
 ```python
-async with tracer.span(
+async with runtime_tracer.span(
     module=self.TRACE_MODULE,
     operation="resolve",
     attributes={"goal_count": len(goals)},
@@ -67,15 +68,16 @@ async with tracer.span(
 A milestone uses the shared marker API:
 
 ```python
-tracer.mark(
+runtime_tracer.mark(
     module=TRACE_MODULE,
     name="first_observable_motion",
     kind="user_observable",
 )
 ```
 
-The exact API is an implementation target. Modules should not create competing
-wrappers before the shared tracing library exists.
+The shared API is implemented in `shared/chromie_runtime/runtime_trace.py`.
+Modules should import `TraceModule` and the process-local `runtime_tracer`
+singleton rather than create competing wrappers or persistence paths.
 
 ## Context propagation
 
@@ -104,13 +106,10 @@ if os.getenv("DEBUG_TRACE"):
     write_json(...)
 ```
 
-Instead:
-
-```python
-policy = tracer.policy_for(TRACE_MODULE)
-```
-
-or simply emit through the tracer and let it decide whether the span is active.
+Instead, emit through `runtime_tracer.span(...)` and let the shared policy decide
+whether the span is active. When metadata is expensive to compute, check the
+returned span's `enabled` property after entering it before producing debug-only
+attributes.
 
 The framework owns global and per-module configuration, sampling, privacy,
 attribute limits, and Runtime Event emission.

@@ -14,6 +14,11 @@ immutable evidence for the external data loop; Experience Episodes preserve
 semantic interaction history; and Scenario Candidates are derived offline under
 human review. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md).
+The initial default-off implementation now provides generic nested spans,
+cross-service trace fragments, topology-aware summaries, optional interaction
+trace Runtime Events, and active-trace attachment to cognitive-integrity
+incidents across the goal-driven cognitive/model path. Execution, audio, TTS,
+provider, resource, and user-observable milestone instrumentation remains open.
 
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
 > semantic authority: Goal Association -> Fast/terminal Deep Planning ->

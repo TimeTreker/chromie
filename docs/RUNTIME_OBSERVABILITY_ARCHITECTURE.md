@@ -1,5 +1,16 @@
 # Runtime Observability Architecture
 
+## Implementation status
+
+The initial default-off Runtime Trace foundation and cognitive/model-path
+instrumentation are implemented. Current coverage includes the goal-driven
+coordinator, canonical adapter, cognitive Agent service calls and resolvers, and
+Ollama model calls. Completed traces can produce summaries and optional Runtime
+Event packages, and cognitive-integrity incidents attach an active trace snapshot
+when available. Execution, audio, TTS, provider/resource observations,
+user-observable milestones, session recovery, sampling policy, and retained live
+latency evidence remain open.
+
 ## Purpose
 
 Runtime Observability is Chromie's architecture for understanding what happened,

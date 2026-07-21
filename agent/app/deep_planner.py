@@ -14,8 +14,10 @@ from .schema import AgentRunRequest
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+    from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from .planner_contract import (
     canonical_goal_grounding,
     canonical_plan_response_schema,
@@ -38,6 +40,13 @@ logger = logging.getLogger("chromie.agent.deep_planner")
 class DeepPlannerResolver:
     """Full-catalog semantic planner with one bounded same-tier revision."""
 
+    TRACE_MODULE = TraceModule(
+        name="agent.deep_planner",
+        component_type="planner",
+        implementation="DeepPlannerResolver",
+        schema_version=1,
+    )
+
     def __init__(self, ollama: OllamaClient, catalog: CapabilityCatalog, *, min_confidence: float = 0.65,
                  num_ctx: int = 8192, num_predict: int = 1024, max_capabilities: int = 96,
                  max_replans: int = 1, min_goal_satisfaction: float = 0.75) -> None:
@@ -51,6 +60,36 @@ class DeepPlannerResolver:
         self.min_goal_satisfaction = max(0.0, min(1.0, float(min_goal_satisfaction)))
 
     async def resolve(self, request: AgentRunRequest) -> CanonicalPlan:
+        trace_scope = runtime_tracer.continue_from_context(request.context)
+        if not trace_scope.enabled:
+            return await self._resolve(request)
+        try:
+            async with trace_scope:
+                async with runtime_tracer.span(
+                    module=self.TRACE_MODULE,
+                    operation="resolve",
+                    attributes={
+                        "num_ctx": self.num_ctx,
+                        "num_predict": self.num_predict,
+                        "max_capabilities": self.max_capabilities,
+                        "max_replans": self.max_replans,
+                    },
+                ) as span:
+                    result = await self._resolve(request)
+                    span.set_attribute("disposition", result.disposition)
+                    span.set_attribute("coverage", result.coverage)
+                    span.set_attribute("step_count", len(result.steps))
+                    span.set_attribute("goal_count", len(result.goal_ids))
+                    if result.metadata.get("failure_class"):
+                        span.set_status("error")
+        except BaseException:
+            trace_scope.finish(state="abandoned")
+            raise
+        trace_scope.finish(state="complete")
+        runtime_tracer.attach_fragment(result.metadata, trace_scope)
+        return result
+
+    async def _resolve(self, request: AgentRunRequest) -> CanonicalPlan:
         plan_id = self._plan_id(request)
         capabilities = await self.catalog.prompt_entries(scope="all", refresh=False)
         executable = [

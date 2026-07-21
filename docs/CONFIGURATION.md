@@ -416,6 +416,36 @@ python scripts/evaluate_experience_episodes.py \
 from those reviews; it does not auto-apply prompt, memory, safety, or policy
 changes.
 
+## Runtime observability
+
+Runtime Trace is default-off and independent of the current module graph. When
+enabled, each participating module declares a stable module descriptor and emits
+generic spans through the shared tracer. The Orchestrator and Agent services must
+use compatible trace modes for cross-service continuation; a service configured
+with `off` does not continue a received carrier. Existing stage-specific
+`timings_ms` fields remain available for compatibility.
+
+| Variable | Default or behavior |
+|---|---|
+| `CHROMIE_RUNTIME_TRACE_MODE` | `off`; accepted values are `off`, `basic`, and `debug`. `basic` records bounded operational timing and topology; `debug` permits additional bounded diagnostic attributes supplied by instrumented modules. |
+| `CHROMIE_RUNTIME_TRACE_MODULES` | Empty allowlist means every instrumented module may emit at the configured mode. A comma-separated list limits collection to exact stable module names such as `agent.fast_planner`. |
+| `CHROMIE_RUNTIME_TRACE_DEBUG_MODULES` | Optional comma-separated exact module names that may emit debug-level attributes while global mode is `basic`. |
+| `CHROMIE_RUNTIME_TRACE_MAX_ITEMS` | `1000`; maximum items retained in one trace, bounded to `16..10000`. Additional items are counted as dropped. |
+| `CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTES` | `32`; maximum attributes retained per trace object or item, bounded to `4..256`. |
+| `CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTE_CHARS` | `512`; maximum retained characters for one string attribute, bounded to `64..8192`. |
+| `CHROMIE_RUNTIME_TRACE_COVERAGE` | `partial`; truthful coverage label written into snapshots until all relevant runtime paths are instrumented. |
+| `CHROMIE_RUNTIME_TRACE_EMIT_EVENTS` | `0`; when enabled, a completed goal-driven interaction may produce one `chromie.interaction_trace` Runtime Event package containing `trace.json` and `trace-summary.json`. |
+| `CHROMIE_RUNTIME_EVENT_ROOT` | Optional durable Runtime Event root used by interaction traces, incidents, episode snapshots, and scenario candidates. Packages are finalized under `ready/<event_id>/`. |
+| `CHROMIE_DATA_LOOP_TRIGGER_ROOT` | Optional external data-loop filesystem inbox. A trigger file confirms local handoff only; it does not prove cloud upload. |
+
+Initial implementation coverage includes the goal-driven coordinator, canonical
+plan adapter, Orchestrator-to-Agent cognitive calls, Goal Association, Fast and
+Deep Planning, Response Composer, and Ollama model calls. Cognitive-integrity
+incidents attach the active trace snapshot when available. Execution, audio,
+TTS, provider, resource, and user-observable milestone coverage remains open.
+See [Runtime Trace Contract](RUNTIME_TRACE.md) and
+[Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md).
+
 ## Agent and TaskGraph
 
 | Variable | Meaning |

@@ -28,6 +28,18 @@ release claim.
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
+The repository now contains an initial default-off Runtime Trace implementation.
+The shared tracer provides module-owned generic spans, monotonic duration,
+wall-clock correlation, async context propagation, cross-service
+Orchestrator-to-Agent carriers and fragments, bounded attributes, immutable
+snapshots, topology-aware summaries, optional `chromie.interaction_trace`
+Runtime Events, and active-trace attachment to cognitive-integrity incidents.
+Current coverage is limited to the goal-driven coordinator, canonical adapter,
+cognitive Agent calls and resolvers, and Ollama model calls. Execution, audio,
+TTS, provider/resource observations, user-observable milestones, session
+lifecycle recovery, and retained live latency evidence remain open; no broad
+end-to-end latency claim follows from this initial implementation.
+
 The provider-readiness milestone is complete. A live local Soridormi MCP
 endpoint passed the `sim`, recommendation-only `hardware_shadow`, and no-motion
 `hardware_dry_run` conformance profiles, profile parity, and all 16 injected

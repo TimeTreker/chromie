@@ -9,6 +9,7 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import ResponseCompositionResolution
 from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
+from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 try:
     from schemas.agent import AgentRequest, AgentResult
@@ -21,6 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class AgentClient:
+    TRACE_MODULE = TraceModule(
+        name="orchestrator.agent_client",
+        component_type="service_client",
+        implementation="AgentClient",
+        schema_version=1,
+    )
+
     def __init__(self, base_url: str, timeout_ms: int = 3000):
         self.base_url = base_url.rstrip("/")
         self.timeout_ms = max(100, int(timeout_ms))
@@ -99,16 +107,37 @@ class AgentClient:
         history: list[dict[str, Any]] | None = None,
         timeout_ms: int | None = None,
     ) -> CanonicalPlan:
-        req = AgentRequest(
-            sid=sid, text=text, route_decision=route_decision,
-            context=context or {}, history=history or [],
-        )
-        timeout = aiohttp.ClientTimeout(total=max(100, int(timeout_ms or self.timeout_ms)) / 1000.0)
-        async with session.post(f"{self.base_url}/fast-plan", json=req.model_dump(mode="json"), timeout=timeout) as resp:
-            body = await resp.text()
-            if resp.status != 200:
-                raise RuntimeError(f"Agent fast-plan endpoint returned HTTP {resp.status}: {body[:500]}")
-            return CanonicalPlan.model_validate_json(body)
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="resolve_fast_plan",
+            kind="tool_call",
+            attributes={"endpoint": "/fast-plan", "timeout_ms": effective_timeout_ms},
+        ) as span:
+            req = AgentRequest(
+                sid=sid,
+                text=text,
+                route_decision=route_decision,
+                context=runtime_tracer.inject_carrier(context or {}),
+                history=history or [],
+            )
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/fast-plan",
+                json=req.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent fast-plan endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = CanonicalPlan.model_validate_json(body)
+            runtime_tracer.merge_fragment_from_metadata(result.metadata)
+            span.set_attribute("disposition", result.disposition)
+            span.set_attribute("step_count", len(result.steps))
+            return result
 
     async def resolve_deep_plan(
         self,
@@ -121,16 +150,37 @@ class AgentClient:
         history: list[dict[str, Any]] | None = None,
         timeout_ms: int | None = None,
     ) -> CanonicalPlan:
-        req = AgentRequest(
-            sid=sid, text=text, route_decision=route_decision,
-            context=context or {}, history=history or [],
-        )
-        timeout = aiohttp.ClientTimeout(total=max(100, int(timeout_ms or self.timeout_ms)) / 1000.0)
-        async with session.post(f"{self.base_url}/deep-plan", json=req.model_dump(mode="json"), timeout=timeout) as resp:
-            body = await resp.text()
-            if resp.status != 200:
-                raise RuntimeError(f"Agent deep-plan endpoint returned HTTP {resp.status}: {body[:500]}")
-            return CanonicalPlan.model_validate_json(body)
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="resolve_deep_plan",
+            kind="tool_call",
+            attributes={"endpoint": "/deep-plan", "timeout_ms": effective_timeout_ms},
+        ) as span:
+            req = AgentRequest(
+                sid=sid,
+                text=text,
+                route_decision=route_decision,
+                context=runtime_tracer.inject_carrier(context or {}),
+                history=history or [],
+            )
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/deep-plan",
+                json=req.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent deep-plan endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = CanonicalPlan.model_validate_json(body)
+            runtime_tracer.merge_fragment_from_metadata(result.metadata)
+            span.set_attribute("disposition", result.disposition)
+            span.set_attribute("step_count", len(result.steps))
+            return result
 
     async def compose_response_plan(
         self,
@@ -143,24 +193,39 @@ class AgentClient:
         history: list[dict[str, Any]] | None = None,
         timeout_ms: int | None = None,
     ) -> ResponseCompositionResolution:
-        req = AgentRequest(
-            sid=sid, text=text, route_decision=route_decision,
-            context=context or {}, history=history or [],
-        )
-        timeout = aiohttp.ClientTimeout(
-            total=max(100, int(timeout_ms or self.timeout_ms)) / 1000.0
-        )
-        async with session.post(
-            f"{self.base_url}/compose-response-plan",
-            json=req.model_dump(mode="json"),
-            timeout=timeout,
-        ) as resp:
-            body = await resp.text()
-            if resp.status != 200:
-                raise RuntimeError(
-                    f"Agent response-composer endpoint returned HTTP {resp.status}: {body[:500]}"
-                )
-            return ResponseCompositionResolution.model_validate_json(body)
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="compose_response_plan",
+            kind="tool_call",
+            attributes={
+                "endpoint": "/compose-response-plan",
+                "timeout_ms": effective_timeout_ms,
+            },
+        ) as span:
+            req = AgentRequest(
+                sid=sid,
+                text=text,
+                route_decision=route_decision,
+                context=runtime_tracer.inject_carrier(context or {}),
+                history=history or [],
+            )
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/compose-response-plan",
+                json=req.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent response-composer endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = ResponseCompositionResolution.model_validate_json(body)
+            runtime_tracer.merge_fragment_from_metadata(result.metadata)
+            span.set_attribute("result_status", result.status)
+            return result
 
     async def resolve_goal_association(
         self,
@@ -173,27 +238,41 @@ class AgentClient:
         history: list[dict[str, Any]] | None = None,
         timeout_ms: int | None = None,
     ) -> GoalAssociationResolution:
-        req = AgentRequest(
-            sid=sid,
-            text=text,
-            route_decision=route_decision,
-            context=context or {},
-            history=history or [],
-        )
-        timeout = aiohttp.ClientTimeout(
-            total=max(100, int(timeout_ms or self.timeout_ms)) / 1000.0
-        )
-        async with session.post(
-            f"{self.base_url}/goal-association",
-            json=req.model_dump(mode="json"),
-            timeout=timeout,
-        ) as resp:
-            body = await resp.text()
-            if resp.status != 200:
-                raise RuntimeError(
-                    f"Agent goal-association endpoint returned HTTP {resp.status}: {body[:500]}"
-                )
-            return GoalAssociationResolution.model_validate_json(body)
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="resolve_goal_association",
+            kind="tool_call",
+            attributes={
+                "endpoint": "/goal-association",
+                "timeout_ms": effective_timeout_ms,
+            },
+        ) as span:
+            req = AgentRequest(
+                sid=sid,
+                text=text,
+                route_decision=route_decision,
+                context=runtime_tracer.inject_carrier(context or {}),
+                history=history or [],
+            )
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/goal-association",
+                json=req.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent goal-association endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = GoalAssociationResolution.model_validate_json(body)
+            runtime_tracer.merge_fragment_from_metadata(result.metadata)
+            span.set_attribute(
+                "result_status", str(result.metadata.get("status") or "resolved")
+            )
+            return result
 
     async def resolve_task_continuity(
         self,

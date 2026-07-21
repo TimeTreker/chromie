@@ -15,12 +15,14 @@ try:
         ollama_prompt_preflight_diagnostics,
     )
     from chromie_runtime.log_colors import colorize_for_cli
+    from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_runtime.llm_diagnostics import (
         ollama_completion_diagnostics,
         ollama_prompt_preflight_diagnostics,
     )
     from shared.chromie_runtime.log_colors import colorize_for_cli
+    from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 
 logger = logging.getLogger("chromie.agent.ollama")
@@ -109,6 +111,13 @@ def llm_failure_metadata(exc: Exception) -> dict[str, Any]:
 
 
 class OllamaClient:
+    TRACE_MODULE = TraceModule(
+        name="agent.ollama",
+        component_type="model_client",
+        implementation="OllamaClient",
+        schema_version=1,
+    )
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -148,6 +157,45 @@ class OllamaClient:
         )
 
     async def generate(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        options: dict[str, Any] | None = None,
+        response_format: ResponseFormat = "text",
+    ) -> str | dict[str, Any]:
+        request_options = dict(options or {})
+        response_format_label = (
+            "json_schema" if isinstance(response_format, dict) else response_format
+        )
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="generate",
+            kind="model_call",
+            attributes={
+                "purpose": self.purpose,
+                "model": self.model,
+                "response_format": response_format_label,
+                "timeout_ms": self.timeout_ms,
+                "prompt_chars": len(prompt),
+                "system_chars": len(system or ""),
+                "num_ctx": request_options.get("num_ctx"),
+                "num_predict": request_options.get("num_predict"),
+            },
+        ) as span:
+            result = await self._generate(
+                prompt,
+                system=system,
+                options=options,
+                response_format=response_format,
+            )
+            if isinstance(result, str):
+                span.set_attribute("response_chars", len(result))
+            elif isinstance(result, dict):
+                span.set_attribute("response_key_count", len(result))
+            return result
+
+    async def _generate(
         self,
         prompt: str,
         *,

@@ -24,6 +24,7 @@ from shared.chromie_contracts.response_composition import (
     ResponseCompositionResolution,
     canonical_plan_fingerprint,
 )
+from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 CognitiveRuntimeMode = Literal["off", "report_only", "apply"]
 CognitiveRuntimeStatus = Literal[
@@ -256,6 +257,13 @@ class CognitiveEvidenceRecorder:
 class CanonicalPlanRuntimeAdapter:
     """Translate validated canonical planning into the existing trusted runtime."""
 
+    TRACE_MODULE = TraceModule(
+        name="orchestrator.canonical_plan_adapter",
+        component_type="runtime_adapter",
+        implementation="CanonicalPlanRuntimeAdapter",
+        schema_version=1,
+    )
+
     def __init__(self, interaction_runtime: Any) -> None:
         self.interaction_runtime = interaction_runtime
 
@@ -272,6 +280,22 @@ class CanonicalPlanRuntimeAdapter:
         return "unsupported"
 
     async def validation_errors(self, plan: CanonicalPlan) -> list[dict[str, Any]]:
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="validate_plan",
+            attributes={
+                "plan_disposition": plan.disposition,
+                "step_count": len(plan.steps),
+                "planner_tier": plan.planner_tier,
+            },
+        ) as span:
+            errors = await self._validation_errors(plan)
+            span.set_attribute("error_count", len(errors))
+            if errors:
+                span.set_status("error")
+            return errors
+
+    async def _validation_errors(self, plan: CanonicalPlan) -> list[dict[str, Any]]:
         errors: list[dict[str, Any]] = []
         if plan.disposition not in {"execute", "mixed"}:
             if plan.steps:
@@ -484,6 +508,47 @@ class CanonicalPlanRuntimeAdapter:
         return False
 
     async def build_response(
+        self,
+        *,
+        plan: CanonicalPlan,
+        composition: CoordinatedResponsePlan,
+        session_id: str,
+        language: str,
+        context: dict[str, Any] | None = None,
+    ) -> InteractionResponse:
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="build_response",
+            attributes={
+                "plan_disposition": plan.disposition,
+                "step_count": len(plan.steps),
+                "speech_stage_count": sum(
+                    1
+                    for item in (
+                        composition.response_plan.immediate,
+                        composition.response_plan.pre_action,
+                        composition.response_plan.final,
+                    )
+                    if item is not None
+                )
+                + len(composition.response_plan.progress),
+            },
+        ) as span:
+            response = await self._build_response(
+                plan=plan,
+                composition=composition,
+                session_id=session_id,
+                language=language,
+                context=context,
+            )
+            span.set_attribute("response_status", response.status)
+            span.set_attribute("speech_count", len(response.speech))
+            span.set_attribute("skill_count", len(response.skills))
+            if response.status == "error":
+                span.set_status("error")
+            return response
+
+    async def _build_response(
         self,
         *,
         plan: CanonicalPlan,
@@ -723,6 +788,13 @@ class CanonicalPlanRuntimeAdapter:
 class GoalDrivenRuntimeCoordinator:
     """Single-direction goal association → fast/deep plan → composition pipeline."""
 
+    TRACE_MODULE = TraceModule(
+        name="orchestrator.cognitive_runtime",
+        component_type="interaction_coordinator",
+        implementation="GoalDrivenRuntimeCoordinator",
+        schema_version=1,
+    )
+
     def __init__(
         self,
         *,
@@ -797,6 +869,103 @@ class GoalDrivenRuntimeCoordinator:
         return payload
 
     async def resolve(
+        self,
+        session: Any,
+        *,
+        text: str,
+        sid: str,
+        route_decision: Any,
+        context: dict[str, Any],
+        history: list[dict[str, Any]],
+        language: str,
+    ) -> CognitiveRuntimeResolution:
+        experience = context.get("experience_context")
+        if not isinstance(experience, dict):
+            experience = {}
+        conversation_id = str(
+            context.get("conversation_id")
+            or experience.get("conversation_id")
+            or ""
+        )
+        interaction_id = str(
+            context.get("interaction_id")
+            or experience.get("interaction_id")
+            or sid
+        )
+        turn_index = context.get("turn_index") or experience.get("turn_index")
+        route = str(getattr(route_decision, "route", "") or "")
+        intent = str(getattr(route_decision, "intent", "") or "")
+        trace_scope = runtime_tracer.start_trace(
+            correlations={
+                "session_id": sid,
+                "conversation_id": conversation_id,
+                "interaction_id": interaction_id,
+                "turn_index": turn_index,
+            },
+            attributes={
+                "runtime_mode": self.policy.mode,
+                "route": route,
+                "intent": intent,
+                "language": language,
+                "text_chars": len(text or ""),
+            },
+            sampling_reason="goal_driven_interaction",
+        )
+        if not trace_scope.enabled:
+            return await self._resolve(
+                session,
+                text=text,
+                sid=sid,
+                route_decision=route_decision,
+                context=context,
+                history=history,
+                language=language,
+            )
+        try:
+            async with trace_scope:
+                async with runtime_tracer.span(
+                    module=self.TRACE_MODULE,
+                    operation="resolve",
+                    kind="interaction",
+                    attributes={"policy_mode": self.policy.mode},
+                ) as span:
+                    resolution = await self._resolve(
+                        session,
+                        text=text,
+                        sid=sid,
+                        route_decision=route_decision,
+                        context=context,
+                        history=history,
+                        language=language,
+                    )
+                    span.set_attribute("result_status", resolution.status)
+                    span.set_attribute("lane", resolution.lane)
+                    span.set_attribute(
+                        "runtime_replan_count",
+                        resolution.metadata.get("runtime_replan_count", 0),
+                    )
+                    if resolution.status == "error":
+                        span.set_status("error")
+        except BaseException:
+            trace_scope.finish(state="abandoned")
+            raise
+
+        snapshot = trace_scope.finish(state="complete")
+        if snapshot is None:
+            return resolution
+        metadata = dict(resolution.metadata)
+        metadata["runtime_trace"] = snapshot.reference()
+        metadata["runtime_trace_summary"] = snapshot.summary
+        if trace_scope.policy.emit_events:
+            metadata["runtime_trace_event"] = runtime_tracer.persist_snapshot(
+                snapshot,
+                event_subtype="goal_driven_interaction",
+                producer="chromie.orchestrator.cognitive_runtime",
+                severity="warning" if resolution.status == "error" else "info",
+            )
+        return resolution.model_copy(update={"metadata": metadata})
+
+    async def _resolve(
         self,
         session: Any,
         *,

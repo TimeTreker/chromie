@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import json
+import os
 import unittest
+from unittest import mock
 from typing import Any
+
+from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.semantic_task import SemanticGoal
+from shared.chromie_runtime.runtime_trace import TRACE_CARRIER_KEY, runtime_tracer
 
 try:
     from orchestrator.clients.agent_client import AgentClient
@@ -48,6 +55,57 @@ class _FakeSession:
 
 @unittest.skipIf(AgentClient is None, "aiohttp is unavailable")
 class AgentClientTests(unittest.IsolatedAsyncioTestCase):
+
+    async def test_goal_association_call_injects_runtime_trace_carrier(self) -> None:
+        resolution = GoalAssociationResolution(
+            turn_id="turn-agent-client",
+            new_goals=[
+                SemanticGoal(
+                    goal_id="goal-agent-client",
+                    description="Respond to the user.",
+                    source_text="hello",
+                )
+            ],
+            confidence=0.9,
+            metadata={"status": "resolved"},
+        )
+        session = _FakeSession(
+            _FakeResponse(text=resolution.model_dump_json())
+        )
+        with mock.patch.dict(
+            os.environ,
+            {"CHROMIE_RUNTIME_TRACE_MODE": "basic"},
+            clear=False,
+        ):
+            scope = runtime_tracer.start_trace(
+                correlations={"session_id": "sid-agent-client"}
+            )
+            async with scope:
+                result = await AgentClient(
+                    "http://agent.local"
+                ).resolve_goal_association(
+                    session,  # type: ignore[arg-type]
+                    sid="sid-agent-client",
+                    text="hello",
+                    route_decision={
+                        "route": "chat",
+                        "intent": "conversation",
+                        "confidence": 0.9,
+                        "source": "llm",
+                    },
+                    context={"history": []},
+                )
+            snapshot = scope.finish()
+
+        self.assertEqual(result.turn_id, "turn-agent-client")
+        carrier = session.posts[0]["json"]["context"][TRACE_CARRIER_KEY]
+        self.assertEqual(carrier["trace_id"], snapshot.trace["trace_id"])
+        self.assertTrue(carrier["parent_item_id"].startswith("item_"))
+        modules = {
+            item["module"]["name"] for item in snapshot.trace["items"]
+        }
+        self.assertIn("orchestrator.agent_client", modules)
+
     async def test_execute_planning_task_graph_posts_graph_payload(self) -> None:
         trace = {
             "graph_id": "nav",

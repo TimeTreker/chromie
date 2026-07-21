@@ -45,13 +45,17 @@ style and auxiliary body expression under one Social Attention purpose;
 candidate actions are discovered from catalog behavior-domain metadata rather
 than a fixed gesture list. Explicit user-requested actions remain primary goals.
 
-A Runtime Observability architecture is now documented for the next
-cross-cutting implementation track. It defines architecture-independent Runtime
-Trace items, module-owned trace identity, basic/debug collection policy,
-monotonic duration measurement, user-observable milestones, topology-aware
-latency summaries, and integration with Runtime Events, Episodes, and Scenario
-Candidates. This is documentation status only; broad Runtime Trace
-instrumentation is not yet an implementation or evidence claim. See
+The initial Runtime Observability implementation is now present behind a
+default-off policy. It provides architecture-independent Runtime Trace items,
+module-owned identity, `off`/`basic`/`debug` collection, monotonic duration
+measurement, nested sync/async spans, cross-service carriers and mergeable
+fragments, bounded attributes, topology-aware summaries, optional
+`chromie.interaction_trace` Runtime Events, and active-trace attachment to
+cognitive-integrity incidents. Current instrumentation covers the goal-driven
+coordinator, canonical adapter, cognitive Agent calls and resolvers, and Ollama.
+Execution, audio, TTS, provider/resource observations, user-observable
+milestones, session lifecycle recovery, and retained live latency evidence remain
+open; coverage is therefore reported as `partial`. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md),
 [Runtime Trace Contract](docs/RUNTIME_TRACE.md), and
 [Runtime Trace Instrumentation Guide](docs/RUNTIME_TRACE_INSTRUMENTATION.md).

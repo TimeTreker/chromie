@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from orchestrator.runtime.cognitive_runtime import (
@@ -270,6 +272,71 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 language="zh-CN",
             )
         )
+
+
+    def test_runtime_trace_profiles_actual_goal_driven_modules(self):
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[respond_plan()],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="report_only"),
+        )
+        with mock.patch.dict(
+            os.environ,
+            {
+                "CHROMIE_RUNTIME_TRACE_MODE": "basic",
+                "CHROMIE_RUNTIME_TRACE_EMIT_EVENTS": "0",
+            },
+            clear=False,
+        ):
+            result = self.run_resolution(coordinator, client)
+
+        trace = result.metadata["runtime_trace"]
+        summary = result.metadata["runtime_trace_summary"]
+        self.assertTrue(trace["trace_id"].startswith("trace_"))
+        self.assertEqual(trace["state"], "complete")
+        self.assertGreaterEqual(summary["item_count"], 2)
+        modules = {
+            item["module"]["name"]
+            for item in summary["module_aggregates"]
+        }
+        self.assertIn("orchestrator.cognitive_runtime", modules)
+        self.assertIn("orchestrator.canonical_plan_adapter", modules)
+        self.assertIn("total", result.timings_ms)
+
+    def test_runtime_trace_can_emit_one_runtime_event_package(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = ScriptedClient(
+                association=new_goal_association(),
+                fast_plans=[respond_plan()],
+            )
+            coordinator = GoalDrivenRuntimeCoordinator(
+                agent_client=client,
+                adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+                policy=CognitiveRuntimePolicy(mode="report_only"),
+            )
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "CHROMIE_RUNTIME_TRACE_MODE": "basic",
+                    "CHROMIE_RUNTIME_TRACE_EMIT_EVENTS": "1",
+                    "CHROMIE_RUNTIME_EVENT_ROOT": str(root / "events"),
+                    "CHROMIE_DATA_LOOP_TRIGGER_ROOT": str(root / "inbox"),
+                },
+                clear=False,
+            ):
+                result = self.run_resolution(coordinator, client)
+
+            event = result.metadata["runtime_trace_event"]
+            self.assertEqual(event["capture_status"], "complete")
+            self.assertEqual(event["trigger_status"], "accepted")
+            payload_root = Path(event["payload_root"])
+            self.assertTrue((payload_root / "trace.json").is_file())
+            self.assertTrue((payload_root / "trace-summary.json").is_file())
 
     def test_report_only_builds_terminal_plan_without_interaction(self):
         client = ScriptedClient(

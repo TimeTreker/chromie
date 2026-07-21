@@ -535,20 +535,25 @@ user-observable latency analysis.
 
 ### Delivery sequence
 
-1. **Documented, implementation open:** Common Runtime Trace envelope, module
-   descriptor, item lifecycle, timing, hierarchy, links, modes, privacy, and
-   summary contracts.
-2. **Open:** Shared tracing library with monotonic timing, wall-clock
-   correlation, context propagation, sync/async spans, bounded attributes, and
+1. **Implemented:** Common Runtime Trace envelope, module descriptor, item
+   lifecycle, timing, hierarchy, links, modes, privacy, and summary contracts.
+2. **Implemented with focused automated evidence:** Shared tracing library with
+   monotonic timing, wall-clock correlation, `contextvars` propagation,
+   sync/async spans, bounded attributes, distributed carriers/fragments, and
    immutable finalization.
-3. **Open:** Incremental instrumentation of goal-driven cognitive stages and
-   model-client calls without changing semantic behavior.
-4. **Open:** Execution, audio, TTS, provider, queue, and user-observable
-   milestone instrumentation.
-5. **Open:** Topology-aware summary generation and critical incident trace
-   attachment through Runtime Events.
-6. **Open:** Sampled normal interaction-trace events, latency-threshold capture,
-   session summaries, and abandoned-session recovery.
+3. **Implemented with partial coverage:** Goal-driven coordinator, canonical
+   plan adapter, Orchestrator-to-Agent cognitive calls, Goal Association, Fast
+   and Deep Planning, Response Composer, and Ollama model calls emit generic
+   module-owned trace items without changing semantic behavior.
+4. **Open:** Execution, audio, TTS, provider, queue, resource, and
+   user-observable milestone instrumentation.
+5. **Implemented for the initial cognitive path:** Topology-aware summaries,
+   inclusive/exclusive module time, parallelism, optional interaction-trace
+   Runtime Events, and active trace attachment to cognitive-integrity incidents.
+   Critical-path output is an explicitly versioned interval/topology
+   approximation until broader dependency instrumentation exists.
+6. **Open:** Normal-path sampling policy, latency-threshold escalation, session
+   summaries, abandoned-session recovery, and retained live latency evidence.
 
 Exit criteria require the trace schema to remain independent of the current
 module graph, disabled tracing to preserve behavior with negligible overhead,
