@@ -74,6 +74,29 @@ class AcceleratorTelemetryTests(unittest.TestCase):
         self.assertTrue(sampler.should_sample("session_finish"))
         self.assertFalse(sampler.should_sample("periodic"))
 
+    def test_worker_timeout_does_not_hold_event_loop_shutdown(self) -> None:
+        def collector(_timeout_s: float):
+            time.sleep(0.5)
+            return {"available": True, "provider": "late"}
+
+        async def run():
+            sampler = AcceleratorTelemetrySampler(
+                AcceleratorTelemetryConfig(
+                    mode="periodic",
+                    provider="auto",
+                    timeout_ms=50,
+                    min_interval_s=0.0,
+                ),
+                collector=collector,
+            )
+            return await sampler.sample(reason="periodic")
+
+        started = time.perf_counter()
+        result = asyncio.run(run())
+
+        self.assertLess(time.perf_counter() - started, 0.45)
+        self.assertEqual(result["provider_status"], "worker_timeout")
+
     def test_session_tracker_records_cached_accelerator_boundaries(self) -> None:
         with mock.patch.dict(
             os.environ,

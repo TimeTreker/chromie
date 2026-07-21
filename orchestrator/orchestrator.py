@@ -351,7 +351,7 @@ class VoiceAssistant:
             auto_confirm_sim_skills=self.auto_confirm_sim_skills,
             action_dry_run=self.action_dry_run,
         )
-        self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "3000")))
+        self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "9000")))
         self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "3000")))
         self.action_client = ActionClient(self.action_executor_url, int(os.getenv("ORCH_ACTION_TIMEOUT_MS", "5000")))
         self.asr_timeout_s = max(
@@ -1842,7 +1842,7 @@ class VoiceAssistant:
             "prompt": prompt,
             "stream": True,
             "think": False,
-            "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
+            "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
             "options": {
                 "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "2048")),
                 "num_predict": int(os.getenv("OLLAMA_NUM_PREDICT", "96")),

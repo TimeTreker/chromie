@@ -20,6 +20,14 @@ for evidence checks; it is not a compatibility pin for normal paired Chromie/Sor
 Do not hand-edit exported tools, schemas, or safety policy. Refresh the source
 export and rematerialize the file instead.
 
+Chromie adds one fail-closed visibility overlay while materializing the export:
+provider compatibility tools whose input schema exposes a raw planar
+`commands[]` controller vector (`vx`, `vy`, and `yaw`) are retained for trusted
+runtime and acceptance use but forced to `llm_visible=false`. The static
+capability audit rejects a checked-in manifest that exposes such an array to a
+language model. Normal embodied planning must use named skills or structured
+Soridormi task goals instead of controller recipes.
+
 The Soridormi task surface includes retry and monitoring contracts used by Chromie's
 TaskGraph:
 

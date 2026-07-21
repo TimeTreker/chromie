@@ -276,6 +276,34 @@
             "1:count=2",
             "2:yaw_radps=-0.12"
           ],
+          "expected_observations": [
+            {
+              "type": "locomotion.velocity",
+              "args": {
+                "vx_mps": 0.2,
+                "duration_s": 10.0
+              }
+            },
+            {
+              "type": "social_attention.nod",
+              "args": {
+                "count": 2
+              }
+            },
+            {
+              "type": "locomotion.turn",
+              "arg_ranges": {
+                "yaw_radps": {
+                  "max": -0.000001
+                }
+              }
+            }
+          ],
+          "expected_observation_sequence": [
+            "locomotion.velocity",
+            "social_attention.nod",
+            "locomotion.turn"
+          ],
           "expected_speech_any": [
             "walk",
             "nod",
@@ -344,6 +372,14 @@
         "Test evidence"
       ],
       "level_a_scenarios": [
+        {
+          "key": "router/factual_sun_round_rules_only_no_motion",
+          "rationale": "A factual statement with weak motion-word overlap must stay in conversation and must not trigger physical action."
+        },
+        {
+          "key": "router/llm_unavailable_factual_moon_delegates",
+          "rationale": "A factual question remains on a cognitive lane when quick routing is unavailable instead of falling through to catalog motion."
+        },
         {
           "key": "router/weather_check",
           "rationale": "Weather intent should use the tool lane when available."

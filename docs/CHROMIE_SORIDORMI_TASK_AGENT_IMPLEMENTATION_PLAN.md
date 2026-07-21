@@ -17,12 +17,12 @@ Related Chromie docs:
 - `docs/agent_capability_registry.md`
 - `docs/ACCEPTANCE.md`
 
-Related Soridormi docs:
+Related documents in the paired `../soridormi` checkout:
 
-- `docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md`
-- `docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`
-- `docs/SORIDORMI_MCP_SERVER.md`
-- `docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md`
+- `../soridormi/docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md`
+- `../soridormi/docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`
+- `../soridormi/docs/SORIDORMI_MCP_SERVER.md`
+- `../soridormi/docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md`
 
 ## Current agreement
 

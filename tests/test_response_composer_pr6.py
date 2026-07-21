@@ -262,6 +262,15 @@ class ResponseComposerResolverTests(unittest.TestCase):
             "covers_goal_ids",
             schema["$defs"]["ResponseStage"]["required"],
         )
+        self.assertTrue(
+            {
+                "text",
+                "speech_act",
+                "commitment_state",
+                "must_not_claim_completion",
+                "covers_goal_ids",
+            }.issubset(schema["$defs"]["ResponseStage"]["required"])
+        )
         repair_prompt = ollama.prompts[1][0]
         self.assertIn('"response_text"', repair_prompt)
         self.assertIn("model_type", repair_prompt)
@@ -328,6 +337,36 @@ class ResponseComposerResolverTests(unittest.TestCase):
         self.assertEqual(result.status, "resolved")
         self.assertEqual(len(ollama.prompts), 2)
         self.assertIn("does not cover all plan goals", ollama.prompts[1][0])
+
+    def test_clarification_decoder_schema_matches_runtime_coordination_contract(self):
+        canonical = CanonicalPlan(
+            plan_id="clarify-without-goal",
+            planner_tier="deep",
+            disposition="clarify",
+            coverage="uncertain",
+            confidence=0.4,
+            goal_ids=[],
+            steps=[],
+            unresolved=["The user intent is incomplete."],
+        )
+
+        schema = ResponseComposerResolver._response_schema(canonical)
+        stage = schema["$defs"]["ResponseStage"]
+
+        self.assertEqual(
+            stage["properties"]["speech_act"]["enum"],
+            ["clarify", "ask_clarification"],
+        )
+        self.assertEqual(
+            stage["properties"]["commitment_state"]["enum"],
+            ["waiting_for_user"],
+        )
+        self.assertTrue(
+            stage["properties"]["must_not_claim_completion"]["const"]
+        )
+        self.assertEqual(
+            stage["properties"]["covers_goal_ids"]["maxItems"], 0
+        )
 
     def test_model_authored_host_envelope_fields_are_rejected_then_repaired(self):
         canonical = plan(goals=["goal-chat"])

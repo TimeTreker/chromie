@@ -93,6 +93,41 @@ class OutcomeObservationTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_argument_ranges_capture_direction_without_freezing_safe_defaults(self) -> None:
+        observations = [
+            {
+                "type": "locomotion.turn",
+                "args": {"yaw_radps": -0.15, "duration_s": 2.0},
+            }
+        ]
+
+        errors = validate_expected_observations(
+            observations,
+            [
+                {
+                    "type": "locomotion.turn",
+                    "arg_ranges": {"yaw_radps": {"max": -0.000001}},
+                }
+            ],
+        )
+
+        self.assertEqual(errors, [])
+        wrong_direction = validate_expected_observations(
+            [
+                {
+                    "type": "locomotion.turn",
+                    "args": {"yaw_radps": 0.15},
+                }
+            ],
+            [
+                {
+                    "type": "locomotion.turn",
+                    "arg_ranges": {"yaw_radps": {"max": -0.000001}},
+                }
+            ],
+        )
+        self.assertTrue(any("locomotion.turn" in item for item in wrong_direction))
+
     def test_sequence_uses_execution_receipts_not_plan_order(self) -> None:
         summary = self._summary()
         summary["execution"]["results"] = [

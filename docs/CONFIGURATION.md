@@ -189,7 +189,7 @@ configuration.
 | `ROUTER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the quick semantic Router budget for legacy/default readers. |
 | `ROUTER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast quick-router model path. |
 | `ROUTER_LLM_NUM_CTX` | `4096`; explicit Router context budget. This prevents the approximately 10k-character quick prompt and common ability menu from being silently truncated by Ollama's smaller global context default. |
-| `ROUTER_LLM_NUM_PREDICT` | `96`; compact JSON output budget for the fast quick-router model. This keeps the quick router bounded to classification JSON and prevents long generations from consuming the realtime route budget. |
+| `ROUTER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for the fast quick-router model. This fits legitimate multi-action routing objects while still preventing unbounded generations from consuming the realtime route budget. |
 | `ROUTER_LLM_KEEP_ALIVE` | `24h`; sent on Router Ollama calls so the warmed routing model remains resident. |
 | `ROUTER_WARM_LLM_ON_STARTUP` | `1`; the Router service warms its primary LLM during startup so the first live turn does not pay cold model load time. |
 | `ROUTER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Router model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
@@ -243,8 +243,8 @@ normalization fallback.
 | `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b`; compact model for complete common-goal coverage. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `2500`; Fast Planner model timeout. |
 | `AGENT_FAST_PLANNER_MIN_CONFIDENCE` | `0.80`; complete plans below this threshold are converted to escalation. |
-| `AGENT_FAST_PLANNER_NUM_CTX` | `4096`; bounded Fast Planner context. |
-| `AGENT_FAST_PLANNER_NUM_PREDICT` | `512`; flat semantic planner-DTO JSON budget. |
+| `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. |
+| `AGENT_FAST_PLANNER_NUM_PREDICT` | `2048`; flat semantic planner-DTO JSON budget sized from live compound and multi-goal output evidence. |
 | `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
 | `ORCH_FAST_PLANNER_TIMEOUT_MS` | `3000`; host timeout for report-only planning. |
@@ -262,8 +262,8 @@ normalization fallback.
 | `AGENT_RESPONSE_COMPOSER_ENABLED` | `1`; exposes advisory composition of an immutable terminal `CanonicalPlan` with a goal-scoped `ResponsePlan` and optional auxiliary `SocialAttentionPlan`. |
 | `AGENT_RESPONSE_COMPOSER_MODEL` | `gemma4:e2b`; model used for multi-goal speech and social-presence composition. |
 | `AGENT_RESPONSE_COMPOSER_TIMEOUT_MS` | `4500`; response-composer model timeout. Failure does not alter the canonical task plan. |
-| `AGENT_RESPONSE_COMPOSER_NUM_CTX` | `4096`; bounded composition context. |
-| `AGENT_RESPONSE_COMPOSER_NUM_PREDICT` | `640`; structured response/social-plan JSON budget. |
+| `AGENT_RESPONSE_COMPOSER_NUM_CTX` | `8192`; bounded composition context sized for an immutable multi-goal plan plus the exact response schema. |
+| `AGENT_RESPONSE_COMPOSER_NUM_PREDICT` | `1024`; structured response/social-plan JSON budget. |
 | `ORCH_RESPONSE_COMPOSER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Unified `apply` requires a validated composition bound to the terminal plan. |
 | `ORCH_RESPONSE_COMPOSER_TIMEOUT_MS` | `5000`; host timeout for report-only composition. |
 

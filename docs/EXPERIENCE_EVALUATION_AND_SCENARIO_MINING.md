@@ -404,7 +404,7 @@ Behavior:
 Add a promotion helper that copies a reviewed candidate into the committed
 scenario tree and validates it.
 
-Suggested command:
+Planned command (the promotion helper is not implemented yet):
 
 ```bash
 python scripts/promote_scenario_candidate.py \

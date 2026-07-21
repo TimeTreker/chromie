@@ -20,9 +20,14 @@ All notable user-visible changes should be recorded here.
   largest items, user-observable latency support, parallel leaf-work analysis,
   and a versioned interval/topology critical-path approximation.
 - Added optional `chromie.interaction_trace` Runtime Event packages and active
-  trace attachment to cognitive-integrity incidents; execution, audio, TTS,
-  provider/resource, session-recovery, and retained live latency evidence remain
-  open.
+  trace attachment to cognitive-integrity incidents.
+- Added detached per-session Runtime Traces plus execution, action-provider,
+  TTS, playback, session-lifecycle, and first-audible instrumentation.
+- Added generic VAD/ASR trace items, provider acknowledgement, optional
+  provider-reported first-motion milestones, and idle-timeout abandonment.
+- Added generic process/host/queue/event-loop resource samples, atomic active
+  trace checkpoints, process-restart recovery, normal-trace retention policy,
+  and late-bound artifact correlation.
 - Added default-off non-blocking accelerator telemetry with bounded NVIDIA GPU
   utilization, memory, temperature, and power observations represented as
   ordinary Runtime Trace resource items.
@@ -33,6 +38,21 @@ All notable user-visible changes should be recorded here.
   invalid when sample counts, evidence class, environment, or clean revision
   requirements are not satisfied. The bundled example policy remains disabled
   until a real target baseline is approved.
+- Replaced accelerator collection through the event loop's default executor
+  with an owned bounded daemon collector. A timed-out telemetry utility can no
+  longer hold Python 3.13 event-loop shutdown open for five minutes.
+
+### Consistency and safety audit
+
+- Reconciled Runtime Observability status, roadmap, index, changelog, and
+  component documentation with the implemented Steps 7-10 source.
+- Aligned standalone Agent, Router, ASR, and Orchestrator fallbacks with the
+  documented common safe defaults.
+- Removed a Sun-specific deterministic conversational rewrite so factual
+  wording remains model-authored under the general interaction contract.
+- Added a fail-closed capability visibility policy that retains raw planar
+  controller-array compatibility tools for trusted runtime use while hiding
+  them from language-model catalogs and rejecting visible manifest regressions.
 
 ### Goal-driven cognitive runtime rollout
 
@@ -51,6 +71,24 @@ All notable user-visible changes should be recorded here.
   identity remains host-owned, multi-goal outcomes are keyed exactly once by
   authoritative Goal IDs, satisfaction is prospective plan adequacy, and typed
   plan-relation/confirmation fields reject unsafe alternatives.
+- Aligned the Fast multi-goal decoder schema with deterministic validation:
+  per-goal outcome schemas are goal-scoped, satisfaction bands are strict,
+  step cardinality is bounded, aggregate disposition is cross-field
+  constrained, and one bounded repair may narrow only the redundant aggregate
+  enum from the model's own complete per-goal outcome map.
+- Required planners to preserve explicit, unambiguous, schema-valid numeric
+  arguments instead of silently replacing them with catalog defaults; uncertain
+  mappings escalate and material adjustments remain confirmation-gated.
+- Added generic source-cited numeric provenance validation across executable
+  plan arguments. A Fast plan that changes an explicit user number now gets one
+  bounded same-tier repair and then visibly escalates to Deep Planning instead
+  of executing the substituted value.
+- Raised the maintained Router structured-output allowance to 512 tokens after
+  live compound requests proved that both 96- and 256-token limits truncated
+  otherwise valid route JSON; truncation remains a hard integrity failure.
+- Sized Response Composer's maintained context/output envelope for a complete
+  multi-goal canonical plan plus its exact response schema, preventing
+  truncation from being hidden behind fallback speech or partial execution.
 - Moved response-transport speech out of goal-driven task steps: conversational
   goals use `respond` outcomes, while Response Composition uses its own exact
   schema, host-owned coordination envelope, and one bounded same-stage repair.
@@ -180,30 +218,3 @@ declaration still blocks publication.
   voice-device support.
 - A future release must declare physical voice-device compatibility separately;
   `0.0.1` intentionally does not include that claim.
-
-## Runtime Trace Step 7
-
-- Added detached per-session Runtime Traces so TTS and playback can remain
-  observable after cognitive interaction traces finish.
-- Added execution, action-provider, TTS, playback, session lifecycle, and first
-  audible response instrumentation using module-owned descriptors.
-- Added complete and abandoned session finalization plus optional Runtime Event
-  packaging.
-
-### Runtime Observability Step 8
-
-- Added generic VAD and ASR trace items on detached voice-session traces.
-- Added provider acknowledgement and optional first-physical-motion milestones.
-- Added configurable idle-timeout finalization for unfinished session traces.
-- Preserved the architecture-independent trace contract and avoided invented
-  physical-motion timing when the action provider supplies no evidence.
-### Runtime Observability Step 9
-
-- Added generic process CPU, process/system memory, load, queue-depth, and
-  event-loop-lag Runtime Trace resource samples.
-- Added atomic active-session trace checkpoints and process-restart recovery as
-  abandoned Runtime Event evidence.
-- Added latency-threshold, abandoned-trace, and deterministic-sampling retention
-  decisions for normal trace Runtime Events.
-- Added late-bound session trace correlation with cognitive traces, interactions,
-  conversations, and experience episodes.

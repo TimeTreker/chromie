@@ -572,7 +572,7 @@ class RouterLlmPromptTests(unittest.TestCase):
             ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
         )
         self.assertEqual(payload["format"]["properties"]["source"]["const"], "llm")
-        self.assertEqual(payload["options"]["num_predict"], 96)
+        self.assertEqual(payload["options"]["num_predict"], 512)
         self.assertEqual(payload["options"]["num_ctx"], 4096)
         self.assertIn("Go ahead and sing a song for me.", payload["messages"][1]["content"])
 

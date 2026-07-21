@@ -470,11 +470,14 @@ remain open.
    authority, adapter-only exact Router actions, emergency-only legacy planner
    with non-empty matching-turn claims, exact Goal Association schema, and strict
    source/evidence provenance checks.
-9. **Implemented with Level A evidence; live qualification open:** Fast Planner
+9. **Implemented; diagnostic functional run complete; latency and target evidence open:** Fast Planner
    multi-goal terminal contract with decoder-compatible empty escalation versus
    complete outcome-map semantics, simple common-catalog mixed planning,
    explicit recovery diagnostics, pending-action claim discipline, and retained
-   latency qualification. See
+   latency qualification. The final hardened July 21 working tree passed a
+   4/4 simulator-backed Fast-tier functional run with execution and safe idle,
+   but its 40.321-second median misses the 15.46-second target; three warm runs,
+   clean paired-source, and endpoint-revision provenance remain open. See
    [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
 
 10. **Implemented with Level A evidence; target evidence open:** User-outcome
@@ -518,7 +521,7 @@ This track does not replace the current physical pilot or audio evidence tracks.
 It must preserve existing deterministic stop, authorization, provider, evidence,
 and release boundaries.
 
-## Planned architecture track - Runtime observability
+## Implemented architecture track - Runtime observability
 
 ### Objective
 

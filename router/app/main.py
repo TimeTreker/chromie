@@ -48,7 +48,7 @@ class Settings(BaseModel):
         ge=2048,
         le=131072,
     )
-    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "96")))
+    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "512")))
     llm_keep_alive: str = Field(
         default_factory=lambda: os.getenv(
             "ROUTER_LLM_KEEP_ALIVE",
@@ -77,7 +77,7 @@ class Settings(BaseModel):
         )
     )
     capability_catalog_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS", "600"))
+        default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS", "400"))
     )
     capability_catalog_cache_ttl_ms: int = Field(
         default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS", "5000"))

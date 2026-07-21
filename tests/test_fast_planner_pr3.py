@@ -162,6 +162,7 @@ def multi_goal_plan(
     response_text: str = "",
     escalation_reason: str = "",
     unresolved: list[str] | None = None,
+    parameter_resolutions: list[dict] | None = None,
     confidence: float = 0.97,
 ) -> dict:
     return {
@@ -173,7 +174,7 @@ def multi_goal_plan(
         "steps": steps,
         "escalation_reason": escalation_reason,
         "unresolved": list(unresolved or []),
-        "parameter_resolutions": [],
+        "parameter_resolutions": list(parameter_resolutions or []),
         "goal_outcomes": goal_outcomes,
         "goal_satisfaction": goal_satisfaction,
         "plan_relation": "exact",
@@ -408,6 +409,60 @@ class FastPlannerResolverTests(unittest.TestCase):
             schema["$defs"]["PlannerModelGoalOutcome"]["properties"]
             ["disposition"]["enum"],
         )
+        self.assertEqual(schema["properties"]["steps"]["maxItems"], 2)
+        goal_a_outcome = schema["properties"]["goal_outcomes"]["properties"][
+            "goal-a"
+        ]
+        goal_a_satisfaction = goal_a_outcome["properties"]["satisfaction"][
+            "anyOf"
+        ][0]
+        self.assertEqual(
+            goal_a_satisfaction["properties"]["satisfied_goal_ids"]["items"][
+                "enum"
+            ],
+            ["goal-a"],
+        )
+        self.assertEqual(
+            goal_a_satisfaction["properties"]["unmet_goal_ids"]["items"][
+                "enum"
+            ],
+            ["goal-a"],
+        )
+        self.assertEqual(goal_a_outcome["properties"]["step_ids"]["maxItems"], 1)
+        self.assertEqual(
+            goal_a_satisfaction["properties"]["unmet_goal_ids"]["maxItems"], 0
+        )
+        self.assertEqual(
+            goal_a_satisfaction["properties"]["unmet_requirements"]["maxItems"],
+            0,
+        )
+        self.assertEqual(
+            schema["properties"]["goal_satisfaction"]["anyOf"][0][
+                "properties"
+            ]["satisfied_goal_ids"]["minItems"],
+            2,
+        )
+        self.assertLess(
+            list(schema["properties"]).index("goal_outcomes"),
+            list(schema["properties"]).index("steps"),
+        )
+        self.assertLess(
+            list(schema["properties"]).index("goal_outcomes"),
+            list(schema["properties"]).index("disposition"),
+        )
+        aggregate_branches = schema["allOf"][0]["anyOf"]
+        mixed_branches = [
+            branch
+            for branch in aggregate_branches
+            if branch["properties"]["disposition"]["enum"] == ["mixed"]
+        ]
+        self.assertEqual(len(mixed_branches), 2)
+        self.assertTrue(
+            all(
+                branch["properties"]["steps"]["maxItems"] == 1
+                for branch in mixed_branches
+            )
+        )
         self.assertEqual(
             set(schema["$defs"]["PlannerModelStep"]["required"]),
             {
@@ -418,6 +473,128 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "source_goal_ids",
                 "reason_summary",
             },
+        )
+        self.assertEqual(schema["properties"]["goal_summary"]["maxLength"], 240)
+        self.assertEqual(
+            schema["$defs"]["PlannerModelStep"]["properties"]
+            ["reason_summary"]["maxLength"],
+            160,
+        )
+        self.assertEqual(
+            schema["$defs"]["PlannerModelGoalOutcome"]["properties"]
+            ["rationale"]["maxLength"],
+            200,
+        )
+        self.assertEqual(
+            schema["$defs"]["PlannerGoalSatisfaction"]["properties"]
+            ["rationale"]["maxLength"],
+            200,
+        )
+        self.assertEqual(
+            schema["$defs"]["PlanParameterResolution"]["properties"]
+            ["source_ref"]["maxLength"],
+            160,
+        )
+        self.assertEqual(
+            set(schema["$defs"]["PlanParameterResolution"]["required"]),
+            {
+                "step_id",
+                "parameter",
+                "strategy",
+                "value",
+                "confidence",
+                "blocking",
+                "rationale",
+                "source_ref",
+                "source_goal_ids",
+            },
+        )
+        self.assertIn("one short sentence each", ollama.prompts[0][0])
+
+    def test_explicit_numeric_grounding_mismatch_gets_bounded_model_repair(self):
+        invalid = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Walk for two seconds and blink.",
+            steps=[
+                execute_step(
+                    "walk",
+                    "soridormi.walk_forward",
+                    {"duration_s": 1.0},
+                    ["goal-walk"],
+                    "Walk forward.",
+                ),
+                execute_step(
+                    "blink",
+                    "soridormi.blink_eyes",
+                    {"count": 1},
+                    ["goal-blink"],
+                    "Blink once.",
+                ),
+            ],
+            goal_outcomes={
+                "goal-walk": execute_outcome(
+                    "goal-walk", ["walk"], "The walk is covered."
+                ),
+                "goal-blink": execute_outcome(
+                    "goal-blink", ["blink"], "The blink is covered."
+                ),
+            },
+            goal_satisfaction=exact_satisfaction(
+                ["goal-walk", "goal-blink"]
+            ),
+            parameter_resolutions=[
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "strategy": "user_supplied",
+                    "value": 1.0,
+                    "confidence": 0.99,
+                    "blocking": False,
+                    "rationale": "Copied from the goal.",
+                    "source_ref": "2 seconds",
+                    "source_goal_ids": ["goal-walk"],
+                }
+            ],
+        )
+        repaired = {
+            **invalid,
+            "steps": [
+                execute_step(
+                    "walk",
+                    "soridormi.walk_forward",
+                    {"duration_s": 2.0},
+                    ["goal-walk"],
+                    "Walk forward.",
+                ),
+                invalid["steps"][1],
+            ],
+            "parameter_resolutions": [
+                {
+                    **invalid["parameter_resolutions"][0],
+                    "value": "2.0",
+                }
+            ],
+        }
+        ollama = ScriptedOllama([invalid, repaired])
+        run_request = request(
+            "Walk forward for 2 seconds, then blink.",
+            goal_ids=["goal-walk", "goal-blink"],
+        )
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "description"
+        ] = "Walk forward for 2 seconds."
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
+        )
+
+        self.assertEqual(plan.steps[0].args["duration_s"], 2.0)
+        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertIn(
+            "source_ref does not cite its resolved value",
+            ollama.prompts[1][0],
         )
 
     def test_multi_goal_fast_execute_terminates_without_repair(self):
@@ -528,6 +705,54 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.metadata["path_classification"], "terminal")
         self.assertEqual(len(ollama.prompts), 1)
 
+    def test_mixed_aggregate_repair_is_constrained_by_model_authored_outcomes(self):
+        initial = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Execute one goal and answer another.",
+            response_text="A concise model-authored answer.",
+            steps=[
+                execute_step(
+                    "physical-step",
+                    "soridormi.blink_eyes",
+                    {"count": 2},
+                    ["goal-action"],
+                    "Execute the physical goal exactly.",
+                )
+            ],
+            goal_outcomes={
+                "goal-action": execute_outcome(
+                    "goal-action", ["physical-step"], "Physical goal plan."
+                ),
+                "goal-answer": respond_outcome(
+                    "goal-answer", "A concise answer.", "Answer goal plan."
+                ),
+            },
+            goal_satisfaction=exact_satisfaction(
+                ["goal-action", "goal-answer"]
+            ),
+        )
+        repaired = {**initial, "disposition": "mixed"}
+        ollama = ScriptedOllama([initial, repaired])
+
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request(
+                    "Complete both abstract goals.",
+                    goal_ids=["goal-action", "goal-answer"],
+                )
+            )
+        )
+
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        first_schema = ollama.prompts[0][1]["response_format"]
+        repair_schema = ollama.prompts[1][1]["response_format"]
+        self.assertIn("execute", first_schema["properties"]["disposition"]["enum"])
+        self.assertEqual(
+            repair_schema["properties"]["disposition"]["enum"], ["mixed"]
+        )
+
     def test_low_confidence_complete_claim_is_forced_to_escalate(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"goal_ids":["goal-blink"],"steps":[{"skill_id":"soridormi.blink_eyes","args":{"count":3}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog(), min_confidence=0.8).resolve(request("眨眼。", goal_ids=["goal-blink"])))
@@ -546,6 +771,56 @@ class FastPlannerResolverTests(unittest.TestCase):
         prompt = ollama.prompts[0][0]
         self.assertIn("Finding one matching skill is not complete coverage", prompt)
         self.assertIn("zero steps", prompt)
+
+    def test_multi_goal_prompt_preserves_explicit_in_range_arguments(self):
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Two exact actions.",
+            steps=[
+                execute_step(
+                    "walk",
+                    "soridormi.walk_forward",
+                    {"duration_s": 2.0},
+                    ["goal-walk"],
+                    "Walk for the supplied duration.",
+                ),
+                execute_step(
+                    "blink",
+                    "soridormi.blink_eyes",
+                    {"count": 2},
+                    ["goal-blink"],
+                    "Blink the supplied count.",
+                ),
+            ],
+            goal_outcomes={
+                "goal-walk": execute_outcome(
+                    "goal-walk", ["walk"], "Walk goal covered."
+                ),
+                "goal-blink": execute_outcome(
+                    "goal-blink", ["blink"], "Blink goal covered."
+                ),
+            },
+            goal_satisfaction=exact_satisfaction(
+                ["goal-walk", "goal-blink"]
+            ),
+        )
+        ollama = FakeOllama(raw)
+
+        asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request(
+                    "Walk for 2 seconds and blink twice.",
+                    goal_ids=["goal-walk", "goal-blink"],
+                )
+            )
+        )
+
+        prompt = ollama.prompts[0][0]
+        self.assertIn("copy it exactly", prompt)
+        self.assertIn("never silently replace it with a schema default", prompt)
+        self.assertIn("Catalog defaults are only for parameters", prompt)
+        self.assertIn("A material adjustment must use a non-exact plan_relation", prompt)
 
     def test_uses_dynamic_schema_for_goal_and_skill_ids(self):
         ollama = FakeOllama({
@@ -680,6 +955,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("oneOf", schema)
         self.assertEqual(schema["title"], "FastPlannerMultiGoalPlanOutput")
         self.assertEqual(ollama.prompts[1][1]["response_format"], schema)
+        repair_prompt = ollama.prompts[1][0]
+        self.assertGreater(
+            repair_prompt.index("FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON"),
+            repair_prompt.index("FINAL CANONICAL GOALS JSON"),
+        )
 
     def test_same_user_text_follows_different_model_authored_plans(self):
         """The host must not map words in the utterance to fixed actions."""

@@ -10,6 +10,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from shared.chromie_contracts.interaction import find_raw_controller_array_schema
+
 from .env import Diagnostic, diagnostics_payload, load_env, parse_bool
 from .output import CommandResult, ExitCode
 
@@ -365,6 +367,19 @@ def _check_tool_contract(tool: dict[str, Any], tool_name: str) -> list[Diagnosti
                     )
                 )
 
+    raw_controller_path = find_raw_controller_array_schema(tool.get("input_schema"))
+    if raw_controller_path is not None and tool.get("llm_visible") is not False:
+        diagnostics.append(
+            Diagnostic(
+                "failure",
+                "llm_visible_raw_controller_array",
+                (
+                    f"{tool_name}.{raw_controller_path} exposes a raw planar "
+                    "controller array to the language model"
+                ),
+            )
+        )
+
     effects_raw = tool.get("effects")
     effects = {
         str(effect).strip()
@@ -616,8 +631,18 @@ def _run_live_probe(
 ) -> tuple[dict[str, Any], list[Diagnostic]]:
     diagnostics: list[Diagnostic] = []
     snapshot = load_env(root)
+    probe_environment = dict(snapshot.values)
+    ambient_endpoint = str(os.environ.get("SORIDORMI_MCP_URL", "")).strip()
+    if ambient_endpoint and not str(
+        probe_environment.get("SORIDORMI_MCP_URL", "")
+    ).strip():
+        # Maintained overlay launchers may leave the generated safe-base value
+        # blank while exporting the live endpoint for the current process.
+        # Fill only a blank snapshot value so a configured runtime endpoint
+        # remains authoritative and reproducible.
+        probe_environment["SORIDORMI_MCP_URL"] = ambient_endpoint
     try:
-        with _temporary_environment(snapshot.values):
+        with _temporary_environment(probe_environment):
             results = asyncio.run(
                 _probe_live_registry(
                     manifest_path,

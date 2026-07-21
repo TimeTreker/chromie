@@ -60,7 +60,7 @@ class Settings(BaseModel):
     model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL", "gemma4:e2b"))
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS", "30000")))
     response_review_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_ENABLED", "1").strip().lower()
+        default_factory=lambda: os.getenv("AGENT_RESPONSE_REVIEW_ENABLED", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     response_review_model: str = Field(
@@ -76,7 +76,7 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "220")))
+    max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "140")))
     expressive_body_cues: Literal["off", "sim_only", "on"] = Field(
         default_factory=lambda: os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "off")
     )
@@ -316,10 +316,10 @@ class Settings(BaseModel):
         default_factory=lambda: float(os.getenv("AGENT_FAST_PLANNER_MIN_CONFIDENCE", "0.80")), ge=0.0, le=1.0
     )
     fast_planner_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_CTX", "4096")), ge=2048, le=131072
+        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_CTX", "8192")), ge=2048, le=131072
     )
     fast_planner_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_PREDICT", "512")), ge=128, le=4096
+        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_PREDICT", "2048")), ge=128, le=4096
     )
     fast_planner_max_capabilities: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_MAX_CAPABILITIES", "24")), ge=1, le=64
@@ -359,10 +359,10 @@ class Settings(BaseModel):
         default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_TIMEOUT_MS", "4500")), ge=100, le=120000
     )
     response_composer_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_CTX", "4096")), ge=2048, le=131072
+        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_CTX", "8192")), ge=2048, le=131072
     )
     response_composer_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_PREDICT", "640")), ge=128, le=4096
+        default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_PREDICT", "1024")), ge=128, le=4096
     )
     task_continuity_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_PREDICT", "256")),

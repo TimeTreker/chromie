@@ -1,13 +1,19 @@
 # Fast Planner Multi-Goal Contract Path
 
-Status: model-authored plan contract implemented; supervised live requalification open
+Status: model-authored plan contract implemented; diagnostic functional run complete; latency and source-bound target validation open
 Decision date: 2026-07-17
 Scope: Fast Planner multi-goal model DTO, semantic authority, validation,
 escalation, observability, response-claim discipline, rollout, and acceptance
 
 - **Implementation:** model-authored multi-goal plan contract is present in the repository snapshot.
-- **Automated verification:** complete for the revised contract.
-- **Target validation:** the earlier plan-shaped contract failed 20/20 measured cases; fresh warm simulator qualification is still required for this revision.
+- **Automated verification:** complete for the revised contract, subject to the
+  repository-wide gate recorded in `STATUS.md`.
+- **Target validation:** the final hardened working tree passed one four-case
+  simulator-backed run on the Fast terminal path, with completed execution and
+  safe idle in every case. Its 40.321-second median misses the 15.46-second
+  latency threshold, and the declared paired Soridormi checkout was dirty while
+  the endpoint did not report its executing revision. Target validation remains
+  open.
 - **Release readiness:** unchanged.
 
 ## 1. Decision
@@ -36,8 +42,18 @@ The host adds only canonical envelope identity:
 
 The host validates the model output and converts the goal-keyed outcome map into
 the CanonicalPlan list representation. It does **not** choose a skill, infer
-arguments from words, generate step IDs, assign step ownership, derive aggregate
-disposition, or manufacture satisfaction judgments.
+arguments from words, generate step IDs, assign step ownership, or manufacture
+satisfaction judgments. During the one bounded contract repair only, the schema
+may narrow the redundant aggregate disposition to the sole value consistent
+with a complete initial model-authored outcome map. This is cross-field contract
+validation over the model's own judgments, not semantic inference from the user
+turn; the model must still regenerate and validate the complete final object.
+
+The planner contract also treats explicit, unambiguous, schema-valid numeric
+values as user-supplied arguments. The model must preserve them exactly rather
+than silently substituting catalog defaults. Uncertain mappings escalate;
+material adjustments use a non-exact plan relation, require confirmation, and
+explain the change.
 
 A normal semantic escalation is a model-authored Fast plan with:
 
@@ -94,6 +110,29 @@ complete objects and did not reproduce that live decoder gap.
 The earliest wrong boundary is therefore the Fast Planner model-facing contract
 and its decoder/validator alignment. It is not Router, Soridormi, Skill Runtime,
 or provider execution.
+
+An earlier July 21 tuning snapshot was exercised in three consecutive warm
+four-case runs and reported 12/12 Fast-terminal passes with a 15.355-second
+aggregate median. That result was superseded by the later generic numeric
+provenance validator, stricter decoder contract, and Router/Response Composer
+envelope corrections; it is historical diagnostic context, not qualification
+evidence for the final working tree.
+
+The final hardened working tree was rebuilt and exercised in a fresh four-case
+simulator-backed run:
+
+- 4/4 cases passed the user-outcome and LLM-integrity gates;
+- 4/4 terminated at Fast Planner with no Deep invocation or hidden Fast
+  technical failure;
+- 4/4 completed Soridormi `sim` execution and returned to explicit safe idle;
+- cognitive runtimes were 42.049, 30.020, 38.593, and 48.839 seconds, for a
+  40.321-second median in the final full ten-case run.
+
+This closes a diagnostic functional run only. It does not satisfy the latency
+threshold, the required three consecutive warm runs, source-bound Target
+validation, or Release readiness. The run recorded a dirty declared paired
+Soridormi checkout, and the MCP endpoint still did not report the revision of
+the code it was executing.
 
 ## 4. Goals and non-goals
 
@@ -221,6 +260,9 @@ to the host:
 11. Cross-field semantic invariants are validated after decoding.
 12. One fresh schema-constrained repair is permitted; the host never fills a
     missing semantic field.
+13. If the initial complete per-goal outcome map conflicts only with its
+    redundant aggregate, the repair schema permits the mechanically consistent
+    aggregate while preserving model authority over every goal outcome.
 
 The schema contains no user-utterance examples that act as dispatch rules. The
 capability catalog and canonical goals are dynamic request inputs.
@@ -444,6 +486,12 @@ Retain at least three consecutive warm runs. The target median cognitive runtime
 is at most 15.46 seconds, corresponding to at least 35 percent improvement over
 the retained 23.79-second baseline.
 
+The final July 21 diagnostic run satisfied the functional matrix over 4/4
+cases, but its 40.321-second median missed the latency target. Repeat and tune
+the complete final source from clean, source-bound Chromie and Soridormi inputs
+with endpoint revision identity before promoting any result to retained Target
+validation.
+
 ## 15. Exit criteria
 
 ### Implementation
@@ -469,6 +517,10 @@ the retained 23.79-second baseline.
 - No retained case hides a Fast contract failure.
 - Soridormi execution and safe-idle evidence remain valid.
 - Median cognitive runtime is at most 15.46 seconds.
+
+The July 21 Level C evidence satisfies these behavioral and latency bullets,
+but remains diagnostic until clean paired-source and endpoint-revision
+provenance requirements are also satisfied.
 
 ### Release readiness
 

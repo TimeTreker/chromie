@@ -191,8 +191,8 @@ class ConversationAgent(BaseAgent):
         options = {
             "temperature": 0.35,
             "top_p": 0.9,
-            "num_ctx": int(os.getenv("AGENT_CONVERSATION_NUM_CTX", "4096")),
-            "num_predict": int(os.getenv("AGENT_CONVERSATION_NUM_PREDICT", "128")),
+            "num_ctx": int(os.getenv("AGENT_CONVERSATION_NUM_CTX", "2048")),
+            "num_predict": int(os.getenv("AGENT_CONVERSATION_NUM_PREDICT", "64")),
             "stop": ["\nUser:", "\nAssistant:", "\n用户：", "\n助手："],
         }
         raw = await self.services.ollama.generate(
@@ -223,7 +223,6 @@ class ConversationAgent(BaseAgent):
                 options=options,
             )
         response = self._clean_response(response, zh=zh)
-        response = self._ensure_factual_subject_anchor(request, response, zh=zh)
         guarded = self._guard_unrouted_physical_action_response(request, response, zh=zh)
         if guarded != response:
             logger.warning(
@@ -247,7 +246,6 @@ class ConversationAgent(BaseAgent):
                 reason="incomplete_or_fragmentary_response",
             )
             response = self._clean_response(response, zh=zh)
-            response = self._ensure_factual_subject_anchor(request, response, zh=zh)
             response = self._guard_unrouted_physical_action_response(request, response, zh=zh)
         if not self.is_playable_spoken_response(response, zh=zh):
             logger.warning(
@@ -674,25 +672,4 @@ class ConversationAgent(BaseAgent):
                 response = response[len(prefix) :].strip()
                 break
 
-        return response
-
-    def _ensure_factual_subject_anchor(
-        self,
-        request: AgentRunRequest,
-        response: str,
-        *,
-        zh: bool,
-    ) -> str:
-        if zh:
-            return response
-        text = (request.text or "").casefold()
-        lowered = (response or "").casefold()
-        if not re.search(r"\bsun\b", text) or re.search(r"\bsun\b", lowered):
-            return response
-        if not re.search(r"\b(?:round|sphere|spherical|rectangular|shape|hot|cold|temperature)\b", lowered):
-            return response
-        if re.search(r"\b(?:round|sphere|spherical|rectangular|shape)\b", text):
-            return f"The Sun is roughly spherical. {response}"
-        if re.search(r"\b(?:hot|cold|temperature)\b", text):
-            return f"The Sun is extremely hot. {response}"
         return response

@@ -112,7 +112,7 @@ TTS_QUANTIZATION=FP16
 TTS_SAMPLE_RATE=44100
 TTS_CHUNK_MS=120
 TTS_N_GPU_LAYERS=-1
-# Profile-specific; RTX 4090 Laptop uses 2048/2048, larger desktop profiles use 4096/4096.
+# Generic profile values; RTX 4090/4090 Laptop/5090 profiles override to 4096/4096.
 TTS_CONTEXT_SIZE=2048
 TTS_MAX_LENGTH=2048
 TTS_MAX_TEXT_CHARS=220

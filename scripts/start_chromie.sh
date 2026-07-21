@@ -117,6 +117,37 @@ wait_for_tcp() {
   echo "[chromie] $label is ready."
 }
 
+python_http_check() {
+  python3 - "$1" "$2" "$3" <<'PYHTTP' >/dev/null 2>&1
+import http.client
+import sys
+
+connection = http.client.HTTPConnection(sys.argv[1], int(sys.argv[2]), timeout=2.0)
+try:
+    connection.request("GET", sys.argv[3])
+    response = connection.getresponse()
+    response.read()
+    if not 200 <= response.status < 300:
+        raise SystemExit(1)
+finally:
+    connection.close()
+PYHTTP
+}
+
+wait_for_http() {
+  local host="$1" port="$2" path="$3" timeout_s="$4" label="$5"
+  local deadline=$((SECONDS + timeout_s))
+  echo "[chromie] Waiting for $label health at http://$host:$port$path..."
+  until python_http_check "$host" "$port" "$path"; do
+    if (( SECONDS >= deadline )); then
+      echo "[chromie][error] Timed out waiting for $label health endpoint." >&2
+      return 1
+    fi
+    sleep 2
+  done
+  echo "[chromie] $label is healthy."
+}
+
 if ! python_tcp_check "$MCP_HOST" "$MCP_PORT"; then
   echo "[chromie][error] Soridormi MCP is not reachable: $HOST_MCP_URL" >&2
   echo "[chromie][hint] Start Soridormi first." >&2
@@ -292,8 +323,8 @@ run_soridormi_capability_probe() {
 
 wait_for_tcp 127.0.0.1 9001 900 "ASR"
 wait_for_tcp 127.0.0.1 5000 900 "TTS"
-wait_for_tcp 127.0.0.1 8091 300 "Router"
-wait_for_tcp 127.0.0.1 8092 300 "Agent"
+wait_for_http 127.0.0.1 8091 /health 300 "Router"
+wait_for_http 127.0.0.1 8092 /health 300 "Agent"
 wait_for_tcp 127.0.0.1 11434 300 "Ollama"
 
 check_soridormi_from_agent_container

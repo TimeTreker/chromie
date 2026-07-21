@@ -87,6 +87,10 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
 - [Runtime Trace Contract](RUNTIME_TRACE.md)
 - [Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md)
+- [Step 7: Session, Execution, and Audio Runtime Trace](STEP7_SESSION_EXECUTION_AUDIO_TRACE.md)
+- [Step 8: Input, Action, and Idle Trace Coverage](STEP8_INPUT_ACTION_IDLE_TRACE.md)
+- [Step 9: Resource, Recovery, and Trace Retention](STEP9_RESOURCE_RECOVERY_RETENTION.md)
+- [Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md)
 - [Runtime Event Architecture](RUNTIME_EVENT_ARCHITECTURE.md)
 - [Cognitive Integrity Events](COGNITIVE_INTEGRITY_EVENTS.md)
 - [Scenario Candidate Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md)
@@ -181,12 +185,3 @@ Run:
 python scripts/check_docs.py
 ./scripts/run_tests.sh
 ```
-
-- [Step 7: Session, Execution, and Audio Runtime Trace](STEP7_SESSION_EXECUTION_AUDIO_TRACE.md)
-  documents detached session tracing, execution/audio producer coverage, and
-  first audible user-observable latency.
-
-- [Step 8: Input, Action, and Idle Trace Coverage](STEP8_INPUT_ACTION_IDLE_TRACE.md)
-- [Step 9: Resource, Recovery, and Trace Retention](STEP9_RESOURCE_RECOVERY_RETENTION.md)
-  documents generic resource samples, crash-recovery checkpoints, trace
-  retention policy, and cross-artifact correlation.

@@ -2,18 +2,21 @@
 
 ## Status
 
-**Design status:** proposed target architecture with two implemented runtime slices.
+**Design status:** historical staged design whose core continuity and
+multi-goal response contracts are now integrated in the unified Goal-driven
+Runtime; generalized observation and richer situational planning remain open.
 
 **Design refresh date:** 2026-07-12.
 
-The complete design is not implemented. The current slices add shared
-semantic-task contracts, bounded active-task snapshots, Router-proposed advisory
-operations, a dedicated Task Continuity model endpoint, deterministic versioned
-goal updates, replay protection, structured capability-planning information
-gaps, staged report/apply rollout, and first structured ResponsePlan claim
-validation. They extend the current Router, Agent, conversation state,
-task-proposal ledger, Interaction Runtime, TaskGraph, Skill Runtime, and
-Soridormi boundaries without widening execution authority.
+The PR1-PR5 slices recorded below added shared semantic-task contracts, bounded
+active-task snapshots, Router-proposed advisory operations, a dedicated Task
+Continuity model endpoint, deterministic versioned goal updates, replay
+protection, structured capability-planning information gaps, staged
+report/apply rollout, and structured ResponsePlan claim validation. The later
+Goal-driven Runtime now owns continuity-before-creation, atomic Goal-state
+application, Fast/Deep multi-goal planning, and response composition. This
+document remains the design history for the broader situational-planning target;
+current implementation and evidence claims belong in `STATUS.md`.
 
 Related documents:
 
@@ -287,12 +290,14 @@ The first dependency-light slice is implemented in the current repository:
   phrase blacklist as its primary truthfulness boundary. Legacy fast-speech
   fields retain the conservative fallback filter.
 
-These slices are automatically verified only. They do not yet provide full
-multi-goal response composition, model repair for rejected speech claims,
+At the completion of these historical PR1-PR5 slices, automated verification
+did not yet provide full multi-goal response composition, bounded model repair,
 generalized observation planning, affordance-rich capability contracts,
 live-text evidence, simulator evidence, or any widened physical execution
-claim. The dedicated continuity path remains default-off in the host until
-report-only evidence is reviewed.
+claim. The dedicated continuity path was therefore default-off. The later
+unified Goal-driven Runtime supplied multi-goal composition and bounded
+same-stage repair; generalized observation planning and current target evidence
+remain open.
 
 ## Target Runtime Flow
 
@@ -1026,8 +1031,9 @@ the first-audio path while preserving semantic routing and deterministic claim
 validation. The cue is suppressed when final speech is ready before the hedge
 threshold and cancelled if queued but not yet audible.
 
-- The Task Continuity endpoint may propose one immediate ResponsePlan across
-  related RouteItems; full multi-goal response composition remains open.
+- At this slice, the Task Continuity endpoint could propose one immediate
+  ResponsePlan across related RouteItems. Full multi-goal response composition
+  was implemented later in the unified Goal-driven Runtime.
 - Add structured commitment and speech claims.
 - Validate immediate claims against trusted task status and evidence before
   fast-first playback.

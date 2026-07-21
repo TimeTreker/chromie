@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -654,6 +655,38 @@ class ChromieCliTests(unittest.TestCase):
         self.assertIn("forbidden_low_level_field", codes)
         self.assertEqual(stderr, "")
 
+    def test_capability_check_rejects_llm_visible_raw_controller_array(self) -> None:
+        manifest = self.safe_manifest()
+        tool = manifest["agents"][0]["tools"][0]
+        tool["llm_visible"] = True
+        tool["input_schema"]["properties"]["commands"] = {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "vx": {"type": "number"},
+                    "vy": {"type": "number"},
+                    "yaw": {"type": "number"},
+                    "duration_s": {"type": "number"},
+                },
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(Path(directory), "ORCH_ACTION_DRY_RUN=true\n")
+            self.write_manifest(root, manifest)
+            code, stdout, stderr = self.run_cli(
+                "--root",
+                str(root),
+                "--json",
+                "capability",
+                "check",
+            )
+        self.assertEqual(code, int(ExitCode.FAILURE))
+        payload = json.loads(stdout)
+        codes = {item["code"] for item in payload["details"]["diagnostics"]}
+        self.assertIn("llm_visible_raw_controller_array", codes)
+        self.assertEqual(stderr, "")
+
     def test_capability_check_rejects_missing_safety_metadata(self) -> None:
         manifest = self.safe_manifest()
         tool = manifest["agents"][0]["tools"][0]
@@ -843,6 +876,54 @@ class ChromieCliTests(unittest.TestCase):
         self.assertEqual(live["excluded_effects"], ["test_control"])
         self.assertEqual(live["endpoints"][0]["expected_tool_count"], 1)
         runner.assert_awaited_once()
+        self.assertEqual(stderr, "")
+
+    def test_capability_check_live_probe_fills_blank_runtime_endpoint_from_process(self) -> None:
+        observed: dict[str, str | None] = {}
+        result = SimpleNamespace(
+            url="http://127.0.0.1:8000/mcp",
+            expected_schemas={"soridormi.robot.get_status": {}},
+            advertised_schemas={"soridormi.robot.get_status": {}},
+            missing_tools=frozenset(),
+            extra_tools=frozenset(),
+            schema_mismatches=frozenset(),
+            schema_mismatch_details={},
+            schema_warnings={},
+            ok=True,
+        )
+
+        async def probe(*_args, **_kwargs):
+            observed["endpoint"] = os.environ.get("SORIDORMI_MCP_URL")
+            return [result]
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.write_repo_env(
+                Path(directory),
+                "ORCH_ACTION_DRY_RUN=true\nSORIDORMI_MCP_URL=\n",
+            )
+            self.write_manifest(root, self.safe_manifest())
+            with (
+                patch.dict(
+                    os.environ,
+                    {"SORIDORMI_MCP_URL": "http://127.0.0.1:8000/mcp"},
+                ),
+                patch(
+                    "tools.chromie_cli.capability._probe_live_registry",
+                    new=probe,
+                ),
+            ):
+                code, stdout, stderr = self.run_cli(
+                    "--root",
+                    str(root),
+                    "--json",
+                    "capability",
+                    "check",
+                    "--live",
+                )
+
+        self.assertEqual(code, int(ExitCode.OK))
+        self.assertEqual(observed["endpoint"], "http://127.0.0.1:8000/mcp")
+        self.assertEqual(json.loads(stdout)["details"]["live_probe"]["status"], "ready")
         self.assertEqual(stderr, "")
 
     def test_capability_check_live_probe_fails_on_missing_tool(self) -> None:

@@ -30,6 +30,17 @@ class RuntimeConfigurationTests(unittest.TestCase):
         with patch.dict(os.environ, {"ROUTER_RULES_FIRST": "0"}, clear=False):
             self.assertTrue(RouterSettings().rules_first)
 
+    def test_standalone_service_fallbacks_match_documented_common_budgets(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(RouterSettings().capability_catalog_timeout_ms, 400)
+        asr_source = (ROOT / "asr" / "server.py").read_text(encoding="utf-8")
+        orchestrator_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('SHERPA_ONNX_NUM_THREADS", "2"', asr_source)
+        self.assertIn('ORCH_ROUTER_TIMEOUT_MS", "9000"', orchestrator_source)
+        self.assertIn('OLLAMA_KEEP_ALIVE", "24h"', orchestrator_source)
+
     def test_router_host_budget_exceeds_router_internal_budget(self) -> None:
         values = _common_env()
         self.assertGreater(
@@ -50,7 +61,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ROUTER_TIMEOUT_MS"], "5400")
         self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "5400")
         self.assertEqual(values["ROUTER_LLM_NUM_CTX"], "4096")
-        self.assertEqual(values["ROUTER_LLM_NUM_PREDICT"], "96")
+        self.assertEqual(values["ROUTER_LLM_NUM_PREDICT"], "512")
         self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "2500")
         self.assertEqual(values["ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
         self.assertEqual(values["ROUTER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
@@ -99,6 +110,28 @@ class RuntimeConfigurationTests(unittest.TestCase):
     def test_agent_code_fallback_does_not_enable_capability_review(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(agent_main.Settings().require_capability_plan_review)
+
+    def test_agent_code_fallback_matches_documented_low_latency_defaults(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            settings = agent_main.Settings()
+        self.assertFalse(settings.response_review_enabled)
+        self.assertEqual(settings.max_speak_chars, 140)
+        self.assertEqual(settings.fast_planner_num_ctx, 8192)
+        self.assertEqual(settings.fast_planner_num_predict, 2048)
+        self.assertEqual(settings.response_composer_num_ctx, 8192)
+        self.assertEqual(settings.response_composer_num_predict, 1024)
+        common = _common_env()
+        self.assertEqual(common["AGENT_FAST_PLANNER_NUM_CTX"], "8192")
+        self.assertEqual(common["AGENT_FAST_PLANNER_NUM_PREDICT"], "2048")
+        self.assertEqual(common["AGENT_RESPONSE_COMPOSER_NUM_CTX"], "8192")
+        self.assertEqual(common["AGENT_RESPONSE_COMPOSER_NUM_PREDICT"], "1024")
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        self.assertIn(
+            "${AGENT_RESPONSE_COMPOSER_NUM_CTX:-8192}", compose
+        )
+        self.assertIn(
+            "${AGENT_RESPONSE_COMPOSER_NUM_PREDICT:-1024}", compose
+        )
 
     def test_agent_conversation_and_deepthinking_have_context_budgets(self) -> None:
         values = _common_env()
@@ -210,6 +243,20 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('START_ORCHESTRATOR=0', source)
         self.assertIn('Skipping host Orchestrator (--no-orchestrator)', source)
         self.assertIn('ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE"', source)
+
+    def test_start_chromie_waits_for_application_health(self) -> None:
+        source = (ROOT / "scripts" / "start_chromie.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("python_http_check()", source)
+        self.assertIn(
+            'wait_for_http 127.0.0.1 8091 /health 300 "Router"', source
+        )
+        self.assertIn(
+            'wait_for_http 127.0.0.1 8092 /health 300 "Agent"', source
+        )
+        self.assertNotIn('wait_for_tcp 127.0.0.1 8091 300 "Router"', source)
+        self.assertNotIn('wait_for_tcp 127.0.0.1 8092 300 "Agent"', source)
 
     def test_architecture_validation_preserves_social_attention(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(

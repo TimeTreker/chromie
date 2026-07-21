@@ -221,8 +221,21 @@ class DagDryRunExecutor:
                 "estimated_duration_s": duration,
                 "requires_confirmation": True,
             }
+        if tool == "soridormi.skill.create_plan":
+            return {
+                "plan_id": f"dryrun-{node.id}",
+                "skill_id": args.get("skill_id", ""),
+                "summary": f"Dry-run Soridormi named-skill plan for {args.get('skill_id', '<missing>')}.",
+                "requires_confirmation": True,
+            }
         if tool == "soridormi.motion.execute_plan":
             return {"completed": True, "summary": f"Dry-run executed plan {args.get('plan_id', '<missing>')}"}
+        if tool == "soridormi.skill.execute_plan":
+            return {
+                "completed": True,
+                "no_motion": True,
+                "summary": f"Dry-run executed named-skill plan {args.get('plan_id', '<missing>')}",
+            }
         if tool == "soridormi.motion.stop":
             return {"stopped": True}
         if tool == "soridormi.motion.cancel":

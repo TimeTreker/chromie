@@ -74,7 +74,7 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("ROUTER_TIMEOUT_MS: ${ROUTER_TIMEOUT_MS:-5400}", router_block)
         self.assertIn("ROUTER_LLM_TIMEOUT_MS: ${ROUTER_LLM_TIMEOUT_MS:-5400}", router_block)
         self.assertIn("ROUTER_LLM_NUM_CTX: ${ROUTER_LLM_NUM_CTX:-4096}", router_block)
-        self.assertIn("ROUTER_LLM_NUM_PREDICT: ${ROUTER_LLM_NUM_PREDICT:-96}", router_block)
+        self.assertIn("ROUTER_LLM_NUM_PREDICT: ${ROUTER_LLM_NUM_PREDICT:-512}", router_block)
         self.assertIn("ROUTER_REVIEW_TIMEOUT_MS: ${ROUTER_REVIEW_TIMEOUT_MS:-2500}", router_block)
         self.assertIn(
             "ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS: ${ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS:-5000}",

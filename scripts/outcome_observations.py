@@ -262,6 +262,21 @@ def observation_matches(actual: dict[str, Any], expected: dict[str, Any]) -> boo
         for key, wanted in expected_args.items():
             if actual_args.get(key) != wanted:
                 return False
+    arg_ranges = expected.get("arg_ranges")
+    if isinstance(arg_ranges, dict):
+        actual_args = actual.get("args") if isinstance(actual.get("args"), dict) else {}
+        for key, bounds in arg_ranges.items():
+            actual_value = actual_args.get(key)
+            if not isinstance(actual_value, (int, float)) or isinstance(actual_value, bool):
+                return False
+            if not isinstance(bounds, dict):
+                return False
+            minimum = bounds.get("min")
+            maximum = bounds.get("max")
+            if minimum is not None and actual_value < float(minimum):
+                return False
+            if maximum is not None and actual_value > float(maximum):
+                return False
     return True
 
 

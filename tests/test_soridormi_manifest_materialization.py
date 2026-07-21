@@ -50,6 +50,54 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
         self.assertEqual(bundle.dag_contract, {"source": "soridormi"})
         self.assertEqual(bundle.metadata["upstream_commit"], "abc123")
 
+    def test_materialization_hides_raw_controller_arrays_from_the_llm(self) -> None:
+        upstream = {
+            "schema_version": "0.1",
+            "source": "soridormi",
+            "agents": [
+                {
+                    "agent_id": "soridormi.motion",
+                    "tools": [
+                        {
+                            "name": "soridormi.motion.create_plan",
+                            "agent_id": "soridormi.motion",
+                            "llm_visible": True,
+                            "input_schema": {
+                                "type": "object",
+                                "properties": {
+                                    "commands": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "vx": {"type": "number"},
+                                                "vy": {"type": "number"},
+                                                "yaw": {"type": "number"},
+                                                "duration_s": {"type": "number"},
+                                            },
+                                        },
+                                    }
+                                },
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+
+        bundle = materialize_soridormi_manifest(upstream)
+        tool = bundle.agents[0].tools[0]
+
+        self.assertFalse(tool.llm_visible)
+        self.assertEqual(
+            tool.llm_hints["chromie_visibility_policy"],
+            "hidden_raw_controller_array",
+        )
+        self.assertEqual(
+            tool.llm_hints["chromie_visibility_policy_path"],
+            "$.properties.commands",
+        )
+
     def test_checked_in_manifest_records_upstream_and_all_exported_tools(self) -> None:
         payload = json.loads(
             (ROOT / "capabilities" / "soridormi.json").read_text(encoding="utf-8")
@@ -99,6 +147,12 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
         task_status = tools["soridormi.task.status"]
         task_events = tools["soridormi.task.events"]
         task_cancel = tools["soridormi.task.cancel"]
+        motion_plan = tools["soridormi.motion.create_plan"]
+        self.assertFalse(motion_plan["llm_visible"])
+        self.assertEqual(
+            motion_plan["llm_hints"]["chromie_visibility_policy"],
+            "hidden_raw_controller_array",
+        )
         self.assertIn("client_task_ref", task_submit["input_schema"]["properties"])
         self.assertIn("client_task_ref", task_status["input_schema"]["properties"])
         self.assertIn("client_task_ref", task_events["input_schema"]["properties"])

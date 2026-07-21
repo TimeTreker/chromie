@@ -6,6 +6,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+try:
+    from chromie_contracts.interaction import find_raw_controller_array_schema
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.interaction import find_raw_controller_array_schema
+
 SafetyClass = Literal[
     "safe_read",
     "planning_only",
@@ -115,9 +120,17 @@ class ToolCapability(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def hide_restricted_tools(self) -> "ToolCapability":
+    def enforce_model_visibility_policy(self) -> "ToolCapability":
         if self.safety_class == "restricted":
             self.llm_visible = False
+        raw_controller_path = find_raw_controller_array_schema(self.input_schema)
+        if raw_controller_path is not None:
+            self.llm_visible = False
+            self.llm_hints = {
+                **self.llm_hints,
+                "chromie_visibility_policy": "hidden_raw_controller_array",
+                "chromie_visibility_policy_path": raw_controller_path,
+            }
         return self
 
 

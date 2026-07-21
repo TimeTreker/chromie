@@ -124,6 +124,18 @@ def audit() -> dict[str, Any]:
         if required not in capability:
             errors.append(f"CapabilityAgent authority guard missing: {required}")
 
+    conversation = _read("agent/app/agents/conversation.py")
+    for forbidden in (
+        "_ensure_factual_subject_anchor",
+        "The Sun is roughly spherical.",
+        "The Sun is extremely hot.",
+    ):
+        if forbidden in conversation:
+            errors.append(
+                "ConversationAgent contains an entity-specific factual rewrite: "
+                f"{forbidden}"
+            )
+
     cognitive_runtime = _read("orchestrator/runtime/cognitive_runtime.py")
     if '"legacy_fallback"' in cognitive_runtime:
         errors.append("goal-driven runtime still declares a legacy_fallback status")

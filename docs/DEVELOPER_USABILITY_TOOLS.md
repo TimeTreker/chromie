@@ -208,6 +208,11 @@ The live mode is explicit rather than automatic:
 python -m tools.chromie_cli capability check --live --timeout-s 10
 ```
 
+The live probe uses the generated runtime endpoint when it is non-empty. When
+the safe-base generated value is blank, a non-empty process
+`SORIDORMI_MCP_URL` may supply the endpoint for an explicitly launched overlay;
+it never overrides a configured generated endpoint.
+
 Exit criteria:
 
 - Level A tests include safe, malformed, duplicate, missing-policy,

@@ -34,37 +34,26 @@ def _soridormi_bundle() -> CapabilityBundle:
                 ],
             ),
             AgentManifest(
-                agent_id="soridormi.motion",
+                agent_id="soridormi.skill",
                 tools=[
                     ToolCapability(
-                        name="soridormi.motion.create_plan",
-                        agent_id="soridormi.motion",
+                        name="soridormi.skill.create_plan",
+                        agent_id="soridormi.skill",
                         input_schema={
                             "type": "object",
                             "properties": {
-                                "commands": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "vx": {"type": "number", "minimum": -0.2, "maximum": 0.2},
-                                            "vy": {"type": "number", "minimum": -0.1, "maximum": 0.1},
-                                            "yaw": {"type": "number", "minimum": -0.4, "maximum": 0.4},
-                                            "duration_s": {"type": "number", "minimum": 0.05, "maximum": 5.0},
-                                        },
-                                        "required": ["vx", "vy", "yaw", "duration_s"],
-                                    },
-                                }
+                                "skill_id": {"type": "string", "enum": ["walk_forward"]},
+                                "parameters": {"type": "object"},
                             },
-                            "required": ["commands"],
+                            "required": ["skill_id"],
                         },
                         output_schema={"type": "object", "properties": {"plan_id": {"type": "string"}, "summary": {"type": "string"}}},
                         effects=["planning_only", "creates_plan"],
                         safety_class="planning_only",
                     ),
                     ToolCapability(
-                        name="soridormi.motion.execute_plan",
-                        agent_id="soridormi.motion",
+                        name="soridormi.skill.execute_plan",
+                        agent_id="soridormi.skill",
                         input_schema={"type": "object", "properties": {"plan_id": {"type": "string"}}, "required": ["plan_id"]},
                         output_schema={"type": "object", "properties": {"completed": {"type": "boolean"}}},
                         effects=["physical_motion"],
@@ -74,6 +63,11 @@ def _soridormi_bundle() -> CapabilityBundle:
                         execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="robot_motion", timeout_s=10.0, idempotent=False, side_effect_free=False),
                         default_failure_policy=FailurePolicy(strategy="stop_and_report"),
                     ),
+                ],
+            ),
+            AgentManifest(
+                agent_id="soridormi.motion",
+                tools=[
                     ToolCapability(
                         name="soridormi.motion.stop",
                         agent_id="soridormi.motion",
@@ -111,10 +105,13 @@ def _motion_graph() -> TaskGraph:
                 {"id": "status", "tool": "soridormi.robot.get_status", "type": "query"},
                 {
                     "id": "make_plan",
-                    "tool": "soridormi.motion.create_plan",
+                    "tool": "soridormi.skill.create_plan",
                     "type": "plan",
                     "depends_on": ["status"],
-                    "args": {"commands": [{"vx": 0.08, "vy": 0.0, "yaw": 0.0, "duration_s": 2.0}]},
+                    "args": {
+                        "skill_id": "walk_forward",
+                        "parameters": {"duration_s": 2.0, "speed": "slow"},
+                    },
                 },
                 {
                     "id": "confirm",
@@ -131,7 +128,7 @@ def _motion_graph() -> TaskGraph:
                 },
                 {
                     "id": "execute_motion",
-                    "tool": "soridormi.motion.execute_plan",
+                    "tool": "soridormi.skill.execute_plan",
                     "type": "action",
                     "depends_on": ["confirm"],
                     "args": {"plan_id": {"$ref": "make_plan.output.plan_id"}},
@@ -240,7 +237,7 @@ def test_tool_executor_invokes_registered_handlers_and_resolves_refs() -> None:
     invoker = FunctionToolInvoker()
     observed: dict[str, object] = {}
     invoker.register("soridormi.robot.get_status", lambda args: {"standing": True})
-    invoker.register("soridormi.motion.create_plan", lambda args: {"plan_id": "real-plan-1", "summary": "plan ready"})
+    invoker.register("soridormi.skill.create_plan", lambda args: {"plan_id": "real-plan-1", "summary": "plan ready"})
     invoker.register("chromie.ask_confirmation", lambda args: {"confirmed": True, "plan_summary": args["plan_summary"]})
     invoker.register("soridormi.safety.monitor_motion", lambda args: {"ok": True, "event": None})
     invoker.register("soridormi.motion.stop", lambda args: {"stopped": True})
@@ -249,7 +246,7 @@ def test_tool_executor_invokes_registered_handlers_and_resolves_refs() -> None:
         observed["execute_plan_id"] = args["plan_id"]
         return {"completed": True, "summary": f"executed {args['plan_id']}"}
 
-    invoker.register("soridormi.motion.execute_plan", execute)
+    invoker.register("soridormi.skill.execute_plan", execute)
     invoker.register("chromie.report", lambda args: {"reported": True, "message": args["message"]})
 
     trace = DagToolExecutor(_registry(), invoker).run(_motion_graph())

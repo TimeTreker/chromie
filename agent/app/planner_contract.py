@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import copy
+from decimal import Decimal, InvalidOperation
+from itertools import product
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -30,6 +33,10 @@ except ImportError:  # pragma: no cover
 
 PlannerTier = Literal["fast", "deep"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
+
+_NUMERIC_LITERAL_RE = re.compile(
+    r"(?<![\w.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?!\w)"
+)
 
 # Response Composer owns user-facing speech in the goal-driven pipeline.  These
 # runtime transport skills are valid in legacy/native InteractionResponse task
@@ -345,6 +352,155 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
     return result
 
 
+def validate_explicit_numeric_parameter_grounding(
+    output: PlannerModelOutput,
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> None:
+    """Verify numeric user-supplied arguments against immutable goal text.
+
+    The planner remains the semantic authority for mapping a user value to a
+    skill parameter.  This check only enforces provenance after that judgment:
+    a value labelled ``user_supplied`` must agree with its executable step and
+    an exact cited span, and every numeric literal in an executable goal must
+    be accounted for.  It therefore catches silent default substitution
+    without introducing phrase-to-action or parameter-name rules.
+    """
+
+    if output.disposition not in {"execute", "mixed"}:
+        return
+
+    def numeric(value: Any) -> Decimal | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal, str)):
+            return None
+        if isinstance(value, str) and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None:
+            return None
+        try:
+            return Decimal(str(value).strip())
+        except InvalidOperation:
+            return None
+
+    def literals(value: str) -> list[Decimal]:
+        found: list[Decimal] = []
+        for match in _NUMERIC_LITERAL_RE.finditer(value):
+            try:
+                number = Decimal(match.group(0))
+            except InvalidOperation:
+                continue
+            if number not in found:
+                found.append(number)
+        return found
+
+    goal_text: dict[str, str] = {}
+    goal_citation_text: dict[str, str] = {}
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        if not goal_id:
+            continue
+        parts: list[str] = []
+        description = str(goal.get("description") or "").strip()
+        if description:
+            parts.append(description)
+        criteria = goal.get("success_criteria")
+        if isinstance(criteria, list):
+            parts.extend(str(item).strip() for item in criteria if str(item).strip())
+        source_text = str(goal.get("source_text") or "").strip()
+        if not parts and source_text:
+            parts.append(source_text)
+        goal_text[goal_id] = " ".join(dict.fromkeys(parts))
+        citation_parts = [*parts]
+        if source_text:
+            citation_parts.append(source_text)
+        goal_citation_text[goal_id] = " ".join(dict.fromkeys(citation_parts))
+
+    steps = {step.step_id: step for step in output.steps}
+    user_numeric_resolutions: list[tuple[PlanParameterResolution, Decimal]] = []
+    for resolution in output.parameter_resolutions:
+        if resolution.blocking:
+            continue
+        step = steps.get(resolution.step_id)
+        if step is None:
+            raise ValueError(
+                "parameter resolution references unknown executable step "
+                f"{resolution.step_id!r}"
+            )
+        if resolution.parameter not in step.args:
+            raise ValueError(
+                "parameter resolution references an argument absent from its step: "
+                f"{resolution.step_id}.{resolution.parameter}"
+            )
+        resolved_number = numeric(resolution.value)
+        argument_number = numeric(step.args[resolution.parameter])
+        if resolved_number is not None and argument_number is not None:
+            if resolved_number != argument_number:
+                raise ValueError(
+                    "parameter resolution value must equal the executable step argument: "
+                    f"{resolution.step_id}.{resolution.parameter} has "
+                    f"resolution={resolution.value!r}, step={step.args[resolution.parameter]!r}"
+                )
+        elif resolution.value != step.args[resolution.parameter]:
+            raise ValueError(
+                "parameter resolution value must equal the executable step argument: "
+                f"{resolution.step_id}.{resolution.parameter}"
+            )
+
+        if resolution.strategy != "user_supplied" or resolved_number is None:
+            continue
+        source_goal_ids = list(dict.fromkeys(resolution.source_goal_ids))
+        if not source_goal_ids:
+            raise ValueError(
+                "numeric user_supplied parameter resolution requires source_goal_ids: "
+                f"{resolution.step_id}.{resolution.parameter}"
+            )
+        texts_with_literals = [
+            goal_citation_text[goal_id]
+            for goal_id in source_goal_ids
+            if goal_id in goal_citation_text and literals(goal_citation_text[goal_id])
+        ]
+        if texts_with_literals:
+            source_ref = resolution.source_ref.strip()
+            if not source_ref:
+                raise ValueError(
+                    "numeric user_supplied parameter resolution requires an exact "
+                    f"source_ref citation: {resolution.step_id}.{resolution.parameter}"
+                )
+            if not any(source_ref.casefold() in text.casefold() for text in texts_with_literals):
+                raise ValueError(
+                    "numeric user_supplied parameter source_ref is not an exact span "
+                    f"of its authoritative goal: {resolution.step_id}.{resolution.parameter}"
+                )
+            if resolved_number not in literals(source_ref):
+                raise ValueError(
+                    "numeric user_supplied parameter source_ref does not cite its "
+                    f"resolved value: {resolution.step_id}.{resolution.parameter}"
+                )
+        user_numeric_resolutions.append((resolution, resolved_number))
+
+    executable_goal_ids = {
+        goal_id
+        for goal_id, outcome in output.goal_outcomes.items()
+        if outcome.disposition == "execute"
+    }
+    if not executable_goal_ids:
+        executable_goal_ids = {
+            goal_id
+            for step in output.steps
+            for goal_id in step.source_goal_ids
+        }
+    for goal_id in executable_goal_ids:
+        for literal in literals(goal_text.get(goal_id, "")):
+            if not any(
+                literal == value and goal_id in resolution.source_goal_ids
+                for resolution, value in user_numeric_resolutions
+            ):
+                raise ValueError(
+                    "explicit numeric goal value has no matching user_supplied "
+                    f"parameter resolution: goal_id={goal_id!r}, value={literal}"
+                )
+
+
 def canonical_plan_response_schema(
     *,
     planner_tier: PlannerTier,
@@ -432,6 +588,23 @@ def canonical_plan_response_schema(
 
     outcome_schema = schema.get("$defs", {}).get("PlannerModelGoalOutcome")
     if isinstance(outcome_schema, dict):
+        # The runtime validator distinguishes an intentionally empty field from
+        # one the decoder silently omitted.  Keep the decoder contract aligned
+        # with that validator: every outcome must make its ownership and
+        # terminal judgment explicit, even when a disposition requires an
+        # empty string/list or a null satisfaction value.
+        outcome_required = outcome_schema.setdefault("required", [])
+        for field_name in (
+            "disposition",
+            "coverage",
+            "response_text",
+            "unresolved",
+            "step_ids",
+            "satisfaction",
+            "rationale",
+        ):
+            if field_name not in outcome_required:
+                outcome_required.append(field_name)
         outcome_disposition = (
             outcome_schema.get("properties", {}).get("disposition")
         )
@@ -526,6 +699,45 @@ def fast_multi_goal_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
 
+    def bound_text(
+        owner: dict[str, Any],
+        field_name: str,
+        maximum: int,
+    ) -> None:
+        field = owner.get(field_name)
+        if isinstance(field, dict):
+            field["maxLength"] = maximum
+
+    # Repeated prose in several semantically redundant fields previously made
+    # otherwise simple plans consume most of the decoder budget.  Keep the
+    # semantic judgments model-authored while bounding their representation.
+    bound_text(properties, "goal_summary", 240)
+    bound_text(properties, "response_text", 800)
+    bound_text(properties, "escalation_reason", 240)
+    top_unresolved = properties.get("unresolved")
+    if isinstance(top_unresolved, dict):
+        top_unresolved["maxItems"] = max(4, len(allowed_goals))
+        if isinstance(top_unresolved.get("items"), dict):
+            top_unresolved["items"]["maxLength"] = 240
+    parameter_resolutions = properties.get("parameter_resolutions")
+    if isinstance(parameter_resolutions, dict):
+        parameter_resolutions["maxItems"] = max(4, len(allowed_goals) * 4)
+
+    steps = properties.get("steps")
+    if isinstance(steps, dict):
+        # Fast multi-goal terminal scope is deliberately limited to simple
+        # goals: at most one executable step per authoritative goal.  Besides
+        # documenting that boundary, the decoder limit prevents a malformed
+        # model response from repeating one physical step until num_predict is
+        # exhausted.  A goal that needs multiple skills belongs in Deep
+        # Planning through a model-authored semantic escalation.
+        steps["maxItems"] = len(allowed_goals)
+        steps["description"] = (
+            "At most one executable step per authoritative goal. A skill's "
+            "count argument represents repeated motions; never duplicate a "
+            "step to implement count. Conversational respond goals have no step."
+        )
+
     goal_outcomes = properties.get("goal_outcomes")
     if isinstance(goal_outcomes, dict):
         goal_outcomes.clear()
@@ -571,6 +783,13 @@ def fast_multi_goal_response_schema(
             if field_name not in outcome_required:
                 outcome_required.append(field_name)
         outcome_properties = outcome_schema.get("properties", {})
+        bound_text(outcome_properties, "response_text", 800)
+        bound_text(outcome_properties, "rationale", 200)
+        outcome_unresolved = outcome_properties.get("unresolved")
+        if isinstance(outcome_unresolved, dict):
+            outcome_unresolved["maxItems"] = 4
+            if isinstance(outcome_unresolved.get("items"), dict):
+                outcome_unresolved["items"]["maxLength"] = 240
         outcome_disposition = outcome_properties.get("disposition")
         if isinstance(outcome_disposition, dict):
             outcome_disposition["enum"] = ["respond", "execute", "escalate"]
@@ -592,6 +811,18 @@ def fast_multi_goal_response_schema(
         ):
             if field_name not in satisfaction_required:
                 satisfaction_required.append(field_name)
+        satisfaction_properties = satisfaction_schema.get("properties", {})
+        bound_text(satisfaction_properties, "rationale", 200)
+        unmet_requirements = satisfaction_properties.get("unmet_requirements")
+        if isinstance(unmet_requirements, dict):
+            unmet_requirements["maxItems"] = 4
+            if isinstance(unmet_requirements.get("items"), dict):
+                unmet_requirements["items"]["maxLength"] = 240
+            unmet_requirements["description"] = (
+                "Actual planning gaps only. Pending execution, the text of a "
+                "covered goal, and sibling goals are not unmet requirements. "
+                "This must be empty when status is exact."
+            )
 
     step_schema = schema.get("$defs", {}).get("PlannerModelStep")
     if isinstance(step_schema, dict):
@@ -609,6 +840,27 @@ def fast_multi_goal_response_schema(
         step_id = step_schema.get("properties", {}).get("step_id")
         if isinstance(step_id, dict):
             step_id["minLength"] = 1
+        bound_text(step_schema.get("properties", {}), "reason_summary", 160)
+
+    resolution_schema = schema.get("$defs", {}).get("PlanParameterResolution")
+    if isinstance(resolution_schema, dict):
+        resolution_required = resolution_schema.setdefault("required", [])
+        for field_name in (
+            "step_id",
+            "parameter",
+            "strategy",
+            "value",
+            "confidence",
+            "blocking",
+            "rationale",
+            "source_ref",
+            "source_goal_ids",
+        ):
+            if field_name not in resolution_required:
+                resolution_required.append(field_name)
+        resolution_properties = resolution_schema.get("properties", {})
+        bound_text(resolution_properties, "rationale", 160)
+        bound_text(resolution_properties, "source_ref", 160)
 
     goal_list_fields = {
         "goal_ids",
@@ -641,6 +893,207 @@ def fast_multi_goal_response_schema(
                 constrain(value)
 
     constrain(schema)
+
+    def strict_satisfaction_schema(
+        base: dict[str, Any],
+        *,
+        exact_satisfied_count: int,
+    ) -> dict[str, Any]:
+        """Align decoder branches with the satisfaction validator bands."""
+
+        branches: list[dict[str, Any]] = []
+        bands = (
+            ("exact", 0.95, 1.0),
+            ("substantial", 0.75, 0.949999),
+            ("partial", 0.01, 0.749999),
+            ("unsatisfied", 0.0, 0.0),
+        )
+        for status_value, minimum, maximum in bands:
+            branch = copy.deepcopy(base)
+            branch_properties = branch.setdefault("properties", {})
+            status = branch_properties.setdefault("status", {})
+            status.clear()
+            status.update({"type": "string", "enum": [status_value]})
+            score = branch_properties.setdefault("score", {})
+            score["minimum"] = minimum
+            score["maximum"] = maximum
+            if status_value == "exact":
+                for field_name in ("unmet_goal_ids", "unmet_requirements"):
+                    field_schema = branch_properties.get(field_name)
+                    if isinstance(field_schema, dict):
+                        field_schema["maxItems"] = 0
+                satisfied = branch_properties.get("satisfied_goal_ids")
+                if isinstance(satisfied, dict):
+                    satisfied["minItems"] = exact_satisfied_count
+                    satisfied["maxItems"] = exact_satisfied_count
+            branches.append(branch)
+        return {
+            "anyOf": branches,
+            "description": (
+                "Prospective plan adequacy. The selected status branch enforces "
+                "its score band; exact satisfaction requires all planned goals "
+                "in satisfied_goal_ids and both unmet lists empty."
+            ),
+        }
+
+    if isinstance(goal_satisfaction, dict) and isinstance(satisfaction_schema, dict):
+        goal_satisfaction.clear()
+        goal_satisfaction.update(
+            strict_satisfaction_schema(
+                satisfaction_schema,
+                exact_satisfied_count=len(allowed_goals),
+            )
+        )
+
+    # A goal_outcomes key already identifies the one goal being judged.  The
+    # generic model schema cannot express that a nested satisfaction object may
+    # reference only its enclosing key, so specialize each decoder property.
+    # This is contract/schema alignment, not semantic compilation: the model
+    # still authors the disposition, step link, score, status, and rationale.
+    # It simply cannot mislabel unrelated sibling goals as unmet inside a
+    # goal-specific judgment and then fail the deterministic validator.
+    if (
+        isinstance(goal_outcomes, dict)
+        and isinstance(outcome_schema, dict)
+        and isinstance(satisfaction_schema, dict)
+    ):
+        outcome_properties = goal_outcomes.get("properties", {})
+        for goal_id in allowed_goals:
+            goal_property = outcome_properties.get(goal_id)
+            if not isinstance(goal_property, dict):
+                continue
+            specialized_outcome = copy.deepcopy(outcome_schema)
+            specialized_satisfaction = copy.deepcopy(satisfaction_schema)
+            specialized_satisfaction_properties = specialized_satisfaction.get(
+                "properties", {}
+            )
+            for field_name in ("satisfied_goal_ids", "unmet_goal_ids"):
+                field_schema = specialized_satisfaction_properties.get(field_name)
+                if isinstance(field_schema, dict):
+                    field_schema["items"] = {"type": "string", "enum": [goal_id]}
+                    field_schema["uniqueItems"] = True
+                    field_schema["maxItems"] = 1
+            satisfied = specialized_satisfaction_properties.get(
+                "satisfied_goal_ids"
+            )
+            if isinstance(satisfied, dict):
+                satisfied["description"] = (
+                    f"Only {goal_id!r} may appear here. Include it when this "
+                    "goal's proposed step or response would satisfy it."
+                )
+            unmet = specialized_satisfaction_properties.get("unmet_goal_ids")
+            if isinstance(unmet, dict):
+                unmet["description"] = (
+                    f"Only {goal_id!r} may appear here, and only for an actual "
+                    "planning gap. Pending execution and sibling goals do not "
+                    "belong here; exact satisfaction requires an empty list."
+                )
+            specialized_outcome_properties = specialized_outcome.get(
+                "properties", {}
+            )
+            specialized_outcome_properties["satisfaction"] = strict_satisfaction_schema(
+                specialized_satisfaction,
+                exact_satisfied_count=1,
+            )
+            step_ids = specialized_outcome_properties.get("step_ids")
+            if isinstance(step_ids, dict):
+                step_ids["maxItems"] = 1
+                step_ids["uniqueItems"] = True
+                step_ids["description"] = (
+                    "The one simple Fast Planner step owned by this goal, or an "
+                    "empty list for respond/escalate."
+                )
+            goal_property.clear()
+            goal_property.update(specialized_outcome)
+            goal_property["description"] = (
+                "The complete model-authored outcome for authoritative goal "
+                f"{goal_id!r}. Satisfaction evaluates this goal only."
+            )
+
+    disposition = properties.get("disposition")
+    if isinstance(disposition, dict):
+        disposition["description"] = (
+            "Aggregate the already-authored goal_outcomes: execute when all "
+            "outcomes execute, respond when all respond, mixed when execute and "
+            "respond are both present, and escalate when all escalate."
+        )
+
+    # Encode the aggregate invariant in the decoder grammar.  The model still
+    # chooses each goal's semantic disposition; this cross-field constraint
+    # only makes the redundant top-level aggregate and executable-step count
+    # consistent with those model-authored choices.  Enumerating the small
+    # execute/respond assignment space avoids a host-side semantic compiler.
+    # Larger turns are outside the Fast terminal surface and retain the normal
+    # validator/Deep Planner path rather than exploding the response schema.
+    if 1 < len(allowed_goals) <= 6:
+        assignment_branches: list[dict[str, Any]] = []
+        assignments = list(product(("execute", "respond"), repeat=len(allowed_goals)))
+        assignments.append(tuple("escalate" for _ in allowed_goals))
+        for assignment in assignments:
+            assignment_set = set(assignment)
+            if assignment_set == {"execute"}:
+                aggregate = "execute"
+            elif assignment_set == {"respond"}:
+                aggregate = "respond"
+            elif assignment_set == {"escalate"}:
+                aggregate = "escalate"
+            else:
+                aggregate = "mixed"
+            execute_count = sum(item == "execute" for item in assignment)
+            branch: dict[str, Any] = {
+                "properties": {
+                    "disposition": {"type": "string", "enum": [aggregate]},
+                    "steps": {
+                        "type": "array",
+                        "minItems": execute_count,
+                        "maxItems": execute_count,
+                    },
+                    "goal_outcomes": {
+                        "type": "object",
+                        "properties": {
+                            goal_id: {
+                                "type": "object",
+                                "properties": {
+                                    "disposition": {
+                                        "type": "string",
+                                        "enum": [goal_disposition],
+                                    }
+                                },
+                            }
+                            for goal_id, goal_disposition in zip(
+                                allowed_goals, assignment, strict=True
+                            )
+                        },
+                    },
+                }
+            }
+            assignment_branches.append(branch)
+        schema.setdefault("allOf", []).append({"anyOf": assignment_branches})
+
+    # The structured decoder normally emits object fields in schema order.
+    # Place per-goal outcomes before steps and aggregate disposition so the
+    # model authors goal meaning first; the generic cross-field grammar can
+    # then bound the number of simple executable steps and aggregate it.
+    preferred_property_order = (
+        "goal_summary",
+        "goal_outcomes",
+        "steps",
+        "goal_satisfaction",
+        "disposition",
+        "coverage",
+        "confidence",
+        "response_text",
+        "escalation_reason",
+        "unresolved",
+        "parameter_resolutions",
+        "plan_relation",
+        "user_confirmation_required",
+    )
+    schema["properties"] = {
+        key: properties[key]
+        for key in preferred_property_order
+        if key in properties
+    }
     return schema
 
 

@@ -361,6 +361,18 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "metadata",
             schema["$defs"]["PlannerModelStep"]["properties"],
         )
+        self.assertEqual(
+            set(schema["$defs"]["PlannerModelGoalOutcome"]["required"]),
+            {
+                "disposition",
+                "coverage",
+                "response_text",
+                "unresolved",
+                "step_ids",
+                "satisfaction",
+                "rationale",
+            },
+        )
         self.assertIn("plan_relation", schema["properties"])
         self.assertIn("user_confirmation_required", schema["properties"])
 

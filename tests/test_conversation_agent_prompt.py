@@ -62,8 +62,8 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Internal components are resources", ollama.calls[0]["system"])
         self.assertNotIn("If the user asks who you are", ollama.calls[0]["system"])
         self.assertNotIn("never say you are a large language model", ollama.calls[0]["system"])
-        self.assertEqual(ollama.calls[0]["options"]["num_ctx"], 4096)
-        self.assertEqual(ollama.calls[0]["options"]["num_predict"], 128)
+        self.assertEqual(ollama.calls[0]["options"]["num_ctx"], 2048)
+        self.assertEqual(ollama.calls[0]["options"]["num_predict"], 64)
 
     async def test_identity_age_question_keeps_internal_age_out_of_ordinary_prompt(self) -> None:
         ollama = _CapturingOllama("I'm Chromie; I don't usually introduce myself by an age.")
@@ -285,7 +285,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("correct obvious false premises", ollama.calls[0]["system"])
         self.assertIn("Current user said: In my opinion, the sun is cold.", ollama.calls[0]["prompt"])
 
-    async def test_sun_shape_reply_names_subject_even_when_model_uses_pronoun(self) -> None:
+    async def test_factual_reply_is_not_rewritten_by_entity_specific_rules(self) -> None:
         ollama = _CapturingOllama("It is indeed a massive, nearly perfect sphere.")
         agent = ConversationAgent(
             AgentServices(
@@ -313,7 +313,7 @@ class ConversationAgentPromptTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             result.speak_immediate[0].text,
-            "The Sun is roughly spherical. It is indeed a massive, nearly perfect sphere.",
+            "It is indeed a massive, nearly perfect sphere.",
         )
 
     async def test_response_review_auto_skips_low_risk_greeting(self) -> None:

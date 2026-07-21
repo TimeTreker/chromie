@@ -279,6 +279,51 @@ class AcceleratorTelemetrySampler:
             return True
         return reason in {"session_start", "session_finish", "session_abandoned"}
 
+    async def _collect(self, timeout_s: float) -> dict[str, Any]:
+        """Run the blocking provider without owning the loop's default executor.
+
+        A timed-out ``asyncio.to_thread`` call keeps its worker alive, and
+        ``asyncio.run`` waits for default-executor workers during shutdown. A
+        stuck telemetry utility could therefore delay Orchestrator shutdown for
+        minutes even though sampling itself had already timed out. The provider
+        has its own subprocess timeout; an owned daemon thread adds a final
+        lifecycle boundary without making shutdown depend on that provider.
+        """
+
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[dict[str, Any]] = loop.create_future()
+
+        def complete(
+            payload: dict[str, Any] | None,
+            error: BaseException | None,
+        ) -> None:
+            if future.done():
+                return
+            if error is not None:
+                future.set_exception(error)
+            else:
+                future.set_result(dict(payload or {}))
+
+        def collect() -> None:
+            payload: dict[str, Any] | None = None
+            error: BaseException | None = None
+            try:
+                payload = self._collector(timeout_s)
+            except BaseException as exc:  # propagated and normalized by sample()
+                error = exc
+            try:
+                loop.call_soon_threadsafe(complete, payload, error)
+            except RuntimeError:
+                # The bounded caller already returned and its loop has closed.
+                return
+
+        threading.Thread(
+            target=collect,
+            name="chromie-accelerator-telemetry",
+            daemon=True,
+        ).start()
+        return await asyncio.wait_for(asyncio.shield(future), timeout=timeout_s + 0.25)
+
     async def sample(self, *, reason: str, force: bool = False) -> dict[str, Any]:
         if not self.should_sample(reason):
             return {}
@@ -294,10 +339,7 @@ class AcceleratorTelemetrySampler:
                 return self.cached_sample(reason=reason)
             timeout_s = self.config.timeout_ms / 1000.0
             try:
-                payload = await asyncio.wait_for(
-                    asyncio.to_thread(self._collector, timeout_s),
-                    timeout=timeout_s + 0.25,
-                )
+                payload = await self._collect(timeout_s)
             except TimeoutError:
                 payload = {
                     "available": False,

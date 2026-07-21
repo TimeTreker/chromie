@@ -291,7 +291,7 @@
           "display_name": "Create Soridormi motion plan",
           "description": "Create a bounded short-range velocity-command plan. This does not move the robot.",
           "version": "0.1.0",
-          "llm_visible": true,
+          "llm_visible": false,
           "input_schema": {
             "type": "object",
             "properties": {
@@ -409,7 +409,9 @@
           },
           "llm_hints": {
             "when_to_use": "Use for short movements like walking forward a little, turning, or stopping.",
-            "when_not_to_use": "Do not use for named-location navigation; use a future nav agent instead."
+            "when_not_to_use": "Do not use for named-location navigation; use a future nav agent instead.",
+            "chromie_visibility_policy": "hidden_raw_controller_array",
+            "chromie_visibility_policy_path": "$.properties.commands"
           }
         },
         {

@@ -37,6 +37,39 @@ FORBIDDEN_LOW_LEVEL_FIELDS = frozenset(
     }
 )
 
+RAW_PLANAR_CONTROLLER_FIELDS = frozenset({"vx", "vy", "yaw"})
+
+
+def find_raw_controller_array_schema(value: Any, *, path: str = "$") -> str | None:
+    """Return the first schema path exposing a raw planar command array.
+
+    Bounded named skills may expose semantic speed or duration parameters.  A
+    repeated ``commands[]`` surface containing the complete ``vx``/``vy``/``yaw``
+    controller vector is different: it lets a model author a low-level motion
+    recipe.  Keep that provider compatibility contract callable by trusted
+    runtime code, but never publish it as an LLM-visible capability.
+    """
+
+    if isinstance(value, dict):
+        for key, item in value.items():
+            child_path = f"{path}.{key}"
+            if str(key).strip().lower() == "commands" and isinstance(item, dict):
+                items = item.get("items")
+                properties = items.get("properties") if isinstance(items, dict) else None
+                if isinstance(properties, dict) and RAW_PLANAR_CONTROLLER_FIELDS.issubset(
+                    {str(name).strip().lower() for name in properties}
+                ):
+                    return child_path
+            found = find_raw_controller_array_schema(item, path=child_path)
+            if found is not None:
+                return found
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            found = find_raw_controller_array_schema(item, path=f"{path}[{index}]")
+            if found is not None:
+                return found
+    return None
+
 
 def reject_forbidden_low_level_fields(value: Any, *, path: str = "$") -> Any:
     if isinstance(value, dict):

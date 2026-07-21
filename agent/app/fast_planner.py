@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -18,6 +19,7 @@ from .planner_contract import (
     materialize_goal_outcomes,
     materialize_planner_metadata,
     planner_contract_diagnostics,
+    validate_explicit_numeric_parameter_grounding,
     validate_planner_model_output,
 )
 from .schema import AgentRunRequest
@@ -53,8 +55,8 @@ class FastPlannerResolver:
         catalog: CapabilityCatalog,
         *,
         min_confidence: float = 0.8,
-        num_ctx: int = 4096,
-        num_predict: int = 512,
+        num_ctx: int = 8192,
+        num_predict: int = 2048,
         max_capabilities: int = 24,
         max_contract_repairs: int = 1,
     ) -> None:
@@ -157,6 +159,15 @@ class FastPlannerResolver:
         for attempt in range(self.max_contract_repairs + 1):
             raw: Any = None
             try:
+                active_response_schema = (
+                    self._repair_response_schema(
+                        response_schema,
+                        initial_raw_output,
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    )
+                    if contract_repair_attempted
+                    else response_schema
+                )
                 raw = await self.ollama.generate(
                     self._prompt(
                         request,
@@ -171,7 +182,7 @@ class FastPlannerResolver:
                         else self._system_prompt()
                     ),
                     options=options,
-                    response_format=response_schema,
+                    response_format=active_response_schema,
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
@@ -191,6 +202,14 @@ class FastPlannerResolver:
                     )
                 )
                 plan = CanonicalPlan.model_validate(normalized)
+                validate_explicit_numeric_parameter_grounding(
+                    validate_planner_model_output(
+                        raw,
+                        planner_tier="fast",
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    ),
+                    authoritative_goals=canonical_goal_grounding(request.context),
+                )
             except Exception as exc:
                 failure = llm_failure_metadata(exc)
                 logger.warning(
@@ -281,6 +300,59 @@ class FastPlannerResolver:
         raise AssertionError("unreachable")
 
     @staticmethod
+    def _repair_response_schema(
+        schema: dict[str, Any],
+        initial_raw_output: Any,
+        *,
+        expected_goal_ids_for_turn: list[str],
+    ) -> dict[str, Any]:
+        """Narrow a redundant aggregate to the model's own goal judgments.
+
+        The initial model output remains the semantic authority for every
+        per-goal disposition.  When that complete outcome map is valid but its
+        redundant top-level aggregate is inconsistent, the bounded repair
+        grammar permits only the mechanically consistent aggregate.  The host
+        never examines user wording or chooses a goal outcome, step, or skill.
+        """
+
+        if not isinstance(initial_raw_output, dict):
+            return schema
+        outcomes = initial_raw_output.get("goal_outcomes")
+        expected = list(expected_goal_ids_for_turn)
+        if not isinstance(outcomes, dict) or set(outcomes) != set(expected):
+            return schema
+        dispositions: list[str] = []
+        for goal_id in expected:
+            outcome = outcomes.get(goal_id)
+            if not isinstance(outcome, dict):
+                return schema
+            disposition = outcome.get("disposition")
+            if disposition not in {"execute", "respond", "escalate"}:
+                return schema
+            dispositions.append(disposition)
+        disposition_set = set(dispositions)
+        if disposition_set == {"execute"}:
+            aggregate = "execute"
+        elif disposition_set == {"respond"}:
+            aggregate = "respond"
+        elif disposition_set == {"execute", "respond"}:
+            aggregate = "mixed"
+        elif disposition_set == {"escalate"}:
+            aggregate = "escalate"
+        else:
+            return schema
+        narrowed = copy.deepcopy(schema)
+        disposition_schema = narrowed.get("properties", {}).get("disposition")
+        if not isinstance(disposition_schema, dict):
+            return schema
+        disposition_schema["enum"] = [aggregate]
+        disposition_schema["description"] = (
+            "Bounded contract repair: this is the sole aggregate consistent "
+            "with the initial model-authored per-goal dispositions."
+        )
+        return narrowed
+
+    @staticmethod
     def _validation_error_json(
         exc: Exception,
         *,
@@ -355,15 +427,41 @@ class FastPlannerResolver:
             "confidence": route.confidence,
         }
         grounding = canonical_goal_grounding(context)
+        argument_grounding_contract = (
+            "Treat an explicit numeric value in an authoritative goal as a "
+            "user-supplied candidate for the matching catalog argument. When "
+            "the value and units are unambiguous and the value is within the "
+            "catalog schema, copy it exactly; never silently replace it with "
+            "a schema default. Catalog defaults are only for parameters the "
+            "user did not supply. If the units, argument mapping, or validity "
+            "are uncertain, escalate instead of claiming exact coverage. A "
+            "material adjustment must use a non-exact plan_relation, require "
+            "confirmation, and explain the change. "
+            "For each numeric literal in an executable authoritative goal, "
+            "include a user_supplied parameter_resolution tied to the owned "
+            "step and goal. Its value must equal the step argument and its "
+            "source_ref must be an exact goal-text span containing that same "
+            "number. "
+        )
+        concise_output_contract = (
+            "Keep goal summaries, step reasons, satisfaction rationales, and "
+            "outcome rationales concise: one short sentence each. Do not "
+            "repeat the user goal, catalog description, arguments, or the same "
+            "justification across multiple fields. "
+        )
         if len(expected_goal_ids(context)) > 1:
             return (
                 f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
                 f"Router advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
                 f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
                 f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
-                f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
                 "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a skill, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
-                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
+                "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. "
+                f"{argument_grounding_contract}"
+                f"{concise_output_contract}"
+                "Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
+                "This is prospective planning: no action has executed yet. A planned step or response counts as satisfying its goal if it would succeed. For each keyed goal outcome, judge only that one goal; never put sibling goals or pending execution in unmet_goal_ids or unmet_requirements. Complete terminal outcomes use exact satisfaction with both unmet lists empty. "
+                "Fast terminal scope permits at most one executable step per goal. A count argument performs repetition inside one skill call; never duplicate a step to implement repeated blinks, nods, or similar motions. Respond goals have no executable step. "
                 "For a terminal plan, every per-goal outcome is execute or respond, coverage is complete, and the top-level disposition exactly aggregates the outcome dispositions. A respond outcome contains the actual answer now and references no steps. An execute outcome references every and only the model-authored steps owned by that goal. "
                 "For semantic escalation, author disposition=escalate, coverage=partial or uncertain, steps=[], a non-empty top-level escalation_reason, and one escalate outcome for every canonical goal. Each escalate outcome must explain its own unresolved need, reference no steps, carry no response_text, and include a non-exact prospective satisfaction judgment. Do not mix escalation outcomes with executable or response outcomes. "
                 "goal_satisfaction and every per-goal satisfaction are model judgments about prospective plan adequacy. A score from 0.95 through 1.0 requires status=exact. Escalation cannot claim exact satisfaction. "
@@ -372,20 +470,25 @@ class FastPlannerResolver:
                 "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. Return JSON only.\n\n"
                 f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
                 f"FINAL CANONICAL GOALS JSON:\n{self._bounded(grounding, 4500)}\n\n"
-                f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}"
+                f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}\n\n"
+                "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
+                f"{validation_errors or '[]'}\n"
+                "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
             )
         return (
             f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
             f"Router advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
             f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
             f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
-            f"Exact contract validation errors when revising:\n{validation_errors or '[]'}\n\n"
             "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. "
             "For a multi-goal turn there are exactly two legal output shapes. A terminal plan uses coverage=complete and goal_outcomes keyed exactly once by every canonical goal ID. A semantic escalation uses disposition=escalate, coverage=partial or uncertain, steps=[], goal_outcomes={}, goal_satisfaction=null, and a specific non-empty escalation_reason. "
             "Finding one matching skill is not complete coverage. If any responsibility, parameter, ordering, concurrency relation, safety judgment, or capability is unresolved, use the semantic-escalation shape with zero steps, an empty outcome map, and no partial outcomes. "
             "Fast Planner may emit disposition=mixed only for a completely covered simple combination of common unlocked execute goals and direct conversational respond goals. A mixed plan requires at least one execute outcome, at least one respond outcome, complete per-goal satisfaction, and exact step ownership. "
-            "For complete direct execution, use exact supplied skill IDs and schema-valid args. User-facing speech is owned by Response Composer, not a plan step. Represent each conversational responsibility with disposition=respond and an actual response_text now; never substitute chromie.speak or a body gesture. "
+            "For complete direct execution, use exact supplied skill IDs and schema-valid args. "
+            f"{argument_grounding_contract}"
+            f"{concise_output_contract}"
+            "User-facing speech is owned by Response Composer, not a plan step. Represent each conversational responsibility with disposition=respond and an actual response_text now; never substitute chromie.speak or a body gesture. "
             "Every executable step must use source_goal_ids copied from the canonical goals. Do not use capability_id, parameters, action, input_schema, route, or step_type as plan-step fields. "
             "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. A score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. If steps are present, top-level disposition cannot be respond. "
             "For every complete multi-goal execute, respond, or mixed result, goal_outcomes must be keyed exactly once by every supplied canonical goal ID. Each execute outcome needs its real step_ids; each respond outcome needs non-empty response_text and step_ids=[]. "
@@ -396,7 +499,10 @@ class FastPlannerResolver:
             "Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
             f"FINAL CANONICAL GOALS JSON:\n{self._bounded(grounding, 4500)}\n\n"
-            f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}"
+            f"FINAL ALLOWED EXECUTABLE SKILL IDS JSON:\n{self._bounded([item['capability_id'] for item in capabilities], 2500)}\n\n"
+            "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
+            f"{validation_errors or '[]'}\n"
+            "When this list is non-empty, correct every listed defect in the fresh object. If an error reports an expected aggregate disposition, author exactly that disposition unless you also revise the underlying per-goal outcomes consistently."
         )
 
     @staticmethod
@@ -412,6 +518,7 @@ class FastPlannerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You regenerate one fresh Fast Planner output using the supplied authoritative goals, executable capability catalog, complete validation errors, and schema-constrained decoder. "
+            "Validation errors describe defects in the prior plan object; they are not evidence that execution occurred, that the user request became uncertain, or that a catalog capability needs confirmation. Preserve the authoritative user meaning and catalog facts while correcting every defect. "
             "Rebuild every required model-authored plan field instead of editing or splicing invalid JSON. Do not rely on host-generated steps, ownership, outcomes, disposition, or satisfaction. Return JSON only."
         )
 

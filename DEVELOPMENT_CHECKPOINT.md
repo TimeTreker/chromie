@@ -2,14 +2,13 @@
 
 **Current release-prep base:** `0.0.1`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-17
-**Current focus:** Qualify the revised model-authored Fast Planner multi-goal
-plan contract with repeated warm simulator runs after the first plan-shaped
-contract failed
-20/20 measured cases; prove simple common-catalog multi-goal turns terminate
-without Deep Planner and retain latency and truthful-speech evidence before
-returning to release provenance work. Physical pilot and human voice-device
-validation remain separate tracks.
+**Status refresh date:** 2026-07-21
+**Current focus:** Finish Fast Planner multi-goal latency qualification and
+promote it to source-bound Target evidence: reduce final-source median cognitive
+runtime to the accepted threshold, repeat three warm runs, add
+endpoint-reported Soridormi revision identity, use a clean paired checkout,
+bind running images/models to source, and make release inputs immutable.
+Physical pilot and human voice-device validation remain separate tracks.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -17,23 +16,18 @@ milestone intent.
 
 ## Resume point
 
-The immediate engineering topic is
-[Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
-The July 17 live-text diagnostic passed 4/4 final cases through Deep Planner
-recovery, but every Fast Planner attempt failed its model contract. The first
-Fast-terminal implementation then failed all 20 cases across five warm benchmark
-runs: every path was `contract_failure`, median cognitive runtime was 22.87
-seconds, and improvement was only 3.9 percent. The revised repository contract
-requires the model to author the complete multi-goal plan: step IDs, catalog
-skills, arguments, ordering, ownership, goal outcomes, aggregate disposition,
-and satisfaction. The host adds only canonical identity and validation. It
-preserves mixed execute/respond support, normalized recovery observability,
-Deep-context sanitization, pending-action claim checks, and live acceptance
-assertions. Automated evidence passes focused and compatibility tests and deterministic
-multi-goal Level A 8/8. Exact current suite counts must come from the latest
-command output. Resume with
-three consecutive warm live-text simulator runs; do not claim Fast target
-behavior or the latency reduction until those retained runs prove it.
+The Fast Planner functional implementation in
+[Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
+has a passing final-working-tree diagnostic run. On July 21, the four daily-life
+cases all terminated at Fast Planner, completed Soridormi `sim` execution, and
+returned to safe idle. Their 40.321-second median cognitive runtime misses the
+15.46-second threshold. An earlier 12/12, 15.355-second tuning result predates
+the final generic numeric-provenance and decoder hardening and is not current
+qualification evidence. The host still adds only canonical identity and
+validation; the model authors skills, arguments, ordering, ownership, outcomes,
+aggregate disposition, and satisfaction. Resume with latency work and then the
+three-run, clean paired-source, endpoint-identified qualification; do not
+promote the current diagnostic result to Target validation.
 
 The current branch also implements the first user-outcome acceptance layer and
 Social Attention behavior-domain model. The default live acceptance scope now
@@ -218,9 +212,9 @@ gates pass from the intended revisions.
    `--soridormi-repo ../soridormi`; the runner still does not obtain the
    endpoint executing revision, so do not relabel its diagnostic output or
    reuse the historical M13 bundle as evidence for this path. The immediate
-   resume action is a fresh post-fix rerun; the prior attempt to start it was
-   interrupted by execution-platform approval for localhost access, not by a
-   product or release blocker.
+   resume action is to add and verify those source-binding guarantees from a
+   clean paired checkout; the functional simulator matrix already passes at
+   diagnostic Level C.
 2. Keep the single-authority boundary fail closed: the common safe base owns
    `chat`, the maintained Soridormi launcher widens ownership to
    `chat,robot_action`, exact Router actions remain adapter-only, and the legacy
@@ -290,18 +284,19 @@ telemetry, safety envelopes, and task-level acceptance metrics exist.
 ## Verification baseline
 
 ```text
-Current 2026-07-17 focused root-cause refresh:
-./scripts/run_tests.sh passed: 1040 primary tests plus 20 legacy Agent tests
-python scripts/check_docs.py passed: 64 Markdown files
-multi_goal_daily_life Level A passed: 8/8
-Focused Goal Association, Planner, Goal Satisfaction, Response Composer, and
-runtime-adapter regressions also passed during the repair sequence.
-Diagnostic live execute progressed through 3/4 daily-life cases before the
-mixed blink-and-joke case exposed the response-transport/outcome-shape defects.
-Those structural fixes are implemented and focused-tested; a fresh post-fix
-localhost run is still pending because execution-platform command approval was
-denied. This is not target validation, release readiness, or a product/release
-blocker.
+Current 2026-07-21 full refresh:
+./scripts/run_tests.sh passed: 1106 primary tests plus 20 legacy Agent tests
+python scripts/check_docs.py passed: 78 Markdown files
+python scripts/scenario_runner.py --no-write passed: 381/381
+general ability Level A passed: 52/52
+python scripts/semantic_authority_audit.py --check passed
+live-text simulator execution passed 10/10, including 4/4 final-source
+daily-life Fast cases and the exact three-step numeric compound through visible
+Deep recovery; all effectful cases completed and every case ended safe idle.
+The daily-life median was 40.321 seconds and misses the 15.46-second target.
+The output remains diagnostic rather than source-bound Target validation
+because both checkouts were dirty and endpoint Soridormi revision identity was
+absent.
 
 Historical focused refresh after f4bbb2f:
 python scripts/check_docs.py passed

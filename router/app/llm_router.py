@@ -1079,7 +1079,7 @@ class OllamaLLMRouter:
         generic_chat_review_enabled: bool = True,
         tool_fast_speech_repair_enabled: bool = False,
         num_ctx: int = 4096,
-        num_predict: int = 96,
+        num_predict: int = 512,
         keep_alive: str | None = None,
         prompt_path: Path | None = None,
     ) -> None:
@@ -1213,7 +1213,7 @@ class OllamaLLMRouter:
                 "temperature": 0,
                 "top_p": 0.9,
                 "num_ctx": self.num_ctx,
-                "num_predict": min(96, max(48, self.num_predict)),
+                "num_predict": min(256, max(96, self.num_predict)),
             },
         }
 

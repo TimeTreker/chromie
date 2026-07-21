@@ -79,7 +79,7 @@ class ResponseComposerResolver:
         schema_version=1,
     )
 
-    def __init__(self, ollama: OllamaClient, *, num_ctx: int = 4096, num_predict: int = 640) -> None:
+    def __init__(self, ollama: OllamaClient, *, num_ctx: int = 8192, num_predict: int = 1024) -> None:
         self.ollama = ollama
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
@@ -268,12 +268,19 @@ class ResponseComposerResolver:
                 properties = node.get("properties")
                 if isinstance(properties, dict):
                     covers_goal_ids = properties.get("covers_goal_ids")
-                    if isinstance(covers_goal_ids, dict) and goal_ids:
-                        covers_goal_ids["items"] = {
-                            "type": "string",
-                            "enum": goal_ids,
-                        }
-                        covers_goal_ids["minItems"] = 1
+                    if isinstance(covers_goal_ids, dict):
+                        covers_goal_ids["items"] = (
+                            {"type": "string", "enum": goal_ids}
+                            if goal_ids
+                            else {"type": "string"}
+                        )
+                        if goal_ids:
+                            covers_goal_ids["minItems"] = 1
+                        else:
+                            # Goal Association can legitimately return a
+                            # clarification before a canonical goal exists.
+                            # In that state an invented goal ID is never valid.
+                            covers_goal_ids["maxItems"] = 0
                         covers_goal_ids["uniqueItems"] = True
                         required = node.setdefault("required", [])
                         if "covers_goal_ids" not in required:
@@ -285,6 +292,39 @@ class ResponseComposerResolver:
                     constrain(value)
 
         constrain(schema)
+        stage_schema = schema.get("$defs", {}).get("ResponseStage")
+        if isinstance(stage_schema, dict):
+            stage_required = stage_schema.setdefault("required", [])
+            for field_name in (
+                "text",
+                "speech_act",
+                "commitment_state",
+                "must_not_claim_completion",
+                "covers_goal_ids",
+            ):
+                if field_name not in stage_required:
+                    stage_required.append(field_name)
+            stage_properties = stage_schema.get("properties", {})
+            speech_act = stage_properties.get("speech_act")
+            commitment = stage_properties.get("commitment_state")
+            must_not_claim = stage_properties.get("must_not_claim_completion")
+            if plan.disposition == "clarify":
+                if isinstance(speech_act, dict):
+                    speech_act["enum"] = ["clarify", "ask_clarification"]
+                if isinstance(commitment, dict):
+                    commitment["enum"] = ["waiting_for_user"]
+                if isinstance(must_not_claim, dict):
+                    must_not_claim["const"] = True
+            elif plan.disposition == "execute":
+                if isinstance(commitment, dict):
+                    commitment["enum"] = [
+                        "none",
+                        "heard",
+                        "evaluating",
+                        "waiting_for_user",
+                    ]
+                if isinstance(must_not_claim, dict):
+                    must_not_claim["const"] = True
         return schema
 
     @staticmethod
@@ -573,7 +613,7 @@ class ResponseComposerResolver:
             "Every plan goal_id must be covered exactly through response stage covers_goal_ids; do not invent goal IDs. "
             "For execute plans this is pre-execution composition: use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, and omit final. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
-            "For clarify, name the actual unresolved need naturally and use waiting_for_user. For alternatives, explain the change and request approval. "
+            "For clarify, name the actual unresolved need naturally. At least one response stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct stage fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
             "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Infer a purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any speech_expression adaptation; do not put a second answer inside SocialAttentionPlan. Select body behaviors only from the supplied social-attention candidates, and choose decision=none when neutral language and stillness are more natural, safer, unsupported, or unnecessary. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
             "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, optional social_attention_plan, confidence, and rationale only."
@@ -590,5 +630,5 @@ class ResponseComposerResolver:
     def _repair_system_prompt() -> str:
         return (
             "You revise one Response Composer output using the immutable CanonicalPlan, exact validation errors, and the supplied ResponseComposerModelOutput JSON Schema. "
-            "Preserve truthful wording and goal coverage, but correct the JSON structure and coordination invariants. Return only the corrected JSON object."
+            "Preserve truthful wording and goal coverage, but correct the JSON structure and coordination invariants. Put speech_act, commitment_state, must_not_claim_completion, and covers_goal_ids directly on each response stage, never in metadata. For clarification, speech_act is clarify or ask_clarification and commitment_state is waiting_for_user. Return only the corrected JSON object."
         )
