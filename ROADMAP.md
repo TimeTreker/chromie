@@ -101,13 +101,24 @@ Exit criteria before widening voice-device or profile support:
 ## Open evidence track - Framework-neutral TTS selection
 
 Chromie now has a versioned stream-oriented `TTSProvider` contract, an adapter
-for the maintained OuteTTS deployment, and one common Mandarin, English,
-mixed-language, interruption, long-dialogue, and concurrency comparison matrix.
-This removes the architectural assumption that one framework must remain the
-permanent backend without changing the current release default.
+for the maintained OuteTTS deployment, isolated locked Fun-CosyVoice3 and
+Qwen3-TTS candidate services, and one common Mandarin, English, mixed-language,
+interruption, long-dialogue, and concurrency comparison matrix. This removes
+the architectural assumption that one framework must remain the permanent
+backend without changing the current release default.
 
-The next work is evidence, not an early winner declaration. Qwen3-TTS and
-Fun-CosyVoice3 are primary online-service candidates; OuteTTS remains the
+Two dirty-tree isolated deployment runs passed all six objective cases for both
+candidates. The latest used the authorized AI-generated Chromie voice
+candidate. Both runs found that CosyVoice3 led ordinary first-audio/RTF while
+Qwen3-TTS recovered faster after worker termination. OuteTTS accepted the
+transcript-validated English, Chinese, and mixed profiles, but rebuilt default
+checks reproduced stochastic token exhaustion for mixed and Chinese-aligned
+profiles; doubling the RTX 5090 diagnostic budget did not fix it. The built-in
+speaker therefore remains the Oute default. The next work is blinded listening,
+approved interruption thresholds, clean source-bound repeated measurements,
+Oute cloned-speaker termination stability, and shared-resource qualification,
+not an early winner declaration.
+Qwen3-TTS and Fun-CosyVoice3 are the first online-service candidates; OuteTTS remains the
 low-resource baseline, and character-voice production tools such as GPT-SoVITS
 may be evaluated separately. Candidate names do not bypass license, immutable
 model, runtime, resource, or support review.

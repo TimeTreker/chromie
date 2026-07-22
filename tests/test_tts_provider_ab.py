@@ -62,6 +62,8 @@ class TTSProviderABTests(unittest.TestCase):
             "provider": {
                 "provider_id": "fixture",
                 "implementation": "fixture",
+                "software_source": "https://example.invalid/fixture",
+                "software_revision": "0123456789abcdef",
                 "software_license_id": "Apache-2.0",
                 "license_review_status": "declared_unreviewed",
                 "model_artifacts": [
@@ -84,6 +86,10 @@ class TTSProviderABTests(unittest.TestCase):
             tts_provider_ab.validate_health("fixture", valid_health)["provider_id"],
             "fixture",
         )
+        valid_health["provider"]["software_revision"] = "main"
+        with self.assertRaisesRegex(RuntimeError, "software revision is mutable"):
+            tts_provider_ab.validate_health("fixture", valid_health)
+        valid_health["provider"]["software_revision"] = "0.4.4"
         valid_health["provider"]["model_artifacts"][0]["revision"] = "main"
         with self.assertRaisesRegex(RuntimeError, "revision is mutable"):
             tts_provider_ab.validate_health("fixture", valid_health)
@@ -105,6 +111,17 @@ class TTSProviderABTests(unittest.TestCase):
                 for rating in review["ratings"].values()
             )
         )
+
+    def test_run_metadata_records_source_identity_and_dirty_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            metadata = tts_provider_ab.run_metadata(Path(temp_dir) / "run-42")
+        self.assertEqual(metadata["run_id"], "run-42")
+        self.assertIn("generated_at", metadata)
+        self.assertEqual(
+            metadata["chromie_source"]["repository"], ROOT.resolve().name
+        )
+        self.assertRegex(metadata["chromie_source"]["revision"], r"^[0-9a-f]{40}$")
+        self.assertIsInstance(metadata["chromie_source"]["dirty"], bool)
 
 
 if __name__ == "__main__":

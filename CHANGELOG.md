@@ -15,6 +15,31 @@ All notable user-visible changes should be recorded here.
 - Added one shared Mandarin, English, mixed-language, interruption/recovery,
   six-turn dialogue, and concurrency matrix plus a multi-endpoint runner that
   retains WAVs, objective metrics, and a mandatory listening-review template.
+- Added separate, profile-gated Fun-CosyVoice3 0.5B and Qwen3-TTS 0.6B Base
+  images with immutable runtime/model locks, one hashed local reference voice,
+  restart-on-cancel workers, and an isolated build/deploy/compare/restore
+  workflow; the maintained Oute default is unchanged.
+- Fixed a missing Oute timing-helper import found by the deployment workflow
+  and added a direct generation-stage regression test.
+- Completed the initial isolated RTX 5090 deployment matrix with 6/6 objective
+  cases for each candidate; retained the ordinary-latency versus
+  interruption-recovery tradeoff without selecting a winner, and added
+  run/source dirty-state metadata for future comparison evidence.
+- Added exact-transcript OuteTTS speaker creation with pinned Whisper alignment,
+  content checks, and private speaker artifacts; created English, Chinese, and
+  mixed profiles from the authorized AI-generated voice candidate while
+  retaining the observed longer mixed-prompt failure as an open blocker.
+- Let the isolated candidate runner consume an existing authorized,
+  SHA-256-bound reference and preserve its voice-license declaration. A second
+  6/6-per-provider run with that voice reproduced the CosyVoice3 ordinary
+  latency versus Qwen3-TTS cancellation-recovery tradeoff; candidate-output
+  listening and provider-selection gates remain open.
+- Tested the owner-approved voice style as a possible Oute default, then kept
+  the built-in speaker after rebuilt-container checks reproduced stochastic
+  token exhaustion with both mixed and Chinese-aligned profiles. An RTX 5090
+  8192-token diagnostic also exhausted its budget, ruling out the existing
+  4096 setting as the root cause. Local profiles remain available for further
+  work; candidate-provider listening and selection gates remain separate.
 - Documented Qwen3-TTS and Fun-CosyVoice3 as primary comparison candidates,
   OuteTTS as the maintained baseline, and license/target evidence as required
   gates before changing the default.

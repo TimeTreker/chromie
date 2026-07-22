@@ -15,9 +15,10 @@ resource, and listening evaluation on the intended host.
 
 The current OuteTTS deployment remains the maintained release-locked baseline.
 This is not a conclusion that OuteTTS is the best backend. The repository now
-contains the provider contract, an Oute adapter, and a common comparison
-matrix; it does not yet contain a retained multi-provider target run or an
-approved replacement.
+contains the provider contract, an Oute adapter, isolated Fun-CosyVoice3 and
+Qwen3-TTS candidate services, and a common comparison matrix; it does not yet
+contain the listening and shared-resource evidence required for an approved
+replacement.
 
 ## Ownership boundary
 
@@ -62,12 +63,12 @@ keep `native_audio_streaming=false`.
 - `TTSProviderRegistry` selects only explicitly registered adapters and fails
   closed on an unknown `TTS_PROVIDER` value.
 
-The maintained container currently registers only `oute`. Alternative
-candidate services must expose the same WebSocket and health contract before
-they can enter the common A/B runner. Adding an adapter also requires immutable
-source/model locks, isolated dependencies, configuration documentation, and
-focused contract tests; importing a second framework into the Oute image is not
-the default integration strategy.
+The maintained container currently registers only `oute`. The optional
+`tts-evaluation` Compose profile exposes Fun-CosyVoice3 and Qwen3-TTS through
+separate images and endpoints with the same WebSocket and health contract.
+Their source/model locks live in `tts_candidates/model-lock.json`; neither is
+selected by `TTS_PROVIDER` or included in the default profile. Importing a
+second framework into the Oute image is not the integration strategy.
 
 Contract version 1 records whether a backend supports native text streaming,
 but the current WebSocket request carries one complete text chunk. Therefore a
@@ -103,6 +104,81 @@ python scripts/tts_provider_ab.py \
   --output-dir .chromie/evidence/tts-provider-ab/<run-id>
 ```
 
+Or build, start, compare, and restore the two pinned candidates:
+
+```bash
+./scripts/run_tts_candidate_ab.sh
+```
+
+By default that workflow generates one local bilingual Oute reference and
+binds its WAV hash and provider declaration into both candidates. An existing
+authorized reference can instead be supplied without copying it into Git:
+
+```bash
+TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
+TTS_AB_SKIP_REFERENCE_GENERATION=1 \
+TTS_AB_RUN_ID=<run-id> \
+./scripts/run_tts_candidate_ab.sh
+```
+
+The directory must contain `reference.wav` and `reference.json`. The metadata
+must carry its exact transcript, matching `audio_sha256`, and a nonempty
+`license_id`; both candidate declarations retain that voice-license identity.
+The workflow temporarily stops Oute and Ollama to make the run fit predictably,
+so the result is isolated service evidence rather than shared-GPU
+qualification.
+
+### Local isolated deployment results
+
+The local run `20260722-initial-isolated` loaded both exact model/runtime locks
+on the RTX 5090 and passed all six objective cases for both providers. It was
+run from a dirty working tree and the artifacts remain under the ignored local
+`.chromie/evidence/` tree, so it is diagnostic deployment evidence rather than
+source-bound Target validation.
+
+| Provider | Cases | Median first binary | Median RTF | Cancel-to-recovery first binary |
+|---|---:|---:|---:|---:|
+| Fun-CosyVoice3 0.5B | 6/6 | 2.3989 s | 0.4827 | 18.2843 s |
+| Qwen3-TTS 0.6B Base | 6/6 | 4.8282 s | 0.9455 | 7.7428 s |
+
+The later run `20260722-chromie-ai-girl-v1` used the user-authorized,
+AI-generated candidate reference `chromie-ai-girl-v1`, revision
+`sha256:b64bf30929220e03ee310c5a43ee87dddd765050fb959833e96ef95fa377e415`.
+It also passed all six objective cases for both providers:
+
+| Provider | Cases | Median first binary | Median RTF | Cancel-to-recovery first binary |
+|---|---:|---:|---:|---:|
+| Fun-CosyVoice3 0.5B | 6/6 | 3.0987 s | 0.5419 | 18.7919 s |
+| Qwen3-TTS 0.6B Base | 6/6 | 5.6786 s | 0.9364 | 8.0885 s |
+
+Both runs show the same tradeoff: CosyVoice3 was faster for ordinary
+synthesis, while Qwen3-TTS recovered faster after the worker was terminated
+for interruption. Neither establishes a winner. No recovery bound has been
+approved, no blinded listening or intended-deployment license review is
+complete, and the maintained ASR, Router, Agent, and Ollama workloads were
+intentionally absent. The owner approved the supplied voice style for Chromie,
+but that does not accept the CosyVoice3 or Qwen3-TTS outputs or satisfy their
+provider listening gate.
+
+### OuteTTS voice-profile diagnostic
+
+The same supplied English and Chinese recordings created separate OuteTTS
+profiles with transcript/alignment similarities `1.00` and `0.95`; their
+combined bilingual reference created a third profile at `1.00`. Short English
+and Chinese auditions and the short mixed prompt `你好，Hello.` produced audio.
+A longer mixed prompt exhausted the 4096-token generation budget without any
+audio-code tokens, including its configured retry, and was rejected instead of
+playing empty or incomplete audio. Rebuilt-container default-speaker tests then
+reproduced stochastic exhaustion with `chromie_mixed` on a short Chinese case
+and with the Chinese-aligned `chromie_zh` profile on a 26-character Chinese
+case. Raising the RTX 5090 diagnostic budget to 8192 still exhausted all 7632
+available generation tokens after the prompt. This locates the blocker in
+Oute's cloned-speaker termination behavior rather than the configured context
+size. The supplied style was therefore not promoted to the maintained default;
+the profiles and source recordings remain ignored local artifacts. This is
+local synthesis evidence only and does not establish pronunciation,
+naturalness, voice similarity, or listening quality.
+
 The runner verifies the provider declaration, generates WAV artifacts for the
 same text, records first-binary latency, total latency, audio duration,
 real-time factor, long-dialogue stability, bounded concurrency, and
@@ -110,6 +186,8 @@ post-interruption recovery. It writes `result.json` plus a
 `listening-review.json` template. It intentionally sets
 `selection_ready=false`: automated timing cannot judge pronunciation,
 naturalness, prosody, code switching, speaker consistency, or audible defects.
+New result files also record the run ID, UTC timestamp, Chromie revision, and
+dirty state; a dirty run adds a clean-source rerun to the selection blockers.
 
 ## Candidate policy
 
@@ -118,11 +196,16 @@ Candidate descriptions below are discovery inputs, not Chromie evidence:
 - [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) publishes 0.6B and 1.7B
   models, multilingual and streaming features, and an Apache-2.0 repository.
   Its reported “as low as” latency is a vendor result until reproduced with
-  Chromie's chunking, IPC, GPU sharing, and playback path.
+  Chromie's chunking, IPC, GPU sharing, and playback path. Chromie's first
+  adapter locks `Qwen3-TTS-12Hz-0.6B-Base` so it can use the same reference
+  voice as CosyVoice; the current upstream API returns a completed waveform,
+  so this adapter truthfully declares native audio streaming false.
 - [Fun-CosyVoice3](https://github.com/FunAudioLLM/CosyVoice) publishes a 0.5B
   model, bi-streaming support, deployment tooling, and an Apache-2.0
-  repository. It remains a primary comparison candidate rather than being
-  excluded based on older CosyVoice generations.
+  repository. Chromie's adapter locks `Fun-CosyVoice3-0.5B-2512`, uses native
+  streamed audio chunks, and conditions on the same reference voice. It remains
+  a primary comparison candidate rather than being excluded based on older
+  CosyVoice generations.
 - [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) remains relevant for
   custom character-voice production and may enter the online matrix only after
   a contract adapter demonstrates interruption and sustained service behavior.

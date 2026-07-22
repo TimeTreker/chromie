@@ -4,6 +4,7 @@
 /ollama_data
 /ollama_data/
 /recordings/
+/tts/speakers/
 
 # Runtime/generated hardware detection state
 /.chromie/

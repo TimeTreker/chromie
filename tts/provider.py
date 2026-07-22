@@ -20,6 +20,13 @@ def _immutable_revision(value: str) -> bool:
     )
 
 
+def _immutable_software_revision(value: str) -> bool:
+    normalized = value.strip().lower()
+    return _immutable_revision(normalized) or bool(
+        re.fullmatch(r"v?\d+\.\d+\.\d+(?:[-+][a-z0-9.-]+)?", normalized)
+    )
+
+
 @dataclass(frozen=True)
 class TTSModelArtifact:
     kind: str
@@ -49,6 +56,8 @@ class TTSProviderCapabilities:
 
     provider_id: str
     implementation: str
+    software_source: str
+    software_revision: str
     software_license_id: str
     model_artifacts: tuple[TTSModelArtifact, ...]
     license_review_status: str
@@ -67,6 +76,13 @@ class TTSProviderCapabilities:
             raise ValueError("provider_id must be non-empty")
         if not self.implementation.strip():
             raise ValueError("implementation must be non-empty")
+        if not self.software_source.strip():
+            raise ValueError("software_source is required")
+        if not _immutable_software_revision(self.software_revision):
+            raise ValueError(
+                "software_revision must be an immutable commit, sha256 digest, "
+                "or semantic version"
+            )
         if not self.software_license_id.strip():
             raise ValueError("software_license_id is required")
         if not self.model_artifacts:
@@ -175,6 +191,7 @@ class TTSProvider(ABC):
         speaker_id: str,
         wav_path: str,
         make_default: bool,
+        transcript: str | None = None,
     ) -> Mapping[str, Any]:
         raise NotImplementedError(
             f"provider {self.capabilities.provider_id} does not create speaker profiles"

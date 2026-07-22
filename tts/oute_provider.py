@@ -43,7 +43,6 @@ class OuteTTSProviderConfig:
     metrics_window: int
     speaker_dir: Path
 
-
 class OuteTTSProvider(TTSProvider):
     """Adapt restartable OuteTTS workers to the common provider contract."""
 
@@ -70,6 +69,8 @@ class OuteTTSProvider(TTSProvider):
         self._capabilities = TTSProviderCapabilities(
             provider_id="oute",
             implementation="OuteTTS/llama.cpp",
+            software_source="https://pypi.org/project/outetts/0.4.4/",
+            software_revision="0.4.4",
             software_license_id="Apache-2.0",
             model_artifacts=(
                 TTSModelArtifact(
@@ -83,6 +84,14 @@ class OuteTTSProvider(TTSProvider):
                     artifact_id=config.gguf_id,
                     revision=config.gguf_revision,
                     license_id="Apache-2.0",
+                ),
+                TTSModelArtifact(
+                    kind="speaker_alignment_model",
+                    artifact_id="openai/whisper-large-v3-turbo",
+                    revision=(
+                        "sha256:aff26ae408abcba5fbf8813c21e62b0941638c5f6eebfb145be0c9839262a19a"
+                    ),
+                    license_id="MIT",
                 ),
             ),
             license_review_status="declared_unreviewed",
@@ -132,6 +141,7 @@ class OuteTTSProvider(TTSProvider):
         speaker_id: str,
         wav_path: str,
         make_default: bool,
+        transcript: str | None = None,
     ) -> dict[str, Any]:
         resolved = self._validate_speaker_path(Path(wav_path))
         response = await self._workers[0].request(
@@ -140,6 +150,7 @@ class OuteTTSProvider(TTSProvider):
                 "speaker_id": speaker_id,
                 "wav_path": str(resolved),
                 "make_default": make_default,
+                "transcript": transcript,
             }
         )
         if response.get("type") == "error":

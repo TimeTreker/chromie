@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,8 @@ def capabilities(provider_id: str = "fixture") -> TTSProviderCapabilities:
     return TTSProviderCapabilities(
         provider_id=provider_id,
         implementation="fixture runtime",
+        software_source="https://example.invalid/fixture",
+        software_revision="0123456789abcdef",
         software_license_id="Apache-2.0",
         model_artifacts=(
             TTSModelArtifact(
@@ -181,6 +184,30 @@ class TTSProviderContractTests(unittest.IsolatedAsyncioTestCase):
                 revision="main",
                 license_id="Apache-2.0",
             )
+        self.assertEqual(
+            capabilities().software_revision,
+            "0123456789abcdef",
+        )
+        versioned = replace(capabilities(), software_revision="0.4.4")
+        self.assertEqual(versioned.software_revision, "0.4.4")
+        with self.assertRaisesRegex(ValueError, "software_revision must be"):
+            TTSProviderCapabilities(
+                provider_id="fixture",
+                implementation="fixture runtime",
+                software_source="https://example.invalid/fixture",
+                software_revision="main",
+                software_license_id="Apache-2.0",
+                model_artifacts=versioned.model_artifacts,
+                license_review_status="declared_unreviewed",
+                languages=("zh", "en"),
+                sample_rates=(16000,),
+                max_concurrency=1,
+                native_text_streaming=True,
+                native_audio_streaming=True,
+                request_cancellation=True,
+                speaker_profiles=False,
+                voice_cloning=False,
+            )
 
     async def test_oute_adapter_yields_transport_chunks_and_common_metrics(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -238,6 +265,28 @@ class TTSProviderContractTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(asyncio.CancelledError):
                 await task
             self.assertTrue(cancelled.is_set())
+
+    async def test_oute_speaker_creation_forwards_exact_transcript(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            wav_path = root / "chromie_zh.wav"
+            wav_path.write_bytes(b"RIFF" + b"\x00" * 128)
+            worker = FakeWorker(
+                response={
+                    "type": "speaker_created",
+                    "speaker_id": "chromie_zh",
+                    "speaker_json": str(root / "chromie_zh.json"),
+                }
+            )
+            provider = oute_provider(worker, root)
+            await provider.create_speaker(
+                speaker_id="chromie_zh",
+                wav_path=str(wav_path),
+                make_default=False,
+                transcript="你好，我是 Chromie。",
+            )
+
+        self.assertEqual(worker.requests[0]["transcript"], "你好，我是 Chromie。")
 
 
 if __name__ == "__main__":

@@ -6,10 +6,12 @@ the contract in `provider.py`; the maintained image currently registers the
 release-locked OuteTTS adapter in `oute_provider.py`. The host Orchestrator owns
 playback, resampling to the selected output device, interruption, and barge-in.
 
-An unknown `TTS_PROVIDER` value fails closed at startup. A future Qwen3-TTS,
-CosyVoice, or other adapter must implement the same lifecycle, capability,
-stream, cancellation, speaker, health, and metric contract. The provider
-boundary does not move audio-device or interruption policy out of the host.
+An unknown `TTS_PROVIDER` value fails closed at startup. Qwen3-TTS and
+CosyVoice now implement the same lifecycle, capability, stream, cancellation,
+speaker, health, and metric contract in isolated evaluation-profile images;
+they are not registered in the maintained image or selected as the default.
+Any additional adapter must use the same boundary, which does not move
+audio-device or interruption policy out of the host.
 
 ## Concurrency model
 
@@ -66,11 +68,17 @@ The response reports available speaker-profile identifiers.
   "type": "create_speaker",
   "speaker_id": "demo",
   "wav_path": "/app/speakers/demo.wav",
-  "save_as_default": false
+  "transcript": "The exact words spoken in demo.wav.",
+  "make_default": false
 }
 ```
 
-The WAV path must resolve inside the configured speaker directory.
+The WAV path must resolve inside the configured speaker directory. An exact
+transcript is required either in the request or in a UTF-8 `.txt` file beside
+the WAV with the same stem. OuteTTS v3 still requires word-level alignment, so
+Chromie runs its content-addressed Whisper large-v3-turbo model on CPU by
+default and rejects an alignment whose normalized transcript differs too much
+from the supplied text. Local files under `tts/speakers/` are ignored by Git.
 
 ### Stream synthesis
 
@@ -136,6 +144,8 @@ TTS_METRICS_WINDOW=20
 GGML_CUDA_DISABLE_GRAPHS=0
 TTS_WORKER_STARTUP_TIMEOUT_SEC=600
 TTS_SPEAKER_ID=default
+TTS_SPEAKER_ALIGNMENT_DEVICE=cpu
+TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY=0.75
 ```
 
 The service downloads those exact snapshots and replaces OuteTTS auto-config
@@ -197,6 +207,20 @@ The runner retains WAVs and objective metrics, then creates a required listening
 review template. It does not select a winner from advertised or measured
 latency alone. See
 [`../docs/TTS_PROVIDER_EVALUATION.md`](../docs/TTS_PROVIDER_EVALUATION.md).
+
+To compare an existing authorized voice reference rather than generate one
+from OuteTTS, provide `reference.wav` and `reference.json` with matching
+`audio_sha256`, exact `text`, and nonempty `license_id`, then run:
+
+```bash
+TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
+TTS_AB_SKIP_REFERENCE_GENERATION=1 \
+TTS_AB_RUN_ID=<run-id> \
+./scripts/run_tts_candidate_ab.sh
+```
+
+Keep private reference audio and generated auditions under ignored local
+paths. Successful synthesis is not approval of the voice for production.
 
 ## Speaker setup and verification
 

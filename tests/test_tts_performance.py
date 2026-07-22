@@ -7,7 +7,7 @@ import tempfile
 import time
 import types
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from unittest import mock
 
@@ -167,6 +167,74 @@ class TtsPerformanceContractTests(unittest.TestCase):
             self.assertTrue(server._active_timing_metrics["generation_limit_reached"])
         finally:
             server._active_timing_metrics = None
+
+    def test_generate_tts_sync_reports_pipeline_overhead(self) -> None:
+        sys.modules.pop("server", None)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env = {
+                "SPEAKER_DIR": temp_dir,
+                "TTS_AUDIO_CODEC_DEVICE": "cpu",
+                "TTS_DETAILED_TIMING": "0",
+                "TTS_TOKENIZER_REPO": "fixture/tokenizer",
+                "TTS_TOKENIZER_REVISION": "0123456789abcdef",
+                "TTS_GGUF_REPO": "fixture/gguf",
+                "TTS_GGUF_REVISION": "fedcba9876543210",
+            }
+            with stub_tts_dependencies(), mock.patch.dict(os.environ, env, clear=False):
+                server = importlib.import_module("server")
+
+        server.interface = types.SimpleNamespace(generate=lambda *, config: config)
+        output, metrics = server.generate_tts_sync("fixture")
+
+        self.assertEqual(output, "fixture")
+        self.assertGreaterEqual(metrics["pipeline_overhead_seconds"], 0.0)
+
+    def test_speaker_creation_validates_exact_transcript_with_aligner(self) -> None:
+        sys.modules.pop("server", None)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            wav_path = root / "chromie_zh.wav"
+            wav_path.write_bytes(b"RIFF" + b"\x00" * 128)
+            env = {
+                "SPEAKER_DIR": temp_dir,
+                "TTS_AUDIO_CODEC_DEVICE": "cpu",
+                "TTS_DETAILED_TIMING": "0",
+                "TTS_TOKENIZER_REPO": "fixture/tokenizer",
+                "TTS_TOKENIZER_REVISION": "0123456789abcdef",
+                "TTS_GGUF_REPO": "fixture/gguf",
+                "TTS_GGUF_REVISION": "fedcba9876543210",
+            }
+            with stub_tts_dependencies(), mock.patch.dict(os.environ, env, clear=False):
+                server = importlib.import_module("server")
+
+            calls = []
+
+            class FakeInterface:
+                def create_speaker(self, path, *, whisper_model, whisper_device):
+                    calls.append((path, whisper_model, whisper_device))
+                    return {"fixture": True, "text": "你好，我是 Chromie。"}
+
+            server.interface = FakeInterface()
+            server.patch_torch_1d_audio_slice = nullcontext
+            server.save_speaker_json = lambda *_args, **_kwargs: None
+            server.create_speaker_profile_from_wav(
+                "chromie_zh",
+                wav_path,
+                transcript=" 你好，我是 Chromie。 ",
+            )
+
+            self.assertEqual(calls, [(str(wav_path), "turbo", "cpu")])
+            self.assertEqual(
+                wav_path.with_suffix(".txt").read_text(encoding="utf-8"),
+                "你好，我是 Chromie。\n",
+            )
+            self.assertEqual(
+                server.speaker_transcript_similarity(
+                    "Hello, I’m Chromie!",
+                    "hello im chromie",
+                ),
+                1.0,
+            )
 
     def test_server_timing_hooks_measure_model_and_codec_without_replacing_output(self) -> None:
         sys.modules.pop("server", None)

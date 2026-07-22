@@ -22,7 +22,7 @@ A higher level does not replace lower-level regression tests.
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
-| ASR/TTS GPU use | TTS provider contract, Oute adapter, and common A/B matrix; ASR/TTS component coverage remains limited | GPU smoke tooling; no retained multi-provider run | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; comparative target evidence open |
+| ASR/TTS GPU use | TTS provider contract, transcript-validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | Two local isolated RTX 5090 candidate runs passed 6/6 cases per provider, including the authorized voice candidate; dirty/non-source-bound | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; listening and comparative shared-resource target evidence open |
 | Audio devices and barge-in | Partial | Manual host run | Can pair with sim | PipeWire virtual-mic 7/7 passed; physical microphone/speaker open |
 
 Retained reference-host evidence from June 14 and June 17, 2026:
@@ -253,6 +253,7 @@ and fail-closed A/B inputs:
 python -m unittest \
   tests.test_tts_provider_contract \
   tests.test_tts_provider_ab \
+  tests.test_tts_candidate_providers \
   tests.test_tts_benchmark
 python scripts/tts_provider_ab.py --check
 ```
@@ -267,6 +268,29 @@ python scripts/tts_provider_ab.py \
   --warmup 1 \
   --output-dir .chromie/evidence/tts-provider-ab/<run-id>
 ```
+
+The repository's pinned isolated candidate workflow is:
+
+```bash
+./scripts/run_tts_candidate_ab.sh
+```
+
+It does not qualify coexistence with ASR, Router, Agent, and Ollama because it
+intentionally releases the maintained Oute and Ollama GPU allocations before
+loading both candidates.
+
+Local diagnostic run `20260722-chromie-ai-girl-v1` used the user-authorized
+AI-generated voice candidate and passed 6/6 cases for CosyVoice3 and 6/6 for
+Qwen3-TTS. Median first-binary/RTF was 3.0987 s/0.5419 and
+5.6786 s/0.9364 respectively. Post-cancel recovery first binary was 18.7919 s
+for CosyVoice3 and 8.0885 s for Qwen3-TTS, so the ordinary latency result cannot
+substitute for an approved interruption bound. The earlier generated-reference
+run showed the same tradeoff. Both were dirty-tree, isolated runs and their
+ignored local artifacts are not release evidence. The owner approved the voice
+style, but rebuilt-container Oute default checks reproduced stochastic token
+exhaustion at 4096 and 8192 diagnostic budgets, so the style was not promoted.
+That approval also does not accept either candidate provider's output, whose
+listening review remains required.
 
 The committed matrix uses identical Mandarin, English, mixed-language,
 interruption/recovery, six-turn dialogue, and concurrent requests. The runner

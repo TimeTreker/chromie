@@ -9,9 +9,11 @@ import json
 import os
 import re
 import statistics
+import subprocess
 import sys
 import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,44 @@ REQUIRED_KINDS = {
     "long_dialogue",
     "concurrency",
 }
+
+
+def immutable_software_revision(value: str) -> bool:
+    normalized = value.strip().lower()
+    return bool(
+        re.fullmatch(r"[0-9a-f]{7,64}", normalized)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", normalized)
+        or re.fullmatch(
+            r"v?\d+\.\d+\.\d+(?:[-+][a-z0-9.-]+)?", normalized
+        )
+    )
+
+
+def source_state(repository: Path) -> dict[str, Any]:
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=repository,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    revision = git("rev-parse", "HEAD")
+    status = git("status", "--porcelain", "--untracked-files=normal")
+    return {
+        "repository": repository.resolve().name,
+        "revision": revision.stdout.strip() if revision.returncode == 0 else None,
+        "dirty": status.returncode != 0 or bool(status.stdout.strip()),
+    }
+
+
+def run_metadata(output_dir: Path) -> dict[str, Any]:
+    return {
+        "run_id": output_dir.resolve().name,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "chromie_source": source_state(SCRIPT_DIR.parent),
+    }
 
 
 def load_matrix(path: Path) -> dict[str, Any]:
@@ -100,6 +140,8 @@ def validate_health(label: str, health: dict[str, Any]) -> dict[str, Any]:
     required = {
         "provider_id",
         "implementation",
+        "software_source",
+        "software_revision",
         "software_license_id",
         "model_artifacts",
         "license_review_status",
@@ -114,6 +156,12 @@ def validate_health(label: str, health: dict[str, Any]) -> dict[str, Any]:
     if missing:
         raise RuntimeError(
             f"{label} provider declaration is missing: {', '.join(missing)}"
+        )
+    software_revision = str(provider["software_revision"] or "")
+    if not immutable_software_revision(software_revision):
+        raise RuntimeError(
+            f"{label} provider software revision is mutable: "
+            f"{software_revision!r}"
         )
     artifacts = provider.get("model_artifacts")
     if not isinstance(artifacts, list) or not artifacts:
@@ -395,8 +443,18 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 output_dir=args.output_dir,
             )
         )
+    metadata = run_metadata(args.output_dir)
+    blockers = [
+        "complete listening-review.json",
+        "review provider and model licenses for the intended deployment",
+        "repeat on the claimed target hardware with other GPU workloads active",
+        "approve environment-specific latency and quality thresholds",
+    ]
+    if metadata["chromie_source"]["dirty"]:
+        blockers.append("repeat from a clean committed Chromie revision")
     return {
         "schema_version": 1,
+        "run": metadata,
         "matrix": str(args.matrix),
         "provider_count": len(results),
         "providers": results,
@@ -404,12 +462,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
             bool(result["summary"]["all_cases_passed"]) for result in results
         ),
         "selection_ready": False,
-        "selection_blockers": [
-            "complete listening-review.json",
-            "review provider and model licenses for the intended deployment",
-            "repeat on the claimed target hardware with other GPU workloads active",
-            "approve environment-specific latency and quality thresholds",
-        ],
+        "selection_blockers": blockers,
     }
 
 

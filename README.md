@@ -58,8 +58,11 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 
 - realtime microphone, VAD, ASR, routing, TTS, playback, and barge-in;
 - a versioned stream-oriented TTSProvider contract, maintained Oute adapter,
-  fail-closed provider registry, and common multilingual/interruption/dialogue/
-  concurrency A/B runner; provider replacement still requires target and
+  isolated pinned CosyVoice3/Qwen3-TTS candidate services, fail-closed provider
+  registry, and common multilingual/interruption/dialogue/concurrency A/B
+  runner; both candidates pass isolated objective runs with generated and
+  user-authorized AI voice references, while
+  provider replacement still requires clean shared-resource and blinded
   listening evidence;
 - sherpa-onnx SenseVoice as the single supported final-utterance ASR runtime,
   with immutable model provenance, CUDA/CPU providers, and startup warm-up;

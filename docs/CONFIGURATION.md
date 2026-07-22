@@ -682,7 +682,31 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `GGML_CUDA_DISABLE_GRAPHS` | Common default `0`; leave CUDA graphs enabled unless a measured compatibility problem requires disabling them. |
 | `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY` | Common defaults `0.4`, `1.1`. |
 | `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Maximum wait for initial or post-cancellation model-worker startup; default `600`. |
-| `SPEAKER_DIR`, `TTS_SPEAKER_ID` | Speaker-profile storage and host selection. |
+| `SPEAKER_DIR`, `TTS_SPEAKER_ID` | Speaker-profile storage and host selection. Local speaker WAV/JSON/transcript files are ignored by Git. Set `TTS_SPEAKER_ID` in `.env.local` only for an installation-specific private override that has passed its deployment checks. New Oute profiles require an exact transcript in the request or a UTF-8 `.txt` sidecar beside the WAV. |
+| `TTS_SPEAKER_ALIGNMENT_DEVICE` | Device for OuteTTS v3's required Whisper word alignment; default `cpu` keeps one-time profile creation from competing with live GPU models. |
+| `TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY` | Minimum normalized similarity between the pinned aligner's result and supplied exact transcript; default `0.75`, with lower results rejected. |
+
+The optional `tts-evaluation` Compose profile adds two isolated candidate
+services without registering either in the maintained Oute image:
+
+| Variable | Purpose |
+|---|---|
+| `COSYVOICE3_SOURCE_REVISION`, `COSYVOICE3_MODEL_ID`, `COSYVOICE3_MODEL_REVISION` | Immutable Fun-CosyVoice3 runtime and `0.5B-2512` model locks. |
+| `COSYVOICE3_FP16` | Candidate-only half-precision model load; default `1`. |
+| `QWEN3_TTS_SOURCE_REVISION`, `QWEN3_TTS_MODEL_ID`, `QWEN3_TTS_MODEL_REVISION` | Immutable Qwen3-TTS runtime and `12Hz-0.6B-Base` model locks. |
+| `QWEN3_TTS_DEVICE`, `QWEN3_TTS_DTYPE`, `QWEN3_TTS_ATTENTION` | Candidate-only Qwen device, dtype, and attention implementation; defaults `cuda:0`, `bfloat16`, and `sdpa`. |
+| `TTS_CANDIDATE_STARTUP_TIMEOUT_SEC` | Model download/load allowance for candidate health; default `1200`. |
+
+Both candidates use the same bilingual reference WAV and metadata. By default
+the runner generates it through OuteTTS; an existing authorized reference can
+be supplied with `TTS_AB_REFERENCE_DIR` and
+`TTS_AB_SKIP_REFERENCE_GENERATION=1`. Its `reference.json` must contain the
+exact text, matching `audio_sha256`, and nonempty `license_id`. References are
+evaluation-only unless their metadata and listening review explicitly approve
+production use. The CosyVoice image uses Torch/Torchaudio 2.10 CUDA 12.8 plus the
+officially compatible TorchCodec 0.10 pairing because the upstream Torch 2.3
+CUDA 12.1 wheel has no RTX 5090 `sm_120` kernels. The CosyVoice source and model
+revisions remain the immutable locks declared above.
 
 Use `TTS_MAX_TEXT_CHARS` to shorten speech. Setting `TTS_MAX_LENGTH` to values
 such as 100 or 120 can produce empty audio; the server clamps unsafe values when
@@ -730,10 +754,31 @@ python scripts/tts_provider_ab.py \
   --output-dir .chromie/evidence/tts-provider-ab/<run-id>
 ```
 
+For the two pinned candidate deployments, run:
+
+```bash
+./scripts/run_tts_candidate_ab.sh
+```
+
+This normally builds the current Oute image and generates and hashes one shared
+reference. To use an existing authorized reference instead:
+
+```bash
+TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
+TTS_AB_SKIP_REFERENCE_GENERATION=1 \
+TTS_AB_RUN_ID=<run-id> \
+./scripts/run_tts_candidate_ab.sh
+```
+
+In either mode the runner temporarily releases Oute and Ollama GPU memory,
+starts CosyVoice3 on port 5001 and Qwen3-TTS on port 5002, runs the same matrix,
+and restores the default services on exit. It is an isolated comparison, not
+the shared-resource qualification required to change the default.
+
 The runner requires at least two version-1 provider endpoints and writes WAV,
 timing, stability, interruption-recovery, concurrency, and manual listening
-review artifacts. It does not change `TTS_PROVIDER` or declare a production
-winner.
+review artifacts. Results record run identity plus Chromie revision/dirty
+state. It does not change `TTS_PROVIDER` or declare a production winner.
 
 ## Ollama
 

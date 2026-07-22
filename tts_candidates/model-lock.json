@@ -1,0 +1,30 @@
+{
+  "candidates": {
+    "fun-cosyvoice3-0.5b": {
+      "model": {
+        "license": "Apache-2.0",
+        "repository": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512",
+        "revision": "29e01c4e8d000f4bcd70751be16fa94bf3d85a18"
+      },
+      "runtime": {
+        "license": "Apache-2.0",
+        "repository": "https://github.com/FunAudioLLM/CosyVoice",
+        "revision": "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc"
+      }
+    },
+    "qwen3-tts-0.6b-base": {
+      "model": {
+        "license": "Apache-2.0",
+        "repository": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+        "revision": "5d83992436eae1d760afd27aff78a71d676296fc"
+      },
+      "runtime": {
+        "license": "Apache-2.0",
+        "repository": "https://github.com/QwenLM/Qwen3-TTS",
+        "revision": "022e286b98fbec7e1e916cb940cdf532cd9f488e"
+      }
+    }
+  },
+  "release_default_changed": false,
+  "schema_version": 1
+}

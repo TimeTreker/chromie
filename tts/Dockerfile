@@ -30,11 +30,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ninja-build \
     pkg-config \
+    ffmpeg \
     libsndfile1 \
     ca-certificates \
     libgomp1 \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && command -v ffmpeg >/dev/null
 
 RUN python3 -m venv /opt/venv
 

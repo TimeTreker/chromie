@@ -45,9 +45,25 @@ The maintained OuteTTS worker path now implements `TTSProvider` contract version
 health/start/end metadata, and unknown adapters fail closed. The shared A/B
 runner uses one Mandarin, English, mixed-language, interruption/recovery,
 six-turn dialogue, and concurrency matrix and produces objective metrics, WAVs,
-and a mandatory listening-review template. This is Level A implementation and
-automated verification only. No second provider adapter or retained target
-comparison exists, so `TTS_PROVIDER=oute` remains the maintained default.
+and a mandatory listening-review template. Separate exact-lock CosyVoice3 0.5B
+and Qwen3-TTS 0.6B Base evaluation images now implement that endpoint using one
+hashed bilingual reference voice and restart-on-cancel workers. This is still
+not provider-selection evidence. The latest local dirty-tree isolated run,
+`20260722-chromie-ai-girl-v1`, used the user-authorized AI-generated candidate
+voice and passed 6/6 cases for each provider: CosyVoice3 recorded 3.0987 s
+median first binary and 0.5419 median RTF, versus 5.6786 s and 0.9364 for
+Qwen3-TTS; post-cancel recovery favored Qwen3-TTS at 8.0885 s versus 18.7919 s.
+The same recordings created transcript-validated English, Chinese, and mixed
+Oute profiles, but one longer mixed prompt exhausted its token budget without
+audio, so mixed-language stability remains open. Candidate-output listening
+review, deployment license review, approved recovery bounds, clean repeated
+runs, and shared-resource target qualification remain open. The owner approved
+the voice style, but it was not promoted to Oute's maintained default: rebuilt
+container checks reproduced stochastic token exhaustion with both
+`chromie_mixed` and Chinese-aligned `chromie_zh`, and an RTX 5090 8192-token
+diagnostic did not fix it. The local profiles and source recordings remain
+untracked. This does not approve either candidate-provider result, and
+`TTS_PROVIDER=oute` with its built-in speaker remains the maintained default.
 
 The initial Runtime Observability implementation is now present behind a
 default-off policy. It provides architecture-independent Runtime Trace items,

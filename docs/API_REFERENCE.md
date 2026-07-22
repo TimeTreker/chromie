@@ -336,7 +336,7 @@ Supported JSON text messages:
 |---|---|
 | `health` or `ping` | `pong` with TTSProvider contract/declaration, registered adapters, sample rate, backend health, generation profile, recent performance summary, worker state, and available speakers. |
 | `list_speakers` | `speakers` with speaker IDs. |
-| `create_speaker` | `speaker_created` or `error`; the WAV path must remain inside `SPEAKER_DIR`. |
+| `create_speaker` | `speaker_created` or `error`; the WAV path must remain inside `SPEAKER_DIR` and the request must include its exact `transcript` (or a UTF-8 sidecar with the same stem must exist). |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
 A synthesis request includes `text`, optional `speaker_id`, and optional
@@ -349,13 +349,21 @@ worker-round-trip, queue, total-time, and real-time-factor fields for backward
 compatibility. Older clients may ignore these additive fields.
 
 The `provider` object includes `contract_version`, `provider_id`,
-`implementation`, `software_license_id`, `license_review_status`, immutable
+`implementation`, `software_source`, `software_revision`,
+`software_license_id`, `license_review_status`, immutable
 `model_artifacts` with per-artifact license IDs, declared languages and sample
 rates, maximum concurrency, native text/audio streaming, request cancellation,
 speaker profiles, and voice-cloning support. Software and model licensing are
 separate declarations; neither field is legal approval. These are capability
 declarations, not target-quality evidence. `provider_health` carries
 backend-specific readiness without forcing Oute worker fields onto future adapters.
+
+OuteTTS 1.0's v3 speaker format requires word timestamps. Chromie uses the
+content-addressed Whisper large-v3-turbo model on the configured alignment
+device, compares its normalized transcript with the mandatory supplied text,
+and rejects the profile below the configured similarity bound. The success
+response includes `transcript_sha256`, alignment identity/device, and
+similarity without echoing either transcript.
 
 The selected backend implements [`TTSProvider`](TTS_PROVIDER_EVALUATION.md).
 Each current OuteTTS/llama.cpp model worker runs in a restartable child process. The

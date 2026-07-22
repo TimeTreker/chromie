@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import difflib
+import hashlib
 import json
 import logging
 import math
@@ -10,6 +12,7 @@ import re
 import threading
 import time
 import types
+import unicodedata
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -34,6 +37,7 @@ from model_sources import apply_model_sources, resolve_model_sources
 from cancellable_worker import RestartableProcessWorker
 from oute_provider import OuteTTSProvider, OuteTTSProviderConfig
 from performance import (
+    nonnegative_remainder,
     realtime_factor,
     resolve_audio_codec_device,
 )
@@ -148,6 +152,19 @@ TTS_AUDIO_CODEC_DEVICE = resolve_audio_codec_device(
 
 SPEAKER_DIR = Path(os.getenv("SPEAKER_DIR", "/app/speakers"))
 SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
+MAX_SPEAKER_TRANSCRIPT_CHARS = 4000
+TTS_SPEAKER_ALIGNMENT_MODEL = "turbo"
+TTS_SPEAKER_ALIGNMENT_DEVICE = os.getenv(
+    "TTS_SPEAKER_ALIGNMENT_DEVICE", "cpu"
+).strip().lower()
+TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY = float(
+    os.getenv("TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY", "0.75")
+)
+
+if TTS_SPEAKER_ALIGNMENT_DEVICE not in {"cpu", "cuda"}:
+    raise ValueError("TTS_SPEAKER_ALIGNMENT_DEVICE must be cpu or cuda")
+if not 0.0 <= TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY <= 1.0:
+    raise ValueError("TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY must be between 0 and 1")
 
 # One global OuteTTS Interface owns one llama.cpp model/context. Treat it as
 # process-global mutable CUDA state inside the generation worker process.
@@ -387,18 +404,101 @@ def save_speaker_json(speaker, output_json: Path):
     logger.info("Speaker saved to %s", output_json)
 
 
-def create_speaker_profile_from_wav(speaker_id: str, wav_path: Path, save_as_default: bool = False):
+def normalize_speaker_transcript(value: object) -> str:
+    if not isinstance(value, str):
+        raise ValueError("Speaker transcript must be a string")
+    transcript = re.sub(r"\s+", " ", value).strip()
+    if not transcript:
+        raise ValueError("Speaker transcript must be non-empty")
+    if len(transcript) > MAX_SPEAKER_TRANSCRIPT_CHARS:
+        raise ValueError(
+            "Speaker transcript exceeds "
+            f"{MAX_SPEAKER_TRANSCRIPT_CHARS} characters"
+        )
+    return transcript
+
+
+def speaker_transcript_for_wav(
+    wav_path: Path,
+    transcript: str | None = None,
+) -> str:
+    if transcript is not None:
+        return normalize_speaker_transcript(transcript)
+    sidecar = wav_path.with_suffix(".txt")
+    if sidecar.is_file():
+        return normalize_speaker_transcript(sidecar.read_text(encoding="utf-8"))
+    raise ValueError(
+        "An exact speaker transcript is required. Pass transcript in the "
+        "create_speaker request or add a UTF-8 .txt file beside the WAV. "
+        "Chromie verifies the pinned word aligner against this text before "
+        "accepting the profile."
+    )
+
+
+def comparable_speaker_transcript(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    return "".join(character for character in normalized if character.isalnum())
+
+
+def speaker_transcript_similarity(expected: str, observed: object) -> float:
+    if not isinstance(observed, str):
+        return 0.0
+    expected_normalized = comparable_speaker_transcript(expected)
+    observed_normalized = comparable_speaker_transcript(observed)
+    if not expected_normalized or not observed_normalized:
+        return 0.0
+    return difflib.SequenceMatcher(
+        None,
+        expected_normalized,
+        observed_normalized,
+        autojunk=False,
+    ).ratio()
+
+
+def create_speaker_profile_from_wav(
+    speaker_id: str,
+    wav_path: Path,
+    save_as_default: bool = False,
+    transcript: str | None = None,
+):
     if not wav_path.exists():
         raise FileNotFoundError(f"Speaker WAV not found: {wav_path}")
 
     speaker_id = sanitize_speaker_id(speaker_id)
+    transcript = speaker_transcript_for_wav(wav_path, transcript)
     output_json = SPEAKER_DIR / f"{speaker_id}.json"
-    logger.info("Creating speaker profile speaker_id=%s wav=%s", speaker_id, wav_path)
+    transcript_sha256 = hashlib.sha256(transcript.encode("utf-8")).hexdigest()
+    logger.info(
+        "Creating speaker profile speaker_id=%s wav=%s transcript_sha256=%s",
+        speaker_id,
+        wav_path,
+        transcript_sha256,
+    )
 
     with tts_interface_lock:
         with patch_torch_1d_audio_slice():
-            speaker = interface.create_speaker(str(wav_path))
+            speaker = interface.create_speaker(
+                str(wav_path),
+                whisper_model=TTS_SPEAKER_ALIGNMENT_MODEL,
+                whisper_device=TTS_SPEAKER_ALIGNMENT_DEVICE,
+            )
+        similarity = speaker_transcript_similarity(
+            transcript,
+            speaker.get("text") if isinstance(speaker, dict) else None,
+        )
+        if similarity < TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY:
+            raise ValueError(
+                "Speaker alignment transcript does not match the supplied exact "
+                "transcript: "
+                f"similarity={similarity:.3f} "
+                f"minimum={TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY:.3f}"
+            )
         save_speaker_json(speaker, output_json)
+
+    wav_path.with_suffix(".txt").write_text(
+        transcript + "\n",
+        encoding="utf-8",
+    )
 
     if save_as_default and speaker_id != "default":
         default_json = SPEAKER_DIR / "default.json"
@@ -790,17 +890,29 @@ def generation_worker_main(connection) -> None:
                     speaker_id = sanitize_speaker_id(command.get("speaker_id", "default"))
                     wav_path = speaker_path_inside_dir(Path(command["wav_path"]))
                     make_default = bool(command.get("make_default", False))
-                    create_speaker_profile_from_wav(
+                    transcript = command.get("transcript")
+                    speaker = create_speaker_profile_from_wav(
                         speaker_id,
                         wav_path,
                         save_as_default=make_default,
+                        transcript=transcript,
                     )
+                    verified_transcript = speaker_transcript_for_wav(wav_path)
                     connection.send(
                         {
                             "type": "speaker_created",
                             "speaker_id": speaker_id,
                             "speaker_json": str(SPEAKER_DIR / f"{speaker_id}.json"),
                             "make_default": make_default,
+                            "transcript_sha256": hashlib.sha256(
+                                verified_transcript.encode("utf-8")
+                            ).hexdigest(),
+                            "alignment_model": TTS_SPEAKER_ALIGNMENT_MODEL,
+                            "alignment_device": TTS_SPEAKER_ALIGNMENT_DEVICE,
+                            "transcript_similarity": speaker_transcript_similarity(
+                                verified_transcript,
+                                speaker.get("text") if isinstance(speaker, dict) else None,
+                            ),
                         }
                     )
                     continue
@@ -1011,6 +1123,7 @@ async def handle_create_speaker(data: dict, ws):
     speaker_id = data.get("speaker_id") or "default"
     wav_path = data.get("wav_path")
     make_default = bool(data.get("make_default", False))
+    transcript = data.get("transcript")
 
     try:
         speaker_id = sanitize_speaker_id(speaker_id)
@@ -1019,6 +1132,7 @@ async def handle_create_speaker(data: dict, ws):
             speaker_id=speaker_id,
             wav_path=str(wav_path),
             make_default=make_default,
+            transcript=transcript,
         )
 
         await send_json(
@@ -1031,6 +1145,10 @@ async def handle_create_speaker(data: dict, ws):
                     "speaker_json", str(SPEAKER_DIR / f"{speaker_id}.json")
                 ),
                 "make_default": make_default,
+                "transcript_sha256": response.get("transcript_sha256"),
+                "alignment_model": response.get("alignment_model"),
+                "alignment_device": response.get("alignment_device"),
+                "transcript_similarity": response.get("transcript_similarity"),
             },
         )
     except Exception as exc:
@@ -1099,6 +1217,14 @@ async def ws_handler(ws):
                         "detailed_timing": TTS_DETAILED_TIMING,
                         "reject_truncated_generation": True,
                         "metrics_window": TTS_METRICS_WINDOW,
+                        "speaker_alignment": {
+                            "model": TTS_SPEAKER_ALIGNMENT_MODEL,
+                            "device": TTS_SPEAKER_ALIGNMENT_DEVICE,
+                            "minimum_transcript_similarity": (
+                                TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY
+                            ),
+                            "exact_transcript_required": True,
+                        },
                         "recent_performance": provider_health.get(
                             "recent_performance", {"count": 0}
                         ),
