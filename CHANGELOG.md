@@ -4,6 +4,21 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### TTS provider evaluation
+
+- Added a versioned, stream-oriented `TTSProvider` contract for lifecycle,
+  immutable model provenance, license identity, language/rate capabilities,
+  native streaming, cancellation, speakers, health, PCM, and metrics.
+- Migrated the maintained OuteTTS/llama.cpp worker path behind an explicit
+  adapter and fail-closed registry while preserving the WebSocket and
+  Orchestrator playback/interruption boundaries.
+- Added one shared Mandarin, English, mixed-language, interruption/recovery,
+  six-turn dialogue, and concurrency matrix plus a multi-endpoint runner that
+  retains WAVs, objective metrics, and a mandatory listening-review template.
+- Documented Qwen3-TTS and Fun-CosyVoice3 as primary comparison candidates,
+  OuteTTS as the maintained baseline, and license/target evidence as required
+  gates before changing the default.
+
 ### Runtime observability
 
 - Added a default-off, architecture-independent Runtime Trace foundation with

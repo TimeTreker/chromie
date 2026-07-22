@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections import deque
 import json
 import logging
 import math
@@ -11,6 +10,7 @@ import re
 import threading
 import time
 import types
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -32,12 +32,16 @@ from scipy import signal
 from model_sources import apply_model_sources, resolve_model_sources
 
 from cancellable_worker import RestartableProcessWorker
+from oute_provider import OuteTTSProvider, OuteTTSProviderConfig
 from performance import (
-    TtsPerformanceSample,
-    nonnegative_remainder,
     realtime_factor,
     resolve_audio_codec_device,
-    summarize_samples,
+)
+from provider import (
+    TTSAudioChunk,
+    TTSSynthesisCompleted,
+    TTSSynthesisRequest,
+    TTSProviderRegistry,
 )
 
 logging.basicConfig(
@@ -80,6 +84,7 @@ def env_int(name: str, default: int, *, minimum: int | None = None) -> int:
 
 HOST = os.getenv("TTS_HOST", "0.0.0.0")
 PORT = env_int("TTS_PORT", 5000, minimum=1)
+TTS_PROVIDER_NAME = os.getenv("TTS_PROVIDER", "oute").strip().lower()
 MODEL_SIZE = os.getenv("TTS_MODEL_SIZE", "0.6B")
 QUANTIZATION_NAME = os.getenv("TTS_QUANTIZATION", "FP16")
 
@@ -143,9 +148,6 @@ TTS_AUDIO_CODEC_DEVICE = resolve_audio_codec_device(
 
 SPEAKER_DIR = Path(os.getenv("SPEAKER_DIR", "/app/speakers"))
 SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
-
-synthesis_semaphore = asyncio.Semaphore(MAX_CONCURRENT_SYNTHESIS)
-recent_performance_samples: deque[TtsPerformanceSample] = deque(maxlen=TTS_METRICS_WINDOW)
 
 # One global OuteTTS Interface owns one llama.cpp model/context. Treat it as
 # process-global mutable CUDA state inside the generation worker process.
@@ -861,15 +863,42 @@ def generation_worker_status() -> list[dict[str, object]]:
     ]
 
 
+provider_registry = TTSProviderRegistry()
+provider_registry.register(
+    "oute",
+    lambda: OuteTTSProvider(
+        config=OuteTTSProviderConfig(
+            tokenizer_id=os.getenv("TTS_TOKENIZER_REPO", ""),
+            tokenizer_revision=os.getenv("TTS_TOKENIZER_REVISION", ""),
+            gguf_id=os.getenv("TTS_GGUF_REPO", ""),
+            gguf_revision=os.getenv("TTS_GGUF_REVISION", ""),
+            sample_rate=TTS_SAMPLE_RATE,
+            chunk_ms=TTS_CHUNK_MS,
+            max_concurrency=MAX_CONCURRENT_SYNTHESIS,
+            generation_retries=TTS_GENERATION_RETRIES,
+            max_length=EFFECTIVE_TTS_MAX_LENGTH,
+            context_size=TTS_CONTEXT_SIZE,
+            quantization=QUANTIZATION_NAME,
+            audio_codec_device=TTS_AUDIO_CODEC_DEVICE,
+            metrics_window=TTS_METRICS_WINDOW,
+            speaker_dir=SPEAKER_DIR,
+        ),
+        workers=generation_workers,
+        select_worker=select_generation_worker,
+        worker_status=generation_worker_status,
+        list_speaker_ids=list_speaker_ids,
+        validate_speaker_path=speaker_path_inside_dir,
+    ),
+)
+tts_provider = provider_registry.create(TTS_PROVIDER_NAME)
+
+
 async def start_generation_workers() -> None:
-    await asyncio.gather(*(worker.start() for worker in generation_workers))
+    await tts_provider.start()
 
 
 async def stop_generation_workers() -> None:
-    await asyncio.gather(
-        *(worker.stop() for worker in generation_workers),
-        return_exceptions=True,
-    )
+    await tts_provider.stop()
 
 
 async def send_json(ws, payload):
@@ -882,181 +911,97 @@ async def synthesize_text(
     ws,
     request_id: Optional[str] = None,
 ):
-    request_received = time.perf_counter()
-    async with synthesis_semaphore:
-        queue_wait_seconds = time.perf_counter() - request_received
-        text = normalize_tts_text(text)
-        if not is_valid_tts_text(text):
-            logger.warning("Skipping invalid TTS text request_id=%s text=%r", request_id, text)
-            await send_json(ws, {"type": "end", "request_id": request_id})
-            return
+    text = normalize_tts_text(text)
+    if not is_valid_tts_text(text):
+        logger.warning("Skipping invalid TTS text request_id=%s text=%r", request_id, text)
+        await send_json(ws, {"type": "end", "request_id": request_id})
+        return
 
-        if text[-1] not in ".!?。！？":
-            text += "."
+    if text[-1] not in ".!?。！？":
+        text += "."
+    request_id = request_id or f"tts-{uuid.uuid4().hex}"
+    request = TTSSynthesisRequest(
+        request_id=request_id,
+        text=text,
+        speaker_id=speaker_id,
+    )
+    capabilities = tts_provider.capabilities
+    logger.info(
+        "TTS input provider=%s request_id=%s text=%r",
+        capabilities.provider_id,
+        request_id,
+        text,
+    )
+    await send_json(
+        ws,
+        {
+            "type": "start",
+            "request_id": request_id,
+            "sample_rate": capabilities.sample_rates[0],
+            "format": "pcm_s16le",
+            "channels": 1,
+            "provider": capabilities.as_dict(),
+            # Backward-compatible OuteTTS metadata while it is the selected adapter.
+            "max_length": EFFECTIVE_TTS_MAX_LENGTH,
+            "audio_codec_device": TTS_AUDIO_CODEC_DEVICE,
+            "quantization": QUANTIZATION_NAME,
+            "context_size": TTS_CONTEXT_SIZE,
+        },
+    )
 
-        logger.info("TTS input request_id=%s text=%r", request_id, text)
-        start_time = time.time()
-        last_error = None
-
-        await send_json(
-            ws,
-            {
-                "type": "start",
-                "request_id": request_id,
-                "sample_rate": TTS_SAMPLE_RATE,
-                "format": "pcm_s16le",
-                "channels": 1,
-                "max_length": EFFECTIVE_TTS_MAX_LENGTH,
-                "audio_codec_device": TTS_AUDIO_CODEC_DEVICE,
-                "quantization": QUANTIZATION_NAME,
-                "context_size": TTS_CONTEXT_SIZE,
-            },
+    completed: TTSSynthesisCompleted | None = None
+    try:
+        async for event in tts_provider.synthesize_stream(request):
+            if isinstance(event, TTSAudioChunk):
+                if event.sample_rate != capabilities.sample_rates[0]:
+                    raise RuntimeError(
+                        "TTS provider changed sample rate inside one stream: "
+                        f"{event.sample_rate} != {capabilities.sample_rates[0]}"
+                    )
+                await ws.send(event.pcm)
+            elif isinstance(event, TTSSynthesisCompleted):
+                completed = event
+        if completed is None:
+            raise RuntimeError("TTS provider stream ended without completion metadata")
+        end_payload = {
+            "type": "end",
+            "request_id": request_id,
+            "provider": capabilities.as_dict(),
+            **dict(completed.metrics),
+            "provider_metadata": dict(completed.provider_metadata),
+        }
+        await send_json(ws, end_payload)
+        logger.info(
+            "TTS done provider=%s request_id=%s audio=%.2fs total=%.2fs rtf=%s",
+            capabilities.provider_id,
+            request_id,
+            float(completed.metrics.get("audio_seconds") or 0.0),
+            float(completed.metrics.get("total_seconds") or 0.0),
+            completed.metrics.get("realtime_factor"),
         )
-
-        for attempt in range(1, TTS_GENERATION_RETRIES + 1):
-            try:
-                worker_index, worker = await select_generation_worker()
-                worker_started = time.perf_counter()
-                response = await worker.request(
-                    {
-                        "type": "generate",
-                        "text": text,
-                        "speaker_id": speaker_id,
-                    }
-                )
-                worker_roundtrip_seconds = time.perf_counter() - worker_started
-                if response.get("type") == "error":
-                    raise RuntimeError(str(response.get("message") or "generation failed"))
-                if response.get("type") != "generated":
-                    raise RuntimeError(
-                        f"Unexpected generation-worker response: {response.get('type')!r}"
-                    )
-                pcm = response.get("pcm") or b""
-                timings = response.get("timings")
-                if not isinstance(timings, dict):
-                    timings = {}
-                generate_seconds = float(timings.get("generate_seconds") or 0.0)
-                model_generate_seconds = float(
-                    timings.get("model_generate_seconds") or 0.0
-                )
-                codec_decode_seconds = float(
-                    timings.get("codec_decode_seconds") or 0.0
-                )
-                pcm_conversion_seconds = float(
-                    timings.get("pcm_conversion_seconds") or 0.0
-                )
-                pipeline_overhead_seconds = float(
-                    timings.get("pipeline_overhead_seconds") or 0.0
-                )
-                model_prompt_tokens = int(timings.get("model_prompt_tokens") or 0)
-                model_generated_tokens = int(timings.get("model_generated_tokens") or 0)
-                generation_max_length = int(timings.get("generation_max_length") or 0)
-                generation_headroom_tokens = int(
-                    timings.get("generation_headroom_tokens") or 0
-                )
-                generation_limit_reached = bool(
-                    timings.get("generation_limit_reached", False)
-                )
-                if generation_limit_reached:
-                    raise RuntimeError(
-                        "OuteTTS reached its generation max_length before the audio end token; "
-                        "refusing to play a truncated sentence. "
-                        f"prompt_tokens={model_prompt_tokens}, "
-                        f"generated_tokens={model_generated_tokens}, "
-                        f"max_length={generation_max_length}, text_chars={len(text)}. "
-                        "Increase TTS_CONTEXT_SIZE/TTS_MAX_LENGTH or shorten the host TTS chunk."
-                    )
-                if not pcm:
-                    raise RuntimeError(
-                        "OuteTTS generated empty audio. "
-                        f"effective_max_length={EFFECTIVE_TTS_MAX_LENGTH}, "
-                        f"text_chars={len(text)}. Do not set TTS_MAX_LENGTH too low; "
-                        "use TTS_MAX_TEXT_CHARS to shorten spoken text."
-                    )
-
-                chunk_bytes = int(TTS_SAMPLE_RATE * TTS_CHUNK_MS / 1000) * 2
-                for offset in range(0, len(pcm), chunk_bytes):
-                    await ws.send(pcm[offset : offset + chunk_bytes])
-                    await asyncio.sleep(0)
-
-                audio_seconds = len(pcm) / (TTS_SAMPLE_RATE * 2)
-                total_seconds = time.time() - start_time
-                sample = TtsPerformanceSample(
-                    audio_seconds=audio_seconds,
-                    generate_seconds=generate_seconds,
-                    model_generate_seconds=model_generate_seconds,
-                    codec_decode_seconds=codec_decode_seconds,
-                    pcm_conversion_seconds=pcm_conversion_seconds,
-                    worker_roundtrip_seconds=worker_roundtrip_seconds,
-                    queue_wait_seconds=queue_wait_seconds,
-                    total_seconds=total_seconds,
-                )
-                recent_performance_samples.append(sample)
-                end_payload = {
-                    "type": "end",
-                    "request_id": request_id,
-                    **sample.as_dict(),
-                    "pipeline_overhead_seconds": pipeline_overhead_seconds,
-                    "ipc_overhead_seconds": nonnegative_remainder(
-                        worker_roundtrip_seconds,
-                        generate_seconds,
-                        pcm_conversion_seconds,
-                    ),
-                    "audio_codec_device": TTS_AUDIO_CODEC_DEVICE,
-                    "quantization": QUANTIZATION_NAME,
-                    "context_size": TTS_CONTEXT_SIZE,
-                    "max_length": EFFECTIVE_TTS_MAX_LENGTH,
-                    "model_prompt_tokens": model_prompt_tokens,
-                    "model_generated_tokens": model_generated_tokens,
-                    "generation_max_length": generation_max_length,
-                    "generation_headroom_tokens": generation_headroom_tokens,
-                    "generation_limit_reached": generation_limit_reached,
-                }
-                await send_json(ws, end_payload)
-                logger.info(
-                    "TTS done request_id=%s worker=%s attempt=%s audio=%.2fs "
-                    "generate=%.2fs model=%.2fs codec=%.2fs pcm=%.3fs "
-                    "queue=%.3fs roundtrip=%.2fs rtf=%s total=%.2fs "
-                    "prompt_tokens=%s generated_tokens=%s headroom=%s limit_reached=%s",
-                    request_id,
-                    worker_index,
-                    attempt,
-                    audio_seconds,
-                    generate_seconds,
-                    model_generate_seconds,
-                    codec_decode_seconds,
-                    pcm_conversion_seconds,
-                    queue_wait_seconds,
-                    worker_roundtrip_seconds,
-                    f"{sample.realtime_factor:.3f}"
-                    if sample.realtime_factor is not None
-                    else "n/a",
-                    total_seconds,
-                    model_prompt_tokens,
-                    model_generated_tokens,
-                    generation_headroom_tokens,
-                    generation_limit_reached,
-                )
-                return
-            except Exception as exc:
-                last_error = exc
-                logger.warning(
-                    "TTS generation failed request_id=%s attempt=%s/%s text=%r error=%s",
-                    request_id,
-                    attempt,
-                    TTS_GENERATION_RETRIES,
-                    text,
-                    exc,
-                    exc_info=True,
-                )
-                await asyncio.sleep(0.05)
-
+    except asyncio.CancelledError:
+        logger.info(
+            "TTS cancelled provider=%s request_id=%s",
+            capabilities.provider_id,
+            request_id,
+        )
+        raise
+    except Exception as exc:
+        logger.warning(
+            "TTS generation failed provider=%s request_id=%s text=%r error=%s",
+            capabilities.provider_id,
+            request_id,
+            text,
+            exc,
+            exc_info=True,
+        )
         await send_json(
             ws,
             {
                 "type": "error",
                 "request_id": request_id,
-                "message": f"TTS generated no audio after retries: {last_error}",
+                "provider_id": capabilities.provider_id,
+                "message": str(exc),
             },
         )
 
@@ -1070,20 +1015,11 @@ async def handle_create_speaker(data: dict, ws):
     try:
         speaker_id = sanitize_speaker_id(speaker_id)
         wav_path = speaker_path_inside_dir(Path(wav_path) if wav_path else SPEAKER_DIR / f"{speaker_id}.wav")
-        response = await generation_workers[0].request(
-            {
-                "type": "create_speaker",
-                "speaker_id": speaker_id,
-                "wav_path": str(wav_path),
-                "make_default": make_default,
-            }
+        response = await tts_provider.create_speaker(
+            speaker_id=speaker_id,
+            wav_path=str(wav_path),
+            make_default=make_default,
         )
-        if response.get("type") == "error":
-            raise RuntimeError(str(response.get("message") or "speaker creation failed"))
-        if response.get("type") != "speaker_created":
-            raise RuntimeError(
-                f"Unexpected generation-worker response: {response.get('type')!r}"
-            )
 
         await send_json(
             ws,
@@ -1091,7 +1027,9 @@ async def handle_create_speaker(data: dict, ws):
                 "type": "speaker_created",
                 "request_id": request_id,
                 "speaker_id": speaker_id,
-                "speaker_json": str(SPEAKER_DIR / f"{speaker_id}.json"),
+                "speaker_json": response.get(
+                    "speaker_json", str(SPEAKER_DIR / f"{speaker_id}.json")
+                ),
                 "make_default": make_default,
             },
         )
@@ -1122,25 +1060,33 @@ async def ws_handler(ws):
 
             msg_type = data.get("type")
             if msg_type in {"health", "ping"}:
+                provider_health = dict(await tts_provider.health())
+                speakers = await tts_provider.list_speakers()
                 await send_json(
                     ws,
                     {
                         "type": "pong",
                         "service": "tts",
+                        "provider_contract_version": tts_provider.capabilities.contract_version,
+                        "provider": tts_provider.capabilities.as_dict(),
+                        "provider_health": provider_health,
+                        "registered_providers": list(provider_registry.provider_ids()),
                         "sample_rate": TTS_SAMPLE_RATE,
                         "gpu_layers": TTS_N_GPU_LAYERS,
                         "reset_llama_state": TTS_RESET_LLAMA_STATE,
                         "single_model_worker": TTS_WORKER_COUNT == 1,
-                        "worker_count": TTS_WORKER_COUNT,
-                        "max_concurrent_synthesis": MAX_CONCURRENT_SYNTHESIS,
-                        "worker_process_alive": all(
-                            worker.is_alive for worker in generation_workers
+                        "worker_count": provider_health.get("worker_count"),
+                        "max_concurrent_synthesis": provider_health.get(
+                            "max_concurrent_synthesis"
                         ),
-                        "worker_restart_count": sum(
-                            worker.restart_count for worker in generation_workers
+                        "worker_process_alive": provider_health.get(
+                            "worker_process_alive"
                         ),
-                        "workers": generation_worker_status(),
-                        "cancellation_mode": "terminate_and_restart_worker",
+                        "worker_restart_count": provider_health.get(
+                            "worker_restart_count"
+                        ),
+                        "workers": provider_health.get("workers", []),
+                        "cancellation_mode": provider_health.get("cancellation_mode"),
                         "requested_max_length": REQUESTED_TTS_MAX_LENGTH,
                         "effective_max_length": EFFECTIVE_TTS_MAX_LENGTH,
                         "min_generation_length": MIN_TTS_GENERATION_LENGTH,
@@ -1153,16 +1099,19 @@ async def ws_handler(ws):
                         "detailed_timing": TTS_DETAILED_TIMING,
                         "reject_truncated_generation": True,
                         "metrics_window": TTS_METRICS_WINDOW,
-                        "recent_performance": summarize_samples(
-                            recent_performance_samples
+                        "recent_performance": provider_health.get(
+                            "recent_performance", {"count": 0}
                         ),
-                        "speakers": list_speaker_ids(),
+                        "speakers": speakers,
                     },
                 )
                 continue
 
             if msg_type == "list_speakers":
-                await send_json(ws, {"type": "speakers", "speakers": list_speaker_ids()})
+                await send_json(
+                    ws,
+                    {"type": "speakers", "speakers": await tts_provider.list_speakers()},
+                )
                 continue
 
             if msg_type == "create_speaker":
@@ -1188,9 +1137,9 @@ async def ws_handler(ws):
                 )
                 continue
 
-            if speaker_id != "default" and not (
-                (SPEAKER_DIR / f"{speaker_id}.json").exists()
-                or (SPEAKER_DIR / f"{speaker_id}.wav").exists()
+            if (
+                speaker_id != "default"
+                and speaker_id not in await tts_provider.list_speakers()
             ):
                 await send_json(
                     ws,
@@ -1224,8 +1173,9 @@ async def ws_handler(ws):
 async def main():
     await start_generation_workers()
     logger.info(
-        "TTS server ready on ws://%s:%s output=%sHz pcm_s16le chunk_ms=%s "
+        "TTS server ready provider=%s on ws://%s:%s output=%sHz pcm_s16le chunk_ms=%s "
         "effective_max_length=%s max_text_chars=%s worker_count=%s max_concurrent=%s",
+        tts_provider.capabilities.provider_id,
         HOST,
         PORT,
         TTS_SAMPLE_RATE,

@@ -57,6 +57,10 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 ## What works
 
 - realtime microphone, VAD, ASR, routing, TTS, playback, and barge-in;
+- a versioned stream-oriented TTSProvider contract, maintained Oute adapter,
+  fail-closed provider registry, and common multilingual/interruption/dialogue/
+  concurrency A/B runner; provider replacement still requires target and
+  listening evidence;
 - sherpa-onnx SenseVoice as the single supported final-utterance ASR runtime,
   with immutable model provenance, CUDA/CPU providers, and startup warm-up;
 - deterministic stop, cancel, emergency, ignore, and silence handling;
@@ -83,7 +87,8 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 Endpoint-reported Soridormi source identity, running Chromie image/model source
 binding, immutable publishable image references, current-revision goal-driven
 live/MuJoCo evidence, physical microphone/speaker evidence, a reviewed release
-bundle, verified Jetson packaging, and physical robot support remain open.
+bundle, a retained multi-provider TTS comparison, verified Jetson packaging,
+and physical robot support remain open.
 
 ## Quick start
 
@@ -200,6 +205,8 @@ documented in
 - [Roadmap](ROADMAP.md): milestone order and exit criteria
 - [SenseVoice ASR](docs/SENSEVOICE_ASR.md): runtime contract, model provenance,
   evaluation, and release evidence
+- [TTS Provider Evaluation](docs/TTS_PROVIDER_EVALUATION.md): provider contract,
+  common A/B matrix, candidate policy, and selection gates
 - [User Manual](docs/USER_MANUAL.md): current simulator operation
 - [Project Handoff](docs/HANDOFF.md): resume point for the next developer
 - [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point

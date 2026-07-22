@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import statistics
 import sys
 import time
 import uuid
+import wave
 from pathlib import Path
 from typing import Any
 
@@ -50,11 +52,12 @@ async def synthesize_case(
     case_name: str,
     text: str,
     timeout_s: float,
+    audio_output: Path | None = None,
 ) -> dict[str, Any]:
     request_id = f"benchmark-{case_name}-{uuid.uuid4().hex[:10]}"
     started = time.perf_counter()
     first_binary_at: float | None = None
-    audio_bytes = 0
+    audio = bytearray()
     start_metadata: dict[str, Any] = {}
     end_metadata: dict[str, Any] = {}
 
@@ -82,7 +85,7 @@ async def synthesize_case(
                 if isinstance(message, bytes):
                     if first_binary_at is None:
                         first_binary_at = now
-                    audio_bytes += len(message)
+                    audio.extend(message)
                     continue
                 data = json.loads(message)
                 message_type = data.get("type")
@@ -98,13 +101,25 @@ async def synthesize_case(
 
     completed = time.perf_counter()
     sample_rate = int(start_metadata.get("sample_rate") or 44100)
+    audio_bytes = len(audio)
     observed_audio_seconds = audio_bytes / (sample_rate * 2) if audio_bytes else 0.0
+    audio_path: str | None = None
+    if audio_output is not None and audio:
+        audio_output.parent.mkdir(parents=True, exist_ok=True)
+        with wave.open(str(audio_output), "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate)
+            wav.writeframes(audio)
+        audio_path = str(audio_output)
     return {
         "case": case_name,
         "text": text,
         "text_chars": len(text),
         "request_id": request_id,
         "audio_bytes": audio_bytes,
+        "audio_sha256": hashlib.sha256(audio).hexdigest() if audio else None,
+        "audio_path": audio_path,
         "observed_audio_seconds": round(observed_audio_seconds, 4),
         "observed_first_binary_seconds": round(
             (first_binary_at - started) if first_binary_at is not None else 0.0,

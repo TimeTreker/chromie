@@ -176,6 +176,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
 
     def test_tts_performance_diagnostics_and_cuda_graphs_are_enabled(self) -> None:
         values = _common_env()
+        self.assertEqual(values["TTS_PROVIDER"], "oute")
         self.assertEqual(values["TTS_AUDIO_CODEC_DEVICE"], "auto")
         self.assertEqual(values["TTS_DETAILED_TIMING"], "1")
         self.assertEqual(values["TTS_METRICS_WINDOW"], "20")

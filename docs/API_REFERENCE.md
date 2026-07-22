@@ -334,19 +334,31 @@ Supported JSON text messages:
 
 | Request type | Result |
 |---|---|
-| `health` or `ping` | `pong` with sample rate, GPU-layer setting, resolved/actual DAC device, generation profile, recent performance summary, worker state, and available speakers. |
+| `health` or `ping` | `pong` with TTSProvider contract/declaration, registered adapters, sample rate, backend health, generation profile, recent performance summary, worker state, and available speakers. |
 | `list_speakers` | `speakers` with speaker IDs. |
 | `create_speaker` | `speaker_created` or `error`; the WAV path must remain inside `SPEAKER_DIR`. |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
 A synthesis request includes `text`, optional `speaker_id`, and optional
 `request_id`. The `start` message declares `sample_rate`, `format=pcm_s16le`,
-`channels=1`, codec device, quantization, context size, and generation limit.
-The terminal `end` message includes audio duration plus model-generation, DAC
-decode, PCM conversion, worker round-trip, queue delay, total time, and
-real-time-factor fields. Older clients may ignore these additive fields.
+`channels=1`, and a versioned `provider` object. The terminal `end` repeats the
+provider declaration and includes audio duration plus comparable timing and
+provider metadata. The current Oute adapter retains its codec device,
+quantization, context, token-budget, model-generation, DAC-decode, PCM,
+worker-round-trip, queue, total-time, and real-time-factor fields for backward
+compatibility. Older clients may ignore these additive fields.
 
-Each OuteTTS/llama.cpp model worker runs in a restartable child process. The
+The `provider` object includes `contract_version`, `provider_id`,
+`implementation`, `software_license_id`, `license_review_status`, immutable
+`model_artifacts` with per-artifact license IDs, declared languages and sample
+rates, maximum concurrency, native text/audio streaming, request cancellation,
+speaker profiles, and voice-cloning support. Software and model licensing are
+separate declarations; neither field is legal approval. These are capability
+declarations, not target-quality evidence. `provider_health` carries
+backend-specific readiness without forcing Oute worker fields onto future adapters.
+
+The selected backend implements [`TTSProvider`](TTS_PROVIDER_EVALUATION.md).
+Each current OuteTTS/llama.cpp model worker runs in a restartable child process. The
 common/default configuration uses one worker; high-memory GPU profiles may start
 more than one worker for bounded parallel synthesis. If an active synthesis is
 cancelled because its client disconnects, the owning child is terminated and

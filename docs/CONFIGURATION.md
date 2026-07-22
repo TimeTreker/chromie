@@ -657,6 +657,7 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 
 | Variable | Purpose |
 |---|---|
+| `TTS_PROVIDER` | Registered provider adapter selected by the TTS service. The maintained image currently supports only `oute`; unknown values fail closed. Candidate frameworks are compared as separate contract-compatible endpoints before any default changes. |
 | `TTS_MODEL_SIZE` | OuteTTS model size, currently release-locked to `0.6B`. |
 | `TTS_TOKENIZER_REPO`, `TTS_TOKENIZER_REVISION` | Immutable tokenizer/config snapshot used instead of a mutable repository branch. |
 | `TTS_GGUF_REPO`, `TTS_GGUF_REVISION` | Immutable GGUF snapshot; the quantization selects an exact filename inside it. |
@@ -692,6 +693,14 @@ synthesis terminates that process and starts a clean worker, preventing stale
 native generation from occupying the only model slot. New synthesis waits for
 the replacement model worker to become ready.
 
+`TTS_PROVIDER` selects an explicitly registered implementation of
+[`TTSProvider`](TTS_PROVIDER_EVALUATION.md). The common protocol distinguishes
+provider-native text/audio streaming from transport chunking, exposes immutable
+model provenance and declared license identity, and requires cancellation to
+isolate native work. The current Oute adapter declares native streaming false;
+host sentence chunking and WebSocket PCM frames do not turn it into a native
+streaming model.
+
 The RTX 4090 Laptop profile uses a 4096-token TTS context. A 2048-token
 experiment left too little headroom after the speaker/prompt tokens and caused
 otherwise short sentences to stop after their first words. The service now
@@ -710,6 +719,21 @@ factor, and whether any request exhausted the model token budget. It exits
 non-zero on token-budget exhaustion because a fast but incomplete waveform is
 not a valid performance result. It does not play audio and is not a
 voice-quality acceptance test.
+
+For a multi-provider comparison, use the committed common matrix:
+
+```bash
+python scripts/tts_provider_ab.py --check
+python scripts/tts_provider_ab.py \
+  --provider oute=ws://127.0.0.1:5000 \
+  --provider candidate=ws://127.0.0.1:5001 \
+  --output-dir .chromie/evidence/tts-provider-ab/<run-id>
+```
+
+The runner requires at least two version-1 provider endpoints and writes WAV,
+timing, stability, interruption-recovery, concurrency, and manual listening
+review artifacts. It does not change `TTS_PROVIDER` or declare a production
+winner.
 
 ## Ollama
 

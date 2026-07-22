@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "description": "Framework-neutral Chromie TTS provider comparison matrix.",
+  "required_case_kinds": [
+    "chinese",
+    "english",
+    "mixed",
+    "interruption",
+    "long_dialogue",
+    "concurrency"
+  ],
+  "cases": [
+    {
+      "id": "mandarin_daily_reply",
+      "kind": "chinese",
+      "text": "好的，我已经记下了。外面可能下雨，出门时请带上雨伞。"
+    },
+    {
+      "id": "english_daily_reply",
+      "kind": "english",
+      "text": "Got it. I will keep the conversation concise and let you interrupt at any time."
+    },
+    {
+      "id": "mixed_navigation_reply",
+      "kind": "mixed",
+      "text": "Chromie，please check the living room，然后告诉我 door sensor 是否正常。"
+    },
+    {
+      "id": "barge_in_recovery",
+      "kind": "interruption",
+      "text": "我会先说明当前状态，然后继续讲解后面的步骤。这段话故意比较长，用来确认用户打断以后，旧语音生成不会继续占用服务，也不会泄漏到下一次回答。",
+      "recovery_text": "已停止上一段语音。"
+    },
+    {
+      "id": "bilingual_long_dialogue",
+      "kind": "long_dialogue",
+      "turns": [
+        "早上好。今天我们先确认日程，再检查家里的状态。",
+        "Your first meeting starts at nine thirty, and the reminder is already prepared.",
+        "厨房窗户是关着的，不过 balcony door 还需要你确认。",
+        "如果你愿意，我可以继续逐项说明，但你随时可以打断我。",
+        "I will keep names, numbers, and language switches clear across the whole conversation.",
+        "最后总结一下：日程已确认，厨房安全，阳台门仍待检查。"
+      ]
+    },
+    {
+      "id": "parallel_short_replies",
+      "kind": "concurrency",
+      "texts": [
+        "我在这里。",
+        "The timer is ready.",
+        "客厅灯已经关闭。",
+        "You can interrupt me now."
+      ]
+    }
+  ],
+  "listening_dimensions": [
+    "intelligibility",
+    "naturalness",
+    "prosody",
+    "chinese_pronunciation",
+    "english_pronunciation",
+    "code_switching",
+    "speaker_consistency",
+    "artifact_severity"
+  ]
+}

@@ -2,7 +2,7 @@
 
 **Current release-prep base:** `0.0.1`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-21
+**Status refresh date:** 2026-07-22
 **Current focus:** Finish Fast Planner multi-goal latency qualification and
 promote it to source-bound Target evidence: reduce final-source median cognitive
 runtime to the accepted threshold, repeat three warm runs, add
@@ -38,6 +38,16 @@ when fallback succeeds. Response Composer may model-author contextual language
 style and auxiliary body expression under one Social Attention purpose;
 candidate actions are discovered from catalog behavior-domain metadata rather
 than a fixed gesture list. Explicit user-requested actions remain primary goals.
+
+The current branch also implements the framework-neutral TTS provider boundary.
+The maintained OuteTTS worker path now implements `TTSProvider` contract version
+1, provider/model provenance and native-streaming truth are exposed through
+health/start/end metadata, and unknown adapters fail closed. The shared A/B
+runner uses one Mandarin, English, mixed-language, interruption/recovery,
+six-turn dialogue, and concurrency matrix and produces objective metrics, WAVs,
+and a mandatory listening-review template. This is Level A implementation and
+automated verification only. No second provider adapter or retained target
+comparison exists, so `TTS_PROVIDER=oute` remains the maintained default.
 
 The initial Runtime Observability implementation is now present behind a
 default-off policy. It provides architecture-independent Runtime Trace items,
@@ -274,6 +284,12 @@ gates pass from the intended revisions.
     gates, rerun the Soridormi task-agent and locomotion-readiness gates, and
     keep the tag claim limited to generated-speech and Soridormi
     MuJoCo-executor evidence.
+15. For TTS selection work, keep OuteTTS as the release-locked baseline and add
+    candidate services only behind the versioned provider contract. Run
+    `python scripts/tts_provider_ab.py --check`, then compare at least two
+    endpoints with the same committed matrix. Do not change the default until
+    target resource evidence, interruption recovery, blinded listening,
+    license review, model locks, rollback, and release support all pass.
 
 Do not start physical motion until the first reference robot satisfies the
 commissioning checklist and Soridormi has retained simulator/physical evidence

@@ -22,7 +22,7 @@ A higher level does not replace lower-level regression tests.
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
-| ASR/TTS GPU use | Limited | GPU smoke tooling | Not applicable | RTX 5090 smoke passed 21/21 |
+| ASR/TTS GPU use | TTS provider contract, Oute adapter, and common A/B matrix; ASR/TTS component coverage remains limited | GPU smoke tooling; no retained multi-provider run | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; comparative target evidence open |
 | Audio devices and barge-in | Partial | Manual host run | Can pair with sim | PipeWire virtual-mic 7/7 passed; physical microphone/speaker open |
 
 Retained reference-host evidence from June 14 and June 17, 2026:
@@ -81,6 +81,7 @@ python scripts/test_matrix.py general-ability
 python scripts/test_matrix.py asr tts router
 python scripts/test_matrix.py local-modules
 python scripts/test_matrix.py voice-mujoco-sim
+python scripts/tts_provider_ab.py --check
 ```
 
 This runner is a Level A convenience layer over existing tests. It lets modules
@@ -241,6 +242,41 @@ This checks host/container GPU visibility, Compose health, Router-to-Agent
 round trip, ASR/TTS WebSockets, Ollama generation, model GPU placement, and
 optional non-empty TTS PCM generation. It does not evaluate microphone or
 speaker quality.
+
+### TTS provider comparison
+
+Level A verifies the framework-neutral provider schema, explicit registry,
+Oute adapter, streaming event rules, cancellation propagation, common matrix,
+and fail-closed A/B inputs:
+
+```bash
+python -m unittest \
+  tests.test_tts_provider_contract \
+  tests.test_tts_provider_ab \
+  tests.test_tts_benchmark
+python scripts/tts_provider_ab.py --check
+```
+
+For Level B/D comparison, run at least two separately deployed endpoints that
+expose TTSProvider contract version 1:
+
+```bash
+python scripts/tts_provider_ab.py \
+  --provider oute=ws://127.0.0.1:5000 \
+  --provider candidate=ws://127.0.0.1:5001 \
+  --warmup 1 \
+  --output-dir .chromie/evidence/tts-provider-ab/<run-id>
+```
+
+The committed matrix uses identical Mandarin, English, mixed-language,
+interruption/recovery, six-turn dialogue, and concurrent requests. The runner
+retains provider/model declarations, audio hashes and WAV files, first-binary
+and total latency, RTF, dialogue/concurrency results, and a mandatory listening
+review template. A run is not provider-selection evidence until the listening
+review, license review, target hardware/resource capture, approved thresholds,
+and exact source/model provenance are complete. The runner therefore never
+sets `selection_ready=true` automatically. See
+[TTS Provider Contract and Evaluation](TTS_PROVIDER_EVALUATION.md).
 
 SenseVoice ASR verification starts at Level A with model-file resolution,
 normalization, mode validation, and bounded executor tests. Level B service

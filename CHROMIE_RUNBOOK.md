@@ -602,6 +602,30 @@ The normal startup script uses `/tmp/chromie-orchestrator.lock`.
 - Run `python scripts/benchmark_tts.py --repeat 2 --warmup 1`; the benchmark
   fails when any case reaches the generation limit.
 
+### Compare or diagnose TTS providers
+
+- Confirm the selected service exposes `provider_contract_version=1`, a
+  software-license declaration, and immutable licensed
+  `provider.model_artifacts` in its `health` response.
+- The maintained image supports `TTS_PROVIDER=oute`; an unknown value is a
+  startup error, not a fallback.
+- Validate the common matrix before a live run:
+  `python scripts/tts_provider_ab.py --check`.
+- Compare at least two isolated endpoints with identical inputs:
+
+  ```bash
+  python scripts/tts_provider_ab.py \
+    --provider oute=ws://127.0.0.1:5000 \
+    --provider candidate=ws://127.0.0.1:5001 \
+    --output-dir .chromie/evidence/tts-provider-ab/<run-id>
+  ```
+
+- Review `result.json`, every WAV, and `listening-review.json`. A fast automated
+  run is not approval to change the default.
+- If interruption recovery fails, inspect the provider cancellation mode,
+  worker/process lifecycle, active GPU work, and whether stale PCM appeared in
+  the recovery request. Host barge-in policy remains in the Orchestrator.
+
 ### Named skill fails before execution
 
 - Confirm `ORCH_ENABLE_SORIDORMI_SKILLS=1`.

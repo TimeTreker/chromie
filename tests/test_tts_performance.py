@@ -137,9 +137,9 @@ class TtsPerformanceContractTests(unittest.TestCase):
                 "TTS_AUDIO_CODEC_DEVICE": "cpu",
                 "TTS_DETAILED_TIMING": "0",
                 "TTS_TOKENIZER_REPO": "fixture/tokenizer",
-                "TTS_TOKENIZER_REVISION": "tokrev",
+                "TTS_TOKENIZER_REVISION": "0123456789abcdef",
                 "TTS_GGUF_REPO": "fixture/gguf",
-                "TTS_GGUF_REVISION": "ggufrev",
+                "TTS_GGUF_REVISION": "fedcba9876543210",
             }
             with stub_tts_dependencies(), mock.patch.dict(os.environ, env, clear=False):
                 server = importlib.import_module("server")
@@ -176,9 +176,9 @@ class TtsPerformanceContractTests(unittest.TestCase):
                 "TTS_AUDIO_CODEC_DEVICE": "cpu",
                 "TTS_DETAILED_TIMING": "0",
                 "TTS_TOKENIZER_REPO": "fixture/tokenizer",
-                "TTS_TOKENIZER_REVISION": "tokrev",
+                "TTS_TOKENIZER_REVISION": "0123456789abcdef",
                 "TTS_GGUF_REPO": "fixture/gguf",
-                "TTS_GGUF_REVISION": "ggufrev",
+                "TTS_GGUF_REVISION": "fedcba9876543210",
             }
             with stub_tts_dependencies(), mock.patch.dict(os.environ, env, clear=False):
                 server = importlib.import_module("server")

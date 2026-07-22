@@ -40,6 +40,7 @@ When documents disagree, correct the lower-authority document.
 | What common contract must runtime trace items obey? | `docs/RUNTIME_TRACE.md` |
 | How should a module add trace instrumentation? | `docs/RUNTIME_TRACE_INSTRUMENTATION.md` |
 | How are accelerator observations, retained latency reports, and regression gates produced? | `docs/STEP10_ACCELERATOR_LATENCY_EVIDENCE.md` |
+| What contract and evidence govern TTS backend selection? | `docs/TTS_PROVIDER_EVALUATION.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` and `docs/USER_OUTCOME_ACCEPTANCE.md` |
 | What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How is the goal-driven runtime enabled, observed, evidenced, and rolled back? | `docs/COGNITIVE_RUNTIME_ROLLOUT.md` |
@@ -67,6 +68,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Runtime Observability Architecture](RUNTIME_OBSERVABILITY_ARCHITECTURE.md)
 - [Runtime Trace Contract](RUNTIME_TRACE.md)
 - [Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md)
+- [TTS Provider Contract and Evaluation](TTS_PROVIDER_EVALUATION.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
@@ -99,6 +101,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Router](../router/README.md)
 - [ASR](../asr/README.md)
 - [TTS](../tts/README.md)
+- [TTS Provider Contract and Evaluation](TTS_PROVIDER_EVALUATION.md)
 - [Shared Packages](../shared/README.md)
 - [Capability Manifests](../capabilities/README.md)
 - [Legacy Hardware Daemon](../hardware/README.md)

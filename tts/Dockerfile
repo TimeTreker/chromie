@@ -74,7 +74,7 @@ RUN pip uninstall -y llama-cpp-python || true && \
     FORCE_CMAKE=1 \
     pip install --no-cache-dir --no-deps --force-reinstall --no-binary=llama-cpp-python llama-cpp-python==0.3.9
 
-COPY server.py cancellable_worker.py model_sources.py performance.py ./
+COPY server.py cancellable_worker.py model_sources.py performance.py provider.py oute_provider.py ./
 COPY create_speaker.py .
 
 RUN mkdir -p /app/speakers

@@ -98,6 +98,40 @@ Exit criteria before widening voice-device or profile support:
 - retained evidence uses the four-axis status vocabulary and does not turn a
   benchmark into release readiness.
 
+## Open evidence track - Framework-neutral TTS selection
+
+Chromie now has a versioned stream-oriented `TTSProvider` contract, an adapter
+for the maintained OuteTTS deployment, and one common Mandarin, English,
+mixed-language, interruption, long-dialogue, and concurrency comparison matrix.
+This removes the architectural assumption that one framework must remain the
+permanent backend without changing the current release default.
+
+The next work is evidence, not an early winner declaration. Qwen3-TTS and
+Fun-CosyVoice3 are primary online-service candidates; OuteTTS remains the
+low-resource baseline, and character-voice production tools such as GPT-SoVITS
+may be evaluated separately. Candidate names do not bypass license, immutable
+model, runtime, resource, or support review.
+
+Exit criteria before changing the maintained TTS provider:
+
+- at least two isolated, contract-compatible provider endpoints pass the same
+  committed matrix with immutable source and model revisions;
+- interruption stops or isolates native work and a fresh request recovers
+  within an approved bound without stale audio;
+- Chinese, English, code switching, long dialogue, and declared concurrency
+  pass on the target host while ASR, Router, Agent, and Ollama share resources;
+- cold/warm first-audio, p50/p95 total latency, RTF, GPU/host memory,
+  utilization, power, queueing, and failure causes are retained;
+- blinded listening review accepts intelligibility, naturalness, prosody,
+  pronunciation, code switching, speaker consistency, and audible artifacts;
+- software, weight, voice, output, and commercial-use license obligations are
+  reviewed for the intended deployment;
+- the selected provider has configuration, model locks, rollback, support,
+  target evidence, and release compatibility updates in the same candidate;
+- `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
+
+See [TTS Provider Contract and Evaluation](docs/TTS_PROVIDER_EVALUATION.md).
+
 ## Open architecture track - Orchestrator task proposal merge
 
 Router, quick intent, and deepthinking stages may all propose tasks, but

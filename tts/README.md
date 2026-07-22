@@ -1,13 +1,19 @@
 # Chromie TTS Service
 
-`chromie-tts` is the GPU-backed OuteTTS speech-synthesis service. It runs inside
-Docker and listens on WebSocket port `5000` by default. The host Orchestrator
-owns playback, resampling to the selected output device, interruption, and
-barge-in.
+`chromie-tts` is Chromie's framework-neutral speech-synthesis service. It runs
+inside Docker and listens on WebSocket port `5000` by default. The service uses
+the contract in `provider.py`; the maintained image currently registers the
+release-locked OuteTTS adapter in `oute_provider.py`. The host Orchestrator owns
+playback, resampling to the selected output device, interruption, and barge-in.
+
+An unknown `TTS_PROVIDER` value fails closed at startup. A future Qwen3-TTS,
+CosyVoice, or other adapter must implement the same lifecycle, capability,
+stream, cancellation, speaker, health, and metric contract. The provider
+boundary does not move audio-device or interruption policy out of the host.
 
 ## Concurrency model
 
-Each OuteTTS/llama.cpp interface owns mutable model and CUDA state in a dedicated
+The current OuteTTS/llama.cpp adapter owns mutable model and CUDA state in a dedicated
 child process. `TTS_WORKER_COUNT` controls how many independent model workers
 are started; the common/default configuration uses one worker, while the RTX
 5090 profile can use two. `TTS_MAX_CONCURRENT_SYNTHESIS` limits admitted
@@ -80,9 +86,11 @@ Request:
 
 Response sequence:
 
-1. JSON `start` metadata including the source sample rate;
+1. JSON `start` metadata including the source sample rate and provider
+   declaration;
 2. one or more binary raw PCM chunks;
-3. JSON `end` metadata, or JSON `error` on failure.
+3. JSON `end` metadata including the provider declaration and comparable timing,
+   or JSON `error` on failure.
 
 The Orchestrator may resample the service's source rate to the selected speaker
 output rate.
@@ -103,6 +111,7 @@ Common settings:
 ```env
 TTS_HOST=0.0.0.0
 TTS_PORT=5000
+TTS_PROVIDER=oute
 TTS_MODEL_SIZE=0.6B
 TTS_TOKENIZER_REPO=OuteAI/OuteTTS-1.0-0.6B
 TTS_TOKENIZER_REVISION=<immutable-hugging-face-commit>
@@ -172,6 +181,22 @@ current service still returns the first binary frame only after one complete
 TTS request has generated and decoded; host sentence/clause chunking is what
 allows later chunks to overlap earlier playback. The benchmark does not prove
 microphone, speaker, pronunciation, or voice-quality acceptance.
+
+For framework comparison, validate and run the shared Mandarin, English,
+mixed-language, interruption, long-dialogue, and concurrency matrix:
+
+```bash
+python scripts/tts_provider_ab.py --check
+python scripts/tts_provider_ab.py \
+  --provider oute=ws://127.0.0.1:5000 \
+  --provider candidate=ws://127.0.0.1:5001 \
+  --output-dir .chromie/evidence/tts-provider-ab/<run-id>
+```
+
+The runner retains WAVs and objective metrics, then creates a required listening
+review template. It does not select a winner from advertised or measured
+latency alone. See
+[`../docs/TTS_PROVIDER_EVALUATION.md`](../docs/TTS_PROVIDER_EVALUATION.md).
 
 ## Speaker setup and verification
 

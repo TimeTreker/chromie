@@ -4,7 +4,7 @@
 **Current release-prep base:** `0.0.1` scope with Soridormi MuJoCo `sim`
 execution; retained target evidence below records the exact revision that
 produced each bundle
-**Status refresh date:** 2026-07-21
+**Status refresh date:** 2026-07-22
 **Current focus:** **Promote the completed diagnostic Fast Planner multi-goal
 qualification to source-bound target evidence by adding endpoint-reported
 Soridormi revision identity, using a clean paired checkout, binding running
@@ -40,6 +40,20 @@ attachment to cognitive-integrity incidents are also implemented. Coverage
 remains `partial` because representative simulator/hardware traces and approved
 environment-specific latency thresholds are not retained; implementation alone
 does not establish an end-to-end target-latency claim.
+
+The TTS service now has a framework-neutral, stream-oriented `TTSProvider`
+contract with explicit lifecycle, immutable model provenance, separate software
+and model-artifact license declarations,
+language/rate capabilities, native-streaming truth, request cancellation,
+speaker operations, health, PCM events, and comparable completion metrics. The
+maintained OuteTTS/llama.cpp worker path is implemented through that adapter,
+and unknown provider selections fail closed. A committed A/B matrix and runner
+apply the same Mandarin, English, mixed-language, interruption/recovery,
+six-turn dialogue, and concurrent-request cases to two or more compatible
+endpoints and retain WAV/metric/listening-review artifacts. This is implemented
+and automatically verified at Level A. No Qwen3-TTS, CosyVoice, or other
+candidate adapter is shipped, no comparative target bundle is retained, and no
+production-provider change is target validated or release ready.
 
 The provider-readiness milestone is complete. A live local Soridormi MCP
 endpoint passed the `sim`, recommendation-only `hardware_shadow`, and no-motion
@@ -296,6 +310,7 @@ Target validation or Release readiness.
 |---|---|---|---|---|
 | Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
 | Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; SenseVoice ASR inference runs off the WebSocket event loop through a final-utterance service boundary; ASR decode and routed-turn execution have separate lifecycles so barge-in does not remain blocked behind Agent/TTS work; one newest VAD utterance is queued while ASR is busy instead of being dropped; `ASR_MODE=final` is the maintained protocol; ASR startup performs a synthetic warm-up decode before accepting WebSocket requests; TTS playback stays ordered while complete speech can be chunked across bounded restartable service workers; startup-primed English/Chinese acknowledgement PCM uses an adaptive hedge timer; TTS health and each successful response expose the resolved and observed DAC device plus model-generation, codec-decode, PCM, queue, IPC, total, and real-time-factor metrics; `scripts/benchmark_tts.py` provides repeatable no-playback measurements | Component concurrency/cancellation, busy-ASR latest-utterance queue, routed-turn replacement, cleanup, SenseVoice model resolution, normalization, ASR accuracy-evaluator tests, TTS worker-pool, TTS alignment, fast-first cache load/prime/hedge/cancellation, codec-device resolution, timing-hook, rolling-summary, benchmark, and worker-startup-metadata tests, plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Local sherpa-onnx CPU and warmed CUDA evidence passed health plus English/Chinese final transcripts; the retained clean SenseVoice English/Chinese smoke showed 0 WER/CER; no Stage 6 TTS benchmark JSON or listening-quality bundle is retained in the repository yet | Sherpa-onnx SenseVoice CUDA provider default with startup warm-up; CPU fallback configurable; cached fast-first audio enabled with a 750 ms hedge; legacy generative tool acknowledgements disabled; DAC device resolves from `TTS_AUDIO_CODEC_DEVICE=auto`; synchronized detailed timing and a 20-request health window are enabled; the RTX 4090 Laptop TTS profile uses 4096 context/max length; prompt/generated token counts are retained and max-length exhaustion is rejected so incomplete audio is not played; FP16 remains unchanged pending measured A/B evidence |
+| Framework-neutral TTS provider evaluation | Contract version 1, explicit registry, maintained Oute adapter, provider-aware WebSocket health/start/end metadata, shared six-kind A/B matrix, WAV capture, interruption recovery, long-dialogue, concurrency, and listening-review template implemented | Provider/adapter/registry/cancellation/matrix/benchmark unit coverage plus matrix validation | No retained two-provider target comparison, blinded listening review, or shared-GPU resource qualification | `TTS_PROVIDER=oute`; only `oute` is registered in the maintained image; no automatic winner selection |
 | Deterministic Router operational controls plus quick LLM route classifier | Implemented; interrupt/ignore controls remain deterministic while normal requests use catalog context, the fast Router model, structural route/intent validation, independent semantic repair, safe clarification, or deep model handoff; catalog search does not choose ordinary intent by itself; quick routing can emit ordered unlocked common-catalog compound `RouteDecision.actions` including `chromie.speak` speech tasks with per-action confidence, low-confidence `quick_router_review_request`, and deepthinking accept/revise/supersede review metadata | Router rule, capability-routing, LLM-prompt, route-contract repair, low-confidence clarification, scripted raw-model replay, repeated weather-to-walk multi-turn Router-to-Interaction scenarios, deepthinking, interaction, and regression-scenario tests | The final July 21 diagnostic 10/10 live-text simulator run exercised typo recovery, exact capability routing, safe clarification, compound routing, and all four daily-life requests without hidden Router truncation. It is not microphone or source-bound Target evidence | Enabled by `.env.common` |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Historical compatibility evidence only; it is not the maintained semantic-authority path | Service remains available, but common cognitive `apply` does not use it as semantic authority |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle on the historical path; it is not evidence for the current cognitive authority path | Enabled in the common safe base |
@@ -588,6 +603,12 @@ These legacy evidence tracks do not define the current delivery:
   evidence, and safety envelopes for the selected target body.
 - Jetson profiles select model/runtime values, but this repository does not yet
   include verified Jetson-specific Dockerfiles or Compose overrides.
+- The maintained TTS image registers only the release-locked Oute adapter. The
+  common provider contract and A/B harness do not constitute a working
+  Qwen3-TTS or CosyVoice integration, comparative target evidence, or approval
+  to change the default. Contract version 1 records native text-streaming
+  capability, but its current WebSocket request carries complete text; the
+  declaration is not end-to-end token-to-audio streaming evidence.
 - The host hardware daemon currently constructs `MockRobotDriver` regardless of
   serial-related modules or environment variables. It is not a production
   hardware backend.

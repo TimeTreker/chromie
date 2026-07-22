@@ -1637,6 +1637,19 @@ class VoiceAssistant:
                                 self.maybe_session_done(session_id)
                                 return
                             if msg_type == "end":
+                                provider_metadata = data.get("provider")
+                                if not isinstance(provider_metadata, dict):
+                                    provider_metadata = {}
+                                model_artifacts = provider_metadata.get("model_artifacts")
+                                if not isinstance(model_artifacts, list):
+                                    model_artifacts = []
+                                provider_revision_summary = ",".join(
+                                    f"{artifact.get('kind')}={artifact.get('revision')}"
+                                    for artifact in model_artifacts
+                                    if isinstance(artifact, dict)
+                                    and artifact.get("kind")
+                                    and artifact.get("revision")
+                                )
                                 self.sessions.trace_mark(
                                     session_id,
                                     "tts_stream_finished",
@@ -1647,13 +1660,19 @@ class VoiceAssistant:
                                         "source_rate": source_rate,
                                         "queue_wait_seconds": float(data.get("queue_wait_seconds") or 0.0),
                                         "generate_seconds": float(data.get("generate_seconds") or 0.0),
+                                        "provider_id": provider_metadata.get("provider_id"),
+                                        "provider_implementation": provider_metadata.get("implementation"),
+                                        "provider_model_revisions": provider_revision_summary,
                                     },
                                 )
                                 self.session_log(session_id, "tts_stream_end: order=%s attempt=%s/%s tts_ms=%.1f bytes=%s source_rate=%s generation=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, len(audio_buffer), source_rate, generation)
                                 self.session_log(
                                     session_id,
-                                    "tts_server_metrics: order=%s audio_s=%.3f generate_s=%.3f model_s=%.3f codec_s=%.3f pcm_s=%.3f queue_s=%.3f rtf=%s codec_device=%s quantization=%s context=%s prompt_tokens=%s generated_tokens=%s headroom=%s limit_reached=%s",
+                                    "tts_server_metrics: order=%s provider=%s implementation=%s model_revisions=%s audio_s=%.3f generate_s=%.3f model_s=%.3f codec_s=%.3f pcm_s=%.3f queue_s=%.3f rtf=%s codec_device=%s quantization=%s context=%s prompt_tokens=%s generated_tokens=%s headroom=%s limit_reached=%s",
                                     order,
+                                    provider_metadata.get("provider_id"),
+                                    provider_metadata.get("implementation"),
+                                    provider_revision_summary,
                                     float(data.get("audio_seconds") or 0.0),
                                     float(data.get("generate_seconds") or 0.0),
                                     float(data.get("model_generate_seconds") or 0.0),

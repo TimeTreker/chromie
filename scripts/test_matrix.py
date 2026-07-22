@@ -45,8 +45,16 @@ GROUPS: dict[str, TestGroup] = {
         ),
     ),
     "tts": TestGroup(
-        "TTS model-source and cancellable worker behavior.",
-        (_unittest("tests.test_tts_model_sources", "tests.test_tts_cancellable_worker"),),
+        "TTS provider contract, comparison matrix, model source, and cancellation behavior.",
+        (
+            _unittest(
+                "tests.test_tts_provider_contract",
+                "tests.test_tts_provider_ab",
+                "tests.test_tts_model_sources",
+                "tests.test_tts_cancellable_worker",
+            ),
+            (sys.executable, "scripts/tts_provider_ab.py", "--check"),
+        ),
     ),
     "router": TestGroup(
         "Deterministic hard filter, capability routing, model routing, and regressions.",
