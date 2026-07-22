@@ -217,11 +217,14 @@ services:
     ports:
       - "5001:5000"
     environment:
+      CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
+      CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
       TTS_REFERENCE_WAV: /evaluation/reference.wav
       TTS_REFERENCE_METADATA: /evaluation/reference.json
       TTS_WORKER_STARTUP_TIMEOUT_SEC: ${TTS_CANDIDATE_STARTUP_TIMEOUT_SEC:-1200}
+      TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC: ${TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC:-3}
       COSYVOICE3_SOURCE_REVISION: ${COSYVOICE3_SOURCE_REVISION:-074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc}
       COSYVOICE3_MODEL_ID: ${COSYVOICE3_MODEL_ID:-FunAudioLLM/Fun-CosyVoice3-0.5B-2512}
       COSYVOICE3_MODEL_REVISION: ${COSYVOICE3_MODEL_REVISION:-29e01c4e8d000f4bcd70751be16fa94bf3d85a18}
@@ -237,6 +240,7 @@ services:
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
     volumes:
       - ./hf_cache:/root/.cache/huggingface
+      - ./hf_cache/modelscope:/root/.cache/modelscope
       - ${TTS_AB_REFERENCE_DIR:-./.chromie/evidence/tts-provider-ab/reference}:/evaluation:ro
     networks:
       - chromie-net
@@ -277,11 +281,14 @@ services:
     ports:
       - "5002:5000"
     environment:
+      CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
+      CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
       TTS_REFERENCE_WAV: /evaluation/reference.wav
       TTS_REFERENCE_METADATA: /evaluation/reference.json
       TTS_WORKER_STARTUP_TIMEOUT_SEC: ${TTS_CANDIDATE_STARTUP_TIMEOUT_SEC:-1200}
+      TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC: ${TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC:-3}
       QWEN3_TTS_SOURCE_REVISION: ${QWEN3_TTS_SOURCE_REVISION:-022e286b98fbec7e1e916cb940cdf532cd9f488e}
       QWEN3_TTS_MODEL_ID: ${QWEN3_TTS_MODEL_ID:-Qwen/Qwen3-TTS-12Hz-0.6B-Base}
       QWEN3_TTS_MODEL_REVISION: ${QWEN3_TTS_MODEL_REVISION:-5d83992436eae1d760afd27aff78a71d676296fc}

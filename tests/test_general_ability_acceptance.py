@@ -125,8 +125,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         summary = run_level_a(args)
 
         self.assertTrue(summary["ok"], summary["errors"])
-        self.assertEqual(summary["case_count"], 8)
-        self.assertEqual(summary["passed"], 8)
+        self.assertEqual(summary["case_count"], 9)
+        self.assertEqual(summary["passed"], 9)
 
     def test_live_case_namespace_can_select_goal_driven_runtime(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)

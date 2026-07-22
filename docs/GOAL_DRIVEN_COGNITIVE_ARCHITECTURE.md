@@ -456,6 +456,16 @@ Goal continuity is cognitive. Task lifecycle is operational.
 
 The two must be linked but not conflated.
 
+The link is explicit and scoped. A model-facing semantic `goal_id` is not the
+same identifier as the host `task_id`; the host resolves the semantic goal to
+its owning task context and binds each canonical speech or skill request by
+`source_goal_ids`. Provider completion, refusal, failure, timeout, or
+cancellation updates every bound goal independently. A conversational
+`respond` goal likewise remains active until its scoped speech request has
+runtime delivery evidence; producing Response Composer text is not completion.
+This prevents a completed compound action from remaining in the active-goal
+projection and being accidentally associated with a later turn.
+
 ### 6.6 Active goals protect conversational continuity
 
 A goal remains conversationally active while it is planning, waiting for user
@@ -837,6 +847,22 @@ the staged goal mutations from that turn become durable. Execution request IDs
 and terminal provider evidence are then recorded against every source goal they
 serve; optional social-attention requests never enter the primary user-goal
 lifecycle.
+
+Effect authority is also monotonic within one turn. The configured cognitive
+lane allowlist says which kinds of plans the deployment can support, but the
+current Router decision supplies the turn's maximum effect envelope. A
+speech-only `chat` turn cannot become `robot_action` after Goal Association or
+planning merely because both lanes are enabled. Such escalation stops at the
+authority boundary before Response Composition, capability validation, or any
+SkillRequest is emitted.
+
+For an accepted effectful plan, executable wording from the Response Composer
+is not treated as execution evidence. The trusted adapter derives a short
+prospective cue from the canonical plan and actual confirmation state, excludes
+pre-execution progress/final claims, and requires playback to start before a
+dependent physical request may begin. If that delivery barrier fails or times
+out, all queued chunks from the cue are invalidated so delayed synthesis cannot
+announce an action after the runtime has stopped it.
 
 ## 12. Social interaction layer
 

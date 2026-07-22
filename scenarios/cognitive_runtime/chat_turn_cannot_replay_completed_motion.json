@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "id": "chat_turn_cannot_replay_completed_motion",
+  "suite": "cognitive_runtime",
+  "level": "integration",
+  "description": "A social chat turn cannot acquire physical authority from motion goals that were erroneously retained as active after an earlier completed turn.",
+  "tags": [
+    "goal-lifecycle",
+    "lane-authority",
+    "regression",
+    "voice-log-20260722"
+  ],
+  "input": {
+    "text": "想啥呢？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "mode": "apply",
+    "apply_lanes": [
+      "chat",
+      "robot_action"
+    ],
+    "route_decision": {
+      "route": "chat",
+      "intent": "social_exchange",
+      "language": "zh-CN"
+    },
+    "context": {
+      "active_goal_snapshots": [
+        {
+          "goal_id": "goal-old-walk",
+          "status": "planning",
+          "goal": "Walk forward for fifteen seconds."
+        },
+        {
+          "goal_id": "goal-old-blink",
+          "status": "planning",
+          "goal": "Blink twice."
+        }
+      ],
+      "history": []
+    },
+    "goal_association": {
+      "turn_id": "turn-social-after-motion",
+      "associations": [
+        {
+          "association_id": "assoc-old-walk",
+          "relationship": "continue",
+          "target_goal_ids": [
+            "goal-old-walk"
+          ],
+          "confidence": 0.91
+        },
+        {
+          "association_id": "assoc-old-blink",
+          "relationship": "continue",
+          "target_goal_ids": [
+            "goal-old-blink"
+          ],
+          "confidence": 0.91
+        }
+      ],
+      "confidence": 0.91,
+      "metadata": {
+        "status": "resolved"
+      }
+    },
+    "fast_plan": {
+      "plan_id": "plan-invalid-replay",
+      "planner_tier": "fast",
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 0.91,
+      "goal_ids": [
+        "goal-old-walk",
+        "goal-old-blink"
+      ],
+      "steps": [
+        {
+          "step_id": "replay-walk",
+          "skill_id": "soridormi.walk_forward",
+          "args": {
+            "duration_s": 15.0,
+            "speed": "normal"
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-old-walk"
+          ]
+        },
+        {
+          "step_id": "replay-blink",
+          "skill_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 2
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-old-blink"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-old-walk",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "replay-walk"
+          ]
+        },
+        {
+          "goal_id": "goal-old-blink",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "replay-blink"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
+          "goal-old-walk",
+          "goal-old-blink"
+        ]
+      }
+    }
+  },
+  "expect": {
+    "status": "error",
+    "lane": "robot_action",
+    "planner_tier": "fast",
+    "disposition": "execute",
+    "coverage": "complete",
+    "skill_ids": [],
+    "requires_confirmation": false,
+    "calls": [
+      "goal_association",
+      "fast_plan"
+    ]
+  }
+}

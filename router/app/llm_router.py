@@ -36,7 +36,8 @@ ROUTE_NAMES = {
     "ignore",
 }
 
-DETERMINISTIC_ONLY_ROUTES = {"interrupt", "ignore"}
+DETERMINISTIC_ONLY_ROUTES = {"interrupt"}
+MODEL_IGNORE_INTENTS = {"not_addressed", "ambient_speech"}
 ROUTE_ITEM_PRIMARY_RANK = {
     "interrupt": 0,
     "robot_action": 1,
@@ -48,6 +49,7 @@ ROUTE_ITEM_PRIMARY_RANK = {
     "ignore": 7,
 }
 REVIEW_STAGES = {
+    "addressedness_review",
     "intent_review",
     "post_interrupt_review",
     "semantic_route_repair",
@@ -75,6 +77,42 @@ PLACEHOLDER_CAPABILITY_INTENTS = {
     "capability:<exact capability_id>",
     "capability:<exact skill_id>",
 }
+
+
+def interaction_engagement(request: RouteRequest) -> dict[str, Any]:
+    raw = request.context.get("interaction_engagement")
+    return raw if isinstance(raw, dict) else {}
+
+
+def is_allowed_model_ignore(
+    request: RouteRequest,
+    decision: RouteDecision,
+    *,
+    min_confidence: float = 0.72,
+) -> bool:
+    """Accept semantic ambient-speech rejection only outside engagement."""
+
+    engagement = interaction_engagement(request)
+    metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    return bool(
+        decision.route == "ignore"
+        and str(decision.intent or "").strip().casefold() in MODEL_IGNORE_INTENTS
+        and metadata.get("semantic_addressedness_gate") is True
+        and engagement.get("gate_enabled") is True
+        and engagement.get("active") is False
+        and float(decision.confidence) >= min_confidence
+    )
+
+
+def is_disallowed_model_control_route(
+    request: RouteRequest,
+    decision: RouteDecision,
+) -> bool:
+    return bool(
+        decision.route == "interrupt"
+        or decision.route == "ignore"
+        and not is_allowed_model_ignore(request, decision)
+    )
 
 WEATHER_LOOKUP_CAPABILITY_ID = "chromie.weather.lookup"
 _ZH_WEATHER_TERMS = (
@@ -1141,7 +1179,7 @@ class OllamaLLMRouter:
             f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n"
             f"Active Task Snapshot JSON:{active_tasks_json}\n\n"
             "Current Job:\n"
-            "quick intent router and fast lane splitter. Decide from meaning, bounded context, active semantic goals, and common abilities. Return calibrated confidence; do not answer, execute, commit task changes, or authorize side effects.\n\n"
+            "quick intent router and fast lane splitter. The deterministic emergency/noise filter already ran. Decide from meaning, bounded context, active semantic goals, and common abilities. Return calibrated confidence; do not answer, execute, commit task changes, or authorize side effects.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
@@ -1149,9 +1187,9 @@ class OllamaLLMRouter:
             "Task Continuity:\n"
             "Use active task IDs and open goals semantically. A turn may create, modify, answer, correct, confirm, reject, cancel, pause, resume, replace, or query a task. Decide by meaning, never keywords, regexes, overlap, or recency alone. One independent responsibility is one route item; plan steps are downstream. Clarify ambiguous targets instead of guessing a task ID.\n"
             "Affordance Grounding:\n"
-            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Bind an exact skill only for an explicit execution method with one clear match. One parameterized skill may leave args to CapabilityAgent; compound explicit skills use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. Weather -> route=tool intent=weather_query metadata.tool_name=weather. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
+            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Bind an exact skill only for an explicit execution method with one clear match. One parameterized skill may leave args to CapabilityAgent; compound explicit skills use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. Weather -> route=tool intent=weather_query metadata.tool_name=weather. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
             "Cost Function:\n"
-            "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Do not return interrupt or ignore; the deterministic emergency/noise filter already ran.\n\n"
+            "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"
             "Return one compact JSON object. Required keys: route, intent, confidence. routes[] split independent responsibilities; actions[] carry exact capability_id, args, sequence, timing, confidence (\"confidence\":0.0 marker) only for explicit skills. metadata.semantic_task_operations may contain advisory operations with operation_id, operation, target_task_ids, goal/goal_update, information_gaps, resolved_gap_ids, requires_replan, response_plan, confidence, and reason_summary. create requires goal.description and source_text; later operations use exact supplied task IDs. fast_speech/speak_first and metadata.response_plan.immediate are process acknowledgement only, with human-like social warmth, not a program, programme, backend, software process, or language model; they must not claim completion. Omit agents, metadata, candidate_capabilities, explanations unless needed. No chain-of-thought, analysis, progress text, scratchpad, markdown, or text outside JSON."
         )
@@ -1227,6 +1265,22 @@ class OllamaLLMRouter:
             source.update({"type": "string", "const": "llm"})
         return schema
 
+    @staticmethod
+    def _addressedness_response_schema() -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "addressed": {"type": "boolean"},
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                },
+            },
+            "required": ["addressed", "confidence"],
+            "additionalProperties": False,
+        }
+
     def build_payload(self, request: RouteRequest, *, relaxed_json: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.model,
@@ -1283,7 +1337,9 @@ class OllamaLLMRouter:
                         "- Review the latest user input and decide whether the quick route should be chat, deep_thought, robot_action, tool, memory, clarify, interrupt, or ignore.\n"
                         "- Body/head/gaze/motion/expression requests are robot_action when an available interaction_executable common ability can satisfy them.\n"
                         "- Capability questions can be polite requests; if the user is pragmatically asking Chromie to perform a listed physical action now, choose robot_action.\n"
+                        "- capability_inquiry applies only when the user is asking about Chromie's abilities, not when discussing capabilities of another person, model, vehicle, sensor, or system.\n"
                         "- Identity, status, factual, greeting, joke, story, song, and other speech-only requests are chat unless physical motion or tool lookup is explicitly requested.\n"
+                        "- Never choose ignore. A separate focused addressedness stage owns bounded ambient suppression.\n"
                         "- Current or upcoming weather and forecast questions are tool work when a weather lookup capability is present. Use route=tool with intent=weather_query, not ordinary chat, and do not answer weather from memory.\n"
                         "- For weather route metadata, include metadata.tool_name=weather and metadata.weather_query with location/date/units when clear from the user text.\n\n"
                         "- Use working memory, task context, and recent action history for follow-up resolution, but not as authorization for side effects.\n"
@@ -1294,7 +1350,7 @@ class OllamaLLMRouter:
                         "- fast_speech, when present, must be a short process acknowledgement only. It must not claim completion, physical execution, memory commit, or a tool result.\n"
                         "- For weather, fast_speech may say that Chromie will check the requested location/date, for example that it will check today's weather for the city.\n"
                         "- Do not output chain-of-thought, hidden reasoning, analysis, progress text, scratchpad text, markdown, or any text outside the JSON object.\n"
-                        "- Do not choose interrupt or ignore unless the text is plainly stop, cancel, silence, empty, or unusable audio.\n"
+                        "- Never choose interrupt or ignore.\n"
                         "- If selecting a known common ability, set intent to capability:<exact capability_id>; otherwise use a short semantic intent such as robot_action or weather_query."
                     ),
                 },
@@ -1312,6 +1368,63 @@ class OllamaLLMRouter:
                 "top_p": 0.9,
                 "num_ctx": self.num_ctx,
                 "num_predict": self.num_predict,
+            },
+        }
+
+    def build_addressedness_review_payload(
+        self,
+        request: RouteRequest,
+    ) -> dict[str, Any]:
+        """Build a small binary semantic gate on the warm fast model."""
+
+        engagement_json = _bounded_json(interaction_engagement(request), max_chars=500)
+        return {
+            "model": self.model,
+            "stream": False,
+            "think": False,
+            "format": self._addressedness_response_schema(),
+            **({"keep_alive": self.keep_alive} if self.keep_alive else {}),
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You classify whether the latest transcript is directed to a nearby "
+                        "robot named Chromie. Host evidence says there is no active "
+                        "conversation. Decide from the utterance's speech act, addressee, "
+                        "and subject, never from keywords. Questions, requests, imperatives, "
+                        "greetings, and Chromie's name are addressed even when the robot's "
+                        "name or the pronoun 'you' is omitted. Third-person reports, "
+                        "dictation, meeting talk, or narration without a second-person "
+                        "addressee are ambient. Delivery to this classifier is not evidence "
+                        "of addressedness. If genuinely unclear, use addressed=true.\n"
+                        "Semantic contrasts:\n"
+                        "User asks 'How are you?' -> addressed=true.\n"
+                        "User says '请帮我打开灯。' -> addressed=true.\n"
+                        "User greets '你好。' -> addressed=true.\n"
+                        "Nearby speaker reports '他们明天讨论传感器数据。' -> addressed=false.\n"
+                        "Nearby speaker narrates 'She said the model runs locally.' -> "
+                        "addressed=false.\n"
+                        "Return only addressed and calibrated confidence as JSON."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Host engagement JSON: {engagement_json}\n"
+                        f"Language hint: {request.language or 'auto'}\n"
+                        f"Latest transcript: {request.text}"
+                    ),
+                },
+            ],
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                # Keep the same runner context as quick_intent. Ollama keys a
+                # loaded runner by context size; changing it here reloads the
+                # model and turns a subsecond binary review into multi-second
+                # latency on every inactive turn.
+                "num_ctx": self.num_ctx,
+                "num_predict": 32,
             },
         }
 
@@ -1419,7 +1532,8 @@ class OllamaLLMRouter:
                         "- memory is a requested memory operation.\n"
                         "- deep_thought is clear complex reasoning, situational planning, or multi-step task work.\n"
                         "- clarify is required when the current input remains referential, fragmentary, or semantically underdetermined after using supplied context.\n"
-                        "- Never return interrupt or ignore; deterministic controls already ran.\n\n"
+                        "- capability_inquiry is only an inquiry about Chromie's bounded abilities, not technical discussion about some other person, model, vehicle, sensor, or system.\n"
+                        "- Never return interrupt or ignore; focused addressedness is a separate stage.\n\n"
                         "Output Contract:\n"
                         "- Return compact RouteDecision JSON only with route, intent, and confidence.\n"
                         "- Optional actions must use exact supplied capability IDs.\n"
@@ -1905,7 +2019,7 @@ class OllamaLLMRouter:
                 conflict,
             )
             return decision
-        if reviewed_decision.route in DETERMINISTIC_ONLY_ROUTES:
+        if is_disallowed_model_control_route(request, reviewed_decision):
             return decision
         if reviewed_decision.route != "clarify" and (
             reviewed_decision.confidence < self.confidence_threshold
@@ -2270,7 +2384,7 @@ class OllamaLLMRouter:
                 decision,
                 reason=f"{reason}; repaired decision still violates {conflict}",
             )
-        if repaired_decision.route in DETERMINISTIC_ONLY_ROUTES:
+        if is_disallowed_model_control_route(request, repaired_decision):
             return self._safe_semantic_clarification(
                 request,
                 decision,
@@ -2371,7 +2485,10 @@ class OllamaLLMRouter:
                 if (
                     conflict is None
                     and review_resolved
-                    and reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES
+                    and not is_disallowed_model_control_route(
+                        request,
+                        reviewed_decision,
+                    )
                     and (
                         reviewed_decision.route == "clarify"
                         or reviewed_decision.confidence >= self.confidence_threshold
@@ -2422,7 +2539,10 @@ class OllamaLLMRouter:
             except Exception as exc:
                 logger.warning("LLM review model deterministic-only recovery failed: %s", exc)
             else:
-                if reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES:
+                if not is_disallowed_model_control_route(
+                    request,
+                    reviewed_decision,
+                ):
                     if reviewed_decision.confidence >= self.confidence_threshold:
                         reviewed_decision.reason = (
                             f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
@@ -2444,7 +2564,7 @@ class OllamaLLMRouter:
         except Exception as exc:
             logger.warning("LLM fast route repair failed: %s", exc)
         else:
-            if repaired_decision.route not in DETERMINISTIC_ONLY_ROUTES:
+            if not is_disallowed_model_control_route(request, repaired_decision):
                 repaired_decision.reason = (
                     f"{repaired_decision.reason}; " if repaired_decision.reason else ""
                 ) + f"{reason_prefix}; fast_model:{self.model} repaired quick-router mistake"
@@ -2482,7 +2602,7 @@ class OllamaLLMRouter:
             logger.warning("LLM placeholder capability repair failed: %s", exc)
         else:
             if (
-                repaired_decision.route not in DETERMINISTIC_ONLY_ROUTES
+                not is_disallowed_model_control_route(request, repaired_decision)
                 and not _is_placeholder_capability_intent(repaired_decision.intent)
             ):
                 repaired_decision.reason = (
@@ -2518,6 +2638,71 @@ class OllamaLLMRouter:
             f"{decision.reason}; " if decision.reason else ""
         ) + "post-interrupt review corrected deterministic interrupt"
         return decision
+
+    async def _review_inactive_addressedness(
+        self,
+        request: RouteRequest,
+        decision: RouteDecision,
+    ) -> RouteDecision:
+        """Review every inactive first turn before committing it to speech.
+
+        The observed collapse changed labels across runs (capability inquiry,
+        self-description, and generic chat). Addressedness therefore cannot be
+        gated on a particular proposed intent. The reviewer may suppress a turn
+        only with the narrow ambient-speech contract; otherwise the quick
+        decision is preserved and normal route validation continues.
+        """
+
+        engagement = interaction_engagement(request)
+        if (
+            engagement.get("gate_enabled") is not True
+            or engagement.get("active") is not False
+            or decision.route == "interrupt"
+        ):
+            return decision
+        try:
+            reviewed = await self._chat_logged(
+                self.build_addressedness_review_payload(request),
+                stage="addressedness_review",
+                request=request,
+            )
+            message = reviewed.get("message")
+            content = message.get("content") if isinstance(message, dict) else None
+            reviewed_payload = _extract_json_object(str(content or ""))
+            addressed = reviewed_payload.get("addressed")
+            confidence = float(reviewed_payload.get("confidence"))
+            if not isinstance(addressed, bool) or not 0.0 <= confidence <= 1.0:
+                raise ValueError("invalid addressedness response")
+        except Exception as exc:
+            logger.warning(
+                "inactive addressedness review failed sid=%s error_type=%s error=%s",
+                request.sid,
+                type(exc).__name__,
+                exc,
+            )
+            return decision
+        if addressed or confidence < 0.72:
+            return decision
+        return finalize_decision(
+            RouteDecision(
+                route="ignore",
+                intent="ambient_speech",
+                confidence=confidence,
+                language=request.language or decision.language or "auto",
+                priority=decision.priority,
+                needs_agent=False,
+                should_speak=False,
+                reason="reviewed inactive turn as unaddressed ambient speech",
+                source="llm",
+                metadata={
+                    "semantic_addressedness_gate": True,
+                    "addressedness_confidence": confidence,
+                    "host_engagement_evidence": engagement.get("evidence"),
+                },
+            ),
+            request,
+            source="llm",
+        )
 
     def _low_confidence_deep_thought_decision(
         self,
@@ -2597,7 +2782,10 @@ class OllamaLLMRouter:
                 except Exception as review_exc:
                     logger.warning("LLM review model primary-error recovery failed: %s", review_exc)
                 else:
-                    if reviewed_decision.route not in DETERMINISTIC_ONLY_ROUTES:
+                    if not is_disallowed_model_control_route(
+                        request,
+                        reviewed_decision,
+                    ):
                         reviewed_decision.reason = (
                             f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
                         ) + f"primary router error {type(exc).__name__}; review_model:{self.review_model} recovered route"
@@ -2659,8 +2847,18 @@ class OllamaLLMRouter:
             reason="post_review_robot_action_weather_like",
         )
         decision = await self._repair_route_intent_contract(request, decision)
+        decision = await self._review_inactive_addressedness(request, decision)
         decision = await self._review_generic_chat_affordance(request, decision)
         decision = self._reject_ambiguous_weather_tool_route(request, decision)
+
+        if decision.route == "ignore":
+            if is_allowed_model_ignore(request, decision):
+                return decision
+            recovered = await self._recover_deterministic_only_decision(
+                request,
+                decision,
+            )
+            return await self._repair_missing_fast_speech(request, recovered)
 
         if decision.route in DETERMINISTIC_ONLY_ROUTES:
             recovered = await self._recover_deterministic_only_decision(request, decision)

@@ -288,6 +288,56 @@ class TTSProviderContractTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(worker.requests[0]["transcript"], "你好，我是 Chromie。")
 
+    async def test_oute_speaker_creation_reloads_every_worker(self) -> None:
+        class ReloadWorker(FakeWorker):
+            async def request(self, payload: dict[str, object]) -> dict[str, object]:
+                self.requests.append(payload)
+                return {
+                    "type": "speaker_reloaded",
+                    "speaker_ids": list(payload["speaker_ids"]),
+                }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            wav_path = root / "chromie_mixed.wav"
+            wav_path.write_bytes(b"RIFF" + b"\x00" * 128)
+            creator = FakeWorker(
+                response={
+                    "type": "speaker_created",
+                    "speaker_id": "chromie_mixed",
+                    "speaker_json": str(root / "chromie_mixed.json"),
+                }
+            )
+            follower = ReloadWorker()
+
+            async def select_worker() -> tuple[int, FakeWorker]:
+                return 0, creator
+
+            provider = OuteTTSProvider(
+                config=oute_provider(creator, root)._config,
+                workers=[creator, follower],
+                select_worker=select_worker,
+                worker_status=lambda: [],
+                list_speaker_ids=lambda: ["default", "chromie_mixed"],
+                validate_speaker_path=lambda path: path,
+            )
+            await provider.create_speaker(
+                speaker_id="chromie_mixed",
+                wav_path=str(wav_path),
+                make_default=True,
+                transcript="你好，Hello。",
+            )
+
+        self.assertEqual(
+            follower.requests,
+            [
+                {
+                    "type": "reload_speaker",
+                    "speaker_ids": ["chromie_mixed", "default"],
+                }
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -180,6 +180,87 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(spoken, ["Hello."])
         self.assertEqual(execution.results[0].skill_id, "chromie.speak")
 
+    async def test_failed_playback_start_barrier_prevents_following_body_effect(self) -> None:
+        registry = SkillRegistry()
+        registry.register(local_speech_definition())
+        registry.register(_body_definition())
+        body = MockSkillProvider("mock.body")
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(
+            LocalSpeechSkillProvider(
+                lambda _args: {
+                    "scheduled": True,
+                    "playback_started": False,
+                }
+            )
+        )
+        runtime.register_provider(body)
+
+        execution = await runtime.execute(
+            InteractionResponse(
+                speech=[
+                    {
+                        "text": "I heard you.",
+                        "timing": "immediate",
+                        "metadata": {"wait_for_playback_start": True},
+                    }
+                ],
+                skills=[
+                    {
+                        "request_id": "nod-after-cue",
+                        "skill_id": "soridormi.nod_yes",
+                        "timing": "sequential",
+                    }
+                ],
+            )
+        )
+
+        self.assertEqual(execution.status, "failed")
+        self.assertEqual(execution.results[0].reason_code, "playback_not_started")
+        self.assertEqual(body.calls, [])
+
+    async def test_started_playback_barrier_releases_following_body_effect(self) -> None:
+        events: list[str] = []
+
+        async def speak(_args: dict[str, object]) -> dict[str, object]:
+            events.append("playback_start")
+            return {"scheduled": True, "playback_started": True}
+
+        class OrderedBodyProvider(MockSkillProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                events.append("body_start")
+                return await super().execute(request, definition, context)
+
+        registry = SkillRegistry()
+        registry.register(local_speech_definition())
+        registry.register(_body_definition())
+        body = OrderedBodyProvider("mock.body")
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(LocalSpeechSkillProvider(speak))
+        runtime.register_provider(body)
+
+        execution = await runtime.execute(
+            InteractionResponse(
+                speech=[
+                    {
+                        "text": "I heard you.",
+                        "timing": "immediate",
+                        "metadata": {"wait_for_playback_start": True},
+                    }
+                ],
+                skills=[
+                    {
+                        "request_id": "nod-after-cue",
+                        "skill_id": "soridormi.nod_yes",
+                        "timing": "parallel",
+                    }
+                ],
+            )
+        )
+
+        self.assertEqual(execution.status, "completed")
+        self.assertEqual(events, ["playback_start", "body_start"])
+
     async def test_action_only_request_reaches_mock_provider(self) -> None:
         registry = SkillRegistry()
         registry.register(_body_definition())

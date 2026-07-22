@@ -206,8 +206,8 @@ immediate -> pre_action -> progress -> final
 
 This proposal builds on current implemented foundations:
 
-- deterministic stop, cancel, emergency, ignore, silence, and unusable-audio
-  handling;
+- deterministic stop, cancel, emergency, silence, and unusable-audio handling,
+  with semantic ambient addressedness isolated from task planning;
 - quick LLM routing with multi-route output;
 - `RouteDecision.routes[]`, task proposals, desired abilities, and route-stage
   metadata;

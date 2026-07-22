@@ -129,7 +129,7 @@ TTS_QUANTIZATION=FP16
 TTS_SAMPLE_RATE=44100
 TTS_CHUNK_MS=120
 TTS_N_GPU_LAYERS=-1
-# Generic profile values; RTX 4090/4090 Laptop/5090 profiles override to 4096/4096.
+# Generic values; RTX 4090/4090 Laptop use 4096 and RTX 5090 uses 8192.
 TTS_CONTEXT_SIZE=2048
 TTS_MAX_LENGTH=2048
 TTS_MAX_TEXT_CHARS=220
@@ -147,6 +147,14 @@ TTS_SPEAKER_ID=default
 TTS_SPEAKER_ALIGNMENT_DEVICE=cpu
 TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY=0.75
 ```
+
+Speaker creation validates both transcript alignment and acoustic conditioning.
+OuteTTS v3 profiles must contain matched DAC codebooks with enough code duration
+to cover the reference recording. Malformed profiles are never selected; when
+the matching WAV and exact transcript sidecar remain available, the service
+rebuilds them through the validated path. OuteTTS 0.4.4 mutates speaker prompt
+data internally, so Chromie supplies an isolated copy per request and reloads a
+newly accepted profile in every worker.
 
 The service downloads those exact snapshots and replaces OuteTTS auto-config
 paths with local immutable tokenizer and GGUF paths. The maintained lock is
@@ -230,6 +238,13 @@ Repository helpers:
 ./scripts/record_voice.sh
 ./scripts/create_speaker_in_container.sh
 ./scripts/verify_tts_gpu.sh
+```
+
+After the multilingual, interruption, long-dialogue, and concurrency gate
+passes, select the installation-local profile in `.env.local`, for example:
+
+```env
+TTS_SPEAKER_ID=chromie_mixed
 ```
 
 Start the service set with:

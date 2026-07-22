@@ -56,6 +56,40 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
         self.assertFalse(any(item.route == "robot_action" for item in guarded.routes))
         self.assertNotIn("soridormi.express_attention", str(guarded.metadata))
 
+    def test_completed_retained_task_does_not_authorize_tiny_fragment_motion(self) -> None:
+        request = RouteRequest(
+            text="I.",
+            language="en-US",
+            context={
+                "pending_tasks": [
+                    {
+                        "task_id": "task-old",
+                        "status": "done",
+                        "goal": "blink once",
+                    }
+                ]
+            },
+        )
+        bad_llm_decision = finalize_decision(
+            RouterRouteDecision(
+                route="robot_action",
+                agents=["capability_agent", "safety_agent"],
+                intent="soridormi.blink_eyes",
+                confidence=0.93,
+                source="llm",
+            ),
+            request,
+            source="llm",
+        )
+
+        guarded = _guard_low_information_side_effect(request, bad_llm_decision)
+
+        self.assertIsNotNone(guarded)
+        assert guarded is not None
+        self.assertEqual(guarded.route, "clarify")
+        self.assertEqual(guarded.intent, "clarify_insufficient_information")
+        self.assertFalse(any(item.route == "robot_action" for item in guarded.routes))
+
     def test_duplicate_audit_route_items_do_not_make_exact_walk_compound(self) -> None:
         policy = DeepThinkingDelegationPolicy(DeepThinkingPolicyConfig())
         duplicated_route_item = {

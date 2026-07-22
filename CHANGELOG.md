@@ -35,14 +35,75 @@ All notable user-visible changes should be recorded here.
   latency versus Qwen3-TTS cancellation-recovery tradeoff; candidate-output
   listening and provider-selection gates remain open.
 - Tested the owner-approved voice style as a possible Oute default, then kept
-  the built-in speaker after rebuilt-container checks reproduced stochastic
-  token exhaustion with both mixed and Chinese-aligned profiles. An RTX 5090
-  8192-token diagnostic also exhausted its budget, ruling out the existing
-  4096 setting as the root cause. Local profiles remain available for further
-  work; candidate-provider listening and selection gates remain separate.
+  the built-in speaker after rebuilt-container checks reproduced token
+  exhaustion with both mixed and Chinese-aligned profiles. A later root-cause
+  audit found those profiles contained only one DAC code pair because the
+  soundfile fallback returned a two-dimensional tensor where OuteTTS requires
+  batch, channel, and sample axes. Fixed the loader, added acoustic-coverage
+  validation and automatic invalid-profile rebuild, isolated mutable Oute
+  prompt data per request, and synchronized profile reloads across workers.
+- Regenerated `chromie_mixed` with 776 DAC code pairs covering all 28 aligned
+  words. The corrected profile passed a 10/10 multilingual smoke and two
+  complete 6/6 Mandarin/English/mixed/interruption/dialogue/concurrency runs at
+  an RTX 5090 8192-token context. That profile is now the installation-local
+  selected speaker; private WAV/JSON artifacts remain ignored and the portable
+  repository default still falls back to Oute's built-in speaker when no local
+  profile is installed.
+- Diagnosed OuteTTS enrollment-prompt leakage in short Chinese
+  `chromie_mixed` cues. Fast-first cache v2 now keys audio by provider/model and
+  speaker revision, enforces a short-cue duration bound, and rejects requested
+  text that fails an ASR round trip before playback.
+- Added `--tts-trial cosyvoice` for a reversible one-session listening check
+  against the owner-authorized local reference; it does not modify the normal
+  provider configuration or select a winner.
+- Fixed the CosyVoice candidate's ONNX Runtime/cuDNN mismatch by moving to the
+  cuDNN 9-compatible 1.18.1 wheel, persisted its WeText ModelScope cache, and
+  added one bounded regeneration for short cues that fail the unchanged ASR
+  content gate. The rebuilt candidate initialized CUDA ONNX execution and all
+  six bilingual acknowledgement cues passed; this remains trial evidence.
+- Fixed the full-stack CosyVoice trial's pre-microphone failure: the temporary
+  launcher now uses one compact Ollama model across all cognitive lanes, limits
+  Ollama to one resident model, and avoids generating missing fast-first cues
+  during startup. Individual synthesis timeout stops remaining cache work,
+  total prime timeout is non-fatal on Python 3.10, and the readiness banner no
+  longer claims voice interaction is ready before the host microphone starts.
+- Matched the temporary CosyVoice trial to its single model worker, replaced
+  TCP-only ASR/TTS readiness with application WebSocket health, required one
+  complete no-playback warm synthesis, and added bounded cancellation draining
+  before fail-closed worker reload. Health now distinguishes drained
+  cancellations from restart recovery.
+- Made the top-level launcher check the host Orchestrator's exclusive lock
+  before changing generated runtime files or recreating services. An old
+  microphone/goal-state process can no longer remain silently attached to new
+  containers during a service-only rebuild.
 - Documented Qwen3-TTS and Fun-CosyVoice3 as primary comparison candidates,
   OuteTTS as the maintained baseline, and license/target evidence as required
   gates before changing the default.
+
+### Router addressedness
+
+- Added host-owned engagement evidence and semantic addressedness/subject
+  ownership review so unrelated nearby technical speech can fail silently
+  instead of collapsing into a Chromie capability answer. Direct questions,
+  greetings, requests, Chromie's name, active tasks, and recent accepted turns
+  remain engaged; ignored ambient turns do not extend engagement.
+- Kept isolated low-information ASR fragments behind clarification even when
+  completed tasks remain in bounded conversation history; only an explicit
+  confirmation or clarification wait supplies strong follow-up context.
+
+### Goal lifecycle and truthful embodied speech
+
+- Bound semantic goal IDs to their distinct host task contexts and to scoped
+  speech, skill, and confirmation request IDs, so compound goals independently
+  reach completed, refused, failed, timed-out, or cancelled lifecycle states.
+- Added a route-effect authority envelope: a conversation turn cannot become a
+  physical terminal plan merely because both cognitive lanes are enabled.
+- Removed planner-owned exact-execution speech and pre-execution progress/final
+  projection. The trusted adapter now derives prospective action cues from the
+  validated plan and actual confirmation state.
+- Required response delivery to reach playback start before dependent physical
+  effects, and invalidated all queued utterance chunks on delivery timeout so
+  delayed synthesis cannot announce an action after it was stopped.
 
 ### Runtime observability
 

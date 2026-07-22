@@ -191,6 +191,15 @@ class VoiceAssistant:
             "ORCH_AUTO_CONFIRM_SIM_SKILLS",
             False,
         )
+        self.addressedness_gate_enabled = env_bool(
+            "ORCH_ADDRESSEDNESS_GATE_ENABLED",
+            True,
+        )
+        self.addressedness_engagement_timeout_s = env_float(
+            "ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC",
+            45.0,
+            minimum=1.0,
+        )
         self.fast_first_response_enabled = env_bool(
             "ORCH_FAST_FIRST_RESPONSE_ENABLED",
             True,
@@ -221,6 +230,25 @@ class VoiceAssistant:
             120000,
             minimum=1000,
         )
+        self.fast_first_audio_content_gate_enabled = env_bool(
+            "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED",
+            True,
+        )
+        self.fast_first_audio_max_cue_seconds = env_float(
+            "ORCH_FAST_FIRST_AUDIO_MAX_CUE_SECONDS",
+            4.0,
+            minimum=0.25,
+        )
+        self.fast_first_audio_transcript_min_similarity = env_float(
+            "ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY",
+            0.65,
+            minimum=0.0,
+        )
+        self.fast_first_audio_generation_attempts = env_int(
+            "ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS",
+            2,
+            minimum=1,
+        )
         fast_first_cache_dir = Path(
             os.getenv(
                 "ORCH_FAST_FIRST_AUDIO_CACHE_DIR",
@@ -239,6 +267,17 @@ class VoiceAssistant:
             request_timeout_s=min(
                 30.0,
                 self.fast_first_audio_prime_timeout_ms / 1000.0,
+            ),
+            content_validation_enabled=self.fast_first_audio_content_gate_enabled,
+            max_cue_seconds=self.fast_first_audio_max_cue_seconds,
+            transcript_min_similarity=min(
+                1.0,
+                self.fast_first_audio_transcript_min_similarity,
+            ),
+            generation_attempts=self.fast_first_audio_generation_attempts,
+            cache_revision=os.getenv(
+                "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION",
+                "",
             ),
         )
         self.fast_planner_mode = os.getenv("ORCH_FAST_PLANNER_MODE", "off").strip().lower()
@@ -654,7 +693,7 @@ class VoiceAssistant:
             "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s "
             "confirmation_ttl_s=%.1f fast_first_response=%s fast_first_tool=%s "
             "router_generated_fast_speech=%s fast_first_audio=%s hedge_ms=%s "
-            "cache_dir=%s",
+            "cache_dir=%s prime_on_startup=%s prime_timeout_ms=%s",
             self.enable_interaction_response,
             self.enable_soridormi_skills,
             self.auto_confirm_sim_skills,
@@ -665,6 +704,8 @@ class VoiceAssistant:
             self.fast_first_audio_cache.enabled,
             self.fast_first_audio_hedge_ms,
             self.fast_first_audio_cache.cache_dir,
+            self.fast_first_audio_prime_on_startup,
+            self.fast_first_audio_prime_timeout_ms,
         )
 
     @property
@@ -739,9 +780,12 @@ class VoiceAssistant:
         if waiter is None:
             return False
         try:
-            return await asyncio.wait_for(waiter, timeout=timeout_s)
+            # Keep the waiter live on timeout so the caller can invalidate the
+            # scheduled order.  ``wait_for`` otherwise cancels the Future and
+            # a late synthesis result can slip through to audible playback
+            # after the physical-effect barrier has already failed.
+            return await asyncio.wait_for(asyncio.shield(waiter), timeout=timeout_s)
         except TimeoutError:
-            self.playback_start_waiters.pop(key, None)
             self.session_log(
                 session_id,
                 "tts_playback_start_waiter_timeout: order=%s timeout_s=%.3f",
@@ -784,6 +828,42 @@ class VoiceAssistant:
         )
         self.maybe_session_done(session_id)
         return True
+
+    def _cancel_scheduled_playback_before_start(
+        self,
+        scheduled: dict[str, Any],
+        *,
+        session_id: str | None,
+        reason: str,
+    ) -> list[int]:
+        """Invalidate every still-pending order owned by one speech request.
+
+        A playback-start barrier covers the whole utterance, not only its first
+        chunk.  If that barrier fails, later synthesis results must be consumed
+        as cancelled rather than becoming delayed, misleading speech.
+        """
+
+        try:
+            generation = int(scheduled["generation"])
+        except (KeyError, TypeError, ValueError):
+            return []
+        raw_orders = scheduled.get("orders")
+        if not isinstance(raw_orders, list):
+            raw_orders = [scheduled.get("order")]
+        cancelled: list[int] = []
+        for raw_order in raw_orders:
+            try:
+                order = int(raw_order)
+            except (TypeError, ValueError):
+                continue
+            if self._cancel_playback_order_before_start(
+                generation=generation,
+                order=order,
+                session_id=session_id,
+                reason=reason,
+            ):
+                cancelled.append(order)
+        return cancelled
 
     async def schedule_cached_fast_first_audio(
         self,
@@ -1814,6 +1894,12 @@ class VoiceAssistant:
                 timeout_s=max(0.001, timeout_ms / 1000.0),
             )
             scheduled["playback_started"] = playback_started
+            if not playback_started:
+                scheduled["cancelled_orders"] = self._cancel_scheduled_playback_before_start(
+                    scheduled,
+                    session_id=session_id,
+                    reason="required_playback_start_not_observed",
+                )
         return scheduled
 
     def ensure_playback_worker(self) -> None:
@@ -2051,6 +2137,9 @@ class VoiceAssistant:
             "current_generation": self.playback_generation,
             "session_id": session_id,
             "conversation_id": conversation.get("conversation_id"),
+            "interaction_engagement": self._interaction_engagement_context(
+                conversation
+            ),
             "conversation": conversation,
             "session_memory": conversation.get("session_memory", {}),
             "memory_summary": (conversation.get("session_memory") or {}).get("memory_summary"),
@@ -2071,6 +2160,65 @@ class VoiceAssistant:
                 "available": not self.action_dry_run,
                 "source": "host_orchestrator",
             },
+        }
+
+    def _interaction_engagement_context(
+        self,
+        conversation: dict[str, Any],
+    ) -> dict[str, Any]:
+        history = conversation.get("history")
+        if not isinstance(history, list):
+            history = []
+        active_pending = conversation.get("active_pending_tasks")
+        active_tasks = conversation.get("active_task_contexts")
+        has_active_work = bool(
+            isinstance(active_pending, list)
+            and active_pending
+            or isinstance(active_tasks, list)
+            and active_tasks
+        )
+        last_exchange_ms = 0.0
+        for turn in history:
+            if not isinstance(turn, dict):
+                continue
+            # Ambient speech is recorded for traceability, but accepting it as
+            # a conversation turn would make the next ambient fragment look
+            # actively addressed for the whole engagement window.
+            if str(turn.get("route") or "").strip().casefold() == "ignore":
+                continue
+            try:
+                last_exchange_ms = max(
+                    last_exchange_ms,
+                    float(turn.get("ts_ms") or 0.0),
+                )
+            except (TypeError, ValueError):
+                continue
+        idle_ms = (
+            max(0.0, time.time() * 1000.0 - last_exchange_ms)
+            if last_exchange_ms > 0.0
+            else None
+        )
+        recent_exchange = bool(
+            idle_ms is not None
+            and idle_ms <= self.addressedness_engagement_timeout_s * 1000.0
+        )
+        active = bool(has_active_work or recent_exchange)
+        evidence = (
+            "active_task"
+            if has_active_work
+            else "recent_exchange"
+            if recent_exchange
+            else "none"
+        )
+        return {
+            "gate_enabled": self.addressedness_gate_enabled,
+            "active": active,
+            "evidence": evidence,
+            "idle_ms": round(idle_ms, 1) if idle_ms is not None else None,
+            "engagement_timeout_ms": round(
+                self.addressedness_engagement_timeout_s * 1000.0,
+                1,
+            ),
         }
 
     def _experience_context(
@@ -3692,10 +3840,16 @@ class VoiceAssistant:
         )
         self.session_log(
             session_id,
-            "context_snapshot: conversation_id=%s history_turns=%s pending_tasks=%s",
+            "context_snapshot: conversation_id=%s history_turns=%s pending_tasks=%s engagement=%s",
             context.get("conversation_id"),
             len(context.get("history", [])),
             len(context.get("active_pending_tasks", [])),
+            json.dumps(
+                context.get("interaction_engagement", {}),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
         )
         router_start_ms = now_ms()
         self.session_log(session_id, "router_start: text_chars=%s text=%r", len(user_text), user_text)
@@ -4315,22 +4469,38 @@ class VoiceAssistant:
             session_id,
             prompt_response,
         )
-        self.conversation_state.record_pending_task(
-            sid=session_id,
-            task_type="confirmation",
-            status="awaiting_confirmation",
-            summary=", ".join(
-                request.skill_id
-                for request in response.skills
-                if request.request_id in pending.confirmed_request_ids
-            ),
-            metadata={
-                "confirmation_id": pending.confirmation_id,
-                "interaction_id": response.interaction_id,
-                "fingerprint": pending.fingerprint,
-                "expires_at": pending.expires_at,
-            },
+        record_confirmation_scope = getattr(
+            self.conversation_state,
+            "record_confirmation_scope",
+            None,
         )
+        if callable(record_confirmation_scope):
+            record_confirmation_scope(
+                sid=session_id,
+                confirmation_id=pending.confirmation_id,
+                interaction_id=response.interaction_id,
+                fingerprint=pending.fingerprint,
+                expires_at=pending.expires_at,
+                response=response,
+                confirmed_request_ids=set(pending.confirmed_request_ids),
+            )
+        else:  # pragma: no cover - compatibility with lightweight test doubles
+            self.conversation_state.record_pending_task(
+                sid=session_id,
+                task_type="confirmation",
+                status="awaiting_confirmation",
+                summary=", ".join(
+                    request.skill_id
+                    for request in response.skills
+                    if request.request_id in pending.confirmed_request_ids
+                ),
+                metadata={
+                    "confirmation_id": pending.confirmation_id,
+                    "interaction_id": response.interaction_id,
+                    "fingerprint": pending.fingerprint,
+                    "expires_at": pending.expires_at,
+                },
+            )
         self._launch_interaction(
             prompt_response,
             session_id,
@@ -4405,11 +4575,24 @@ class VoiceAssistant:
                 resolution.fingerprint,
             )
             if resolution.confirmation_id:
-                self.conversation_state.update_pending_task_status(
-                    metadata_key="confirmation_id",
-                    metadata_value=resolution.confirmation_id,
-                    status="cancelled",
+                resolve_confirmation_scope = getattr(
+                    self.conversation_state,
+                    "resolve_confirmation_scope",
+                    None,
                 )
+                handled = bool(
+                    callable(resolve_confirmation_scope)
+                    and resolve_confirmation_scope(
+                        confirmation_id=resolution.confirmation_id,
+                        decision=resolution.decision,
+                    )
+                )
+                if not handled:
+                    self.conversation_state.update_pending_task_status(
+                        metadata_key="confirmation_id",
+                        metadata_value=resolution.confirmation_id,
+                        status="cancelled",
+                    )
             return False
 
         self.conversation_state.record_user_turn(
@@ -4430,15 +4613,28 @@ class VoiceAssistant:
             resolution.fingerprint,
         )
         if resolution.confirmation_id:
-            pending_status = {
-                "approved": "done",
-                "expired": "expired",
-            }.get(resolution.decision, "cancelled")
-            self.conversation_state.update_pending_task_status(
-                metadata_key="confirmation_id",
-                metadata_value=resolution.confirmation_id,
-                status=pending_status,
+            resolve_confirmation_scope = getattr(
+                self.conversation_state,
+                "resolve_confirmation_scope",
+                None,
             )
+            handled = bool(
+                callable(resolve_confirmation_scope)
+                and resolve_confirmation_scope(
+                    confirmation_id=resolution.confirmation_id,
+                    decision=resolution.decision,
+                )
+            )
+            if not handled:
+                pending_status = {
+                    "approved": "done",
+                    "expired": "expired",
+                }.get(resolution.decision, "cancelled")
+                self.conversation_state.update_pending_task_status(
+                    metadata_key="confirmation_id",
+                    metadata_value=resolution.confirmation_id,
+                    status=pending_status,
+                )
 
         if resolution.decision == "approved":
             assert resolution.response is not None
@@ -4454,6 +4650,7 @@ class VoiceAssistant:
             self.conversation_state.record_agent_result(
                 session_id,
                 resolution.response,
+                confirmed_request_ids=set(resolution.confirmed_request_ids),
             )
             self._launch_interaction(
                 resolution.response,
@@ -4734,11 +4931,15 @@ class VoiceAssistant:
                 await self._record_soridormi_post_status(session_id)
             completed_request_ids = {result.request_id for result in execution.results}
             if execution.status != "completed":
-                for request in response.skills:
-                    if request.request_id in completed_request_ids:
+                response_request_ids = [
+                    *(request.request_id for request in response.skills),
+                    *(speech.id for speech in response.speech),
+                ]
+                for request_id in response_request_ids:
+                    if request_id in completed_request_ids:
                         continue
                     self.conversation_state.update_pending_task_status_for_request_id(
-                        request_id=request.request_id,
+                        request_id=request_id,
                         status=execution.status,
                     )
                 await self._maybe_stage_body_recovery_confirmation(
@@ -4762,6 +4963,14 @@ class VoiceAssistant:
                 "skill_runtime_cancelled: runtime_ms=%.1f",
                 now_ms() - started_ms,
             )
+            for request_id in [
+                *(request.request_id for request in response.skills),
+                *(speech.id for speech in response.speech),
+            ]:
+                self.conversation_state.update_pending_task_status_for_request_id(
+                    request_id=request_id,
+                    status="cancelled",
+                )
             if has_soridormi_request:
                 await self._record_soridormi_post_status(session_id)
             raise
@@ -4782,6 +4991,14 @@ class VoiceAssistant:
                 session_id=session_id,
                 errors=[str(exc) or exc.__class__.__name__],
             )
+            for request_id in [
+                *(request.request_id for request in response.skills),
+                *(speech.id for speech in response.speech),
+            ]:
+                self.conversation_state.update_pending_task_status_for_request_id(
+                    request_id=request_id,
+                    status="failed",
+                )
             raise
         finally:
             if mark_session_done:
@@ -5326,6 +5543,39 @@ class VoiceAssistant:
             self.sessions.checkpoint_active_traces()
             self.sessions.finalize_idle_sessions(idle_timeout_ms=idle_timeout_ms)
 
+    async def _prime_fast_first_audio(self) -> dict[str, int]:
+        fast_first_cache = getattr(self, "fast_first_audio_cache", None)
+        if fast_first_cache is None or not fast_first_cache.enabled:
+            return {"loaded": 0, "generated": 0, "failed": 0}
+        prime_started_ms = now_ms()
+        try:
+            stats = await asyncio.wait_for(
+                fast_first_cache.prime_missing(
+                    tts_url=self.tts_url,
+                    speaker_id=self.speaker_id,
+                    asr_url=self.asr_url,
+                    asr_sample_rate=self.target_asr_rate,
+                ),
+                timeout=self.fast_first_audio_prime_timeout_ms / 1000.0,
+            )
+        except asyncio.TimeoutError:
+            stats = {"loaded": fast_first_cache.ready_count, "generated": 0, "failed": 1}
+            logger.warning(
+                "Fast-first audio cache priming exceeded total timeout_ms=%s; "
+                "continuing with ready=%s",
+                self.fast_first_audio_prime_timeout_ms,
+                fast_first_cache.ready_count,
+            )
+        logger.info(
+            "Fast-first audio cache ready=%s loaded=%s generated=%s failed=%s ms=%.1f",
+            fast_first_cache.ready_count,
+            stats.get("loaded", 0),
+            stats.get("generated", 0),
+            stats.get("failed", 0),
+            now_ms() - prime_started_ms,
+        )
+        return stats
+
     async def run(self):
         gate = ServiceReadinessGate(
             asr_url=self.asr_url,
@@ -5340,33 +5590,7 @@ class VoiceAssistant:
             enable_agent=self.enable_agent,
         )
         self.asr_ws = await gate.wait_until_ready()
-        fast_first_cache = getattr(self, "fast_first_audio_cache", None)
-        if fast_first_cache is not None and fast_first_cache.enabled:
-            prime_started_ms = now_ms()
-            try:
-                stats = await asyncio.wait_for(
-                    fast_first_cache.prime_missing(
-                        tts_url=self.tts_url,
-                        speaker_id=self.speaker_id,
-                    ),
-                    timeout=self.fast_first_audio_prime_timeout_ms / 1000.0,
-                )
-            except TimeoutError:
-                stats = {"loaded": fast_first_cache.ready_count, "generated": 0, "failed": 1}
-                logger.warning(
-                    "Fast-first audio cache priming exceeded total timeout_ms=%s; "
-                    "continuing with ready=%s",
-                    self.fast_first_audio_prime_timeout_ms,
-                    fast_first_cache.ready_count,
-                )
-            logger.info(
-                "Fast-first audio cache ready=%s loaded=%s generated=%s failed=%s ms=%.1f",
-                fast_first_cache.ready_count,
-                stats.get("loaded", 0),
-                stats.get("generated", 0),
-                stats.get("failed", 0),
-                now_ms() - prime_started_ms,
-            )
+        await self._prime_fast_first_audio()
         self.playback_task = asyncio.create_task(self.playback_worker())
         if self.audio_input_mode == "stdin":
             await self.injected_audio_stream()
@@ -5423,4 +5647,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Orchestrator stopped by operator")

@@ -194,6 +194,9 @@ def create_provider() -> WorkerBackedCandidateProvider:
         worker_target,
         name="qwen3-tts-worker",
         startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "1200")),
+        cancel_drain_timeout_s=float(
+            os.getenv("TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC", "3")
+        ),
     )
     return WorkerBackedCandidateProvider(
         capabilities=capabilities,

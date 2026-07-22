@@ -17,8 +17,12 @@ here. Current revision and verification status are maintained in
 `context` object. Route names are `chat`, `deep_thought`, `robot_action`,
 `tool`, `memory`, `clarify`, `interrupt`, and `ignore`.
 
-Interrupt and ignore decisions are normalized deterministically: they do not
-require the Agent and they do not speak. For other input, Router queries the
+Interrupt, silence, and unusable-audio decisions remain deterministic. A
+separate focused addressedness classifier may propose `addressed=false` only
+when host evidence says no exchange or task is active; deterministic code maps
+a high-confidence result to a non-speaking `ignore`. Classifier failure,
+uncertainty, direct address, or active engagement preserves normal routing.
+For other input, Router queries the
 Agent-owned shared capability catalog snapshot, sends bounded context and the
 unlocked common ability catalog to the quick intent Router model when enabled,
 and delegates low-confidence or explicitly complex quick routes to
@@ -334,9 +338,9 @@ Supported JSON text messages:
 
 | Request type | Result |
 |---|---|
-| `health` or `ping` | `pong` with TTSProvider contract/declaration, registered adapters, sample rate, backend health, generation profile, recent performance summary, worker state, and available speakers. |
+| `health` or `ping` | `pong` with TTSProvider contract/declaration, registered adapters, sample rate, backend health, generation profile, recent performance summary, worker state, available speakers, and content-addressed `speaker_revisions` when the provider has local profiles. |
 | `list_speakers` | `speakers` with speaker IDs. |
-| `create_speaker` | `speaker_created` or `error`; the WAV path must remain inside `SPEAKER_DIR` and the request must include its exact `transcript` (or a UTF-8 sidecar with the same stem must exist). |
+| `create_speaker` | `speaker_created` or `error`; the WAV path must remain inside `SPEAKER_DIR` and the request must include its exact `transcript` (or a UTF-8 sidecar with the same stem must exist). Success includes `profile_stats` for aligned words, conditioned words, DAC-code count/duration, and reference coverage; transcript agreement without valid acoustic coverage is rejected. Every generation worker reloads the accepted profile before success is returned. |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
 A synthesis request includes `text`, optional `speaker_id`, and optional
@@ -377,6 +381,11 @@ The host Orchestrator may split one logical speech response into multiple
 ordered `synthesize_stream` requests. This lowers time-to-first-audio and lets
 later chunks generate while earlier chunks are played, while preserving audible
 order at the playback layer.
+
+Startup-primed acknowledgement WAVs are not trusted solely because synthesis
+completed. Their cache identity includes provider/model and speaker revision,
+and the default content gate rejects overlong audio or an ASR transcript that
+does not sufficiently match the intended cue.
 
 ## Soridormi contract snapshot
 

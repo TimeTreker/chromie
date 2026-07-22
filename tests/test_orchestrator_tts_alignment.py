@@ -72,6 +72,239 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(assistant._post_interrupt_corrected_decision(interrupt))
 
+    async def test_multi_goal_confirmation_denial_closes_all_scoped_goals(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(
+            ttl_s=20.0
+        )
+        assistant.conversation_state = ConversationStateManager(
+            base_conversation_id="orchestrator-confirm-denied"
+        )
+        assistant.conversation_state.apply_goal_association_resolution(
+            {
+                "turn_id": "turn-confirm-denied",
+                "new_goals": [
+                    {
+                        "goal_id": "goal-walk",
+                        "description": "Walk forward.",
+                        "source_text": "Walk forward.",
+                    },
+                    {
+                        "goal_id": "goal-blink",
+                        "description": "Blink.",
+                        "source_text": "Blink.",
+                    },
+                ],
+                "confidence": 0.95,
+                "reason_summary": "Two independent actions.",
+            },
+            sid="sid-confirm",
+            user_text="Walk and blink.",
+            route="robot_action",
+            intent="compound_action",
+            atomic=True,
+        )
+        launched: list[tuple[InteractionResponse, set[str] | None]] = []
+
+        class _Runtime:
+            async def confirmation_request_ids(
+                self,
+                response: InteractionResponse,
+            ) -> set[str]:
+                return {request.request_id for request in response.skills}
+
+            async def confirmation_exemption_request_ids(
+                self,
+                response: InteractionResponse,
+            ) -> set[str]:
+                del response
+                return set()
+
+        def session_log(
+            self: VoiceAssistant,
+            sid: str | None,
+            message: str,
+            *args: Any,
+        ) -> None:
+            del self, sid, message, args
+
+        def launch_interaction(
+            self: VoiceAssistant,
+            response: InteractionResponse,
+            session_id: str | None,
+            *,
+            confirmed_request_ids: set[str] | None = None,
+            reset_playback: bool = True,
+            mark_session_done: bool = True,
+        ) -> None:
+            del self, session_id, reset_playback, mark_session_done
+            launched.append((response, confirmed_request_ids))
+
+        assistant.interaction_runtime = _Runtime()
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant._launch_interaction = MethodType(launch_interaction, assistant)
+        response = InteractionResponse(
+            interaction_id="interaction-confirm-denied",
+            skills=[
+                {
+                    "request_id": "walk-1",
+                    "skill_id": "soridormi.walk_forward",
+                    "metadata": {"source_goal_ids": ["goal-walk"]},
+                },
+                {
+                    "request_id": "blink-1",
+                    "skill_id": "soridormi.blink_eyes",
+                    "metadata": {"source_goal_ids": ["goal-blink"]},
+                },
+            ],
+            metadata={
+                "planning_result": "composed_plan",
+                "semantic_plan_confirmation_required": True,
+            },
+        )
+
+        self.assertTrue(
+            await assistant._stage_interaction_confirmation(
+                response,
+                "sid-confirm",
+                language="en-US",
+            )
+        )
+        self.assertEqual(
+            [
+                item["status"]
+                for item in assistant.conversation_state.active_goal_snapshots()
+            ],
+            ["awaiting_confirmation", "awaiting_confirmation"],
+        )
+        self.assertTrue(
+            await assistant._handle_confirmation_reply("no", "sid-confirm")
+        )
+        self.assertEqual(
+            assistant.conversation_state.active_goal_snapshots(),
+            [],
+        )
+        self.assertEqual(
+            [
+                item["status"]
+                for item in assistant.conversation_state.snapshot()["task_contexts"]
+            ],
+            ["cancelled", "cancelled"],
+        )
+        self.assertEqual(len(launched), 2)
+
+    async def test_multi_goal_confirmation_approval_schedules_all_scoped_goals(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(
+            ttl_s=20.0
+        )
+        assistant.conversation_state = ConversationStateManager(
+            base_conversation_id="orchestrator-confirm-approved"
+        )
+        assistant.conversation_state.apply_goal_association_resolution(
+            {
+                "turn_id": "turn-confirm-approved",
+                "new_goals": [
+                    {
+                        "goal_id": "goal-walk",
+                        "description": "Walk forward.",
+                        "source_text": "Walk forward.",
+                    },
+                    {
+                        "goal_id": "goal-blink",
+                        "description": "Blink.",
+                        "source_text": "Blink.",
+                    },
+                ],
+                "confidence": 0.95,
+                "reason_summary": "Two independent actions.",
+            },
+            sid="sid-confirm",
+            user_text="Walk and blink.",
+            route="robot_action",
+            intent="compound_action",
+            atomic=True,
+        )
+        launched: list[tuple[InteractionResponse, set[str] | None]] = []
+
+        class _Runtime:
+            async def confirmation_request_ids(
+                self,
+                response: InteractionResponse,
+            ) -> set[str]:
+                return {request.request_id for request in response.skills}
+
+            async def confirmation_exemption_request_ids(
+                self,
+                response: InteractionResponse,
+            ) -> set[str]:
+                del response
+                return set()
+
+        def session_log(
+            self: VoiceAssistant,
+            sid: str | None,
+            message: str,
+            *args: Any,
+        ) -> None:
+            del self, sid, message, args
+
+        def launch_interaction(
+            self: VoiceAssistant,
+            response: InteractionResponse,
+            session_id: str | None,
+            *,
+            confirmed_request_ids: set[str] | None = None,
+            reset_playback: bool = True,
+            mark_session_done: bool = True,
+        ) -> None:
+            del self, session_id, reset_playback, mark_session_done
+            launched.append((response, confirmed_request_ids))
+
+        assistant.interaction_runtime = _Runtime()
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant._launch_interaction = MethodType(launch_interaction, assistant)
+        response = InteractionResponse(
+            interaction_id="interaction-confirm-approved",
+            skills=[
+                {
+                    "request_id": "walk-1",
+                    "skill_id": "soridormi.walk_forward",
+                    "metadata": {"source_goal_ids": ["goal-walk"]},
+                },
+                {
+                    "request_id": "blink-1",
+                    "skill_id": "soridormi.blink_eyes",
+                    "metadata": {"source_goal_ids": ["goal-blink"]},
+                },
+            ],
+            metadata={
+                "planning_result": "composed_plan",
+                "semantic_plan_confirmation_required": True,
+            },
+        )
+
+        self.assertTrue(
+            await assistant._stage_interaction_confirmation(
+                response,
+                "sid-confirm",
+                language="en-US",
+            )
+        )
+        self.assertTrue(
+            await assistant._handle_confirmation_reply("yes", "sid-confirm")
+        )
+
+        self.assertEqual(
+            [
+                item["status"]
+                for item in assistant.conversation_state.active_goal_snapshots()
+            ],
+            ["scheduled", "scheduled"],
+        )
+        self.assertEqual(len(launched), 2)
+        self.assertEqual(launched[-1][1], {"walk-1", "blink-1"})
+
     async def test_deep_thought_ack_is_language_matched_and_scheduled(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
@@ -1251,6 +1484,81 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["playback_started"])
         self.assertEqual(result["order"], 0)
         self.assertEqual(assistant.playback_start_waiters, {})
+
+    async def test_playback_barrier_timeout_cancels_all_late_audio_chunks(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+        assistant.order_lock = asyncio.Lock()
+        assistant.synthesis_order = 0
+        assistant.playback_generation = 0
+        assistant.active_synthesis_tasks = set()
+        assistant.playback_start_waiters = {}
+        assistant.cancelled_playback_orders = set()
+        assistant.tts_text_chunking_enabled = True
+        assistant.tts_chunk_chars = 20
+        assistant.tts_min_chunk_chars = 1
+        assistant.tts_flush_chars = 160
+        played: list[int] = []
+
+        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
+            self.sessions.log(sid, message, *args)
+
+        async def synthesize_one(
+            self: VoiceAssistant,
+            text: str,
+            order: int,
+            sid: str | None,
+            generation: int,
+        ) -> None:
+            del self, text, order, sid, generation
+
+        async def play_audio(
+            self: VoiceAssistant,
+            audio: bytes,
+            source_rate: int | None,
+            generation: int,
+            sid: str | None,
+        ) -> None:
+            del self, audio, source_rate, generation, sid
+            played.append(1)
+
+        assistant.session_log = MethodType(session_log, assistant)
+        assistant.synthesize_one = MethodType(synthesize_one, assistant)
+        assistant.play_audio = MethodType(play_audio, assistant)
+
+        result = await assistant._schedule_interaction_speech(
+            {
+                "text": "First chunk. Second chunk. Third chunk.",
+                "metadata": {
+                    "session_id": session_id,
+                    "wait_for_playback_start": True,
+                    "playback_start_timeout_ms": 1,
+                },
+            }
+        )
+        pending = list(assistant.active_synthesis_tasks)
+        if pending:
+            await asyncio.gather(*pending)
+
+        self.assertFalse(result["playback_started"])
+        self.assertEqual(result["cancelled_orders"], result["orders"])
+        self.assertEqual(
+            assistant.sessions.state[session_id]["skipped_tts"],
+            len(result["orders"]),
+        )
+
+        for order in result["orders"]:
+            consumed = await assistant.play_one_order(
+                result["generation"],
+                order,
+                b"\x00\x00" * 100,
+                24000,
+                session_id,
+            )
+            self.assertTrue(consumed)
+        self.assertEqual(played, [])
+        self.assertEqual(assistant.cancelled_playback_orders, set())
 
     async def test_interaction_speech_splits_long_text_into_ordered_chunks(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

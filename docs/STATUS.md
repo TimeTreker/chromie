@@ -63,11 +63,80 @@ post-cancel recovery first binary was 18.7919 s and 8.0885 s respectively. A
 prior generated-reference run showed the same ordinary-latency versus recovery
 tradeoff. Both runs came from a dirty working tree and intentionally removed
 the maintained Oute/Ollama GPU load. The owner approved the supplied voice
-style, but rebuilt-container Oute default-speaker checks reproduced stochastic
-token exhaustion at both 4096 and 8192-token diagnostics, so it was not
-promoted. Provider-output listening review and a shared-resource source-bound
-target bundle are not retained; no production-provider change is target
-validated or release ready.
+style. A root-cause audit then found the initial Oute speaker JSON was not a
+valid acoustic profile: the soundfile fallback omitted the batch tensor axis,
+so Oute's preprocessing collapsed each full recording to one sample and saved
+only one DAC code pair while transcript alignment still passed. The corrected
+loader now validates DAC structure and reference coverage, rebuilds invalid
+profiles from their WAV plus exact transcript, isolates Oute's mutable prompt
+data per request, and reloads all workers. Regenerated `chromie_mixed` has 776
+code pairs across all 28 aligned words. A 10/10 smoke and two repeated complete
+6/6 matrices passed at the RTX 5090 8192-token setting; median first-binary/RTF
+for the repeated matrices was 6.7510 s/0.7769 and 7.1491 s/0.7841. The local
+installation selects this profile, but its ignored private artifacts make a
+clean repository installation fall back to Oute's built-in speaker.
+Provider-output listening review and a shared-resource source-bound target
+bundle are not retained; no production-provider change is target validated or
+release ready.
+
+A July 22 live-output diagnosis added an important negative result: short
+Chinese fast-first cues generated with Oute `chromie_mixed` contained the
+bilingual enrollment sentence and unnatural Chinese. Local ASR reproduced the
+leaked English sentence. The earlier Oute matrix therefore remains transport
+and stability evidence, not requested-text or listening-quality evidence.
+Fast-first cache v2 now binds entries to endpoint, provider/model, speaker, and
+speaker revision; duration and ASR round-trip content gates reject bad cues
+before disk or memory admission. A reversible `--tts-trial cosyvoice` launcher
+path uses the authorized local reference on port 5001 without changing the
+configured default. The candidate's former ONNX Runtime 1.18.0/cuDNN 9 mismatch
+is fixed with the compatible 1.18.1 runtime, WeText artifacts survive container
+recreation, and a rebuilt live candidate initialized `CUDAExecutionProvider`.
+All six English/Chinese short cues then passed the duration and ASR content
+gates; bounded regeneration handled one independently observed stochastic bad
+sample without admitting it. These protections and trial wiring are
+implemented and Level A verified; the human listening verdict,
+shared-resource qualification, and production-provider decision remain open.
+
+The first full-stack CosyVoice trial then failed before microphone startup even
+though the isolated candidate run and container health checks passed. The
+earliest responsible boundary was the launcher's shared-GPU startup policy: the
+normal qwen/gemma cognitive load plus CosyVoice and ASR occupied roughly 28 GiB,
+a 30-second short-cue cancellation restarted the candidate worker, retries paid
+repeated cold loads, and the 120-second outer `asyncio.TimeoutError` escaped the
+Python 3.10 handler. The temporary trial now maps all cognitive lanes to
+`qwen3:4b`, permits one resident Ollama model, loads validated cache entries but
+does not generate missing cues on startup, and treats cache-prime expiry as
+non-fatal. The exact July 22 launcher subsequently reached `Microphone started`
+with cache resolution in 4.1 ms and no startup synthesis. This upgrades the
+trial launch path to live local operational evidence, not listening-quality,
+normal-profile cognition, sustained-load, or release-ready evidence.
+
+A later July 22 conversation log separated a provider latency problem from an
+interaction-authority problem. CosyVoice's single synchronous worker received
+two host requests, queued the second, and still paid a roughly 18–19 second
+cold reload when cancellation could not finish natively. That delayed and
+reordered audible feedback, but it did not choose the repeated movement: the
+Router correctly returned `chat/social_exchange`, after which completed
+walk/blink goals remained falsely active because semantic goal IDs were looked
+up as host task IDs and the cognitive lane gate did not constrain effects to
+the source route. The implementation now maps goal IDs to their owning task
+contexts, binds every speech/skill/confirmation request to its source goals,
+closes each goal from scoped runtime evidence, and rejects `chat`-to-physical
+effect escalation before composition or Skill Runtime. Executable speech is
+projected from the validated plan and actual confirmation state; playback must
+start before dependent motion, and timeout invalidates every late chunk. The
+Cosy trial separately forces one host synthesis request, uses application-level
+WebSocket readiness plus a complete no-playback warm synthesis, and applies a
+bounded cancellation drain before fail-closed reload. The July 22 post-fix
+automated gate passed 1164 primary tests plus 20 legacy Agent tests, 382/382
+file-backed scenarios, and 53/53 Level A cases. A rebuilt service-only trial
+then passed strict health and returned 485760 bytes of CosyVoice PCM. It also
+exposed a 46-minute-old host Orchestrator still attached across the service
+rebuild; that stale process was stopped, and the top-level launcher now checks
+the shared exclusive Orchestrator lock before changing runtime files or
+containers. A rebuilt supervised
+microphone/speaker/simulator rerun is still open, so no new Target-validation or
+provider-selection claim is made.
 
 The provider-readiness milestone is complete. A live local Soridormi MCP
 endpoint passed the `sim`, recommendation-only `hardware_shadow`, and no-motion
@@ -144,6 +213,19 @@ automated regressions, not retained live microphone, simulator, or physical
 robot evidence.
 This is not evidence of microphone, speaker, simulator execution, or physical
 robot behavior until the corresponding live acceptance run is retained.
+
+The July 22 robot log also showed repeated unrelated technical fragments being
+classified as the same high-confidence `capability_inquiry`, causing Chromie to
+answer speech that was not directed at it. The earliest wrong boundary was the
+Router contract: semantic `ignore` was universally prohibited and the host
+supplied no engagement evidence. The host now supplies bounded active-task and
+recent-exchange state, while the Router reviews addressedness and whether the
+subject is Chromie's own ability. Only high-confidence `not_addressed` or
+`ambient_speech` may be ignored while host engagement is inactive; interrupt,
+silence, and unusable-audio controls remain deterministic. Direct questions,
+requests, greetings, Chromie's name, active tasks, and recent accepted turns
+remain addressed, and ignored ambient turns do not extend engagement. This is
+Level A automated evidence, not retained live-microphone acceptance.
 Deterministic semantic action parsing is now a rules-only or explicit
 compatibility fallback rather than the normal hybrid brain path. The
 fast Qwen-class Router now receives unlocked
@@ -323,13 +405,13 @@ Target validation or Release readiness.
 | Capability | Implementation | Automated evidence | Target or live evidence | Default deployment state |
 |---|---|---|---|---|
 | Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
-| Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; SenseVoice ASR inference runs off the WebSocket event loop through a final-utterance service boundary; ASR decode and routed-turn execution have separate lifecycles so barge-in does not remain blocked behind Agent/TTS work; one newest VAD utterance is queued while ASR is busy instead of being dropped; `ASR_MODE=final` is the maintained protocol; ASR startup performs a synthetic warm-up decode before accepting WebSocket requests; TTS playback stays ordered while complete speech can be chunked across bounded restartable service workers; startup-primed English/Chinese acknowledgement PCM uses an adaptive hedge timer; TTS health and each successful response expose the resolved and observed DAC device plus model-generation, codec-decode, PCM, queue, IPC, total, and real-time-factor metrics; `scripts/benchmark_tts.py` provides repeatable no-playback measurements | Component concurrency/cancellation, busy-ASR latest-utterance queue, routed-turn replacement, cleanup, SenseVoice model resolution, normalization, ASR accuracy-evaluator tests, TTS worker-pool, TTS alignment, fast-first cache load/prime/hedge/cancellation, codec-device resolution, timing-hook, rolling-summary, benchmark, and worker-startup-metadata tests, plus automatic TTS-generated stdin and virtual-microphone acceptance modes | Local sherpa-onnx CPU and warmed CUDA evidence passed health plus English/Chinese final transcripts; the retained clean SenseVoice English/Chinese smoke showed 0 WER/CER; no Stage 6 TTS benchmark JSON or listening-quality bundle is retained in the repository yet | Sherpa-onnx SenseVoice CUDA provider default with startup warm-up; CPU fallback configurable; cached fast-first audio enabled with a 750 ms hedge; legacy generative tool acknowledgements disabled; DAC device resolves from `TTS_AUDIO_CODEC_DEVICE=auto`; synchronized detailed timing and a 20-request health window are enabled; the RTX 4090 Laptop TTS profile uses 4096 context/max length; prompt/generated token counts are retained and max-length exhaustion is rejected so incomplete audio is not played; FP16 remains unchanged pending measured A/B evidence |
-| Framework-neutral TTS provider evaluation | Contract version 1, explicit registry, maintained Oute adapter, transcript-validated Oute speaker creation, isolated locked Fun-CosyVoice3/Qwen3-TTS adapters, shared hashed reference voice, provider-aware WebSocket metadata, six-kind A/B matrix, WAV capture, interruption recovery, long-dialogue, concurrency, and listening-review template implemented | Provider/adapter/registry/restart-on-cancel/reference-license/reference-lock/matrix/benchmark unit coverage plus matrix validation; both candidate images build and run on the RTX 5090 host | Local non-source-bound run `20260722-chromie-ai-girl-v1` used the authorized voice candidate and passed 6/6 cases per provider; CosyVoice3 median first binary/RTF 3.0987 s/0.5419, Qwen3-TTS 5.6786 s/0.9364; Oute cloned profiles passed alignment but rebuilt default checks reproduced token exhaustion even with an 8192 diagnostic budget; candidate-provider listening and shared-GPU resource qualification remain open | `TTS_PROVIDER=oute` with its built-in speaker; approved voice profiles remain ignored local candidates and were not promoted; candidate services require the `tts-evaluation` profile and no provider winner is selected automatically |
-| Deterministic Router operational controls plus quick LLM route classifier | Implemented; interrupt/ignore controls remain deterministic while normal requests use catalog context, the fast Router model, structural route/intent validation, independent semantic repair, safe clarification, or deep model handoff; catalog search does not choose ordinary intent by itself; quick routing can emit ordered unlocked common-catalog compound `RouteDecision.actions` including `chromie.speak` speech tasks with per-action confidence, low-confidence `quick_router_review_request`, and deepthinking accept/revise/supersede review metadata | Router rule, capability-routing, LLM-prompt, route-contract repair, low-confidence clarification, scripted raw-model replay, repeated weather-to-walk multi-turn Router-to-Interaction scenarios, deepthinking, interaction, and regression-scenario tests | The final July 21 diagnostic 10/10 live-text simulator run exercised typo recovery, exact capability routing, safe clarification, compound routing, and all four daily-life requests without hidden Router truncation. It is not microphone or source-bound Target evidence | Enabled by `.env.common` |
+| Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR decode and routed-turn execution have separate lifecycles, one newest utterance is retained while ASR is busy, playback remains ordered, and startup acknowledgements use an adaptive hedge plus provider/speaker-addressed cache v2, duration limit, and ASR content check. Response speech may carry a delivery/effect barrier: dependent motion waits for playback start, and failure invalidates all late chunks. TTS health and responses expose generation, codec, queue, IPC, total, and real-time-factor metrics | Concurrency/cancellation, playback-barrier/late-audio, busy-ASR queue, cleanup, model resolution, ASR accuracy, TTS worker/profile, cache identity/content/hedge, timing, benchmark, and automatic speech-path coverage | Local ASR evidence passed English/Chinese transcripts. July 22 diagnostic ASR exposed Oute enrollment-text leakage in Chinese cached cues; no physical listening-quality bundle is retained | SenseVoice CUDA default; cached cues and failed delivery barriers fail closed; Oute remains configured, with no accepted Chinese `chromie_mixed` listening claim |
+| Framework-neutral TTS provider evaluation | Contract version 1, maintained Oute adapter, isolated locked CosyVoice3/Qwen3-TTS adapters, common hashed voice and six-kind matrix, listening template, and reversible shared-GPU-safe CosyVoice trial launcher implemented. Candidate trials use declared worker concurrency, application-level readiness, full synthesis warmup, and bounded cancellation drain/reload semantics | Provider, adapter, bounded-drain/restart cancellation, speaker acoustics, reference locks, matrix, benchmark, cache-content, strict readiness, timeout, and trial-wiring tests; both candidate images run on the RTX 5090 | `20260722-chromie-ai-girl-v1` passed 6/6 transport/stability cases per candidate: CosyVoice3 median first binary/RTF 3.0987 s/0.5419 and Qwen3-TTS 5.6786 s/0.9364. Oute later failed requested-text/listening diagnostics. An earlier one-model CosyVoice launcher reached the physical microphone loop. The rebuilt strict service-only path passed application health and returned 485760 bytes of PCM; its host Orchestrator was deliberately off, so supervised listening still remains | `TTS_PROVIDER=oute`; `--tts-trial cosyvoice` is reversible, non-persistent, uses one host request for one candidate worker and a reduced cognitive resource envelope; no provider winner is selected |
+| Deterministic controls plus semantic quick Router | Implemented; interrupt/silence/unusable-audio controls remain deterministic. Normal routing uses catalog context, bounded host engagement evidence, subject-ownership/addressedness review, structural validation, semantic repair, clarification, or deep handoff. Only high-confidence bounded ambient speech may use semantic `ignore`; ignored turns do not open engagement. Retained completed tasks alone cannot turn a tiny ASR fragment into an effectful follow-up | Router rules, addressedness/engagement, low-information retained-task regression, capability routing, prompt, route-contract, replay, multi-turn, deepthinking, interaction, and regression coverage | July 21 live-text evidence predates this fix. July 22 logs diagnose the repeated ambient `capability_inquiry` and isolated `I.` failures; a retained post-fix microphone run is open | Enabled; addressedness gate on with a 45-second recent accepted-exchange window |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Historical compatibility evidence only; it is not the maintained semantic-authority path | Service remains available, but common cognitive `apply` does not use it as semantic authority |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle on the historical path; it is not evidence for the current cognitive authority path | Enabled in the common safe base |
 | Native structured Interaction Agent | Implemented as the strict output and compatibility surface for `InteractionSpeech`/`SkillRequest` accumulation, TaskGraph requests, and optional `SocialAttentionPlan` coordination. Under cognitive `apply`, fingerprint-bound Response Composition is part of the authoritative Goal-driven pipeline rather than a separate background observer. Attention is selected from exact named capabilities or `none`; the host validates target evidence, schemas, latency, confirmation policy, and conflicts and excludes auxiliary attention from user task proposals | Native route, TaskGraph, validation, fail-closed, fallback, response-composition goal coverage/claim/immutability, social-attention selection/none/invalid/latency/target/conflict, exact-intent, and compatibility-mode tests plus file-backed interaction scenarios | The final July 21 diagnostic 10/10 live-text simulator run exercised fingerprint-bound cognitive response composition, ordered speech transport, action requests, execution receipts, and safe closure. Auxiliary Social Attention still lacks its own retained live qualification | Structured interaction enabled; normal profiles keep attention off. Only the explicit architecture-validation overlay selects `sim_only` with calibrated right-side fallback |
-| Goal-driven cognitive runtime and single semantic authority | PR1–PR8 contracts and stages are integrated through one host coordinator: state-specific exact-schema Goal Association, exact flat Fast/Deep Planner DTOs with host-owned canonical envelopes, goal-keyed model outcomes, prospective Goal Satisfaction, exact-schema fingerprint-bound Response Composition, response-transport separation, one bounded same-stage repair, lane-gated runtime adaptation, atomic Goal-state application, mixed-plan execution, and existing confirmation/Skill Runtime execution. Maintained `apply` mode is authoritative for enabled routes and fails closed after ownership acquisition. Exact Router actions are adapter-only. The old CapabilityAgent semantic planner is retained only behind host and Agent gates plus a non-empty authoritative emergency claim whose `turn_id` exactly matches the request | The final July 21 gate passed 1106 primary plus 20 legacy Agent tests, 381/381 declarative scenarios, 52/52 Level A general-ability cases, the fail-on-error semantic-authority audit, and documentation validation. The retained cognitive-runtime family contains twelve scenarios and the daily-life Level A class contains eight cases | The final July 21 diagnostic live-text simulator suite passed 10/10 with complete execution receipts and safe idle. All four daily-life cases terminated at Fast; the explicit numeric three-action compound safely rejected a bad Fast substitution and recovered through Deep with 0.2 m/s preserved. Daily-life median cognitive runtime was 40.321 seconds, above the 15.46-second target. Dirty checkouts and absent endpoint revision identity prevent source-bound Target validation | Common safe base: authoritative `chat` apply, structured interaction on, Soridormi off. Maintained Soridormi launcher: authoritative `chat,robot_action`, Soridormi on. Both fail closed; legacy semantic fallback gates are off |
+| Goal-driven cognitive runtime and single semantic authority | PR1–PR8 contracts and stages are integrated through one host coordinator: state-specific exact-schema Goal Association, exact flat Fast/Deep Planner DTOs with host-owned canonical envelopes, goal-keyed model outcomes, prospective Goal Satisfaction, exact-schema fingerprint-bound Response Composition, response-transport separation, one bounded same-stage repair, source-route effect authority, atomic Goal-state application, goal-scoped runtime evidence, mixed-plan execution, confirmation, and playback-gated Skill Runtime execution. Maintained `apply` mode is authoritative for enabled routes and fails closed after ownership acquisition. Exact Router actions are adapter-only. The old CapabilityAgent semantic planner is retained only behind host and Agent gates plus a non-empty authoritative emergency claim whose `turn_id` exactly matches the request | The July 22 post-fix gate passed 1164 primary plus 20 legacy Agent tests, 382/382 declarative scenarios, 53/53 Level A general-ability cases, the fail-on-error semantic-authority audit, and documentation validation. The retained cognitive-runtime family contains thirteen scenarios and the daily-life Level A class contains nine cases | The final July 21 diagnostic live-text simulator suite passed 10/10 with complete execution receipts and safe idle. All four daily-life cases terminated at Fast; the explicit numeric three-action compound safely rejected a bad Fast substitution and recovered through Deep with 0.2 m/s preserved. That live evidence predates the July 22 lifecycle/effect-envelope repair; a post-fix supervised rerun remains open. Daily-life median cognitive runtime was 40.321 seconds, above the 15.46-second target. Dirty checkouts and absent endpoint revision identity prevent source-bound Target validation | Common safe base: authoritative `chat` apply, structured interaction on, Soridormi off. Maintained Soridormi launcher: authoritative `chat,robot_action`, Soridormi on. Both fail closed; legacy semantic fallback gates are off |
 | Semantic compound capability planning | Implemented inside Fast/Deep canonical planning over bounded capability schemas plus provider/resource evidence. The model chooses exact execution, safe adjustment, alternative proposal, clarification, or unsupported; model-authored timing and explanation are preserved. A quick Router that cannot account for the complete effectful goal hands the original utterance to the unified planner instead of declaring the ability missing or invoking the legacy CapabilityAgent planner. Deterministic code validates the complete plan atomically, blocks partial-skill leakage, requires confirmation for material alternatives, and performs authorization/resource arbitration rather than natural-language action interpretation | Exact parallel composition, sequential alternative proposal, unresolved Router-to-planner handoff, unknown concurrency evidence, invalid-substep atomic rejection, confirmation-prompt override, host blocked-state stripping, repeated-step audit identity, and file-backed Chinese walk/blink regression tests | The July 21 diagnostic compound case executed sequential walk at exactly 0.2 m/s, two nods, and a left turn through Deep recovery, then returned safe idle. This is simulator evidence only and makes no claim that concurrent walking and blinking are physically compatible on a particular robot | Unified cognitive planning enabled for configured apply lanes; provider metadata remains authoritative; no normal-language action/count/speed fast-path parser |
 | Trusted host Skill Runtime | Implemented | Scheduling, confirmation, timeout, cancellation, and isolation tests | The final July 21 diagnostic 10/10 suite exercised speech and Soridormi requests, sequential multi-step execution, normalized receipts, and safe-idle closure on the current Goal-driven path | Used only by structured path |
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, and denial | Approval, denial, ambiguity, replay, mutation, expiry, and authorization tests | Historical synthetic and virtual-mic approval/denial evidence passed; the current goal-driven path still needs a clean retained rerun | Structured path; simulator exemption configurable |

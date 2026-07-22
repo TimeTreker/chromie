@@ -159,6 +159,22 @@ class OuteTTSProvider(TTSProvider):
             raise RuntimeError(
                 f"Unexpected generation-worker response: {response.get('type')!r}"
             )
+        reload_ids = [speaker_id]
+        if make_default and speaker_id != "default":
+            reload_ids.append("default")
+        for worker in self._workers[1:]:
+            reload_response = await worker.request(
+                {"type": "reload_speaker", "speaker_ids": reload_ids}
+            )
+            if reload_response.get("type") == "error":
+                raise RuntimeError(
+                    str(reload_response.get("message") or "speaker reload failed")
+                )
+            if reload_response.get("type") != "speaker_reloaded":
+                raise RuntimeError(
+                    "Unexpected generation-worker response while reloading speaker: "
+                    f"{reload_response.get('type')!r}"
+                )
         return dict(response)
 
     async def _generate(self, request: TTSSynthesisRequest) -> tuple[bytes, dict[str, Any]]:

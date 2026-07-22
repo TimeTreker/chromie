@@ -61,12 +61,15 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
   isolated pinned CosyVoice3/Qwen3-TTS candidate services, fail-closed provider
   registry, and common multilingual/interruption/dialogue/concurrency A/B
   runner; both candidates pass isolated objective runs with generated and
-  user-authorized AI voice references, while
-  provider replacement still requires clean shared-resource and blinded
-  listening evidence;
+  user-authorized AI voice references, and the reversible CosyVoice trial uses
+  a one-model cognitive envelope to reach the live microphone path without
+  changing the default provider, while provider replacement still requires
+  clean shared-resource and blinded listening evidence;
 - sherpa-onnx SenseVoice as the single supported final-utterance ASR runtime,
   with immutable model provenance, CUDA/CPU providers, and startup warm-up;
-- deterministic stop, cancel, emergency, ignore, and silence handling;
+- deterministic stop, cancel, emergency, silence, and unusable-audio handling,
+  plus bounded model-assisted addressedness that can only suppress an inactive
+  ambient turn and fails open to normal routing;
 - three-stage route flow: emergency filter, Qwen quick intent routing, and
   larger-model deepthought handoff when quick confidence is low or planning is
   needed;

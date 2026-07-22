@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import fcntl
 import os
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -152,10 +155,19 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP"], "1")
         self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED"], "1")
+        self.assertEqual(values["ORCH_FAST_FIRST_AUDIO_MAX_CUE_SECONDS"], "4")
+        self.assertEqual(
+            values["ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY"],
+            "0.65",
+        )
+        self.assertEqual(values["ORCH_ADDRESSEDNESS_GATE_ENABLED"], "1")
+        self.assertEqual(values["ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC"], "45")
         self.assertEqual(values["ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED"], "0")
         self.assertEqual(values["ORCH_ENABLE_INTERACTION_RESPONSE"], "1")
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_SKILLS"], "0")
         self.assertEqual(values["ORCH_AUTO_CONFIRM_SIM_SKILLS"], "0")
+        self.assertEqual(values["TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC"], "3")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
         self.assertEqual(values["ORCH_COGNITIVE_APPLY_LANES"], "chat")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
@@ -187,6 +199,13 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertIn("TTS_CONTEXT_SIZE=4096", profile)
         self.assertIn("TTS_MAX_LENGTH=4096", profile)
+
+        rtx5090 = (ROOT / "env" / "profiles" / "rtx5090.env").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("TTS_CONTEXT_SIZE=8192", rtx5090)
+        self.assertIn("TTS_MAX_LENGTH=8192", rtx5090)
+        self.assertIn("TTS_RESET_LLAMA_STATE=1", rtx5090)
 
     def test_episode_recording_is_enabled_by_default(self) -> None:
         values = _common_env()
@@ -244,6 +263,88 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('START_ORCHESTRATOR=0', source)
         self.assertIn('Skipping host Orchestrator (--no-orchestrator)', source)
         self.assertIn('ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE"', source)
+
+    def test_start_chromie_refuses_to_mutate_services_under_active_orchestrator(self) -> None:
+        launcher = (ROOT / "scripts" / "start_chromie.sh").read_text(
+            encoding="utf-8"
+        )
+        guard = ROOT / "scripts" / "check_orchestrator_idle.sh"
+        self.assertIn("./scripts/check_orchestrator_idle.sh", launcher)
+        self.assertLess(
+            launcher.index("\n./scripts/check_orchestrator_idle.sh\n"),
+            launcher.index("\n./scripts/build_runtime_env.sh\n"),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lock_path = Path(temp_dir) / "orchestrator.lock"
+            with lock_path.open("w", encoding="utf-8") as lock_handle:
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                blocked = subprocess.run(
+                    [str(guard)],
+                    cwd=ROOT,
+                    env=dict(os.environ, ORCH_LOCK_FILE=str(lock_path)),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertNotEqual(blocked.returncode, 0)
+                self.assertIn("already running", blocked.stderr)
+                fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+            idle = subprocess.run(
+                [str(guard)],
+                cwd=ROOT,
+                env=dict(os.environ, ORCH_LOCK_FILE=str(lock_path)),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(idle.returncode, 0, idle.stderr)
+
+    def test_start_chromie_has_non_persistent_cosyvoice_trial(self) -> None:
+        launcher = (ROOT / "scripts" / "start_chromie.sh").read_text(
+            encoding="utf-8"
+        )
+        services = (ROOT / "scripts" / "start_services.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("--tts-trial cosyvoice", launcher)
+        self.assertIn("TTS_URL=ws://127.0.0.1:5001", launcher)
+        self.assertIn("TTS_SPEAKER_ID=default", launcher)
+        self.assertIn("ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=cosyvoice3-", launcher)
+        self.assertIn("ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0", launcher)
+        self.assertIn('echo "ORCH_TTS_CONCURRENCY=1"', launcher)
+        self.assertIn("TTS_COSYVOICE_TRIAL_OLLAMA_MODEL:-qwen3:4b", launcher)
+        self.assertIn("EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1", launcher)
+        self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", launcher)
+        self.assertIn("The configured default TTS provider is unchanged", launcher)
+        self.assertIn("Chromie services are ready", launcher)
+        self.assertNotIn("Chromie voice interaction is ready", launcher)
+        self.assertIn("python_ws_health_check()", launcher)
+        self.assertIn(
+            'wait_for_ws_health 127.0.0.1 9001 asr 900 "ASR"',
+            launcher,
+        )
+        self.assertIn(
+            'wait_for_ws_health 127.0.0.1 "$TTS_READY_PORT" tts 1200 "$TTS_READY_LABEL"',
+            launcher,
+        )
+        self.assertNotIn('wait_for_tcp 127.0.0.1 9001 900 "ASR"', launcher)
+        self.assertIn("warm_tts_candidate", launcher)
+        self.assertIn("TTS_COSYVOICE_TRIAL_WARMUP_TEXT", launcher)
+        self.assertIn("fun-cosyvoice3-0.5b", launcher)
+        self.assertIn("TTS_SERVICE=chromie-tts-cosyvoice", services)
+        self.assertIn("--profile tts-evaluation", services)
+        self.assertEqual(
+            _common_env()["TTS_COSYVOICE_TRIAL_OLLAMA_MODEL"],
+            "qwen3:4b",
+        )
+        self.assertEqual(_common_env()["ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS"], "2")
+
+        verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", verifier)
 
     def test_start_chromie_waits_for_application_health(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(

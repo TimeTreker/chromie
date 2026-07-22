@@ -26,12 +26,18 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 381)
+        self.assertEqual(len(all_cases), 382)
         self.assertEqual(len(adapter_cases), 4)
         self.assertEqual(len(router_cases), 23)
         self.assertEqual(len(router_dialogue_cases), 2)
         self.assertEqual(len(dialogue_cases), 319)
         self.assertEqual(len(load_scenarios(suites={"interaction"})), 21)
+        cognitive_cases = load_scenarios(suites={"cognitive_runtime"})
+        self.assertEqual(len(cognitive_cases), 13)
+        self.assertIn(
+            "cognitive_runtime/chat_turn_cannot_replay_completed_motion",
+            [case.key for case in cognitive_cases],
+        )
         self.assertIn("dialogue/walk_then_followup_status", dialogue_keys)
         self.assertIn("dialogue/raw_joint_command_refusal", dialogue_keys)
         self.assertIn("dialogue/batch2_safety_117_walk_into_a_smoky_hallway", dialogue_keys)

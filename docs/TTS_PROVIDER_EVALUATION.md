@@ -164,20 +164,124 @@ provider listening gate.
 
 The same supplied English and Chinese recordings created separate OuteTTS
 profiles with transcript/alignment similarities `1.00` and `0.95`; their
-combined bilingual reference created a third profile at `1.00`. Short English
-and Chinese auditions and the short mixed prompt `你好，Hello.` produced audio.
-A longer mixed prompt exhausted the 4096-token generation budget without any
-audio-code tokens, including its configured retry, and was rejected instead of
-playing empty or incomplete audio. Rebuilt-container default-speaker tests then
-reproduced stochastic exhaustion with `chromie_mixed` on a short Chinese case
-and with the Chinese-aligned `chromie_zh` profile on a 26-character Chinese
-case. Raising the RTX 5090 diagnostic budget to 8192 still exhausted all 7632
-available generation tokens after the prompt. This locates the blocker in
-Oute's cloned-speaker termination behavior rather than the configured context
-size. The supplied style was therefore not promoted to the maintained default;
-the profiles and source recordings remain ignored local artifacts. This is
-local synthesis evidence only and does not establish pronunciation,
-naturalness, voice similarity, or listening quality.
+combined bilingual reference created a third profile at `1.00`. Those checks
+were incomplete: the soundfile fallback returned `[channels, samples]` while
+OuteTTS's DAC path requires `[batch, channels, samples]`. Oute's loudness stage
+therefore collapsed each complete recording to one sample, and all three JSON
+profiles contained only one DAC code pair even though text alignment passed.
+The earlier 4096/8192 exhaustion result came from those malformed profiles and
+did not isolate a model-only termination defect.
+
+The loader now preserves all three axes. Creation rejects missing/mismatched DAC
+codebooks, fewer than 30 acoustic codes, or less than 50 percent reference-audio
+coverage; invalid stored profiles rebuild only from a matching WAV and exact
+transcript. Generation deep-copies profiles because OuteTTS 0.4.4 mutates the
+last aligned word while composing a prompt, and accepted profiles are reloaded
+across every service worker. The regenerated `chromie_mixed` profile has 776
+DAC code pairs, 28/28 acoustically conditioned words, and 10.35 seconds of code
+coverage. A corrected-profile 4096 full matrix still exhausted one 23-character
+Chinese dialogue turn because its approximately 1900-token acoustic prompt left
+insufficient stochastic generation headroom. With the RTX 5090 context and
+generation limit raised to 8192 and per-request llama reset enabled, a 10/10
+smoke passed and two repeated full matrices each passed all six Mandarin,
+English, mixed, interruption/recovery, long-dialogue, and concurrency cases.
+Median first-binary/RTF was `6.7510 s/0.7769` and `7.1491 s/0.7841`.
+
+The owner installation now selects `chromie_mixed`, but the profile and source
+recordings remain ignored local artifacts. A clean installation without that
+profile still uses Oute's built-in speaker. This is local, dirty-tree synthesis
+evidence; it does not establish pronunciation, naturalness, voice similarity,
+physical speaker quality, or release readiness.
+
+A later live-output diagnosis found a content failure that the transport matrix
+did not measure: OuteTTS `chromie_mixed` generated the bilingual enrollment
+sentence inside nominally short Chinese acknowledgement cues, and the remaining
+Chinese was audibly unnatural. Local ASR reproduced the leaked English sentence.
+This means the successful Oute matrix proves completion, stability, and timing,
+not intelligibility or acceptance of that speaker. `chromie_mixed` remains the
+owner installation's configured experiment, but it has not passed the listening
+gate and must not be described as a production-quality Chinese voice.
+
+The host now binds fast-first cache keys to the endpoint, provider/model
+declaration, speaker ID, reported speaker revision, and optional operator
+revision. Every existing or newly generated cue is duration-limited and, by
+default, transcribed through ASR before it can enter the in-memory playback
+cache. A mismatched cue fails closed. This protects acknowledgement playback;
+it does not repair OuteTTS pronunciation or promote another provider. Missing
+cues receive at most two generation attempts by default when synthesis
+completes but content validation rejects the sample; every attempt must pass
+the same gate, and rejected audio is never cached. A synthesis timeout aborts
+the remaining startup generation instead of cancelling and repeatedly
+cold-loading the provider.
+
+For supervised listening only, `./scripts/start_chromie.sh --tts-trial
+cosyvoice --keep-services` selects the isolated CosyVoice3 service and the
+installation-local authorized reference for that run. It stops OuteTTS to avoid
+GPU contention, maps every cognitive lane to the compact
+`TTS_COSYVOICE_TRIAL_OLLAMA_MODEL` (`qwen3:4b` by default), permits one resident
+Ollama model, and points the host Orchestrator at port 5001 without editing the
+normal provider configuration. It loads existing validated fast-first cues but
+does not generate missing cues before opening the microphone. The next normal
+launch restores OuteTTS and the normal model profile. This trial path is not a
+provider-selection decision.
+
+The July 22 local trial also exposed and fixed a candidate deployment defect:
+`onnxruntime-gpu==1.18.0` expected cuDNN 8 while the CUDA 12.8 candidate image
+provides cuDNN 9. The candidate now pins 1.18.1 and starts its normalizer with
+`CUDAExecutionProvider`; its ModelScope WeText cache is persistent. After that
+fix, all six English and Chinese fast-first cues passed the duration and ASR
+content gates. This is local automated content evidence, not the operator's
+listening verdict or a provider promotion.
+
+The first full-stack trial exposed a separate shared-resource startup failure
+that the isolated matrix could not reveal. The normal `qwen3:4b` plus
+`gemma4:26b` cognitive profile, CosyVoice, ASR, and runtime processes occupied
+roughly 28 GiB of GPU memory before candidate inference. Short-cue synthesis
+then exceeded its 30-second request budget; cancelling each WebSocket request
+restarted CosyVoice's process worker and the next retry paid another cold load.
+After the 120-second outer budget, Python 3.10's `asyncio.TimeoutError` escaped
+the old built-in-only timeout handler and terminated the host before microphone
+startup. The trial-specific one-model profile and disabled missing-cue startup
+generation remove that contention loop, while the host now treats the outer
+timeout as non-fatal. On July 22 the exact full launcher reached service
+readiness, resolved the cache in 4.1 ms with zero generation, and logged
+`Microphone started`. This is local operational startup evidence only; no voice
+quality or provider-selection verdict follows from it.
+
+The following live conversation exposed two more trial-topology limits. First,
+the host used two concurrent synthesis requests because the RTX 5090 Oute
+profile has two workers, while CosyVoice has one singleton model worker. The
+second request therefore waited behind the first without gaining throughput.
+Second, cancelling synchronous candidate inference restarted and reloaded the
+worker, reproducing the measured roughly 18–19 second recovery tail. These
+delays made speech arrive after related simulator effects and made an unrelated
+goal-lifecycle defect much more visible, but CosyVoice did not cause the old
+walk/blink plan to be selected: the Router had correctly classified the
+reported follow-up as `chat/social_exchange` before the cognitive runtime
+replayed stale goals.
+
+The reversible CosyVoice trial now forces `ORCH_TTS_CONCURRENCY=1`, validates
+ASR/TTS application health over WebSocket rather than treating an open TCP port
+as readiness, and completes one no-playback synthesis with nonempty PCM before
+the launcher reports the candidate ready. Candidate cancellation holds the
+singleton lock for a bounded three-second drain: an almost-complete result is
+discarded without unloading the model, while timeout, malformed output, or a
+dead worker still triggers a fail-closed restart before another request can
+begin. Health exposes drain and restart counters. Because upstream CosyVoice
+inference is still synchronous at this boundary, a request that cannot finish
+inside the drain may continue to pay the cold-reload recovery cost; the fix
+prevents false concurrency/readiness claims and stale audio, not a new latency
+claim or provider promotion.
+
+The rebuilt service-only trial completed both application-health checks and a
+full no-playback synthesis under the shared service load, returning 485760
+bytes of PCM from `fun-cosyvoice3-0.5b`. That run also exposed an older host
+Orchestrator still holding the microphone and submitting requests while the
+containers were recreated. The old process was stopped, and the top-level
+launcher now checks the same exclusive Orchestrator lock before changing
+runtime files or services. This is startup and synthesis-readiness evidence;
+the host Orchestrator was deliberately left stopped, so it is not a supervised
+listening or robot-behavior result.
 
 The runner verifies the provider declaration, generates WAV artifacts for the
 same text, records first-binary latency, total latency, audio duration,

@@ -354,17 +354,41 @@ class CanonicalPlanRuntimeAdapter:
             if step.timing == "parallel":
                 parallel_batch.append(step)
                 continue
-            errors.extend(self._parallel_errors(parallel_batch, definitions))
+            errors.extend(
+                self._parallel_errors(
+                    parallel_batch,
+                    definitions,
+                    plan_step_count=len(plan.steps),
+                )
+            )
             parallel_batch = []
-        errors.extend(self._parallel_errors(parallel_batch, definitions))
+        errors.extend(
+            self._parallel_errors(
+                parallel_batch,
+                definitions,
+                plan_step_count=len(plan.steps),
+            )
+        )
         return errors
 
     @staticmethod
     def _parallel_errors(
-        steps: list[Any], definitions: dict[str, Any]
+        steps: list[Any],
+        definitions: dict[str, Any],
+        *,
+        plan_step_count: int,
     ) -> list[dict[str, Any]]:
-        if len(steps) < 2:
+        if not steps:
             return []
+        if len(steps) == 1 and plan_step_count > 1:
+            step = steps[0]
+            return [
+                {
+                    "type": "runtime_parallel_singleton_group",
+                    "step_id": step.step_id,
+                    "skill_id": step.skill_id,
+                }
+            ]
         errors: list[dict[str, Any]] = []
         for index, step in enumerate(steps):
             definition = definitions.get(step.step_id)
@@ -507,6 +531,207 @@ class CanonicalPlanRuntimeAdapter:
                 return True
         return False
 
+    @staticmethod
+    def _authoritative_nonexecuting_text(
+        plan: CanonicalPlan,
+        goal_ids: list[str],
+        *,
+        language: str,
+    ) -> str:
+        """Render only canonical non-execution outcomes as user-facing text.
+
+        A Response Composer stage can cover both an executable goal and a
+        conversational or clarification goal.  Its prose cannot be safely
+        reused after those authorities are split because the prose may claim
+        an execution state.  Canonical per-goal outcome text is the trusted
+        source for respond/clarify content; disposition-only fallbacks keep
+        other non-execution outcomes truthful without borrowing action prose.
+        """
+
+        zh = language.lower().startswith("zh")
+        texts: list[str] = []
+        for goal_id in plan.goal_ids:
+            if goal_id not in goal_ids:
+                continue
+            outcome = plan.outcome_for_goal(goal_id)
+            if outcome is None or outcome.disposition == "execute":
+                continue
+            text = str(outcome.response_text or "").strip()
+            if text:
+                texts.append(text)
+            elif outcome.disposition == "clarify":
+                texts.append(
+                    "我还需要你补充这个请求的信息。"
+                    if zh
+                    else "I still need more information for this request."
+                )
+            elif outcome.disposition == "unavailable":
+                texts.append(
+                    "这个请求当前不可用。"
+                    if zh
+                    else "This request is currently unavailable."
+                )
+            elif outcome.disposition == "refused":
+                texts.append(
+                    "我不能执行这个请求。"
+                    if zh
+                    else "I cannot carry out this request."
+                )
+        return " ".join(texts).strip()
+
+    @staticmethod
+    def _spoken_number(value: Any, *, language: str, repetitions: bool = False) -> str:
+        """Render bounded structured numeric arguments without model prose."""
+
+        zh = language.lower().startswith("zh")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return str(value)
+        numeric = float(value)
+        if numeric.is_integer():
+            integer = int(numeric)
+            if zh and 0 <= integer <= 10:
+                if repetitions and integer == 2:
+                    return "两"
+                return "零一二三四五六七八九十"[integer]
+            if not zh and 0 <= integer <= 10:
+                words = (
+                    "zero",
+                    "one",
+                    "two",
+                    "three",
+                    "four",
+                    "five",
+                    "six",
+                    "seven",
+                    "eight",
+                    "nine",
+                    "ten",
+                )
+                return words[integer]
+            return str(integer)
+        return f"{numeric:g}"
+
+    @classmethod
+    def _authoritative_step_text(cls, step: Any, *, language: str) -> str:
+        """Describe one validated high-level step from its skill id and args.
+
+        The text is deliberately rendered by the host from the same structured
+        values later sent to Skill Runtime.  It therefore cannot inherit an
+        execution or confirmation claim hidden in planner/composer prose.
+        Unknown skills retain a truthful generic description instead of
+        exposing an internal identifier or guessing at their effect.
+        """
+
+        zh = language.lower().startswith("zh")
+        skill_id = str(step.skill_id)
+        args = dict(step.args)
+        count = args.get("count", 1)
+        duration = args.get("duration_s")
+
+        if skill_id == "soridormi.blink_eyes":
+            if zh:
+                number = cls._spoken_number(
+                    count, language=language, repetitions=True
+                )
+                return f"眨{number}下眼睛"
+            if count == 1:
+                return "blink once"
+            if count == 2:
+                return "blink twice"
+            number = cls._spoken_number(count, language=language)
+            return f"blink {number} times"
+
+        if skill_id == "soridormi.nod_yes":
+            if zh:
+                number = cls._spoken_number(
+                    count, language=language, repetitions=True
+                )
+                return f"点{number}下头"
+            if count == 1:
+                return "nod once"
+            if count == 2:
+                return "nod twice"
+            number = cls._spoken_number(count, language=language)
+            return f"nod {number} times"
+
+        if skill_id == "soridormi.look_at_person":
+            if duration is None:
+                return "看着你" if zh else "look at you"
+            number = cls._spoken_number(duration, language=language)
+            unit = "second" if float(duration) == 1 else "seconds"
+            return (
+                f"看着你{number}秒"
+                if zh
+                else f"look at you for {number} {unit}"
+            )
+
+        if skill_id == "soridormi.walk_forward":
+            if duration is None:
+                return "往前走" if zh else "walk forward"
+            number = cls._spoken_number(duration, language=language)
+            unit = "second" if float(duration) == 1 else "seconds"
+            return (
+                f"往前走{number}秒"
+                if zh
+                else f"walk forward for {number} {unit}"
+            )
+
+        if skill_id == "soridormi.shake_no":
+            if zh:
+                number = cls._spoken_number(
+                    count, language=language, repetitions=True
+                )
+                return f"摇{number}下头"
+            if count == 1:
+                return "shake my head once"
+            if count == 2:
+                return "shake my head twice"
+            number = cls._spoken_number(count, language=language)
+            return f"shake my head {number} times"
+
+        if skill_id == "soridormi.bow":
+            return "鞠躬" if zh else "bow"
+        if skill_id == "soridormi.neutral_head":
+            return "把头恢复到自然位置" if zh else "return my head to neutral"
+        if skill_id == "soridormi.stand_idle":
+            return "保持站立待机" if zh else "stand idle"
+        if skill_id == "soridormi.stop":
+            return "停止动作" if zh else "stop moving"
+
+        return "执行请求的动作" if zh else "perform the requested action"
+
+    @classmethod
+    def _authoritative_operational_text(
+        cls,
+        plan: CanonicalPlan,
+        *,
+        language: str,
+        confirmation_required: bool,
+    ) -> str:
+        """Render prospective action speech from validated runtime authority."""
+
+        zh = language.lower().startswith("zh")
+        actions = [
+            cls._authoritative_step_text(step, language=language)
+            for step in plan.steps
+        ]
+        if zh:
+            if len(actions) == 1:
+                action_text = actions[0]
+            else:
+                action_text = "先" + actions[0] + "，再" + "，再".join(actions[1:])
+            if confirmation_required:
+                return f"请确认是否要我{action_text}。"
+            return f"我会{action_text}。"
+
+        if len(actions) == 1:
+            action_text = actions[0]
+        else:
+            action_text = ", then ".join(actions)
+        if confirmation_required:
+            return f"Please confirm whether you'd like me to {action_text}."
+        return f"I'll {action_text}."
+
     async def build_response(
         self,
         *,
@@ -565,7 +790,19 @@ class CanonicalPlanRuntimeAdapter:
         if errors:
             raise ValueError("runtime canonical-plan validation failed: " + json.dumps(errors, ensure_ascii=False))
 
-        speech: list[InteractionSpeech] = []
+        fingerprint = canonical_plan_fingerprint(plan)
+        alternative = str(plan.metadata.get("plan_relation") or "") in {
+            "alternative",
+            "safe_adjustment",
+        } or bool(plan.metadata.get("user_confirmation_required"))
+        executable_goal_ids = set(plan.executable_goal_ids())
+        confirmation_goal_ids = set(executable_goal_ids) if alternative else set()
+        if not alternative:
+            for step in plan.steps:
+                definition = self.interaction_runtime.skill_definition(step.skill_id)
+                if definition.requires_confirmation:
+                    confirmation_goal_ids.update(step.source_goal_ids)
+
         response_plan = composition.response_plan
         stage_items = [
             ("immediate", response_plan.immediate),
@@ -573,32 +810,201 @@ class CanonicalPlanRuntimeAdapter:
             *[("progress", item) for item in response_plan.progress],
             ("final", response_plan.final),
         ]
-        for phase, stage in stage_items:
-            if stage is None:
-                continue
+        effectful_pre_execution = (
+            plan.disposition in {"execute", "mixed"} and bool(plan.steps)
+        )
+        omitted_pre_execution_speech_phases: list[str] = []
+        projected_speech_stages: list[dict[str, Any]] = []
+        if effectful_pre_execution:
+            required_goal_ids = set(plan.goal_ids)
+            immediate_item = (
+                ("immediate", response_plan.immediate)
+                if response_plan.immediate is not None
+                else None
+            )
+            pre_action_item = (
+                ("pre_action", response_plan.pre_action)
+                if response_plan.pre_action is not None
+                else None
+            )
+            available_pre_execution = [
+                item
+                for item in (immediate_item, pre_action_item)
+                if item is not None
+            ]
+            covered_pre_execution = {
+                goal_id
+                for _, stage in available_pre_execution
+                for goal_id in stage.covers_goal_ids
+            }
+            if not available_pre_execution or not required_goal_ids.issubset(
+                covered_pre_execution
+            ):
+                raise ValueError(
+                    "effectful pre-execution response requires immediate and/or "
+                    "pre_action stages covering all canonical goals"
+                )
+
+            if (
+                pre_action_item is not None
+                and required_goal_ids.issubset(
+                    set(pre_action_item[1].covers_goal_ids)
+                )
+            ):
+                stage_items = [pre_action_item]
+            elif (
+                immediate_item is not None
+                and required_goal_ids.issubset(
+                    set(immediate_item[1].covers_goal_ids)
+                )
+            ):
+                stage_items = [immediate_item]
+            else:
+                stage_items = list(available_pre_execution)
+
+            selected_keys = {(phase, id(stage)) for phase, stage in stage_items}
+            omitted_pre_execution_speech_phases = [
+                phase
+                for phase, stage in (
+                    ("immediate", response_plan.immediate),
+                    ("pre_action", response_plan.pre_action),
+                    *[("progress", item) for item in response_plan.progress],
+                    ("final", response_plan.final),
+                )
+                if stage is not None and (phase, id(stage)) not in selected_keys
+            ]
+
+            nonexecuting_goal_ids = required_goal_ids - executable_goal_ids
+            projected_nonexecuting_goal_ids: set[str] = set()
+            immediate_nonexecuting: list[dict[str, Any]] = []
+            pre_action_nonexecuting: list[dict[str, Any]] = []
+            for phase, stage in stage_items:
+                covered_nonexecuting = [
+                    goal_id
+                    for goal_id in plan.goal_ids
+                    if goal_id in stage.covers_goal_ids
+                    and goal_id in nonexecuting_goal_ids
+                ]
+                if not covered_nonexecuting:
+                    continue
+                text = self._authoritative_nonexecuting_text(
+                    plan,
+                    covered_nonexecuting,
+                    language=language,
+                )
+                if not text:
+                    raise ValueError(
+                        "effectful response cannot safely render non-executable "
+                        "goal outcomes from canonical state"
+                    )
+                projected_nonexecuting_goal_ids.update(covered_nonexecuting)
+                projected = {
+                    "phase": phase,
+                    "text": text,
+                    "speech_act": stage.speech_act,
+                    "commitment_state": stage.commitment_state,
+                    "must_not_claim_completion": True,
+                    "covers_goal_ids": covered_nonexecuting,
+                    "claims": [],
+                    "source": "goal_driven_canonical_outcome",
+                }
+                (
+                    immediate_nonexecuting
+                    if phase == "immediate"
+                    else pre_action_nonexecuting
+                ).append(projected)
+
+            missing_nonexecuting = (
+                nonexecuting_goal_ids - projected_nonexecuting_goal_ids
+            )
+            if missing_nonexecuting:
+                raise ValueError(
+                    "effectful response projection lost non-executable goals: "
+                    + ",".join(sorted(missing_nonexecuting))
+                )
+
+            ordered_executable_goal_ids = [
+                goal_id
+                for goal_id in plan.goal_ids
+                if goal_id in executable_goal_ids
+            ]
+            projected_operational = {
+                "phase": "pre_action",
+                "text": self._authoritative_operational_text(
+                    plan,
+                    language=language,
+                    confirmation_required=bool(confirmation_goal_ids),
+                ),
+                "speech_act": (
+                    "request_confirmation"
+                    if confirmation_goal_ids
+                    else "acknowledge"
+                ),
+                "commitment_state": (
+                    "waiting_for_user" if confirmation_goal_ids else "accepted"
+                ),
+                "must_not_claim_completion": True,
+                "covers_goal_ids": ordered_executable_goal_ids,
+                "claims": [],
+                "source": "goal_driven_runtime_authority",
+                "operational_text_source": "runtime_authoritative_state",
+                "runtime_confirmation_required": bool(confirmation_goal_ids),
+            }
+            projected_speech_stages = [
+                *immediate_nonexecuting,
+                projected_operational,
+                *pre_action_nonexecuting,
+            ]
+        else:
+            projected_speech_stages = [
+                {
+                    "phase": phase,
+                    "text": stage.text,
+                    "speech_act": stage.speech_act,
+                    "commitment_state": stage.commitment_state,
+                    "must_not_claim_completion": stage.must_not_claim_completion,
+                    "covers_goal_ids": stage.covers_goal_ids,
+                    "claims": stage.claims,
+                    "source": "goal_driven_response_composer",
+                }
+                for phase, stage in stage_items
+                if stage is not None
+            ]
+
+        speech: list[InteractionSpeech] = []
+        for projected in projected_speech_stages:
+            phase = str(projected["phase"])
+            speech_metadata = {
+                "source": projected["source"],
+                "phase": phase,
+                "speech_act": projected["speech_act"],
+                "commitment_state": projected["commitment_state"],
+                "must_not_claim_completion": projected[
+                    "must_not_claim_completion"
+                ],
+                "covers_goal_ids": projected["covers_goal_ids"],
+                "claims": projected["claims"],
+                "wait_for_playback_start": True,
+                "playback_start_required_for_delivery": True,
+            }
+            if effectful_pre_execution:
+                speech_metadata["playback_start_required_for_effects"] = True
+            for key in (
+                "operational_text_source",
+                "runtime_confirmation_required",
+            ):
+                if key in projected:
+                    speech_metadata[key] = projected[key]
             speech.append(
                 InteractionSpeech(
-                    text=stage.text,
+                    text=str(projected["text"]),
                     timing="immediate" if phase == "immediate" else "sequential",
                     style="brief",
-                    metadata={
-                        "source": "goal_driven_response_composer",
-                        "phase": phase,
-                        "speech_act": stage.speech_act,
-                        "commitment_state": stage.commitment_state,
-                        "must_not_claim_completion": stage.must_not_claim_completion,
-                        "covers_goal_ids": stage.covers_goal_ids,
-                        "claims": stage.claims,
-                    },
+                    metadata=speech_metadata,
                 )
             )
 
-        fingerprint = canonical_plan_fingerprint(plan)
         skills: list[SkillRequest] = []
-        alternative = str(plan.metadata.get("plan_relation") or "") in {
-            "alternative",
-            "safe_adjustment",
-        } or bool(plan.metadata.get("user_confirmation_required"))
         for step in plan.steps:
             definition = self.interaction_runtime.skill_definition(step.skill_id)
             digest = hashlib.sha256(
@@ -767,6 +1173,14 @@ class CanonicalPlanRuntimeAdapter:
                 else None
             ),
             "omitted_social_attention": omitted_attention,
+            "omitted_pre_execution_speech_phases": (
+                omitted_pre_execution_speech_phases
+            ),
+            "operational_speech_authority": (
+                "runtime_authoritative_state"
+                if effectful_pre_execution
+                else "not_applicable"
+            ),
         }
         if alternative:
             metadata["disable_body_auto_confirm"] = True
@@ -1151,6 +1565,33 @@ class GoalDrivenRuntimeCoordinator:
                         raise CognitiveStageFailure("deep_planner", deep_failure)
 
             lane = self.adapter.lane_for_plan(terminal_plan)
+            source_route = str(getattr(route_decision, "route", "") or "")
+            if lane == "robot_action" and source_route != "robot_action":
+                return self._finish(
+                    mode=self.policy.mode,
+                    status="error",
+                    lane=lane,
+                    association=association,
+                    fast_plan=fast_plan,
+                    terminal_plan=terminal_plan,
+                    composition=None,
+                    timings=timings,
+                    started=started,
+                    fallback_reason=(
+                        "terminal_plan_exceeds_source_route_effect_envelope"
+                    ),
+                    metadata={
+                        "failure_stage": "authority_boundary",
+                        "failure_class": "route_effect_escalation",
+                        "failure_domain": "cognitive_runtime",
+                        "architecture_attribution": "not_evaluated",
+                        "retryable": False,
+                        "source_route": source_route,
+                        "terminal_lane": lane,
+                        "stage_diagnostics": stage_diagnostics,
+                        **path_metadata(),
+                    },
+                )
             runtime_errors = await self.adapter.validation_errors(terminal_plan)
             replan_count = 0
             while runtime_errors and replan_count < self.policy.host_replan_budget:
@@ -1184,6 +1625,32 @@ class GoalDrivenRuntimeCoordinator:
                 if deep_failure is not None:
                     raise CognitiveStageFailure("deep_planner", deep_failure)
                 lane = self.adapter.lane_for_plan(terminal_plan)
+                if lane == "robot_action" and source_route != "robot_action":
+                    return self._finish(
+                        mode=self.policy.mode,
+                        status="error",
+                        lane=lane,
+                        association=association,
+                        fast_plan=fast_plan,
+                        terminal_plan=terminal_plan,
+                        composition=None,
+                        timings=timings,
+                        started=started,
+                        fallback_reason=(
+                            "terminal_plan_exceeds_source_route_effect_envelope"
+                        ),
+                        metadata={
+                            "failure_stage": "authority_boundary",
+                            "failure_class": "route_effect_escalation",
+                            "failure_domain": "cognitive_runtime",
+                            "architecture_attribution": "not_evaluated",
+                            "retryable": False,
+                            "source_route": source_route,
+                            "terminal_lane": lane,
+                            "stage_diagnostics": stage_diagnostics,
+                            **path_metadata(),
+                        },
+                    )
                 runtime_errors = await self.adapter.validation_errors(terminal_plan)
             if runtime_errors:
                 raise ValueError(

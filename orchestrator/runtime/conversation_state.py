@@ -394,6 +394,32 @@ class ConversationStateManager:
                 return context
         return None
 
+    def _task_context_by_goal_id(self, goal_id: str | None) -> dict[str, Any] | None:
+        """Resolve a semantic goal ID without confusing it with its task ID.
+
+        Goal Association intentionally gives newly segmented goals stable
+        ``goal_*`` identifiers while the host creates separate ``task_*``
+        persistence records.  Planner steps are scoped to the semantic goal ID,
+        so execution evidence must cross that boundary explicitly instead of
+        treating a goal ID as a task ID.  Legacy task-backed goals still work
+        because their semantic goal ID is the task ID.
+        """
+
+        normalized = " ".join(str(goal_id or "").strip().split())
+        if not normalized:
+            return None
+        task_id_match: dict[str, Any] | None = None
+        for context in reversed(self._task_contexts):
+            goal = self._semantic_goal_from_context(context)
+            if str(goal.goal_id or "") == normalized:
+                return context
+            if (
+                task_id_match is None
+                and str(context.get("task_id") or "") == normalized
+            ):
+                task_id_match = context
+        return task_id_match
+
     @staticmethod
     def _semantic_goal_from_context(context: dict[str, Any]) -> SemanticGoal:
         raw = context.get("semantic_goal")
@@ -1872,6 +1898,109 @@ class ConversationStateManager:
             self._persist_task_contexts_if_enabled()
         self.last_activity_ms = _now_ms()
 
+    @staticmethod
+    def _canonical_goal_outcomes(
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, dict[str, Any]]:
+        """Return goal-keyed outcomes from a trusted canonical-plan envelope."""
+
+        if not isinstance(metadata, dict):
+            return {}
+        plan = metadata.get("canonical_plan")
+        if not isinstance(plan, dict):
+            return {}
+        raw_outcomes = plan.get("goal_outcomes")
+        outcomes: dict[str, dict[str, Any]] = {}
+        if isinstance(raw_outcomes, dict):
+            iterable = []
+            for goal_id, value in raw_outcomes.items():
+                if isinstance(value, dict):
+                    iterable.append({"goal_id": goal_id, **value})
+        elif isinstance(raw_outcomes, list):
+            iterable = [item for item in raw_outcomes if isinstance(item, dict)]
+        else:
+            iterable = []
+        for item in iterable:
+            goal_id = " ".join(str(item.get("goal_id") or "").strip().split())
+            disposition = str(item.get("disposition") or "").strip().lower()
+            if goal_id and disposition:
+                outcomes[goal_id] = dict(item)
+
+        # Single-disposition plans may omit per-goal outcomes. Preserve their
+        # exact structured disposition without inferring anything from speech.
+        if not outcomes:
+            disposition = str(plan.get("disposition") or "").strip().lower()
+            goal_ids = plan.get("goal_ids")
+            if isinstance(goal_ids, str):
+                goal_ids = [goal_ids]
+            if disposition and isinstance(goal_ids, list):
+                for value in goal_ids:
+                    goal_id = " ".join(str(value or "").strip().split())
+                    if goal_id:
+                        outcomes[goal_id] = {
+                            "goal_id": goal_id,
+                            "disposition": disposition,
+                        }
+        return outcomes
+
+    @staticmethod
+    def _commitment_state_for_status(status: str) -> str:
+        return {
+            "awaiting_confirmation": "waiting_for_user",
+            "scheduled": "accepted",
+            "running": "executing",
+            "done": "completed",
+            "failed": "failed",
+            "refused": "failed",
+            "timed_out": "failed",
+            "cancelled": "cancelled",
+        }.get(status, "evaluating")
+
+    def _record_nonexecuting_goal_outcomes(
+        self,
+        outcomes: dict[str, dict[str, Any]],
+    ) -> None:
+        """Apply deterministic non-execution lifecycle outcomes per goal.
+
+        A clarification remains active and waits for the user.  Refusal and
+        unavailability are terminal planning outcomes.  Respond outcomes are
+        deliberately left for speech-request evidence, while execute outcomes
+        are left for their goal-scoped SkillRequest evidence.
+        """
+
+        changed = False
+        now = _now_ms()
+        for goal_id, outcome in outcomes.items():
+            disposition = str(outcome.get("disposition") or "").strip().lower()
+            context = self._task_context_by_goal_id(goal_id)
+            if context is None:
+                continue
+            item_changed = False
+            if disposition == "clarify":
+                context["status"] = "waiting_for_user"
+                context["commitment_state"] = "waiting_for_user"
+                context["plan_status"] = "blocked_on_user"
+                unresolved = outcome.get("unresolved")
+                if isinstance(unresolved, str):
+                    unresolved = [unresolved]
+                if isinstance(unresolved, list):
+                    context["pending_questions"] = [
+                        self._compact_text(str(item), limit=220)
+                        for item in unresolved
+                        if str(item).strip()
+                    ][:4]
+                item_changed = True
+            elif disposition in {"unavailable", "refused"}:
+                context["status"] = "refused"
+                context["commitment_state"] = "failed"
+                context["plan_status"] = disposition
+                item_changed = True
+            if item_changed:
+                context["updated_ms"] = now
+                changed = True
+        if changed:
+            self._persist_task_contexts_if_enabled()
+
     def _record_goal_pending_execution(
         self,
         *,
@@ -1915,9 +2044,10 @@ class ConversationStateManager:
                 "metadata": metadata,
             }
         )
-        context = self._task_context_by_id(goal_id)
+        context = self._task_context_by_goal_id(goal_id)
         if context is not None:
             context["status"] = status
+            context["commitment_state"] = self._commitment_state_for_status(status)
             context["updated_ms"] = timestamp_ms
             current_metadata = context.get("metadata")
             if not isinstance(current_metadata, dict):
@@ -1925,6 +2055,218 @@ class ConversationStateManager:
             context["metadata"] = {**current_metadata, **metadata}
             self._persist_task_contexts_if_enabled()
         self.last_activity_ms = timestamp_ms
+
+    def record_confirmation_scope(
+        self,
+        *,
+        sid: str | None,
+        confirmation_id: str,
+        interaction_id: str,
+        fingerprint: str,
+        expires_at: float,
+        response: Any,
+        confirmed_request_ids: set[str],
+    ) -> list[str]:
+        """Bind a staged confirmation to every semantic goal it covers.
+
+        A confirmation is a user-decision boundary, not runtime execution
+        evidence.  Its request IDs are therefore retained for auditability but
+        are deliberately stored in ``goal_confirmation`` records instead of
+        ``goal_execution`` records.  Only the post-approval Agent result may
+        schedule those requests.
+        """
+
+        if not self.enabled or self.max_pending_tasks <= 0:
+            return []
+        if hasattr(response, "model_dump"):
+            data = response.model_dump(mode="json")
+        elif isinstance(response, dict):
+            data = response
+        else:
+            data = {}
+
+        confirmed = {
+            str(request_id).strip()
+            for request_id in confirmed_request_ids
+            if str(request_id).strip()
+        }
+        by_goal: dict[str, list[dict[str, str]]] = {}
+        scoped_request_ids: set[str] = set()
+        for raw_request in data.get("skills", []) or data.get("actions", []) or []:
+            if isinstance(raw_request, dict):
+                request = raw_request
+            else:
+                request = {
+                    "request_id": getattr(raw_request, "request_id", None),
+                    "skill_id": getattr(raw_request, "skill_id", None),
+                    "metadata": getattr(raw_request, "metadata", None),
+                }
+            request_id = str(request.get("request_id") or "").strip()
+            if not request_id or request_id not in confirmed:
+                continue
+            metadata = request.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            skill_id = str(
+                request.get("skill_id")
+                or request.get("type")
+                or request.get("target")
+                or "action"
+            ).strip()
+            for goal_id in self._string_list(metadata.get("source_goal_ids")):
+                by_goal.setdefault(goal_id, []).append(
+                    {"request_id": request_id, "skill_id": skill_id}
+                )
+                scoped_request_ids.add(request_id)
+
+        timestamp_ms = _now_ms()
+        goal_ids: list[str] = []
+        for goal_id, requests in by_goal.items():
+            request_ids = list(
+                dict.fromkeys(item["request_id"] for item in requests)
+            )
+            summary = ", ".join(
+                dict.fromkeys(item["skill_id"] for item in requests)
+            )
+            metadata = {
+                "confirmation_id": confirmation_id,
+                "interaction_id": interaction_id,
+                "fingerprint": fingerprint,
+                "expires_at": expires_at,
+                "goal_id": goal_id,
+                "request_ids": request_ids,
+                "confirmation_request_ids": request_ids,
+            }
+            self._pending_tasks.append(
+                {
+                    "sid": sid,
+                    "type": "goal_confirmation",
+                    "status": "awaiting_confirmation",
+                    "summary": self._compact_text(summary or goal_id),
+                    "ts_ms": timestamp_ms,
+                    "updated_ms": timestamp_ms,
+                    "conversation_id": self.conversation_id,
+                    "metadata": metadata,
+                }
+            )
+            goal_ids.append(goal_id)
+            context = self._task_context_by_goal_id(goal_id)
+            if context is None:
+                continue
+            context["status"] = "awaiting_confirmation"
+            context["commitment_state"] = "waiting_for_user"
+            context["plan_status"] = "awaiting_confirmation"
+            context["confirmation"] = {
+                "status": "pending",
+                "confirmation_id": confirmation_id,
+                "fingerprint": fingerprint,
+                "expires_at": expires_at,
+                "request_ids": request_ids,
+            }
+            context["updated_ms"] = timestamp_ms
+            current_metadata = context.get("metadata")
+            if not isinstance(current_metadata, dict):
+                current_metadata = {}
+            context["metadata"] = {
+                **current_metadata,
+                "confirmation_id": confirmation_id,
+                "confirmation_request_ids": request_ids,
+            }
+
+        # Keep request-bound evidence even for legacy/unscoped requests, but do
+        # not mutate whichever task context happens to be current.
+        unscoped_request_ids = sorted(confirmed - scoped_request_ids)
+        if unscoped_request_ids:
+            self._pending_tasks.append(
+                {
+                    "sid": sid,
+                    "type": "confirmation",
+                    "status": "awaiting_confirmation",
+                    "summary": "confirmation",
+                    "ts_ms": timestamp_ms,
+                    "updated_ms": timestamp_ms,
+                    "conversation_id": self.conversation_id,
+                    "metadata": {
+                        "confirmation_id": confirmation_id,
+                        "interaction_id": interaction_id,
+                        "fingerprint": fingerprint,
+                        "expires_at": expires_at,
+                        "request_ids": unscoped_request_ids,
+                        "confirmation_request_ids": unscoped_request_ids,
+                    },
+                }
+            )
+
+        if goal_ids:
+            self._persist_task_contexts_if_enabled()
+        self.last_activity_ms = timestamp_ms
+        return goal_ids
+
+    def resolve_confirmation_scope(
+        self,
+        *,
+        confirmation_id: str,
+        decision: str,
+    ) -> bool:
+        """Resolve all pending records and goals bound to one confirmation."""
+
+        if not self.enabled or not confirmation_id:
+            return False
+        normalized_decision = str(decision or "").strip().lower()
+        final_status = {
+            "approved": "done",
+            "denied": "cancelled",
+            "ambiguous": "refused",
+            "expired": "timed_out",
+            "operational_interrupt": "cancelled",
+        }.get(normalized_decision, "cancelled")
+        matched = False
+        changed_context = False
+        timestamp_ms = _now_ms()
+        for task in self._pending_tasks:
+            metadata = task.get("metadata")
+            if not isinstance(metadata, dict):
+                continue
+            if metadata.get("confirmation_id") != confirmation_id:
+                continue
+            matched = True
+            task["status"] = final_status
+            task["updated_ms"] = timestamp_ms
+            goal_id = str(metadata.get("goal_id") or "").strip()
+            if not goal_id:
+                continue
+            context = self._task_context_by_goal_id(goal_id)
+            if context is None:
+                continue
+            if normalized_decision == "approved":
+                # Approval commits the plan but does not claim that Skill
+                # Runtime has scheduled it. record_agent_result performs that
+                # transition immediately before the authorized launch.
+                context["status"] = "planning"
+                context["commitment_state"] = "accepted"
+                context["plan_status"] = "confirmed"
+            else:
+                context["status"] = final_status
+                context["commitment_state"] = self._commitment_state_for_status(
+                    final_status
+                )
+                context["plan_status"] = final_status
+            confirmation = context.get("confirmation")
+            if not isinstance(confirmation, dict):
+                confirmation = {}
+            context["confirmation"] = {
+                **confirmation,
+                "status": normalized_decision or final_status,
+                "resolved_ms": timestamp_ms,
+            }
+            context["updated_ms"] = timestamp_ms
+            changed_context = True
+
+        if changed_context:
+            self._persist_task_contexts_if_enabled()
+        if matched:
+            self.last_activity_ms = timestamp_ms
+        return matched
 
     def record_pending_task(
         self,
@@ -2007,14 +2349,19 @@ class ConversationStateManager:
             "ok": "done",
             "cancelled": "cancelled",
             "canceled": "cancelled",
-            "expired": "expired",
-            "timed_out": "expired",
-            "refused": "cancelled",
+            "expired": "timed_out",
+            "timed_out": "timed_out",
+            "refused": "refused",
             "failed": "failed",
             "error": "failed",
         }.get(normalized_status, normalized_status)
         matched = False
         for task in list(self._pending_tasks):
+            if task.get("type") in {"confirmation", "goal_confirmation"}:
+                # A confirmation record is decision evidence only. Runtime
+                # results belong to the execution record created after
+                # approval, even though both retain the same request IDs.
+                continue
             metadata = task.get("metadata")
             if not isinstance(metadata, dict):
                 continue
@@ -2042,10 +2389,12 @@ class ConversationStateManager:
                 values = list(statuses.values())
                 if "failed" in values:
                     task_status = "failed"
+                elif "refused" in values:
+                    task_status = "refused"
                 elif "cancelled" in values:
                     task_status = "cancelled"
-                elif "expired" in values:
-                    task_status = "expired"
+                elif "timed_out" in values:
+                    task_status = "timed_out"
                 else:
                     task_status = "done"
             task["status"] = task_status
@@ -2054,7 +2403,7 @@ class ConversationStateManager:
             goal_id = str(metadata.get("goal_id") or "").strip()
             contexts: list[dict[str, Any]] = []
             if goal_id:
-                context = self._task_context_by_id(goal_id)
+                context = self._task_context_by_goal_id(goal_id)
                 if context is not None:
                     contexts.append(context)
             else:
@@ -2069,6 +2418,11 @@ class ConversationStateManager:
                         contexts.append(context)
             for context in contexts:
                 context["status"] = task_status
+                context["commitment_state"] = (
+                    self._commitment_state_for_status(task_status)
+                )
+                if task_status in _DONE_TASK_STATUSES:
+                    context["plan_status"] = task_status
                 context["updated_ms"] = task["updated_ms"]
                 context_metadata = context.get("metadata")
                 if not isinstance(context_metadata, dict):
@@ -2095,6 +2449,8 @@ class ConversationStateManager:
     def _record_planning_metadata(
         self,
         metadata: dict[str, Any],
+        *,
+        confirmation_authorized: bool = False,
     ) -> None:
         planning_result = str(metadata.get("planning_result") or "").strip()
         if not planning_result:
@@ -2166,9 +2522,12 @@ class ConversationStateManager:
             context["plan_version"] = max(0, int(context.get("plan_version") or 0)) + 1
             context["plan_status"] = "proposed"
             requires_confirmation = bool(
-                metadata.get("semantic_plan_confirmation_required")
-                or metadata.get("confirmation_prompt")
-                or planning_result == "alternative_plan"
+                not confirmation_authorized
+                and (
+                    metadata.get("semantic_plan_confirmation_required")
+                    or metadata.get("confirmation_prompt")
+                    or planning_result == "alternative_plan"
+                )
             )
             context["status"] = (
                 "awaiting_confirmation" if requires_confirmation else "planning"
@@ -2210,7 +2569,13 @@ class ConversationStateManager:
         }
         self._persist_task_contexts_if_enabled()
 
-    def record_agent_result(self, sid: str | None, result: Any) -> None:
+    def record_agent_result(
+        self,
+        sid: str | None,
+        result: Any,
+        *,
+        confirmed_request_ids: set[str] | None = None,
+    ) -> None:
         """Record assistant speech and lightweight task hints from AgentResult."""
         if not self.enabled:
             return
@@ -2223,8 +2588,14 @@ class ConversationStateManager:
             data = {}
 
         result_metadata = data.get("metadata")
+        goal_outcomes: dict[str, dict[str, Any]] = {}
         if isinstance(result_metadata, dict):
-            self._record_planning_metadata(result_metadata)
+            self._record_planning_metadata(
+                result_metadata,
+                confirmation_authorized=bool(confirmed_request_ids),
+            )
+            goal_outcomes = self._canonical_goal_outcomes(result_metadata)
+            self._record_nonexecuting_goal_outcomes(goal_outcomes)
 
         speech_parts: list[str] = []
         for key in ("speak_immediate", "speak_after", "speech"):
@@ -2235,6 +2606,52 @@ class ConversationStateManager:
                     speech_parts.append(text)
         if speech_parts:
             self.record_assistant_turn(sid, " ".join(speech_parts), metadata={"source": "agent_result"})
+
+        # A conversational Goal is not complete merely because Response
+        # Composer produced text. Bind it to the concrete chromie.speak request
+        # IDs generated from InteractionSpeech so only Skill Runtime evidence
+        # can make that Goal terminal. Clarification speech is intentionally not
+        # bound: its Goal must remain active while waiting for the user.
+        speech_items = [
+            item for item in (data.get("speech") or []) if isinstance(item, dict)
+        ]
+        for goal_id, outcome in goal_outcomes.items():
+            if str(outcome.get("disposition") or "").strip().lower() != "respond":
+                continue
+            scoped_speech: list[dict[str, Any]] = []
+            for item in speech_items:
+                item_metadata = item.get("metadata")
+                if not isinstance(item_metadata, dict):
+                    continue
+                covered_goal_ids = self._string_list(
+                    item_metadata.get("covers_goal_ids")
+                )
+                if goal_id in covered_goal_ids:
+                    scoped_speech.append(item)
+            request_ids = [
+                str(item.get("id"))
+                for item in scoped_speech
+                if str(item.get("id") or "").strip()
+            ]
+            if not request_ids:
+                continue
+            self._record_goal_pending_execution(
+                sid=sid,
+                goal_id=goal_id,
+                status="scheduled",
+                summary="chromie.speak",
+                request_ids=request_ids,
+                planning_result="respond",
+                planned_skills=[
+                    {
+                        "skill_id": "chromie.speak",
+                        "request_id": request_id,
+                        "source_goal_ids": [goal_id],
+                    }
+                    for request_id in request_ids
+                ],
+                confirmation_pending=False,
+            )
 
         actions = data.get("actions", []) or data.get("skills", []) or []
         primary_actions: list[dict[str, Any]] = []
@@ -2264,7 +2681,8 @@ class ConversationStateManager:
                 else ""
             )
             confirmation_pending = bool(
-                isinstance(result_metadata, dict)
+                not confirmed_request_ids
+                and isinstance(result_metadata, dict)
                 and (
                     result_metadata.get("semantic_plan_confirmation_required")
                     or result_metadata.get("confirmation_prompt")

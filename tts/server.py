@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import contextlib
 import difflib
 import hashlib
@@ -153,6 +154,9 @@ TTS_AUDIO_CODEC_DEVICE = resolve_audio_codec_device(
 SPEAKER_DIR = Path(os.getenv("SPEAKER_DIR", "/app/speakers"))
 SPEAKER_DIR.mkdir(parents=True, exist_ok=True)
 MAX_SPEAKER_TRANSCRIPT_CHARS = 4000
+OUTETTS_V3_AUDIO_TOKENS_PER_SECOND = 75
+MIN_SPEAKER_AUDIO_CODES = 30
+MIN_SPEAKER_REFERENCE_COVERAGE = 0.5
 TTS_SPEAKER_ALIGNMENT_MODEL = "turbo"
 TTS_SPEAKER_ALIGNMENT_DEVICE = os.getenv(
     "TTS_SPEAKER_ALIGNMENT_DEVICE", "cpu"
@@ -306,7 +310,13 @@ def build_model_config():
 
 
 def load_audio_with_soundfile(path: str, target_sr: int) -> torch.Tensor:
-    """Load speaker reference audio without torchaudio/torchcodec."""
+    """Load speaker audio as ``[batch, channels, samples]`` without torchcodec.
+
+    OuteTTS's ``DacInterface.load_audio`` returns a three-dimensional tensor.
+    Returning only ``[channels, samples]`` makes its loudness normalizer average
+    over the sample axis and collapse the complete recording to one sample.
+    That in turn creates a speaker profile with a single DAC token.
+    """
     wav, sr = sf.read(path, dtype="float32", always_2d=False)
     if wav.size == 0:
         raise ValueError(f"Audio file is empty: {path}")
@@ -324,8 +334,7 @@ def load_audio_with_soundfile(path: str, target_sr: int) -> torch.Tensor:
     if peak > 1.0:
         wav = wav / peak
 
-    # OuteTTS speaker creation expects [channels, samples].
-    return torch.from_numpy(wav).float().unsqueeze(0)
+    return torch.from_numpy(wav).float().unsqueeze(0).unsqueeze(0)
 
 
 def patch_audio_loader(tts_interface: Interface):
@@ -455,6 +464,80 @@ def speaker_transcript_similarity(expected: str, observed: object) -> float:
     ).ratio()
 
 
+def speaker_profile_stats(speaker: object) -> dict[str, float | int]:
+    """Validate OuteTTS v3 acoustic conditioning and return stable statistics."""
+    if not isinstance(speaker, dict):
+        raise ValueError("Speaker profile must be a JSON object")
+    words = speaker.get("words")
+    if not isinstance(words, list) or not words:
+        raise ValueError("Speaker profile has no aligned words")
+
+    audio_codes = 0
+    conditioned_words = 0
+    for index, word in enumerate(words):
+        if not isinstance(word, dict):
+            raise ValueError(f"Speaker profile word {index} is not an object")
+        c1 = word.get("c1")
+        c2 = word.get("c2")
+        if not isinstance(c1, list) or not isinstance(c2, list):
+            raise ValueError(f"Speaker profile word {index} has invalid DAC codes")
+        if len(c1) != len(c2):
+            raise ValueError(
+                f"Speaker profile word {index} has mismatched DAC codebooks"
+            )
+        if c1:
+            conditioned_words += 1
+        audio_codes += len(c1)
+
+    if audio_codes < MIN_SPEAKER_AUDIO_CODES:
+        raise ValueError(
+            "Speaker profile has insufficient acoustic conditioning: "
+            f"audio_codes={audio_codes}, minimum={MIN_SPEAKER_AUDIO_CODES}"
+        )
+
+    return {
+        "word_count": len(words),
+        "conditioned_word_count": conditioned_words,
+        "audio_code_count": audio_codes,
+        "audio_code_seconds": audio_codes / OUTETTS_V3_AUDIO_TOKENS_PER_SECOND,
+    }
+
+
+def reference_audio_duration_seconds(wav_path: Path) -> float:
+    info = sf.info(str(wav_path))
+    duration = float(getattr(info, "duration", 0.0) or 0.0)
+    if duration <= 0.0:
+        raise ValueError(f"Speaker reference audio has no duration: {wav_path}")
+    return duration
+
+
+def validate_speaker_profile(
+    speaker: object,
+    *,
+    reference_audio_seconds: float | None = None,
+) -> dict[str, float | int]:
+    stats = speaker_profile_stats(speaker)
+    if reference_audio_seconds is not None:
+        coverage = float(stats["audio_code_seconds"]) / reference_audio_seconds
+        if coverage < MIN_SPEAKER_REFERENCE_COVERAGE:
+            raise ValueError(
+                "Speaker profile acoustic coverage is too low: "
+                f"coverage={coverage:.3f}, "
+                f"minimum={MIN_SPEAKER_REFERENCE_COVERAGE:.3f}, "
+                f"audio_codes={stats['audio_code_count']}, "
+                f"reference_seconds={reference_audio_seconds:.3f}"
+            )
+        stats["reference_audio_seconds"] = reference_audio_seconds
+        stats["reference_audio_coverage"] = coverage
+    return stats
+
+
+def speaker_for_generation(speaker: object) -> dict:
+    """Return an isolated profile because OuteTTS mutates prompt speaker data."""
+    validate_speaker_profile(speaker)
+    return copy.deepcopy(speaker)
+
+
 def create_speaker_profile_from_wav(
     speaker_id: str,
     wav_path: Path,
@@ -493,6 +576,10 @@ def create_speaker_profile_from_wav(
                 f"similarity={similarity:.3f} "
                 f"minimum={TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY:.3f}"
             )
+        profile_stats = validate_speaker_profile(
+            speaker,
+            reference_audio_seconds=reference_audio_duration_seconds(wav_path),
+        )
         save_speaker_json(speaker, output_json)
 
     wav_path.with_suffix(".txt").write_text(
@@ -507,6 +594,7 @@ def create_speaker_profile_from_wav(
     speakers_cache[speaker_id] = speaker
     if save_as_default:
         speakers_cache["default"] = speaker
+    logger.info("Validated speaker profile speaker_id=%s stats=%s", speaker_id, profile_stats)
     return speaker
 
 
@@ -737,8 +825,17 @@ def load_default_speaker():
 
     if speaker_json.exists():
         logger.info("Loading default speaker from %s", speaker_json)
-        with tts_interface_lock:
-            return interface.load_speaker(str(speaker_json))
+        try:
+            with tts_interface_lock:
+                speaker = interface.load_speaker(str(speaker_json))
+            validate_speaker_profile(speaker)
+            return speaker
+        except (OSError, ValueError, TypeError) as exc:
+            logger.error("Rejected invalid default speaker profile %s: %s", speaker_json, exc)
+            if speaker_wav.exists():
+                return create_speaker_profile_from_wav(
+                    "default", speaker_wav, save_as_default=False
+                )
 
     if speaker_wav.exists():
         logger.info("Creating default speaker from %s", speaker_wav)
@@ -777,10 +874,26 @@ def get_or_load_speaker(speaker_id: str):
 
     if speaker_json.exists():
         logger.info("Loading speaker_id=%s from %s", speaker_id, speaker_json)
-        with tts_interface_lock:
-            speaker = interface.load_speaker(str(speaker_json))
-        speakers_cache[speaker_id] = speaker
-        return speaker
+        try:
+            with tts_interface_lock:
+                speaker = interface.load_speaker(str(speaker_json))
+            validate_speaker_profile(speaker)
+            speakers_cache[speaker_id] = speaker
+            return speaker
+        except (OSError, ValueError, TypeError) as exc:
+            logger.error(
+                "Rejected invalid speaker profile speaker_id=%s path=%s: %s",
+                speaker_id,
+                speaker_json,
+                exc,
+            )
+            if speaker_wav.exists():
+                return create_speaker_profile_from_wav(
+                    speaker_id, speaker_wav, save_as_default=False
+                )
+            raise RuntimeError(
+                f"Speaker profile {speaker_id!r} is invalid and has no WAV to rebuild"
+            ) from exc
 
     if speaker_wav.exists():
         logger.info("Creating speaker_id=%s from %s", speaker_id, speaker_wav)
@@ -797,6 +910,20 @@ def list_speaker_ids():
         ids.add(path.stem)
     ids.update(speakers_cache.keys())
     return sorted(ids)
+
+
+def speaker_profile_revisions(speaker_ids: list[str]) -> dict[str, str]:
+    """Return content revisions used to isolate host-side audio caches."""
+
+    revisions: dict[str, str] = {}
+    for speaker_id in speaker_ids:
+        for suffix in (".json", ".wav"):
+            path = SPEAKER_DIR / f"{speaker_id}{suffix}"
+            if not path.is_file():
+                continue
+            revisions[speaker_id] = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+            break
+    return revisions
 
 
 # Speaker state is populated inside the generation subprocess.
@@ -859,7 +986,10 @@ def generation_worker_main(connection) -> None:
                     cfg = GenerationConfig(
                         text=str(command.get("text") or ""),
                         generation_type=outetts.GenerationType.CHUNKED,
-                        speaker=speaker,
+                        # OuteTTS 0.4.4 mutates the final word while merging a
+                        # speaker prompt. Keep cached profiles immutable across
+                        # requests and retries.
+                        speaker=speaker_for_generation(speaker),
                         sampler_config=SamplerConfig(
                             temperature=TTS_TEMPERATURE,
                             repetition_penalty=TTS_REPETITION_PENALTY,
@@ -884,6 +1014,21 @@ def generation_worker_main(connection) -> None:
                             "timings": timings,
                         }
                     )
+                    continue
+
+                if command_type == "reload_speaker":
+                    speaker_ids = command.get("speaker_ids")
+                    if not isinstance(speaker_ids, list) or not speaker_ids:
+                        raise ValueError("reload_speaker requires speaker_ids")
+                    reloaded = []
+                    for raw_speaker_id in speaker_ids:
+                        speaker_id = sanitize_speaker_id(str(raw_speaker_id))
+                        speakers_cache.pop(speaker_id, None)
+                        speaker = get_or_load_speaker(speaker_id)
+                        if speaker is None:
+                            raise ValueError(f"Speaker not found: {speaker_id}")
+                        reloaded.append(speaker_id)
+                    connection.send({"type": "speaker_reloaded", "speaker_ids": reloaded})
                     continue
 
                 if command_type == "create_speaker":
@@ -913,6 +1058,7 @@ def generation_worker_main(connection) -> None:
                                 verified_transcript,
                                 speaker.get("text") if isinstance(speaker, dict) else None,
                             ),
+                            "profile_stats": speaker_profile_stats(speaker),
                         }
                     )
                     continue
@@ -1149,6 +1295,7 @@ async def handle_create_speaker(data: dict, ws):
                 "alignment_model": response.get("alignment_model"),
                 "alignment_device": response.get("alignment_device"),
                 "transcript_similarity": response.get("transcript_similarity"),
+                "profile_stats": response.get("profile_stats"),
             },
         )
     except Exception as exc:
@@ -1229,6 +1376,7 @@ async def ws_handler(ws):
                             "recent_performance", {"count": 0}
                         ),
                         "speakers": speakers,
+                        "speaker_revisions": speaker_profile_revisions(speakers),
                     },
                 )
                 continue

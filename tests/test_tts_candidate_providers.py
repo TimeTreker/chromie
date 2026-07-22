@@ -41,6 +41,17 @@ def stream_fixture_target(connection: Connection) -> None:
         if payload.get("text") == "block":
             while True:
                 time.sleep(1)
+        if payload.get("text") == "slow-complete":
+            time.sleep(0.08)
+        if payload.get("text") == "audio-then-complete":
+            connection.send(
+                {"type": "audio", "pcm": b"\x01\x00" * 80, "sample_rate": 8000}
+            )
+            time.sleep(0.08)
+            connection.send(
+                {"type": "complete", "metrics": {"generate_seconds": 0.1}}
+            )
+            continue
         connection.send({"type": "audio", "pcm": b"\x01\x00" * 80, "sample_rate": 8000})
         connection.send({"type": "complete", "metrics": {"generate_seconds": 0.1}})
 
@@ -48,6 +59,9 @@ def stream_fixture_target(connection: Connection) -> None:
 class FakeStreamingWorker:
     is_alive = True
     restart_count = 0
+    cancel_drain_count = 0
+    cancel_restart_count = 0
+    cancellation_mode = "bounded_drain_then_restart_worker"
     ready_payload = {"fixture": True}
 
     async def start(self) -> None:
@@ -115,6 +129,14 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completed.metrics["audio_seconds"], 0.01)
         self.assertGreater(float(completed.metrics["total_seconds"]), 0.0)
 
+        health = await provider.health()
+        self.assertEqual(
+            health["cancellation_mode"],
+            "bounded_drain_then_restart_worker",
+        )
+        self.assertEqual(health["worker_cancel_drain_count"], 0)
+        self.assertEqual(health["worker_cancel_restart_count"], 0)
+
     async def test_streaming_worker_restarts_after_native_cancellation(self) -> None:
         worker = StreamingProcessWorker(
             stream_fixture_target,
@@ -140,6 +162,122 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([event["type"] for event in events], ["audio", "complete"])
         await worker.stop()
 
+    async def test_streaming_worker_drains_nearly_complete_cancel_without_reload(
+        self,
+    ) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-drain-worker",
+            startup_timeout_s=5.0,
+            cancel_drain_timeout_s=0.5,
+        )
+        await worker.start()
+
+        async def consume_slow() -> None:
+            async for _event in worker.stream(
+                {"type": "synthesize", "text": "slow-complete"}
+            ):
+                pass
+
+        try:
+            task = asyncio.create_task(consume_slow())
+            await asyncio.sleep(0.02)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+
+            self.assertTrue(worker.is_alive)
+            self.assertEqual(worker.restart_count, 0)
+            self.assertEqual(worker.cancel_restart_count, 0)
+            self.assertEqual(worker.cancel_drain_count, 1)
+            self.assertEqual(
+                worker.cancellation_mode,
+                "bounded_drain_then_restart_worker",
+            )
+            events = [
+                event
+                async for event in worker.stream(
+                    {"type": "synthesize", "text": "recover"}
+                )
+            ]
+            self.assertEqual(
+                [event["type"] for event in events],
+                ["audio", "complete"],
+            )
+        finally:
+            await worker.stop()
+
+    async def test_streaming_worker_drain_timeout_restarts_fail_closed(self) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-drain-timeout-worker",
+            startup_timeout_s=5.0,
+            cancel_drain_timeout_s=0.05,
+        )
+        await worker.start()
+
+        async def consume_blocking() -> None:
+            async for _event in worker.stream(
+                {"type": "synthesize", "text": "block"}
+            ):
+                pass
+
+        try:
+            task = asyncio.create_task(consume_blocking())
+            await asyncio.sleep(0.02)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+
+            self.assertTrue(worker.is_alive)
+            self.assertEqual(worker.cancel_drain_count, 0)
+            self.assertEqual(worker.restart_count, 1)
+            self.assertEqual(worker.cancel_restart_count, 1)
+            events = [
+                event
+                async for event in worker.stream(
+                    {"type": "synthesize", "text": "recover"}
+                )
+            ]
+            self.assertEqual(
+                [event["type"] for event in events],
+                ["audio", "complete"],
+            )
+        finally:
+            await worker.stop()
+
+    async def test_streaming_worker_generator_close_drains_terminal_event(self) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-generator-close-worker",
+            startup_timeout_s=5.0,
+            cancel_drain_timeout_s=0.5,
+        )
+        await worker.start()
+        stream = worker.stream(
+            {"type": "synthesize", "text": "audio-then-complete"}
+        )
+        try:
+            first = await stream.__anext__()
+            self.assertEqual(first["type"], "audio")
+            await stream.aclose()
+
+            self.assertTrue(worker.is_alive)
+            self.assertEqual(worker.cancel_drain_count, 1)
+            self.assertEqual(worker.restart_count, 0)
+            events = [
+                event
+                async for event in worker.stream(
+                    {"type": "synthesize", "text": "recover"}
+                )
+            ]
+            self.assertEqual(
+                [event["type"] for event in events],
+                ["audio", "complete"],
+            )
+        finally:
+            await worker.stop()
+
     def test_candidate_locks_match_provider_constants_and_compose_profile(self) -> None:
         lock = json.loads(
             (ROOT / "tts_candidates" / "model-lock.json").read_text(encoding="utf-8")
@@ -163,7 +301,14 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"5001:5000"', compose)
         self.assertIn('"5002:5000"', compose)
         self.assertIn("TTS_AB_REFERENCE_DIR", compose)
+        self.assertIn("./hf_cache/modelscope:/root/.cache/modelscope", compose)
+        self.assertIn("TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC", compose)
         self.assertIn("Qwen/Qwen3-TTS-12Hz-0.6B-Base", compose)
+        cosy_dockerfile = (ROOT / "tts_candidates" / "cosyvoice" / "Dockerfile").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("onnxruntime-gpu==1.18.1", cosy_dockerfile)
+        self.assertNotIn("onnxruntime-gpu==1.18.0", cosy_dockerfile)
 
     def test_candidate_reference_metadata_preserves_authorized_license(self) -> None:
         for relative, name in (

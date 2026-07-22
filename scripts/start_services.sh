@@ -64,6 +64,24 @@ echo "[start] TTS model size: ${TTS_MODEL_SIZE:-unset}"
 
 COMPOSE_ARGS=(--env-file .env.runtime -f docker-compose.yml)
 
+TTS_SERVICE=chromie-tts
+case "${CHROMIE_TTS_TRIAL_PROVIDER:-}" in
+  "") ;;
+  cosyvoice3)
+    TTS_SERVICE=chromie-tts-cosyvoice
+    COMPOSE_ARGS+=(--profile tts-evaluation)
+    if [ -z "${TTS_AB_REFERENCE_DIR:-}" ]; then
+      echo "[start][error] TTS_AB_REFERENCE_DIR is required for the CosyVoice3 trial." >&2
+      exit 1
+    fi
+    echo "[start] TTS provider: CosyVoice3 temporary trial (default unchanged)"
+    ;;
+  *)
+    echo "[start][error] Unsupported CHROMIE_TTS_TRIAL_PROVIDER=${CHROMIE_TTS_TRIAL_PROVIDER}" >&2
+    exit 2
+    ;;
+esac
+
 # Optional comma-separated override list, for example:
 # CHROMIE_COMPOSE_OVERRIDE_FILES=docker-compose.jetson.yml,docker-compose.local.yml
 if [ -n "${CHROMIE_COMPOSE_OVERRIDE_FILES:-}" ]; then
@@ -82,14 +100,14 @@ fi
 SERVICES=(
   chromie-asr
   chromie-llm
-  chromie-tts
+  "$TTS_SERVICE"
   chromie-router
   chromie-agent
 )
 
 BUILD_SERVICES=(
   chromie-asr
-  chromie-tts
+  "$TTS_SERVICE"
   chromie-router
   chromie-agent
 )
@@ -98,6 +116,14 @@ unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
 echo "[start] Validating resolved Docker Compose configuration..."
 docker compose "${COMPOSE_ARGS[@]}" config --quiet
+
+if [ "$TTS_SERVICE" = "chromie-tts-cosyvoice" ]; then
+  echo "[start] Stopping the maintained OuteTTS service during the temporary trial..."
+  docker compose "${COMPOSE_ARGS[@]}" stop chromie-tts chromie-tts-qwen3 >/dev/null 2>&1 || true
+else
+  docker compose "${COMPOSE_ARGS[@]}" --profile tts-evaluation stop \
+    chromie-tts-cosyvoice chromie-tts-qwen3 >/dev/null 2>&1 || true
+fi
 
 if [[ "${REBUILD_NO_CACHE:-0}" == "1" ]]; then
   export BUILD=1
@@ -129,7 +155,7 @@ docker compose "${COMPOSE_ARGS[@]}" ps
 echo
 echo "[start] Useful follow-up commands:"
 echo " ./scripts/compose.sh logs -f chromie-llm"
-echo " ./scripts/compose.sh logs -f chromie-tts"
+echo " ./scripts/compose.sh logs -f $TTS_SERVICE"
 echo " ./scripts/compose.sh logs -f chromie-asr"
 echo " ./scripts/compose.sh logs -f chromie-router"
 echo " ./scripts/compose.sh logs -f chromie-agent"

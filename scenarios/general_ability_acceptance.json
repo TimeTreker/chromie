@@ -399,6 +399,10 @@
         {
           "key": "dialogue/bilingual_translation_followup",
           "rationale": "Ordinary language tasks should remain conversational, not embodied."
+        },
+        {
+          "key": "cognitive_runtime/chat_turn_cannot_replay_completed_motion",
+          "rationale": "A chat route cannot inherit physical authority from a stale active projection of earlier motion goals, even if a model tries to replay them."
         }
       ],
       "live_text_cases": []
@@ -509,6 +513,10 @@
         {
           "key": "cognitive_runtime/daily_multi_goal_blink_joke_and_ambiguous_move",
           "rationale": "Execute, respond, and clarify outcomes coexist without cross-goal leakage."
+        },
+        {
+          "key": "cognitive_runtime/chat_turn_cannot_replay_completed_motion",
+          "rationale": "A stale multi-goal projection left by completed motion cannot cross-authorize new physical effects on a social turn."
         }
       ],
       "live_text_cases": [

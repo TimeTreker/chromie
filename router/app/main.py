@@ -15,7 +15,11 @@ from pydantic import BaseModel, Field
 from .capability_catalog import CapabilityCatalogClient, CapabilityCatalogResult
 from .config import router_mode_from_env
 from .fallback import fallback_decision
-from .llm_router import OllamaLLMRouter, _is_placeholder_capability_intent
+from .llm_router import (
+    OllamaLLMRouter,
+    _is_placeholder_capability_intent,
+    is_allowed_model_ignore,
+)
 from .rules import route_by_priority_rules
 from .schema import (
     HealthResponse,
@@ -221,7 +225,7 @@ async def routes() -> dict:
             },
             {
                 "id": "quick_intent",
-                "description": "Capability-catalog bounded quick intent and meaning routing with the fast Router model.",
+                "description": "Capability-catalog bounded quick intent, subject ownership, and addressedness routing with the fast Router model.",
                 "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
                 "llm": settings.mode in {"hybrid", "llm_only"},
             },
@@ -275,9 +279,45 @@ def _has_strong_followup_context(request: RouteRequest) -> bool:
         value = context.get(key)
         if value:
             return True
-    pending_tasks = context.get("pending_tasks")
-    if isinstance(pending_tasks, list) and pending_tasks:
-        return True
+
+    # A retained or executing task is not, by itself, evidence that an isolated
+    # ASR fragment is a meaningful answer.  Only an explicit confirmation or
+    # clarification wait can give a tiny token enough context.  Completed tasks
+    # remain in the bounded history for audit and must never disable the
+    # unusable-audio side-effect guard.
+    for key in ("active_pending_tasks", "pending_tasks"):
+        tasks = context.get(key)
+        if not isinstance(tasks, list):
+            continue
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+            status = str(task.get("status") or "").strip().casefold()
+            metadata = task.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            if status in {"awaiting_confirmation", "waiting_for_user"} and (
+                str(task.get("type") or "").strip().casefold()
+                in {"confirmation", "clarification"}
+                or metadata.get("confirmation_id")
+                or metadata.get("awaiting_user_choice")
+                or metadata.get("confirmation_pending") is True
+            ):
+                return True
+
+    current = context.get("current_task_context")
+    if isinstance(current, dict):
+        status = str(current.get("status") or "").strip().casefold()
+        confirmation = current.get("confirmation")
+        pending_questions = current.get("pending_questions")
+        if status == "awaiting_confirmation" and isinstance(confirmation, dict):
+            return True
+        if (
+            status == "waiting_for_user"
+            and isinstance(pending_questions, list)
+            and bool(pending_questions)
+        ):
+            return True
     return False
 
 
@@ -1604,7 +1644,10 @@ async def route(request: RouteRequest) -> RouteDecision:
                     )
                     if side_effect_guard is not None:
                         decision = side_effect_guard
-                    elif llm_decision.route in {"interrupt", "ignore"}:
+                    elif llm_decision.route == "interrupt" or (
+                        llm_decision.route == "ignore"
+                        and not is_allowed_model_ignore(request, llm_decision)
+                    ):
                         decision = _recover_invalid_operational_llm_decision(
                             request,
                             llm_decision,

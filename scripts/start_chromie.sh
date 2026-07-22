@@ -11,6 +11,7 @@ REBUILD_NO_CACHE=0
 KEEP_SERVICES=0
 START_ORCHESTRATOR=1
 ARCHITECTURE_VALIDATION=0
+TTS_TRIAL_PROVIDER="${CHROMIE_TTS_TRIAL_PROVIDER:-}"
 
 usage() {
   cat <<'USAGE'
@@ -32,6 +33,8 @@ Options:
   --architecture-validation
                           Use long-context, long-output, long-timeout validation
                           budgets while retaining Social Attention inference
+  --tts-trial cosyvoice   Temporarily use CosyVoice3 with the owner-authorized
+                          local reference; does not change the default provider
   -h, --help              Show this help
 USAGE
 }
@@ -46,6 +49,7 @@ while [ "$#" -gt 0 ]; do
     --keep-services) KEEP_SERVICES=1; shift ;;
     --no-orchestrator) START_ORCHESTRATOR=0; shift ;;
     --architecture-validation) ARCHITECTURE_VALIDATION=1; shift ;;
+    --tts-trial) TTS_TRIAL_PROVIDER="${2:?--tts-trial requires cosyvoice}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[chromie][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -56,7 +60,7 @@ if [ "$ARCHITECTURE_VALIDATION" = "1" ]; then
   echo "[chromie] Architecture-validation budgets enabled; Social Attention remains active."
 fi
 
-for cmd in docker python3; do
+for cmd in docker python3 flock; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "[chromie][error] Required command not found: $cmd" >&2
     exit 1
@@ -68,12 +72,18 @@ docker info >/dev/null 2>&1 || {
   exit 1
 }
 
-for path in scripts/build_runtime_env.sh scripts/generate_runtime_env.py scripts/verify_runtime_profile.sh scripts/list_runtime_ollama_models.sh scripts/start_services.sh scripts/start_orchestrator.sh docker-compose.yml capabilities/soridormi.json; do
+for path in scripts/build_runtime_env.sh scripts/check_orchestrator_idle.sh scripts/generate_runtime_env.py scripts/verify_runtime_profile.sh scripts/list_runtime_ollama_models.sh scripts/start_services.sh scripts/start_orchestrator.sh docker-compose.yml capabilities/soridormi.json; do
   [ -e "$path" ] || {
     echo "[chromie][error] Missing repository file: $path" >&2
     exit 1
   }
 done
+
+# Rebuilding or recreating services under an already-running host Orchestrator
+# leaves the old Python process, microphone session, and in-memory goal state
+# attached to the new containers. Fail before any runtime files or containers
+# are changed; the operator can then stop the old launcher cleanly and retry.
+./scripts/check_orchestrator_idle.sh
 
 readarray -t MCP_PARTS < <(python3 - "$MCP_URL" <<'PYURL'
 from urllib.parse import urlparse
@@ -115,6 +125,140 @@ wait_for_tcp() {
     sleep 2
   done
   echo "[chromie] $label is ready."
+}
+
+python_ws_health_check() {
+  python3 - "$1" "$2" "$3" <<'PYWSHEALTH' >/dev/null 2>&1
+import asyncio
+import json
+import sys
+
+import websockets
+
+
+async def main() -> None:
+    host, raw_port, expected_service = sys.argv[1:]
+    async with websockets.connect(
+        f"ws://{host}:{int(raw_port)}",
+        open_timeout=5,
+        ping_interval=20,
+        ping_timeout=20,
+    ) as ws:
+        await ws.send(json.dumps({"type": "health"}))
+        raw = await asyncio.wait_for(ws.recv(), timeout=5)
+        if not isinstance(raw, str):
+            raise RuntimeError("health response was not JSON text")
+        payload = json.loads(raw)
+        if payload.get("type") != "pong" or payload.get("service") != expected_service:
+            raise RuntimeError(f"invalid {expected_service} health response")
+        if expected_service == "tts":
+            if payload.get("provider_contract_version") != 1:
+                raise RuntimeError("TTS provider contract is not ready")
+            provider = payload.get("provider")
+            provider_health = payload.get("provider_health")
+            if not isinstance(provider, dict) or int(provider.get("max_concurrency") or 0) < 1:
+                raise RuntimeError("TTS provider capability declaration is invalid")
+            if not isinstance(provider_health, dict):
+                raise RuntimeError("TTS provider health is missing")
+            if "ready" in provider_health and provider_health.get("ready") is not True:
+                raise RuntimeError("TTS provider is not ready")
+            if (
+                "worker_process_alive" in provider_health
+                and provider_health.get("worker_process_alive") is not True
+            ):
+                raise RuntimeError("TTS worker process is not ready")
+
+
+asyncio.run(main())
+PYWSHEALTH
+}
+
+wait_for_ws_health() {
+  local host="$1" port="$2" service="$3" timeout_s="$4" label="$5"
+  local deadline=$((SECONDS + timeout_s))
+  echo "[chromie] Waiting for $label application health at ws://$host:$port..."
+  until python_ws_health_check "$host" "$port" "$service"; do
+    if (( SECONDS >= deadline )); then
+      echo "[chromie][error] Timed out waiting for $label WebSocket health." >&2
+      return 1
+    fi
+    sleep 2
+  done
+  echo "[chromie] $label application is healthy."
+}
+
+warm_tts_candidate() {
+  local host="$1" port="$2" expected_provider="$3" text="$4" timeout_s="$5" label="$6"
+  local output
+  echo "[chromie] Warming $label with a no-playback synthesis under the full service load..."
+  output="$(python3 - "$host" "$port" "$expected_provider" "$text" "$timeout_s" <<'PYTTSWARM'
+import asyncio
+import json
+import sys
+import uuid
+
+import websockets
+
+
+async def synthesize() -> tuple[int, str]:
+    host, raw_port, expected_provider, text, _raw_timeout = sys.argv[1:]
+    audio_bytes = 0
+    observed_provider = ""
+    async with websockets.connect(
+        f"ws://{host}:{int(raw_port)}",
+        max_size=10**7,
+        open_timeout=10,
+        ping_interval=20,
+        ping_timeout=20,
+    ) as ws:
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "synthesize_stream",
+                    "request_id": f"startup-warm-{uuid.uuid4().hex}",
+                    "text": text,
+                    "speaker_id": "default",
+                    "language_hint": "zh",
+                },
+                ensure_ascii=False,
+            )
+        )
+        async for raw in ws:
+            if isinstance(raw, bytes):
+                audio_bytes += len(raw)
+                continue
+            payload = json.loads(raw)
+            message_type = payload.get("type")
+            if message_type == "error":
+                raise RuntimeError(str(payload.get("message") or "TTS warm-up failed"))
+            if message_type != "end":
+                continue
+            provider = payload.get("provider")
+            if isinstance(provider, dict):
+                observed_provider = str(provider.get("provider_id") or "")
+            if observed_provider != expected_provider:
+                raise RuntimeError(
+                    f"expected provider {expected_provider!r}, got {observed_provider!r}"
+                )
+            if audio_bytes <= 0:
+                raise RuntimeError("TTS warm-up completed without PCM audio")
+            return audio_bytes, observed_provider
+    raise RuntimeError("TTS warm-up socket closed before completion")
+
+
+async def main() -> None:
+    timeout_s = max(1.0, float(sys.argv[5]))
+    audio_bytes, provider = await asyncio.wait_for(synthesize(), timeout=timeout_s)
+    print(f"provider={provider} pcm_bytes={audio_bytes}")
+
+
+asyncio.run(main())
+PYTTSWARM
+)" || {
+    echo "[chromie][error] $label failed its full synthesis readiness probe." >&2
+    return 1
+  }
+  echo "[chromie] $label is synthesis-ready ($output)."
 }
 
 python_http_check() {
@@ -166,16 +310,115 @@ set -a
 source .env.runtime
 set +a
 
+TTS_READY_PORT=5000
+TTS_READY_LABEL="TTS"
+TTS_TRIAL_REFERENCE_SHA=""
+case "${TTS_TRIAL_PROVIDER,,}" in
+  "")
+    unset CHROMIE_TTS_TRIAL_PROVIDER
+    ;;
+  cosyvoice|cosyvoice3)
+    TTS_TRIAL_REFERENCE_DIR="${TTS_COSYVOICE_TRIAL_REFERENCE_DIR:-$ROOT_DIR/.chromie/private/tts-voice}"
+    TTS_TRIAL_REFERENCE_SHA="$(python3 - "$TTS_TRIAL_REFERENCE_DIR" <<'PY_TTS_REFERENCE'
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).expanduser().resolve()
+wav_path = root / "reference.wav"
+metadata_path = root / "reference.json"
+if not wav_path.is_file() or not metadata_path.is_file():
+    raise SystemExit(
+        f"CosyVoice trial reference is incomplete: expected {wav_path} and {metadata_path}"
+    )
+metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+actual_sha = hashlib.sha256(wav_path.read_bytes()).hexdigest()
+if metadata.get("usage_authorized") is not True:
+    raise SystemExit("CosyVoice trial reference is not marked usage_authorized=true")
+if str(metadata.get("audio_sha256") or "").lower() != actual_sha:
+    raise SystemExit("CosyVoice trial reference SHA-256 does not match its metadata")
+if not str(metadata.get("text") or "").strip() or not str(metadata.get("license_id") or "").strip():
+    raise SystemExit("CosyVoice trial reference lacks text or license metadata")
+print(actual_sha)
+PY_TTS_REFERENCE
+)"
+    export CHROMIE_TTS_TRIAL_PROVIDER=cosyvoice3
+    export TTS_AB_REFERENCE_DIR="$TTS_TRIAL_REFERENCE_DIR"
+    TTS_READY_PORT=5001
+    TTS_READY_LABEL="CosyVoice3 trial TTS"
+    echo "[chromie] Temporary TTS trial: CosyVoice3 reference_sha256=${TTS_TRIAL_REFERENCE_SHA:0:12}"
+    echo "[chromie] The configured default TTS provider is unchanged."
+    ;;
+  *)
+    echo "[chromie][error] Unsupported --tts-trial provider: $TTS_TRIAL_PROVIDER" >&2
+    echo "[chromie][hint] Supported temporary provider: cosyvoice" >&2
+    exit 2
+    ;;
+esac
+
 mkdir -p .chromie/voice-runtime hf_cache "${OLLAMA_DATA_DIR:-ollama_data}" recordings
 
 RUNTIME_DIR="$ROOT_DIR/.chromie/voice-runtime"
 COMPOSE_OVERRIDE="$RUNTIME_DIR/compose.voice-mujoco.yaml"
 ORCH_OVERRIDE="$RUNTIME_DIR/orchestrator.env"
+SERVICE_OVERRIDE="$RUNTIME_DIR/services.env"
+
+EFFECTIVE_ROUTER_MODEL="${ROUTER_MODEL}"
+EFFECTIVE_ROUTER_REVIEW_MODEL="${ROUTER_REVIEW_MODEL}"
+EFFECTIVE_AGENT_MODEL="${AGENT_MODEL}"
+EFFECTIVE_GOAL_ASSOCIATION_MODEL="${AGENT_GOAL_ASSOCIATION_MODEL}"
+EFFECTIVE_FAST_PLANNER_MODEL="${AGENT_FAST_PLANNER_MODEL}"
+EFFECTIVE_DEEP_PLANNER_MODEL="${AGENT_DEEP_PLANNER_MODEL}"
+EFFECTIVE_RESPONSE_COMPOSER_MODEL="${AGENT_RESPONSE_COMPOSER_MODEL}"
+EFFECTIVE_TASK_CONTINUITY_MODEL="${AGENT_TASK_CONTINUITY_MODEL}"
+EFFECTIVE_SOCIAL_ATTENTION_MODEL="${AGENT_SOCIAL_ATTENTION_MODEL}"
+EFFECTIVE_RESPONSE_REVIEW_MODEL="${AGENT_RESPONSE_REVIEW_MODEL}"
+EFFECTIVE_OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-2}"
+
+if [ "${CHROMIE_TTS_TRIAL_PROVIDER:-}" = "cosyvoice3" ]; then
+  COSYVOICE_TRIAL_BRAIN_MODEL="${TTS_COSYVOICE_TRIAL_OLLAMA_MODEL:-qwen3:4b}"
+  EFFECTIVE_ROUTER_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_ROUTER_REVIEW_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_AGENT_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_GOAL_ASSOCIATION_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_FAST_PLANNER_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_DEEP_PLANNER_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_RESPONSE_COMPOSER_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_TASK_CONTINUITY_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_SOCIAL_ATTENTION_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_RESPONSE_REVIEW_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+  EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1
+  echo "[chromie] CosyVoice trial brain: ${COSYVOICE_TRIAL_BRAIN_MODEL} (one resident Ollama model; GPU headroom reserved for TTS)."
+fi
+
+cat > "$SERVICE_OVERRIDE" <<EOF_SERVICE
+ROUTER_MODEL=${EFFECTIVE_ROUTER_MODEL}
+ROUTER_REVIEW_MODEL=${EFFECTIVE_ROUTER_REVIEW_MODEL}
+AGENT_MODEL=${EFFECTIVE_AGENT_MODEL}
+AGENT_GOAL_ASSOCIATION_MODEL=${EFFECTIVE_GOAL_ASSOCIATION_MODEL}
+AGENT_FAST_PLANNER_MODEL=${EFFECTIVE_FAST_PLANNER_MODEL}
+AGENT_DEEP_PLANNER_MODEL=${EFFECTIVE_DEEP_PLANNER_MODEL}
+AGENT_RESPONSE_COMPOSER_MODEL=${EFFECTIVE_RESPONSE_COMPOSER_MODEL}
+AGENT_TASK_CONTINUITY_MODEL=${EFFECTIVE_TASK_CONTINUITY_MODEL}
+AGENT_SOCIAL_ATTENTION_MODEL=${EFFECTIVE_SOCIAL_ATTENTION_MODEL}
+AGENT_RESPONSE_REVIEW_MODEL=${EFFECTIVE_RESPONSE_REVIEW_MODEL}
+OLLAMA_MAX_LOADED_MODELS=${EFFECTIVE_OLLAMA_MAX_LOADED_MODELS}
+EOF_SERVICE
 
 cat > "$COMPOSE_OVERRIDE" <<EOF_COMPOSE
 services:
   chromie-agent:
     environment:
+      AGENT_MODEL: "${EFFECTIVE_AGENT_MODEL}"
+      AGENT_GOAL_ASSOCIATION_MODEL: "${EFFECTIVE_GOAL_ASSOCIATION_MODEL}"
+      AGENT_FAST_PLANNER_MODEL: "${EFFECTIVE_FAST_PLANNER_MODEL}"
+      AGENT_DEEP_PLANNER_MODEL: "${EFFECTIVE_DEEP_PLANNER_MODEL}"
+      AGENT_RESPONSE_COMPOSER_MODEL: "${EFFECTIVE_RESPONSE_COMPOSER_MODEL}"
+      AGENT_TASK_CONTINUITY_MODEL: "${EFFECTIVE_TASK_CONTINUITY_MODEL}"
+      AGENT_RESPONSE_REVIEW_MODEL: "${EFFECTIVE_RESPONSE_REVIEW_MODEL}"
       AGENT_CAPABILITY_MANIFESTS: /app/capabilities/soridormi.json
       SORIDORMI_MCP_URL: ${CONTAINER_MCP_URL}
       AGENT_EXPRESSIVE_BODY_CUES: off
@@ -183,7 +426,7 @@ services:
       # Attention to off, while the architecture-validation overlay explicitly
       # selects sim_only. Optional inference never delays the primary response.
       AGENT_SOCIAL_ATTENTION_MODE: ${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-off}}
-      AGENT_SOCIAL_ATTENTION_MODEL: ${AGENT_SOCIAL_ATTENTION_MODEL:-${ROUTER_MODEL:-qwen3:4b}}
+      AGENT_SOCIAL_ATTENTION_MODEL: "${EFFECTIVE_SOCIAL_ATTENTION_MODEL}"
       AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET: ${AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET:-calibrated_right_side}
       AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION: ${AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION:-right}
       AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD: ${AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD:-0.35}
@@ -191,6 +434,13 @@ services:
       AGENT_INTERACTION_OUTPUT_MODE: native
       AGENT_NATIVE_INTERACTION_FALLBACK: "0"
       AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED: "0"
+  chromie-router:
+    environment:
+      ROUTER_MODEL: "${EFFECTIVE_ROUTER_MODEL}"
+      ROUTER_REVIEW_MODEL: "${EFFECTIVE_ROUTER_REVIEW_MODEL}"
+  chromie-llm:
+    environment:
+      OLLAMA_MAX_LOADED_MODELS: "${EFFECTIVE_OLLAMA_MAX_LOADED_MODELS}"
 EOF_COMPOSE
 
 cat > "$ORCH_OVERRIDE" <<EOF_ORCH
@@ -210,8 +460,34 @@ ORCH_COGNITIVE_APPLY_LANES=chat,robot_action
 ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed
 ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0
 SORIDORMI_MCP_URL=${HOST_MCP_URL}
+OLLAMA_MODEL=${EFFECTIVE_AGENT_MODEL}
+ROUTER_MODEL=${EFFECTIVE_ROUTER_MODEL}
+ROUTER_REVIEW_MODEL=${EFFECTIVE_ROUTER_REVIEW_MODEL}
+AGENT_MODEL=${EFFECTIVE_AGENT_MODEL}
+AGENT_GOAL_ASSOCIATION_MODEL=${EFFECTIVE_GOAL_ASSOCIATION_MODEL}
+AGENT_FAST_PLANNER_MODEL=${EFFECTIVE_FAST_PLANNER_MODEL}
+AGENT_DEEP_PLANNER_MODEL=${EFFECTIVE_DEEP_PLANNER_MODEL}
+AGENT_RESPONSE_COMPOSER_MODEL=${EFFECTIVE_RESPONSE_COMPOSER_MODEL}
+AGENT_TASK_CONTINUITY_MODEL=${EFFECTIVE_TASK_CONTINUITY_MODEL}
+AGENT_SOCIAL_ATTENTION_MODEL=${EFFECTIVE_SOCIAL_ATTENTION_MODEL}
+AGENT_RESPONSE_REVIEW_MODEL=${EFFECTIVE_RESPONSE_REVIEW_MODEL}
+OLLAMA_MAX_LOADED_MODELS=${EFFECTIVE_OLLAMA_MAX_LOADED_MODELS}
 EOF_ORCH
 
+if [ "${CHROMIE_TTS_TRIAL_PROVIDER:-}" = "cosyvoice3" ]; then
+  {
+    echo "TTS_URL=ws://127.0.0.1:5001"
+    echo "TTS_SPEAKER_ID=default"
+    echo "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=cosyvoice3-${TTS_TRIAL_REFERENCE_SHA}"
+    echo "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED=1"
+    echo "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0"
+    echo "ORCH_TTS_CONCURRENCY=1"
+  } >> "$ORCH_OVERRIDE"
+  echo "[chromie] CosyVoice trial TTS: one host request for the provider's one model worker."
+  echo "[chromie] CosyVoice trial fast-first cache: load validated entries only; startup generation disabled."
+fi
+
+export CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE="$SERVICE_OVERRIDE"
 export CHROMIE_COMPOSE_OVERRIDE_FILES="${CHROMIE_COMPOSE_OVERRIDE_FILES:+${CHROMIE_COMPOSE_OVERRIDE_FILES},}${COMPOSE_OVERRIDE}"
 export CHROMIE_PULL_POLICY=never
 
@@ -321,23 +597,37 @@ run_soridormi_capability_probe() {
   return "$rc"
 }
 
-wait_for_tcp 127.0.0.1 9001 900 "ASR"
-wait_for_tcp 127.0.0.1 5000 900 "TTS"
+wait_for_ws_health 127.0.0.1 9001 asr 900 "ASR"
+wait_for_ws_health 127.0.0.1 "$TTS_READY_PORT" tts 1200 "$TTS_READY_LABEL"
 wait_for_http 127.0.0.1 8091 /health 300 "Router"
 wait_for_http 127.0.0.1 8092 /health 300 "Agent"
 wait_for_tcp 127.0.0.1 11434 300 "Ollama"
 
+if [ "${CHROMIE_TTS_TRIAL_PROVIDER:-}" = "cosyvoice3" ]; then
+  COSYVOICE_TRIAL_WARMUP_TEXT="${TTS_COSYVOICE_TRIAL_WARMUP_TEXT:-你好，我是 Chromie。现在语音系统已经准备好了，很高兴和你一起探索这个世界。Hello, I am ready to talk with you.}"
+  warm_tts_candidate \
+    127.0.0.1 "$TTS_READY_PORT" fun-cosyvoice3-0.5b \
+    "$COSYVOICE_TRIAL_WARMUP_TEXT" 300 "$TTS_READY_LABEL"
+fi
+
 check_soridormi_from_agent_container
 run_soridormi_capability_probe
+
+if [ "$START_ORCHESTRATOR" = "1" ]; then
+  READY_NEXT_STEP='The host Orchestrator starts next; wait for "Microphone started" before speaking.'
+else
+  READY_NEXT_STEP='Host Orchestrator: not started (--no-orchestrator).'
+fi
 
 cat <<EOF_READY
 
 ======================================================================
-Chromie voice interaction is ready
+Chromie services are ready
 ======================================================================
 Soridormi MCP: ${HOST_MCP_URL}
 Images: defined once in .env.common/.env.local and consumed by Compose
 Pull policy: never
+TTS: ${CHROMIE_TTS_TRIAL_PROVIDER:-configured default}${CHROMIE_TTS_TRIAL_PROVIDER:+ (temporary trial; default unchanged)}
 
 Speak normally, for example:
   Hello Chromie.
@@ -346,6 +636,7 @@ Speak normally, for example:
   Look at me for three seconds.
   Stop.
 
+${READY_NEXT_STEP}
 Press Ctrl+C to stop Chromie.
 ======================================================================
 EOF_READY

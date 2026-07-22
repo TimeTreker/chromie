@@ -143,6 +143,12 @@ validation, but it must not automatically resume interrupted physical work.
    can answer or ask for clarification. If the quick model chooses
    `deep_thought`, deterministic code must not override that by phrase
    matching.
+   Ambient addressedness is not a general quick-route output. Only a separate
+   two-field classifier may propose `addressed=false`, and only while bounded
+   host evidence says no exchange or task is active. Deterministic code maps a
+   high-confidence false result to non-speaking `ambient_speech`; classifier
+   failure, low confidence, direct address, or active engagement preserves the
+   original route.
 4. Schemas and policies revalidate everything.
    `RouteDecision`, `InteractionResponse`, Skill Runtime requests, TaskGraphs,
    and MCP calls must be validated after model output is produced.
@@ -165,9 +171,11 @@ validation, but it must not automatically resume interrupted physical work.
 If the model chooses the wrong route, the expected outcome is not "execute the
 wrong action." The expected outcome is one of:
 
-- deterministic interrupt/ignore handling wins before model routing;
-- an invalid model `interrupt`/`ignore` after that filter falls back to safe
+- deterministic interrupt and unusable-audio handling wins before model routing;
+- an invalid quick/review model `interrupt`/`ignore` after that filter falls back to safe
   chat rather than catalog motion or deep-thought detours;
+- the focused addressedness classifier may suppress only an inactive,
+  high-confidence ambient turn and otherwise fails open to the original route;
 - a model `robot_action` for a factual knowledge question is addressed by the
   Router prompt/review model and, if it reaches conversation, by semantic
   spoken-response review rather than phrase-based Agent rules;

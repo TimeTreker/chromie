@@ -7,6 +7,7 @@ import tempfile
 import time
 import types
 import unittest
+import numpy as np
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from unittest import mock
@@ -212,16 +213,28 @@ class TtsPerformanceContractTests(unittest.TestCase):
             class FakeInterface:
                 def create_speaker(self, path, *, whisper_model, whisper_device):
                     calls.append((path, whisper_model, whisper_device))
-                    return {"fixture": True, "text": "你好，我是 Chromie。"}
+                    return {
+                        "text": "你好，我是 Chromie。",
+                        "words": [
+                            {
+                                "word": "你好",
+                                "duration": 1.0,
+                                "c1": [1] * 75,
+                                "c2": [2] * 75,
+                                "features": {},
+                            }
+                        ],
+                    }
 
             server.interface = FakeInterface()
             server.patch_torch_1d_audio_slice = nullcontext
             server.save_speaker_json = lambda *_args, **_kwargs: None
-            server.create_speaker_profile_from_wav(
-                "chromie_zh",
-                wav_path,
-                transcript=" 你好，我是 Chromie。 ",
-            )
+            with mock.patch.object(server, "reference_audio_duration_seconds", return_value=1.0):
+                server.create_speaker_profile_from_wav(
+                    "chromie_zh",
+                    wav_path,
+                    transcript=" 你好，我是 Chromie。 ",
+                )
 
             self.assertEqual(calls, [(str(wav_path), "turbo", "cpu")])
             self.assertEqual(
@@ -235,6 +248,84 @@ class TtsPerformanceContractTests(unittest.TestCase):
                 ),
                 1.0,
             )
+
+    def test_soundfile_loader_preserves_batch_channel_sample_axes(self) -> None:
+        sys.modules.pop("server", None)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env = {
+                "SPEAKER_DIR": temp_dir,
+                "TTS_AUDIO_CODEC_DEVICE": "cpu",
+                "TTS_DETAILED_TIMING": "0",
+                "TTS_TOKENIZER_REPO": "fixture/tokenizer",
+                "TTS_TOKENIZER_REVISION": "0123456789abcdef",
+                "TTS_GGUF_REPO": "fixture/gguf",
+                "TTS_GGUF_REVISION": "fedcba9876543210",
+            }
+            with stub_tts_dependencies(), mock.patch.dict(os.environ, env, clear=False):
+                server = importlib.import_module("server")
+
+        class FakeTensor:
+            def __init__(self, array):
+                self.array = np.asarray(array)
+
+            @property
+            def shape(self):
+                return self.array.shape
+
+            def float(self):
+                return self
+
+            def unsqueeze(self, axis):
+                return FakeTensor(np.expand_dims(self.array, axis))
+
+        server.sf.read = lambda *_args, **_kwargs: (
+            np.ones(48000, dtype=np.float32),
+            48000,
+        )
+        server.torch.from_numpy = FakeTensor
+        loaded = server.load_audio_with_soundfile("fixture.wav", target_sr=48000)
+        self.assertEqual(loaded.shape, (1, 1, 48000))
+
+    def test_speaker_profile_gate_rejects_collapsed_acoustic_codes(self) -> None:
+        sys.modules.pop("server", None)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env = {
+                "SPEAKER_DIR": temp_dir,
+                "TTS_AUDIO_CODEC_DEVICE": "cpu",
+                "TTS_DETAILED_TIMING": "0",
+                "TTS_TOKENIZER_REPO": "fixture/tokenizer",
+                "TTS_TOKENIZER_REVISION": "0123456789abcdef",
+                "TTS_GGUF_REPO": "fixture/gguf",
+                "TTS_GGUF_REVISION": "fedcba9876543210",
+            }
+            with stub_tts_dependencies(), mock.patch.dict(os.environ, env, clear=False):
+                server = importlib.import_module("server")
+
+        collapsed = {
+            "text": "你好",
+            "words": [
+                {"word": "你好", "duration": 0.01, "c1": [1], "c2": [2]}
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "insufficient acoustic conditioning"):
+            server.validate_speaker_profile(collapsed, reference_audio_seconds=1.0)
+
+        valid = {
+            "text": "你好",
+            "words": [
+                {
+                    "word": "你好",
+                    "duration": 1.0,
+                    "c1": [1] * 75,
+                    "c2": [2] * 75,
+                }
+            ],
+        }
+        stats = server.validate_speaker_profile(valid, reference_audio_seconds=1.0)
+        self.assertEqual(stats["audio_code_count"], 75)
+        isolated = server.speaker_for_generation(valid)
+        isolated["words"][-1]["word"] += "。"
+        self.assertEqual(valid["words"][-1]["word"], "你好")
 
     def test_server_timing_hooks_measure_model_and_codec_without_replacing_output(self) -> None:
         sys.modules.pop("server", None)

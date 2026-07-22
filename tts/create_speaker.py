@@ -123,7 +123,10 @@ def load_audio_with_soundfile(path: str, target_sr: int) -> torch.Tensor:
     peak = float(np.max(np.abs(wav))) if wav.size else 0.0
     if peak > 1.0:
         wav = wav / peak
-    return torch.from_numpy(wav).float().unsqueeze(0)
+    # Match OuteTTS DacInterface.load_audio: [batch, channels, samples].
+    # A two-dimensional tensor is collapsed to one sample by OuteTTS's
+    # loudness normalizer and creates a malformed one-token speaker profile.
+    return torch.from_numpy(wav).float().unsqueeze(0).unsqueeze(0)
 
 
 def patch_audio_loader(interface: Interface):

@@ -22,7 +22,7 @@ A higher level does not replace lower-level regression tests.
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
-| ASR/TTS GPU use | TTS provider contract, transcript-validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | Two local isolated RTX 5090 candidate runs passed 6/6 cases per provider, including the authorized voice candidate; dirty/non-source-bound | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; listening and comparative shared-resource target evidence open |
+| ASR/TTS GPU use | TTS provider contract, transcript-plus-acoustic validated Oute speaker creation, candidate adapters, and common A/B matrix; ASR/TTS component coverage remains limited | Two local isolated RTX 5090 candidate runs passed 6/6 cases per provider; corrected local Oute `chromie_mixed` passed 10/10 smoke plus two repeated 6/6 full matrices at 8192; dirty/non-source-bound | Not applicable | RTX 5090 smoke passed 21/21 for the historical Oute deployment; physical listening and comparative shared-resource target evidence open |
 | Audio devices and barge-in | Partial | Manual host run | Can pair with sim | PipeWire virtual-mic 7/7 passed; physical microphone/speaker open |
 
 Retained reference-host evidence from June 14 and June 17, 2026:
@@ -207,8 +207,11 @@ LLM is not used as the pass/fail judge during regression runs.
 The fast Router model is accepted only as an advisory semantic classifier.
 Level A routing evidence must continue to prove:
 
-- deterministic stop, cancel, emergency, ignore, silence, and unusable-audio
-  paths do not depend on model output;
+- deterministic stop, cancel, emergency, silence, and unusable-audio paths do
+  not depend on model output;
+- semantic ambient suppression is isolated to the two-field addressedness
+  contract, requires inactive host engagement plus high confidence, cannot
+  authorize effects, and fails open to the original route;
 - model routes are bounded by capability-catalog candidates and schema
   finalization;
 - low-confidence, ambiguous, unsupported, or unavailable routes clarify, refuse,
@@ -254,7 +257,8 @@ python -m unittest \
   tests.test_tts_provider_contract \
   tests.test_tts_provider_ab \
   tests.test_tts_candidate_providers \
-  tests.test_tts_benchmark
+  tests.test_tts_benchmark \
+  tests.test_fast_first_audio_cache
 python scripts/tts_provider_ab.py --check
 ```
 
@@ -287,10 +291,47 @@ for CosyVoice3 and 8.0885 s for Qwen3-TTS, so the ordinary latency result cannot
 substitute for an approved interruption bound. The earlier generated-reference
 run showed the same tradeoff. Both were dirty-tree, isolated runs and their
 ignored local artifacts are not release evidence. The owner approved the voice
-style, but rebuilt-container Oute default checks reproduced stochastic token
-exhaustion at 4096 and 8192 diagnostic budgets, so the style was not promoted.
-That approval also does not accept either candidate provider's output, whose
+style. A later audit found the first Oute profiles were acoustically malformed:
+the fallback loader omitted the batch tensor axis and created only one DAC code
+pair while transcript similarity still passed. The corrected loader and
+acoustic-coverage gate produced a 776-code `chromie_mixed` profile. At the RTX
+5090 8192-token setting it passed a 10/10 smoke plus two complete 6/6 runs of
+the same multilingual/interruption/dialogue/concurrency matrix. These ignored
+local dirty-tree artifacts support an installation-local speaker override only;
+they are not source-bound Target evidence or a listening-quality acceptance.
+The approval also does not accept either candidate provider's output, whose
 listening review remains required.
+
+The objective matrix accepts non-empty, correctly terminated audio; it does not
+prove that the audio speaks the requested text. The startup fast-first path has
+an additional fail-closed ASR content gate: each cue must remain within the
+configured duration and its normalized round-trip transcript must meet
+`ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY`. Unit evidence includes the
+observed regression shape where a Chinese cue instead contains the English
+voice-enrollment sentence. This is Level A component evidence, not a human
+pronunciation or speaker-quality verdict.
+
+To stage a one-session manual CosyVoice3 listening check without selecting a
+winner:
+
+```bash
+./scripts/start_chromie.sh --tts-trial cosyvoice --keep-services
+```
+
+The trial still requires a human verdict. It does not replace the common A/B
+matrix, shared-resource target evidence, interruption bound, or license review.
+For this temporary full-stack trial, all Router/Agent lanes use
+`TTS_COSYVOICE_TRIAL_OLLAMA_MODEL` (`qwen3:4b` by default), Ollama permits one
+resident model, and missing fast-first cues are not generated during startup.
+Existing cues remain subject to the duration and ASR gates. This profile is a
+voice-listening resource envelope, not evidence that the normal mixed-model
+cognitive profile was exercised. Cache-prime timeouts must remain non-fatal and
+must not cause repeated provider cold restarts.
+
+The July 22 exact-launch regression reached `Microphone started` after resolving
+an empty candidate cache in 4.1 ms with zero startup synthesis. This is live
+local startup-path evidence; it is not a recorded listening review, sustained
+interaction run, or release-closing target bundle.
 
 The committed matrix uses identical Mandarin, English, mixed-language,
 interruption/recovery, six-turn dialogue, and concurrent requests. The runner

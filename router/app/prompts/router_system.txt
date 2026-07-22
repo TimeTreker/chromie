@@ -12,12 +12,11 @@ compatibility route plus optional routes[] for independent jobs so lanes remain 
 reasoning.
 
 Route Taxonomy: chat=speech-only conversation, social exchange, self-description, facts,
-agreement/disagreement, creative speech, and questions about available abilities that do not request execution now. deep_thought=complex reasoning,
-debugging, implementation planning, long-horizon goals, task-session work.
+agreement/disagreement, creative speech, and ability availability questions. deep_thought=complex reasoning, debugging, implementation planning, long-horizon goals, task-session work.
 robot_action=listed body/head/gaze/motion/expression skill requested for execution now.
 tool=external/changing lookup, especially current weather/forecast. memory=fact
-or preference update. clarify=short clarification. interrupt/ignore are
-deterministic-only routes.
+or preference update. clarify=short clarification. interrupt/ignore are not
+quick-intent outputs.
 
 Uncertainty And Confirmation Acting Rule: ask for clarification when information
 is insufficient. Short ASR fragments, isolated letters, clipped tokens, unclear
@@ -25,19 +24,26 @@ pronouns, and weak lexical or phonetic catalog associations are not robot_action
 unless recent context supplies the meaning. If no listed skill clearly supports
 an action, do not substitute a similar skill.
 
-Semantic Task Continuity: use active task IDs, open goals, versions, gaps, and
-state to decide whether the turn creates, modifies, answers, corrects, confirms,
-rejects, cancels, pauses, resumes, replaces, or queries a task. Decide by meaning,
-never keywords, regexes, overlap, or recency alone. Use exact supplied task IDs;
-clarify ambiguous targets. Goals are open outcome descriptions. Plan steps are
-not separate route items.
+Semantic Task Continuity: use active task IDs, open goals, gaps, and state to
+decide whether the turn changes, answers, corrects, confirms, rejects, cancels,
+pauses, resumes, replaces, or queries a task. Decide by meaning, not keywords,
+regexes, overlap, or recency. Use exact task IDs; clarify ambiguous targets.
 
-Capability Inquiry And Execution: infer from the whole utterance and context whether the user is asking about availability or requesting execution. Availability questions stay chat with an intent such as capability_inquiry; execution requests use robot_action only when a listed skill supports them. This is a semantic distinction, not a phrase pattern.
+Capability Inquiry And Execution: infer from the whole utterance and context.
+capability_inquiry covers only Chromie's bounded abilities; technical discussion about another person,
+model, vehicle, sensor, or system does not.
+Availability questions stay chat; execution requests use robot_action when a listed
+skill supports them. This is a semantic distinction, not a phrase pattern.
+
+Addressedness: interaction_engagement is host evidence for subject ownership,
+but a separate focused classifier owns ambient suppression. Do not emit ignore
+here. Greetings, direct questions/requests, Chromie's name, and active
+engagement are addressed. Informal, multilingual, or imperfect speech remains
+normal semantic input.
 
 Tool Grounding And Affordance Grounding: weather lookup uses route=tool,
 intent=weather_query, metadata.tool_name=weather, metadata.weather_query. Do not answer weather from memory. Catalog entries are a body/tool affordance interface,
-not a phrase table, and are proposals, not authorization. Ground semantic intent
-against skill_id, route, desc, effect, safety, required_args, args. Bind an exact
+not a phrase table, and are proposals, not authorization. Bind an exact
 skill in the quick route only when the user explicitly requests that method and
 one listed capability clearly matches. Outcome requests with multiple methods,
 missing context, or role/permission/world dependence use deep_thought and retain
@@ -53,9 +59,8 @@ deep_thought, robot_action, tool, memory, clarify, interrupt, ignore. Optional:
 routes, actions, fast_speech, speak_first, direct_to_tts, metadata.
 metadata.desired_abilities may describe missing abilities with
 status=missing_ability; never put missing abilities in actions[].
-metadata.semantic_task_operations may contain advisory task operations. Create
-uses an open goal; later operations use exact task IDs and update the goal before
-replanning. The Router never commits them. Allowed lanes:
+metadata.semantic_task_operations may contain advisory task operations; the
+Router never commits them. Allowed lanes:
 immediate_speech, conversation, post_turn, deepthought, skill_runtime, tool,
 deterministic_control, none. Allowed context_profile values: none, fast_minimal,
 session_compact, capability_safety, full_mind. fast_speech and speak_first must

@@ -187,6 +187,15 @@ class ExecuteGoalPlanOutcome(_GoalPlanOutcomeBase):
     def normalize_step_ids(cls, value: Any) -> list[str]:
         return _normalize_ids(value)
 
+    @model_validator(mode="after")
+    def reject_planner_owned_execution_speech(self) -> "ExecuteGoalPlanOutcome":
+        if self.response_text:
+            raise ValueError(
+                "execute goal outcomes must not carry response_text; "
+                "Response Composer owns pre-execution speech"
+            )
+        return self
+
 
 class RespondGoalPlanOutcome(_GoalPlanOutcomeBase):
     disposition: Literal["respond"]
@@ -359,6 +368,15 @@ class CanonicalPlan(BaseModel):
             )
         if self.disposition in {"execute", "respond", "mixed"} and self.coverage != "complete":
             raise ValueError("respond, execute, and mixed plans require complete accounting coverage")
+        if (
+            self.disposition == "execute"
+            and str(self.metadata.get("plan_relation") or "exact") == "exact"
+            and self.response_text
+        ):
+            raise ValueError(
+                "exact execute plans must not carry response_text; "
+                "Response Composer owns pre-execution speech"
+            )
 
         resolution_keys = [(item.step_id, item.parameter) for item in self.parameter_resolutions]
         if len(resolution_keys) != len(set(resolution_keys)):

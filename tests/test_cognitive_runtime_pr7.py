@@ -15,7 +15,13 @@ from orchestrator.runtime.cognitive_runtime import (
     GoalDrivenRuntimeCoordinator,
 )
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from orchestrator.runtime.skill_runtime import SkillDefinition
+from orchestrator.runtime.skill_runtime import (
+    LocalSpeechSkillProvider,
+    SkillDefinition,
+    SkillRegistry,
+    SkillRuntime,
+    local_speech_definition,
+)
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
@@ -256,7 +262,18 @@ def blink_definition(*, confirmation: bool = False) -> SkillDefinition:
 
 
 class GoalDrivenRuntimeTests(unittest.TestCase):
-    def run_resolution(self, coordinator, client, *, text="hello"):
+    def run_resolution(
+        self,
+        coordinator,
+        client,
+        *,
+        text="hello",
+        route="chat",
+        intent=None,
+    ):
+        resolved_intent = intent or (
+            "capability:soridormi.motion" if route == "robot_action" else "conversation"
+        )
         return asyncio.run(
             coordinator.resolve(
                 object(),
@@ -265,7 +282,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 route_decision=type(
                     "Decision",
                     (),
-                    {"route": "chat", "intent": "conversation", "language": "zh-CN"},
+                    {
+                        "route": route,
+                        "intent": resolved_intent,
+                        "language": "zh-CN",
+                    },
                 )(),
                 context={"history": [], "active_goal_snapshots": []},
                 history=[],
@@ -482,6 +503,351 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertFalse(result.metadata["deep_planner_invoked"])
         self.assertTrue(result.metadata["deep_planner_avoided"])
 
+    def test_respond_delivery_failure_cannot_complete_goal(self):
+        plan = respond_plan()
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-respond-delivery",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                final=ResponseStage(
+                    text="你好。",
+                    speech_act="inform",
+                    commitment_state="none",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=plan.goal_ids,
+                )
+            ),
+            confidence=0.9,
+        )
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(FakeRuntime()).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-respond-delivery",
+                language="zh-CN",
+            )
+        )
+        self.assertTrue(response.speech[0].metadata["wait_for_playback_start"])
+        self.assertTrue(
+            response.speech[0].metadata["playback_start_required_for_delivery"]
+        )
+
+        state = ConversationStateManager(
+            base_conversation_id="respond-delivery-failure"
+        )
+        state.apply_goal_association_resolution(
+            new_goal_association(),
+            sid="sid-respond-delivery",
+            user_text="hello",
+            route="chat",
+            intent="conversation",
+            atomic=True,
+        )
+        state.record_agent_result("sid-respond-delivery", response)
+        self.assertEqual(
+            state.active_goal_snapshots()[0]["status"],
+            "scheduled",
+        )
+
+        registry = SkillRegistry()
+        registry.register(local_speech_definition())
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(
+            LocalSpeechSkillProvider(lambda _args: {"scheduled": False})
+        )
+        execution = asyncio.run(runtime.execute(response))
+
+        self.assertEqual(execution.status, "failed")
+        self.assertEqual(execution.results[0].reason_code, "playback_not_started")
+        self.assertTrue(
+            state.update_pending_task_status_for_request_id(
+                request_id=execution.results[0].request_id,
+                status=execution.results[0].status,
+            )
+        )
+        goal_context = next(
+            item
+            for item in state.snapshot()["task_contexts"]
+            if item["semantic_goal"]["goal_id"] == "goal-1"
+        )
+        self.assertEqual(goal_context["status"], "failed")
+        self.assertEqual(goal_context["plan_status"], "failed")
+        self.assertNotEqual(goal_context["status"], "done")
+
+    def test_chat_source_route_cannot_elevate_to_robot_action(self):
+        fast = execute_plan(plan_id="fast-route-escalation").model_copy(
+            update={
+                "planner_tier": "fast",
+                "metadata": {"path_classification": "terminal"},
+            }
+        )
+        runtime = FakeRuntime([blink_definition()])
+        client = ScriptedClient(
+            association=new_goal_association(),
+            fast_plans=[fast],
+        )
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(
+                mode="apply",
+                apply_lanes=frozenset({"chat", "robot_action"}),
+            ),
+        )
+
+        result = self.run_resolution(
+            coordinator,
+            client,
+            text="What are you thinking?",
+            route="chat",
+        )
+
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.lane, "robot_action")
+        self.assertEqual(result.metadata["failure_stage"], "authority_boundary")
+        self.assertEqual(result.metadata["failure_class"], "route_effect_escalation")
+        self.assertEqual(result.metadata["source_route"], "chat")
+        self.assertEqual(
+            result.fallback_reason,
+            "terminal_plan_exceeds_source_route_effect_envelope",
+        )
+        self.assertIsNone(result.response_composition)
+        self.assertIsNone(result.interaction_response)
+        self.assertEqual(client.calls, ["association", "fast"])
+        self.assertEqual(runtime.ensure_calls, [])
+
+    def test_exact_execute_plan_rejects_planner_owned_speech(self):
+        top_level_payload = execute_plan().model_dump(mode="json")
+        top_level_payload["response_text"] = "I am already carrying this out."
+        with self.assertRaisesRegex(
+            ValueError, "exact execute plans must not carry response_text"
+        ):
+            CanonicalPlan.model_validate(top_level_payload)
+
+        goal_outcome_payload = execute_plan().model_dump(mode="json")
+        goal_outcome_payload["goal_outcomes"] = [
+            {
+                "goal_id": "goal-1",
+                "disposition": "execute",
+                "coverage": "complete",
+                "response_text": "I am already carrying this out.",
+                "step_ids": ["blink"],
+            }
+        ]
+        with self.assertRaisesRegex(
+            ValueError, "execute goal outcomes must not carry response_text"
+        ):
+            CanonicalPlan.model_validate(goal_outcome_payload)
+
+    def test_effectful_pre_execution_keeps_one_grounded_speech_with_barrier(self):
+        plan = execute_plan()
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-pre-action-projection",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                immediate=ResponseStage(
+                    text="I heard the request and will blink next.",
+                    speech_act="inform",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=plan.goal_ids,
+                ),
+                progress=[
+                    ResponseStage(
+                        text="I am beginning the blink.",
+                        speech_act="inform",
+                        commitment_state="evaluating",
+                        must_not_claim_completion=True,
+                        covers_goal_ids=plan.goal_ids,
+                    )
+                ],
+            ),
+            confidence=0.9,
+        )
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(
+                FakeRuntime([blink_definition()])
+            ).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-pre-action-projection",
+                language="en-US",
+            )
+        )
+
+        self.assertEqual(len(response.speech), 1)
+        self.assertEqual(
+            response.speech[0].text,
+            "I'll blink four times.",
+        )
+        self.assertEqual(response.speech[0].metadata["phase"], "pre_action")
+        self.assertEqual(
+            response.speech[0].metadata["operational_text_source"],
+            "runtime_authoritative_state",
+        )
+        self.assertTrue(response.speech[0].metadata["wait_for_playback_start"])
+        self.assertTrue(
+            response.speech[0].metadata["playback_start_required_for_delivery"]
+        )
+        self.assertTrue(
+            response.speech[0].metadata["playback_start_required_for_effects"]
+        )
+        self.assertEqual(
+            response.metadata["omitted_pre_execution_speech_phases"],
+            ["progress"],
+        )
+
+    def test_exact_execute_normalizes_untrusted_progress_and_confirmation_prose(self):
+        plan = execute_plan()
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-false-confirmation",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                immediate=ResponseStage(
+                    text="正在眨眼睛，请确认是否需要调整。",
+                    speech_act="inform",
+                    commitment_state="evaluating",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=plan.goal_ids,
+                )
+            ),
+            confidence=0.9,
+        )
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(
+                FakeRuntime([blink_definition()])
+            ).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-false-confirmation",
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(len(response.speech), 1)
+        self.assertEqual(
+            response.speech[0].text,
+            "我会眨四下眼睛。",
+        )
+        self.assertNotIn("正在眨眼睛", response.speech[0].text)
+        self.assertNotIn("请确认", response.speech[0].text)
+        self.assertFalse(
+            response.speech[0].metadata["runtime_confirmation_required"]
+        )
+        self.assertEqual(
+            response.speech[0].metadata["operational_text_source"],
+            "runtime_authoritative_state",
+        )
+
+    def test_mixed_execute_and_clarify_splits_waiting_from_action_authority(self):
+        plan = CanonicalPlan(
+            plan_id="plan-mixed-execute-clarify",
+            planner_tier="deep",
+            disposition="mixed",
+            coverage="complete",
+            confidence=0.93,
+            goal_ids=["goal-nod", "goal-walk"],
+            goal_summary="Nod twice and ask how long to walk.",
+            steps=[
+                {
+                    "step_id": "nod",
+                    "skill_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                    "source_goal_ids": ["goal-nod"],
+                }
+            ],
+            parameter_resolutions=[
+                {
+                    "step_id": "walk",
+                    "parameter": "duration_s",
+                    "strategy": "ask_user",
+                    "blocking": True,
+                    "source_goal_ids": ["goal-walk"],
+                    "rationale": "Walking duration is required.",
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-nod",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["nod"],
+                },
+                {
+                    "goal_id": "goal-walk",
+                    "disposition": "clarify",
+                    "coverage": "partial",
+                    "response_text": "你希望我往前走多久？",
+                },
+            ],
+            goal_satisfaction={
+                "score": 0.75,
+                "status": "substantial",
+                "satisfied_goal_ids": ["goal-nod"],
+                "unmet_goal_ids": ["goal-walk"],
+            },
+        )
+        composition = CoordinatedResponsePlan(
+            composition_id="composition-mixed-execute-clarify",
+            canonical_plan_id=plan.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_plan=plan,
+            response_plan=ResponsePlan(
+                immediate=ResponseStage(
+                    text="我先点头两次。你希望我往前走多久？",
+                    speech_act="clarify",
+                    commitment_state="waiting_for_user",
+                    must_not_claim_completion=True,
+                    covers_goal_ids=["goal-nod", "goal-walk"],
+                )
+            ),
+            confidence=0.92,
+        )
+        nod = SkillDefinition(
+            skill_id="soridormi.nod_yes",
+            provider_id="soridormi.mcp",
+            input_schema={
+                "type": "object",
+                "properties": {"count": {"type": "integer", "minimum": 1}},
+                "required": ["count"],
+            },
+            available=True,
+            requires_confirmation=False,
+        )
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(FakeRuntime([nod])).build_response(
+                plan=plan,
+                composition=composition,
+                session_id="sid-mixed-execute-clarify",
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(len(response.speech), 2)
+        clarification, operational = response.speech
+        self.assertEqual(clarification.text, "你希望我往前走多久？")
+        self.assertEqual(
+            clarification.metadata["covers_goal_ids"], ["goal-walk"]
+        )
+        self.assertEqual(
+            clarification.metadata["commitment_state"], "waiting_for_user"
+        )
+        self.assertEqual(
+            operational.metadata["covers_goal_ids"], ["goal-nod"]
+        )
+        self.assertEqual(operational.metadata["commitment_state"], "accepted")
+        self.assertFalse(operational.metadata["runtime_confirmation_required"])
+        self.assertFalse(response.requires_confirmation)
+
     def test_fast_terminal_multi_goal_mixed_plan_skips_deep_planner(self):
         fast = CanonicalPlan(
             plan_id="fast-mixed",
@@ -532,6 +898,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coordinator,
             client,
             text="Blink twice and tell me a short joke.",
+            route="robot_action",
         )
 
         self.assertEqual(result.status, "applied")
@@ -566,7 +933,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ),
         )
 
-        result = self.run_resolution(coordinator, client, text="眨眼。")
+        result = self.run_resolution(
+            coordinator, client, text="眨眼。", route="robot_action"
+        )
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(
@@ -611,7 +980,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ),
         )
 
-        result = self.run_resolution(coordinator, client, text="眨眼。")
+        result = self.run_resolution(
+            coordinator, client, text="眨眼。", route="robot_action"
+        )
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(
@@ -652,13 +1023,29 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 mode="apply", apply_lanes=frozenset({"robot_action"})
             ),
         )
-        result = self.run_resolution(coordinator, client, text="眨眼。")
+        result = self.run_resolution(
+            coordinator, client, text="眨眼。", route="robot_action"
+        )
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.lane, "robot_action")
         request = result.interaction_response.skills[0]
         self.assertTrue(request.requires_confirmation)
         self.assertEqual(request.args, {"count": 4})
         self.assertIn("canonical_plan_fingerprint", request.metadata)
+        self.assertEqual(
+            result.interaction_response.speech[0].text,
+            "请确认是否要我眨四下眼睛。",
+        )
+        self.assertTrue(
+            result.interaction_response.speech[0].metadata[
+                "runtime_confirmation_required"
+            ]
+        )
+        self.assertTrue(
+            result.interaction_response.speech[0].metadata[
+                "wait_for_playback_start"
+            ]
+        )
 
     def test_disabled_apply_lane_fails_closed(self):
         client = ScriptedClient(
@@ -680,10 +1067,59 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
             policy=CognitiveRuntimePolicy(mode="apply", apply_lanes=frozenset({"chat"})),
         )
-        result = self.run_resolution(coordinator, client, text="眨眼。")
+        result = self.run_resolution(
+            coordinator, client, text="眨眼。", route="robot_action"
+        )
         self.assertEqual(result.status, "error")
         self.assertEqual(result.fallback_reason, "terminal_plan_lane_not_enabled_for_apply")
         self.assertIsNone(result.interaction_response)
+
+    def test_single_step_parallel_plan_is_allowed(self):
+        plan = execute_plan().model_copy(
+            deep=True,
+            update={
+                "steps": [
+                    execute_plan().steps[0].model_copy(
+                        update={"timing": "parallel"}
+                    )
+                ]
+            },
+        )
+        adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()]))
+
+        errors = asyncio.run(adapter.validation_errors(plan))
+
+        self.assertEqual(errors, [])
+
+    def test_singleton_parallel_batch_in_multi_step_plan_is_rejected(self):
+        base = execute_plan()
+        plan = base.model_copy(
+            deep=True,
+            update={
+                "steps": [
+                    base.steps[0].model_copy(
+                        update={"step_id": "blink-first", "timing": "sequential"}
+                    ),
+                    base.steps[0].model_copy(
+                        update={"step_id": "blink-second", "timing": "parallel"}
+                    ),
+                ]
+            },
+        )
+        adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()]))
+
+        errors = asyncio.run(adapter.validation_errors(plan))
+
+        self.assertEqual(
+            errors,
+            [
+                {
+                    "type": "runtime_parallel_singleton_group",
+                    "step_id": "blink-second",
+                    "skill_id": "soridormi.blink_eyes",
+                }
+            ],
+        )
 
     def test_runtime_conflict_triggers_one_deep_replan(self):
         walk = SkillDefinition(
@@ -761,7 +1197,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 host_replan_budget=1,
             ),
         )
-        result = self.run_resolution(coordinator, client, text="边走边眨眼。")
+        result = self.run_resolution(
+            coordinator, client, text="边走边眨眼。", route="robot_action"
+        )
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.metadata["runtime_replan_count"], 1)
         self.assertIn("runtime_validator_feedback", client.deep_contexts[1])
@@ -1092,6 +1530,16 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual([item.skill_id for item in response.skills], ["soridormi.blink_eyes"])
         self.assertEqual(response.skills[0].metadata["source_goal_ids"], ["goal-blink"])
         self.assertEqual(response.metadata["planning_result"], "composed_plan")
+        self.assertEqual(
+            [item.text for item in response.speech],
+            [
+                "A short joke.",
+                "I'll blink twice.",
+            ],
+        )
+        self.assertTrue(
+            all(item.metadata["wait_for_playback_start"] for item in response.speech)
+        )
 
 
 

@@ -8,6 +8,7 @@ from router.app.llm_router import (
     _payload_message_texts,
     _prompt_feature_flags,
     _raw_router_output_summary,
+    is_allowed_model_ignore,
 )
 from router.app.schema import RouteDecision, RouteRequest
 
@@ -143,6 +144,38 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Availability questions stay chat", system)
         self.assertIn("execution requests use robot_action", system)
         self.assertIn("semantic distinction, not a phrase pattern", system)
+        self.assertIn("technical discussion about another person", system)
+        self.assertIn("Addressedness", system)
+
+    def test_semantic_ignore_requires_inactive_host_engagement_evidence(self) -> None:
+        inactive = RouteRequest(
+            text="他们之后再把传感器结果合并。",
+            context={
+                "interaction_engagement": {
+                    "gate_enabled": True,
+                    "active": False,
+                }
+            },
+        )
+        decision = RouteDecision(
+            route="ignore",
+            intent="ambient_speech",
+            confidence=0.91,
+            metadata={"semantic_addressedness_gate": True},
+        )
+        self.assertTrue(is_allowed_model_ignore(inactive, decision))
+
+        active = inactive.model_copy(
+            update={
+                "context": {
+                    "interaction_engagement": {
+                        "gate_enabled": True,
+                        "active": True,
+                    }
+                }
+            }
+        )
+        self.assertFalse(is_allowed_model_ignore(active, decision))
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
         router = OllamaLLMRouter(
@@ -271,7 +304,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("last_task", prompt)
         self.assertIn("authorize side effects", prompt)
         self.assertIn("Speech-only conversation", prompt)
-        self.assertIn("Do not return interrupt or ignore", prompt)
+        self.assertIn("Never return interrupt or ignore", prompt)
+        self.assertIn("separate focused addressedness stage", prompt)
         self.assertIn("Required keys: route, intent, confidence", prompt)
         self.assertIn("routes[]", prompt)
         self.assertIn("Allowed lanes", contract_prompt)
@@ -782,6 +816,93 @@ class RouterLlmPromptTests(unittest.TestCase):
 
 
 class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_inactive_mislabelled_chat_is_reviewed_to_ambient_ignore(self) -> None:
+        class AddressednessRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="quick-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.models: list[str] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                self.models.append(payload["model"])
+                if "You classify whether" in payload["messages"][0]["content"]:
+                    return {
+                        "message": {
+                            "content": '{"addressed":false,"confidence":0.95}'
+                        }
+                    }
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"chat","intent":"self-description",'
+                            '"confidence":0.95}'
+                        )
+                    }
+                }
+
+        router = AddressednessRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="之后融合输出一个，他自己回放训练。",
+                language="zh-CN",
+                context={
+                    "interaction_engagement": {
+                        "gate_enabled": True,
+                        "active": False,
+                    }
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "ignore")
+        self.assertEqual(decision.intent, "ambient_speech")
+        self.assertFalse(decision.should_speak)
+        self.assertEqual(router.models, ["quick-model", "quick-model"])
+
+    async def test_inactive_direct_request_preserves_original_action_route(self) -> None:
+        class AddressedRequestRouter(OllamaLLMRouter):
+            async def _chat(self, payload: dict) -> dict:
+                self.assert_payload = payload
+                return {
+                    "message": {
+                        "content": '{"addressed":true,"confidence":0.99}'
+                    }
+                }
+
+        router = AddressedRequestRouter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="review-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Chromie, please blink twice.",
+            context={
+                "interaction_engagement": {
+                    "gate_enabled": True,
+                    "active": False,
+                }
+            },
+        )
+        original = RouteDecision(
+            route="robot_action",
+            intent="capability:soridormi.blink_eyes",
+            confidence=0.93,
+        )
+
+        reviewed = await router._review_inactive_addressedness(request, original)
+
+        self.assertIs(reviewed, original)
+        self.assertEqual(router.assert_payload["model"], "quick-model")
+        self.assertEqual(router.assert_payload["options"]["num_ctx"], 4096)
+        self.assertEqual(router.assert_payload["options"]["num_predict"], 32)
+
     async def test_llm_router_returns_low_confidence_raw_for_pipeline_validation(self) -> None:
         class LowConfidenceRouter(OllamaLLMRouter):
             async def _chat(self, payload: dict) -> dict:

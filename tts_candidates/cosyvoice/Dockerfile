@@ -87,7 +87,7 @@ RUN pip install --no-build-isolation --no-deps \
 
 RUN pip install \
     --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ \
-    onnxruntime-gpu==1.18.0
+    onnxruntime-gpu==1.18.1
 
 ENV PYTHONPATH=/opt/CosyVoice:/opt/CosyVoice/third_party/Matcha-TTS
 WORKDIR /app

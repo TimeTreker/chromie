@@ -558,5 +558,408 @@ class ConversationStateTests(unittest.TestCase):
         )
 
 
+class GoalScopedLifecycleTests(unittest.TestCase):
+    @staticmethod
+    def _create_goals(
+        manager: ConversationStateManager,
+        *goal_ids: str,
+    ) -> list[dict]:
+        return manager.apply_goal_association_resolution(
+            {
+                "turn_id": "turn-create-" + "-".join(goal_ids),
+                "new_goals": [
+                    {
+                        "goal_id": goal_id,
+                        "description": f"Complete {goal_id}.",
+                        "source_text": f"Complete {goal_id}.",
+                    }
+                    for goal_id in goal_ids
+                ],
+                "confidence": 0.95,
+                "reason_summary": "Independent user goals.",
+            },
+            sid="sid-create",
+            user_text="Complete the requested goals.",
+            route="robot_action",
+            intent="compound_action",
+            atomic=True,
+        )
+
+    @staticmethod
+    def _canonical_plan(
+        disposition: str,
+        outcomes: list[dict],
+    ) -> dict:
+        return {
+            "plan_id": "plan-lifecycle",
+            "planner_tier": "fast",
+            "disposition": disposition,
+            "coverage": "complete" if disposition != "clarify" else "uncertain",
+            "confidence": 0.95,
+            "goal_ids": [item["goal_id"] for item in outcomes],
+            "steps": [],
+            "goal_outcomes": outcomes,
+        }
+
+    def test_semantic_goal_ids_bind_results_to_their_distinct_task_contexts(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="goal-lifecycle")
+        created = self._create_goals(manager, "goal-walk", "goal-blink")
+
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-walk", "goal-blink"],
+        )
+        self.assertNotEqual(created[0]["task_id"], "goal-walk")
+        self.assertNotEqual(created[1]["task_id"], "goal-blink")
+
+        response = InteractionResponse(
+            skills=[
+                {
+                    "request_id": "skill-walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "metadata": {"source_goal_ids": ["goal-walk"]},
+                },
+                {
+                    "request_id": "skill-blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "metadata": {"source_goal_ids": ["goal-blink"]},
+                },
+            ],
+            metadata={
+                "planning_result": "composed_plan",
+                "canonical_plan": self._canonical_plan(
+                    "execute",
+                    [
+                        {
+                            "goal_id": "goal-walk",
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "step_ids": ["walk"],
+                        },
+                        {
+                            "goal_id": "goal-blink",
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "step_ids": ["blink"],
+                        },
+                    ],
+                ),
+            },
+        )
+
+        manager.record_agent_result("sid-execute", response)
+        self.assertEqual(
+            [item["status"] for item in manager.active_goal_snapshots()],
+            ["scheduled", "scheduled"],
+        )
+
+        self.assertTrue(
+            manager.update_pending_task_status_for_request_id(
+                request_id="skill-walk",
+                status="completed",
+            )
+        )
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-blink"],
+        )
+
+        self.assertTrue(
+            manager.update_pending_task_status_for_request_id(
+                request_id="skill-blink",
+                status="completed",
+            )
+        )
+        self.assertEqual(manager.active_goal_snapshots(), [])
+
+    def test_respond_goal_waits_for_scoped_speech_runtime_result(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="respond-lifecycle")
+        self._create_goals(manager, "goal-answer")
+        response = InteractionResponse(
+            speech=[
+                {
+                    "id": "speech-answer",
+                    "text": "Here is the answer.",
+                    "metadata": {"covers_goal_ids": ["goal-answer"]},
+                }
+            ],
+            metadata={
+                "planning_result": "respond",
+                "canonical_plan": self._canonical_plan(
+                    "respond",
+                    [
+                        {
+                            "goal_id": "goal-answer",
+                            "disposition": "respond",
+                            "coverage": "complete",
+                            "step_ids": [],
+                            "response_text": "Here is the answer.",
+                        }
+                    ],
+                ),
+            },
+        )
+
+        manager.record_agent_result("sid-answer", response)
+
+        active = manager.active_goal_snapshots()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["goal_id"], "goal-answer")
+        self.assertEqual(active[0]["status"], "scheduled")
+        self.assertTrue(
+            manager.update_pending_task_status_for_request_id(
+                request_id="speech-answer",
+                status="completed",
+            )
+        )
+        self.assertEqual(manager.active_goal_snapshots(), [])
+
+    def test_clarify_goal_remains_active_after_clarification_speech(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="clarify-lifecycle")
+        self._create_goals(manager, "goal-clarify")
+        response = InteractionResponse(
+            status="clarify",
+            speech=[
+                {
+                    "id": "speech-question",
+                    "text": "Which target do you mean?",
+                    "metadata": {"covers_goal_ids": ["goal-clarify"]},
+                }
+            ],
+            metadata={
+                "planning_result": "clarify",
+                "canonical_plan": self._canonical_plan(
+                    "clarify",
+                    [
+                        {
+                            "goal_id": "goal-clarify",
+                            "disposition": "clarify",
+                            "coverage": "uncertain",
+                            "step_ids": [],
+                            "unresolved": ["target"],
+                            "response_text": "Which target do you mean?",
+                        }
+                    ],
+                ),
+            },
+        )
+
+        manager.record_agent_result("sid-clarify", response)
+
+        active = manager.active_goal_snapshots()
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["status"], "waiting_for_user")
+        self.assertEqual(active[0]["commitment_state"], "waiting_for_user")
+        self.assertFalse(
+            manager.update_pending_task_status_for_request_id(
+                request_id="speech-question",
+                status="completed",
+            )
+        )
+        self.assertEqual(
+            manager.active_goal_snapshots()[0]["status"],
+            "waiting_for_user",
+        )
+
+    def test_noncompleted_goal_requests_reach_terminal_lifecycle_states(self) -> None:
+        expected = {
+            "cancelled": "cancelled",
+            "failed": "failed",
+            "timed_out": "timed_out",
+            "refused": "refused",
+        }
+        for runtime_status, goal_status in expected.items():
+            with self.subTest(runtime_status=runtime_status):
+                manager = ConversationStateManager(
+                    base_conversation_id=f"terminal-{runtime_status}"
+                )
+                self._create_goals(manager, "goal-action")
+                manager.record_agent_result(
+                    "sid-action",
+                    InteractionResponse(
+                        skills=[
+                            {
+                                "request_id": "skill-action",
+                                "skill_id": "soridormi.blink_eyes",
+                                "metadata": {
+                                    "source_goal_ids": ["goal-action"]
+                                },
+                            }
+                        ],
+                        metadata={
+                            "planning_result": "composed_plan",
+                            "canonical_plan": self._canonical_plan(
+                                "execute",
+                                [
+                                    {
+                                        "goal_id": "goal-action",
+                                        "disposition": "execute",
+                                        "coverage": "complete",
+                                        "step_ids": ["action"],
+                                    }
+                                ],
+                            ),
+                        },
+                    ),
+                )
+
+                self.assertTrue(
+                    manager.update_pending_task_status_for_request_id(
+                        request_id="skill-action",
+                        status=runtime_status,
+                    )
+                )
+                self.assertEqual(manager.active_goal_snapshots(), [])
+                self.assertEqual(
+                    manager.snapshot()["task_contexts"][0]["status"],
+                    goal_status,
+                )
+
+    def test_multi_goal_confirmation_denial_and_expiry_close_every_goal(self) -> None:
+        expected = {
+            "denied": "cancelled",
+            "expired": "timed_out",
+        }
+        for decision, final_status in expected.items():
+            with self.subTest(decision=decision):
+                manager = ConversationStateManager(
+                    base_conversation_id=f"confirmation-{decision}"
+                )
+                self._create_goals(manager, "goal-walk", "goal-blink")
+                response = InteractionResponse(
+                    interaction_id=f"interaction-{decision}",
+                    skills=[
+                        {
+                            "request_id": "skill-walk",
+                            "skill_id": "soridormi.walk_forward",
+                            "metadata": {"source_goal_ids": ["goal-walk"]},
+                        },
+                        {
+                            "request_id": "skill-blink",
+                            "skill_id": "soridormi.blink_eyes",
+                            "metadata": {"source_goal_ids": ["goal-blink"]},
+                        },
+                    ],
+                    metadata={
+                        "planning_result": "composed_plan",
+                        "semantic_plan_confirmation_required": True,
+                    },
+                )
+
+                bound_goal_ids = manager.record_confirmation_scope(
+                    sid="sid-confirm",
+                    confirmation_id="confirm-multi",
+                    interaction_id=response.interaction_id,
+                    fingerprint="fingerprint-multi",
+                    expires_at=42.0,
+                    response=response,
+                    confirmed_request_ids={"skill-walk", "skill-blink"},
+                )
+
+                self.assertEqual(
+                    bound_goal_ids,
+                    ["goal-walk", "goal-blink"],
+                )
+                self.assertEqual(
+                    [item["status"] for item in manager.active_goal_snapshots()],
+                    ["awaiting_confirmation", "awaiting_confirmation"],
+                )
+                self.assertFalse(
+                    any(
+                        task["type"] == "goal_execution"
+                        for task in manager.get_pending_tasks()
+                    )
+                )
+                self.assertTrue(
+                    manager.resolve_confirmation_scope(
+                        confirmation_id="confirm-multi",
+                        decision=decision,
+                    )
+                )
+                self.assertEqual(manager.active_goal_snapshots(), [])
+                self.assertEqual(
+                    [
+                        item["status"]
+                        for item in manager.snapshot()["task_contexts"]
+                    ],
+                    [final_status, final_status],
+                )
+
+    def test_multi_goal_confirmation_approval_schedules_only_after_approval(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="confirmation-approved")
+        self._create_goals(manager, "goal-walk", "goal-blink")
+        response = InteractionResponse(
+            interaction_id="interaction-approved",
+            skills=[
+                {
+                    "request_id": "skill-walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "metadata": {"source_goal_ids": ["goal-walk"]},
+                },
+                {
+                    "request_id": "skill-blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "metadata": {"source_goal_ids": ["goal-blink"]},
+                },
+            ],
+            metadata={
+                "planning_result": "composed_plan",
+                "semantic_plan_confirmation_required": True,
+            },
+        )
+        manager.record_confirmation_scope(
+            sid="sid-confirm",
+            confirmation_id="confirm-multi",
+            interaction_id=response.interaction_id,
+            fingerprint="fingerprint-multi",
+            expires_at=42.0,
+            response=response,
+            confirmed_request_ids={"skill-walk", "skill-blink"},
+        )
+
+        self.assertTrue(
+            manager.resolve_confirmation_scope(
+                confirmation_id="confirm-multi",
+                decision="approved",
+            )
+        )
+        self.assertEqual(
+            [item["status"] for item in manager.active_goal_snapshots()],
+            ["planning", "planning"],
+        )
+
+        manager.record_agent_result(
+            "sid-confirm",
+            response,
+            confirmed_request_ids={"skill-walk", "skill-blink"},
+        )
+
+        self.assertEqual(
+            [item["status"] for item in manager.active_goal_snapshots()],
+            ["scheduled", "scheduled"],
+        )
+        active_task_types = [
+            task["type"] for task in manager.snapshot()["active_pending_tasks"]
+        ]
+        self.assertEqual(active_task_types, ["goal_execution", "goal_execution"])
+        self.assertTrue(
+            manager.update_pending_task_status_for_request_id(
+                request_id="skill-walk",
+                status="completed",
+            )
+        )
+        self.assertEqual(
+            [item["goal_id"] for item in manager.active_goal_snapshots()],
+            ["goal-blink"],
+        )
+        self.assertTrue(
+            manager.update_pending_task_status_for_request_id(
+                request_id="skill-blink",
+                status="completed",
+            )
+        )
+        self.assertEqual(manager.active_goal_snapshots(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

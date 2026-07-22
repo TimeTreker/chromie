@@ -88,7 +88,14 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | Wait this long after Agent/tool work starts; suppress the acknowledgement when the final response becomes ready first. |
 | `ORCH_FAST_FIRST_AUDIO_CACHE_DIR` | `.chromie/cache/fast-first-audio` | Ignored local WAV cache for speaker-specific English and Chinese acknowledgement cues. |
 | `ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP` | `1` | Generate any missing cache entries through the configured TTS service before opening microphone input. |
-| `ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS` | `120000` | Total startup cache-prime budget. Individual cue synthesis is also bounded; timeout continues with the cues already available. |
+| `ORCH_FAST_FIRST_AUDIO_PRIME_TIMEOUT_MS` | `120000` | Total startup cache-prime budget. Expiry is non-fatal: startup continues with the cues already available. An individual synthesis timeout also aborts the remaining missing-cue work so cancellation cannot repeatedly cold-restart a provider. |
+| `ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED` | `1` | Before a startup cue can enter memory or disk, enforce its duration bound and transcribe it through the configured ASR service. A content mismatch fails closed for that cue. |
+| `ORCH_FAST_FIRST_AUDIO_MAX_CUE_SECONDS` | `4` | Maximum audio duration for one cached acknowledgement. This prevents enrollment-prompt leakage from being accepted as a short cue. |
+| `ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY` | `0.65` | Minimum normalized similarity between the intended cue and its ASR round trip. |
+| `ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS` | `2` | Bounded attempts for a missing cue that completes synthesis but fails validation. A rejected sample is never cached; one regeneration handles stochastic content defects without weakening the gate. Synthesis timeouts are not retried during startup. |
+| `ORCH_FAST_FIRST_AUDIO_CACHE_REVISION` | empty | Optional operator invalidation salt. Cache keys already include the TTS endpoint, provider/model declaration, speaker ID, and reported speaker revision. |
+| `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to the Router. Only high-confidence semantic `not_addressed`/`ambient_speech` decisions may use model route `ignore`; stop/cancel and unusable audio remain deterministic. |
+| `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; ignored ambient turns do not. |
 | `ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED` | `0` | Legacy opt-in for tool-route fast-first scheduling. Router-authored dynamic wording also requires `ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED=1` and the full structured FastSpeech contract. Cached fast-first audio is independent of both settings. |
 | `ORCH_TTS_CJK_CHUNK_CHARS` | `36` | Smaller chunk target for CJK speech so long Chinese weather/status responses can begin playback while later chunks are still synthesized. |
 | `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
@@ -120,8 +127,29 @@ Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
 | `CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced by `start_services.sh` after `.env.runtime`; intended for acceptance/service harnesses that need temporary Compose variables. |
 | `WARM_OLLAMA_BEFORE_ORCH` | Warm the Agent model before opening the microphone; when Router LLM is enabled, also warm the fast Router model. Default `1`. |
 | `OLLAMA_AUTO_RESTART_ON_CRASH` | `1` by default. During host warmup, restart `chromie-llm` once if Ollama reports a native `llama-server` crash such as a segmentation fault, then retry generation. |
-| `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. |
+| `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
+| `TTS_COSYVOICE_TRIAL_OLLAMA_MODEL` | Compact Ollama model used for every Router/Agent lane during `--tts-trial cosyvoice`; default `qwen3:4b`. The trial also forces one resident Ollama model. |
+
+For a one-session CosyVoice3 listening trial with the installation-local,
+owner-authorized reference, use:
+
+```bash
+./scripts/start_chromie.sh --tts-trial cosyvoice --keep-services
+```
+
+The launcher selects `chromie-tts-cosyvoice` on port 5001, verifies the local
+reference authorization and hash, stops OuteTTS, uses the configured compact
+trial model for every Router/Agent lane, and limits Ollama to one resident model
+so the candidate retains GPU inference headroom. It loads already validated
+fast-first cache entries but does not generate missing cues during startup; the
+manual trial therefore exercises normal response synthesis instead of risking
+repeated candidate cold restarts before the microphone opens. Cache-prime
+timeouts in other profiles are non-fatal. The launcher points only that
+Orchestrator run at the candidate. It does not edit `.env.local`, change
+`TTS_PROVIDER`, or select a production winner. A later normal
+`./scripts/start_chromie.sh` restores the configured maintained service and
+normal model profile.
 
 See [Hardware Profiles](../HARDWARE_PROFILES.md) for profile values and Jetson
 limitations. Direct hardware-profile override is intentionally unsupported;
@@ -293,7 +321,7 @@ canonical plan copy, and its fingerprint remain host-owned.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the trusted Skill Runtime. Code fallback is `apply`. |
-| `ORCH_COGNITIVE_APPLY_LANES` | `chat` in the common safe base; `scripts/start_chromie.sh` widens it to `chat,robot_action` only after enabling the trusted Soridormi provider. A route outside the set is rejected before Goal-driven ownership is acquired. A terminal plan that changes to a disabled lane fails closed and cannot re-enter the legacy planner. |
+| `ORCH_COGNITIVE_APPLY_LANES` | `chat` in the common safe base; `scripts/start_chromie.sh` widens it to `chat,robot_action` only after enabling the trusted Soridormi provider. A route outside the set is rejected before Goal-driven ownership is acquired. This allowlist is necessary but not sufficient for effects: a terminal plan may not exceed the current Router decision's effect envelope, so a `chat` turn cannot become a physical plan merely because `robot_action` is also enabled. Disabled-lane and route-effect escalation both fail closed without entering the legacy planner. |
 | `ORCH_COGNITIVE_FALLBACK_POLICY` | Deprecated compatibility input. The effective policy is always `fail_closed`: after Goal-driven authority is acquired, technical or validation failure returns truthful no-action speech and never enters another semantic planner in the same turn. |
 | `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; host-side emergency compatibility gate. It can create a legacy CapabilityAgent authority claim only on a turn that has not entered authoritative Goal-driven processing. |
 | `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a `legacy_capability_fallback` claim with a non-empty `turn_id` exactly matching the request `sid`. Empty or cross-turn claims fail closed before an LLM call. The claim is internal routing metadata, not caller authentication or a single-use replay token. Exact Router actions remain adapter-only and do not require this gate. |
@@ -346,9 +374,13 @@ how many catalog items were visible, what route/intent the raw model JSON
 contained, and whether normalization changed the final route. Full raw model
 JSON and prompt text require the debug flags above.
 
-Router routing has four decision stages plus deterministic validation
-guardrails. The hard emergency filter for interrupt and ignore stays
-deterministic in every mode. The optional post-interrupt review runs only after
+Router routing has a hard operational filter, a focused addressedness gate,
+normal semantic stages, and deterministic validation guardrails. Interrupt,
+silence, and unusable-audio handling stay deterministic in every mode. When
+host engagement is inactive, the focused classifier returns only `addressed`
+and confidence; deterministic code may map a high-confidence false result to
+non-speaking ambient `ignore`, while failure or uncertainty preserves the
+original route. The optional post-interrupt review runs only after
 that interrupt is already applied, so it cannot delay cancellation; it may only
 confirm the stop or attach a corrected follow-up route. The quick intent stage
 uses catalog-bounded LLM routing when `ROUTER_MODE` is `hybrid` or `llm_only`.
@@ -539,7 +571,7 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_TTS_FIRST_CHUNK_CHARS` | Preferred first complete-speech chunk size; common and code default `16` so short complete openers such as `I'm doing well.`, `Not tired.`, or `Too fast.` can be synthesized before longer follow-up sections. Set `0` to use `ORCH_TTS_CHUNK_CHARS` for every chunk. |
 | `ORCH_TTS_CHUNK_CHARS` | Preferred upper size for complete-speech chunks; common and code default `120`. Complete speech is split on sentence and substantial clause boundaries first; tiny fragments may be grouped, and length splitting is only a fallback for text longer than `TTS_MAX_TEXT_CHARS`. |
 | `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
-| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for a body-aligned speech item to become audible before continuing; code default `20000`. |
+| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Maximum host wait for response speech that carries a playback-start delivery/effect barrier; code default `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
 | `ORCH_VOICE_SYSTEM_PROMPT` | Optional replacement for the direct-LLM voice brevity/style instruction. |
 
 ## Orchestrator audio and VAD
@@ -560,7 +592,7 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_MIN_RMS` | `120`. |
 | `ORCH_BARGE_IN_MIN_RMS` | `350`. |
 | `ORCH_PLAYBACK_CHUNK_MS` | `80`. |
-| `ORCH_TTS_CONCURRENCY` | Host-side concurrent TTS requests; common/default value `1`; RTX 5090 profile uses `2` to match the TTS worker pool. |
+| `ORCH_TTS_CONCURRENCY` | Host-side concurrent TTS requests; common/default value `1`; RTX 5090 profile uses `2` for the maintained two-worker Oute service. `--tts-trial cosyvoice` forces `1` because that candidate exposes one singleton model worker; raising host concurrency cannot create provider parallelism and only adds hidden queueing. |
 | `ORCH_TTS_WS_RETRIES` | `2`. |
 | `ORCH_TTS_WS_RETRY_DELAY_MS` | `300`. |
 | `ORCH_SESSION_TIMING_LOGS` | `true` in the host example. |
@@ -664,7 +696,7 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `TTS_HOST` | Service bind address; default `0.0.0.0`. |
 | `TTS_QUANTIZATION` | Common default `FP16`. |
 | `TTS_N_GPU_LAYERS` | Common default `-1` for full offload. |
-| `TTS_CONTEXT_SIZE` | Profile-specific model context. |
+| `TTS_CONTEXT_SIZE` | Profile-specific model context. RTX 5090 uses `8192` so a validated full acoustic speaker prompt still leaves bounded generation headroom. |
 | `TTS_MAX_LENGTH` | Total OuteTTS token budget for the speaker/prompt **and** generated audio-code tokens; **not** a text limit. |
 | `MIN_TTS_GENERATION_LENGTH` | Minimum safe generation budget; profiles use `1024`. |
 | `TTS_MAX_TEXT_CHARS` | Spoken text character limit. |
@@ -675,14 +707,14 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `TTS_MAX_CONCURRENT_SYNTHESIS` | Request semaphore; common default `1`; RTX 5090 profile uses `2`. |
 | `TTS_WORKER_COUNT` | Number of independent OuteTTS model workers; common/default value `1`; RTX 5090 profile uses `2`. |
 | `TTS_GENERATION_RETRIES` | Common default `1`. |
-| `TTS_RESET_LLAMA_STATE` | Common low-latency default `0`; set to `1` for stricter per-request state reset at the cost of slower first audio. |
+| `TTS_RESET_LLAMA_STATE` | Common low-latency default `0`; RTX 5090 uses `1` so cloned-speaker requests and retries do not reuse mutable llama prompt state. |
 | `TTS_AUDIO_CODEC_DEVICE` | `auto` resolves to CUDA when available and CPU otherwise. The resolved and actual DAC devices are reported by TTS health. |
 | `TTS_DETAILED_TIMING` | Emit synchronized model-generation, DAC-decode, PCM-conversion, queue, IPC, and real-time-factor metrics; common default `1`. |
 | `TTS_METRICS_WINDOW` | Number of recent successful requests summarized in TTS health; common default `20`. |
 | `GGML_CUDA_DISABLE_GRAPHS` | Common default `0`; leave CUDA graphs enabled unless a measured compatibility problem requires disabling them. |
 | `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY` | Common defaults `0.4`, `1.1`. |
 | `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Maximum wait for initial or post-cancellation model-worker startup; default `600`. |
-| `SPEAKER_DIR`, `TTS_SPEAKER_ID` | Speaker-profile storage and host selection. Local speaker WAV/JSON/transcript files are ignored by Git. Set `TTS_SPEAKER_ID` in `.env.local` only for an installation-specific private override that has passed its deployment checks. New Oute profiles require an exact transcript in the request or a UTF-8 `.txt` sidecar beside the WAV. |
+| `SPEAKER_DIR`, `TTS_SPEAKER_ID` | Speaker-profile storage and host selection. Local speaker WAV/JSON/transcript files are ignored by Git. Set `TTS_SPEAKER_ID` in `.env.local` only for an installation-specific private override that has passed its deployment checks. New Oute profiles require an exact transcript in the request or a UTF-8 `.txt` sidecar beside the WAV; transcript agreement and DAC acoustic coverage must both pass. Invalid profiles are rejected and are rebuilt only when the matching WAV and transcript sidecar are available. |
 | `TTS_SPEAKER_ALIGNMENT_DEVICE` | Device for OuteTTS v3's required Whisper word alignment; default `cpu` keeps one-time profile creation from competing with live GPU models. |
 | `TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY` | Minimum normalized similarity between the pinned aligner's result and supplied exact transcript; default `0.75`, with lower results rejected. |
 
@@ -696,6 +728,7 @@ services without registering either in the maintained Oute image:
 | `QWEN3_TTS_SOURCE_REVISION`, `QWEN3_TTS_MODEL_ID`, `QWEN3_TTS_MODEL_REVISION` | Immutable Qwen3-TTS runtime and `12Hz-0.6B-Base` model locks. |
 | `QWEN3_TTS_DEVICE`, `QWEN3_TTS_DTYPE`, `QWEN3_TTS_ATTENTION` | Candidate-only Qwen device, dtype, and attention implementation; defaults `cuda:0`, `bfloat16`, and `sdpa`. |
 | `TTS_CANDIDATE_STARTUP_TIMEOUT_SEC` | Model download/load allowance for candidate health; default `1200`. |
+| `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Candidate cancellation grace while holding the singleton worker lock; default `3`. A nearly complete native request is drained and discarded without reloading the model. Timeout or malformed/dead worker state still terminates and reloads fail closed before the next request. |
 
 Both candidates use the same bilingual reference WAV and metadata. By default
 the runner generates it through OuteTTS; an existing authorized reference can
@@ -706,7 +739,11 @@ evaluation-only unless their metadata and listening review explicitly approve
 production use. The CosyVoice image uses Torch/Torchaudio 2.10 CUDA 12.8 plus the
 officially compatible TorchCodec 0.10 pairing because the upstream Torch 2.3
 CUDA 12.1 wheel has no RTX 5090 `sm_120` kernels. The CosyVoice source and model
-revisions remain the immutable locks declared above.
+revisions remain the immutable locks declared above. Its CUDA 12 text-normalizer
+sessions use `onnxruntime-gpu==1.18.1`, the cuDNN 9-compatible 1.18 release;
+the earlier 1.18.0 pin expected cuDNN 8 and fell back to CPU. WeText ModelScope
+artifacts are persisted under `hf_cache/modelscope` so a normal candidate
+recreate does not download them again.
 
 Use `TTS_MAX_TEXT_CHARS` to shorten speech. Setting `TTS_MAX_LENGTH` to values
 such as 100 or 120 can produce empty audio; the server clamps unsafe values when
@@ -725,7 +762,10 @@ isolate native work. The current Oute adapter declares native streaming false;
 host sentence chunking and WebSocket PCM frames do not turn it into a native
 streaming model.
 
-The RTX 4090 Laptop profile uses a 4096-token TTS context. A 2048-token
+The RTX 4090 and RTX 4090 Laptop profiles use a 4096-token TTS context. The RTX
+5090 profile uses 8192 plus strict per-request llama-state reset because the
+validated 10-second `chromie_mixed` acoustic prompt occupies about 1900 model
+tokens; two repeated full matrices passed with this setting. A 2048-token
 experiment left too little headroom after the speaker/prompt tokens and caused
 otherwise short sentences to stop after their first words. The service now
 records prompt/generated token counts and rejects audio when generation reaches

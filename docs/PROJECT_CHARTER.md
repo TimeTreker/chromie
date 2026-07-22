@@ -43,7 +43,9 @@ A successful Chromie release lets an operator:
 ### Chromie owns
 
 - microphone capture, VAD, ASR coordination, playback, and barge-in;
-- deterministic routing for stop, cancel, emergency, silence, and ignore paths;
+- deterministic routing for stop, cancel, emergency, silence, and unusable-audio
+  paths; bounded semantic addressedness is a separate fail-open interaction
+  policy and cannot authorize effects;
 - conversation state and user-facing interaction semantics;
 - native structured Agent output and strict model-facing contracts;
 - trusted Skill Runtime validation, authorization, scheduling, timeout, and

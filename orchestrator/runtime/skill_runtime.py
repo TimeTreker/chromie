@@ -261,14 +261,22 @@ class SkillRuntime:
                     pending_parallel.append((request, definition))
                     continue
                 if pending_parallel:
+                    parallel_items = list(pending_parallel)
                     batch_results, batch_traces = await self._run_parallel(
                         response.interaction_id,
-                        pending_parallel,
+                        parallel_items,
                         authorization,
                     )
                     results.extend(batch_results)
                     traces.extend(batch_traces)
                     pending_parallel = []
+                    if any(
+                        self._failure_blocks_following_requests(item, result)
+                        for (item, _), result in zip(
+                            parallel_items, batch_results, strict=True
+                        )
+                    ):
+                        break
                 result, trace = await self._run_one(
                     response.interaction_id,
                     request,
@@ -277,6 +285,8 @@ class SkillRuntime:
                 )
                 results.append(result)
                 traces.append(trace)
+                if self._failure_blocks_following_requests(request, result):
+                    break
             if pending_parallel:
                 batch_results, batch_traces = await self._run_parallel(
                     response.interaction_id,
@@ -302,6 +312,26 @@ class SkillRuntime:
             status=status,
             results=results,
             traces=traces,
+        )
+
+    @staticmethod
+    def _failure_blocks_following_requests(
+        request: SkillRequest,
+        result: SkillResult,
+    ) -> bool:
+        """Honor explicit runtime barriers without making all skills fail-fast.
+
+        Most independent skills should still report their own outcomes even if a
+        sibling fails.  A pre-action speech cue is different: when it promises
+        an audible acknowledgement before an effect, a failed playback-start
+        barrier must prevent the later effect from beginning.
+        """
+
+        metadata = request.args.get("metadata")
+        return bool(
+            isinstance(metadata, dict)
+            and metadata.get("abort_remaining_on_failure") is True
+            and result.status != "completed"
         )
 
     async def cancel_all(self) -> None:
@@ -362,6 +392,10 @@ class SkillRuntime:
         return [*before, *response.skills, *after]
 
     def _speech_request(self, speech: InteractionSpeech) -> SkillRequest:
+        speech_metadata = dict(speech.metadata)
+        playback_barrier = speech_metadata.get("wait_for_playback_start") is True
+        if playback_barrier:
+            speech_metadata["abort_remaining_on_failure"] = True
         return SkillRequest(
             request_id=speech.id,
             skill_id="chromie.speak",
@@ -370,11 +404,12 @@ class SkillRuntime:
                 "style": speech.style,
                 "priority": speech.priority,
                 "interruptible": speech.interruptible,
-                "metadata": speech.metadata,
+                "metadata": speech_metadata,
             },
             timing=(
                 "sequential"
-                if speech.timing in {"sequential", "after_skills"}
+                if playback_barrier
+                or speech.timing in {"sequential", "after_skills"}
                 else "parallel"
             ),
             timeout_ms=speech.timeout_ms,
@@ -565,6 +600,28 @@ class LocalSpeechSkillProvider:
     ) -> SkillResult:
         raw = self._handler(request.args)
         output = await raw if inspect.isawaitable(raw) else raw
+        metadata = request.args.get("metadata")
+        playback_barrier = bool(
+            isinstance(metadata, dict)
+            and metadata.get("wait_for_playback_start") is True
+        )
+        playback_started = bool(
+            isinstance(output, dict) and output.get("playback_started") is True
+        )
+        if playback_barrier and not playback_started:
+            return SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                output=output if isinstance(output, dict) else {},
+                reason_code="playback_not_started",
+                message=(
+                    "required pre-action speech did not begin playback; "
+                    "following requests were not authorized to start"
+                ),
+            )
         return SkillResult(
             request_id=request.request_id,
             skill_id=request.skill_id,

@@ -53,17 +53,103 @@ not provider-selection evidence. The latest local dirty-tree isolated run,
 voice and passed 6/6 cases for each provider: CosyVoice3 recorded 3.0987 s
 median first binary and 0.5419 median RTF, versus 5.6786 s and 0.9364 for
 Qwen3-TTS; post-cancel recovery favored Qwen3-TTS at 8.0885 s versus 18.7919 s.
-The same recordings created transcript-validated English, Chinese, and mixed
-Oute profiles, but one longer mixed prompt exhausted its token budget without
-audio, so mixed-language stability remains open. Candidate-output listening
-review, deployment license review, approved recovery bounds, clean repeated
-runs, and shared-resource target qualification remain open. The owner approved
-the voice style, but it was not promoted to Oute's maintained default: rebuilt
-container checks reproduced stochastic token exhaustion with both
-`chromie_mixed` and Chinese-aligned `chromie_zh`, and an RTX 5090 8192-token
-diagnostic did not fix it. The local profiles and source recordings remain
-untracked. This does not approve either candidate-provider result, and
-`TTS_PROVIDER=oute` with its built-in speaker remains the maintained default.
+The same recordings initially appeared to create transcript-validated English,
+Chinese, and mixed Oute profiles, but a root-cause audit found the custom
+soundfile loader had omitted Oute's batch dimension. Each resulting profile
+contained only one DAC code pair, so transcript similarity was true while
+acoustic conditioning was invalid. The loader now preserves batch/channel/
+sample axes; profile creation validates DAC-code structure and reference-audio
+coverage, invalid JSON is rebuilt from its WAV plus exact transcript, cached
+profiles are copied before Oute mutates prompt data, and every worker reloads a
+new profile. Regenerated `chromie_mixed` contains 776 code pairs across all 28
+words. At the corrected RTX 5090 8192-token setting it passed a 10/10 smoke and
+two repeated complete 6/6 multilingual/interruption/dialogue/concurrency runs.
+The installation-local `.env.local` now selects `TTS_SPEAKER_ID=chromie_mixed`;
+the private profile and recordings remain ignored, so a clean installation
+without them still uses Oute's built-in speaker. Listening quality, clean
+source-bound evidence, candidate-provider selection, and shared-resource target
+qualification remain open.
+
+A subsequent live-output diagnosis found that OuteTTS leaked the bilingual
+enrollment sentence into short Chinese `chromie_mixed` acknowledgements and
+spoke the remaining Chinese unnaturally. The old transport/stability matrix did
+not validate requested-text content. Fast-first cache v2 now includes
+provider/model/speaker revision identity, a four-second cue limit, and an ASR
+round-trip similarity gate before disk or memory admission. A one-session
+`--tts-trial cosyvoice` launcher path uses the authorized local reference on
+port 5001 without changing the maintained default; its human listening verdict
+and provider selection remain open. The trial image now uses the cuDNN
+9-compatible ONNX Runtime 1.18.1 instead of the 1.18.0/cuDNN 8 pairing that
+silently moved normalizer sessions to CPU, persists its WeText cache, and
+initialized `CUDAExecutionProvider` after rebuild. Six bilingual short cues
+passed the live ASR content gate. A separate stochastic bad short sample was
+rejected, so missing cues now receive one bounded regeneration while every
+attempt remains subject to the same fail-closed gate.
+
+The initial full-stack CosyVoice trial nevertheless terminated before opening
+the microphone. Under the normal qwen/gemma brain profile, the shared GPU was
+already at roughly 28 GiB; short-cue timeout cancellation restarted the
+candidate worker, retries repeatedly cold-loaded it, and the outer
+`asyncio.TimeoutError` escaped on Python 3.10. The temporary trial now runs every
+cognitive lane on `qwen3:4b`, limits Ollama to one resident model, and loads only
+already validated fast-first cues at startup. Individual synthesis timeout
+aborts remaining startup generation and outer prime expiry is non-fatal. The
+exact launcher subsequently reached `Microphone started` after a 4.1 ms empty
+cache resolution. A supervised listening verdict and sustained shared-load A/B
+run remain the next TTS evidence, not another startup-cache generation run.
+
+The same robot log exposed a separate Router failure: unrelated technical
+speech was repeatedly collapsed to `capability_inquiry`, forcing Chromie to
+answer as though it had been addressed. The host now supplies bounded
+interaction-engagement evidence, the Router distinguishes Chromie's abilities
+from discussion of other systems, and high-confidence semantic ambient speech
+may be ignored only outside an active exchange. Ignored ambient turns do not
+open a new engagement window. This is implemented and Level A verified; a
+retained live-microphone rerun is still required.
+
+The next supervised log exposed a different root cause behind repeated body
+actions. The Router correctly classified “想啥呢？” as
+`chat/social_exchange`, but the Goal-driven Runtime still saw the earlier walk
+and blink goals as active: semantic `goal_*` IDs had been looked up as unrelated
+host `task_*` IDs, so completed Skill Runtime results did not close their true
+contexts. With both cognitive lanes enabled, the later planner could also widen
+the chat turn into a physical plan. This is fixed at the responsible
+boundaries: semantic goals resolve to owning task contexts; speech, skill, and
+multi-goal confirmation requests bind by `source_goal_ids`; terminal runtime
+evidence closes every scoped goal; and a source `chat` route cannot authorize a
+physical terminal plan. The trusted adapter now owns prospective action cues
+from validated plan/runtime state, ignores Composer progress/final execution
+claims, waits for audible playback before dependent motion, and cancels every
+queued cue chunk when that barrier fails. A retained replay combines completed
+walk/blink lifecycle with the following social turn, and the relevant Level A
+ability classes cover the route-effect boundary. This is automated evidence;
+the updated services still require a supervised live voice/simulator rerun.
+
+CosyVoice amplified that incident but did not select the repeated action. The
+trial had inherited two host TTS requests from the two-worker Oute profile even
+though CosyVoice owns one singleton model worker, and cancellation could pay
+the measured cold-reload tail. The temporary trial now forces one host request,
+checks ASR/TTS WebSocket application health, completes a no-playback warm
+synthesis before readiness, and drains a nearly complete cancelled request for
+up to three seconds before falling back to fail-closed worker reload. A stuck
+synchronous inference can still require reload, so sustained shared-load
+latency and listening quality remain open.
+
+The rebuilt service-only trial passed ASR/TTS application health and produced
+485760 bytes of nonempty CosyVoice PCM under the full service load. During that
+run, a 46-minute-old host Orchestrator was found still reading the microphone
+and submitting requests across container recreation. It was stopped while the
+containers and Soridormi remained healthy. `start_chromie.sh` now checks the
+same exclusive lock used by `start_orchestrator.sh` before it writes generated
+runtime files or mutates services, so this stale-process topology fails closed.
+The host Orchestrator remains deliberately stopped pending supervised retest.
+
+The July 22 post-fix automated gate passed `./scripts/run_tests.sh` with 1164
+primary tests plus 20 legacy Agent tests, `scripts/scenario_runner.py` with
+382/382 file-backed scenarios, the complete Level A matrix with 53/53 cases
+(`multi_goal_daily_life` 9/9), documentation validation, shell syntax, and diff
+hygiene. This does not replace the still-open supervised
+microphone/speaker/simulator rerun.
 
 The initial Runtime Observability implementation is now present behind a
 default-off policy. It provides architecture-independent Runtime Trace items,
