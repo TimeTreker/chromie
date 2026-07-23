@@ -83,9 +83,6 @@ IGNORED_MARKDOWN_DIRS = {
 }
 
 STALE_PHRASES = {
-    "current milestone is M6": "old current-milestone wording",
-    "current engineering milestone: **M6": "old M6 status declaration",
-    "the current milestone is **M6": "old M6 status declaration",
     "tool actions for a future executor": "TaskGraph execution is implemented",
     "vision_agent`: placeholder": "vision is a compatibility proposal, not an undocumented placeholder",
     "taskgraph execution is not connected": "TaskGraph execution endpoints are implemented",
@@ -98,8 +95,31 @@ STALE_PHRASES = {
     "add request-bound confirmation dialogue": "spoken request-bound confirmation is implemented",
     "spoken-confirmation blocker remains": "only retained confirmation evidence remains open",
     "8c448e2de2cd8a602b0d48e31461f9be9f1b8d08": "stale repository snapshot revision",
-    "current engineering milestone: **m13": "historical milestone numbering is no longer the delivery model",
-    "active milestone: m13": "historical milestone numbering is no longer the delivery model",
+}
+
+MILESTONE_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9])M(?:0|[1-9][0-9]*)(?=\b|_)"
+)
+NUMBERED_PHASE_PATH_RE = re.compile(
+    r"(?:^|[._/-])(?:m|step)(?:0|[1-9][0-9]*)(?=$|[._/-])",
+    re.IGNORECASE,
+)
+TEXT_SCAN_SUFFIXES = {
+    ".env",
+    ".json",
+    ".md",
+    ".py",
+    ".sh",
+    ".toml",
+    ".txt",
+    ".yaml",
+    ".yml",
+}
+TEXT_SCAN_FILENAMES = {
+    ".dockerignore",
+    ".gitignore",
+    "Dockerfile",
+    "VERSION",
 }
 
 
@@ -113,6 +133,38 @@ def markdown_files() -> list[Path]:
         if path.is_file():
             files.append(path)
     return sorted(files)
+
+
+def repository_text_files() -> list[Path]:
+    files: list[Path] = []
+    for path in ROOT.rglob("*"):
+        if not path.is_file():
+            continue
+        relative_parts = path.relative_to(ROOT).parts
+        if any(part in IGNORED_MARKDOWN_DIRS for part in relative_parts[:-1]):
+            continue
+        if path.suffix.lower() in TEXT_SCAN_SUFFIXES or path.name in TEXT_SCAN_FILENAMES:
+            files.append(path)
+    return sorted(files)
+
+
+def check_semantic_project_naming(errors: list[str]) -> None:
+    """Reject development-order identifiers from the maintained source tree."""
+
+    for path in repository_text_files():
+        relative = path.relative_to(ROOT).as_posix()
+        if NUMBERED_PHASE_PATH_RE.search(relative):
+            errors.append(
+                f"{relative}: path uses a numbered project-phase identifier; "
+                "use a capability or issue-oriented name"
+            )
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for match in MILESTONE_TOKEN_RE.finditer(text):
+            line = text.count("\n", 0, match.start()) + 1
+            errors.append(
+                f"{relative}:{line}: numbered milestone token is forbidden in "
+                "maintained source; use a semantic capability, issue, or evidence name"
+            )
 
 
 def normalized_link_target(raw: str) -> str:
@@ -226,19 +278,27 @@ def check_project_direction(errors: list[str]) -> None:
     ):
         if heading not in roadmap:
             errors.append(f"ROADMAP.md is missing {heading!r}")
-    for obsolete in (
-        "## M13 ",
-        "## M14 ",
-        "## M15 ",
-        "## M16 ",
-        "## R1 ",
-        "## R2 ",
-        "## R3 ",
-    ):
-        if obsolete in roadmap:
-            errors.append(f"ROADMAP.md still contains obsolete section {obsolete!r}")
-    if "Earlier work previously labeled M0-M12" not in roadmap:
-        errors.append("ROADMAP.md does not collapse historical M0-M12 work")
+    obsolete_heading = re.search(
+        r"^##\s+(?:M|R)\d+\b",
+        roadmap,
+        flags=re.MULTILINE,
+    )
+    if obsolete_heading is not None:
+        errors.append(
+            "ROADMAP.md still contains a numbered project-phase heading: "
+            f"{obsolete_heading.group(0)!r}"
+        )
+    if "Earlier incremental work is represented by two completed" not in roadmap:
+        errors.append(
+            "ROADMAP.md does not describe the completed foundations semantically"
+        )
+    if re.search(
+        r"Sequential milestone\s+codes are not part of the current project model",
+        roadmap,
+    ) is None:
+        errors.append(
+            "ROADMAP.md does not prohibit development-order milestone codes"
+        )
     for question in (
         "Does it close the active milestone",
         "Is the behavior owned by Chromie or Soridormi",
@@ -417,6 +477,7 @@ def main() -> int:
     errors: list[str] = []
     check_local_links(errors)
     check_document_index(errors)
+    check_semantic_project_naming(errors)
     check_current_focus(errors)
     check_project_direction(errors)
     check_api_reference(errors)
@@ -432,8 +493,8 @@ def main() -> int:
     print(
         "Documentation checks passed: "
         f"{len(markdown_files())} Markdown files, project direction, "
-        "local links, current focus, API routes, runtime configuration coverage "
-        "and safety defaults, "
+        "local links, semantic project naming, current focus, API routes, "
+        "runtime configuration coverage and safety defaults, "
         "and reproducible release inputs."
     )
     return 0

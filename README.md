@@ -31,8 +31,8 @@ environment-specific evidence work rather than inferred release claims.
 > `UserTurnEnvelope` now preserves the admitted Gateway input through this loop.
 > The contracts and host path are automatically verified and default to
 > authoritative chat in the common safe base; the maintained Soridormi launcher
-> widens authority to simulator robot actions. Historical M13 evidence remains
-> valid only for its recorded legacy revisions. A clean live rerun of the
+> widens authority to simulator robot actions. Historical voice-pipeline and
+> text-to-MuJoCo evidence remains valid only for its recorded legacy revisions. A clean live rerun of the
 > current authority path is still required before target validation or
 > publication of the blocked `0.0.1` candidate. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).

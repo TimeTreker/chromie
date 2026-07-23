@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Step 5 converts offline episode evaluations into durable, correlated scenario-
-candidate events. A candidate is a proposal for human review. It is not an
+Offline scenario mining converts episode evaluations into durable, correlated
+scenario-candidate events. A candidate is a proposal for human review. It is not an
 active regression scenario, training sample, prompt update, or runtime policy.
 
 ## Derivation chain

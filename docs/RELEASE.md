@@ -10,7 +10,7 @@ Soridormi source identity, running Chromie image/model binding, immutable image
 references, and fresh current-revision goal-driven voice and MuJoCo evidence.
 No official GitHub release has been published yet.
 
-Treat `main` as a development branch. The historical M13 text-to-MuJoCo
+Treat `main` as a development branch. The historical text-to-MuJoCo
 interaction scope is closed with retained text evidence. Clean synthetic,
 virtual-microphone, and acoustic generated-speech evidence can support this
 release only when the release claim remains narrowed to generated speech and
@@ -63,7 +63,7 @@ does not provide that binding, so newly generated bundles remain outside
 release-policy evaluation. `human_voice_device_claim_eligible` is a separate
 supervised-evidence field and remains false for generated-speech modes.
 
-The retained M13 text-to-MuJoCo interaction scope is historically evidenced by
+The retained text-to-MuJoCo interaction scope is historically evidenced by
 `.chromie/acceptance/text-mujoco/20260617T081411Z`. It does not validate the
 current goal-driven authority path. Before tagging, produce a clean
 current-revision text-to-MuJoCo `summary.json`. Recording a paired Soridormi

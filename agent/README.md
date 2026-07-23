@@ -260,7 +260,7 @@ PYTHONPATH=. python -m app.soridormi_acceptance \
 
 The probe checks the complete manifest by default. Acceptance workflows that
 intentionally target a smaller surface may repeat `--exclude-effect EFFECT`;
-M13 uses this only for the hidden `test_control` surface.
+The voice-interaction acceptance runner uses this only for the hidden `test_control` surface.
 
 The Agent's direct Ollama client ignores ambient host proxy variables so
 Compose-local model traffic cannot be redirected through an unreachable proxy.

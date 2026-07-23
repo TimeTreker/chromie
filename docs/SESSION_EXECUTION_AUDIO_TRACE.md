@@ -1,13 +1,13 @@
-# Step 7: Session, Execution, and Audio Runtime Trace
+# Session, Execution, and Audio Runtime Trace
 
 ## Status
 
-Implemented as the second Runtime Observability delivery milestone. The trace
-contract remains architecture-independent; this step extends producer coverage.
+Implemented as the session, execution, and audio coverage slice of Runtime
+Observability. The trace contract remains architecture-independent.
 
 ## Scope
 
-Step 7 adds runtime trace coverage for work that can continue after a cognitive
+This slice adds runtime trace coverage for work that can continue after a cognitive
 interaction has completed:
 
 - voice-session lifecycle;
@@ -95,7 +95,7 @@ retention.
 
 ## Remaining coverage
 
-This step does not claim full operational observability. Still open:
+This coverage does not claim full operational observability. Still open:
 
 - ASR and VAD spans rather than existing workflow events alone;
 - first physical motion and execution acknowledgement from robot providers;

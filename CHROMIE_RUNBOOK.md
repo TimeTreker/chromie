@@ -422,7 +422,7 @@ SUPERVISED_ACCEPTANCE=1 TARGET_ACCEPTANCE_DRY_RUN=1 \
 ## 13. Alpha voice acceptance
 
 Use the functional voice acceptance commands for new evidence. Historical
-M13 text evidence remains documented separately.
+Historical text-to-MuJoCo evidence remains documented separately.
 
 Before live simulator work, run the dependency-free provider fault matrix:
 

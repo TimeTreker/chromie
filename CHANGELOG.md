@@ -157,7 +157,7 @@ All notable user-visible changes should be recorded here.
 ### Consistency and safety audit
 
 - Reconciled Runtime Observability status, roadmap, index, changelog, and
-  component documentation with the implemented Steps 7-10 source.
+  component documentation with the implemented observability coverage.
 - Aligned standalone Agent, Router, ASR, and Orchestrator fallbacks with the
   documented common safe defaults.
 - Removed a Sun-specific deterministic conversational rewrite so factual
@@ -257,12 +257,12 @@ declaration still blocks publication.
   and fail-closed verifier for Physical pilot preparation.
 - Fixed the Ollama container healthcheck to use a reachable loopback client
   address while the service continues listening on all interfaces.
-- Scoped M13 capability probing to the production surface while retaining
+- Scoped voice-acceptance capability probing to the production surface while retaining
   strict full-manifest probing for provider-readiness conformance.
 - Prevented host proxy variables from intercepting Agent-to-Ollama traffic on
   the trusted Compose network.
 - Retained passing RTX 5090 GPU smoke plus complete synthetic and PipeWire
-  virtual-microphone M13 evidence; supervised physical audio remains open.
+  virtual-microphone voice-pipeline evidence; supervised physical audio remains open.
 - Aligned release and roadmap wording with sherpa-onnx as the maintained ASR
   default and scoped supervised audio blockers to physical voice-device release
   claims.

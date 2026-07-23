@@ -30,18 +30,18 @@ Retained reference-host evidence from June 14 and June 17, 2026:
 | Evidence ID | Revision | Result | Scope |
 |---|---|---|---|
 | GPU `20260614T130944Z` | `280c36a` | 21 passed, 0 failed | RTX 5090 service/GPU smoke, Ollama GPU placement, ASR/TTS health, generated PCM |
-| M13 `20260614T132934Z` | `f0e22ba` | 7/7 passed | Synthetic framed PCM through VAD, ASR, Router, Agent, Skill Runtime, TTS, and MuJoCo |
-| M13 `20260614T133155Z` | `f0e22ba` | 7/7 passed | PipeWire virtual-microphone capture through the same interaction and MuJoCo path |
-| M13 `20260617T075825Z` | `4604a03` | 7/7 passed | Clean synthetic framed PCM through VAD, ASR, Router, Agent live Soridormi catalog, host confirmation, Skill Runtime, TTS, and MuJoCo |
+| Synthetic voice pipeline `20260614T132934Z` | `f0e22ba` | 7/7 passed | Synthetic framed PCM through VAD, ASR, Router, Agent, Skill Runtime, TTS, and MuJoCo |
+| Virtual-microphone voice pipeline `20260614T133155Z` | `f0e22ba` | 7/7 passed | PipeWire virtual-microphone capture through the same interaction and MuJoCo path |
+| Synthetic voice pipeline `20260617T075825Z` | `4604a03` | 7/7 passed | Clean synthetic framed PCM through VAD, ASR, Router, Agent live Soridormi catalog, host confirmation, Skill Runtime, TTS, and MuJoCo |
 | Text-MuJoCo `20260617T081411Z` | `857c15f` | passed | Direct text input through Router, Agent `/interaction`, host Skill Runtime, live Soridormi MCP, ordered walk/nod/turn execution, and safe-idle status |
 
-The retained M13 automated bundles are historical evidence for their recorded
+The retained voice-pipeline automated bundles are historical evidence for their recorded
 revisions and legacy semantic path; they are not current goal-driven validation.
 They can be inspected by supplying their recorded revisions through the
 verifier's `--expected-*` options. The verifier defaults to the current source
 and therefore rejects them as release evidence for a newer revision. They report
 they are not eligible for a human physical voice-device claim. The retained
-Text-MuJoCo bundle closes the historical M13 text interaction scope. It
+Text-MuJoCo bundle closes the historical text interaction scope. It
 intentionally skips microphone and ASR and therefore does not prove physical
 audio-device quality.
 
@@ -377,7 +377,7 @@ the probe uses the same MCP SDK and dependency versions as the deployed Agent:
 service hostname instead. A host-side probe remains available for development
 after installing `agent/requirements.txt`.
 
-The general probe verifies the complete manifest by default. M13 voice
+The general probe verifies the complete manifest by default. Voice interaction
 acceptance adds `--exclude-effect test_control` because its production
 voice-to-simulator path does not depend on hidden fault-injection controls.
 Provider-readiness evidence continues to require those controls separately.
@@ -485,7 +485,7 @@ contains internal labels such as `Task Split`, `Key Risk`, `Next Step`, or
 model-facing `soridormi.*` skill IDs. It still writes `route.json`,
 `interaction_response.json`, session events, and `summary.json` for diagnosis.
 
-The retained `20260617T081411Z` text bundle is historical M13 `/interaction`
+The retained `20260617T081411Z` text bundle is historical text-to-MuJoCo `/interaction`
 closure evidence. It does not contain the provenance or cognitive status needed
 to validate the current goal-driven path. Produce a new clean goal-driven bundle
 when the claim includes the current semantic-authority boundary.
@@ -604,7 +604,7 @@ SUPERVISED_ACCEPTANCE=1 TARGET_ACCEPTANCE_DRY_RUN=1 \
 ## Voice audio acceptance modes
 
 New voice evidence uses functional script names and the
-`.chromie/acceptance/voice/` directory. Historical M13 text evidence remains
+`.chromie/acceptance/voice/` directory. Historical text-to-MuJoCo evidence remains
 documented separately.
 
 ## Provider fault matrix
@@ -770,7 +770,7 @@ endpoint-reported Soridormi revision. The current runner records only a
 
 Use `scripts/interaction_text_mujoco_check.py` when the goal is to skip both
 microphone and ASR but still hear Chromie through the speaker. Use
-`synthetic` M13 mode when the goal is to skip only the microphone: generated
+`synthetic` voice-acceptance mode when the goal is to skip only the microphone: generated
 Chromie TTS audio is injected as input and still passes through VAD and ASR.
 
 ### Automatic synthetic acceptance
@@ -925,7 +925,7 @@ operator's `.env.local` or generated `.env.runtime`. The Soridormi capability
 probe runs inside `chromie-agent` by default; host-loopback endpoints are
 translated to `host.docker.internal` only for that container command.
 
-This supervised mode is not required for M13 text interaction closure. Use it
+This supervised mode is not required for text-to-MuJoCo interaction closure. Use it
 when the claim being tested includes real microphone recognition, real speaker
 playback, and operator-observed behavior.
 
@@ -1025,4 +1025,4 @@ The gate returns invalid rather than pass when evidence class, environment,
 sample count, revision cleanliness, or required metric samples are not
 qualified. The committed `.example.json` policy is disabled and carries no
 release authority. See
-[Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md).
+[Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md).

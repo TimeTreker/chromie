@@ -1,8 +1,8 @@
-# Step 10: Accelerator Telemetry and Latency Evidence Gates
+# Accelerator Telemetry and Latency Evidence Gates
 
 ## Status
 
-Implemented and automatically verified at Level A. This step completes the
+Implemented and automatically verified at Level A. This work completes the
 Chromie-side Runtime Observability implementation. It does not create target
 GPU, simulator, microphone, speaker, or physical-robot evidence by itself.
 Operators must still retain real traces from the claimed environment before a
@@ -10,7 +10,8 @@ release latency gate can be enabled.
 
 ## Purpose
 
-Step 10 closes the remaining implementation gaps identified after Step 9:
+This work closes the remaining implementation gaps after resource, recovery,
+and trace-retention coverage:
 
 - collect accelerator telemetry without blocking the realtime event loop;
 - derive reproducible latency distributions from retained Runtime Trace events;
@@ -218,8 +219,8 @@ retrieved evidence packages.
 
 ## Remaining operational work
 
-After this step, no additional Runtime Observability subsystem implementation
-step is planned in Chromie. Remaining work is evidence acquisition and product
+No additional Runtime Observability subsystem implementation slice is currently
+planned in Chromie. Remaining work is evidence acquisition and product
 operations:
 
 - collect representative simulator and target trace sets;

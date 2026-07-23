@@ -207,7 +207,7 @@ representative simulator/hardware traces and environment-approved thresholds
 are retained; code does not manufacture that evidence. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md),
 [Runtime Trace Contract](docs/RUNTIME_TRACE.md), and
-[Step 10: Accelerator Telemetry and Latency Evidence Gates](docs/STEP10_ACCELERATOR_LATENCY_EVIDENCE.md).
+[Accelerator Telemetry and Latency Evidence Gates](docs/ACCELERATOR_LATENCY_EVIDENCE.md).
 
 The `0.0.1` release implementation is present:
 
@@ -338,7 +338,7 @@ The `0.0.1` release implementation is present:
   `task_api_no_motion=true` before preview/submit and monitors terminal
   `soridormi.task.events`.
 
-The M13 text interaction scope is closed. Linux RTX 5090 GPU smoke passed
+The text-to-MuJoCo interaction scope is closed. Linux RTX 5090 GPU smoke passed
 21/21; clean seven-case synthetic and PipeWire virtual-mic bundles passed; and
 text-to-MuJoCo evidence `20260617T081411Z` passed at Chromie revision `857c15f`
 with ordered walk, nod, and turn execution in MuJoCo plus safe idle. Physical
@@ -389,7 +389,7 @@ completed target validation.
    endpoint-reported Soridormi revision. Pass the declared paired checkout with
    `--soridormi-repo ../soridormi`; the runner still does not obtain the
    endpoint executing revision, so do not relabel its diagnostic output or
-   reuse the historical M13 bundle as evidence for this path. The immediate
+   reuse the historical text-to-MuJoCo bundle as evidence for this path. The immediate
    resume action is to add and verify those source-binding guarantees from a
    clean paired checkout; the functional simulator matrix already passes at
    diagnostic Level C.

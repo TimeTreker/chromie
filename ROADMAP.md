@@ -7,36 +7,36 @@ are tracked in [Status](docs/STATUS.md).
 
 ## Planning model
 
-Chromie uses a small number of outcome milestones. Historical implementation
-increments are not maintained as separate planning units.
+Chromie plans and reports work by the problem being solved, the capability being
+qualified, and the evidence required for the product claim. Sequential milestone
+codes are not part of the current project model.
 
 - Only one delivery milestone is active at a time.
 - A milestone closes only when its implementation and required evidence exist.
 - Default-off experimental work is not release support.
-- Older evidence tools retain legacy names such as M3, M5, or M13 for
-  compatibility; those names do not create additional active milestones.
+- Documents, tools, tests, and evidence classes use semantic names rather than
+  development-order identifiers.
 - Future work must preserve the ownership and safety boundaries in the charter.
 
 ## Completed foundations
 
-Earlier work previously labeled M0-M12 is now represented by two completed
-capability foundations:
+Earlier incremental work is represented by two completed capability foundations:
 
 | Foundation | Included outcomes | State |
 |---|---|---|
 | Realtime interaction foundation | Five-service runtime, host audio/VAD/playback, deterministic routing, contracts, generated configuration, GPU and target tooling | Implemented and automatically verified; some target evidence remains open |
 | Structured embodiment foundation | Native interaction, Skill Runtime, Soridormi named skills, TaskGraphs, confirmation, cancellation, bounded scheduling, traces, and MuJoCo integration | Implemented and automatically verified locally and in simulation |
 
-The old M0-M12 numbering remains visible only in historical commits, tool names,
-and evidence references. It should not drive new scope.
+Historical Git commits retain their original messages. Current source, tests,
+documentation, and evidence indexes use capability- and issue-oriented names.
 
 ## Completed phase - Text-to-MuJoCo interaction closure
 
 ### Objective
 
-Close the historical M13 interaction milestone by proving the deterministic
-text-input path through Router, native `/interaction`, trusted Skill Runtime,
-Soridormi named skills, MuJoCo execution, and safe-idle recovery.
+Prove the deterministic text-input path through Router, native `/interaction`,
+trusted Skill Runtime, Soridormi named skills, MuJoCo execution, and safe-idle
+recovery.
 
 This phase is complete. The retained `text-mujoco` evidence proves a compound
 text request is routed into ordered walking, nodding, and turning skills, all
@@ -45,7 +45,7 @@ automatic synthetic and virtual-microphone matrices remain retained regression
 evidence for the broader voice pipeline.
 
 Physical microphone recognition and speaker quality are deliberately excluded
-from M13 closure. They remain an audio-device validation track for any future
+from this closure. They remain an audio-device validation track for any future
 release claim that includes real voice input/output support.
 
 ### Exit criteria
@@ -61,12 +61,9 @@ This closure does not claim robust human ASR, physical microphone/speaker
 quality, production robot support, verified Jetson packaging, or unattended
 operation.
 
-The voice acceptance scripts and evidence directories still use the historical
-`m13` name. That identifier is retained for compatibility only.
-
 ## Open evidence track - Physical audio validation
 
-Physical voice validation is no longer a blocker for M13 text interaction
+Physical voice validation is no longer a blocker for text-to-MuJoCo interaction
 closure. Before publishing a release that claims support for real microphone and
 speaker operation, retain a clean supervised bundle, operator review, and
 release evidence that cover microphone choice, room noise, ASR recognition,

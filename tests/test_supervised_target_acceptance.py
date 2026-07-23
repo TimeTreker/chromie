@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "run_supervised_target_acceptance.sh"
 
 
-class M5TargetAcceptanceTests(unittest.TestCase):
+class SupervisedTargetAcceptanceTests(unittest.TestCase):
     def test_requires_explicit_supervision(self) -> None:
         result = subprocess.run(
             [str(SCRIPT)],

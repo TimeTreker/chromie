@@ -62,11 +62,11 @@ endpoint-reported Soridormi revision. Running Chromie image/model source
 binding and immutable release image references are also open. Retained
 live-text and MuJoCo evidence for the current multi-goal and single-authority
 path remains open. Do not claim target validation or release readiness from
-Level A results, a newly diagnostic-only bundle, or the historical M13 bundle.
+Level A results, a newly diagnostic-only bundle, or the historical text-to-MuJoCo bundle.
 
 ## Historical Evidence Boundary
 
-The M13 text-to-MuJoCo interaction closure remains valid evidence for the
+The text-to-MuJoCo interaction closure remains valid evidence for the
 historical structured path:
 
 ```text

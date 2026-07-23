@@ -497,7 +497,7 @@ async def run_soridormi_guarded_dry_run_acceptance(
     if exercise_emergency_stop:
         emergency = await invoker.invoke(
             "soridormi.safety.emergency_stop",
-            {"reason": "Chromie M5 dry-run acceptance"},
+            {"reason": "Chromie supervised target dry-run acceptance"},
             context=ToolInvocationContext(allow_safety_controls=True),
         )
         if emergency.status != "success" or emergency.output.get("stopped") is not True:

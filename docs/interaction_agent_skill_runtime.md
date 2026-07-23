@@ -395,7 +395,7 @@ catalog/default timeouts unchanged. Generated TTS-audio injection is covered by
 `scripts/voice_acceptance.py --mode synthetic`; that mode skips the physical
 microphone but intentionally keeps VAD and ASR in the path.
 
-The retained `20260617T081411Z` bundle closes the historical M13 text
+The retained `20260617T081411Z` bundle closes the historical text-to-MuJoCo
 interaction scope. Physical microphone and ASR behavior are intentionally
 separate from that closure.
 

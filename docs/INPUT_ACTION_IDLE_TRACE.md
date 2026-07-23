@@ -1,13 +1,13 @@
-# Step 8: Input, Action, and Idle Trace Coverage
+# Input, Action, and Idle Trace Coverage
 
 ## Status
 
-Implemented as the next incremental Runtime Observability milestone after the
+Implemented as the input, action, and idle-finalization coverage slice after the
 initial cognitive trace and detached voice-session trace foundations.
 
 ## Scope
 
-Step 8 extends the generic Runtime Trace contract without adding architecture-
+This coverage extends the generic Runtime Trace contract without adding architecture-
 specific latency fields. The participating modules declare their own identities
 and emit normal trace items:
 
@@ -63,7 +63,7 @@ claim that the interaction completed successfully.
 
 ## Remaining work
 
-This step does not yet add continuous CPU/GPU/memory sampling, process-restart
+This coverage does not yet add continuous CPU/GPU/memory sampling, process-restart
 recovery from persisted active sessions, or a provider-independent method for
 measuring physical motion. Those require separate evidence sources and should
 not be inferred by the host.

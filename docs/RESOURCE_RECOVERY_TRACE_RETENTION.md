@@ -1,10 +1,10 @@
-# Step 9: Resource, Recovery, and Trace Retention
+# Resource, Recovery, and Trace Retention
 
 ## Status
 
 Implemented behind the existing default-off Runtime Trace policy.
 
-Step 9 extends the architecture-independent trace foundation with four
+This coverage extends the architecture-independent trace foundation with four
 operational capabilities:
 
 - generic process, host-memory, queue, and event-loop resource samples;
@@ -13,7 +13,7 @@ operational capabilities:
 - late-bound correlation between session, cognitive, interaction, and episode
   artifacts.
 
-This step does not claim GPU telemetry, fleet analytics, or retained hardware
+This coverage does not claim GPU telemetry, fleet analytics, or retained hardware
 latency qualification.
 
 ## Resource samples
@@ -164,8 +164,8 @@ unless operators reduce the sample rate or set thresholds.
 
 ## Follow-on status
 
-[Step 10](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md) implements non-blocking
-accelerator telemetry plus retained latency distributions and evidence-qualified
+[Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md)
+implements non-blocking accelerator telemetry plus retained latency distributions and evidence-qualified
 regression gates. Provider-independent first-motion truth still belongs to the
 body telemetry source, and cloud-side clustering/fleet analytics remain future
 data-loop work.

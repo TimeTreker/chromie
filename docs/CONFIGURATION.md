@@ -494,7 +494,7 @@ simulator/hardware baselines and approved environment-specific thresholds are
 retained. See
 [Runtime Trace Contract](RUNTIME_TRACE.md),
 [Runtime Trace Instrumentation Guide](RUNTIME_TRACE_INSTRUMENTATION.md), and
-[Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md).
+[Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md).
 
 ## Agent and TaskGraph
 

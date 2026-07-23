@@ -413,19 +413,19 @@ On June 14, 2026, the Linux x86_64 reference host with an NVIDIA GeForce RTX
 
 - GPU smoke `20260614T130944Z`: 21 passed, 0 failed, including ASR/TTS GPU
   visibility, non-empty TTS PCM, and `gemma4:26b` loaded 100% on GPU;
-- synthetic M13 `20260614T132934Z`: all seven cases passed at Chromie revision
+- synthetic voice-pipeline `20260614T132934Z`: all seven cases passed at Chromie revision
   `f0e22ba`;
-- virtual-microphone M13 `20260614T133155Z`: all seven cases passed through
+- virtual-microphone voice-pipeline `20260614T133155Z`: all seven cases passed through
   PipeWire at the same revision.
 
-At their recorded revisions, both M13 bundles passed the verifier then in use.
+At their recorded revisions, both voice-pipeline bundles passed the verifier then in use.
 The current verifier defaults to the current source and rejects them for
 current-release provenance; they remain historical automated target-host
 evidence, not current goal-driven or physical microphone/speaker evidence.
 
 On June 17, 2026, the same development line retained:
 
-- synthetic M13 `20260617T075825Z`: all seven cases passed at Chromie revision
+- synthetic voice-pipeline `20260617T075825Z`: all seven cases passed at Chromie revision
   `4604a03`, including the live Soridormi catalog and host confirmation path;
 - text-to-MuJoCo `20260617T081411Z`: the text request “walk ahead at 0.2 speed
   for 10 seconds and then nod your head twice, then turn left” routed to ordered
@@ -433,7 +433,7 @@ On June 17, 2026, the same development line retained:
   `soridormi.turn_in_place`; all three completed in MuJoCo `sim` mode and the
   status check ended standing, with no active task and no emergency stop.
 
-That text-to-MuJoCo evidence closes the historical M13 text interaction scope.
+That text-to-MuJoCo evidence closes the historical text-to-MuJoCo interaction scope.
 It intentionally skips microphone and ASR. Physical microphone/speaker
 validation remains open only for future voice-device release claims.
 
@@ -498,7 +498,7 @@ Target validation or Release readiness.
 | Shared bounded scheduling and resource arbitration | Implemented | Agent and Orchestrator concurrency tests | MuJoCo interaction path exercises the policy | Parallel flags off |
 | Hardware profile detection and generated `.env.runtime` | Implemented | Profile-detection tests | RTX 5090 profile and CUDA arch 120 validated; Jetson packaging evidence is incomplete | Automatic |
 | Host hardware daemon | Legacy mock compatibility implementation | Hardware/control-plane tests | No production hardware claim | Optional; mock driver only |
-| Release packaging | `0.0.1` version, candidate notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests | Historical M13 and acoustic evidence does not validate the current authority path. The current runners record a declared paired Soridormi checkout but no endpoint-reported executing revision; running Chromie images/models are not yet bound to host `HEAD`; maintained image references remain mutable; fresh target-validated voice and text-to-MuJoCo evidence is still required. Human voice-device scope separately requires supervised physical audio evidence | Blocked candidate preparation |
+| Release packaging | `0.0.1` version, candidate notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests | Historical voice-pipeline, text-to-MuJoCo, and acoustic evidence does not validate the current authority path. The current runners record a declared paired Soridormi checkout but no endpoint-reported executing revision; running Chromie images/models are not yet bound to host `HEAD`; maintained image references remain mutable; fresh target-validated voice and text-to-MuJoCo evidence is still required. Human voice-device scope separately requires supervised physical audio evidence | Blocked candidate preparation |
 
 ## Verified automated evidence
 
@@ -694,7 +694,7 @@ validates the target GPU and automated host audio paths.
 
 `scripts/interaction_text_mujoco_check.py` is available for text-input,
 speaker-output, live-MuJoCo checks that skip microphone and ASR. The retained
-`20260617T081411Z` bundle is the historical M13 text interaction closure
+`20260617T081411Z` bundle is the historical text-to-MuJoCo interaction closure
 evidence. It does not prove physical microphone recognition or speaker quality.
 On 2026-07-02, local live simulator rehearsals also passed through the current
 Router/Agent/Skill Runtime/Soridormi MCP stack: warning text
@@ -902,23 +902,25 @@ host validates and may drop auxiliary behavior; concrete user-requested actions
 remain primary CanonicalPlan goals. Automated verification exists, while fresh
 live interaction evidence for contextual appropriateness remains open.
 
-## Runtime Observability Step 7
+## Session, execution, and audio trace coverage
 
-Step 7 added generic Runtime Trace items for session lifecycle, action execution,
-TTS, playback, and first audible response. At that checkpoint, ASR/VAD spans,
-first physical motion, resource sampling, crash recovery, and retained live
-latency qualification were open. Steps 8-10 subsequently implemented those
-instrumentation paths; target latency qualification remains open. See
-[Step 7: Session, Execution, and Audio Runtime Trace](STEP7_SESSION_EXECUTION_AUDIO_TRACE.md).
+Session, execution, and audio trace coverage added generic Runtime Trace
+items for session lifecycle, action execution, TTS, playback, and first audible
+response. At that checkpoint, ASR/VAD spans, first physical motion, resource
+sampling, crash recovery, and retained live latency qualification were open.
+Later observability coverage implemented those instrumentation paths; target
+latency qualification remains open. See
+[Session, Execution, and Audio Runtime Trace](SESSION_EXECUTION_AUDIO_TRACE.md).
 
-## Runtime Observability Step 8
+## Input, action, and idle trace coverage
 
-Step 8 added valid VAD utterances, ASR calls, action-provider acknowledgements,
-optional provider-reported first physical motion, and idle-timeout abandonment
-of unfinished voice sessions. Resource sampling and persisted process-restart
-recovery were added in Step 9; retained target latency baselines remain open.
+Input, action, and idle trace coverage added valid VAD utterances, ASR calls,
+action-provider acknowledgements, optional provider-reported first physical
+motion, and idle-timeout abandonment of unfinished voice sessions. Resource
+sampling and persisted process-restart recovery were added by the resource and
+recovery trace work; retained target latency baselines remain open.
 
-## Runtime Observability Step 9
+## Resource, recovery, and trace-retention coverage
 
 Runtime Trace now records optional generic process/host-memory, queue-depth, and
 event-loop-lag resource samples. Active voice-session traces can be atomically
@@ -928,11 +930,11 @@ retention, latency thresholds, and deterministic sampling, while critical
 cognitive-integrity incidents remain independent of normal sampling. Session
 traces gain conversation, cognitive-trace, interaction, and episode correlation
 IDs as those artifacts become available. At that checkpoint accelerator
-telemetry was open; Step 10 subsequently added the optional non-blocking
-provider. Retained simulator/hardware latency baselines remain open. See
-[Step 9: Resource, Recovery, and Trace Retention](STEP9_RESOURCE_RECOVERY_RETENTION.md).
+telemetry was open; the accelerator evidence work subsequently added the
+optional non-blocking provider. Retained simulator/hardware latency baselines remain open. See
+[Resource, Recovery, and Trace Retention](RESOURCE_RECOVERY_TRACE_RETENTION.md).
 
-## Runtime Observability Step 10
+## Accelerator telemetry and latency evidence gates
 
 Chromie now supports optional non-blocking accelerator telemetry through a
 bounded worker-thread provider, represented as generic `resource_sample` trace
@@ -944,4 +946,4 @@ environment identity, clean revisions, and configured absolute/relative
 thresholds. The repository example gate is disabled and is not release
 evidence. Real simulator/hardware baselines and approved environment-specific
 thresholds remain open operational evidence. See
-[Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md).
+[Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md).

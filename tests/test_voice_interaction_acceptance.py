@@ -274,7 +274,7 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
     )
 
 
-class M13AcceptanceTests(unittest.TestCase):
+class VoiceInteractionAcceptanceTests(unittest.TestCase):
     def test_parse_all_cases_preserves_release_order(self) -> None:
         self.assertEqual(parse_case_list("all"), list(FULL_CASE_ORDER))
 
@@ -2067,7 +2067,7 @@ class M13AcceptanceTests(unittest.TestCase):
                         SimpleNamespace(preview=False)
                     )
 
-    def test_dry_run_evidence_cannot_close_m13(self) -> None:
+    def test_dry_run_evidence_cannot_close_text_to_mujoco_interaction(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             for name in REQUIRED_FILES:
