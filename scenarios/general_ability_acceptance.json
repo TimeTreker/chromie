@@ -417,7 +417,8 @@
       "general_rule": "Stop, cancel, emergency, silence, and unusable-audio paths must not depend on model judgment.",
       "minimum_level_a_cases": 3,
       "root_cause_boundaries": [
-        "Router/intent",
+        "Cognitive Gateway/ingress",
+        "Compatibility Router/attention",
         "Orchestrator policy",
         "Skill Runtime/provider"
       ],
@@ -689,6 +690,42 @@
           ]
         }
       ]
+    },
+    {
+      "id": "evidence_bound_cognitive_turn_closure",
+      "title": "Evidence-Bound Cognitive Turn Closure",
+      "general_rule": "Every admitted effectful turn should preserve its identity through execution, retain completed, missing, failed, and cancelled outcomes, commit goal state, suppress stale speech, and emit at most one evidence-bound speech-only final while the turn remains current.",
+      "minimum_level_a_cases": 5,
+      "root_cause_boundaries": [
+        "Cognitive Gateway/ingress",
+        "Goal-Driven Cognitive Core",
+        "Orchestrator policy",
+        "Skill Runtime/provider",
+        "Execution outcome evidence"
+      ],
+      "level_a_scenarios": [
+        {
+          "key": "cognitive_turn_loop/admitted_mixed_completed_not_run_final",
+          "rationale": "An admitted multi-goal turn preserves identity, retains completed and missing outcomes, updates each goal, and emits one speech-only final."
+        },
+        {
+          "key": "cognitive_turn_loop/provider_exception_before_results",
+          "rationale": "A provider exception before terminal results closes every planned step as not_run without speaking internal failure text."
+        },
+        {
+          "key": "cognitive_turn_loop/schema_unavailable_output_not_spoken",
+          "rationale": "A completed result without a committed output schema retains terminal status but cannot expose its untrusted payload in final speech."
+        },
+        {
+          "key": "cognitive_turn_loop/newer_turn_suppresses_stale_final",
+          "rationale": "A newer turn suppresses stale final speech while retaining the completed outcome and updated goal state."
+        },
+        {
+          "key": "cognitive_turn_loop/active_stop_cancel_retains_outcome",
+          "rationale": "A deterministic stop cancels the active provider request, marks its queued sibling not_run, retains both outcomes, and emits no late final."
+        }
+      ],
+      "live_text_cases": []
     }
   ]
 }

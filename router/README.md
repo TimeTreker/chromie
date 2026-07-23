@@ -1,12 +1,22 @@
 # Chromie Router
 
-`chromie-router` is a CPU-only routing service on port `8091` by default. It is
-Chromie's robot-brain router: it turns user text and bounded session context
-into a validated `RouteDecision` that lets downstream agents produce voice
-and/or body actions. It never opens audio devices, performs speech recognition
-or synthesis, invokes skills, or controls hardware.
+`chromie-router` is the current CPU-only compatibility routing service on port
+`8091` by default. It turns user text and bounded session context into a
+validated `RouteDecision` for current downstream consumers. It is neither the
+robot's brain nor the target semantic-planning authority. It never opens audio
+devices, performs speech recognition or synthesis, invokes skills, or controls
+hardware.
 
-## Processing modes
+The target ingress boundary is the
+[Cognitive Gateway / 认知网关](../docs/COGNITIVE_GATEWAY.md). The current Router
+mixes some Gateway-like input, reflex, and attention work with legacy semantic
+classification and compatibility route production. The architecture therefore
+does not treat `Cognitive Gateway` as a cosmetic rename of this service, and it
+does not claim that the full target boundary is implemented. Its deterministic
+priority rules now reuse the same shared `ReflexFilter`/`ReflexOutcome` contract
+as the host; the remaining Gateway/Core separation is open.
+
+## Current compatibility processing modes
 
 ```text
 text + bounded context
@@ -58,6 +68,12 @@ model mistake. The review model may correct it semantically; if review fails,
 Router falls back to safe chat instead of stopping, ignoring, or executing
 catalog motion. Low-confidence normal decisions delegate to `deep_thought`
 rather than being recovered by a catalog action rule.
+
+In the target architecture, ordinary intent and goal understanding, capability
+selection, planning, result reconciliation, and final response composition
+belong to the Goal-Driven Cognitive Core, not the Cognitive Gateway. The stages,
+routes, and `RouteDecision` described below remain current compatibility
+interfaces until a separately evidenced migration replaces them.
 
 Inactive ambient suppression uses a separate structured addressedness contract.
 That classifier must identify the speech act as well as addressedness and

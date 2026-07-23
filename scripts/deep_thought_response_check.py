@@ -176,7 +176,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
     errors: list[str] = []
     sid = assistant.create_session()
     try:
-        await assistant.handle_routed_text(args.text, sid)
+        await assistant.handle_routed_text(args.text, sid, channel="text")
         try:
             await _wait_for_session_done(assistant, sid, timeout_s=args.timeout_s)
         except Exception as exc:

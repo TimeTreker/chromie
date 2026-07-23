@@ -921,6 +921,50 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("Done.", [item["text"] for item in spoken])
 
+    async def test_cognitive_body_failure_defers_terminal_speech_to_turn_closure(
+        self,
+    ) -> None:
+        spoken: list[dict[str, Any]] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(args) or {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(
+                execute_outcome=ToolCallOutcome.success(
+                    {"completed": False, "skill_id": "nod_yes"}
+                )
+            ),
+        )
+
+        result = await coordinator.execute(
+            InteractionResponse(
+                speech=[
+                    {"text": "Starting.", "timing": "immediate"},
+                    {"text": "Done.", "timing": "after_skills"},
+                ],
+                skills=[
+                    {
+                        "request_id": "nod-cognitive",
+                        "skill_id": "soridormi.nod_yes",
+                    }
+                ],
+                metadata={
+                    "language": "en-US",
+                    "cognitive_runtime_apply": True,
+                    "canonical_plan": {"plan_id": "plan-cognitive"},
+                },
+            ),
+            session_id="sid-cognitive-failure",
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual([item["text"] for item in spoken], ["Starting."])
+        self.assertFalse(
+            any(
+                item["metadata"].get("source")
+                == "host_body_failure_fallback"
+                for item in spoken
+            )
+        )
+
     async def test_timed_out_body_skill_uses_language_matched_fallback(self) -> None:
         spoken: list[str] = []
         coordinator = InteractionRuntimeCoordinator(

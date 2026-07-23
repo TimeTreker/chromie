@@ -7,6 +7,11 @@ Routing, observation, schema validation, skill adaptation, confirmation, and
 execution may involve multiple components, but they must not independently
 reinterpret the same user goal after an authoritative planner has started.
 
+The Cognitive Gateway precedes this semantic boundary. It owns ingress,
+protective reflexes, and attention/admission, but not goal meaning or planning.
+The Goal-Driven Cognitive Core, implemented today by the unified Goal-driven
+Runtime for acquired lanes, is the semantic planning authority.
+
 This boundary is separate from robot validation. It can be automatically
 verified without a GPU, Ollama, Soridormi, MuJoCo, a microphone, or physical
 hardware. Live services are still required to validate model quality and robot
@@ -22,20 +27,32 @@ owner and one of three roles:
 - `adapter`: may validate and materialize an already-selected exact action but
   cannot reinterpret the utterance.
 
-After the Goal-driven Runtime acquires authoritative ownership, any planning,
-composition, host-validation, or state-commit failure is fail-closed. The same
-turn cannot re-enter the legacy CapabilityAgent planner.
+After the Goal-Driven Cognitive Core's current Goal-driven Runtime acquires
+authoritative ownership, any planning, composition, host-validation, or
+state-commit failure is fail-closed. The same turn cannot re-enter the legacy
+CapabilityAgent planner.
+
+## Current compatibility boundary
+
+The service currently named Router has not yet been reduced to the narrow
+Cognitive Gateway role. It still performs the deployed emergency filter and
+addressedness review and also emits semantic/advisory route, intent, affordance,
+route-item, action, and task proposals. Those fields remain compatibility
+inputs, including the current lane and source-effect envelope; they are not a
+second semantic plan after the Goal-driven Runtime acquires a turn. Renaming the
+conceptual boundary therefore does not claim that the service migration is
+complete.
 
 ## Entrypoint ownership
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-driven Runtime | authoritative | Goal Association → Fast Planner → terminal Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
+| Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Association → Fast Planner → terminal Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
 | Orchestrator turn in `apply`; mapped route lane is excluded | Existing routed Agent path | authoritative | The compatibility path selected before Goal-driven ownership; exact Router actions remain adapter-only | Goal-driven Runtime never acquires this turn. |
-| Orchestrator turn in `report_only` | Goal-driven Runtime | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
+| Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
 | Agent `/interaction` or `/run` with exact Router `actions[]` | No new semantic planner; Router-action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
-| Post-interrupt correction in `apply`; corrected mapped lane is allowlisted | Goal-driven Runtime | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
+| Post-interrupt correction in `apply`; corrected mapped lane is allowlisted | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
 | Post-interrupt correction in `apply`; corrected mapped lane is excluded | Existing post-interrupt Agent path | authoritative | Compatibility handling selected before Goal-driven ownership; exact actions remain adapter-only and physical resume stays locked | Goal-driven Runtime never acquires this correction. |
 
 `GET /semantic-authority` exposes the same machine-readable route matrix from
@@ -68,13 +85,15 @@ The maintained launcher and common profiles set both gates to `0`.
 
 ## Disabled lanes versus failed authoritative turns
 
-The Orchestrator first maps Router routes to semantic lanes: `chat`, `clarify`,
-and `deep_thought` map to `chat`; `robot_action`, `tool`, and `memory` retain
-their lane names; everything else maps to `unsupported`. A mapped lane excluded
-by `ORCH_COGNITIVE_APPLY_LANES` stays on the existing routed Agent path before
-the Goal-driven Runtime starts. Exact Router actions on that path are still
+In the current compatibility topology, the Orchestrator first maps Router
+routes to semantic lanes: `chat`, `clarify`, and `deep_thought` map to `chat`;
+`robot_action`, `tool`, and `memory` retain their lane names; everything else
+maps to `unsupported`. A mapped lane excluded by
+`ORCH_COGNITIVE_APPLY_LANES` stays on the existing routed Agent path before the
+Goal-driven Runtime starts. Exact Router actions on that path are still
 adapter-only, and the old CapabilityAgent semantic planner still needs its
-explicit emergency gates and turn claim.
+explicit emergency gates and turn claim. This compatibility lane mapping does
+not make the Cognitive Gateway the owner of goal meaning.
 
 Once Goal Association begins under authoritative `apply`, there is no
 same-turn compatibility fallback. Technical failure, terminal-lane mismatch,

@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "id": "active_stop_cancel_retains_outcome",
+  "suite": "cognitive_turn_loop",
+  "level": "integration",
+  "description": "A deterministic stop reflex cancels an active Skill Runtime request, leaves the queued sibling not_run, retains both outcomes, and emits no stale final.",
+  "tags": ["level-a", "stop", "cancel", "skill-runtime", "evidence-retention"],
+  "input": {
+    "text": "Run the long first task and then the second task.",
+    "language": "en-US"
+  },
+  "stub": {
+    "execution_mode": "active_cancel",
+    "stop_text": "Stop now.",
+    "capabilities": [
+      {
+        "skill_id": "chromie.scenario.long_first",
+        "provider_id": "scenario.blocking",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+        "output_schema": {
+          "type": "object",
+          "properties": {"summary": {"type": "string"}},
+          "additionalProperties": false
+        },
+        "interruptible": true
+      },
+      {
+        "skill_id": "chromie.scenario.queued_second",
+        "provider_id": "scenario.blocking",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+        "output_schema": {
+          "type": "object",
+          "properties": {"summary": {"type": "string"}},
+          "additionalProperties": false
+        },
+        "interruptible": true
+      }
+    ],
+    "plan": {
+      "plan_id": "plan-level-a-active-cancel",
+      "planner_tier": "fast",
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 0.99,
+      "goal_ids": ["goal-active", "goal-queued"],
+      "goal_summary": "Run two sequential cancellable tasks.",
+      "steps": [
+        {
+          "step_id": "active-first",
+          "skill_id": "chromie.scenario.long_first",
+          "args": {},
+          "timing": "sequential",
+          "source_goal_ids": ["goal-active"]
+        },
+        {
+          "step_id": "queued-second",
+          "skill_id": "chromie.scenario.queued_second",
+          "args": {},
+          "timing": "sequential",
+          "source_goal_ids": ["goal-queued"]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-active",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": ["active-first"]
+        },
+        {
+          "goal_id": "goal-queued",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": ["queued-second"]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": ["goal-active", "goal-queued"]
+      }
+    }
+  },
+  "expect": {
+    "admission": "admit",
+    "original_input_preserved": true,
+    "turn_identity_preserved": true,
+    "runtime_status": "cancelled",
+    "aggregate_status": "failed",
+    "evidence_statuses": ["cancelled", "not_run"],
+    "goal_statuses": ["cancelled", "not_run"],
+    "goal_state_statuses": ["cancelled", "failed"],
+    "goal_state_outcome_statuses": ["cancelled", "not_run"],
+    "closure_status": "suppressed_stale",
+    "delivery_status": "suppressed",
+    "suppression_reason": "stale_turn",
+    "final_response_absent": true,
+    "final_speech_only": false,
+    "final_speech_count": 0,
+    "final_goal_statuses": [],
+    "final_skill_ids": [],
+    "runtime_call_count": 1,
+    "stop_admission": "reflex_and_admit",
+    "stop_reflex_action": "interrupt",
+    "provider_cancelled_step_ids": ["active-first"]
+  }
+}

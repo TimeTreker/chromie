@@ -26,12 +26,15 @@ environment-specific evidence work rather than inferred release claims.
 
 > **Current state:** the Goal-driven Runtime is implemented as Chromie's single
 > semantic authority: Goal Association -> Fast/terminal Deep Planning ->
-> Response Composition -> trusted host adaptation. It is automatically verified
-> and defaults to authoritative chat in the common safe base; the maintained
-> Soridormi launcher widens authority to simulator robot actions. Historical M13
-> evidence remains valid only for its recorded legacy revisions. A clean live
-> rerun of the current authority path is still required before target validation
-> or publication of the blocked `0.0.1` candidate. See
+> prospective Response Composition -> trusted execution -> deterministic
+> per-goal outcome reconciliation -> speech-only final response. A frozen
+> `UserTurnEnvelope` now preserves the admitted Gateway input through this loop.
+> The contracts and host path are automatically verified and default to
+> authoritative chat in the common safe base; the maintained Soridormi launcher
+> widens authority to simulator robot actions. Historical M13 evidence remains
+> valid only for its recorded legacy revisions. A clean live rerun of the
+> current authority path is still required before target validation or
+> publication of the blocked `0.0.1` candidate. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
@@ -40,16 +43,31 @@ environment-specific evidence work rather than inferred release claims.
 
 ```text
 Host Orchestrator
-  microphone -> VAD -> ASR -> Router
-    -> Goal Association -> Fast Planner -> terminal Deep Planner when needed
-    -> Response Composer -> strict InteractionResponse -> trusted Skill Runtime
-       -> speech -> TTS -> speaker
-       -> named skill -> Soridormi MCP
+  microphone -> VAD -> ASR -> Cognitive Gateway
+    |-> Protective Reflex -> immediate stop/cancel (no model wait)
+    `-> immutable admitted UserTurnEnvelope -> Goal-driven Cognitive Core
+        -> Goal Association -> Fast Planner -> terminal Deep Planner when needed
+        -> prospective Response Composer -> strict InteractionResponse
+        -> trusted Skill Runtime -> named skill -> Soridormi MCP
+        -> structured results and traces
+        -> exact plan/request/result join -> per-goal outcome reconciliation
+        -> speech-only final response -> TTS -> speaker
 
-Docker: ASR, Router, Agent, Ollama, TTS
+Docker: ASR, compatibility Router/Gateway backend, Agent, Ollama, TTS
 Soridormi: embodied planning, simulator/robot execution, monitoring, stop,
            emergency stop, recovery, and hardware commissioning
 ```
+
+The [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md) is an ingress boundary,
+not the semantic brain. It normalizes and admits turns, applies deterministic
+protective reflexes, reviews attention, and assembles bounded context. Goal
+meaning, capability grounding, planning, delegation, result reconciliation,
+and final response remain the responsibility of the Goal-driven Cognitive
+Core. The frozen version 1 `UserTurnEnvelope`, host admission adapter, local
+protective-reflex/suppression paths, and configured-lane Core projection are
+implemented. Physical extraction of the five logical Gateway modules is still
+open; the existing `router` service and `/route` API remain compatibility
+surfaces.
 
 Chromie never gives raw motor, joint, actuator, or torque controls to the
 language model. The legacy `hardware/` daemon is mock compatibility only.
@@ -67,9 +85,11 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
   clean shared-resource and blinded listening evidence;
 - sherpa-onnx SenseVoice as the single supported final-utterance ASR runtime,
   with immutable model provenance, CUDA/CPU providers, and startup warm-up;
-- deterministic stop, cancel, emergency, silence, and unusable-audio handling,
-  plus bounded model-assisted addressedness that can only suppress an inactive
-  ambient turn and fails open to normal routing;
+- a host-side Cognitive Gateway with a frozen immutable turn envelope,
+  deterministic stop/cancel/emergency recognition before Router or model
+  inference, deterministic local suppression, and bounded model-assisted
+  addressedness that can only suppress an inactive ambient turn and fails open
+  to admitted cognition;
 - three-stage route flow: emergency filter, Qwen quick intent routing, and
   larger-model deepthought handoff when quick confidence is low or planning is
   needed;
@@ -83,6 +103,10 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 - native strict `POST /interaction` plus explicit compatibility rollback;
 - trusted Skill Runtime with validation, confirmation, timeout, cancellation,
   bounded scheduling, and traces;
+- manager-owned effectful-turn closure that correlates exact immutable plans,
+  committed requests, schemas, results, and traces; retains exact per-goal
+  terminal outcomes; suppresses stale final speech; and emits a validated
+  speech-only result response;
 - request-bound spoken approval and denial;
 - Soridormi named-skill discovery and MuJoCo execution;
 - TaskGraph validation and gated read, planning, guarded, and physical-policy
@@ -192,7 +216,7 @@ documented in
 | Path | Responsibility |
 |---|---|
 | `orchestrator/` | Host audio, interruption, conversation state, and Skill Runtime |
-| `router/` | Deterministic and optional LLM routing |
+| `router/` | Compatibility Cognitive Gateway backend for attention review and advisory routing |
 | `agent/` | Native interaction, capabilities, and TaskGraph APIs |
 | `asr/`, `tts/` | Speech services |
 | `shared/` | Shared contracts and scheduling primitives |
@@ -205,6 +229,8 @@ documented in
 ## Read next
 
 - [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
+- [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md): input, reflex, attention, and turn-admission boundary
+- [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md): Core-managed delegation, evidence reconciliation, and final-response lifecycle
 - [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY_ARCHITECTURE.md): trace, event, episode, and scenario relationships
 - [Runtime Trace Contract](docs/RUNTIME_TRACE.md): architecture-independent trace-item schema and lifecycle
 - [Status](docs/STATUS.md): what exists and what is evidenced

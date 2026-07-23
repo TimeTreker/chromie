@@ -186,10 +186,10 @@ IDs.
 
 ## General Ability Text Probes
 
-Use the general ability runner for robot-brain text behavior that is not just a
-single motion skill: false-belief questions, compliments, discourse markers,
-unsupported requests, deep-thinking handoff, emergency stop, mixed speech/body
-cases, noisy ASR-like input, and Chinese/English ambiguity.
+Use the general ability runner for Cognitive Gateway/Core text behavior that is
+not just a single motion skill: false-belief questions, compliments, discourse
+markers, unsupported requests, deep-thinking handoff, emergency stop, mixed
+speech/body cases, noisy ASR-like input, and Chinese/English ambiguity.
 
 ```bash
 conda run -n Chromie python scripts/general_ability_acceptance.py --list

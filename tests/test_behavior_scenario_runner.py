@@ -22,11 +22,14 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         adapter_cases = load_scenarios(suites={"adapter"})
         dialogue_cases = load_scenarios(suites={"dialogue"})
         router_dialogue_cases = load_scenarios(suites={"router_dialogue"})
+        cognitive_turn_loop_cases = load_scenarios(
+            suites={"cognitive_turn_loop"}
+        )
         selected = load_scenarios(only={"router/normal_greeting"})
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 383)
+        self.assertEqual(len(all_cases), 388)
         self.assertEqual(len(adapter_cases), 4)
         self.assertEqual(len(router_cases), 24)
         self.assertEqual(len(router_dialogue_cases), 2)
@@ -34,6 +37,11 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertEqual(len(load_scenarios(suites={"interaction"})), 21)
         cognitive_cases = load_scenarios(suites={"cognitive_runtime"})
         self.assertEqual(len(cognitive_cases), 13)
+        self.assertEqual(len(cognitive_turn_loop_cases), 5)
+        self.assertIn(
+            "cognitive_turn_loop/active_stop_cancel_retains_outcome",
+            [case.key for case in cognitive_turn_loop_cases],
+        )
         self.assertIn(
             "cognitive_runtime/chat_turn_cannot_replay_completed_motion",
             [case.key for case in cognitive_cases],
@@ -162,6 +170,41 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertEqual(
             actual["llm_stages"],
             ["quick_intent", "addressedness_review"],
+        )
+
+    def test_cognitive_turn_loop_retains_outcomes_and_suppresses_unsafe_speech(
+        self,
+    ) -> None:
+        scenarios = load_scenarios(suites={"cognitive_turn_loop"})
+
+        report = run_scenarios_sync(scenarios)
+        cases = {case["id"]: case for case in report["cases"]}
+
+        self.assertTrue(report["ok"], report["cases"])
+        self.assertEqual(report["case_count"], 5)
+        self.assertEqual(report["passed"], 5)
+        self.assertEqual(
+            cases["admitted_mixed_completed_not_run_final"]["actual"][
+                "evidence_statuses"
+            ],
+            ["completed", "not_run"],
+        )
+        self.assertEqual(
+            cases["schema_unavailable_output_not_spoken"]["actual"][
+                "observation_statuses"
+            ],
+            ["schema_unavailable"],
+        )
+        self.assertTrue(
+            cases["newer_turn_suppresses_stale_final"]["actual"][
+                "final_response_absent"
+            ]
+        )
+        self.assertEqual(
+            cases["active_stop_cancel_retains_outcome"]["actual"][
+                "provider_cancelled_step_ids"
+            ],
+            ["active-first"],
         )
 
     def test_dialogue_scenario_checks_extracted_memory_context(self) -> None:

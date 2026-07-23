@@ -139,6 +139,7 @@ class InteractionRuntimeCoordinator:
             if request.skill_id.startswith("soridormi.")
         ]
         optional_body_cue = bool(response.metadata.get("optional_body_cue"))
+        cognitive_effectful = self._is_cognitive_effectful(response)
         if raw_body_requests:
             if self.soridormi_invoker is None:
                 try:
@@ -148,7 +149,7 @@ class InteractionRuntimeCoordinator:
                         ),
                     )
                 except RuntimeError as exc:
-                    if optional_body_cue:
+                    if optional_body_cue or cognitive_effectful:
                         return await self._body_setup_failure(
                             response,
                             raw_body_requests,
@@ -171,7 +172,7 @@ class InteractionRuntimeCoordinator:
                     session_id=session_id,
                     reason_code="catalog_unavailable",
                     message=str(exc),
-                    suppress_speech=optional_body_cue,
+                    suppress_speech=optional_body_cue or cognitive_effectful,
                 )
 
         prepared = self.prepare_response(
@@ -180,6 +181,7 @@ class InteractionRuntimeCoordinator:
             confirmed_request_ids=confirmed_request_ids,
         )
         optional_body_cue = bool(prepared.metadata.get("optional_body_cue"))
+        cognitive_effectful = self._is_cognitive_effectful(prepared)
         body_requests = [
             request
             for request in prepared.skills
@@ -201,6 +203,7 @@ class InteractionRuntimeCoordinator:
                     "InteractionResponse requested a TaskGraph, but host "
                     "TaskGraph execution is disabled"
                 ),
+                suppress_speech=cognitive_effectful,
             )
         if body_requests:
             unavailable = [
@@ -216,7 +219,7 @@ class InteractionRuntimeCoordinator:
                     session_id=session_id,
                     reason_code="skill_unavailable",
                     message=definition.unavailable_reason or "unavailable",
-                    suppress_speech=optional_body_cue,
+                    suppress_speech=optional_body_cue or cognitive_effectful,
                 )
 
         authorized_request_ids = set(confirmed_request_ids or ())
@@ -289,11 +292,11 @@ class InteractionRuntimeCoordinator:
         if execution.status == "cancelled":
             return execution
         if failed_body_results:
-            if optional_body_cue:
+            if optional_body_cue or cognitive_effectful:
                 return execution
             recovery_confirmation = build_body_recovery_confirmation(
                 prepared,
-                failed_body_results,
+                body_results,
                 max_attempts=self.body_recovery_max_attempts,
                 timeout_s=self.body_recovery_confirmation_ttl_s,
                 language=str(prepared.metadata.get("language") or ""),
@@ -347,6 +350,15 @@ class InteractionRuntimeCoordinator:
                 ),
             )
         return execution
+
+    @staticmethod
+    def _is_cognitive_effectful(response: InteractionResponse) -> bool:
+        metadata = response.metadata
+        return bool(
+            metadata.get("cognitive_runtime_apply") is True
+            and isinstance(metadata.get("canonical_plan"), dict)
+            and response.skills
+        )
 
     def prepare_response(
         self,

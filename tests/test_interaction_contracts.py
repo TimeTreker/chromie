@@ -9,6 +9,7 @@ from shared.chromie_contracts.interaction import (
     SkillRequest,
     SkillResult,
     SkillTrace,
+    output_schema_sha256,
 )
 
 
@@ -72,6 +73,59 @@ class InteractionContractTests(unittest.TestCase):
             with self.subTest(payload=payload):
                 with self.assertRaisesRegex(ValidationError, "forbidden low-level field"):
                     SkillRequest(skill_id="soridormi.nod_yes", args=payload)
+
+    def test_low_level_field_name_variants_are_rejected(self) -> None:
+        variants = (
+            "motorCommand",
+            "motor command",
+            "motor-command",
+            "motor.command",
+            "RAWMotorCommands",
+            "raw motor commands",
+            "jointTargets",
+            "positions-by-name",
+            "actuator Ctrl",
+            "torque/commands",
+            "action14D",
+        )
+
+        for field_name in variants:
+            with self.subTest(field_name=field_name):
+                with self.assertRaisesRegex(
+                    ValidationError,
+                    "forbidden low-level field",
+                ):
+                    SkillResult(
+                        request_id="unsafe-result",
+                        skill_id="soridormi.unsafe",
+                        status="completed",
+                        output={"nested": {field_name: [0.0]}},
+                    )
+
+    def test_output_schema_commitment_is_digest_only_and_strictly_validated(
+        self,
+    ) -> None:
+        schema = {
+            "type": "object",
+            "properties": {"completed": {"type": "boolean"}},
+            "additionalProperties": False,
+        }
+        digest = output_schema_sha256(schema)
+        request = SkillRequest(
+            skill_id="soridormi.nod_yes",
+            committed_output_schema_sha256=digest,
+        )
+
+        restored = SkillRequest.model_validate_json(request.model_dump_json())
+
+        self.assertEqual(restored.committed_output_schema_sha256, digest)
+        self.assertEqual(len(digest), 64)
+        self.assertNotIn("properties", request.model_dump_json())
+        with self.assertRaises(ValidationError):
+            SkillRequest(
+                skill_id="soridormi.nod_yes",
+                committed_output_schema_sha256="not-a-sha256",
+            )
 
     def test_unknown_contract_fields_are_rejected(self) -> None:
         with self.assertRaises(ValidationError):

@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "id": "admitted_mixed_completed_not_run_final",
+  "suite": "cognitive_turn_loop",
+  "level": "integration",
+  "description": "One admitted two-goal turn retains its identity through a completed result, an explicit missing result, goal reconciliation, and one speech-only final.",
+  "tags": ["level-a", "turn-envelope", "mixed-outcome", "speech-only-final"],
+  "input": {
+    "text": "Run the first check and the second check.",
+    "language": "en-US"
+  },
+  "stub": {
+    "execution_mode": "scripted",
+    "runtime_status": "failed",
+    "capabilities": [
+      {
+        "skill_id": "chromie.scenario.first_check",
+        "provider_id": "scenario.checks",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+        "output_schema": {
+          "type": "object",
+          "properties": {"summary": {"type": "string"}},
+          "additionalProperties": false
+        }
+      },
+      {
+        "skill_id": "chromie.scenario.second_check",
+        "provider_id": "scenario.checks",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+        "output_schema": {
+          "type": "object",
+          "properties": {"summary": {"type": "string"}},
+          "additionalProperties": false
+        }
+      }
+    ],
+    "plan": {
+      "plan_id": "plan-level-a-mixed",
+      "planner_tier": "fast",
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 0.99,
+      "goal_ids": ["goal-first", "goal-second"],
+      "goal_summary": "Run two independent checks.",
+      "steps": [
+        {
+          "step_id": "step-first",
+          "skill_id": "chromie.scenario.first_check",
+          "args": {},
+          "timing": "sequential",
+          "source_goal_ids": ["goal-first"]
+        },
+        {
+          "step_id": "step-second",
+          "skill_id": "chromie.scenario.second_check",
+          "args": {},
+          "timing": "sequential",
+          "source_goal_ids": ["goal-second"]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-first",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": ["step-first"]
+        },
+        {
+          "goal_id": "goal-second",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": ["step-second"]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": ["goal-first", "goal-second"]
+      }
+    },
+    "results": [
+      {
+        "step_id": "step-first",
+        "status": "completed",
+        "output": {"summary": "The first check passed"}
+      }
+    ]
+  },
+  "expect": {
+    "admission": "admit",
+    "original_input_preserved": true,
+    "turn_identity_preserved": true,
+    "runtime_status": "failed",
+    "aggregate_status": "partial",
+    "evidence_statuses": ["completed", "not_run"],
+    "goal_statuses": ["completed", "not_run"],
+    "observation_statuses": ["available", null],
+    "goal_state_statuses": ["done", "failed"],
+    "goal_state_outcome_statuses": ["completed", "not_run"],
+    "closure_status": "speech_runtime_completed",
+    "delivery_status": "speech_runtime_completed",
+    "suppression_reason": "",
+    "final_response_absent": false,
+    "final_speech_only": true,
+    "final_speech_count": 2,
+    "final_goal_statuses": ["completed", "not_run"],
+    "final_skill_ids": [],
+    "runtime_call_count": 2,
+    "final_speech_contains_all": ["The first check passed"]
+  }
+}

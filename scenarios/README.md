@@ -45,6 +45,7 @@ scenarios/
   interaction/      InteractionRuntime scenarios
   dialogue/         Multi-turn InteractionRuntime conversation scenarios
   cognitive_runtime/ Goal-driven planning and coordinated-response scenarios
+  cognitive_turn_loop/ Deterministic outcome-closure and cancellation scenarios
   templates/        Authoring templates, not executed as scenarios
 ```
 
@@ -177,6 +178,21 @@ python scripts/general_ability_acceptance.py \
   --ability-class multi_goal_daily_life \
   --no-write
 ```
+
+Run the focused evidence-bound cognitive turn-closure suite with:
+
+```bash
+python scripts/general_ability_acceptance.py \
+  --mode level-a \
+  --ability-class evidence_bound_cognitive_turn_closure \
+  --no-write
+```
+
+These turn-loop cases use the real turn envelope, canonical-plan runtime
+adapter, Skill Runtime cancellation path, outcome reconciler, goal-state
+commit, stale-turn gate, and final-response composer with deterministic
+providers. They are Level A synthetic integration evidence only; they do not
+prove a live model, microphone, speaker, simulator, or robot run.
 
 The retained cases cover supported sequential gestures, repeated identical
 skills, body action plus conversation, body action plus clarification,

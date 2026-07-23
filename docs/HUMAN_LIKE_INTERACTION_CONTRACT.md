@@ -1,8 +1,8 @@
 # Human-Like Interaction Contract
 
 This document is mandatory guidance for humans and coding agents changing
-Chromie's ASR, router, orchestrator, agent, tool, skill, speech, safety, or test
-behavior.
+Chromie's ASR, Cognitive Gateway, compatibility Router, Goal-Driven Cognitive
+Core, orchestrator, agent, tool, skill, speech, safety, or test behavior.
 
 Chromie should behave like a careful, natural robot companion. It must know the
 difference between what it heard, what it understood, what it can do, what it
@@ -17,7 +17,8 @@ do not patch only the exact sentence that exposed the problem. First identify
 which interaction contract was violated:
 
 - Did ASR provide an uncertain hypothesis that was treated as truth?
-- Did the router substitute a nearby capability for unclear user meaning?
+- Did the compatibility Router or Cognitive Core substitute a nearby capability
+  for unclear user meaning?
 - Did fast-first speech and final speech both answer the same conversational act?
 - Did an agent claim an action or tool result that had not been committed?
 - Did internal state-machine text leak to the user?
@@ -73,8 +74,12 @@ Classify the root cause before choosing a fix:
 
 - **ASR/audio** - the transcript is wrong, uncertain, clipped, duplicated, or
   over-trusted.
-- **Router/intent** - the route, intent, confidence, or affordance grounding is
-  wrong.
+- **Cognitive Gateway/ingress** - normalization, protective reflex, attention,
+  or turn admission is wrong. Current traces may expose this through the
+  compatibility Router.
+- **Cognitive Core/goal meaning** - goal association, intent, decomposition,
+  planning, affordance grounding, or outcome synthesis is wrong. During
+  migration, some advisory route/intent output still originates in the Router.
 - **Agent contract** - the model is allowed to invent speech acts, tool results,
   skill proposals, or physical execution claims.
 - **Prompt wording** - the state and authority are correct, but the generated
@@ -103,7 +108,7 @@ notes must state:
 ```text
 Observed failure: <exact user/ASR text and wrong visible behavior>
 Expected contract: <what Chromie should have done>
-Earliest wrong component: <ASR/router/agent/orchestrator/runtime/provider/test>
+Earliest wrong component: <ASR/gateway/core/router-compat/agent/orchestrator/runtime/provider/test>
 Fix class: <architecture/contract-schema/prompt/runtime-policy/test-evidence>
 Regression boundary: <trace replay, black-box interaction, integration, or unit>
 Evidence level: <live trace, retained trace, Level A, Level B/C/D, or not run>
@@ -132,8 +137,8 @@ Use a prompt-only fix only when all of these are true:
 Use an architecture or policy fix when any of these are true:
 
 - Multiple modules can independently speak for the same turn.
-- A downstream agent can reinterpret a router clarification or refusal as an
-  action.
+- A downstream agent can reinterpret a Gateway admission decision or a
+  compatibility Router clarification/refusal as an action.
 - Fast-first speech is not known to the final response generator.
 - Internal markers such as `checking_only` can reach TTS.
 - ASR homophones, clipped speech, or low-information text are treated as
@@ -182,14 +187,29 @@ Examples:
 A good response is natural and specific, for example asking whether the user
 meant weather, without pretending the meaning was already known.
 
-## Router and affordance grounding
+## Cognitive Gateway and Cognitive Core
 
-The router proposes interpretations. It is not final semantic authority.
+The Cognitive Gateway owns the narrow ingress contract: preserve and normalize
+the input, apply urgent deterministic protective reflexes, review bounded
+attention/admission evidence, and forward an auditable turn envelope. It does
+not decide the final user goal, decompose work, choose a semantic plan, or
+compose the answer. A stop or emergency command is both an input and an urgent
+control: the safe effect happens first, without waiting for model reasoning,
+and the control outcome remains available to later cognition and response.
 
-The router should use the live tool and skill catalog as affordance grounding,
-not phrase tables. However, catalog presence does not justify weak substitution.
-A capability may be selected only when the user intent and required arguments
-are sufficiently supported.
+The Goal-Driven Cognitive Core owns goal association and meaning, independent
+goal segmentation, planning, semantic agent/tool coordination, outcome
+reconciliation, and response composition. It should use the live tool and skill
+catalog as affordance grounding, not phrase tables. Catalog presence does not
+justify weak substitution: a capability may be selected only when user meaning
+and required arguments are sufficiently supported.
+
+The deployed Router remains a compatibility implementation. It currently
+combines Gateway-like emergency and addressedness handling with semantic,
+advisory route/intent, affordance, and task proposals. Preserve that fact in
+traces and tests, but do not treat its service name or advisory output as final
+semantic authority for a turn acquired by the Goal-driven Runtime. The
+Gateway/Core migration is not complete.
 
 If no matching capability exists, Chromie should say what is missing or ask a
 clarifying question. It should not substitute a vaguely related skill or tool.
@@ -376,10 +396,12 @@ unit test passed" when that is all that was tested.
 Before submitting a fix for a user-visible interaction problem, write down:
 
 1. What did the user actually say, and what did ASR produce?
-2. What meaning did the router propose?
-3. What uncertainty or missing argument existed?
-4. Which component first violated the human-like interaction contract?
-5. Which later component amplified the bad behavior?
-6. Was the failure caused by missing architecture/policy, or only by wording?
-7. What test would have caught this before a user heard it?
-8. Does the fix generalize beyond the exact phrase in the report?
+2. What reflex or admission decision did the Cognitive Gateway make?
+3. What advisory route/intent did the compatibility Router propose, and what
+   goal meaning did the Cognitive Core resolve?
+4. What uncertainty or missing argument existed?
+5. Which component first violated the human-like interaction contract?
+6. Which later component amplified the bad behavior?
+7. Was the failure caused by missing architecture/policy, or only by wording?
+8. What test would have caught this before a user heard it?
+9. Does the fix generalize beyond the exact phrase in the report?

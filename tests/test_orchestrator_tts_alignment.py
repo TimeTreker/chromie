@@ -1386,6 +1386,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 return SkillRuntimeResult(
                     interaction_id=response.interaction_id,
                     status="completed",
+                    results=[
+                        SkillResult(
+                            request_id=response.speech[0].id,
+                            skill_id="chromie.speak",
+                            status="completed",
+                            output={"playback_started": True},
+                        )
+                    ],
                 )
 
         assistant.reset_playback_ordering = MethodType(reset_playback_ordering, assistant)
@@ -1431,6 +1439,50 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent_records[-1].metadata["source"], "host_body_recovery_confirmation")
         self.assertEqual(len(execute_calls), 2)
         self.assertEqual(execute_calls[-1].speech[0].metadata["source"], "host_body_recovery_confirmation")
+
+    async def test_scheduled_confirmation_without_playback_is_not_history(
+        self,
+    ) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        recorded: list[InteractionResponse] = []
+
+        class _ConversationState:
+            def record_agent_result(
+                self,
+                sid: str | None,
+                response: InteractionResponse,
+            ) -> None:
+                del sid
+                recorded.append(response)
+
+        assistant.conversation_state = _ConversationState()
+        assistant.session_log = lambda *args, **kwargs: None
+        response = assistant._host_speech_response(
+            "Please confirm.",
+            style="confirm",
+        )
+        execution = SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="completed",
+            results=[
+                SkillResult(
+                    request_id=response.speech[0].id,
+                    skill_id="chromie.speak",
+                    status="completed",
+                    output={"scheduled": True},
+                )
+            ],
+        )
+
+        delivered = assistant._record_successfully_delivered_speech(
+            response,
+            execution,
+            session_id="sid-confirmation-failed",
+            log_event="test_confirmation_history",
+        )
+
+        self.assertEqual(delivered, 0)
+        self.assertEqual(recorded, [])
 
     async def test_interaction_speech_can_wait_until_playback_starts(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

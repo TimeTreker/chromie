@@ -37,6 +37,10 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("truthful_embodied_speech", ability_ids)
         self.assertIn("evidence_coverage_and_claim_discipline", ability_ids)
         self.assertIn("multi_goal_daily_life", ability_ids)
+        self.assertIn(
+            "evidence_bound_cognitive_turn_closure",
+            ability_ids,
+        )
         self.assertEqual(validate_manifest(manifest), [])
         self.assertGreaterEqual(len(level_a_keys(manifest.ability_classes)), 20)
         live_ids = live_case_ids(manifest.ability_classes)
@@ -127,6 +131,30 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertTrue(summary["ok"], summary["errors"])
         self.assertEqual(summary["case_count"], 9)
         self.assertEqual(summary["passed"], 9)
+
+    def test_evidence_bound_cognitive_turn_closure_level_a_class_passes(
+        self,
+    ) -> None:
+        args = build_parser().parse_args(
+            [
+                "--mode",
+                "level-a",
+                "--ability-class",
+                "evidence_bound_cognitive_turn_closure",
+                "--no-write",
+            ]
+        )
+
+        summary = run_level_a(args)
+
+        self.assertTrue(summary["ok"], summary["errors"])
+        self.assertEqual(summary["evidence_level"], "A")
+        self.assertEqual(summary["case_count"], 5)
+        self.assertEqual(summary["passed"], 5)
+        self.assertIn(
+            "deterministic file-backed evidence",
+            summary["claim_scope"],
+        )
 
     def test_live_case_namespace_can_select_goal_driven_runtime(self) -> None:
         manifest = load_manifest(DEFAULT_MANIFEST)
@@ -313,7 +341,13 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertFalse(summary["user_outcome"]["ok"])
 
     def test_llm_truncation_fails_user_outcome_even_when_actions_complete(self) -> None:
-        case = load_manifest(DEFAULT_MANIFEST).ability_classes[-1].live_text_cases[0].case
+        manifest = load_manifest(DEFAULT_MANIFEST)
+        ability = next(
+            item
+            for item in manifest.ability_classes
+            if item.ability_id == "multi_goal_daily_life"
+        )
+        case = ability.live_text_cases[0].case
         summary = {
             "route": {"route": "robot_action"},
             "interaction_response": {"skills": [], "speech": [{"text": "Done."}]},

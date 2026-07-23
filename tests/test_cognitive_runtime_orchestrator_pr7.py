@@ -4,6 +4,7 @@ import asyncio
 import unittest
 
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.cognitive_gateway import GatewayCoreCompatibilityAdapter
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.interaction import InteractionResponse
@@ -84,6 +85,18 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             source="llm",
             language="zh-CN",
         )
+        gateway = GatewayCoreCompatibilityAdapter()
+        capture = gateway.capture(
+            "你好。",
+            session_id="sid",
+            conversation_id="conversation-test",
+            channel="text",
+        )
+        turn_envelope = gateway.for_route(
+            capture,
+            context={"history": []},
+            decision=decision,
+        )
 
         async def run():
             handled, returned = await assistant._try_apply_cognitive_runtime(
@@ -93,6 +106,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 context={"history": []},
                 decision=decision,
                 router_latency_ms=10.0,
+                turn_envelope=turn_envelope,
             )
             self.assertTrue(handled)
             self.assertEqual(returned.route, "chat")
@@ -102,6 +116,23 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(len(assistant.conversation_state.user_turns), 1)
         self.assertEqual(len(assistant.conversation_state.agent_results), 1)
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
+        prepared_response = assistant.interaction_runtime.prepared[0][0]
+        self.assertEqual(prepared_response.metadata["turn_id"], "sid")
+        self.assertEqual(
+            prepared_response.metadata["user_turn_envelope_schema_version"],
+            1,
+        )
+        self.assertEqual(
+            prepared_response.metadata["user_turn_envelope"]["turn_id"],
+            "sid",
+        )
+        recorded_metadata = assistant.conversation_state.user_turns[0][1][
+            "metadata"
+        ]
+        self.assertEqual(
+            recorded_metadata["user_turn_envelope"]["turn_id"],
+            "sid",
+        )
 
     def test_chat_lane_includes_clarify_and_deep_thought_routes(self):
         for route in ("clarify", "deep_thought"):

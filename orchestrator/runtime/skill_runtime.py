@@ -271,6 +271,16 @@ class SkillRuntime:
                     traces.extend(batch_traces)
                     pending_parallel = []
                     if any(
+                        self._is_runtime_cancellation(result)
+                        for result in batch_results
+                    ):
+                        return SkillRuntimeResult(
+                            interaction_id=response.interaction_id,
+                            status="cancelled",
+                            results=results,
+                            traces=traces,
+                        )
+                    if any(
                         self._failure_blocks_following_requests(item, result)
                         for (item, _), result in zip(
                             parallel_items, batch_results, strict=True
@@ -285,6 +295,13 @@ class SkillRuntime:
                 )
                 results.append(result)
                 traces.append(trace)
+                if self._is_runtime_cancellation(result):
+                    return SkillRuntimeResult(
+                        interaction_id=response.interaction_id,
+                        status="cancelled",
+                        results=results,
+                        traces=traces,
+                    )
                 if self._failure_blocks_following_requests(request, result):
                     break
             if pending_parallel:
@@ -295,6 +312,16 @@ class SkillRuntime:
                 )
                 results.extend(batch_results)
                 traces.extend(batch_traces)
+                if any(
+                    self._is_runtime_cancellation(result)
+                    for result in batch_results
+                ):
+                    return SkillRuntimeResult(
+                        interaction_id=response.interaction_id,
+                        status="cancelled",
+                        results=results,
+                        traces=traces,
+                    )
         except asyncio.CancelledError:
             await asyncio.shield(
                 self.cancel_interaction(response.interaction_id)
@@ -306,7 +333,11 @@ class SkillRuntime:
                 traces=traces,
             )
 
-        status = "completed" if all(result.status == "completed" for result in results) else "failed"
+        status = (
+            "completed"
+            if all(result.status == "completed" for result in results)
+            else "failed"
+        )
         return SkillRuntimeResult(
             interaction_id=response.interaction_id,
             status=status,
@@ -332,6 +363,13 @@ class SkillRuntime:
             isinstance(metadata, dict)
             and metadata.get("abort_remaining_on_failure") is True
             and result.status != "completed"
+        )
+
+    @staticmethod
+    def _is_runtime_cancellation(result: SkillResult) -> bool:
+        return (
+            result.status == "cancelled"
+            and result.reason_code == "cancelled"
         )
 
     async def cancel_all(self) -> None:
@@ -448,12 +486,61 @@ class SkillRuntime:
         items: list[tuple[SkillRequest, SkillDefinition]],
         authorization: RuntimeAuthorization,
     ) -> tuple[list[SkillResult], list[SkillTrace]]:
-        completed = await asyncio.gather(
-            *(
-                self._run_one(interaction_id, request, definition, authorization)
-                for request, definition in items
+        tasks = [
+            asyncio.create_task(
+                self._run_one(
+                    interaction_id,
+                    request,
+                    definition,
+                    authorization,
+                )
             )
-        )
+            for request, definition in items
+        ]
+        try:
+            completed = await asyncio.gather(*tasks)
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
+            completed_or_errors = await asyncio.shield(
+                asyncio.gather(*tasks, return_exceptions=True)
+            )
+            completed = []
+            for (
+                request,
+                definition,
+            ), item in zip(items, completed_or_errors, strict=True):
+                if isinstance(item, asyncio.CancelledError):
+                    finished_at = datetime.now(timezone.utc)
+                    trace = SkillTrace(
+                        interaction_id=interaction_id,
+                        request_id=request.request_id,
+                        skill_id=request.skill_id,
+                        provider_id=definition.provider_id,
+                        status="cancelled",
+                        events=[
+                            SkillTraceEvent(type="validated"),
+                            SkillTraceEvent(type="cancelled"),
+                        ],
+                        finished_at=finished_at,
+                    )
+                    result = SkillResult(
+                        request_id=request.request_id,
+                        skill_id=request.skill_id,
+                        skill_version=definition.version,
+                        status="cancelled",
+                        provider_id=definition.provider_id,
+                        reason_code="cancelled",
+                        message="skill execution was cancelled",
+                        trace_id=trace.trace_id,
+                        started_at=trace.started_at,
+                        finished_at=finished_at,
+                    )
+                    completed.append((result, trace))
+                    continue
+                if isinstance(item, BaseException):
+                    raise item
+                completed.append(item)
         return [item[0] for item in completed], [item[1] for item in completed]
 
     async def _run_one(
@@ -517,8 +604,9 @@ class SkillRuntime:
                 ),
             )
         except asyncio.CancelledError:
+            cancel_error: str | None = None
             if request.cancellable and definition.interruptible:
-                await asyncio.shield(
+                cancel_error = await asyncio.shield(
                     self._cancel_provider(
                         provider,
                         request,
@@ -526,10 +614,22 @@ class SkillRuntime:
                         context,
                     )
                 )
-            trace.status = "cancelled"
-            trace.finished_at = datetime.now(timezone.utc)
-            trace.events.append(SkillTraceEvent(type="cancelled"))
-            raise
+            result = SkillResult(
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                skill_version=definition.version,
+                status="cancelled",
+                provider_id=definition.provider_id,
+                reason_code="cancelled",
+                message=(
+                    "skill execution was cancelled"
+                    + (
+                        f"; provider cancellation failed: {cancel_error}"
+                        if cancel_error
+                        else ""
+                    )
+                ),
+            )
         except Exception as exc:
             result = SkillResult(
                 request_id=request.request_id,
@@ -547,6 +647,10 @@ class SkillRuntime:
         result.trace_id = trace.trace_id
         trace.status = result.status
         trace.finished_at = datetime.now(timezone.utc)
+        if result.started_at is None:
+            result.started_at = trace.started_at
+        if result.finished_at is None:
+            result.finished_at = trace.finished_at
         trace.events.append(
             SkillTraceEvent(
                 type=result.status,

@@ -12,11 +12,16 @@ from typing import Any, Awaitable, Callable, Literal, Protocol
 from agent.app.capabilities.validator import validate_args_for_schema
 from pydantic import BaseModel, ConfigDict, Field
 
+from shared.chromie_contracts.execution_outcome import (
+    ExecutionOutcomeBundle,
+    execution_outcome_fingerprint,
+)
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
     SkillRequest,
+    output_schema_sha256,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
@@ -24,6 +29,7 @@ from shared.chromie_contracts.response_composition import (
     ResponseCompositionResolution,
     canonical_plan_fingerprint,
 )
+from shared.chromie_contracts.user_turn import UserTurnEnvelope
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 CognitiveRuntimeMode = Literal["off", "report_only", "apply"]
@@ -61,6 +67,7 @@ class CognitiveRuntimeResolution(BaseModel):
     mode: CognitiveRuntimeMode
     status: CognitiveRuntimeStatus
     lane: CognitiveLane
+    turn_envelope: UserTurnEnvelope | None = None
     goal_association: GoalAssociationResolution | None = None
     fast_plan: CanonicalPlan | None = None
     terminal_plan: CanonicalPlan | None = None
@@ -166,6 +173,11 @@ class CognitiveEvidenceRecorder:
             "mode": resolution.mode,
             "status": resolution.status,
             "lane": resolution.lane,
+            "user_turn_envelope": (
+                resolution.turn_envelope.model_dump(mode="json")
+                if resolution.turn_envelope is not None
+                else None
+            ),
             "text_chars": len(text or ""),
             "text_sha256_16": self._text_digest(text),
             "goal_association": (
@@ -187,6 +199,41 @@ class CognitiveEvidenceRecorder:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+
+    def record_outcome(
+        self,
+        bundle: ExecutionOutcomeBundle,
+        *,
+        sid: str,
+        final_response: InteractionResponse | None,
+        delivery_status: str,
+        suppression_reason: str = "",
+        goal_state_results: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Append the trusted post-execution half of a cognitive turn."""
+
+        self.counters["outcome_bundles"] += 1
+        self.counters[f"outcome_status:{bundle.aggregate_status}"] += 1
+        self.counters[f"outcome_delivery:{delivery_status}"] += 1
+        if not self.enabled:
+            return
+        payload = {
+            "schema_version": 1,
+            "event": "cognitive_execution_outcome",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "sid": sid,
+            "outcome_fingerprint": execution_outcome_fingerprint(bundle),
+            "outcome_bundle": bundle.model_dump(mode="json", exclude_none=True),
+            "goal_state_results": list(goal_state_results or []),
+            "final_response": self._interaction_summary(final_response),
+            "delivery_status": delivery_status,
+            "suppression_reason": suppression_reason,
+        }
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n"
+            )
 
     @staticmethod
     def _plan_summary(plan: CanonicalPlan | None) -> dict[str, Any] | None:
@@ -338,6 +385,17 @@ class CanonicalPlanRuntimeAdapter:
                     }
                 )
                 continue
+            try:
+                output_schema_sha256(definition.output_schema)
+            except (TypeError, ValueError) as exc:
+                errors.append(
+                    {
+                        "type": "runtime_invalid_output_schema",
+                        "step_id": step.step_id,
+                        "skill_id": step.skill_id,
+                        "message": str(exc)[:160],
+                    }
+                )
             schema_errors = validate_args_for_schema(step.args, definition.input_schema)
             if schema_errors:
                 errors.append(
@@ -1023,6 +1081,9 @@ class CanonicalPlanRuntimeAdapter:
                         bool(definition.requires_confirmation) or alternative
                     ),
                     idempotency_key=f"{plan.plan_id}:{step.step_id}:{fingerprint[:16]}",
+                    committed_output_schema_sha256=output_schema_sha256(
+                        definition.output_schema
+                    ),
                     metadata={
                         "source": "goal_driven_canonical_plan",
                         "canonical_plan_id": plan.plan_id,
@@ -1292,7 +1353,37 @@ class GoalDrivenRuntimeCoordinator:
         context: dict[str, Any],
         history: list[dict[str, Any]],
         language: str,
+        turn_envelope: UserTurnEnvelope | None = None,
     ) -> CognitiveRuntimeResolution:
+        if turn_envelope is not None:
+            if turn_envelope.admission not in {"admit", "reflex_and_admit"}:
+                raise ValueError(
+                    "Goal-driven Runtime accepts only admitted UserTurnEnvelope "
+                    f"records, got {turn_envelope.admission}"
+                )
+            if str(sid or "").strip() != turn_envelope.session_id:
+                raise ValueError(
+                    "Goal-driven Runtime session does not match UserTurnEnvelope"
+                )
+            if " ".join((text or "").strip().split()) != (
+                turn_envelope.normalized_input.text
+            ):
+                raise ValueError(
+                    "Goal-driven Runtime text does not match UserTurnEnvelope"
+                )
+            text = turn_envelope.normalized_input.text
+            sid = turn_envelope.session_id
+            language = turn_envelope.normalized_input.language
+            context = {
+                **context,
+                "user_turn_envelope": turn_envelope.model_dump(mode="json"),
+                "turn_id": turn_envelope.turn_id,
+                "user_turn_schema_version": turn_envelope.schema_version,
+            }
+            envelope_history = context.get("history")
+            if isinstance(envelope_history, list):
+                history = list(envelope_history)
+
         experience = context.get("experience_context")
         if not isinstance(experience, dict):
             experience = {}
@@ -1326,7 +1417,7 @@ class GoalDrivenRuntimeCoordinator:
             sampling_reason="goal_driven_interaction",
         )
         if not trace_scope.enabled:
-            return await self._resolve(
+            resolution = await self._resolve(
                 session,
                 text=text,
                 sid=sid,
@@ -1335,6 +1426,11 @@ class GoalDrivenRuntimeCoordinator:
                 history=history,
                 language=language,
             )
+            if turn_envelope is not None:
+                resolution = resolution.model_copy(
+                    update={"turn_envelope": turn_envelope}
+                )
+            return resolution
         try:
             async with trace_scope:
                 async with runtime_tracer.span(
@@ -1352,6 +1448,10 @@ class GoalDrivenRuntimeCoordinator:
                         history=history,
                         language=language,
                     )
+                    if turn_envelope is not None:
+                        resolution = resolution.model_copy(
+                            update={"turn_envelope": turn_envelope}
+                        )
                     span.set_attribute("result_status", resolution.status)
                     span.set_attribute("lane", resolution.lane)
                     span.set_attribute(

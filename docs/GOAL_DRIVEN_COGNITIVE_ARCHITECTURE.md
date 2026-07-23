@@ -2,15 +2,25 @@
 
 Status: Maintained architecture constitution
 Scope: Chromie cognition, planning, interaction, validation, and execution
-Implementation state: Implemented through the unified PR1-PR8 cognitive runtime;
-retained live-text and MuJoCo evidence for that authoritative path remains open
+Implementation state: PR1-PR9 implement the maintained goal-association,
+planning, validation, pre-execution composition, trusted-execution, and
+post-execution closure path. A frozen version 1 Gateway-to-Core
+`UserTurnEnvelope`, exact immutable plan/request/result reconciliation,
+per-goal `ExecutionOutcomeBundle`, and speech-only final outcome response are
+integrated as defined by the
+[Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). Retained live-text and MuJoCo
+evidence for the authoritative path remains open. The logical Cognitive
+Gateway contract is active, but the current Router service still contains
+attention and compatibility semantics and has not completed physical
+decomposition.
 
 ## 1. Purpose
 
 Chromie has migrated its maintained semantic-planning path from a skill-routed
 interaction system to a goal-driven cognitive runtime. This document defines
-the architectural principles and contracts that current and future Router,
-Agent, memory, planning, social interaction, and execution work must follow.
+the Goal-Driven Cognitive Core and the principles and contracts that current and
+future Gateway, Router-compatibility, Agent, memory, planning, social
+interaction, and execution work must follow.
 
 The central change is simple:
 
@@ -21,6 +31,25 @@ This document is intentionally more stable than any individual prompt, model,
 service, or implementation. Models, prompts, and internal modules may change.
 The cognitive invariants defined here should change only through explicit
 architecture review.
+
+The Cognitive Gateway is immediately upstream of this Core. It owns normalized
+turn ingress, urgent deterministic protective reflexes, and bounded
+attention/admission review. It must preserve the original turn and relevant
+control evidence, but it does not own user-goal meaning, decomposition,
+planning, semantic agent coordination, outcome synthesis, or response
+composition. Those belong to the Goal-Driven Cognitive Core.
+
+The deployed Router is currently a compatibility implementation that spans both
+sides of this target boundary: it performs Gateway-like emergency and
+addressedness work and still emits semantic/advisory route, intent, affordance,
+action, and task proposals. Those outputs remain current migration inputs, not a
+claim that the Gateway/Core split is already complete.
+
+The executable state machine that carries one admitted turn through specialist
+delegation, trusted observations, per-goal reconciliation, and a final response
+is defined in [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). This constitution
+defines what cognition must preserve; the loop document defines when each
+contract is produced and consumed.
 
 ## 2. Motivation
 
@@ -128,10 +157,11 @@ preserves the user’s goal.
 ### 3.8.1 Single semantic authority
 
 For an enabled route, one turn has one authoritative semantic planner. In
-maintained `apply` mode that owner is the unified Goal-driven Runtime. Exact
-Router actions may be consumed only as compatibility-adapter input; they do not
-form a second semantic plan, and a turn acquired by the Goal-driven Runtime
-cannot fall through to the old CapabilityAgent planner after a failure.
+maintained `apply` mode that owner is the Goal-Driven Cognitive Core, currently
+implemented by the unified Goal-driven Runtime. Exact Router actions may be
+consumed only as compatibility-adapter input; they do not form a second semantic
+plan, and a turn acquired by the Goal-driven Runtime cannot fall through to the
+old CapabilityAgent planner after a failure.
 
 The old CapabilityAgent semantic planner is retained only as an explicit
 emergency path. It requires the host gate, the Agent gate, and an authoritative
@@ -321,7 +351,10 @@ core principles.
 ```text
 User Turn
   ↓
-Deterministic emergency / stop / audio-validity boundary
+Cognitive Gateway
+  ├─ preserve and normalize input
+  ├─ deterministic protective reflex: stop / cancel / emergency / audio validity
+  └─ bounded attention and turn admission
   ↓
 Bounded active-goal projection
   ↓
@@ -347,14 +380,32 @@ Deterministic Validator
   ├─ unavailable / refused → explain
   └─ structured rejection → bounded replan by originating tier
   ↓
+Pre-execution Response Plan + optional Social Attention Plan
+  ↓
 Skill Runtime / Tools / Memory / Soridormi
   ↓
-Execution Evidence
+ExecutionOutcomeBundle
   ↓
-Response Plan + optional Social Attention Plan
+Per-goal Outcome Reconciliation
+  ├─ close completed, failed, refused, timed-out, or cancelled goals
+  ├─ preserve partial and not-run outcomes
+  └─ request one bounded replan only when policy and authorization permit
+  ↓
+Evidence-bound Final Response
   ↓
 Experience and Scenario Mining
 ```
+
+The Gateway-to-Core handoff is an auditable turn envelope, not a completed
+semantic interpretation. A protective reflex may act immediately, before model
+inference, while preserving its input and outcome for cognitive state. Admitted
+turns reach Goal Association with the original user meaning intact.
+
+In the current deployment, the compatibility Router still supplies route and
+intent advisories, addressedness review, and task/action proposals before this
+pipeline. They may bound rollout lanes and the source-effect envelope, but they
+do not replace Goal Association or become a second authority after Core
+acquisition.
 
 ### 5.1 Model-facing Goal Association boundary
 
@@ -849,12 +900,13 @@ serve; optional social-attention requests never enter the primary user-goal
 lifecycle.
 
 Effect authority is also monotonic within one turn. The configured cognitive
-lane allowlist says which kinds of plans the deployment can support, but the
-current Router decision supplies the turn's maximum effect envelope. A
-speech-only `chat` turn cannot become `robot_action` after Goal Association or
-planning merely because both lanes are enabled. Such escalation stops at the
-authority boundary before Response Composition, capability validation, or any
-SkillRequest is emitted.
+lane allowlist says which kinds of plans the deployment can support. During the
+current migration, the compatibility Router decision supplies the turn's
+maximum source-effect envelope; that safety constraint is not semantic goal
+ownership. A speech-only `chat` turn cannot become `robot_action` after Goal
+Association or planning merely because both lanes are enabled. Such escalation
+stops at the authority boundary before Response Composition, capability
+validation, or any SkillRequest is emitted.
 
 For an accepted effectful plan, executable wording from the Response Composer
 is not treated as execution evidence. The trusted adapter derives a short
@@ -972,31 +1024,83 @@ Execution is owned by trusted runtimes:
 Execution never rewrites the user goal. Runtime observations may trigger a new
 plan version, but only the cognitive layer proposes a semantic goal change.
 
-Every committed step records:
+Every committed step records or binds:
 
-- request and plan IDs;
+- request, plan ID, and immutable plan fingerprint;
+- exact step skill/version, arguments, and execution timing;
 - goal and plan versions;
 - provider;
+- the full committed output-schema SHA-256 identity;
 - start and end state;
 - cancellation state;
 - result evidence;
 - failure reason;
 - resource and safety events.
 
+The host joins those records into an immutable `ExecutionOutcomeBundle` by
+canonical plan fingerprint, exact step skill/arguments/timing, request ID,
+source goal ID, result, and trace. An absent result is `not_run`, never inferred
+success. `partial` requires completed and unresolved work; heterogeneous
+all-uncompleted states aggregate conservatively while exact per-goal and
+per-step statuses remain present. Pre-action speech and auxiliary social
+attention cannot satisfy an effectful goal.
+
+Provider output may enter model-facing final composition only through a bounded
+projection that passes the declared non-empty output schema and low-level-field
+filter. Retained evidence keeps provenance and an output digest even when the
+model-facing projection is unavailable. Provider postcondition evidence such
+as Soridormi safe idle is recorded separately; it supports only the claims its
+contract proves.
+
 ## 15. Response architecture
 
-### 15.1 Response stages
+### 15.1 Pre-execution response
 
-A response plan may contain:
+Before effectful execution, a response plan may contain:
 
 - immediate low-commitment acknowledgement;
 - pre-action confirmation;
 - progress update;
-- final result;
 - clarification;
 - refusal or unavailable explanation.
 
-### 15.2 Claim validation
+Prospective planning output cannot contain a final completion claim.
+
+### 15.2 Post-execution response
+
+After execution, the host's deterministic closure reconciles every executable
+canonical goal against the `ExecutionOutcomeBundle` and commits the resulting
+goal state. The current conservative final composer receives the immutable plan
+and reconciled evidence. It returns speech only, with exact goal and evidence
+references. It cannot add a skill, action, retry, authorization, or goal
+change. A future model-assisted final composer must consume the same bounded
+contract and obey the same validator.
+
+The host validates that:
+
+- every relevant goal is covered exactly once;
+- every claimed outcome matches the reconciled goal status;
+- every evidence reference exists and belongs to that goal;
+- completion language is unavailable for partial, failed, timed-out, refused,
+  cancelled, or `not_run` outcomes;
+- a stale or preempted interaction cannot emit final speech.
+
+If outcome-response validation or composition fails, the host retains the
+trusted outcome bundle and emits no unvalidated completion claim. The current
+deterministic composer is itself the conservative language-matched status path.
+
+### 15.3 Recovery child plans
+
+A recoverable Soridormi failure may produce a retry proposal only by creating a
+new immutable child `CanonicalPlan` containing the failed recoverable subset.
+The child records the parent plan ID and fingerprint, receives its own plan
+fingerprint, new request/idempotency identities, and fresh request-bound
+confirmation. It then re-enters ordinary validation, execution, and
+reconciliation. Completed parent steps are neither mutated nor replayed; an
+invalid subset, non-recoverable sibling, exhausted budget, or missing
+confirmation means no retry.
+
+### 15.4 Claim validation
 
 Speech claims must be structurally tied to task and evidence state.
 
@@ -1007,7 +1111,7 @@ Examples:
 - “I’m walking” requires committed execution state.
 - “Done” requires completion evidence.
 
-### 15.3 Natural multi-goal composition
+### 15.5 Natural multi-goal composition
 
 The response composer may combine updates naturally:
 
@@ -1015,12 +1119,14 @@ The response composer may combine updates naturally:
 
 The individual goals remain separately tracked even when speech is consolidated.
 
-The model-facing composer contract contains only response stages, optional
-social attention, confidence, and rationale, with response coverage constrained
-to the immutable plan's Goal IDs. The host owns composition identity, the
-embedded canonical plan, and its fingerprint. Invalid model output may receive
-one bounded repair in the same composer stage using the exact schema and
-validation errors; it cannot trigger another semantic planner.
+The model-facing pre-execution composer contract contains only response stages,
+optional social attention, confidence, and rationale, with response coverage
+constrained to the immutable plan's Goal IDs. The post-execution contract
+contains only final text, exact goal/evidence claims, confidence, and rationale.
+The host owns both composition identities, the embedded canonical plan and
+fingerprint, and the execution-outcome fingerprint. Invalid model output may
+receive one bounded repair in the same composer stage using the exact schema
+and validation errors; it cannot trigger another semantic planner.
 
 ## 16. Scenario-driven development
 
@@ -1091,11 +1197,17 @@ The following patterns violate this architecture:
 
 ## 19. Implementation record
 
-This constitution was implemented through staged PR1-PR8 work. The stage
+This constitution was implemented through staged PR1-PR9 work. The stage
 descriptions below are an implementation record, not a statement that the
 maintained runtime still runs those components as independent report-only
 observers. Each stage began with retained scenarios and did not claim
 later-stage behavior.
+
+PR1-PR9 establish the Goal-Driven Cognitive Core and close one admitted
+effectful turn through evidence-bound final response. They do not establish
+that the current Router service has been fully decomposed into a narrow
+Cognitive Gateway or that target live behavior is qualified; those migrations
+and evidence claims are tracked separately.
 
 ### PR1 — Goal contracts and continuity projection
 
@@ -1249,6 +1361,46 @@ Exit criteria:
 - retained live-text and MuJoCo evidence is reviewed before target behavior is
   claimed.
 
+### PR9 — Cognitive turn closure
+
+Implementation status: integrated in the host manager path with focused
+automated contract and host-integration coverage. Retained provider-backed
+live-text, simulator, microphone, dedicated E-stop/safe-idle, and physical
+robot evidence remains open.
+
+This stage closes the two contract gaps around PR1-PR8 without redesigning its
+semantic planners:
+
+- a versioned `UserTurnEnvelope` is the preserved Gateway-to-Core input;
+- a compatibility adapter keeps current Router and Agent interfaces
+  behavior-preserving during migration;
+- a deterministic `ExecutionOutcomeBundle` joins exact canonical
+  step/skill/arguments/timing, committed requests/schema identity, and trusted
+  runtime results/traces to exact goal IDs;
+- outcome reconciliation updates goal state from evidence rather than
+  prospective planner output;
+- a deterministic post-execution composer produces one evidence-bound,
+  speech-only final response with no executable work;
+- cancellation and newer-turn preemption suppress stale final speech while
+  preserving outcome evidence;
+- recoverable retries create independently fingerprinted,
+  confirmation-bound child plans over only the failed recoverable subset.
+
+Exit criteria:
+
+- original input, reflex, attention, admission, and context provenance survive
+  the Gateway/Core boundary;
+- success, partial failure, refusal, timeout, cancellation, and missing results
+  are distinct per-goal outcomes;
+- unknown plan, goal, step, request, or evidence references fail closed;
+- provider output is model-visible only after declared-schema validation and
+  bounded low-level-field filtering;
+- effectful interactions produce at most one post-execution final response;
+- response-composition failure retains evidence and emits no unvalidated
+  completion claim;
+- no automated test is reported as live provider, simulator, microphone, or
+  physical-robot evidence.
+
 ## 20. Migration strategy
 
 Routes, route items, semantic tasks, and task proposal ledgers remain bounded
@@ -1257,6 +1409,14 @@ compatibility surfaces around the maintained Goal-driven Runtime.
 Migration rules:
 
 - do not delete current safety or evidence boundaries;
+- establish the Cognitive Gateway as a local, model-independent protective
+  reflex and bounded attention/admission boundary before removing Router
+  compatibility behavior;
+- move goal meaning, goal association, task decomposition, affordance grounding,
+  planning, semantic agent coordination, outcome synthesis, and response
+  composition behind the Goal-Driven Cognitive Core boundary;
+- preserve current Router route/intent and proposal fields as explicitly named
+  compatibility inputs until every consumer and regression boundary migrates;
 - introduce goal contracts alongside existing task contracts;
 - use `report_only` only for explicit observation or rollout diagnosis, not as
   the maintained authority mode;
@@ -1269,6 +1429,8 @@ Migration rules:
 
 The cognitive pipeline should record, without exposing private model reasoning:
 
+- normalized input identity, protective-reflex result, and admission decision;
+- compatibility Router advisories while that service topology remains;
 - goal-association result and confidence;
 - candidate goal IDs considered;
 - goal segmentation count;
@@ -1305,18 +1467,20 @@ This RFC does not claim:
 
 Every cognition-related pull request should answer:
 
-1. What user goal or relationship is preserved?
-2. Does the change associate before creating new goals?
-3. Can a compound goal be narrowed or partially executed?
-4. Which planner tier owns the semantic decision?
-5. Does the Deep Planner ever call the Fast Planner?
-6. Is the output a canonical plan?
-7. What does deterministic validation enforce?
-8. Are alternatives and confirmations version-bound?
-9. Are claims grounded in evidence?
-10. Is social behavior separated from user-task semantics?
-11. Which retained scenario failed before the change?
-12. What evidence supports the resulting claim?
+1. Is this ingress/reflex/attention work for the Cognitive Gateway, or semantic
+   goal/planning work for the Cognitive Core?
+2. What user goal or relationship is preserved?
+3. Does the change associate before creating new goals?
+4. Can a compound goal be narrowed or partially executed?
+5. Which planner tier owns the semantic decision?
+6. Does the Deep Planner ever call the Fast Planner?
+7. Is the output a canonical plan?
+8. What does deterministic validation enforce?
+9. Are alternatives and confirmations version-bound?
+10. Are claims grounded in evidence?
+11. Is social behavior separated from user-task semantics?
+12. Which retained scenario failed before the change?
+13. What evidence supports the resulting claim?
 
 ## 24. Definition of architectural success
 

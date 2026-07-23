@@ -14,6 +14,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from types import MethodType
 from typing import Any
 from unittest.mock import patch
 
@@ -26,6 +27,8 @@ from agent.app.capabilities.catalog import CapabilityMatch, CapabilitySearchResu
 from agent.app.interaction import AgentResultInteractionAdapter
 from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentResult, AgentRunRequest
+from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.cognitive_gateway import GatewayCoreCompatibilityAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.cognitive_runtime import (
@@ -33,8 +36,20 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
-from orchestrator.runtime.skill_runtime import SkillDefinition
+from orchestrator.runtime.session import SessionTracker
+from orchestrator.runtime.skill_runtime import (
+    LocalSpeechSkillProvider,
+    SkillDefinition,
+    SkillRegistry,
+    SkillRuntime,
+    SkillRuntimeResult,
+    local_speech_definition,
+)
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.interaction import (
+    InteractionResponse,
+    SkillResult,
+)
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
@@ -50,7 +65,7 @@ DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
 SUPPORTED_SUITES = {
     "router", "router_dialogue", "interaction", "dialogue", "adapter",
-    "cognitive_runtime",
+    "cognitive_runtime", "cognitive_turn_loop",
 }
 
 
@@ -277,6 +292,7 @@ class _CognitiveScenarioRuntime:
                 provider_id=str(item.get("provider_id") or "scenario.provider"),
                 description=str(item.get("description") or ""),
                 input_schema=dict(item.get("input_schema") or {}),
+                output_schema=dict(item.get("output_schema") or {}),
                 available=bool(item.get("available", True)),
                 unavailable_reason=item.get("unavailable_reason"),
                 requires_confirmation=bool(item.get("requires_confirmation", False)),
@@ -301,6 +317,228 @@ class _CognitiveScenarioRuntime:
             return self.definitions[skill_id]
         except KeyError as exc:
             raise ValueError(f"unknown scenario skill {skill_id!r}") from exc
+
+
+class _CognitiveTurnEvidenceRecorder:
+    def __init__(self) -> None:
+        self.outcomes: list[dict[str, Any]] = []
+
+    def record_outcome(self, bundle: Any, **kwargs: Any) -> None:
+        self.outcomes.append({"bundle": bundle, **kwargs})
+
+
+class _BlockingScenarioProvider:
+    def __init__(
+        self,
+        provider_id: str,
+        *,
+        started: asyncio.Event,
+        cancelled_request_ids: list[str],
+    ) -> None:
+        self.provider_id = provider_id
+        self.started = started
+        self.cancelled_request_ids = cancelled_request_ids
+
+    async def execute(
+        self,
+        request: Any,
+        definition: SkillDefinition,
+        context: Any,
+    ) -> SkillResult:
+        del definition, context
+        self.started.set()
+        await asyncio.Event().wait()
+        raise AssertionError(
+            f"blocking scenario request unexpectedly resumed: {request.request_id}"
+        )
+
+    async def cancel(
+        self,
+        request: Any,
+        definition: SkillDefinition,
+        context: Any,
+    ) -> None:
+        del definition, context
+        self.cancelled_request_ids.append(request.request_id)
+
+
+class _CognitiveTurnScenarioRuntime:
+    """Deterministic execution boundary for Level A turn-loop scenarios."""
+
+    def __init__(self, stub: dict[str, Any]) -> None:
+        catalog = _CognitiveScenarioRuntime(
+            list(stub.get("capabilities") or [])
+        )
+        self.definitions = catalog.definitions
+        self.stub = stub
+        self.mode = str(stub.get("execution_mode") or "scripted")
+        self.calls: list[InteractionResponse] = []
+        self.provider_started = asyncio.Event()
+        self.cancelled_request_ids: list[str] = []
+        self.on_effectful_done: Any = None
+        self.soridormi_invoker = None
+        self.soridormi_mode = None
+        self.runtime: SkillRuntime | None = None
+        if self.mode == "active_cancel":
+            registry = SkillRegistry()
+            registry.register(local_speech_definition())
+            for definition in self.definitions.values():
+                registry.register(definition)
+            self.runtime = SkillRuntime(registry)
+            self.runtime.register_provider(
+                LocalSpeechSkillProvider(
+                    lambda _args: {
+                        "scheduled": True,
+                        "playback_started": True,
+                        "spoken": True,
+                    }
+                )
+            )
+            for provider_id in sorted(
+                {item.provider_id for item in self.definitions.values()}
+            ):
+                self.runtime.register_provider(
+                    _BlockingScenarioProvider(
+                        provider_id,
+                        started=self.provider_started,
+                        cancelled_request_ids=self.cancelled_request_ids,
+                    )
+                )
+
+    async def ensure_skill_definitions(self, skill_ids: list[str]) -> None:
+        missing = [
+            skill_id for skill_id in skill_ids
+            if skill_id not in self.definitions
+        ]
+        if missing:
+            raise ValueError(
+                "unknown cognitive-turn scenario skills: "
+                + ",".join(missing)
+            )
+
+    def skill_definition(self, skill_id: str) -> SkillDefinition:
+        try:
+            return self.definitions[skill_id]
+        except KeyError as exc:
+            raise ValueError(
+                f"unknown cognitive-turn scenario skill {skill_id!r}"
+            ) from exc
+
+    def apply_current_schema_overrides(self) -> None:
+        raw = self.stub.get("current_output_schemas") or {}
+        if not isinstance(raw, dict):
+            raise ValueError("stub.current_output_schemas must be an object")
+        for skill_id, schema in raw.items():
+            if skill_id not in self.definitions:
+                raise ValueError(
+                    f"current schema override references unknown skill {skill_id!r}"
+                )
+            if not isinstance(schema, dict):
+                raise ValueError(
+                    f"current schema override for {skill_id!r} must be an object"
+                )
+            updated = self.definitions[skill_id].model_copy(
+                deep=True,
+                update={"output_schema": dict(schema)},
+            )
+            self.definitions[skill_id] = updated
+            if self.runtime is not None:
+                self.runtime.registry.upsert(updated)
+
+    async def execute(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+        confirmed_request_ids: set[str] | None = None,
+    ) -> SkillRuntimeResult:
+        del session_id
+        self.calls.append(response)
+        plan_requests = [
+            request
+            for request in response.skills
+            if request.metadata.get("source")
+            == "goal_driven_canonical_plan"
+        ]
+        if not plan_requests:
+            return SkillRuntimeResult(
+                interaction_id=response.interaction_id,
+                status="completed",
+                results=[
+                    SkillResult(
+                        request_id=item.id,
+                        skill_id="chromie.speak",
+                        status="completed",
+                        provider_id="chromie.local_speech",
+                        output={"playback_started": True},
+                    )
+                    for item in response.speech
+                ],
+            )
+        if self.mode == "provider_exception_before_results":
+            raise RuntimeError(
+                str(
+                    self.stub.get("provider_exception")
+                    or "scenario provider failed before returning results"
+                )
+            )
+        if self.mode == "active_cancel":
+            if self.runtime is None:  # pragma: no cover - construction guard
+                raise AssertionError("active-cancel runtime was not initialized")
+            return await self.runtime.execute(
+                response,
+                authorization=None,
+            )
+
+        requests_by_step = {
+            str(request.metadata.get("step_id") or ""): request
+            for request in plan_requests
+        }
+        results: list[SkillResult] = []
+        for raw in self.stub.get("results") or []:
+            if not isinstance(raw, dict):
+                raise ValueError("stub.results entries must be objects")
+            step_id = str(raw.get("step_id") or "").strip()
+            request = requests_by_step.get(step_id)
+            if request is None:
+                raise ValueError(
+                    f"scripted result references unknown step {step_id!r}"
+                )
+            results.append(
+                SkillResult(
+                    request_id=request.request_id,
+                    skill_id=request.skill_id,
+                    skill_version=request.skill_version,
+                    status=str(raw.get("status") or "completed"),
+                    provider_id=self.skill_definition(
+                        request.skill_id
+                    ).provider_id,
+                    output=dict(raw.get("output") or {}),
+                    reason_code=raw.get("reason_code"),
+                    message=str(raw.get("message") or ""),
+                )
+            )
+        status = str(
+            self.stub.get("runtime_status")
+            or (
+                "completed"
+                if results
+                and all(item.status == "completed" for item in results)
+                else "failed"
+            )
+        )
+        execution = SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status=status,
+            results=results,
+        )
+        if self.on_effectful_done is not None:
+            self.on_effectful_done()
+        return execution
+
+    async def cancel_all(self) -> None:
+        if self.runtime is not None:
+            await self.runtime.cancel_all()
 
 
 class _CognitiveScenarioClient:
@@ -1633,6 +1871,296 @@ async def evaluate_cognitive_runtime_scenario(
     return {"ok": not errors, "errors": errors, "actual": actual}
 
 
+async def evaluate_cognitive_turn_loop_scenario(
+    scenario: BehaviorScenario,
+) -> dict[str, Any]:
+    """Exercise the deterministic post-execution loop without live services."""
+
+    stub = scenario.stub
+    plan = CanonicalPlan.model_validate(stub["plan"])
+    runtime = _CognitiveTurnScenarioRuntime(stub)
+    sessions = SessionTracker(enabled=True)
+    session_id = sessions.create()
+    gateway = GatewayCoreCompatibilityAdapter()
+    capture = gateway.capture(
+        scenario.text,
+        session_id=session_id,
+        conversation_id="level-a-cognitive-turn-loop",
+        channel="text",
+    )
+    envelope = gateway.for_direct(
+        capture,
+        context={"history": []},
+        source="level_a.cognitive_turn_loop",
+        reason="deterministic Level A scenario input",
+    )
+    response_plan_raw = stub.get("response_plan") or {
+        "pre_action": {
+            "text": "I will run the requested checks.",
+            "speech_act": "inform",
+            "commitment_state": "evaluating",
+            "must_not_claim_completion": True,
+            "covers_goal_ids": plan.goal_ids,
+        }
+    }
+    composition = CoordinatedResponsePlan(
+        composition_id=f"composition-{scenario.scenario_id}",
+        canonical_plan_id=plan.plan_id,
+        canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+        canonical_plan=plan,
+        response_plan=ResponsePlan.model_validate(response_plan_raw),
+        confidence=0.99,
+        rationale="deterministic Level A turn-loop composition",
+    )
+    response = await CanonicalPlanRuntimeAdapter(runtime).build_response(
+        plan=plan,
+        composition=composition,
+        session_id=session_id,
+        language=scenario.language or "en-US",
+        context={"history": []},
+    )
+    response = response.model_copy(
+        deep=True,
+        update={
+            "metadata": {
+                **response.metadata,
+                **gateway.metadata(envelope),
+            }
+        },
+    )
+    runtime.apply_current_schema_overrides()
+
+    manager = ConversationStateManager(
+        base_conversation_id="level-a-cognitive-turn-loop"
+    )
+    manager.apply_goal_association_resolution(
+        {
+            "turn_id": envelope.turn_id,
+            "new_goals": [
+                {
+                    "goal_id": goal_id,
+                    "description": f"Complete {goal_id}.",
+                    "source_text": scenario.text,
+                }
+                for goal_id in plan.goal_ids
+            ],
+            "confidence": 0.99,
+            "reason_summary": "Deterministic scenario goals.",
+        },
+        sid=session_id,
+        user_text=scenario.text,
+        route="tool",
+        intent="cognitive_turn_loop_acceptance",
+        atomic=True,
+    )
+    manager.record_agent_result(session_id, response)
+
+    evidence = _CognitiveTurnEvidenceRecorder()
+    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant.interaction_runtime = runtime
+    assistant.playback_generation = 7
+    assistant.sessions = sessions
+    assistant.conversation_state = manager
+    assistant.cognitive_evidence = evidence
+    session_events: list[str] = []
+    assistant.session_log = (
+        lambda _sid, message, *args: session_events.append(
+            message % args if args else message
+        )
+    )
+    assistant.maybe_session_done = lambda *args, **kwargs: None
+    assistant._record_experience = lambda **kwargs: None
+    assistant._prepared_interaction_response_for_record = (
+        lambda prepared, **kwargs: prepared
+    )
+
+    async def no_recovery(self: Any, *args: Any, **kwargs: Any) -> bool:
+        del self, args, kwargs
+        return False
+
+    assistant._maybe_stage_body_recovery_confirmation = MethodType(
+        no_recovery,
+        assistant,
+    )
+
+    stop_envelope = None
+    if runtime.mode == "stale_final":
+        runtime.on_effectful_done = lambda: setattr(
+            assistant,
+            "playback_generation",
+            assistant.playback_generation + 1,
+        )
+
+    if runtime.mode == "active_cancel":
+        execution_task = asyncio.create_task(
+            assistant.execute_interaction_response(
+                response,
+                session_id,
+                reset_playback=False,
+            )
+        )
+        await asyncio.wait_for(runtime.provider_started.wait(), timeout=1.0)
+        stop_text = str(stub.get("stop_text") or "Stop now.")
+        stop_capture = gateway.capture(
+            stop_text,
+            session_id=f"{session_id}-stop",
+            conversation_id=envelope.conversation_id,
+            channel="text",
+        )
+        stop_envelope = gateway.for_reflex(
+            stop_capture,
+            context={"active_goal_snapshots": plan.goal_ids},
+        )
+        assistant.playback_generation += 1
+        execution_task.cancel()
+        await runtime.cancel_all()
+        execution = await execution_task
+    else:
+        execution = await assistant.execute_interaction_response(
+            response,
+            session_id,
+            reset_playback=False,
+        )
+
+    if len(evidence.outcomes) != 1:
+        raise AssertionError(
+            "cognitive turn produced "
+            f"{len(evidence.outcomes)} outcome evidence records; "
+            f"closure_status={response.metadata.get('cognitive_turn_closure_status')!r} "
+            f"outcome_error={response.metadata.get('execution_outcome_error')!r} "
+            f"execution_status={execution.status!r} events={session_events!r}"
+        )
+    retained = evidence.outcomes[0]
+    bundle = retained["bundle"]
+    final_response = retained.get("final_response")
+    final_speech = list(final_response.speech) if final_response else []
+    contexts = {
+        str(item.get("semantic_goal", {}).get("goal_id") or ""): item
+        for item in manager.snapshot()["task_contexts"]
+    }
+    actual = {
+        "admission": envelope.admission,
+        "original_input_preserved": (
+            envelope.original_input.text == scenario.text
+        ),
+        "turn_identity_preserved": (
+            response.metadata.get("turn_id")
+            == envelope.turn_id
+            == bundle.turn_id
+        ),
+        "runtime_status": execution.status,
+        "aggregate_status": bundle.aggregate_status,
+        "evidence_statuses": [
+            item.status for item in bundle.evidence
+        ],
+        "goal_statuses": [
+            item.status for item in bundle.goal_outcomes
+        ],
+        "observation_statuses": [
+            item.observation.status if item.observation is not None else None
+            for item in bundle.evidence
+        ],
+        "schema_gate_reasons": [
+            str(item.metadata.get("output_schema_gate_reason") or "")
+            for item in bundle.evidence
+        ],
+        "goal_state_statuses": [
+            contexts[goal_id]["status"] for goal_id in plan.goal_ids
+        ],
+        "goal_state_outcome_statuses": [
+            contexts[goal_id]["metadata"]["execution_outcome_status"]
+            for goal_id in plan.goal_ids
+        ],
+        "closure_status": response.metadata.get(
+            "cognitive_turn_closure_status"
+        ),
+        "delivery_status": retained.get("delivery_status"),
+        "suppression_reason": retained.get("suppression_reason"),
+        "final_response_absent": final_response is None,
+        "final_speech_only": bool(
+            final_response is not None and not final_response.skills
+        ),
+        "final_speech_count": len(final_speech),
+        "final_speech_texts": [item.text for item in final_speech],
+        "final_goal_statuses": [
+            item.metadata.get("goal_status") for item in final_speech
+        ],
+        "final_skill_ids": (
+            [item.skill_id for item in final_response.skills]
+            if final_response is not None
+            else []
+        ),
+        "runtime_call_count": len(runtime.calls),
+        "stop_admission": (
+            stop_envelope.admission if stop_envelope is not None else None
+        ),
+        "stop_reflex_action": (
+            stop_envelope.reflex.action
+            if stop_envelope is not None
+            else None
+        ),
+        "provider_cancelled_request_ids": list(
+            runtime.cancelled_request_ids
+        ),
+        "provider_cancelled_step_ids": [
+            next(
+                (
+                    str(request.metadata.get("step_id") or "")
+                    for request in response.skills
+                    if request.request_id == request_id
+                ),
+                request_id,
+            )
+            for request_id in runtime.cancelled_request_ids
+        ],
+    }
+    errors: list[str] = []
+    exact_keys = (
+        "admission",
+        "original_input_preserved",
+        "turn_identity_preserved",
+        "runtime_status",
+        "aggregate_status",
+        "evidence_statuses",
+        "goal_statuses",
+        "observation_statuses",
+        "schema_gate_reasons",
+        "goal_state_statuses",
+        "goal_state_outcome_statuses",
+        "closure_status",
+        "delivery_status",
+        "suppression_reason",
+        "final_response_absent",
+        "final_speech_only",
+        "final_speech_count",
+        "final_goal_statuses",
+        "final_skill_ids",
+        "runtime_call_count",
+        "stop_admission",
+        "stop_reflex_action",
+        "provider_cancelled_request_ids",
+        "provider_cancelled_step_ids",
+    )
+    for key in exact_keys:
+        if key in scenario.expect and actual[key] != scenario.expect[key]:
+            errors.append(
+                f"{key}={actual[key]!r}, expected {scenario.expect[key]!r}"
+            )
+    final_text = "\n".join(actual["final_speech_texts"])
+    for phrase in scenario.expect.get("final_speech_contains_all") or []:
+        if str(phrase).casefold() not in final_text.casefold():
+            errors.append(
+                f"final speech missing {phrase!r}: {final_text!r}"
+            )
+    for phrase in scenario.expect.get("final_speech_forbid") or []:
+        if str(phrase).casefold() in final_text.casefold():
+            errors.append(
+                f"final speech exposed forbidden text {phrase!r}: "
+                f"{final_text!r}"
+            )
+    return {"ok": not errors, "errors": errors, "actual": actual}
+
+
 async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
     if scenario.suite == "router":
         return await evaluate_router_scenario(scenario)
@@ -1646,6 +2174,8 @@ async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
         return await evaluate_dialogue_scenario(scenario)
     if scenario.suite == "cognitive_runtime":
         return await evaluate_cognitive_runtime_scenario(scenario)
+    if scenario.suite == "cognitive_turn_loop":
+        return await evaluate_cognitive_turn_loop_scenario(scenario)
     raise ValueError(f"unsupported suite {scenario.suite!r}")
 
 

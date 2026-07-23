@@ -23,6 +23,7 @@ from orchestrator.runtime.skill_runtime import (
     local_speech_definition,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.interaction import output_schema_sha256
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
@@ -1032,6 +1033,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertTrue(request.requires_confirmation)
         self.assertEqual(request.args, {"count": 4})
         self.assertIn("canonical_plan_fingerprint", request.metadata)
+        self.assertEqual(
+            request.committed_output_schema_sha256,
+            output_schema_sha256({}),
+        )
         self.assertEqual(
             result.interaction_response.speech[0].text,
             "请确认是否要我眨四下眼睛。",

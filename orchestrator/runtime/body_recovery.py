@@ -10,6 +10,10 @@ from shared.chromie_contracts.interaction import (
     SkillRequest,
     SkillResult,
 )
+from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.response_composition import (
+    canonical_plan_fingerprint,
+)
 
 _TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
 _RECOVERABLE_FAILURE_CLASSES = frozenset(
@@ -80,7 +84,7 @@ def recoverable_body_results(results: list[SkillResult]) -> list[SkillResult]:
 
 def build_body_recovery_confirmation(
     response: InteractionResponse,
-    failed_results: list[SkillResult],
+    results: list[SkillResult],
     *,
     max_attempts: int,
     timeout_s: float,
@@ -94,8 +98,56 @@ def build_body_recovery_confirmation(
 
     if max_attempts <= 0:
         return None
-    recoverable = recoverable_body_results(failed_results)
+    results_by_request: dict[str, SkillResult] = {}
+    for result in results:
+        if result.request_id in results_by_request:
+            # Recovery must not choose between contradictory terminal evidence.
+            return None
+        results_by_request[result.request_id] = result
+
+    cognitive_response = (
+        response.metadata.get("cognitive_runtime_apply") is True
+    )
+    committed_effect_request_ids = {
+        request.request_id
+        for request in response.skills
+        if (
+            request.metadata.get("source")
+            == "goal_driven_canonical_plan"
+            if cognitive_response
+            else (
+                request.skill_id.startswith("soridormi.")
+                or request.skill_id == _TASK_GRAPH_SKILL_ID
+            )
+        )
+    }
+    if not committed_effect_request_ids:
+        return None
+    if not committed_effect_request_ids.issubset(results_by_request):
+        # A missing sibling result is an unresolved parent-plan step. Retrying
+        # only the visible failure could later make the reduced retry plan look
+        # complete while silently erasing that unresolved work.
+        return None
+    committed_results = [
+        results_by_request[request_id]
+        for request_id in committed_effect_request_ids
+    ]
+    if any(
+        result.status in {"accepted", "running"}
+        for result in committed_results
+    ):
+        return None
+
+    recoverable = recoverable_body_results(committed_results)
     if not recoverable:
+        return None
+    terminal_body_failures = [
+        result
+        for result in committed_results
+        if result.status != "completed"
+    ]
+    if len(recoverable) != len(terminal_body_failures):
+        # Never hide a non-recoverable sibling behind a retry prompt.
         return None
 
     requests_by_id = {request.request_id: request for request in response.skills}
@@ -146,6 +198,35 @@ def build_body_recovery_confirmation(
     if not retry_requests:
         return None
 
+    recovery_plan = _recovery_canonical_plan(
+        response,
+        retry_requests=retry_requests,
+        attempt=next_attempt,
+    )
+    if (
+        response.metadata.get("cognitive_runtime_apply") is True
+        and recovery_plan is None
+    ):
+        # A cognitive retry must have its own exact immutable plan. Retaining
+        # the full parent plan with only failed requests would make outcome
+        # reconciliation ambiguous and could overwrite unrelated goals.
+        return None
+    if recovery_plan is not None:
+        recovery_fingerprint = canonical_plan_fingerprint(recovery_plan)
+        retry_requests = [
+            request.model_copy(
+                deep=True,
+                update={
+                    "metadata": {
+                        **request.metadata,
+                        "canonical_plan_id": recovery_plan.plan_id,
+                        "canonical_plan_fingerprint": recovery_fingerprint,
+                    }
+                },
+            )
+            for request in retry_requests
+        ]
+
     after_skills_speech = [
         speech
         for speech in response.speech
@@ -161,6 +242,18 @@ def build_body_recovery_confirmation(
         "body_recovery_failed_request_ids": failed_request_ids,
         "body_recovery_retry_request_ids": retry_request_ids,
     }
+    if recovery_plan is not None:
+        metadata.update(
+            {
+                "canonical_plan": recovery_plan.model_dump(
+                    mode="json",
+                    exclude_none=True,
+                ),
+                "canonical_plan_id": recovery_plan.plan_id,
+                "canonical_plan_fingerprint": recovery_fingerprint,
+                "planning_result": "body_recovery_retry_plan",
+            }
+        )
     retry_response = InteractionResponse(
         interaction_id=f"{response.interaction_id}_recovery{next_attempt}",
         speech=after_skills_speech,
@@ -183,6 +276,79 @@ def build_body_recovery_confirmation(
         retry_request_ids=tuple(retry_request_ids),
         attempt=next_attempt,
         max_attempts=max_attempts,
+    )
+
+
+def _recovery_canonical_plan(
+    response: InteractionResponse,
+    *,
+    retry_requests: list[SkillRequest],
+    attempt: int,
+) -> CanonicalPlan | None:
+    raw_plan = response.metadata.get("canonical_plan")
+    if not isinstance(raw_plan, dict):
+        return None
+    try:
+        parent = CanonicalPlan.model_validate(raw_plan)
+    except Exception:
+        return None
+
+    selected_step_ids = {
+        str(request.metadata.get("step_id") or "").strip()
+        for request in retry_requests
+        if str(request.metadata.get("step_id") or "").strip()
+    }
+    selected_steps = [
+        step for step in parent.steps if step.step_id in selected_step_ids
+    ]
+    if (
+        not selected_steps
+        or {step.step_id for step in selected_steps} != selected_step_ids
+    ):
+        return None
+
+    selected_goal_set = {
+        goal_id
+        for step in selected_steps
+        for goal_id in step.source_goal_ids
+    }
+    selected_goal_ids = [
+        goal_id
+        for goal_id in parent.goal_ids
+        if goal_id in selected_goal_set
+    ]
+    if not selected_goal_ids:
+        return None
+    goal_outcomes = [
+        {
+            "goal_id": goal_id,
+            "disposition": "execute",
+            "coverage": "complete",
+            "step_ids": [
+                step.step_id
+                for step in selected_steps
+                if goal_id in step.source_goal_ids
+            ],
+            "rationale": "confirmation-bound retry of a recoverable failure",
+        }
+        for goal_id in selected_goal_ids
+    ]
+    return CanonicalPlan(
+        plan_id=f"{parent.plan_id}_recovery{attempt}",
+        planner_tier=parent.planner_tier,
+        disposition="execute",
+        coverage="complete",
+        confidence=parent.confidence,
+        goal_ids=selected_goal_ids,
+        goal_summary="Retry the confirmed recoverable plan steps.",
+        steps=selected_steps,
+        goal_outcomes=goal_outcomes,
+        metadata={
+            "plan_relation": "recovery_subset",
+            "parent_plan_id": parent.plan_id,
+            "parent_plan_fingerprint": canonical_plan_fingerprint(parent),
+            "body_recovery_attempt": attempt,
+        },
     )
 
 

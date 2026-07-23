@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
@@ -36,8 +39,36 @@ FORBIDDEN_LOW_LEVEL_FIELDS = frozenset(
         "torque_commands",
     }
 )
+_FORBIDDEN_LOW_LEVEL_FIELD_COMPACTS = frozenset(
+    field.replace("_", "") for field in FORBIDDEN_LOW_LEVEL_FIELDS
+)
+_FIELD_CAMEL_BOUNDARY = re.compile(
+    r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])"
+)
+_FIELD_SEPARATOR = re.compile(r"[^a-z0-9]+")
 
 RAW_PLANAR_CONTROLLER_FIELDS = frozenset({"vx", "vy", "yaw"})
+_OUTPUT_SCHEMA_DIGEST_DOMAIN = b"chromie-output-schema-v1\x00"
+
+
+def output_schema_sha256(output_schema: dict[str, Any]) -> str:
+    """Return the deterministic identity of one validated output schema."""
+
+    if not isinstance(output_schema, dict):
+        raise TypeError("output_schema must be a dictionary")
+    try:
+        canonical = json.dumps(
+            output_schema,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("output_schema is not canonical JSON") from exc
+    return hashlib.sha256(
+        _OUTPUT_SCHEMA_DIGEST_DOMAIN + canonical
+    ).hexdigest()
 
 
 def find_raw_controller_array_schema(value: Any, *, path: str = "$") -> str | None:
@@ -74,8 +105,17 @@ def find_raw_controller_array_schema(value: Any, *, path: str = "$") -> str | No
 def reject_forbidden_low_level_fields(value: Any, *, path: str = "$") -> Any:
     if isinstance(value, dict):
         for key, item in value.items():
-            normalized = str(key).strip().lower()
-            if normalized in FORBIDDEN_LOW_LEVEL_FIELDS:
+            expanded = _FIELD_CAMEL_BOUNDARY.sub(" ", str(key).strip())
+            normalized = "_".join(
+                part
+                for part in _FIELD_SEPARATOR.split(expanded.casefold())
+                if part
+            )
+            if (
+                normalized in FORBIDDEN_LOW_LEVEL_FIELDS
+                or normalized.replace("_", "")
+                in _FORBIDDEN_LOW_LEVEL_FIELD_COMPACTS
+            ):
                 raise ValueError(f"forbidden low-level field at {path}.{key}")
             reject_forbidden_low_level_fields(item, path=f"{path}.{key}")
     elif isinstance(value, (list, tuple)):
@@ -122,6 +162,10 @@ class SkillRequest(BaseModel):
     cancellable: bool = True
     requires_confirmation: bool = False
     idempotency_key: str | None = None
+    committed_output_schema_sha256: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("request_id", "skill_id")

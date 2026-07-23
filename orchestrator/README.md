@@ -5,8 +5,10 @@ Docker because it owns microphone capture, VAD, utterance boundaries, speaker
 playback, barge-in, short-term conversation state, and trusted Skill Runtime
 coordination.
 
-For authoritative status and configuration, see:
+For authoritative architecture, status, and configuration, see:
 
+- [`../docs/COGNITIVE_GATEWAY.md`](../docs/COGNITIVE_GATEWAY.md)
+- [`../docs/COGNITIVE_TURN_LOOP.md`](../docs/COGNITIVE_TURN_LOOP.md)
 - [`../docs/STATUS.md`](../docs/STATUS.md)
 - [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md)
 - [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md)
@@ -29,18 +31,50 @@ read/planning/guarded endpoints may use MCP, but normal embodied apply is
 adapted and authorized by the host Skill Runtime. The language model is never
 the final authorization boundary for a side effect.
 
+## Cognitive ingress boundary
+
+The [Cognitive Gateway / 认知网关](../docs/COGNITIVE_GATEWAY.md) is the logical
+boundary between interaction transport and semantic cognition. It owns input
+normalization, deterministic protective reflexes, attention review, bounded
+context assembly, and turn admission. The Goal-Driven Cognitive Core owns
+ordinary intent and goal understanding, planning, execution coordination,
+outcome reconciliation, and final response composition.
+
+The frozen version 1 `UserTurnEnvelope`, shared deterministic reflex contract,
+host admission adapter, source/freshness context references, and local
+stop/suppression paths are implemented. The host begins stop/cancel handling
+before Router or model inference and projects only admitted envelopes into the
+Core. The Router still hosts addressedness review and mixed compatibility
+semantics, so physical extraction of the five Gateway modules remains open.
+Existing Router APIs, service names, environment variables, and log fields
+remain current compatibility surfaces.
+
 ## Current interaction paths
 
 ### Maintained goal-driven path
 
 ```text
-microphone -> host VAD -> ASR -> deterministic operational routing
+microphone -> host VAD -> ASR -> Cognitive Gateway
+  -> matched stop/cancel: interrupt current work and retain the envelope/outcome
+  -> local suppression: record the envelope and start no ordinary cognition
+  -> otherwise: compatibility attention/route review -> admitted UserTurnEnvelope
   -> Goal Association -> Fast Planner -> terminal Deep Planner when required
-  -> Response Composer -> host-built strict InteractionResponse
+  -> prospective Response Composer -> host-built strict InteractionResponse
   -> InteractionCoordinator -> Skill Runtime
-      -> local speech provider -> TTS -> playback
       -> Soridormi provider -> MCP -> simulator/robot
+  -> exact plan/request/result/trace join -> per-goal outcome commit
+  -> validated speech-only final response -> TTS -> playback
 ```
+
+For an effectful cognitive response, the Orchestrator commits requests only
+when plan ID/fingerprint, step, skill, arguments, timing, goal ownership, and
+output-schema identity match. Terminal `SkillResult` and `SkillTrace` records
+then produce an immutable `ExecutionOutcomeBundle`; missing results become
+`not_run`, and only bounded schema-validated observations may appear in the
+final result speech. Cancellation or a newer turn suppresses stale final audio
+without discarding outcome evidence. A recoverable Soridormi failure can
+propose only a fresh-confirmed child plan containing the failed recoverable
+subset; it cannot replay or mutate completed parent work.
 
 The common safe base enables this path for `chat`. The Soridormi launcher adds
 the provider and widens authority to `robot_action`:
@@ -86,7 +120,9 @@ ASR -> Ollama -> TTS -> playback
 This fallback produces speech only. It does not gain permission to invoke
 skills or hardware. If the Router fails while the utterance or active pending
 task looks embodied, the Orchestrator uses a deterministic safe-fallback speech
-response instead of the generic conversational LLM path.
+response instead of the generic conversational LLM path. Deterministic local
+silence/unusable-input suppression is applied before Router enablement or
+failure handling, so suppressed input cannot fall through to this LLM path.
 
 ## Configuration precedence
 

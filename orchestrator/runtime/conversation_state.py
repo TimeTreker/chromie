@@ -17,6 +17,10 @@ try:
         GoalAssociationResolution,
         stable_goal_operation_id,
     )
+    from chromie_contracts.execution_outcome import (
+        ExecutionOutcomeBundle,
+        execution_outcome_fingerprint,
+    )
     from chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -28,6 +32,10 @@ except ImportError:  # pragma: no cover - repository development path
         ActiveGoalSnapshot,
         GoalAssociationResolution,
         stable_goal_operation_id,
+    )
+    from shared.chromie_contracts.execution_outcome import (
+        ExecutionOutcomeBundle,
+        execution_outcome_fingerprint,
     )
     from shared.chromie_contracts.semantic_task import (
         InformationGap,
@@ -2012,6 +2020,10 @@ class ConversationStateManager:
         planning_result: str,
         planned_skills: list[dict[str, Any]],
         confirmation_pending: bool,
+        interaction_id: str = "",
+        turn_id: str = "",
+        canonical_plan_id: str = "",
+        canonical_plan_fingerprint: str = "",
     ) -> None:
         """Track execution lifecycle for one semantic goal only.
 
@@ -2031,6 +2043,12 @@ class ConversationStateManager:
             "planning_result": planning_result,
             "confirmation_pending": confirmation_pending,
             "planned_skills": [dict(item) for item in planned_skills],
+            "interaction_id": str(interaction_id or "").strip(),
+            "turn_id": str(turn_id or "").strip(),
+            "canonical_plan_id": str(canonical_plan_id or "").strip(),
+            "canonical_plan_fingerprint": str(
+                canonical_plan_fingerprint or ""
+            ).strip(),
         }
         self._pending_tasks.append(
             {
@@ -2354,6 +2372,8 @@ class ConversationStateManager:
             "refused": "refused",
             "failed": "failed",
             "error": "failed",
+            "partial": "failed",
+            "not_run": "failed",
         }.get(normalized_status, normalized_status)
         matched = False
         for task in list(self._pending_tasks):
@@ -2445,6 +2465,193 @@ class ConversationStateManager:
             self._persist_task_contexts_if_enabled()
             self.last_activity_ms = _now_ms()
         return matched
+
+    def record_execution_outcome_bundle(
+        self,
+        bundle: ExecutionOutcomeBundle,
+        *,
+        sid: str | None,
+    ) -> list[dict[str, Any]]:
+        """Atomically attach exact execution evidence to every affected goal.
+
+        The existing task lifecycle uses a smaller legacy status vocabulary.
+        Keep that projection for compatibility, but retain the exact
+        ``GoalExecutionOutcome.status`` in each task context's evidence and
+        metadata so partial and not-run results are never flattened in the
+        authoritative cognitive record.
+        """
+
+        if not self.enabled:
+            return []
+        validated = ExecutionOutcomeBundle.model_validate(bundle)
+        fingerprint = execution_outcome_fingerprint(validated)
+        normalized_sid = str(sid or "").strip()
+        evidence_request_ids_by_goal: dict[str, set[str]] = {}
+        for evidence in validated.evidence:
+            for goal_id in evidence.source_goal_ids:
+                evidence_request_ids_by_goal.setdefault(goal_id, set()).add(
+                    evidence.request_id
+                )
+
+        expected_binding = {
+            "interaction_id": validated.interaction_id,
+            "turn_id": validated.turn_id,
+            "canonical_plan_id": validated.canonical_plan_id,
+            "canonical_plan_fingerprint": (
+                validated.canonical_plan_fingerprint
+            ),
+        }
+        bound_records: dict[
+            str,
+            tuple[dict[str, Any], list[dict[str, Any]]],
+        ] = {}
+        for outcome in validated.goal_outcomes:
+            context = self._task_context_by_goal_id(outcome.goal_id)
+            if context is None:
+                raise ValueError(
+                    "execution outcome references a goal with no committed "
+                    f"task context: {outcome.goal_id}"
+                )
+            context_metadata = context.get("metadata")
+            if not isinstance(context_metadata, dict):
+                raise ValueError(
+                    "execution outcome goal has no committed plan binding: "
+                    f"{outcome.goal_id}"
+                )
+            for key, expected in expected_binding.items():
+                if str(context_metadata.get(key) or "").strip() != expected:
+                    raise ValueError(
+                        "execution outcome is stale or does not match the "
+                        f"current goal binding: {outcome.goal_id}:{key}"
+                    )
+
+            expected_request_ids = evidence_request_ids_by_goal.get(
+                outcome.goal_id,
+                set(),
+            )
+            matches: list[dict[str, Any]] = []
+            for task in self._pending_tasks:
+                task_metadata = task.get("metadata")
+                if (
+                    task.get("type") != "goal_execution"
+                    or not isinstance(task_metadata, dict)
+                    or str(task_metadata.get("goal_id") or "").strip()
+                    != outcome.goal_id
+                ):
+                    continue
+                if normalized_sid and str(task.get("sid") or "").strip() != normalized_sid:
+                    continue
+                if any(
+                    str(task_metadata.get(key) or "").strip() != expected
+                    for key, expected in expected_binding.items()
+                ):
+                    continue
+                request_ids = task_metadata.get("request_ids")
+                if isinstance(request_ids, str):
+                    request_ids = [request_ids]
+                if not isinstance(request_ids, list):
+                    continue
+                if {
+                    str(item).strip()
+                    for item in request_ids
+                    if str(item).strip()
+                } != expected_request_ids:
+                    continue
+                matches.append(task)
+            if len(matches) != 1:
+                raise ValueError(
+                    "execution outcome requires exactly one matching committed "
+                    f"goal execution record: {outcome.goal_id}"
+                )
+            bound_records[outcome.goal_id] = (context, matches)
+
+        pending_backup = copy.deepcopy(self._pending_tasks)
+        contexts_backup = copy.deepcopy(self._task_contexts)
+        timestamp_ms = _now_ms()
+        status_projection = {
+            "completed": "done",
+            "partial": "failed",
+            "failed": "failed",
+            "refused": "refused",
+            "timed_out": "timed_out",
+            "cancelled": "cancelled",
+            "not_run": "failed",
+        }
+        results: list[dict[str, Any]] = []
+        try:
+            for outcome in validated.goal_outcomes:
+                context, matching_tasks = bound_records[outcome.goal_id]
+                lifecycle_status = status_projection[outcome.status]
+                evidence_summary = context.get("evidence_summary")
+                if not isinstance(evidence_summary, dict):
+                    evidence_summary = {}
+                evidence_summary["execution_outcome"] = {
+                    "outcome_id": validated.outcome_id,
+                    "outcome_fingerprint": fingerprint,
+                    "turn_id": validated.turn_id,
+                    "interaction_id": validated.interaction_id,
+                    "canonical_plan_id": validated.canonical_plan_id,
+                    "canonical_plan_fingerprint": (
+                        validated.canonical_plan_fingerprint
+                    ),
+                    "goal_id": outcome.goal_id,
+                    "status": outcome.status,
+                    "step_ids": list(outcome.step_ids),
+                    "evidence_ids": list(outcome.evidence_ids),
+                    "completed_step_ids": list(outcome.completed_step_ids),
+                    "unresolved_step_ids": list(outcome.unresolved_step_ids),
+                    "reason_codes": list(outcome.reason_codes),
+                }
+                context["evidence_summary"] = evidence_summary
+                context["status"] = lifecycle_status
+                context["commitment_state"] = (
+                    self._commitment_state_for_status(lifecycle_status)
+                )
+                context["plan_status"] = lifecycle_status
+                context["updated_ms"] = timestamp_ms
+                metadata = context.get("metadata")
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                context["metadata"] = {
+                    **metadata,
+                    "execution_outcome_id": validated.outcome_id,
+                    "execution_outcome_fingerprint": fingerprint,
+                    "execution_outcome_status": outcome.status,
+                    "execution_evidence_ids": list(outcome.evidence_ids),
+                }
+
+                matched_pending = 0
+                for task in matching_tasks:
+                    task_metadata = task.get("metadata")
+                    assert isinstance(task_metadata, dict)
+                    task["status"] = lifecycle_status
+                    task["updated_ms"] = timestamp_ms
+                    task["metadata"] = {
+                        **task_metadata,
+                        "execution_outcome_id": validated.outcome_id,
+                        "execution_outcome_fingerprint": fingerprint,
+                        "execution_outcome_status": outcome.status,
+                        "execution_evidence_ids": list(outcome.evidence_ids),
+                    }
+                    matched_pending += 1
+
+                results.append(
+                    {
+                        "goal_id": outcome.goal_id,
+                        "status": outcome.status,
+                        "lifecycle_status": lifecycle_status,
+                        "outcome_id": validated.outcome_id,
+                        "applied": True,
+                        "pending_records_updated": matched_pending,
+                    }
+                )
+            self._persist_task_contexts_if_enabled()
+        except Exception:
+            self._pending_tasks = pending_backup
+            self._task_contexts = contexts_backup
+            raise
+        self.last_activity_ms = timestamp_ms
+        return results
 
     def _record_planning_metadata(
         self,
@@ -2588,8 +2795,19 @@ class ConversationStateManager:
             data = {}
 
         result_metadata = data.get("metadata")
+        interaction_id = str(data.get("interaction_id") or "").strip()
+        turn_id = ""
+        canonical_plan_id = ""
+        canonical_plan_fingerprint = ""
         goal_outcomes: dict[str, dict[str, Any]] = {}
         if isinstance(result_metadata, dict):
+            turn_id = str(result_metadata.get("turn_id") or "").strip()
+            canonical_plan_id = str(
+                result_metadata.get("canonical_plan_id") or ""
+            ).strip()
+            canonical_plan_fingerprint = str(
+                result_metadata.get("canonical_plan_fingerprint") or ""
+            ).strip()
             self._record_planning_metadata(
                 result_metadata,
                 confirmation_authorized=bool(confirmed_request_ids),
@@ -2651,6 +2869,10 @@ class ConversationStateManager:
                     for request_id in request_ids
                 ],
                 confirmation_pending=False,
+                interaction_id=interaction_id,
+                turn_id=turn_id,
+                canonical_plan_id=canonical_plan_id,
+                canonical_plan_fingerprint=canonical_plan_fingerprint,
             )
 
         actions = data.get("actions", []) or data.get("skills", []) or []
@@ -2730,6 +2952,10 @@ class ConversationStateManager:
                     planning_result=planning_result,
                     planned_skills=planned_skills,
                     confirmation_pending=confirmation_pending,
+                    interaction_id=interaction_id,
+                    turn_id=turn_id,
+                    canonical_plan_id=canonical_plan_id,
+                    canonical_plan_fingerprint=canonical_plan_fingerprint,
                 )
 
             if unscoped:

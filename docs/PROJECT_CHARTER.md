@@ -13,8 +13,8 @@ The intended user experience is:
 
 ```text
 natural speech
--> deterministic operational controls
--> language understanding and planning
+-> Cognitive Gateway: normalize, apply protective reflexes, and review attention
+-> Goal-Driven Cognitive Core: understand goals, decompose, plan, and coordinate
 -> validated speech and named-skill requests
 -> trusted execution
 -> observable completion, failure, cancellation, or recovery
@@ -43,10 +43,13 @@ A successful Chromie release lets an operator:
 ### Chromie owns
 
 - microphone capture, VAD, ASR coordination, playback, and barge-in;
-- deterministic routing for stop, cancel, emergency, silence, and unusable-audio
-  paths; bounded semantic addressedness is a separate fail-open interaction
-  policy and cannot authorize effects;
+- the Cognitive Gateway ingress boundary: input normalization, deterministic
+  protective reflexes for stop, cancel, emergency, silence, and unusable audio,
+  and bounded attention/admission review; attention review cannot authorize
+  effects and direct or unclear turns fail open to cognition;
 - conversation state and user-facing interaction semantics;
+- the Goal-Driven Cognitive Core: goal meaning and continuity, semantic
+  decomposition and planning, outcome reconciliation, and response composition;
 - native structured Agent output and strict model-facing contracts;
 - trusted Skill Runtime validation, authorization, scheduling, timeout, and
   cancellation;
@@ -81,12 +84,31 @@ A successful Chromie release lets an operator:
 The legacy host hardware daemon is mock compatibility infrastructure, not a
 future production robot backend.
 
+### Cognitive boundary
+
+The Cognitive Gateway is the narrow ingress, protective-reflex, and attention
+boundary. It decides whether a turn must be acted on immediately for operational
+safety, admitted to cognition, or ignored as confidently ambient input. It does
+not own final user-goal meaning, task decomposition, planning, agent selection,
+or response composition.
+
+The Goal-Driven Cognitive Core owns those semantic decisions. Stop and emergency
+commands are still user inputs, but their immediate protective effect must not
+wait for model inference; the resulting control and evidence can then be
+incorporated into goal and response state.
+
+The deployed service currently named Router is a compatibility implementation
+that still combines Gateway responsibilities with semantic/advisory routing.
+That service topology must not be mistaken for the intended ownership boundary,
+and its migration status is reported in [STATUS.md](STATUS.md).
+
 ## Engineering principles
 
 1. **High-level contracts stay stable.** Simulation and physical providers
    should implement the same named-skill and result semantics.
-2. **Robot thinking belongs to models and contracts.** Outside deterministic
-   operational controls, normal conversation, memory, tool, robot-action,
+2. **Robot thinking belongs to the Cognitive Core, models, and contracts.**
+   Outside deterministic operational controls, normal conversation, memory,
+   tool, robot-action,
    capability-selection, body-goal interpretation, planning, low-confidence
    correction, and deep-thought behavior must be decided by LLM reasoning over
    language meaning, bounded context, capability descriptions, schemas, and

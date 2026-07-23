@@ -609,7 +609,20 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             enabled=bool(args.cognitive_runtime),
             apply_lanes=str(args.cognitive_apply_lanes),
         )
+        turn_envelope = None
         if cognitive_runtime_selected:
+            gateway = assistant._cognitive_gateway_adapter()
+            turn_capture = gateway.capture(
+                args.text,
+                session_id=sid,
+                conversation_id=context.get("conversation_id"),
+                channel="text",
+            )
+            turn_envelope = gateway.for_route(
+                turn_capture,
+                context=context,
+                decision=route,
+            )
             cognitive_resolution = await assistant._run_cognitive_runtime_pipeline(
                 session,
                 user_text=args.text,
@@ -617,6 +630,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                 context=context,
                 decision=route,
                 record_evidence=False,
+                turn_envelope=turn_envelope,
             )
             cognitive_resolution_payload = cognitive_resolution.model_dump(
                 mode="json", exclude_none=True
@@ -651,10 +665,15 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                     decision=route,
                 )
                 response.metadata = {
-                    **response.metadata,
+                    **assistant._metadata_with_turn_envelope(
+                        response.metadata,
+                        turn_envelope,
+                    ),
                     "goal_state_results": goal_state_results,
-                    "cognitive_runtime_resolution": assistant._cognitive_resolution_summary(
-                        cognitive_resolution
+                    "cognitive_runtime_resolution": (
+                        assistant._cognitive_resolution_summary(
+                            cognitive_resolution
+                        )
                     ),
                 }
                 cognitive_resolution.goal_state_results = goal_state_results

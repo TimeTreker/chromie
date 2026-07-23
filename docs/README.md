@@ -7,20 +7,26 @@ authoritative home and other documents should link to it rather than repeat it.
 
 1. [Project Charter](PROJECT_CHARTER.md) - stable mission, ownership, principles,
    and non-goals.
-2. [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) -
+2. [Cognitive Gateway](COGNITIVE_GATEWAY.md) - authoritative target boundary
+   for interaction input, protective reflexes, attention review, context
+   assembly, and turn admission.
+3. [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md) - executable manager-owned
+   turn lifecycle from admission through delegation, outcome reconciliation,
+   and final response.
+4. [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) -
    cognitive constitution for goal continuity, multi-goal planning, validation, and interaction.
-3. [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) -
+5. [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) -
    root-cause rules for natural, grounded robot behavior and valid interaction
    evidence.
-4. [Current Status](STATUS.md) - implementation, automated verification, target
+6. [Current Status](STATUS.md) - implementation, automated verification, target
    validation, and release readiness.
-5. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
-6. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
-7. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
-8. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
+7. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
+8. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
+9. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
+10. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
    [Acceptance](ACCEPTANCE.md) - interface and evidence details.
-9. Component documents - local implementation boundaries.
-10. Decision documents - rationale for an established design.
+11. Component documents - local implementation boundaries.
+12. Decision documents - rationale for an established design.
 
 When documents disagree, correct the lower-authority document.
 
@@ -29,6 +35,8 @@ When documents disagree, correct the lower-authority document.
 | Question | Owner |
 |---|---|
 | What is Chromie trying to become? | `docs/PROJECT_CHARTER.md` |
+| What admits interaction input before semantic cognition? | `docs/COGNITIVE_GATEWAY.md` |
+| What lifecycle carries one admitted turn through execution evidence and a final response? | `docs/COGNITIVE_TURN_LOOP.md` |
 | What exists and what evidence is retained? | `docs/STATUS.md` |
 | What milestone is next and what closes it? | `ROADMAP.md` |
 | Where should development resume? | `DEVELOPMENT_CHECKPOINT.md` |
@@ -69,6 +77,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Runtime Trace Contract](RUNTIME_TRACE.md)
 - [Step 10: Accelerator Telemetry and Latency Evidence Gates](STEP10_ACCELERATOR_LATENCY_EVIDENCE.md)
 - [TTS Provider Contract and Evaluation](TTS_PROVIDER_EVALUATION.md)
+- [Cognitive Gateway](COGNITIVE_GATEWAY.md)
+- [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
@@ -96,6 +106,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Runtime Event Architecture](RUNTIME_EVENT_ARCHITECTURE.md)
 - [Cognitive Integrity Events](COGNITIVE_INTEGRITY_EVENTS.md)
 - [Scenario Candidate Data Loop](SCENARIO_CANDIDATE_DATA_LOOP.md)
+- [Cognitive Gateway](COGNITIVE_GATEWAY.md)
+- [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Agent](../agent/README.md)
 - [Orchestrator](../orchestrator/README.md)
 - [Router](../router/README.md)
@@ -109,6 +121,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 
 ## Interaction and execution
 
+- [Cognitive Gateway](COGNITIVE_GATEWAY.md)
+- [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)

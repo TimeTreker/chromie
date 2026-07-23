@@ -46,6 +46,10 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimeResolution,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
+from orchestrator.runtime.cognitive_gateway import (
+    GatewayCoreCompatibilityAdapter,
+)
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.episode import EpisodeRecorder
 from orchestrator.runtime.experience import ExperienceManager
@@ -63,6 +67,7 @@ from orchestrator.runtime.interaction_coordinator import (
 )
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.post_interrupt import lock_post_interrupt_physical_resume
+from orchestrator.runtime.outcome_response import compose_outcome_response
 from orchestrator.runtime.response_plan import validate_immediate_response_plan
 from orchestrator.runtime.session import SessionTracker, now_ms
 from shared.chromie_runtime.accelerator_telemetry import (
@@ -73,7 +78,13 @@ from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.skill_runtime import SkillRuntimeResult
 from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
-from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.interaction import (
+    InteractionResponse,
+    SkillRequest,
+    SkillResult,
+)
+from shared.chromie_contracts.reflex import DEFAULT_REFLEX_FILTER
+from shared.chromie_contracts.user_turn import UserTurnEnvelope
 from shared.chromie_contracts.semantic_authority import (
     SemanticAuthorityClaim,
     context_with_semantic_authority,
@@ -625,6 +636,8 @@ class VoiceAssistant:
         # to be dropped while the Agent or TTS was still working.
         self.active_asr_task: asyncio.Task | None = None
         self.active_turn_task: asyncio.Task | None = None
+        self.active_reflex_task: asyncio.Task | None = None
+        self._pending_turn_after_reflex: tuple[str, str] | None = None
         self._pending_vad_audio: bytes | None = None
         self.synthesis_semaphore = asyncio.Semaphore(int(os.getenv("ORCH_TTS_CONCURRENCY", "1")))
         self.next_playback_order = 0
@@ -681,6 +694,10 @@ class VoiceAssistant:
             enabled=self.cognitive_evidence_enabled,
             include_text=self.cognitive_evidence_include_text,
         )
+        self.cognitive_turn_closure = CognitiveTurnClosure(
+            self.interaction_runtime
+        )
+        self.cognitive_gateway = GatewayCoreCompatibilityAdapter()
         self.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=self.agent_client,
             adapter=CanonicalPlanRuntimeAdapter(self.interaction_runtime),
@@ -2303,6 +2320,46 @@ class VoiceAssistant:
                 len(episode.turns),
             )
 
+    def _record_execution_experience_safely(
+        self,
+        *,
+        response: InteractionResponse,
+        execution: SkillRuntimeResult | None,
+        session_id: str | None,
+        confirmed_request_ids: set[str] | None,
+        errors: list[str] | None = None,
+    ) -> None:
+        """Keep observability failures outside execution/response semantics."""
+
+        try:
+            prepared = self._prepared_interaction_response_for_record(
+                response,
+                session_id=session_id,
+                confirmed_request_ids=confirmed_request_ids,
+            )
+            record_kwargs: dict[str, Any] = {
+                "response": prepared,
+                "execution": execution,
+                "session_id": session_id,
+            }
+            if errors is not None:
+                record_kwargs["errors"] = errors
+            self._record_experience(
+                **record_kwargs,
+            )
+        except Exception as exc:  # pragma: no cover - defensive containment
+            logger.warning(
+                "Execution experience preparation failed: %s",
+                exc,
+                exc_info=True,
+            )
+            self.session_log(
+                session_id,
+                "experience_prepare_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+
     def _ability_registry(self) -> AbilityRegistry:
         abilities = getattr(self, "abilities", None)
         if isinstance(abilities, AbilityRegistry):
@@ -2905,6 +2962,32 @@ class VoiceAssistant:
         )
         return delegated
 
+    def _cognitive_gateway_adapter(self) -> GatewayCoreCompatibilityAdapter:
+        adapter = getattr(self, "cognitive_gateway", None)
+        if adapter is None:
+            adapter = GatewayCoreCompatibilityAdapter()
+            self.cognitive_gateway = adapter
+        return adapter
+
+    def _current_conversation_id(self, session_id: str) -> str:
+        conversation_id = str(
+            getattr(getattr(self, "conversation_state", None), "conversation_id", "")
+            or ""
+        ).strip()
+        return conversation_id or session_id
+
+    def _metadata_with_turn_envelope(
+        self,
+        metadata: dict[str, Any],
+        turn_envelope: UserTurnEnvelope | None,
+    ) -> dict[str, Any]:
+        if turn_envelope is None:
+            return dict(metadata)
+        return {
+            **metadata,
+            **self._cognitive_gateway_adapter().metadata(turn_envelope),
+        }
+
     @staticmethod
     def _cognitive_lane_from_route(decision: RouteDecision) -> str:
         if decision.route in {"chat", "clarify", "deep_thought"}:
@@ -3019,25 +3102,69 @@ class VoiceAssistant:
         context: dict[str, Any],
         decision: RouteDecision,
         record_evidence: bool = True,
+        turn_envelope: UserTurnEnvelope | None = None,
     ) -> CognitiveRuntimeResolution:
         started_ms = now_ms()
+        if turn_envelope is None:
+            resolution = CognitiveRuntimeResolution(
+                mode=self.cognitive_runtime_mode,
+                status="error",
+                lane=self._cognitive_lane_from_route(decision),
+                timings_ms={"total": round(now_ms() - started_ms, 1)},
+                fallback_reason="missing_admitted_user_turn_envelope",
+                metadata={
+                    "failure_stage": "cognitive_gateway_admission",
+                    "failure_class": "missing_user_turn_envelope",
+                    "failure_domain": "contract",
+                    "architecture_attribution": "cognitive_gateway",
+                    "retryable": False,
+                },
+            )
+            if record_evidence:
+                self._record_cognitive_runtime_evidence(
+                    resolution,
+                    session_id=session_id,
+                    user_text=user_text,
+                )
+            self.session_log(
+                session_id,
+                "cognitive_runtime_rejected: reason=missing_admitted_user_turn_envelope",
+            )
+            return resolution
         authority_context = self._goal_driven_authority_context(
             context,
             session_id=session_id,
             observer=self.cognitive_runtime_mode != "apply",
         )
+        resolved_text = user_text
+        resolved_session_id = session_id
+        resolved_language = decision.language or (
+            "zh-CN" if self._looks_zh(user_text) else "en-US"
+        )
+        resolved_history = authority_context.get("history", [])
+        if turn_envelope is not None:
+            projection = self._cognitive_gateway_adapter().project_for_core(
+                turn_envelope,
+                legacy_text=user_text,
+                legacy_session_id=session_id,
+                context=authority_context,
+            )
+            resolved_text = projection.text
+            resolved_session_id = projection.sid
+            resolved_language = projection.language
+            authority_context = projection.context
+            resolved_history = projection.history
         try:
             resolution = await asyncio.wait_for(
                 self.cognitive_runtime.resolve(
                     session,
-                    text=user_text,
-                    sid=session_id,
+                    text=resolved_text,
+                    sid=resolved_session_id,
                     route_decision=decision,
                     context=authority_context,
-                    history=authority_context.get("history", []),
-                    language=decision.language or (
-                        "zh-CN" if self._looks_zh(user_text) else "en-US"
-                    ),
+                    history=resolved_history,
+                    language=resolved_language,
+                    turn_envelope=turn_envelope,
                 ),
                 timeout=self.cognitive_runtime_timeout_ms / 1000.0,
             )
@@ -3048,6 +3175,7 @@ class VoiceAssistant:
                 mode=self.cognitive_runtime_mode,
                 status=status,
                 lane=self._cognitive_lane_from_route(decision),
+                turn_envelope=turn_envelope,
                 timings_ms={"total": round(now_ms() - started_ms, 1)},
                 fallback_reason=f"{type(exc).__name__}: {str(exc)[:500]}",
                 metadata={
@@ -3060,6 +3188,10 @@ class VoiceAssistant:
                     "architecture_attribution": "not_evaluated",
                     "retryable": is_timeout,
                 },
+            )
+        if turn_envelope is not None and resolution.turn_envelope is None:
+            resolution = resolution.model_copy(
+                update={"turn_envelope": turn_envelope}
             )
 
         trace_reference = resolution.metadata.get("runtime_trace")
@@ -3107,6 +3239,7 @@ class VoiceAssistant:
         session_id: str,
         context: dict[str, Any],
         decision: RouteDecision,
+        turn_envelope: UserTurnEnvelope | None = None,
     ) -> None:
         await self._run_cognitive_runtime_pipeline(
             session,
@@ -3114,6 +3247,7 @@ class VoiceAssistant:
             session_id=session_id,
             context=context,
             decision=decision,
+            turn_envelope=turn_envelope,
         )
 
     def _schedule_cognitive_runtime_report(
@@ -3124,6 +3258,7 @@ class VoiceAssistant:
         session_id: str,
         context: dict[str, Any],
         decision: RouteDecision,
+        turn_envelope: UserTurnEnvelope | None = None,
     ) -> RouteDecision:
         if (
             self.cognitive_runtime_mode != "report_only"
@@ -3139,6 +3274,7 @@ class VoiceAssistant:
                 session_id=session_id,
                 context=context,
                 decision=decision,
+                turn_envelope=turn_envelope,
             )
         )
         self.cognitive_runtime_report_tasks.add(task)
@@ -3199,6 +3335,7 @@ class VoiceAssistant:
         context: dict[str, Any],
         decision: RouteDecision,
         router_latency_ms: float,
+        turn_envelope: UserTurnEnvelope | None = None,
     ) -> tuple[bool, RouteDecision]:
         cognitive_lane = self._cognitive_lane_from_route(decision)
         if (
@@ -3225,7 +3362,12 @@ class VoiceAssistant:
             context=context,
             decision=decision,
             record_evidence=False,
+            turn_envelope=turn_envelope,
         )
+        if turn_envelope is not None and resolution.turn_envelope is None:
+            resolution = resolution.model_copy(
+                update={"turn_envelope": turn_envelope}
+            )
         summary = self._cognitive_resolution_summary(resolution)
         metadata = dict(decision.metadata or {})
         metadata["cognitive_runtime_resolution"] = summary
@@ -3257,11 +3399,14 @@ class VoiceAssistant:
                 user_text,
                 route=decision.route,
                 intent=decision.intent,
-                metadata={
-                    "source": "goal_driven_cognitive_runtime",
-                    "semantic_task_resolution_authoritative": True,
-                    "cognitive_runtime_resolution": summary,
-                },
+                metadata=self._metadata_with_turn_envelope(
+                    {
+                        "source": "goal_driven_cognitive_runtime",
+                        "semantic_task_resolution_authoritative": True,
+                        "cognitive_runtime_resolution": summary,
+                    },
+                    turn_envelope,
+                ),
             )
             self.conversation_state.record_agent_result(session_id, safe_response)
             self._record_cognitive_runtime_evidence(
@@ -3276,23 +3421,27 @@ class VoiceAssistant:
 
         response = resolution.interaction_response.model_copy(deep=True)
         try:
+            response_metadata = self._metadata_with_turn_envelope(
+                {
+                    **response.metadata,
+                    "language": decision.language,
+                    **self._route_proposal_metadata(decision),
+                    "cognitive_runtime_resolution": summary,
+                    "experience_context": self._experience_context(
+                        user_text=user_text,
+                        decision=decision,
+                        router_latency_ms=router_latency_ms,
+                        agent_latency_ms=float(
+                            resolution.timings_ms.get("total", 0.0)
+                        ),
+                    ),
+                },
+                turn_envelope,
+            )
             response = response.model_copy(
                 deep=True,
                 update={
-                    "metadata": {
-                        **response.metadata,
-                        "language": decision.language,
-                        **self._route_proposal_metadata(decision),
-                        "cognitive_runtime_resolution": summary,
-                        "experience_context": self._experience_context(
-                            user_text=user_text,
-                            decision=decision,
-                            router_latency_ms=router_latency_ms,
-                            agent_latency_ms=float(
-                                resolution.timings_ms.get("total", 0.0)
-                            ),
-                        ),
-                    }
+                    "metadata": response_metadata,
                 },
             )
             response = self.interaction_runtime.prepare_response(
@@ -3351,11 +3500,14 @@ class VoiceAssistant:
                 user_text,
                 route=decision.route,
                 intent=decision.intent,
-                metadata={
-                    "source": "goal_driven_cognitive_runtime",
-                    "semantic_task_resolution_authoritative": True,
-                    "cognitive_runtime_resolution": summary,
-                },
+                metadata=self._metadata_with_turn_envelope(
+                    {
+                        "source": "goal_driven_cognitive_runtime",
+                        "semantic_task_resolution_authoritative": True,
+                        "cognitive_runtime_resolution": summary,
+                    },
+                    turn_envelope,
+                ),
             )
             self.conversation_state.record_agent_result(session_id, safe_response)
             self._record_cognitive_runtime_evidence(
@@ -3371,12 +3523,15 @@ class VoiceAssistant:
             user_text,
             route=decision.route,
             intent=decision.intent,
-            metadata={
-                "source": "goal_driven_cognitive_runtime",
-                "confidence": decision.confidence,
-                "semantic_task_resolution_authoritative": True,
-                "cognitive_runtime_resolution": summary,
-            },
+            metadata=self._metadata_with_turn_envelope(
+                {
+                    "source": "goal_driven_cognitive_runtime",
+                    "confidence": decision.confidence,
+                    "semantic_task_resolution_authoritative": True,
+                    "cognitive_runtime_resolution": summary,
+                },
+                turn_envelope,
+            ),
         )
         self._record_cognitive_runtime_evidence(
             resolution, session_id=session_id, user_text=user_text
@@ -3801,11 +3956,125 @@ class VoiceAssistant:
         )
         return decision.model_copy(update={"metadata": metadata})
 
-    async def handle_routed_text(self, user_text: str, session_id: str) -> None:
-        if await self._handle_confirmation_reply(user_text, session_id):
+    async def handle_routed_text(
+        self,
+        user_text: str,
+        session_id: str,
+        *,
+        channel: str = "voice",
+    ) -> None:
+        gateway = self._cognitive_gateway_adapter()
+        turn_capture = gateway.capture(
+            user_text,
+            session_id=session_id,
+            conversation_id=self._current_conversation_id(session_id),
+            channel=channel,
+        )
+        reflex_outcome = turn_capture.reflex_candidate
+        if reflex_outcome.action == "interrupt":
+            self.session_log(
+                session_id,
+                "cognitive_gateway_reflex_detected: action=%s trigger=%s intent=%s confidence=%.2f",
+                reflex_outcome.action,
+                reflex_outcome.trigger,
+                reflex_outcome.intent,
+                reflex_outcome.confidence,
+            )
+            revoked_confirmation = self._revoke_pending_confirmation_for_reflex()
+            # The approval token is revoked synchronously before the first
+            # await, so slow trusted-provider cancellation cannot leave an old
+            # action approvable. Persistence and goal-state reconciliation run
+            # only after interruption has begun, so they cannot delay stopping.
+            try:
+                await self.interrupt(new_session_id=session_id)
+            finally:
+                cancelled_confirmation = (
+                    self._reconcile_revoked_confirmation_for_reflex(
+                        revoked_confirmation,
+                        session_id,
+                    )
+                )
+            if cancelled_confirmation:
+                reflex_outcome = reflex_outcome.model_copy(
+                    update={
+                        "metadata": {
+                            **reflex_outcome.metadata,
+                            "cancelled_confirmation": cancelled_confirmation,
+                        }
+                    }
+                )
+            turn_capture = gateway.with_reflex_outcome(
+                turn_capture,
+                reflex_outcome,
+            )
+            turn_envelope = gateway.for_reflex(turn_capture)
+            self.conversation_state.record_user_turn(
+                session_id,
+                user_text,
+                route="interrupt",
+                intent=reflex_outcome.intent,
+                metadata=self._metadata_with_turn_envelope(
+                    {
+                        "source": "cognitive_gateway_reflex",
+                        "confidence": reflex_outcome.confidence,
+                        "reflex_outcome": reflex_outcome.model_dump(mode="json"),
+                    },
+                    turn_envelope,
+                ),
+            )
+            self.session_log(
+                session_id,
+                "cognitive_gateway_reflex_applied: action=%s trigger=%s router_bypassed=True",
+                reflex_outcome.action,
+                reflex_outcome.trigger,
+            )
+            state = self.sessions.state.get(session_id)
+            if state is not None:
+                state["llm_done"] = True
+            self.maybe_session_done(session_id)
+            return
+
+        confirmation_envelope = gateway.for_confirmation(turn_capture)
+        if await self._handle_confirmation_reply(
+            user_text,
+            session_id,
+            turn_envelope=confirmation_envelope,
+        ):
+            return
+
+        if reflex_outcome.action == "ignore":
+            turn_envelope = gateway.for_suppression(turn_capture)
+            self.conversation_state.record_user_turn(
+                session_id,
+                user_text,
+                route="ignore",
+                intent=reflex_outcome.intent,
+                metadata=self._metadata_with_turn_envelope(
+                    {
+                        "source": "cognitive_gateway_reflex",
+                        "confidence": reflex_outcome.confidence,
+                        "reflex_outcome": reflex_outcome.model_dump(mode="json"),
+                    },
+                    turn_envelope,
+                ),
+            )
+            self.session_log(
+                session_id,
+                "cognitive_gateway_reflex_applied: action=%s trigger=%s router_bypassed=True",
+                reflex_outcome.action,
+                reflex_outcome.trigger,
+            )
+            state = self.sessions.state.get(session_id)
+            if state is not None:
+                state["llm_done"] = True
+            self.maybe_session_done(session_id)
             return
 
         boundary = self.conversation_state.prepare_for_user_text(user_text, session_id)
+        turn_capture = gateway.with_conversation_id(
+            turn_capture,
+            boundary.get("conversation_id"),
+        )
         if boundary.get("started_new"):
             self.session_log(
                 session_id,
@@ -3815,12 +4084,20 @@ class VoiceAssistant:
             )
 
         if not self.enable_router:
+            turn_envelope = gateway.for_direct(
+                turn_capture,
+                source="orchestrator.router_disabled",
+                reason="compatibility Router is disabled; preserving existing direct path",
+            )
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
                 route="direct_llm",
                 intent="unknown",
-                metadata={"source": "router_disabled"},
+                metadata=self._metadata_with_turn_envelope(
+                    {"source": "router_disabled"},
+                    turn_envelope,
+                ),
             )
             self.active_llm_task = asyncio.create_task(
                 self.process_llm_tts(
@@ -3834,6 +4111,10 @@ class VoiceAssistant:
 
         session = await self.get_http_session()
         context = self.build_context(session_id)
+        turn_capture = gateway.with_conversation_id(
+            turn_capture,
+            context.get("conversation_id"),
+        )
         self.sessions.update_trace_correlations(
             session_id,
             conversation_id=context.get("conversation_id"),
@@ -3874,13 +4155,22 @@ class VoiceAssistant:
                 user_text,
                 context=context,
             )
+            turn_envelope = gateway.for_direct(
+                turn_capture,
+                context=context,
+                source="orchestrator.router_exception",
+                reason="compatibility Router failed; preserving existing fallback path",
+            )
             if safe_response is not None:
                 self.conversation_state.record_user_turn(
                     session_id,
                     user_text,
                     route="safe_fallback",
                     intent="router_exception_embodied",
-                    metadata={"source": "router_exception", "error": str(exc)},
+                    metadata=self._metadata_with_turn_envelope(
+                        {"source": "router_exception", "error": str(exc)},
+                        turn_envelope,
+                    ),
                 )
                 self.session_log(
                     session_id,
@@ -3895,7 +4185,10 @@ class VoiceAssistant:
                 user_text,
                 route="direct_llm",
                 intent="router_exception",
-                metadata={"source": "router_exception", "error": str(exc)},
+                metadata=self._metadata_with_turn_envelope(
+                    {"source": "router_exception", "error": str(exc)},
+                    turn_envelope,
+                ),
             )
             self.active_llm_task = asyncio.create_task(
                 self.process_llm_tts(
@@ -3907,6 +4200,11 @@ class VoiceAssistant:
             )
             return
 
+        turn_envelope = gateway.for_route(
+            turn_capture,
+            context=context,
+            decision=decision,
+        )
         if self.cognitive_runtime_mode == "apply":
             handled, decision = await self._try_apply_cognitive_runtime(
                 session,
@@ -3915,6 +4213,7 @@ class VoiceAssistant:
                 context=context,
                 decision=decision,
                 router_latency_ms=router_latency_ms,
+                turn_envelope=turn_envelope,
             )
             if handled:
                 return
@@ -3925,6 +4224,7 @@ class VoiceAssistant:
                 session_id=session_id,
                 context=context,
                 decision=decision,
+                turn_envelope=turn_envelope,
             )
 
         # The legacy conditional-deepthinking and task-continuity chain remains
@@ -3992,6 +4292,10 @@ class VoiceAssistant:
                     turn_metadata["post_interrupt_corrected_route"] = corrected.get("route")
                     turn_metadata["post_interrupt_corrected_intent"] = corrected.get("intent")
 
+        turn_metadata = self._metadata_with_turn_envelope(
+            turn_metadata,
+            turn_envelope,
+        )
         self.conversation_state.record_user_turn(
             session_id,
             user_text,
@@ -4023,6 +4327,7 @@ class VoiceAssistant:
                         session_id=session_id,
                         context=context,
                         decision=correction,
+                        turn_envelope=turn_envelope,
                     )
                 )
                 return
@@ -4263,6 +4568,7 @@ class VoiceAssistant:
         session_id: str,
         context: dict[str, Any],
         decision: RouteDecision,
+        turn_envelope: UserTurnEnvelope,
     ) -> None:
         fast_first_scheduled = False
         if decision.speak_first:
@@ -4280,6 +4586,7 @@ class VoiceAssistant:
                 context=context,
                 decision=decision,
                 router_latency_ms=0.0,
+                turn_envelope=turn_envelope,
             )
             if handled:
                 return
@@ -4465,9 +4772,15 @@ class VoiceAssistant:
             pending.prompt,
             style="confirm",
         )
-        self.conversation_state.record_agent_result(
-            session_id,
-            prompt_response,
+        prompt_response = prompt_response.model_copy(
+            deep=True,
+            update={
+                "metadata": {
+                    **prompt_response.metadata,
+                    "history_after_successful_delivery": True,
+                    "confirmation_id": pending.confirmation_id,
+                }
+            },
         )
         record_confirmation_scope = getattr(
             self.conversation_state,
@@ -4561,6 +4874,8 @@ class VoiceAssistant:
         self,
         user_text: str,
         session_id: str,
+        *,
+        turn_envelope: UserTurnEnvelope | None = None,
     ) -> bool:
         resolution = self.confirmation_dialogue.resolve(user_text)
         if resolution.decision == "not_confirmation":
@@ -4600,10 +4915,13 @@ class VoiceAssistant:
             user_text,
             route="confirmation",
             intent=f"confirmation_{resolution.decision}",
-            metadata={
-                "confirmation_id": resolution.confirmation_id,
-                "fingerprint": resolution.fingerprint,
-            },
+            metadata=self._metadata_with_turn_envelope(
+                {
+                    "confirmation_id": resolution.confirmation_id,
+                    "fingerprint": resolution.fingerprint,
+                },
+                turn_envelope,
+            ),
         )
         self.session_log(
             session_id,
@@ -4673,6 +4991,63 @@ class VoiceAssistant:
         self.conversation_state.record_agent_result(session_id, response)
         self._launch_interaction(response, session_id)
         return True
+
+    def _revoke_pending_confirmation_for_reflex(self) -> Any | None:
+        """Revoke an approval token synchronously, before interruption awaits."""
+
+        dialogue = getattr(self, "confirmation_dialogue", None)
+        cancel = getattr(dialogue, "cancel", None)
+        return cancel() if callable(cancel) else None
+
+    def _reconcile_revoked_confirmation_for_reflex(
+        self,
+        pending: Any | None,
+        session_id: str,
+    ) -> dict[str, str]:
+        """Persist cancellation only after the operational reflex has begun."""
+
+        if pending is None:
+            return {}
+
+        confirmation_id = str(getattr(pending, "confirmation_id", "") or "")
+        fingerprint = str(getattr(pending, "fingerprint", "") or "")
+        conversation_state = getattr(self, "conversation_state", None)
+        resolved = False
+        resolve_confirmation_scope = getattr(
+            conversation_state,
+            "resolve_confirmation_scope",
+            None,
+        )
+        if confirmation_id and callable(resolve_confirmation_scope):
+            resolved = bool(
+                resolve_confirmation_scope(
+                    confirmation_id=confirmation_id,
+                    decision="operational_interrupt",
+                )
+            )
+        if confirmation_id and not resolved:
+            update_pending_task_status = getattr(
+                conversation_state,
+                "update_pending_task_status",
+                None,
+            )
+            if callable(update_pending_task_status):
+                update_pending_task_status(
+                    metadata_key="confirmation_id",
+                    metadata_value=confirmation_id,
+                    status="cancelled",
+                )
+
+        self.session_log(
+            session_id,
+            "cognitive_gateway_confirmation_cancelled: confirmation_id=%s fingerprint=%s",
+            confirmation_id or "<unknown>",
+            fingerprint or "<unknown>",
+        )
+        return {
+            "confirmation_id": confirmation_id,
+            "fingerprint": fingerprint,
+        }
 
     def _router_exception_safe_response(
         self,
@@ -4799,7 +5174,11 @@ class VoiceAssistant:
                     "timing": "immediate",
                     "priority": "high",
                     "interruptible": True,
-                    "metadata": {"source": source},
+                    "metadata": {
+                        "source": source,
+                        "wait_for_playback_start": True,
+                        "playback_start_required_for_delivery": True,
+                    },
                 }
             ],
             metadata={"source": source},
@@ -4849,6 +5228,413 @@ class VoiceAssistant:
         session = await self.get_http_session()
         return await self.agent_client.execute_planning_task_graph(session, graph)
 
+    def _cognitive_turn_closure_adapter(self) -> CognitiveTurnClosure:
+        closure = getattr(self, "cognitive_turn_closure", None)
+        if closure is None:
+            closure = CognitiveTurnClosure(self.interaction_runtime)
+            self.cognitive_turn_closure = closure
+        return closure
+
+    def _record_cognitive_outcome_evidence(
+        self,
+        bundle: Any,
+        *,
+        session_id: str | None,
+        final_response: InteractionResponse | None,
+        delivery_status: str,
+        suppression_reason: str = "",
+        goal_state_results: list[dict[str, Any]] | None = None,
+    ) -> None:
+        recorder = getattr(self, "cognitive_evidence", None)
+        if recorder is None or not hasattr(recorder, "record_outcome"):
+            return
+        try:
+            recorder.record_outcome(
+                bundle,
+                sid=str(session_id or bundle.turn_id),
+                final_response=final_response,
+                delivery_status=delivery_status,
+                suppression_reason=suppression_reason,
+                goal_state_results=goal_state_results,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "cognitive_outcome_evidence_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+
+    def _outcome_response_is_stale(
+        self,
+        *,
+        generation: int,
+        session_id: str | None,
+    ) -> bool:
+        current_generation = int(
+            getattr(self, "playback_generation", generation)
+        )
+        current_session_id = getattr(self, "session_id", session_id)
+        return (
+            generation != current_generation
+            or (
+                session_id is not None
+                and current_session_id is not None
+                and session_id != current_session_id
+            )
+        )
+
+    async def _execute_cognitive_outcome_response(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+    ) -> str:
+        try:
+            execution = await self.interaction_runtime.execute(
+                response,
+                session_id=session_id,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "cognitive_outcome_response_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            for speech in response.speech:
+                self.conversation_state.update_pending_task_status_for_request_id(
+                    request_id=speech.id,
+                status="failed",
+            )
+            return "speech_runtime_failed"
+
+        delivered_count = self._record_successfully_delivered_speech(
+            response,
+            execution,
+            session_id=session_id,
+            log_event="cognitive_outcome_history_after_delivery",
+        )
+        for result in execution.results:
+            self.conversation_state.update_pending_task_status_for_request_id(
+                request_id=result.request_id,
+                status=result.status,
+            )
+        self.session_log(
+            session_id,
+            "cognitive_outcome_response_done: status=%s speech=%s results=%s",
+            execution.status,
+            len(response.speech),
+            len(execution.results),
+        )
+        state = self.sessions.state.get(session_id or "")
+        if state is not None:
+            state["response_chars"] = state.get("response_chars", 0) + sum(
+                len(item.text) for item in response.speech
+            )
+        if (
+            execution.status == "completed"
+            and delivered_count == len(response.speech)
+        ):
+            return "speech_runtime_completed"
+        if execution.status == "completed":
+            return "speech_runtime_delivery_unverified"
+        return f"speech_runtime_{execution.status}"
+
+    def _record_successfully_delivered_speech(
+        self,
+        response: InteractionResponse,
+        execution: SkillRuntimeResult,
+        *,
+        session_id: str | None,
+        log_event: str,
+    ) -> int:
+        """Expose only speech the runtime proves was delivered.
+
+        Confirmation prompts are operational turns: recording them before the
+        speech provider succeeds would let unheard text influence later model
+        context and confirmation resolution.
+        """
+
+        results_by_request = {
+            result.request_id: result for result in execution.results
+        }
+        delivered_speech = [
+            speech
+            for speech in response.speech
+            if (
+                (result := results_by_request.get(speech.id)) is not None
+                and result.skill_id == "chromie.speak"
+                and result.status == "completed"
+                and (
+                    not (
+                        speech.metadata.get(
+                            "playback_start_required_for_delivery"
+                        )
+                        is True
+                        or speech.metadata.get("wait_for_playback_start")
+                        is True
+                    )
+                    or (
+                        isinstance(result.output, dict)
+                        and result.output.get("playback_started") is True
+                    )
+                )
+            )
+        ]
+        if not delivered_speech:
+            self.session_log(
+                session_id,
+                "%s: delivered_speech=0 runtime_status=%s",
+                log_event,
+                execution.status,
+            )
+            return 0
+        delivered_response = response.model_copy(
+            deep=True,
+            update={
+                "speech": delivered_speech,
+                "skills": [],
+                "requires_confirmation": False,
+            },
+        )
+        try:
+            self.conversation_state.record_agent_result(
+                session_id,
+                delivered_response,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "%s_failed: error_type=%s error=%s",
+                log_event,
+                type(exc).__name__,
+                exc,
+            )
+            return 0
+        self.session_log(
+            session_id,
+            "%s: delivered_speech=%s runtime_status=%s",
+            log_event,
+            len(delivered_speech),
+            execution.status,
+        )
+        return len(delivered_speech)
+
+    async def _close_cognitive_execution(
+        self,
+        *,
+        response: InteractionResponse,
+        execution: SkillRuntimeResult,
+        session_id: str | None,
+        generation: int,
+        provider_status: dict[str, Any] | None,
+        recovery_confirmation_staged: bool,
+        suppress_final_reason: str | None = None,
+    ) -> str:
+        closure = self._cognitive_turn_closure_adapter()
+        try:
+            plan = closure.canonical_plan(response)
+        except Exception as exc:
+            plan = None
+            self.session_log(
+                session_id,
+                "cognitive_outcome_plan_rejected: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            response.metadata["execution_outcome_error"] = (
+                f"plan_rejected:{type(exc).__name__}"
+            )
+        if plan is None:
+            return "not_applicable"
+
+        try:
+            bundle = closure.build(
+                response=response,
+                execution=execution,
+                session_id=session_id,
+                provider_status=provider_status,
+            )
+            if bundle is None:  # pragma: no cover - guarded by plan above
+                raise ValueError("effectful cognitive turn produced no outcome")
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "cognitive_outcome_reconciliation_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            response.metadata["execution_outcome_error"] = (
+                f"reconciliation_failed:{type(exc).__name__}"
+            )
+            if (
+                not recovery_confirmation_staged
+                and suppress_final_reason is None
+                and not self._outcome_response_is_stale(
+                    generation=generation,
+                    session_id=session_id,
+                )
+            ):
+                warning = self._host_speech_response(
+                    (
+                        "执行已经结束，但我没能可靠核对结果。"
+                        if str(response.metadata.get("language") or "").lower().startswith("zh")
+                        else "Execution ended, but I could not verify the result reliably."
+                    ),
+                    style="warning",
+                    source="host_cognitive_outcome_reconciliation_failure",
+                )
+                await self._execute_cognitive_outcome_response(
+                    warning,
+                    session_id=session_id,
+                )
+            return "reconciliation_failed"
+
+        response.metadata["execution_outcome_bundle"] = bundle.model_dump(
+            mode="json"
+        )
+        goal_state_results: list[dict[str, Any]] = []
+        try:
+            goal_state_results = (
+                self.conversation_state.record_execution_outcome_bundle(
+                    bundle,
+                    sid=session_id,
+                )
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "cognitive_outcome_goal_state_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            response.metadata["execution_outcome_goal_state_error"] = (
+                type(exc).__name__
+            )
+            warning: InteractionResponse | None = None
+            delivery_status = "goal_state_commit_failed"
+            if (
+                not recovery_confirmation_staged
+                and suppress_final_reason is None
+                and not self._outcome_response_is_stale(
+                    generation=generation,
+                    session_id=session_id,
+                )
+            ):
+                warning = self._host_speech_response(
+                    (
+                        "结果已经返回，但我没能可靠更新任务状态。"
+                        if str(response.metadata.get("language") or "").lower().startswith("zh")
+                        else "The result returned, but I could not update the task state reliably."
+                    ),
+                    style="warning",
+                    source="host_cognitive_outcome_goal_state_failure",
+                )
+                delivery_status = await self._execute_cognitive_outcome_response(
+                    warning,
+                    session_id=session_id,
+                )
+            self._record_cognitive_outcome_evidence(
+                bundle,
+                session_id=session_id,
+                final_response=warning,
+                delivery_status=delivery_status,
+                suppression_reason="goal_state_commit_failed",
+            )
+            return "goal_state_commit_failed"
+
+        response.metadata["execution_outcome_goal_state_results"] = (
+            goal_state_results
+        )
+        self.session_log(
+            session_id,
+            "cognitive_outcome_reconciled: outcome_id=%s aggregate=%s goals=%s evidence=%s",
+            bundle.outcome_id,
+            bundle.aggregate_status,
+            len(bundle.goal_outcomes),
+            len(bundle.evidence),
+        )
+
+        if self._outcome_response_is_stale(
+            generation=generation,
+            session_id=session_id,
+        ):
+            self.session_log(
+                session_id,
+                "cognitive_outcome_response_suppressed: reason=stale_turn",
+            )
+            self._record_cognitive_outcome_evidence(
+                bundle,
+                session_id=session_id,
+                final_response=None,
+                delivery_status="suppressed",
+                suppression_reason="stale_turn",
+                goal_state_results=goal_state_results,
+            )
+            return "suppressed_stale"
+        if suppress_final_reason is not None:
+            self._record_cognitive_outcome_evidence(
+                bundle,
+                session_id=session_id,
+                final_response=None,
+                delivery_status="suppressed",
+                suppression_reason=suppress_final_reason,
+                goal_state_results=goal_state_results,
+            )
+            return f"suppressed_{suppress_final_reason}"
+        if recovery_confirmation_staged:
+            self._record_cognitive_outcome_evidence(
+                bundle,
+                session_id=session_id,
+                final_response=None,
+                delivery_status="waiting_for_recovery_confirmation",
+                suppression_reason="recovery_confirmation_staged",
+                goal_state_results=goal_state_results,
+            )
+            return "waiting_for_recovery_confirmation"
+
+        try:
+            final_response = compose_outcome_response(
+                bundle,
+                plan,
+                str(response.metadata.get("language") or "en-US"),
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "cognitive_outcome_response_rejected: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            self._record_cognitive_outcome_evidence(
+                bundle,
+                session_id=session_id,
+                final_response=None,
+                delivery_status="composition_failed",
+                suppression_reason=type(exc).__name__,
+                goal_state_results=goal_state_results,
+            )
+            return "composition_failed"
+
+        delivery_status = await self._execute_cognitive_outcome_response(
+            final_response,
+            session_id=session_id,
+        )
+        response.metadata["post_execution_response"] = final_response.model_dump(
+            mode="json"
+        )
+        self._record_cognitive_outcome_evidence(
+            bundle,
+            session_id=session_id,
+            final_response=final_response,
+            delivery_status=delivery_status,
+            goal_state_results=goal_state_results,
+        )
+        return delivery_status
+
     def _launch_interaction(
         self,
         response: InteractionResponse,
@@ -4894,10 +5680,16 @@ class VoiceAssistant:
     ) -> SkillRuntimeResult:
         if reset_playback:
             await self.reset_playback_ordering()
+        execution_generation = int(
+            getattr(self, "playback_generation", 0)
+        )
         started_ms = now_ms()
         has_soridormi_request = any(
             request.skill_id.startswith("soridormi.") for request in response.skills
         )
+        execution: SkillRuntimeResult | None = None
+        provider_status: dict[str, Any] | None = None
+        cognitive_closure_attempted = False
         try:
             execution = await self.interaction_runtime.execute(
                 response,
@@ -4927,34 +5719,70 @@ class VoiceAssistant:
                     request_id=result.request_id,
                     status=result.status,
                 )
-            if has_soridormi_request:
-                await self._record_soridormi_post_status(session_id)
-            completed_request_ids = {result.request_id for result in execution.results}
-            if execution.status != "completed":
-                response_request_ids = [
-                    *(request.request_id for request in response.skills),
-                    *(speech.id for speech in response.speech),
-                ]
-                for request_id in response_request_ids:
-                    if request_id in completed_request_ids:
-                        continue
-                    self.conversation_state.update_pending_task_status_for_request_id(
-                        request_id=request_id,
-                        status=execution.status,
-                    )
-                await self._maybe_stage_body_recovery_confirmation(
+            if response.metadata.get(
+                "history_after_successful_delivery"
+            ) is True:
+                self._record_successfully_delivered_speech(
                     response,
                     execution,
-                    session_id,
-                )
-            self._record_experience(
-                response=self._prepared_interaction_response_for_record(
-                    response,
                     session_id=session_id,
-                    confirmed_request_ids=confirmed_request_ids,
-                ),
+                    log_event="interaction_history_after_delivery",
+                )
+            if has_soridormi_request:
+                provider_status = await self._record_soridormi_post_status(
+                    session_id
+                )
+            completed_request_ids = {result.request_id for result in execution.results}
+            recovery_confirmation_staged = False
+            if execution.status != "completed":
+                is_cognitive_effectful = bool(
+                    response.metadata.get("cognitive_runtime_apply") is True
+                    and response.metadata.get("canonical_plan")
+                    and response.skills
+                )
+                for request in response.skills:
+                    if request.request_id in completed_request_ids:
+                        continue
+                    self.conversation_state.update_pending_task_status_for_request_id(
+                        request_id=request.request_id,
+                        status=(
+                            "not_run"
+                            if is_cognitive_effectful
+                            else execution.status
+                        ),
+                    )
+                for speech in response.speech:
+                    if speech.id in completed_request_ids:
+                        continue
+                    self.conversation_state.update_pending_task_status_for_request_id(
+                        request_id=speech.id,
+                        status=execution.status,
+                    )
+                recovery_confirmation_staged = (
+                    await self._maybe_stage_body_recovery_confirmation(
+                        response,
+                        execution,
+                        session_id,
+                    )
+                )
+            cognitive_closure_attempted = True
+            closure_status = await self._close_cognitive_execution(
+                response=response,
                 execution=execution,
                 session_id=session_id,
+                generation=execution_generation,
+                provider_status=provider_status,
+                recovery_confirmation_staged=recovery_confirmation_staged,
+            )
+            if closure_status != "not_applicable":
+                response.metadata["cognitive_turn_closure_status"] = (
+                    closure_status
+                )
+            self._record_execution_experience_safely(
+                response=response,
+                execution=execution,
+                session_id=session_id,
+                confirmed_request_ids=confirmed_request_ids,
             )
             return execution
         except asyncio.CancelledError:
@@ -4963,16 +5791,68 @@ class VoiceAssistant:
                 "skill_runtime_cancelled: runtime_ms=%.1f",
                 now_ms() - started_ms,
             )
-            for request_id in [
-                *(request.request_id for request in response.skills),
-                *(speech.id for speech in response.speech),
-            ]:
+            cancelled_execution = (
+                self._cancelled_execution_with_unknown_request_results(
+                    response,
+                    execution,
+                )
+            )
+            completed_by_request = {
+                result.request_id: result
+                for result in cancelled_execution.results
+            }
+            for request in response.skills:
+                result = completed_by_request.get(request.request_id)
                 self.conversation_state.update_pending_task_status_for_request_id(
-                    request_id=request_id,
-                    status="cancelled",
+                    request_id=request.request_id,
+                    status=result.status if result is not None else "not_run",
+                )
+            for speech in response.speech:
+                result = completed_by_request.get(speech.id)
+                self.conversation_state.update_pending_task_status_for_request_id(
+                    request_id=speech.id,
+                    status=result.status if result is not None else "cancelled",
                 )
             if has_soridormi_request:
-                await self._record_soridormi_post_status(session_id)
+                provider_status = await asyncio.shield(
+                    self._record_soridormi_post_status(session_id)
+                )
+
+            try:
+                cognitive_plan = (
+                    self._cognitive_turn_closure_adapter().canonical_plan(
+                        response
+                    )
+                )
+            except Exception:
+                cognitive_plan = None
+            if cognitive_plan is not None:
+                outcome_execution = cancelled_execution
+                closure_status = await asyncio.shield(
+                    self._close_cognitive_execution(
+                        response=response,
+                        execution=outcome_execution,
+                        session_id=session_id,
+                        generation=execution_generation,
+                        provider_status=provider_status,
+                        recovery_confirmation_staged=False,
+                        # A stop/interruption must never emit a late terminal
+                        # utterance, even if playback generation is unchanged
+                        # in a synthetic or test caller.
+                        suppress_final_reason="interaction_cancelled",
+                    )
+                )
+                response.metadata["cognitive_turn_closure_status"] = (
+                    closure_status
+                )
+                self._record_execution_experience_safely(
+                    response=response,
+                    execution=outcome_execution,
+                    session_id=session_id,
+                    confirmed_request_ids=confirmed_request_ids,
+                    errors=["interaction_cancelled"],
+                )
+                return outcome_execution
             raise
         except Exception as exc:
             self.session_log(
@@ -4981,16 +5861,65 @@ class VoiceAssistant:
                 now_ms() - started_ms,
                 exc,
             )
-            self._record_experience(
-                response=self._prepared_interaction_response_for_record(
-                    response,
+            try:
+                cognitive_plan = (
+                    self._cognitive_turn_closure_adapter().canonical_plan(
+                        response
+                    )
+                )
+            except Exception:
+                cognitive_plan = None
+            if cognitive_plan is not None:
+                outcome_execution = execution or SkillRuntimeResult(
+                    interaction_id=response.interaction_id,
+                    status="failed",
+                )
+                if execution is None and has_soridormi_request:
+                    provider_status = (
+                        await self._record_soridormi_post_status(session_id)
+                    )
+                if execution is None:
+                    for request in response.skills:
+                        self.conversation_state.update_pending_task_status_for_request_id(
+                            request_id=request.request_id,
+                            status="not_run",
+                        )
+                    for speech in response.speech:
+                        self.conversation_state.update_pending_task_status_for_request_id(
+                            request_id=speech.id,
+                            status="failed",
+                        )
+                if cognitive_closure_attempted:
+                    closure_status = str(
+                        response.metadata.get(
+                            "cognitive_turn_closure_status",
+                            "closure_already_attempted",
+                        )
+                    )
+                    response.metadata[
+                        "cognitive_turn_closure_followup_error"
+                    ] = type(exc).__name__
+                else:
+                    cognitive_closure_attempted = True
+                    closure_status = await self._close_cognitive_execution(
+                        response=response,
+                        execution=outcome_execution,
+                        session_id=session_id,
+                        generation=execution_generation,
+                        provider_status=provider_status,
+                        recovery_confirmation_staged=False,
+                    )
+                response.metadata["cognitive_turn_closure_status"] = (
+                    closure_status
+                )
+                self._record_execution_experience_safely(
+                    response=response,
+                    execution=outcome_execution,
                     session_id=session_id,
                     confirmed_request_ids=confirmed_request_ids,
-                ),
-                execution=None,
-                session_id=session_id,
-                errors=[str(exc) or exc.__class__.__name__],
-            )
+                    errors=[str(exc) or exc.__class__.__name__],
+                )
+                return outcome_execution
             for request_id in [
                 *(request.request_id for request in response.skills),
                 *(speech.id for speech in response.speech),
@@ -4999,6 +5928,13 @@ class VoiceAssistant:
                     request_id=request_id,
                     status="failed",
                 )
+            self._record_execution_experience_safely(
+                response=response,
+                execution=execution,
+                session_id=session_id,
+                confirmed_request_ids=confirmed_request_ids,
+                errors=[str(exc) or exc.__class__.__name__],
+            )
             raise
         finally:
             if mark_session_done:
@@ -5010,6 +5946,57 @@ class VoiceAssistant:
                         0,
                     ) + sum(len(item.text) for item in response.speech)
                 self.maybe_session_done(session_id)
+
+    @staticmethod
+    def _cancelled_execution_with_unknown_request_results(
+        response: InteractionResponse,
+        execution: SkillRuntimeResult | None,
+    ) -> SkillRuntimeResult:
+        """Conservatively retain cancellation when terminal evidence is lost.
+
+        When cancellation propagates through a coordinator, the host cannot
+        prove that a request with no returned result never started. Marking it
+        ``not_run`` would be an unsafe assertion for physical work, so every
+        committed request lacking terminal evidence is retained as cancelled
+        with an explicit unknown-start diagnostic.
+        """
+
+        existing_results = list(execution.results if execution else [])
+        existing_by_request = {
+            result.request_id: result for result in existing_results
+        }
+        merged_results: list[SkillResult] = []
+        committed_request_ids: set[str] = set()
+        for request in response.skills:
+            committed_request_ids.add(request.request_id)
+            result = existing_by_request.get(request.request_id)
+            if result is None:
+                result = SkillResult(
+                    request_id=request.request_id,
+                    skill_id=request.skill_id,
+                    skill_version=request.skill_version,
+                    status="cancelled",
+                    reason_code=(
+                        "interaction_cancelled_terminal_result_unavailable"
+                    ),
+                    message=(
+                        "Interaction cancellation propagated before terminal "
+                        "per-request evidence was returned; start state is "
+                        "unknown."
+                    ),
+                )
+            merged_results.append(result)
+        merged_results.extend(
+            result
+            for result in existing_results
+            if result.request_id not in committed_request_ids
+        )
+        return SkillRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="cancelled",
+            results=merged_results,
+            traces=list(execution.traces if execution else []),
+        )
 
     async def _record_soridormi_post_status(
         self,
@@ -5106,10 +6093,6 @@ class VoiceAssistant:
             recovery.max_attempts,
             pending.expires_at,
         )
-        self.conversation_state.record_agent_result(
-            session_id,
-            recovery.response,
-        )
         self.conversation_state.record_pending_task(
             sid=session_id,
             task_type="body_recovery_confirmation",
@@ -5135,10 +6118,15 @@ class VoiceAssistant:
             style="confirm",
             source="host_body_recovery_confirmation",
         )
-        self.conversation_state.record_agent_result(session_id, prompt_response)
-        await self.interaction_runtime.execute(
+        prompt_execution = await self.interaction_runtime.execute(
             prompt_response,
             session_id=session_id,
+        )
+        self._record_successfully_delivered_speech(
+            prompt_response,
+            prompt_execution,
+            session_id=session_id,
+            log_event="body_recovery_history_after_delivery",
         )
         return True
 
@@ -5225,9 +6213,11 @@ class VoiceAssistant:
             self.active_llm_task.cancel()
         current_task = asyncio.current_task()
         active_turn_task = getattr(self, "active_turn_task", None)
+        active_reflex_task = getattr(self, "active_reflex_task", None)
         if (
             active_turn_task is not None
             and active_turn_task is not current_task
+            and active_turn_task is not active_reflex_task
             and not active_turn_task.done()
         ):
             active_turn_task.cancel()
@@ -5368,11 +6358,37 @@ class VoiceAssistant:
                 self.asr_ws = None
 
     def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
+        active_reflex = getattr(self, "active_reflex_task", None)
+        if active_reflex is not None and not active_reflex.done():
+            replaced = getattr(self, "_pending_turn_after_reflex", None)
+            if replaced is not None:
+                _, replaced_session_id = replaced
+                self.session_log(
+                    replaced_session_id,
+                    "turn_replaced_while_reflex_active: replacement_sid=%s",
+                    session_id,
+                )
+                state = self.sessions.state.get(replaced_session_id)
+                if state is not None:
+                    state["llm_done"] = True
+                self.maybe_session_done(replaced_session_id)
+            self._pending_turn_after_reflex = (user_text, session_id)
+            self.session_log(
+                session_id,
+                "turn_queued_behind_cognitive_gateway_reflex: replaced=%s",
+                replaced is not None,
+            )
+            return
+
         previous = getattr(self, "active_turn_task", None)
         if previous is not None and not previous.done():
             previous.cancel()
         task = asyncio.create_task(self.handle_routed_text(user_text, session_id))
         self.active_turn_task = task
+        if DEFAULT_REFLEX_FILTER.evaluate(user_text).action == "interrupt":
+            # Mark the task at launch time so a following utterance cannot
+            # cancel it before the coroutine reaches its first instruction.
+            self.active_reflex_task = task
         task.add_done_callback(
             lambda completed, sid=session_id: self._on_routed_turn_done(
                 completed,
@@ -5385,24 +6401,51 @@ class VoiceAssistant:
         task: asyncio.Task,
         session_id: str,
     ) -> None:
+        was_reflex = getattr(self, "active_reflex_task", None) is task
         if getattr(self, "active_turn_task", None) is task:
             self.active_turn_task = None
+        completed_ok = False
         if task.cancelled():
             self.session_log(session_id, "turn_cancelled_by_new_session")
             state = self.sessions.state.get(session_id)
             if state is not None:
                 state["llm_done"] = True
             self.maybe_session_done(session_id)
+        else:
+            try:
+                task.result()
+                completed_ok = True
+            except Exception as exc:  # pragma: no cover - defensive callback logging
+                logger.error(
+                    "%s routed turn failed outside normal handler: %s",
+                    session_id,
+                    exc,
+                    exc_info=True,
+                )
+
+        if not was_reflex:
             return
-        try:
-            task.result()
-        except Exception as exc:  # pragma: no cover - defensive callback logging
-            logger.error(
-                "%s routed turn failed outside normal handler: %s",
-                session_id,
-                exc,
-                exc_info=True,
+        self.active_reflex_task = None
+        pending = getattr(self, "_pending_turn_after_reflex", None)
+        self._pending_turn_after_reflex = None
+        if pending is None:
+            return
+        pending_text, pending_session_id = pending
+        if completed_ok:
+            self.session_log(
+                pending_session_id,
+                "turn_released_after_cognitive_gateway_reflex",
             )
+            self._launch_routed_turn(pending_text, pending_session_id)
+            return
+        self.session_log(
+            pending_session_id,
+            "turn_dropped_after_failed_cognitive_gateway_reflex",
+        )
+        state = self.sessions.state.get(pending_session_id)
+        if state is not None:
+            state["llm_done"] = True
+        self.maybe_session_done(pending_session_id)
 
     def _queue_vad_utterance(self, audio: bytes) -> None:
         active = getattr(self, "active_asr_task", None)
@@ -5620,6 +6663,8 @@ class VoiceAssistant:
             self.active_asr_task.cancel()
         if self.active_turn_task and not self.active_turn_task.done():
             self.active_turn_task.cancel()
+        self.active_reflex_task = None
+        self._pending_turn_after_reflex = None
         self._pending_vad_audio = None
         sweeper = getattr(self, "session_idle_sweeper_task", None)
         if sweeper is not None and not sweeper.done():

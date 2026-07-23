@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
@@ -959,6 +960,285 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             )
         )
         self.assertEqual(manager.active_goal_snapshots(), [])
+
+    def test_execution_outcome_bundle_preserves_exact_mixed_goal_evidence(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="outcome-bundle")
+        self._create_goals(manager, "goal-walk", "goal-blink")
+        manager.record_agent_result(
+            "sid-outcome",
+            InteractionResponse(
+                interaction_id="interaction-outcome",
+                skills=[
+                    {
+                        "request_id": "request-walk",
+                        "skill_id": "soridormi.walk_forward",
+                        "metadata": {
+                            "source_goal_ids": ["goal-walk"],
+                            "canonical_plan_id": "plan-lifecycle",
+                            "canonical_plan_fingerprint": "f" * 64,
+                        },
+                    },
+                    {
+                        "request_id": "request-blink",
+                        "skill_id": "soridormi.blink_eyes",
+                        "metadata": {
+                            "source_goal_ids": ["goal-blink"],
+                            "canonical_plan_id": "plan-lifecycle",
+                            "canonical_plan_fingerprint": "f" * 64,
+                        },
+                    },
+                ],
+                metadata={
+                    "planning_result": "composed_plan",
+                    "turn_id": "turn-outcome",
+                    "canonical_plan_id": "plan-lifecycle",
+                    "canonical_plan_fingerprint": "f" * 64,
+                    "canonical_plan": self._canonical_plan(
+                        "execute",
+                        [
+                            {
+                                "goal_id": "goal-walk",
+                                "disposition": "execute",
+                                "coverage": "complete",
+                                "step_ids": ["step-walk"],
+                            },
+                            {
+                                "goal_id": "goal-blink",
+                                "disposition": "execute",
+                                "coverage": "complete",
+                                "step_ids": ["step-blink"],
+                            },
+                        ],
+                    ),
+                },
+            ),
+        )
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-mixed",
+            turn_id="turn-outcome",
+            interaction_id="interaction-outcome",
+            canonical_plan_id="plan-lifecycle",
+            canonical_plan_fingerprint="f" * 64,
+            canonical_goal_ids=["goal-walk", "goal-blink"],
+            aggregate_status="partial",
+            evidence=[
+                {
+                    "evidence_id": "evidence-walk",
+                    "request_id": "request-walk",
+                    "step_id": "step-walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "source_goal_ids": ["goal-walk"],
+                    "status": "completed",
+                },
+                {
+                    "evidence_id": "evidence-blink",
+                    "request_id": "request-blink",
+                    "step_id": "step-blink",
+                    "skill_id": "soridormi.blink_eyes",
+                    "source_goal_ids": ["goal-blink"],
+                    "status": "not_run",
+                    "missing_result": True,
+                },
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "status": "completed",
+                    "step_ids": ["step-walk"],
+                    "evidence_ids": ["evidence-walk"],
+                    "completed_step_ids": ["step-walk"],
+                },
+                {
+                    "goal_id": "goal-blink",
+                    "status": "not_run",
+                    "step_ids": ["step-blink"],
+                    "evidence_ids": ["evidence-blink"],
+                    "unresolved_step_ids": ["step-blink"],
+                    "reason_codes": ["missing_skill_result"],
+                },
+            ],
+        )
+
+        applied = manager.record_execution_outcome_bundle(
+            bundle,
+            sid="sid-outcome",
+        )
+
+        self.assertEqual(
+            [item["status"] for item in applied],
+            ["completed", "not_run"],
+        )
+        contexts = {
+            item["semantic_goal"]["goal_id"]: item
+            for item in manager.snapshot()["task_contexts"]
+        }
+        self.assertEqual(contexts["goal-walk"]["status"], "done")
+        self.assertEqual(contexts["goal-blink"]["status"], "failed")
+        self.assertEqual(
+            contexts["goal-blink"]["evidence_summary"]["execution_outcome"][
+                "status"
+            ],
+            "not_run",
+        )
+        self.assertEqual(
+            contexts["goal-walk"]["metadata"]["execution_outcome_status"],
+            "completed",
+        )
+
+    def test_stale_outcome_cannot_overwrite_a_newer_goal_plan_binding(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="stale-outcome")
+        self._create_goals(manager, "goal-walk")
+
+        def response(
+            *,
+            interaction_id: str,
+            turn_id: str,
+            plan_id: str,
+            fingerprint: str,
+            request_id: str,
+        ) -> InteractionResponse:
+            return InteractionResponse(
+                interaction_id=interaction_id,
+                skills=[
+                    {
+                        "request_id": request_id,
+                        "skill_id": "soridormi.walk_forward",
+                        "metadata": {
+                            "source_goal_ids": ["goal-walk"],
+                            "canonical_plan_id": plan_id,
+                            "canonical_plan_fingerprint": fingerprint,
+                        },
+                    }
+                ],
+                metadata={
+                    "planning_result": "composed_plan",
+                    "turn_id": turn_id,
+                    "canonical_plan_id": plan_id,
+                    "canonical_plan_fingerprint": fingerprint,
+                    "canonical_plan": self._canonical_plan(
+                        "execute",
+                        [
+                            {
+                                "goal_id": "goal-walk",
+                                "disposition": "execute",
+                                "coverage": "complete",
+                                "step_ids": ["step-walk"],
+                            }
+                        ],
+                    ),
+                },
+            )
+
+        manager.record_agent_result(
+            "sid-current",
+            response(
+                interaction_id="interaction-old",
+                turn_id="turn-old",
+                plan_id="plan-old",
+                fingerprint="a" * 64,
+                request_id="request-old",
+            ),
+        )
+        manager.record_agent_result(
+            "sid-current",
+            response(
+                interaction_id="interaction-new",
+                turn_id="turn-new",
+                plan_id="plan-new",
+                fingerprint="b" * 64,
+                request_id="request-new",
+            ),
+        )
+        stale_bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-old",
+            turn_id="turn-old",
+            interaction_id="interaction-old",
+            canonical_plan_id="plan-old",
+            canonical_plan_fingerprint="a" * 64,
+            canonical_goal_ids=["goal-walk"],
+            aggregate_status="completed",
+            evidence=[
+                {
+                    "evidence_id": "evidence-old",
+                    "request_id": "request-old",
+                    "step_id": "step-walk",
+                    "skill_id": "soridormi.walk_forward",
+                    "source_goal_ids": ["goal-walk"],
+                    "status": "completed",
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "status": "completed",
+                    "step_ids": ["step-walk"],
+                    "evidence_ids": ["evidence-old"],
+                    "completed_step_ids": ["step-walk"],
+                }
+            ],
+        )
+
+        with self.assertRaisesRegex(ValueError, "stale"):
+            manager.record_execution_outcome_bundle(
+                stale_bundle,
+                sid="sid-current",
+            )
+
+        context = manager.snapshot()["task_contexts"][0]
+        self.assertEqual(context["metadata"]["canonical_plan_id"], "plan-new")
+        self.assertNotIn("execution_outcome", context["evidence_summary"])
+        pending = manager.snapshot()["pending_tasks"]
+        self.assertEqual(
+            [task["status"] for task in pending if task["type"] == "goal_execution"],
+            ["scheduled", "scheduled"],
+        )
+
+    def test_not_run_never_creates_a_false_completed_memory(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="not-run-memory")
+        self._create_goals(manager, "goal-walk")
+        manager.record_agent_result(
+            "sid-not-run",
+            InteractionResponse(
+                skills=[
+                    {
+                        "request_id": "request-not-run",
+                        "skill_id": "soridormi.walk_forward",
+                        "metadata": {"source_goal_ids": ["goal-walk"]},
+                    }
+                ],
+                metadata={
+                    "planning_result": "composed_plan",
+                    "canonical_plan": self._canonical_plan(
+                        "execute",
+                        [
+                            {
+                                "goal_id": "goal-walk",
+                                "disposition": "execute",
+                                "coverage": "complete",
+                                "step_ids": ["step-walk"],
+                            }
+                        ],
+                    ),
+                },
+            ),
+        )
+
+        self.assertTrue(
+            manager.update_pending_task_status_for_request_id(
+                request_id="request-not-run",
+                status="not_run",
+            )
+        )
+
+        snapshot = manager.snapshot()
+        self.assertEqual(snapshot["task_contexts"][0]["status"], "failed")
+        outcome_texts = [
+            item["text"]
+            for item in snapshot["extracted_memory"]
+            if item["kind"] == "outcome"
+        ]
+        self.assertTrue(any(" is failed" in text for text in outcome_texts))
+        self.assertFalse(any("task completed" in text for text in outcome_texts))
 
 
 if __name__ == "__main__":

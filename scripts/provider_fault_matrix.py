@@ -217,8 +217,8 @@ SCENARIOS = (
     FaultScenario(
         "operator_cancel",
         "cancelled",
-        None,
-        None,
+        "cancelled",
+        "cancelled",
         ("Starting.",),
         (*CANCEL_CALLS, STATUS_CALL),
         operator_cancel=True,

@@ -204,6 +204,93 @@ capability:
 - generalization-oriented Level A and retained live-text evidence pass;
 - `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
 
+## Implemented contract track - Cognitive Gateway decomposition
+
+Chromie's settled ingress boundary is the
+[Cognitive Gateway](docs/COGNITIVE_GATEWAY.md), not a renamed brain or a
+cosmetic rename of `chromie-router`. The Gateway owns Input Normalization,
+Protective Reflex, Attention Review, Context Assembly, and Turn Admission. The
+Goal-Driven Cognitive Core owns goal meaning, planning, delegation, outcome
+reconciliation, and response composition.
+
+The logical ingress contract is implemented. A frozen version 1
+`UserTurnEnvelope` preserves immutable input, quality, attention, reflex,
+source/freshness context references, admission, and stable correlation. The
+host builds and dual-records it across current interaction paths, projects only
+admitted envelopes into Core, and applies local deterministic stop or
+suppression before ordinary cognition. The shared reflex contract is also used
+by Router compatibility rules; pending approval is revoked before the first
+await and a later utterance cannot preempt the active reflex lifecycle.
+Dedicated Soridormi E-stop/safe-idle evidence and physical five-module
+extraction remain open.
+
+Exit criteria before treating the Gateway/Core migration as complete:
+
+- the implemented `UserTurnEnvelope` continues to preserve original input,
+  normalized evidence, quality, attention, context provenance, admission,
+  reflex outcome, and turn correlation without embedding a Gateway-authored
+  normal intent or plan;
+- the five logical Gateway modules have explicit contracts and tests, even if
+  some remain co-deployed during migration;
+- stop, cancel, emergency, silence, and unusable-input controls remain
+  deterministic, while dedicated E-stop claims require trusted provider and
+  safe-idle evidence;
+- Attention Review emits only a bounded admission finding, fails open for
+  direct or unclear speech, and cannot authorize effects;
+- normal goal interpretation, semantic triage, affordance grounding, planning,
+  execution reconciliation, and final response are owned by one Core authority;
+- `RouteDecision`, `chromie-router`, `/route`, `ROUTER_*`, and existing log
+  names remain compatibility surfaces until dual-contract parity and rollback
+  evidence permit deprecation;
+- focused contract tests, deterministic-safety General Ability Level A,
+  retained live-text, cancellation, simulator safe-idle, and documentation
+  checks pass without overstating microphone or physical-robot evidence.
+
+## Implemented architecture track - Cognitive Turn Loop closure
+
+The complete manager-owned lifecycle is defined in
+[Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md). Its host/runtime baseline is
+implemented around Goal Association, Fast/terminal Deep planning, canonical
+validation, confirmation, prospective composition, Skill Runtime, tools,
+memory, and Soridormi integration:
+
+1. the versioned `UserTurnEnvelope` and behavior-preserving Core compatibility
+   adapter retain the canonical admitted input;
+2. committed requests match immutable plan ID/fingerprint, step, skill,
+   arguments, timing, goal ownership, and output-schema digest;
+3. trusted `SkillResult`/`SkillTrace` records join into an immutable
+   `ExecutionOutcomeBundle`;
+4. exact per-goal success, partial completion, failure, refusal, timeout,
+   cancellation, and `not_run` states commit atomically;
+5. only bounded schema-validated provider observations may enter outcome
+   response composition;
+6. the current post-execution composer returns speech only with exact
+   goal/evidence references;
+7. cancellation and newer-turn preemption retain evidence while suppressing
+   stale final speech;
+8. a recoverable embodied retry uses a fresh-confirmed, independently
+   fingerprinted child plan over only the failed recoverable subset.
+
+Exit criteria before treating the implemented loop as target-qualified:
+
+- one stable turn identity reaches Gateway, Core, execution, reconciliation,
+  final response, and retained evidence;
+- an absent runtime result is `not_run`, never inferred completion;
+- multi-goal success and failure remain independently reportable;
+- prospective planner or pre-action speech is never treated as result
+  evidence;
+- unknown or stale plan, goal, step, request, evidence, and fingerprint
+  references fail closed;
+- model-visible outputs pass a declared schema and bounded low-level-field
+  projection; retained evidence preserves a digest when projection is denied;
+- the post-execution response schedules no skills or actions and remains a
+  conservative language-matched status path;
+- cancellation and newer-turn preemption cannot play a stale final response;
+- focused tests, relevant General Ability Level A, the full suite, and
+  documentation checks pass for the final source revision;
+- provider-backed live-text, simulator, microphone, E-stop, safe-idle, and
+  physical-robot behavior remain separate evidence claims.
+
 ## Current checkpoint - Cognitive authority and evidence validation
 
 The active milestone is to validate the implemented Goal-driven Runtime as the

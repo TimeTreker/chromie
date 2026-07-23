@@ -519,6 +519,20 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         kept = await keep_task
 
         self.assertEqual(cancelled.status, "cancelled")
+        self.assertEqual(
+            [
+                (result.request_id, result.status, result.reason_code)
+                for result in cancelled.results
+            ],
+            [("cancel-request", "cancelled", "cancelled")],
+        )
+        self.assertEqual(
+            [
+                (trace.request_id, trace.status)
+                for trace in cancelled.traces
+            ],
+            [("cancel-request", "cancelled")],
+        )
         self.assertIn("keep", status.active_interaction_ids)
         self.assertNotIn("cancel", status.active_interaction_ids)
         self.assertEqual(kept.status, "completed")
@@ -708,6 +722,21 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await task
 
         self.assertEqual(execution.status, "cancelled")
+        self.assertEqual(
+            [
+                (result.request_id, result.status, result.reason_code)
+                for result in execution.results
+            ],
+            [("nod-1", "cancelled", "cancelled")],
+        )
+        self.assertEqual(
+            [(trace.request_id, trace.status) for trace in execution.traces],
+            [("nod-1", "cancelled")],
+        )
+        self.assertIn(
+            "provider cancellation failed",
+            execution.results[0].message,
+        )
         self.assertEqual(runtime.scheduler_status().active_count, 0)
         self.assertEqual(provider.cancel_attempts, 1)
 
@@ -742,8 +771,85 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         execution = await task
 
         self.assertEqual(execution.status, "cancelled")
-        self.assertIn("speech-1", speech_provider.cancelled_request_ids)
-        self.assertIn("nod-1", body_provider.cancelled_request_ids)
+        self.assertEqual(
+            [
+                (result.request_id, result.status, result.reason_code)
+                for result in execution.results
+            ],
+            [
+                ("speech-1", "cancelled", "cancelled"),
+                ("nod-1", "cancelled", "cancelled"),
+            ],
+        )
+        self.assertEqual(
+            [
+                (trace.request_id, trace.status)
+                for trace in execution.traces
+            ],
+            [
+                ("speech-1", "cancelled"),
+                ("nod-1", "cancelled"),
+            ],
+        )
+        self.assertEqual(speech_provider.cancelled_request_ids, {"speech-1"})
+        self.assertEqual(body_provider.cancelled_request_ids, ["nod-1"])
+        self.assertEqual(runtime.scheduler_status().active_count, 0)
+
+    async def test_interruption_omits_unstarted_sequential_request(self) -> None:
+        provider = MockSkillProvider("mock.body", delay_s=5)
+        registry = SkillRegistry()
+        registry.register(
+            _body_definition(
+                skill_id="soridormi.nod_yes",
+                exclusive_group=None,
+            )
+        )
+        registry.register(
+            _body_definition(
+                skill_id="soridormi.express_attention",
+                exclusive_group=None,
+            )
+        )
+        runtime = SkillRuntime(registry)
+        runtime.register_provider(provider)
+
+        task = asyncio.create_task(
+            runtime.execute(
+                InteractionResponse(
+                    skills=[
+                        {
+                            "request_id": "first-active",
+                            "skill_id": "soridormi.nod_yes",
+                            "timing": "sequential",
+                        },
+                        {
+                            "request_id": "second-unstarted",
+                            "skill_id": "soridormi.express_attention",
+                            "timing": "sequential",
+                        },
+                    ],
+                )
+            )
+        )
+        while not provider.calls:
+            await asyncio.sleep(0)
+        task.cancel()
+        execution = await task
+
+        self.assertEqual(execution.status, "cancelled")
+        self.assertEqual(
+            [
+                (result.request_id, result.status, result.reason_code)
+                for result in execution.results
+            ],
+            [("first-active", "cancelled", "cancelled")],
+        )
+        self.assertEqual(
+            [request.request_id for request in provider.calls],
+            ["first-active"],
+        )
+        self.assertEqual(provider.cancelled_request_ids, ["first-active"])
+        self.assertEqual(runtime.scheduler_status().active_count, 0)
 
     async def test_agent_result_adapter_preserves_speech_actions_and_graphs(self) -> None:
         response = AgentResultInteractionAdapter().convert(

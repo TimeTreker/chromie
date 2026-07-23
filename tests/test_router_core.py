@@ -20,8 +20,18 @@ class RouterCoreTests(unittest.TestCase):
             "Can you stop please?",
             "Could you please stop?",
             "Stop moving right now.",
+            "Stop talking for a moment.",
+            "Please stop talking for a second.",
+            "Stop speaking, please.",
+            "Don't speak anymore.",
+            "Could you stop talking for a while?",
+            "Emergency stop!",
+            "E stop!",
             "停止移动",
             "请停止移动",
+            "急停！",
+            "紧急停止一下",
+            "请急停一下",
         ):
             with self.subTest(text=text):
                 decision = route_by_priority_rules(RouteRequest(sid="s1", text=text))
@@ -45,6 +55,10 @@ class RouterCoreTests(unittest.TestCase):
         self.assertTrue(decision.interrupt_current)
         self.assertFalse(decision.needs_agent)
         self.assertFalse(decision.should_speak)
+        self.assertEqual(
+            decision.metadata["reflex_outcome"]["trigger"],
+            "stop_command",
+        )
 
     def test_priority_rules_do_not_stop_on_negated_or_contextual_stop(self) -> None:
         for text in (
@@ -53,6 +67,13 @@ class RouterCoreTests(unittest.TestCase):
             "Can you explain what stop means?",
             "The stop sign is red.",
             "Stop by the table means visit the table.",
+            "What does emergency stop mean?",
+            "The emergency stop button is red.",
+            "Don't emergency stop the robot.",
+            "What does E stop mean?",
+            "Please explain the phrase 'stop talking for a moment'.",
+            "请解释什么是急停。",
+            "不要急停。",
         ):
             with self.subTest(text=text):
                 self.assertIsNone(route_by_priority_rules(RouteRequest(sid="s-safe", text=text)))

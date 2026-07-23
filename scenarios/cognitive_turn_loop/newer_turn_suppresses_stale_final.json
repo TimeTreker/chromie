@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "id": "newer_turn_suppresses_stale_final",
+  "suite": "cognitive_turn_loop",
+  "level": "integration",
+  "description": "A newer playback generation suppresses the old turn's post-execution speech while preserving its completed outcome and goal state.",
+  "tags": ["level-a", "stale-turn", "barge-in", "evidence-retention"],
+  "input": {
+    "text": "Run the check, but do not answer after a newer turn starts.",
+    "language": "en-US"
+  },
+  "stub": {
+    "execution_mode": "stale_final",
+    "runtime_status": "completed",
+    "capabilities": [
+      {
+        "skill_id": "chromie.scenario.stale_check",
+        "provider_id": "scenario.stale",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+        "output_schema": {
+          "type": "object",
+          "properties": {"summary": {"type": "string"}},
+          "additionalProperties": false
+        }
+      }
+    ],
+    "plan": {
+      "plan_id": "plan-level-a-stale-final",
+      "planner_tier": "fast",
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 0.99,
+      "goal_ids": ["goal-stale"],
+      "goal_summary": "Run one check.",
+      "steps": [
+        {
+          "step_id": "stale-check",
+          "skill_id": "chromie.scenario.stale_check",
+          "args": {},
+          "timing": "sequential",
+          "source_goal_ids": ["goal-stale"]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-stale",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": ["stale-check"]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": ["goal-stale"]
+      }
+    },
+    "results": [
+      {
+        "step_id": "stale-check",
+        "status": "completed",
+        "output": {"summary": "STALE-FINAL-MUST-NOT-PLAY"}
+      }
+    ]
+  },
+  "expect": {
+    "admission": "admit",
+    "original_input_preserved": true,
+    "turn_identity_preserved": true,
+    "runtime_status": "completed",
+    "aggregate_status": "completed",
+    "evidence_statuses": ["completed"],
+    "goal_statuses": ["completed"],
+    "observation_statuses": ["available"],
+    "goal_state_statuses": ["done"],
+    "goal_state_outcome_statuses": ["completed"],
+    "closure_status": "suppressed_stale",
+    "delivery_status": "suppressed",
+    "suppression_reason": "stale_turn",
+    "final_response_absent": true,
+    "final_speech_only": false,
+    "final_speech_count": 0,
+    "final_goal_statuses": [],
+    "final_skill_ids": [],
+    "runtime_call_count": 1
+  }
+}

@@ -166,6 +166,14 @@ primary tests plus 20 legacy Agent tests, `scripts/scenario_runner.py` with
 hygiene. This does not replace the still-open supervised
 microphone/speaker/simulator rerun.
 
+The July 23 Cognitive Gateway and Turn Loop gate passed
+`./scripts/run_tests.sh` with 1241 primary tests plus 20 legacy Agent tests.
+The new `evidence_bound_cognitive_turn_closure` Level A class passed 5/5
+deterministic cases, and the final focused contract audit found no blockers.
+Documentation validation, compilation, and diff hygiene also passed. This is
+automatic evidence only; retained provider-backed live-text, microphone,
+speaker, simulator, safe-idle, and robot qualification remain open.
+
 The initial Runtime Observability implementation is now present behind a
 default-off policy. It provides architecture-independent Runtime Trace items,
 module-owned identity, `off`/`basic`/`debug` collection, monotonic duration
@@ -257,14 +265,18 @@ The `0.0.1` release implementation is present:
   deepthinking may record understood but non-executable desired abilities as
   `missing_ability` task proposals, while executable work still requires exact
   catalog skill IDs and trusted runtime validation;
-- goal-driven PR1–PR8 runtime migration with shared Goal and CanonicalPlan
+- goal-driven PR1–PR9 runtime migration with shared Goal, CanonicalPlan,
+  `UserTurnEnvelope`, and `ExecutionOutcomeBundle`
   contracts, continuity-before-creation association, complete-coverage Fast
   Planning, terminal Deep Planning, parameter resolution, Goal Satisfaction,
   fingerprint-bound response composition, lane-gated
   `off`/`report_only`/`apply`, one bounded trusted-validator replan, atomic
-  Goal-state application, classified operational evidence, and immediate
-  per-lane rollback; maintained configuration uses authoritative `apply`, while
-  retained live-text/MuJoCo evidence for that path remains open;
+  Goal-state application, exact plan/request/result reconciliation, bounded
+  schema-validated observations, speech-only final outcome response,
+  cancellation/stale-response suppression, confirmation-bound recovery child
+  plans, classified operational evidence, and immediate per-lane rollback;
+  maintained configuration uses authoritative `apply`, while retained
+  live-text/MuJoCo evidence for that path remains open;
 - exact model boundaries for that pipeline: Goal Association selects a
   state-specific schema that omits association when no active goals exist;
   Fast/Deep Planning uses a flat exact DTO with host-owned plan identity, tier,
@@ -329,6 +341,28 @@ replacement tag is `0.0.1`, after the Chromie and Soridormi validation
 gates pass from the intended revisions.
 
 ## Next sequence
+
+The Cognitive Gateway contract and manager-owned Cognitive Turn Loop baseline
+are implemented. The host now preserves a frozen version 1
+`UserTurnEnvelope`, projects only admitted turns into Core, binds committed
+requests to the exact immutable plan/arguments/timing/schema identity, produces
+an `ExecutionOutcomeBundle`, commits exact per-goal outcomes, suppresses stale
+final speech, and emits a validated speech-only result response. Recoverable
+embodied failures use a separately fingerprinted, confirmation-bound child
+plan over only the failed recoverable subset.
+
+The next work is qualification and extraction, not another semantic redesign:
+retain source-bound live-text and MuJoCo evidence for the closed loop; verify
+cancel/stop and safe-idle behavior at the proper evidence level; then extract
+the five logical Gateway modules and compatibility `RouteDecision` derivation
+without changing the contracts. Do not start by renaming the Docker service,
+`/route`, `ROUTER_*`, or log fields, and do not widen Agent autonomy or
+automatically replay physical work. The complete ingress sequence and exit
+criteria are owned by [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md), the turn
+lifecycle by [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md), and delivery
+order by the corresponding Roadmap tracks. The implemented contracts do not
+convert the still-open source-bound cognitive evidence checkpoint into
+completed target validation.
 
 1. Exercise the authoritative path with retained live-text and MuJoCo
    multi-goal cases. Confirm Goal Association, Fast/Deep Planning, Response
