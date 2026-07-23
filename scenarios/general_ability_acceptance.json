@@ -425,7 +425,7 @@
       "level_a_scenarios": [
         {
           "key": "router/polite_stop",
-          "rationale": "A polite stop should still route through the deterministic interrupt path."
+          "rationale": "A polite bare stop should deterministically cancel the current foreground interaction rather than relying on model judgment."
         },
         {
           "key": "dialogue/task_close_nevermind",
@@ -722,7 +722,7 @@
         },
         {
           "key": "cognitive_turn_loop/active_stop_cancel_retains_outcome",
-          "rationale": "A deterministic stop cancels the active provider request, marks its queued sibling not_run, retains both outcomes, and emits no late final."
+          "rationale": "A deterministic current-interaction stop cancels the active provider request, closes its selected queued sibling as cancelled-before-start, retains both outcomes, and emits no late final."
         }
       ],
       "live_text_cases": []

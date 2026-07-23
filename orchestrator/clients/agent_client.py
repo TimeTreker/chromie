@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
+from urllib.parse import quote
 
 import aiohttp
 from shared.chromie_contracts.interaction import InteractionResponse
@@ -29,9 +31,20 @@ class AgentClient:
         schema_version=1,
     )
 
-    def __init__(self, base_url: str, timeout_ms: int = 3000):
+    def __init__(
+        self,
+        base_url: str,
+        timeout_ms: int = 3000,
+        *,
+        task_graph_execution_token: str | None = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout_ms = max(100, int(timeout_ms))
+        self.task_graph_execution_token = (
+            str(task_graph_execution_token).strip()
+            if task_graph_execution_token is not None
+            else os.getenv("AGENT_TASK_GRAPH_EXECUTION_TOKEN", "").strip()
+        )
 
     async def run(
         self,
@@ -324,5 +337,43 @@ class AgentClient:
             if resp.status != 200:
                 raise RuntimeError(
                     f"Agent TaskGraph execution returned HTTP {resp.status}: {body[:500]}"
+                )
+            return dict(await resp.json())
+
+    async def cancel_planning_task_graph(
+        self,
+        session: aiohttp.ClientSession,
+        graph_id: str,
+        *,
+        timeout_ms: int = 3000,
+    ) -> dict[str, Any]:
+        normalized_graph_id = str(graph_id or "").strip()
+        if not normalized_graph_id:
+            raise ValueError("TaskGraph cancellation requires graph_id")
+        if not self.task_graph_execution_token:
+            raise RuntimeError(
+                "AGENT_TASK_GRAPH_EXECUTION_TOKEN is required for "
+                "TaskGraph cancellation"
+            )
+        timeout = aiohttp.ClientTimeout(
+            total=max(100, int(timeout_ms)) / 1000.0
+        )
+        async with session.post(
+            (
+                f"{self.base_url}/task-graphs/"
+                f"{quote(normalized_graph_id, safe='')}/cancel"
+            ),
+            headers={
+                "Authorization": (
+                    f"Bearer {self.task_graph_execution_token}"
+                )
+            },
+            timeout=timeout,
+        ) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                raise RuntimeError(
+                    "Agent TaskGraph cancellation returned "
+                    f"HTTP {resp.status}: {body[:500]}"
                 )
             return dict(await resp.json())

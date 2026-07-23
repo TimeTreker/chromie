@@ -51,6 +51,7 @@ from shared.chromie_contracts.interaction import (
     SkillResult,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.response_composition import (
     CoordinatedResponsePlan,
     ResponseCompositionResolution,
@@ -539,6 +540,14 @@ class _CognitiveTurnScenarioRuntime:
     async def cancel_all(self) -> None:
         if self.runtime is not None:
             await self.runtime.cancel_all()
+
+    async def cancel_scope(
+        self,
+        directive: CancellationDirective,
+    ) -> Any:
+        if self.runtime is None:
+            raise AssertionError("scoped-cancel runtime was not initialized")
+        return await self.runtime.cancel_scope(directive)
 
 
 class _CognitiveScenarioClient:
@@ -1984,6 +1993,7 @@ async def evaluate_cognitive_turn_loop_scenario(
     )
 
     stop_envelope = None
+    cancellation_receipt = None
     if runtime.mode == "stale_final":
         runtime.on_effectful_done = lambda: setattr(
             assistant,
@@ -2012,8 +2022,14 @@ async def evaluate_cognitive_turn_loop_scenario(
             context={"active_goal_snapshots": plan.goal_ids},
         )
         assistant.playback_generation += 1
-        execution_task.cancel()
-        await runtime.cancel_all()
+        cancellation_receipt = await runtime.cancel_scope(
+            CancellationDirective(
+                source_turn_id=stop_envelope.turn_id,
+                requested_scope=stop_envelope.reflex.cancellation_scope,
+                foreground_interaction_id=response.interaction_id,
+                reason=stop_envelope.reflex.reason,
+            )
+        )
         execution = await execution_task
     else:
         execution = await assistant.execute_interaction_response(
@@ -2038,6 +2054,20 @@ async def evaluate_cognitive_turn_loop_scenario(
         str(item.get("semantic_goal", {}).get("goal_id") or ""): item
         for item in manager.snapshot()["task_contexts"]
     }
+    request_step_ids = {
+        request.request_id: str(request.metadata.get("step_id") or "")
+        for request in response.skills
+    }
+    execution_by_request_id = {
+        result.request_id: result for result in execution.results
+    }
+
+    def cancellation_step_ids(request_ids: Any) -> list[str]:
+        return [
+            request_step_ids.get(request_id, request_id)
+            for request_id in request_ids
+        ]
+
     actual = {
         "admission": envelope.admission,
         "original_input_preserved": (
@@ -2099,6 +2129,41 @@ async def evaluate_cognitive_turn_loop_scenario(
             if stop_envelope is not None
             else None
         ),
+        "stop_cancellation_scope": (
+            stop_envelope.reflex.cancellation_scope
+            if stop_envelope is not None
+            else None
+        ),
+        "cancel_selected_request_ids": (
+            list(cancellation_receipt.selected_request_ids)
+            if cancellation_receipt is not None
+            else []
+        ),
+        "cancel_queued_request_ids": (
+            list(cancellation_receipt.queued_request_ids)
+            if cancellation_receipt is not None
+            else []
+        ),
+        "cancel_selected_step_ids": (
+            cancellation_step_ids(cancellation_receipt.selected_request_ids)
+            if cancellation_receipt is not None
+            else []
+        ),
+        "cancel_queued_step_ids": (
+            cancellation_step_ids(cancellation_receipt.queued_request_ids)
+            if cancellation_receipt is not None
+            else []
+        ),
+        "plan_reason_codes": [
+            (
+                execution_by_request_id[request.request_id].reason_code
+                if request.request_id in execution_by_request_id
+                else None
+            )
+            for request in response.skills
+            if request.metadata.get("source")
+            == "goal_driven_canonical_plan"
+        ],
         "provider_cancelled_request_ids": list(
             runtime.cancelled_request_ids
         ),
@@ -2138,6 +2203,12 @@ async def evaluate_cognitive_turn_loop_scenario(
         "runtime_call_count",
         "stop_admission",
         "stop_reflex_action",
+        "stop_cancellation_scope",
+        "cancel_selected_request_ids",
+        "cancel_queued_request_ids",
+        "cancel_selected_step_ids",
+        "cancel_queued_step_ids",
+        "plan_reason_codes",
         "provider_cancelled_request_ids",
         "provider_cancelled_step_ids",
     )

@@ -113,6 +113,7 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
                     language="en-US",
                     priority="urgent",
                     interrupt_current=True,
+                    cancellation_scope="current_interaction",
                 )
             )
 

@@ -3,7 +3,7 @@
   "id": "polite_stop",
   "suite": "router",
   "level": "module",
-  "description": "Polite stop stays on the deterministic interrupt path.",
+  "description": "A polite bare stop stays on the deterministic current-interaction interrupt path.",
   "tags": ["interrupt", "safety", "polite"],
   "input": {
     "text": "Could you please stop?"
@@ -13,7 +13,7 @@
   },
   "expect": {
     "route": "interrupt",
-    "intent": "stop_current_output",
+    "intent": "cancel_current_interaction",
     "source": "rules",
     "task_types_include": ["task.cancel_current_action", "body.stop_motion"],
     "llm_calls": 0,

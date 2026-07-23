@@ -49,6 +49,12 @@ def _confirmation_graph(graph_id: str = "confirmation") -> TaskGraph:
 
 
 class TaskGraphRetentionTests(unittest.TestCase):
+    def test_graph_id_is_safe_for_cancel_route(self) -> None:
+        graph = _report_graph("goal:fetch_phone-01")
+        self.assertEqual(graph.graph_id, "goal:fetch_phone-01")
+        with self.assertRaisesRegex(ValueError, "URL-path-safe"):
+            _report_graph("goal/fetch phone")
+
     def test_traces_use_ttl_and_lru_capacity(self) -> None:
         clock = _Clock()
         service = TaskGraphService(

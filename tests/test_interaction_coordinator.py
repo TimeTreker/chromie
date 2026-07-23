@@ -9,6 +9,7 @@ from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.reflex import CancellationDirective
 
 
 class _SoridormiInvoker:
@@ -72,10 +73,102 @@ class _SoridormiInvoker:
             )
         if tool_name == "soridormi.motion.cancel":
             return ToolCallOutcome.success({"cancelled": True})
+        if tool_name == "soridormi.safety.emergency_stop":
+            return ToolCallOutcome.success(
+                {
+                    "stopped": True,
+                    "emergency": True,
+                    "safe_idle": True,
+                }
+            )
         return ToolCallOutcome.failed(f"unexpected tool {tool_name}")
 
 
 class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_emergency_stop_uses_dedicated_soridormi_control(self) -> None:
+        invoker = _SoridormiInvoker()
+        coordinator = InteractionRuntimeCoordinator(
+            lambda _args: {"scheduled": True},
+            soridormi_invoker=invoker,
+        )
+
+        evidence = await coordinator.emergency_stop(
+            reason="user requested emergency stop"
+        )
+
+        self.assertEqual(evidence["status"], "success")
+        self.assertTrue(evidence["output"]["safe_idle"])
+        tool_name, args, context = invoker.calls[-1]
+        self.assertEqual(
+            tool_name,
+            "soridormi.safety.emergency_stop",
+        )
+        self.assertEqual(
+            args,
+            {"reason": "user requested emergency stop"},
+        )
+        self.assertIsNotNone(context)
+        self.assertTrue(context.allow_safety_controls)
+
+    async def test_emergency_stop_fails_closed_when_soridormi_is_disabled(
+        self,
+    ) -> None:
+        coordinator = InteractionRuntimeCoordinator(
+            lambda _args: {"scheduled": True},
+        )
+
+        evidence = await coordinator.emergency_stop(
+            reason="user requested emergency stop"
+        )
+
+        self.assertEqual(evidence["status"], "unavailable")
+        self.assertEqual(
+            evidence["reason"],
+            "soridormi_invoker_disabled",
+        )
+
+    async def test_emergency_stop_rejects_success_without_safe_postcondition(
+        self,
+    ) -> None:
+        class UnconfirmedInvoker(_SoridormiInvoker):
+            def __init__(self, output: dict[str, Any]) -> None:
+                super().__init__()
+                self.output = output
+
+            async def invoke(
+                self,
+                tool_name: str,
+                args: dict[str, Any],
+                *,
+                context: ToolInvocationContext | None = None,
+            ) -> ToolCallOutcome:
+                if tool_name == "soridormi.safety.emergency_stop":
+                    return ToolCallOutcome.success(self.output)
+                return await super().invoke(
+                    tool_name,
+                    args,
+                    context=context,
+                )
+
+        for output in (
+            {"stopped": False, "emergency": True, "safe_idle": True},
+            {"stopped": True, "emergency": True},
+        ):
+            with self.subTest(output=output):
+                coordinator = InteractionRuntimeCoordinator(
+                    lambda _args: {"scheduled": True},
+                    soridormi_invoker=UnconfirmedInvoker(output),
+                )
+                evidence = await coordinator.emergency_stop(reason="stop")
+                self.assertEqual(evidence["status"], "unconfirmed")
+                self.assertEqual(
+                    evidence["reason"],
+                    "emergency_stop_postcondition_unconfirmed",
+                )
+                self.assertFalse(
+                    evidence.get("postcondition_confirmed", False)
+                )
+
     async def test_speech_only_does_not_require_soridormi(self) -> None:
         scheduled: list[dict[str, Any]] = []
         coordinator = InteractionRuntimeCoordinator(
@@ -1163,6 +1256,130 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.results[0].status, "cancelled")
         self.assertEqual(result.results[0].reason_code, "task_graph_cancelled")
         self.assertEqual(spoken, ["The task was cancelled, so I did not continue."])
+
+    async def test_scoped_task_graph_cancel_uses_authoritative_endpoint(
+        self,
+    ) -> None:
+        started = asyncio.Event()
+        cancelled_graph_ids: list[str] = []
+
+        async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("cancelled TaskGraph execution resumed")
+
+        async def cancel_graph(graph_id: str) -> dict[str, Any]:
+            cancelled_graph_ids.append(graph_id)
+            return {
+                "graph_id": graph_id,
+                "cancellation_requested": True,
+            }
+
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            task_graph_handler=execute_graph,
+            task_graph_cancel_handler=cancel_graph,
+        )
+        execution_task = asyncio.create_task(
+            coordinator.execute(
+                InteractionResponse(
+                    interaction_id="interaction-task-graph-cancel",
+                    skills=[
+                        {
+                            "request_id": "graph-request",
+                            "skill_id": "chromie.task_graph.execute",
+                            "args": {
+                                "graph": {
+                                    "graph_id": "graph-cancel",
+                                    "nodes": [],
+                                }
+                            },
+                            "timing": "sequential",
+                        }
+                    ],
+                ),
+                session_id="sid-task-graph-cancel",
+            )
+        )
+        await started.wait()
+
+        receipt = await coordinator.cancel_scope(
+            CancellationDirective(
+                source_turn_id="turn-stop-task-graph",
+                requested_scope="embodied_motion",
+            )
+        )
+        execution = await execution_task
+
+        self.assertEqual(cancelled_graph_ids, ["graph-cancel"])
+        self.assertEqual(receipt.provider_cancel_failures, ())
+        self.assertEqual(
+            receipt.cancel_requested_request_ids,
+            ("graph-request",),
+        )
+        self.assertEqual(execution.status, "cancelled")
+        self.assertEqual(execution.results[0].status, "cancelled")
+        self.assertEqual(
+            execution.results[0].reason_code,
+            "cancelled_embodied_motion",
+        )
+
+    async def test_scoped_task_graph_cancel_fails_closed_without_endpoint(
+        self,
+    ) -> None:
+        started = asyncio.Event()
+
+        async def execute_graph(graph: dict[str, Any]) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("cancelled TaskGraph execution resumed")
+
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True},
+            task_graph_handler=execute_graph,
+        )
+        execution_task = asyncio.create_task(
+            coordinator.execute(
+                InteractionResponse(
+                    interaction_id="interaction-task-graph-no-cancel",
+                    skills=[
+                        {
+                            "request_id": "graph-request",
+                            "skill_id": "chromie.task_graph.execute",
+                            "args": {
+                                "graph": {
+                                    "graph_id": "graph-no-cancel",
+                                    "nodes": [],
+                                }
+                            },
+                            "timing": "sequential",
+                        }
+                    ],
+                ),
+                session_id="sid-task-graph-no-cancel",
+            )
+        )
+        await started.wait()
+
+        receipt = await coordinator.cancel_scope(
+            CancellationDirective(
+                source_turn_id="turn-stop-task-graph-no-endpoint",
+                requested_scope="embodied_motion",
+            )
+        )
+        execution = await execution_task
+
+        self.assertEqual(len(receipt.provider_cancel_failures), 1)
+        self.assertIn(
+            "endpoint is not configured",
+            receipt.provider_cancel_failures[0],
+        )
+        self.assertEqual(execution.status, "failed")
+        self.assertEqual(execution.results[0].status, "failed")
+        self.assertEqual(
+            execution.results[0].reason_code,
+            "cancellation_failed_embodied_motion",
+        )
 
     async def test_task_graph_skill_fails_closed_when_handler_is_disabled(
         self,

@@ -257,7 +257,7 @@ with audible speech instead of merely queued TTS.
 | `POST` | `/task-graphs/execute-planning` | `AGENT_ENABLE_PLANNING_TASK_GRAPH_EXECUTION=1` | Execute safe reads and stateful `planning_only` tools. |
 | `POST` | `/task-graphs/confirmation-grants` | Guarded execution enabled plus bearer token | Issue a short-lived, single-use grant bound to a graph and confirmation nodes. |
 | `POST` | `/task-graphs/execute-guarded` | Guarded execution enabled plus bearer token | Execute authorized side effects; physical motion also requires its separate gate and monitor proofs. |
-| `POST` | `/task-graphs/{graph_id}/cancel` | Guarded execution bearer token | Request cancellation of an active graph. |
+| `POST` | `/task-graphs/{graph_id}/cancel` | Guarded execution bearer token | Cancel an active graph or reserve a bounded cancel-before-start tombstone for a not-yet-arrived execute request. |
 | `GET` | `/task-graphs/{graph_id}/trace` | Diagnostics bearer token | Return the latest non-expired in-memory retained trace. |
 | `GET` | `/task-graphs/scheduler/status` | Diagnostics bearer token | Return scheduler mode, active/waiting counters, and active graph IDs. |
 
@@ -271,6 +271,20 @@ Dry-run, trace, and scheduler requests use
 `AGENT_TASK_GRAPH_DIAGNOSTICS_TOKEN`. When that variable is blank, the Agent
 falls back to `AGENT_TASK_GRAPH_EXECUTION_TOKEN`; when both are blank, the
 diagnostic endpoints return 503. Invalid or missing credentials return 401.
+
+`graph_id` is also the cancellation-path identity. It must contain 1–128
+URL-path-safe letters, digits, periods, underscores, colons, or hyphens. If a
+cancel request wins the transport race against execution registration, the
+Agent retains a capacity- and TTL-bounded tombstone and returns a cancelled
+trace when that graph arrives, without calling its provider. A graph with an
+already-retained terminal trace returns `cancellation_requested=false`.
+Read-only or planning execution retries with the same retained `graph_id`,
+exact graph fingerprint, and execution lane return the retained trace without
+invoking providers. Guarded retries must also present a fresh valid
+graph-bound grant. Reusing the ID for different graph content or a different
+successful execution lane is rejected until retention expires. Dry-run traces
+are diagnostics only: they neither satisfy execution replay nor prevent a
+later cancellation tombstone.
 
 TaskGraph execution responses return an `ExecutionTrace`. Its `summary` remains
 the planner-provided task summary, while `outcome_summary` is generated

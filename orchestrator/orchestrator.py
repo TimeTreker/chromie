@@ -83,7 +83,12 @@ from shared.chromie_contracts.interaction import (
     SkillRequest,
     SkillResult,
 )
-from shared.chromie_contracts.reflex import DEFAULT_REFLEX_FILTER
+from shared.chromie_contracts.reflex import (
+    CancellationDirective,
+    CancellationDispatchReceipt,
+    DEFAULT_REFLEX_FILTER,
+    ReflexOutcome,
+)
 from shared.chromie_contracts.user_turn import UserTurnEnvelope
 from shared.chromie_contracts.semantic_authority import (
     SemanticAuthorityClaim,
@@ -121,6 +126,14 @@ ASR_TRACE_MODULE = TraceModule(
     implementation="ChromieOrchestrator",
 )
 
+
+class _ActiveGoalCancellationRequiresRuntimeDispatch(ValueError):
+    def __init__(self, goal_ids: list[str]) -> None:
+        self.goal_ids = tuple(sorted(goal_ids))
+        super().__init__(
+            "active_goal_cancellation_requires_runtime_dispatch:"
+            + ",".join(self.goal_ids)
+        )
 
 
 def trace_session_async(module: TraceModule, operation: str, session_arg: str):
@@ -510,6 +523,12 @@ class VoiceAssistant:
         )
         self.active_llm_task: asyncio.Task | None = None
         self.active_interaction_task: asyncio.Task | None = None
+        self.active_interaction_id: str | None = None
+        self.active_interaction_tasks: dict[asyncio.Task, str] = {}
+        self.active_interaction_reservations: dict[
+            asyncio.Task,
+            str,
+        ] = {}
         self.task_continuity_report_tasks: set[asyncio.Task] = set()
         self.goal_association_report_tasks: set[asyncio.Task] = set()
         self.fast_planner_report_tasks: set[asyncio.Task] = set()
@@ -637,6 +656,8 @@ class VoiceAssistant:
         self.active_asr_task: asyncio.Task | None = None
         self.active_turn_task: asyncio.Task | None = None
         self.active_reflex_task: asyncio.Task | None = None
+        self.concurrent_protective_reflex_tasks: set[asyncio.Task] = set()
+        self._protective_reflex_failure = False
         self._pending_turn_after_reflex: tuple[str, str] | None = None
         self._pending_vad_audio: bytes | None = None
         self.synthesis_semaphore = asyncio.Semaphore(int(os.getenv("ORCH_TTS_CONCURRENCY", "1")))
@@ -676,6 +697,7 @@ class VoiceAssistant:
             self._schedule_interaction_speech,
             soridormi_invoker=soridormi_invoker,
             task_graph_handler=self._execute_planning_task_graph,
+            task_graph_cancel_handler=self._cancel_planning_task_graph,
             auto_confirm_sim=self.auto_confirm_sim_skills,
         )
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
@@ -1466,15 +1488,29 @@ class VoiceAssistant:
             async with self.output_stream_lock:
                 if self.output_stream is None:
                     return
+                stream = self.output_stream
+
+                def abort_and_close() -> None:
+                    try:
+                        stream.abort()
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to abort output stream: %s",
+                            exc,
+                        )
+                    try:
+                        stream.close()
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to close output stream after abort: %s",
+                            exc,
+                        )
+
                 try:
-                    self.output_stream.abort()
-                except Exception as exc:
-                    logger.warning("Failed to abort output stream: %s", exc)
-                try:
-                    self.output_stream.close()
-                except Exception as exc:
-                    logger.warning("Failed to close output stream after abort: %s", exc)
-                self.output_stream = None
+                    await asyncio.to_thread(abort_and_close)
+                finally:
+                    if self.output_stream is stream:
+                        self.output_stream = None
 
     async def close_output_stream(self):
         async with self.output_write_lock:
@@ -3304,6 +3340,57 @@ class VoiceAssistant:
         association = resolution.goal_association
         if association is None:
             return []
+        cancel_goal_ids = {
+            goal_id
+            for item in association.associations
+            if item.relationship == "cancel"
+            for goal_id in item.target_goal_ids
+        }
+        if cancel_goal_ids:
+            snapshots = self.conversation_state.active_goal_snapshots(
+                limit=self.conversation_state.max_pending_tasks
+            )
+            runtime_bound: list[str] = []
+            for snapshot in snapshots:
+                goal_id = str(snapshot.get("goal_id") or "").strip()
+                if goal_id not in cancel_goal_ids:
+                    continue
+                status = str(snapshot.get("status") or "").strip()
+                metadata = snapshot.get("metadata")
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                remaining = metadata.get("remaining_request_ids")
+                if isinstance(remaining, str):
+                    remaining = [remaining]
+                has_remaining = bool(
+                    isinstance(remaining, list)
+                    and any(str(item).strip() for item in remaining)
+                )
+                exact_binding = all(
+                    str(metadata.get(key) or "").strip()
+                    for key in (
+                        "interaction_id",
+                        "canonical_plan_id",
+                        "canonical_plan_fingerprint",
+                    )
+                )
+                if (
+                    status
+                    in {
+                        "awaiting_confirmation",
+                        "committed",
+                        "scheduled",
+                        "running",
+                        "paused",
+                    }
+                    or has_remaining
+                    or exact_binding
+                ):
+                    runtime_bound.append(goal_id)
+            if runtime_bound:
+                raise _ActiveGoalCancellationRequiresRuntimeDispatch(
+                    runtime_bound
+                )
         results = self.conversation_state.apply_goal_association_resolution(
             association,
             sid=session_id,
@@ -3463,6 +3550,10 @@ class VoiceAssistant:
                 "host_commit_status": "prepared_and_goal_state_committed",
             }
         except Exception as exc:
+            cancellation_dispatch_required = isinstance(
+                exc,
+                _ActiveGoalCancellationRequiresRuntimeDispatch,
+            )
             self.session_log(
                 session_id,
                 "cognitive_runtime_commit_failed: error_type=%s error=%s",
@@ -3486,14 +3577,39 @@ class VoiceAssistant:
                     },
                 },
             )
-            safe_response = self._agent_exception_safe_response(
-                decision, user_text=user_text
-            ) or self._host_speech_response(
-                "这次计划没有通过执行验证，所以我没有继续。"
-                if self._looks_zh(user_text)
-                else "That plan did not pass execution validation, so I stopped before acting.",
-                style="warning",
-                source="host_cognitive_runtime_commit_failure",
+            summary = self._cognitive_resolution_summary(resolution)
+            metadata = dict(decision.metadata or {})
+            metadata["cognitive_runtime_resolution"] = summary
+            metadata["cognitive_runtime_mode"] = "apply"
+            decision = decision.model_copy(update={"metadata": metadata})
+            safe_response = (
+                self._host_speech_response(
+                    (
+                        "我还不能可靠地把这个目标和正在执行的任务一起停下，"
+                        "所以没有把它标记为已取消。"
+                    )
+                    if self._looks_zh(user_text)
+                    else (
+                        "I could not reliably stop the selected goal together "
+                        "with its active execution, so I did not mark it cancelled."
+                    ),
+                    style="warning",
+                    source="host_specific_goal_cancel_not_dispatched",
+                )
+                if cancellation_dispatch_required
+                else self._agent_exception_safe_response(
+                    decision, user_text=user_text
+                )
+                or self._host_speech_response(
+                    "这次计划没有通过执行验证，所以我没有继续。"
+                    if self._looks_zh(user_text)
+                    else (
+                        "That plan did not pass execution validation, "
+                        "so I stopped before acting."
+                    ),
+                    style="warning",
+                    source="host_cognitive_runtime_commit_failure",
+                )
             )
             self.conversation_state.record_user_turn(
                 session_id,
@@ -3980,18 +4096,26 @@ class VoiceAssistant:
                 reflex_outcome.intent,
                 reflex_outcome.confidence,
             )
-            revoked_confirmation = self._revoke_pending_confirmation_for_reflex()
+            revoked_confirmation = self._revoke_pending_confirmation_for_reflex(
+                reflex_outcome
+            )
             # The approval token is revoked synchronously before the first
             # await, so slow trusted-provider cancellation cannot leave an old
             # action approvable. Persistence and goal-state reconciliation run
             # only after interruption has begun, so they cannot delay stopping.
             try:
-                await self.interrupt(new_session_id=session_id)
+                cancellation_receipt = await self._apply_reflex_cancellation(
+                    reflex_outcome,
+                    source_turn_id=session_id,
+                )
             finally:
                 cancelled_confirmation = (
                     self._reconcile_revoked_confirmation_for_reflex(
                         revoked_confirmation,
                         session_id,
+                        cancellation_scope=(
+                            reflex_outcome.cancellation_scope
+                        ),
                     )
                 )
             if cancelled_confirmation:
@@ -4018,6 +4142,9 @@ class VoiceAssistant:
                         "source": "cognitive_gateway_reflex",
                         "confidence": reflex_outcome.confidence,
                         "reflex_outcome": reflex_outcome.model_dump(mode="json"),
+                        "cancellation_dispatch_receipt": (
+                            cancellation_receipt.model_dump(mode="json")
+                        ),
                     },
                     turn_envelope,
                 ),
@@ -4992,10 +5119,48 @@ class VoiceAssistant:
         self._launch_interaction(response, session_id)
         return True
 
-    def _revoke_pending_confirmation_for_reflex(self) -> Any | None:
+    def _revoke_pending_confirmation_for_reflex(
+        self,
+        outcome: ReflexOutcome,
+    ) -> Any | None:
         """Revoke an approval token synchronously, before interruption awaits."""
 
         dialogue = getattr(self, "confirmation_dialogue", None)
+        if outcome.cancellation_scope == "output_only":
+            return None
+        if outcome.cancellation_scope == "embodied_motion":
+            pending = getattr(dialogue, "pending", None)
+            if pending is None:
+                return None
+            confirmed = set(
+                getattr(pending, "confirmed_request_ids", ()) or ()
+            )
+            response = getattr(pending, "response", None)
+            requests = getattr(response, "skills", ()) or ()
+            registry = getattr(
+                getattr(self, "interaction_runtime", None),
+                "registry",
+                None,
+            )
+            has_motion = False
+            seen_confirmed_request_ids: set[str] = set()
+            unknown_confirmed_request = False
+            for request in requests:
+                if request.request_id not in confirmed:
+                    continue
+                seen_confirmed_request_ids.add(request.request_id)
+                try:
+                    definition = registry.get(request.skill_id)
+                except (AttributeError, ValueError):
+                    unknown_confirmed_request = True
+                    continue
+                if "embodied_motion" in definition.cancellation_domains:
+                    has_motion = True
+                    break
+            if confirmed - seen_confirmed_request_ids:
+                unknown_confirmed_request = True
+            if not has_motion and not unknown_confirmed_request:
+                return None
         cancel = getattr(dialogue, "cancel", None)
         return cancel() if callable(cancel) else None
 
@@ -5003,7 +5168,9 @@ class VoiceAssistant:
         self,
         pending: Any | None,
         session_id: str,
-    ) -> dict[str, str]:
+        *,
+        cancellation_scope: str,
+    ) -> dict[str, Any]:
         """Persist cancellation only after the operational reflex has begun."""
 
         if pending is None:
@@ -5011,6 +5178,43 @@ class VoiceAssistant:
 
         confirmation_id = str(getattr(pending, "confirmation_id", "") or "")
         fingerprint = str(getattr(pending, "fingerprint", "") or "")
+        confirmed_request_ids = sorted(
+            str(item)
+            for item in (
+                getattr(pending, "confirmed_request_ids", ()) or ()
+            )
+        )
+        motion_request_ids: set[str] = set()
+        unknown_request_ids: set[str] = set()
+        response = getattr(pending, "response", None)
+        registry = getattr(
+            getattr(self, "interaction_runtime", None),
+            "registry",
+            None,
+        )
+        request_by_id = {
+            str(request.request_id): request
+            for request in (getattr(response, "skills", ()) or ())
+        }
+        for request_id in confirmed_request_ids:
+            request = request_by_id.get(request_id)
+            if request is None:
+                unknown_request_ids.add(request_id)
+                continue
+            try:
+                definition = registry.get(request.skill_id)
+            except (AttributeError, ValueError):
+                unknown_request_ids.add(request_id)
+                continue
+            if "embodied_motion" in definition.cancellation_domains:
+                motion_request_ids.add(request_id)
+        confirmation_scope_widened = bool(
+            cancellation_scope == "embodied_motion"
+            and (
+                set(confirmed_request_ids) - motion_request_ids
+                or unknown_request_ids
+            )
+        )
         conversation_state = getattr(self, "conversation_state", None)
         resolved = False
         resolve_confirmation_scope = getattr(
@@ -5040,13 +5244,28 @@ class VoiceAssistant:
 
         self.session_log(
             session_id,
-            "cognitive_gateway_confirmation_cancelled: confirmation_id=%s fingerprint=%s",
+            "cognitive_gateway_confirmation_cancelled: "
+            "confirmation_id=%s fingerprint=%s scope=%s widened=%s",
             confirmation_id or "<unknown>",
             fingerprint or "<unknown>",
+            cancellation_scope,
+            confirmation_scope_widened,
         )
         return {
             "confirmation_id": confirmation_id,
             "fingerprint": fingerprint,
+            "cancellation_scope": cancellation_scope,
+            "confirmed_request_ids": confirmed_request_ids,
+            "motion_request_ids": sorted(motion_request_ids),
+            "unknown_request_ids": sorted(unknown_request_ids),
+            "confirmation_scope_widened": (
+                confirmation_scope_widened
+            ),
+            "widening_reason": (
+                "shared_confirmation_token_revoked_conservatively"
+                if confirmation_scope_widened
+                else ""
+            ),
         }
 
     def _router_exception_safe_response(
@@ -5227,6 +5446,16 @@ class VoiceAssistant:
     async def _execute_planning_task_graph(self, graph: dict[str, Any]) -> dict[str, Any]:
         session = await self.get_http_session()
         return await self.agent_client.execute_planning_task_graph(session, graph)
+
+    async def _cancel_planning_task_graph(
+        self,
+        graph_id: str,
+    ) -> dict[str, Any]:
+        session = await self.get_http_session()
+        return await self.agent_client.cancel_planning_task_graph(
+            session,
+            graph_id,
+        )
 
     def _cognitive_turn_closure_adapter(self) -> CognitiveTurnClosure:
         closure = getattr(self, "cognitive_turn_closure", None)
@@ -5644,21 +5873,92 @@ class VoiceAssistant:
         reset_playback: bool = True,
         mark_session_done: bool = True,
     ) -> None:
-        task = asyncio.create_task(
-            self.execute_interaction_response(
-                response,
-                session_id,
-                confirmed_request_ids=confirmed_request_ids,
-                reset_playback=reset_playback,
-                mark_session_done=mark_session_done,
-            )
+        reserve = getattr(
+            getattr(self, "interaction_runtime", None),
+            "reserve_interaction",
+            None,
         )
+        release = getattr(
+            getattr(self, "interaction_runtime", None),
+            "release_interaction",
+            None,
+        )
+        reserved = False
+        if callable(reserve):
+            reserve(response.interaction_id)
+            reserved = True
+        try:
+            task = asyncio.create_task(
+                self.execute_interaction_response(
+                    response,
+                    session_id,
+                    confirmed_request_ids=confirmed_request_ids,
+                    reset_playback=reset_playback,
+                    mark_session_done=mark_session_done,
+                )
+            )
+        except BaseException:
+            if reserved and callable(release):
+                release(response.interaction_id)
+            raise
+        active_tasks = getattr(self, "active_interaction_tasks", None)
+        if not isinstance(active_tasks, dict):
+            active_tasks = {}
+            self.active_interaction_tasks = active_tasks
+        active_tasks[task] = response.interaction_id
+        if reserved:
+            reservations = getattr(
+                self,
+                "active_interaction_reservations",
+                None,
+            )
+            if not isinstance(reservations, dict):
+                reservations = {}
+                self.active_interaction_reservations = reservations
+            reservations[task] = response.interaction_id
         self.active_interaction_task = task
+        self.active_interaction_id = response.interaction_id
         task.add_done_callback(self._interaction_task_done)
 
     def _interaction_task_done(self, task: asyncio.Task) -> None:
+        reservations = getattr(
+            self,
+            "active_interaction_reservations",
+            None,
+        )
+        reserved_interaction_id = (
+            reservations.pop(task, None)
+            if isinstance(reservations, dict)
+            else None
+        )
+        if reserved_interaction_id:
+            release = getattr(
+                getattr(self, "interaction_runtime", None),
+                "release_interaction",
+                None,
+            )
+            if callable(release):
+                release(reserved_interaction_id)
+        active_tasks = getattr(self, "active_interaction_tasks", None)
+        if isinstance(active_tasks, dict):
+            active_tasks.pop(task, None)
         if self.active_interaction_task is task:
-            self.active_interaction_task = None
+            replacement = next(
+                (
+                    (candidate, interaction_id)
+                    for candidate, interaction_id in reversed(
+                        list((active_tasks or {}).items())
+                    )
+                    if not candidate.done()
+                ),
+                None,
+            )
+            if replacement is None:
+                self.active_interaction_task = None
+                self.active_interaction_id = None
+            else:
+                self.active_interaction_task = replacement[0]
+                self.active_interaction_id = replacement[1]
         if task.cancelled():
             return
         error = task.exception()
@@ -6198,24 +6498,29 @@ class VoiceAssistant:
             state["response_chars"] = state.get("response_chars", 0) + sum(len(i.text) for i in result.speak_immediate + result.speak_after)
         self.maybe_session_done(session_id)
 
-    async def interrupt_output(
+    def _invalidate_output_state(
         self,
-        new_session_id: Optional[str] = None,
         *,
-        log_event: bool = True,
-    ):
+        cancel_cognitive_work: bool = True,
+    ) -> None:
         self.playback_generation += 1
         self.resolve_all_playback_start_waiters(
             started=False,
             reason="interrupt",
         )
+        # ``active_llm_task`` is the legacy direct speech-stream producer. It
+        # must stop for every output interruption or it can enqueue fresh audio
+        # after the queues below have been invalidated. The broader routed turn
+        # is cancelled separately so output-only scope can preserve committed
+        # Skill Runtime work.
         if self.active_llm_task and not self.active_llm_task.done():
             self.active_llm_task.cancel()
         current_task = asyncio.current_task()
         active_turn_task = getattr(self, "active_turn_task", None)
         active_reflex_task = getattr(self, "active_reflex_task", None)
         if (
-            active_turn_task is not None
+            cancel_cognitive_work
+            and active_turn_task is not None
             and active_turn_task is not current_task
             and active_turn_task is not active_reflex_task
             and not active_turn_task.done()
@@ -6233,14 +6538,464 @@ class VoiceAssistant:
                 break
         self.next_playback_order = 0
         self.synthesis_order = 0
+
+    def _schedule_output_abort(
+        self,
+        *,
+        new_session_id: str | None,
+        log_event: bool,
+    ) -> None:
+        tasks = getattr(self, "output_abort_tasks", None)
+        if not isinstance(tasks, set):
+            tasks = set()
+            self.output_abort_tasks = tasks
+        if any(not task.done() for task in tasks):
+            return
+
+        async def abort_and_log() -> None:
+            await self.abort_output_stream()
+            if new_session_id and log_event:
+                self.session_log(
+                    new_session_id,
+                    "interrupt_previous_audio_done: playback_generation=%s",
+                    self.playback_generation,
+                )
+
+        task = asyncio.create_task(abort_and_log())
+        tasks.add(task)
+
+        def done(completed: asyncio.Task) -> None:
+            tasks.discard(completed)
+            if completed.cancelled():
+                return
+            error = completed.exception()
+            if error is not None:
+                logger.warning(
+                    "Detached output abort failed: %s",
+                    error,
+                    exc_info=error,
+                )
+
+        task.add_done_callback(done)
+
+    async def interrupt_output(
+        self,
+        new_session_id: Optional[str] = None,
+        *,
+        log_event: bool = True,
+        cancel_cognitive_work: bool = True,
+    ):
+        self._invalidate_output_state(
+            cancel_cognitive_work=cancel_cognitive_work,
+        )
         await self.abort_output_stream()
         if new_session_id and log_event:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
 
+    async def _apply_reflex_cancellation(
+        self,
+        outcome: ReflexOutcome,
+        *,
+        source_turn_id: str,
+    ) -> CancellationDispatchReceipt:
+        """Apply one closed reflex scope without semantic goal guessing."""
+
+        scope = outcome.cancellation_scope
+        if scope == "none":
+            raise ValueError("reflex cancellation requires a concrete scope")
+        if scope == "specific_goal":
+            raise ValueError(
+                "specific_goal cancellation requires the Core's exact "
+                "committed plan binding and cannot originate from ReflexOutcome"
+            )
+        active_interaction_id = ""
+        active_tasks = getattr(self, "active_interaction_tasks", None)
+        active_host_interactions: list[
+            tuple[asyncio.Task, str]
+        ] = []
+        if isinstance(active_tasks, dict):
+            active_host_interactions = [
+                (task, str(interaction_id).strip())
+                for task, interaction_id in active_tasks.items()
+                if not task.done() and str(interaction_id).strip()
+            ]
+            if active_host_interactions:
+                active_interaction_id = active_host_interactions[-1][1]
+        if not active_interaction_id:
+            active_task = getattr(
+                self,
+                "active_interaction_task",
+                None,
+            )
+            legacy_interaction_id = str(
+                getattr(self, "active_interaction_id", None) or ""
+            ).strip()
+            if active_task is None or not active_task.done():
+                active_interaction_id = legacy_interaction_id
+            if (
+                active_task is not None
+                and not active_task.done()
+                and legacy_interaction_id
+                and all(
+                    item[0] is not active_task
+                    for item in active_host_interactions
+                )
+            ):
+                active_host_interactions.append(
+                    (active_task, legacy_interaction_id)
+                )
+        if scope == "global_emergency":
+            host_scope_interaction_ids = tuple(
+                sorted(
+                    {
+                        interaction_id
+                        for _, interaction_id in active_host_interactions
+                    }
+                )
+            )
+        elif (
+            scope in {"output_only", "current_interaction"}
+            and active_interaction_id
+        ):
+            host_scope_interaction_ids = (active_interaction_id,)
+        else:
+            host_scope_interaction_ids = ()
+        receipt = CancellationDispatchReceipt(
+            source_turn_id=source_turn_id,
+            requested_scope=scope,
+            effective_scope=scope,
+        )
+        dispatch_failures: list[str] = []
+        emergency_evidence: dict[str, Any] = {}
+        phase_operations: list[tuple[str, Any]] = []
+
+        # Safety dispatches lead the first phase. Output teardown can wait on a
+        # device write lock; it must never serialize motion cancellation or an
+        # emergency stop behind that audio cleanup.
+        if scope == "global_emergency":
+            emergency_stop = getattr(
+                self.interaction_runtime,
+                "emergency_stop",
+                None,
+            )
+            if callable(emergency_stop):
+                phase_operations.append(
+                    (
+                        "emergency_stop",
+                        emergency_stop(reason=outcome.reason),
+                    )
+                )
+            else:
+                emergency_evidence = {
+                    "status": "unavailable",
+                    "reason": "emergency_stop_dispatch_unsupported",
+                }
+                dispatch_failures.append(
+                    "emergency_stop:dispatch_unsupported"
+                )
+
+        runtime_dispatch_required = not (
+            scope in {"output_only", "current_interaction"}
+            and not active_interaction_id
+        )
+        runtime_operation_kind = ""
+        if runtime_dispatch_required:
+            directive = CancellationDirective(
+                source_turn_id=source_turn_id,
+                requested_scope=scope,
+                foreground_interaction_id=(
+                    active_interaction_id
+                    if scope
+                    in {
+                        "output_only",
+                        "current_interaction",
+                        "specific_goal",
+                    }
+                    else None
+                ),
+                target_goal_ids=outcome.target_goal_ids,
+                reason=outcome.reason,
+            )
+            cancel_scope = getattr(
+                self.interaction_runtime,
+                "cancel_scope",
+                None,
+            )
+            if callable(cancel_scope):
+                runtime_operation_kind = "runtime_scope"
+                phase_operations.append(
+                    (
+                        runtime_operation_kind,
+                        cancel_scope(directive),
+                    )
+                )
+            else:
+                # Compatibility-only fallback for older injected runtimes.
+                # It is intentionally broad only for broad scopes.
+                if scope in {
+                    "current_interaction",
+                    "global_emergency",
+                }:
+                    cancel_all = getattr(
+                        self.interaction_runtime,
+                        "cancel_all",
+                        None,
+                    )
+                    if callable(cancel_all):
+                        runtime_operation_kind = "runtime_legacy"
+                        phase_operations.append(
+                            (runtime_operation_kind, cancel_all())
+                        )
+                    else:
+                        dispatch_failures.append(
+                            "skill_runtime:dispatch_unsupported"
+                        )
+                elif scope == "embodied_motion":
+                    dispatch_failures.append(
+                        "skill_runtime:scoped_dispatch_unsupported"
+                    )
+
+        if scope in {
+            "output_only",
+            "current_interaction",
+            "global_emergency",
+        }:
+            try:
+                self._invalidate_output_state(
+                    cancel_cognitive_work=(scope != "output_only"),
+                )
+                self._schedule_output_abort(
+                    new_session_id=source_turn_id,
+                    log_event=False,
+                )
+            except Exception as exc:
+                dispatch_failures.append(
+                    "output_invalidation:"
+                    f"{type(exc).__name__}:{str(exc)[:300]}"
+                )
+
+        phase_results = await asyncio.gather(
+            *(operation for _, operation in phase_operations),
+            return_exceptions=True,
+        )
+        for (operation_kind, _), result in zip(
+            phase_operations,
+            phase_results,
+            strict=True,
+        ):
+            if operation_kind == "runtime_scope":
+                if isinstance(result, BaseException):
+                    dispatch_failures.append(
+                        "skill_runtime:"
+                        f"{type(result).__name__}:{str(result)[:300]}"
+                    )
+                elif isinstance(result, CancellationDispatchReceipt):
+                    receipt = result
+                else:
+                    dispatch_failures.append(
+                        "skill_runtime:invalid_dispatch_receipt"
+                    )
+            elif operation_kind == "runtime_legacy":
+                if isinstance(result, BaseException):
+                    dispatch_failures.append(
+                        "skill_runtime_legacy:"
+                        f"{type(result).__name__}:{str(result)[:300]}"
+                    )
+                elif active_interaction_id:
+                    receipt = receipt.model_copy(
+                        update={
+                            "interaction_ids": (
+                                active_interaction_id,
+                            )
+                        }
+                    )
+            elif operation_kind == "emergency_stop":
+                if isinstance(result, BaseException):
+                    emergency_evidence = {
+                        "status": "failed",
+                        "reason": (
+                            f"{type(result).__name__}:{str(result)[:300]}"
+                        ),
+                    }
+                    dispatch_failures.append(
+                        "emergency_stop:"
+                        f"{type(result).__name__}:{str(result)[:300]}"
+                    )
+                elif isinstance(result, dict):
+                    emergency_evidence = result
+                else:
+                    emergency_evidence = {
+                        "status": "failed",
+                        "reason": "invalid_emergency_stop_evidence",
+                    }
+                    dispatch_failures.append(
+                        "emergency_stop:invalid_evidence"
+                    )
+        receipt = receipt.model_copy(
+            update={
+                "interaction_ids": tuple(
+                    sorted(
+                        {
+                            *receipt.interaction_ids,
+                            *host_scope_interaction_ids,
+                        }
+                    )
+                ),
+                "host_interaction_ids": tuple(
+                    sorted(
+                        {
+                            *receipt.host_interaction_ids,
+                            *host_scope_interaction_ids,
+                        }
+                    )
+                ),
+                "dispatch_failures": tuple(
+                    dict.fromkeys(
+                        [
+                            *receipt.dispatch_failures,
+                            *dispatch_failures,
+                        ]
+                    )
+                ),
+                "emergency_stop_evidence": (
+                    emergency_evidence
+                    if scope == "global_emergency"
+                    else receipt.emergency_stop_evidence
+                ),
+                "output_invalidation_requested": (
+                    receipt.output_invalidation_requested
+                    or scope
+                    in {
+                        "output_only",
+                        "current_interaction",
+                        "global_emergency",
+                    }
+                ),
+            }
+        )
+
+        # A provider task may have been inside the speech scheduler while
+        # runtime cancellation ran. Invalidate once more so no late synthesis
+        # can re-enter playback. Device teardown remains detached: a blocked
+        # audio driver must not keep this protective reflex active or delay a
+        # later emergency reflex.
+        if scope in {
+            "output_only",
+            "current_interaction",
+            "global_emergency",
+        }:
+            try:
+                self._invalidate_output_state(
+                    cancel_cognitive_work=(scope != "output_only"),
+                )
+            except Exception as exc:
+                receipt = receipt.model_copy(
+                    update={
+                        "dispatch_failures": tuple(
+                            dict.fromkeys(
+                                [
+                                    *receipt.dispatch_failures,
+                                    "output_reinvalidation:"
+                                    f"{type(exc).__name__}:"
+                                    f"{str(exc)[:300]}",
+                                ]
+                            )
+                        )
+                    }
+                )
+
+        host_task_cancel_requested: list[str] = []
+        host_cancel_candidates: list[tuple[asyncio.Task, str]] = []
+        if scope == "global_emergency":
+            # Global emergency is also a host-workflow boundary. If the
+            # runtime dispatch fails before it can install durable rules, no
+            # older preflight interaction may survive and start work later.
+            host_cancel_candidates = list(active_host_interactions)
+        elif (
+            scope == "current_interaction"
+            and not receipt.selected_request_bindings
+        ):
+            host_cancel_candidates = [
+                (task, interaction_id)
+                for task, interaction_id in active_host_interactions
+                if interaction_id == active_interaction_id
+            ]
+        current_task = asyncio.current_task()
+        for task, interaction_id in host_cancel_candidates:
+            if (
+                task is not None
+                and task is not current_task
+                and not task.done()
+            ):
+                task.cancel()
+                if interaction_id:
+                    host_task_cancel_requested.append(
+                        interaction_id
+                    )
+        if host_task_cancel_requested:
+            receipt = receipt.model_copy(
+                update={
+                    "host_task_cancel_requested_interaction_ids": tuple(
+                        sorted(
+                            {
+                                *receipt.host_task_cancel_requested_interaction_ids,
+                                *host_task_cancel_requested,
+                            }
+                        )
+                    )
+                }
+            )
+
+        self.session_log(
+            source_turn_id,
+            "cognitive_gateway_cancellation_dispatched: "
+            "requested_scope=%s effective_scope=%s interactions=%s "
+            "selected=%s active=%s queued=%s non_interruptible=%s "
+            "provider_failures=%s dispatch_failures=%s",
+            receipt.requested_scope,
+            receipt.effective_scope,
+            ",".join(receipt.interaction_ids) or "none",
+            len(receipt.selected_request_ids),
+            len(receipt.active_request_ids),
+            len(receipt.queued_request_ids),
+            len(receipt.non_interruptible_request_ids),
+            len(receipt.provider_cancel_failures),
+            len(receipt.dispatch_failures),
+        )
+        emergency_status = str(
+            receipt.emergency_stop_evidence.get("status") or ""
+        )
+        if scope == "global_emergency" and emergency_status != "success":
+            self.session_log(
+                source_turn_id,
+                "cognitive_gateway_emergency_stop_unconfirmed: status=%s "
+                "evidence=%s",
+                emergency_status or "missing",
+                json.dumps(
+                    receipt.emergency_stop_evidence,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            )
+        return receipt
+
     async def interrupt(self, new_session_id: Optional[str] = None):
         await self.interrupt_output(new_session_id, log_event=False)
-        if self.active_interaction_task and not self.active_interaction_task.done():
-            self.active_interaction_task.cancel()
+        tasks = set(
+            task
+            for task in getattr(
+                self,
+                "active_interaction_tasks",
+                {},
+            )
+            if not task.done()
+        )
+        active = getattr(self, "active_interaction_task", None)
+        if active is not None and not active.done():
+            tasks.add(active)
+        for task in tasks:
+            task.cancel()
         await self.interaction_runtime.cancel_all()
         if new_session_id:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
@@ -6299,7 +7054,18 @@ class VoiceAssistant:
             )
             self.session_log(session_id, "vad_valid_end: audio=%.2fs rms=%.1f bytes=%s", duration, rms, len(audio))
             self.save_audio(audio, "input", session_id=session_id)
-            await self.interrupt_output(new_session_id=session_id)
+            # Barge-in must silence audio immediately, before ASR is available,
+            # but it cannot yet know whether the utterance means stop talking,
+            # stop moving, cancel the foreground turn, or something ordinary.
+            # Scope-dependent cognitive/runtime cancellation happens only after
+            # the transcript reaches the Cognitive Gateway.
+            self._invalidate_output_state(
+                cancel_cognitive_work=False,
+            )
+            self._schedule_output_abort(
+                new_session_id=session_id,
+                log_event=True,
+            )
 
             try:
                 async with runtime_tracer.span(
@@ -6357,9 +7123,59 @@ class VoiceAssistant:
                     pass
                 self.asr_ws = None
 
+    def _has_active_protective_reflex(
+        self,
+        *,
+        excluding: asyncio.Task | None = None,
+    ) -> bool:
+        primary = getattr(self, "active_reflex_task", None)
+        if primary is not None and primary is not excluding:
+            return True
+        return any(
+            task is not excluding
+            for task in getattr(
+                self,
+                "concurrent_protective_reflex_tasks",
+                set(),
+            )
+        )
+
     def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
-        active_reflex = getattr(self, "active_reflex_task", None)
-        if active_reflex is not None and not active_reflex.done():
+        reflex_candidate = DEFAULT_REFLEX_FILTER.evaluate(user_text)
+        if self._has_active_protective_reflex():
+            if reflex_candidate.action == "interrupt":
+                # A new deterministic protective input is independent of an
+                # older protective operation. It must not wait behind output
+                # cleanup or provider I/O, and an ordinary queued turn must
+                # never be able to replace it.
+                task = asyncio.create_task(
+                    self.handle_routed_text(user_text, session_id)
+                )
+                tasks = getattr(
+                    self,
+                    "concurrent_protective_reflex_tasks",
+                    None,
+                )
+                if not isinstance(tasks, set):
+                    tasks = set()
+                    self.concurrent_protective_reflex_tasks = tasks
+                tasks.add(task)
+
+                def protective_done(completed: asyncio.Task) -> None:
+                    tasks.discard(completed)
+                    self._on_routed_turn_done(
+                        completed,
+                        session_id,
+                        concurrent_reflex=True,
+                    )
+
+                task.add_done_callback(protective_done)
+                self.session_log(
+                    session_id,
+                    "protective_reflex_launched_concurrently: scope=%s",
+                    reflex_candidate.cancellation_scope,
+                )
+                return
             replaced = getattr(self, "_pending_turn_after_reflex", None)
             if replaced is not None:
                 _, replaced_session_id = replaced
@@ -6385,10 +7201,11 @@ class VoiceAssistant:
             previous.cancel()
         task = asyncio.create_task(self.handle_routed_text(user_text, session_id))
         self.active_turn_task = task
-        if DEFAULT_REFLEX_FILTER.evaluate(user_text).action == "interrupt":
+        if reflex_candidate.action == "interrupt":
             # Mark the task at launch time so a following utterance cannot
             # cancel it before the coroutine reaches its first instruction.
             self.active_reflex_task = task
+            self._protective_reflex_failure = False
         task.add_done_callback(
             lambda completed, sid=session_id: self._on_routed_turn_done(
                 completed,
@@ -6400,8 +7217,18 @@ class VoiceAssistant:
         self,
         task: asyncio.Task,
         session_id: str,
+        *,
+        concurrent_reflex: bool = False,
     ) -> None:
-        was_reflex = getattr(self, "active_reflex_task", None) is task
+        was_primary_reflex = (
+            getattr(self, "active_reflex_task", None) is task
+        )
+        was_concurrent_reflex = concurrent_reflex or task in getattr(
+            self,
+            "concurrent_protective_reflex_tasks",
+            set(),
+        )
+        was_reflex = was_primary_reflex or was_concurrent_reflex
         if getattr(self, "active_turn_task", None) is task:
             self.active_turn_task = None
         completed_ok = False
@@ -6425,13 +7252,22 @@ class VoiceAssistant:
 
         if not was_reflex:
             return
-        self.active_reflex_task = None
+        if not completed_ok:
+            self._protective_reflex_failure = True
+        if was_primary_reflex:
+            self.active_reflex_task = None
+        if self._has_active_protective_reflex():
+            return
         pending = getattr(self, "_pending_turn_after_reflex", None)
         self._pending_turn_after_reflex = None
+        protective_failed = bool(
+            getattr(self, "_protective_reflex_failure", False)
+        )
+        self._protective_reflex_failure = False
         if pending is None:
             return
         pending_text, pending_session_id = pending
-        if completed_ok:
+        if not protective_failed:
             self.session_log(
                 pending_session_id,
                 "turn_released_after_cognitive_gateway_reflex",
@@ -6663,6 +7499,22 @@ class VoiceAssistant:
             self.active_asr_task.cancel()
         if self.active_turn_task and not self.active_turn_task.done():
             self.active_turn_task.cancel()
+        for task in list(
+            getattr(self, "concurrent_protective_reflex_tasks", set())
+        ):
+            if not task.done():
+                task.cancel()
+        output_abort_tasks = list(
+            getattr(self, "output_abort_tasks", set())
+        )
+        for task in output_abort_tasks:
+            if not task.done():
+                task.cancel()
+        if output_abort_tasks:
+            await asyncio.gather(
+                *output_abort_tasks,
+                return_exceptions=True,
+            )
         self.active_reflex_task = None
         self._pending_turn_after_reflex = None
         self._pending_vad_audio = None

@@ -56,6 +56,11 @@ from .response_composition import (
     canonical_plan_fingerprint,
 )
 from .reflex import (
+    CancellationDirective,
+    CancellationDispatchReceipt,
+    CancellationProviderFailure,
+    CancellationRequestBinding,
+    CancellationScope,
     DEFAULT_REFLEX_FILTER,
     ReflexAction,
     ReflexFilter,
@@ -155,6 +160,11 @@ __all__ = [
     "ResponseCompositionResolution",
     "CoordinatedResponsePlan",
     "canonical_plan_fingerprint",
+    "CancellationDirective",
+    "CancellationDispatchReceipt",
+    "CancellationProviderFailure",
+    "CancellationRequestBinding",
+    "CancellationScope",
     "DEFAULT_REFLEX_FILTER",
     "ReflexAction",
     "ReflexFilter",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -74,6 +75,20 @@ class TaskGraph(BaseModel):
     max_duration_s: float | None = Field(default=None, gt=0)
     nodes: list[TaskNode] = Field(default_factory=list)
     policies: TaskGraphPolicies = Field(default_factory=TaskGraphPolicies)
+
+    @field_validator("graph_id")
+    @classmethod
+    def validate_graph_id(cls, value: str) -> str:
+        normalized = (value or "").strip()
+        if not re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}",
+            normalized,
+        ):
+            raise ValueError(
+                "graph_id must be URL-path-safe: 1-128 letters, digits, "
+                "periods, underscores, colons, or hyphens"
+            )
+        return normalized
 
     @model_validator(mode="after")
     def validate_unique_node_ids(self) -> "TaskGraph":

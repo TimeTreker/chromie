@@ -7,6 +7,7 @@ from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import GatewayCoreCompatibilityAdapter
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 from orchestrator.schemas.route import RouteDecision
+from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
@@ -132,6 +133,170 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(
             recorded_metadata["user_turn_envelope"]["turn_id"],
             "sid",
+        )
+
+    def test_active_named_goal_cancel_fails_closed_before_state_mutation(self):
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+
+        class State:
+            max_pending_tasks = 8
+            apply_calls = 0
+
+            def active_goal_snapshots(self, *, limit):
+                return [
+                    {
+                        "goal_id": "goal-delivery",
+                        "status": "running",
+                        "metadata": {
+                            "interaction_id": "interaction-delivery",
+                            "canonical_plan_id": "plan-delivery",
+                            "canonical_plan_fingerprint": "fingerprint-delivery",
+                            "remaining_request_ids": ["deliver-request"],
+                        },
+                    }
+                ]
+
+            def apply_goal_association_resolution(self, *args, **kwargs):
+                self.apply_calls += 1
+                return []
+
+        assistant.conversation_state = State()
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="applied",
+            lane="chat",
+            goal_association=GoalAssociationResolution(
+                turn_id="turn-cancel-delivery",
+                associations=[
+                    {
+                        "association_id": "assoc-cancel-delivery",
+                        "relationship": "cancel",
+                        "target_goal_ids": ["goal-delivery"],
+                        "confidence": 0.95,
+                    }
+                ],
+                confidence=0.95,
+            ),
+        )
+        decision = RouteDecision(
+            route="chat",
+            intent="cancel_goal",
+            confidence=0.9,
+            source="llm",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "active_goal_cancellation_requires_runtime_dispatch",
+        ):
+            assistant._apply_cognitive_goal_state(
+                resolution,
+                session_id="sid-cancel",
+                user_text="Cancel the delivery.",
+                decision=decision,
+            )
+        self.assertEqual(assistant.conversation_state.apply_calls, 0)
+
+    def test_active_named_goal_cancel_returns_truthful_safe_response(self):
+        response = InteractionResponse(
+            speech=[{"text": "Cancelled.", "timing": "immediate"}],
+            metadata={"source": "goal_driven_cognitive_runtime"},
+        )
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="applied",
+            lane="chat",
+            interaction_response=response,
+            goal_association=GoalAssociationResolution(
+                turn_id="turn-cancel-delivery",
+                associations=[
+                    {
+                        "association_id": "assoc-cancel-delivery",
+                        "relationship": "cancel",
+                        "target_goal_ids": ["goal-delivery"],
+                        "confidence": 0.95,
+                    }
+                ],
+                confidence=0.95,
+            ),
+        )
+        assistant = self._assistant(resolution)
+
+        class State(_State):
+            max_pending_tasks = 8
+
+            def __init__(self):
+                super().__init__()
+                self.apply_calls = 0
+
+            def active_goal_snapshots(self, *, limit):
+                return [
+                    {
+                        "goal_id": "goal-delivery",
+                        "status": "running",
+                        "metadata": {
+                            "interaction_id": "interaction-delivery",
+                            "canonical_plan_id": "plan-delivery",
+                            "canonical_plan_fingerprint": (
+                                "fingerprint-delivery"
+                            ),
+                            "remaining_request_ids": ["deliver-request"],
+                        },
+                    }
+                ]
+
+            def apply_goal_association_resolution(self, *args, **kwargs):
+                self.apply_calls += 1
+                return []
+
+        state = State()
+        assistant.conversation_state = state
+        del assistant._apply_cognitive_goal_state
+        decision = RouteDecision(
+            route="chat",
+            intent="cancel_goal",
+            confidence=0.9,
+            source="llm",
+            language="en-US",
+        )
+        returned_decisions = []
+
+        async def run():
+            handled, returned = await assistant._try_apply_cognitive_runtime(
+                object(),
+                user_text="Cancel the delivery.",
+                session_id="sid-cancel",
+                context={"history": []},
+                decision=decision,
+                router_latency_ms=10.0,
+            )
+            self.assertTrue(handled)
+            returned_decisions.append(returned)
+
+        asyncio.run(run())
+
+        self.assertEqual(state.apply_calls, 0)
+        self.assertEqual(len(state.agent_results), 1)
+        safe_response = state.agent_results[0][0][1]
+        self.assertEqual(
+            safe_response.metadata["source"],
+            "host_specific_goal_cancel_not_dispatched",
+        )
+        self.assertIn("did not mark it cancelled", safe_response.speech[0].text)
+        self.assertEqual(len(assistant._launch_interaction_calls), 1)
+        recorded_resolution = state.user_turns[0][1]["metadata"][
+            "cognitive_runtime_resolution"
+        ]
+        self.assertEqual(recorded_resolution["status"], "error")
+        self.assertEqual(
+            recorded_resolution["metadata"]["host_commit_status"],
+            "rejected",
+        )
+        self.assertEqual(
+            returned_decisions[0].metadata[
+                "cognitive_runtime_resolution"
+            ]["metadata"]["host_commit_status"],
+            "rejected",
         )
 
     def test_chat_lane_includes_clarify_and_deep_thought_routes(self):

@@ -433,6 +433,53 @@ class GuardedTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trace.result_map()["emergency"].status, "success")
         self.assertFalse(motion_transport_cancelled)
         self.assertFalse(service.cancel_execution(graph.graph_id).cancellation_requested)
+        with self.assertRaisesRegex(ValueError, "invalid or already used"):
+            await service.execute_guarded(
+                graph,
+                "already-consumed-grant",
+            )
+        self.assertEqual(
+            calls,
+            [
+                "remote.monitor",
+                "remote.move",
+                "remote.emergency_stop",
+            ],
+        )
+
+    async def test_cancel_arriving_before_guarded_execute_blocks_motion(
+        self,
+    ) -> None:
+        calls: list[str] = []
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            calls.append(tool)
+            return {"structuredContent": {"completed": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            guarded_invoker=McpStreamableHttpInvoker(
+                registry,
+                call=call,
+            ),
+            allow_physical_motion=True,
+        )
+        graph = _physical_graph()
+        grant = self._grant(service, graph)
+
+        cancellation = service.cancel_execution(graph.graph_id)
+        trace = await service.execute_guarded(graph, grant)
+
+        self.assertTrue(cancellation.cancellation_requested)
+        self.assertEqual(trace.status, "cancelled")
+        self.assertEqual(trace.events[0].type, "cancelled_before_start")
+        self.assertEqual(calls, [])
 
     async def test_physical_failure_runs_emergency_stop(self) -> None:
         calls: list[str] = []

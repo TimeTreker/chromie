@@ -230,6 +230,18 @@ class SoridormiNamedSkillAdapter:
                 message,
             )
             raise RuntimeError(message)
+        if outcome.output.get("cancelled") is not True:
+            message = (
+                "Soridormi cancellation did not confirm cancelled=true"
+            )
+            logger.warning(
+                "Soridormi cancellation unconfirmed request_id=%s "
+                "skill_id=%s output=%s",
+                request.request_id,
+                request.skill_id,
+                outcome.output,
+            )
+            raise RuntimeError(message)
 
     def _failure_result(
         self,

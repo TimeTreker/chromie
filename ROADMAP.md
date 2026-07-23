@@ -221,8 +221,11 @@ admitted envelopes into Core, and applies local deterministic stop or
 suppression before ordinary cognition. The shared reflex contract is also used
 by Router compatibility rules; pending approval is revoked before the first
 await and a later utterance cannot preempt the active reflex lifecycle.
-Dedicated Soridormi E-stop/safe-idle evidence and physical five-module
-extraction remain open.
+Fixed cancellation scopes, active/queued dispatch receipts, and the dedicated
+Soridormi E-stop dispatch path are implemented and automatically verified.
+Core-to-runtime named-goal cancellation, atomic receipt-to-goal reconciliation,
+retained E-stop/safe-idle evidence, and physical five-module extraction remain
+open.
 
 Exit criteria before treating the Gateway/Core migration as complete:
 

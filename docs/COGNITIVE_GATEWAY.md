@@ -118,10 +118,12 @@ operational effect. Its authority is narrow and deterministic:
 It does not plan a replacement task, decide ordinary meaning, select a normal
 capability, or claim cancellation succeeded without runtime evidence.
 
-In the current implementation, `trigger=emergency_stop_command` records
-recognition of the input and enters generic trusted cancellation. It is not
-evidence that a dedicated Soridormi E-stop was requested or that the robot
-reached safe idle.
+In the current implementation, `trigger=emergency_stop_command` records only
+recognition of the input; recognition alone proves neither dispatch nor a safe
+state. The host then dispatches both global runtime cancellation and the
+dedicated Soridormi E-stop path, and the cancellation receipt records E-stop
+success, failure, or unavailability. Reaching safe idle still requires an
+explicit correlated Soridormi postcondition.
 
 ### 4.3 Attention Review / 注意审查
 
@@ -235,15 +237,95 @@ also a protective control that cannot wait for ordinary semantic analysis.
 receive stop-like input
   -> assign and retain turn identity
   -> deterministically trigger the protective stop/cancel path
-  -> collect trusted cancellation and safe-state evidence
-  -> attach ReflexOutcome to the UserTurnEnvelope and goal state
-  -> let the Core reconcile affected goals and choose any concise response
+  -> collect a trusted cancellation dispatch receipt
+  -> attach ReflexOutcome and the receipt to the turn audit
+  -> (target) let the Core reconcile affected goals from terminal evidence
 ```
 
 The reflex may begin before the complete envelope or model review is ready.
 Recording must never delay stopping, and stopping must not erase the turn or
-leave goal state unaware of cancellation. Later semantic correction must never
-undo the already-applied safe stop or silently resume physical work.
+leave the cancellation unaudited. Later semantic correction must never undo an
+already-applied stop or silently resume physical work. The current host records
+the dispatch receipt with the reflex turn; atomic receipt-to-canonical-goal
+reconciliation remains open.
+
+Output invalidation, scoped Skill Runtime cancellation, and the dedicated
+E-stop are dispatched in one safety-first phase. Device/audio teardown may wait
+on a playback lock, but it cannot serialize runtime cancellation or E-stop
+behind that wait. The receipt distinguishes provider cancellation failures,
+host dispatch failures, and dedicated E-stop evidence; none of those fields is
+itself a safe-idle claim.
+
+For `global_emergency`, the host also cancels every unfinished interaction
+workflow, including work still blocked in preflight. This fail-closed sweep is
+independent of a successful Skill Runtime receipt, so a runtime dispatch
+failure cannot leave an older host interaction able to start later. The receipt
+records every host interaction for which task cancellation was requested.
+
+### 6.1 Cancellation scope is not goal guessing
+
+The deterministic path does not choose one goal from natural-language meaning.
+It first assigns one closed cancellation scope:
+
+| Input class | Cancellation scope | Deterministic target |
+|---|---|---|
+| `Stop talking`, `别说了` | `output_only` | The host's shared audible-output resource plus interruptible speech requests in the bound interaction |
+| `Stop moving`, `停止移动` | `embodied_motion` | Current and queued requests explicitly declared to have a physical-motion effect |
+| Bare `Stop`, `Cancel`, `停止` | `current_interaction` | Every unfinished request in the foreground interaction; completed goals and unrelated remembered goals are unchanged |
+| Exact structured target selected by Core | `specific_goal` | Structured skill/effect requests whose committed `source_goal_ids` are wholly contained in the exact target set and whose plan identity matches |
+| `Emergency stop`, `急停` | `global_emergency` | Every unfinished request and host interaction workflow plus a dispatch attempt through the dedicated Soridormi E-stop path |
+
+`ReflexOutcome` carries only the fixed reflex scopes. The trusted runtime
+contract accepts `specific_goal` only from a caller that supplies authoritative
+goal IDs plus the exact committed plan ID and fingerprint. A model may help the
+Core resolve a non-urgent phrase such as “cancel the delivery but keep the
+music”, but it never invents runtime request IDs, delays an emergency stop, or
+authorizes automatic resumption. The current Gateway reflex does not emit
+`specific_goal`, and automatic Core-to-active-runtime dispatch for named
+selective cancellation remains open. Until that bridge returns trusted
+evidence, such input stays cognitive and must not be reported as having stopped
+execution. The host therefore fails closed before mutating an execution- or
+confirmation-bound Goal; state-only goals may still be cancelled through the
+existing semantic-state transaction.
+
+The current `specific_goal` primitive does not claim exact retraction of shared
+host playback. Goal-owned cognitive speech does not yet carry the complete plan
+binding into its generated runtime request, so the future Core bridge must bind
+that identity and explicitly coordinate output invalidation before named-goal
+speech cancellation can be reported as complete.
+
+The runtime selects both running and queued requests. A selected queued request
+is closed as `cancelled` with `reason_code=cancelled_before_start` and is never
+sent to a provider. A completed request remains completed. Unselected Skill
+Runtime requests that are independent continue; existing sequencing,
+dependency, and required-delivery barriers still apply. For example, cancelling
+a required pre-action speech cue prevents its dependent physical request from
+starting. Selected non-interruptible requests and provider cancellation
+failures are reported separately; neither is evidence that the effect stopped.
+If one canonical step is jointly owned by a target goal and an untargeted goal,
+exact isolation is impossible: the runtime reports a shared-owner conflict and
+does not pretend that only one goal was affected.
+
+Pending confirmation currently has one approval token for the entire staged
+response. `output_only` preserves that token. A motion stop revokes the whole
+token when any confirmed request is motion-bound, or when a confirmed request
+cannot be classified safely; this may also revoke an unrelated, not-yet-used
+approval in the same token. That is an explicit fail-closed widening, not
+partial request cancellation. The revoked confirmation is recorded with the
+reflex turn and is not represented as a Skill Runtime execution selection.
+Partial token reconstruction remains future work.
+
+Exact isolation also depends on provider granularity. Current Soridormi motion
+cancellation is global-domain, so a specific physical target widens to
+`embodied_motion`; the receipt explicitly records `widened`, the reason, and
+every coaffected request and goal. It must never be presented as exact
+goal-only cancellation. A deterministic hold for ambiguous safety-relevant
+language is a future policy, not current implementation.
+
+`embodied_motion` is ledger-bound: it selects motion registered in the host
+Skill Runtime. It is not an unconditional controller stop for motion started
+outside that ledger. `global_emergency` is the scope that additionally
+dispatches Soridormi's dedicated E-stop regardless of the host request ledger.
 
 ## 7. Compatibility with the current Router
 

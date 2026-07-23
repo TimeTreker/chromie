@@ -298,8 +298,14 @@ InteractionResponse and Skill Runtime path.
 
 ## Cancellation and traces
 
-- `POST /task-graphs/{graph_id}/cancel` requests cancellation of an active graph
-  and requires the execution bearer token.
+- `POST /task-graphs/{graph_id}/cancel` cancels an active graph or records a
+  bounded cancel-before-start tombstone when the execute request has not yet
+  registered, and requires the execution bearer token. A later matching
+  execute returns a cancelled trace without invoking a tool. A retained
+  terminal trace returns `cancellation_requested=false`, and an execution
+  retry with that retained `graph_id`, exact graph fingerprint, and execution
+  lane returns the retained trace without invoking tools. Guarded retry also
+  requires a fresh valid graph-bound grant.
 - `GET /task-graphs/{graph_id}/trace` returns the latest non-expired retained
   trace or 404 and requires the diagnostics bearer token.
 - `GET /task-graphs/scheduler/status` reports active/waiting counts and graph IDs
@@ -311,11 +317,18 @@ reports the first non-success node with any available `reason_code`,
 `blocked_subsystems`, and `recommended_next_actions`; successful traces report a
 plain completion result.
 
-Active executions, traces, and grants live only in the Agent process. Restarting
-the service removes them. Traces default to a 900-second TTL and a 128-entry LRU
-bound. Grants default to a 128-entry capacity. Configure these with
+Active executions, traces, grants, and pending cancel-before-start tombstones
+live only in the Agent process; restarting the service removes them. Traces and
+tombstones default to a 900-second TTL and a 128-entry bound. Grants default to
+a 128-entry capacity. Configure these with
 `AGENT_TASK_GRAPH_TRACE_TTL_SEC`, `AGENT_TASK_GRAPH_TRACE_MAX_ENTRIES`, and
 `AGENT_TASK_GRAPH_GRANT_MAX_ENTRIES`.
+
+`graph_id` is a cancel-route identity and must contain 1–128 URL-path-safe
+letters, digits, periods, underscores, colons, or hyphens. It is also the
+execution idempotency identity and must not be reused for a different graph
+or successful execution lane until its retained trace expires. Dry-run traces
+remain diagnostics-only and cannot satisfy or block real execution/cancellation.
 
 ## Concurrency
 

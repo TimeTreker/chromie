@@ -142,6 +142,52 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
                 {"graph_id": "nav", "nodes": []},
             )
 
+    async def test_cancel_planning_task_graph_uses_authenticated_endpoint(
+        self,
+    ) -> None:
+        receipt = {
+            "graph_id": "nav-room",
+            "cancellation_requested": True,
+        }
+        session = _FakeSession(_FakeResponse(payload=receipt))
+
+        result = await AgentClient(
+            "http://agent.local/",
+            task_graph_execution_token="execution-secret",
+        ).cancel_planning_task_graph(
+            session,  # type: ignore[arg-type]
+            "nav-room",
+            timeout_ms=2500,
+        )
+
+        self.assertEqual(result, receipt)
+        self.assertEqual(
+            session.posts[0]["url"],
+            "http://agent.local/task-graphs/nav-room/cancel",
+        )
+        self.assertEqual(
+            session.posts[0]["headers"],
+            {"Authorization": "Bearer execution-secret"},
+        )
+        self.assertAlmostEqual(session.posts[0]["timeout"].total, 2.5)
+
+    async def test_cancel_planning_task_graph_requires_token(self) -> None:
+        session = _FakeSession(_FakeResponse())
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "AGENT_TASK_GRAPH_EXECUTION_TOKEN",
+        ):
+            await AgentClient(
+                "http://agent.local",
+                task_graph_execution_token="",
+            ).cancel_planning_task_graph(
+                session,  # type: ignore[arg-type]
+                "nav",
+            )
+
+        self.assertEqual(session.posts, [])
+
 
 if __name__ == "__main__":
     unittest.main()

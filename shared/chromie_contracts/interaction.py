@@ -136,6 +136,14 @@ class InteractionSpeech(BaseModel):
     timeout_ms: int | None = Field(default=None, ge=1, le=120000)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("id")
+    @classmethod
+    def normalize_identifier(cls, value: str) -> str:
+        normalized = (value or "").strip()
+        if not normalized:
+            raise ValueError("speech id must not be empty")
+        return normalized
+
     @field_validator("text")
     @classmethod
     def normalize_text(cls, value: str) -> str:
@@ -242,6 +250,14 @@ class InteractionResponse(BaseModel):
     reason: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("interaction_id")
+    @classmethod
+    def normalize_interaction_id(cls, value: str) -> str:
+        normalized = (value or "").strip()
+        if not normalized:
+            raise ValueError("interaction_id must not be empty")
+        return normalized
+
     @field_validator("metadata")
     @classmethod
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
@@ -251,4 +267,13 @@ class InteractionResponse(BaseModel):
     def propagate_confirmation_requirement(self) -> "InteractionResponse":
         if any(request.requires_confirmation for request in self.skills):
             self.requires_confirmation = True
+        execution_ids = [
+            *(item.id for item in self.speech),
+            *(item.request_id for item in self.skills),
+        ]
+        if len(execution_ids) != len(set(execution_ids)):
+            raise ValueError(
+                "speech ids and skill request_ids must be unique within "
+                "one interaction"
+            )
         return self

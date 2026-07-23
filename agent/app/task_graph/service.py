@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
@@ -24,7 +26,7 @@ from .async_executor import (
 )
 from .executor import DagDryRunExecutor
 from .grants import ConfirmationGrantStore
-from .models import ExecutionTrace, TaskGraph
+from .models import ExecutionEvent, ExecutionTrace, TaskGraph
 from .residual import attach_residual_replan_state
 from .validator import GraphValidator
 
@@ -114,12 +116,16 @@ class TaskGraphService:
             if enable_parallel_execution
             else None
         )
-        self._traces: OrderedDict[str, tuple[float, ExecutionTrace]] = OrderedDict()
+        self._traces: OrderedDict[
+            str,
+            tuple[float, str, str, ExecutionTrace],
+        ] = OrderedDict()
         self._grants = ConfirmationGrantStore(
             max_entries=grant_max_entries,
             clock=clock,
         )
         self._active_executions: dict[str, asyncio.Task[ExecutionTrace]] = {}
+        self._pending_cancellations: OrderedDict[str, float] = OrderedDict()
 
     def validate(self, graph: TaskGraph) -> TaskGraphValidationResponse:
         report = GraphValidator(self.registry).validate(graph)
@@ -136,7 +142,7 @@ class TaskGraphService:
 
         trace = DagDryRunExecutor(self.registry, auto_confirm=auto_confirm).run(graph, validate=False)
         trace = attach_residual_replan_state(graph, trace, registry=self.registry)
-        self._store_trace(graph.graph_id, trace)
+        self._store_trace(graph, trace, execution_kind="dry_run")
         return trace
 
     async def execute_guarded(
@@ -150,6 +156,15 @@ class TaskGraphService:
             raise RuntimeError(f"TaskGraph {graph.graph_id!r} is already running")
 
         grant = self._grants.consume(confirmation_grant, graph)
+        retained = self._retained_execution_trace(
+            graph,
+            execution_kind="guarded",
+        )
+        if retained is not None:
+            return retained
+        cancelled = self._take_pre_execution_cancellation(graph)
+        if cancelled is not None:
+            return cancelled
         proofs = TaskGraphExecutionProofs(
             confirmed_node_ids=set(grant.confirmed_node_ids)
         )
@@ -167,7 +182,11 @@ class TaskGraphService:
                 max_concurrency=self.max_concurrency,
             ).run(graph, proofs)
             trace = attach_residual_replan_state(graph, trace, registry=self.registry)
-            self._store_trace(graph.graph_id, trace)
+            self._store_trace(
+                graph,
+                trace,
+                execution_kind="guarded",
+            )
             return trace
         finally:
             self._active_executions.pop(graph.graph_id, None)
@@ -204,12 +223,27 @@ class TaskGraphService:
 
     def cancel_execution(self, graph_id: str) -> TaskGraphCancelResponse:
         task = self._active_executions.get(graph_id)
-        if task is None or task.done():
+        if task is not None and not task.done():
+            task.cancel()
+            return TaskGraphCancelResponse(
+                graph_id=graph_id,
+                cancellation_requested=True,
+            )
+
+        self._purge_expired_traces()
+        self._purge_expired_cancellations()
+        retained = self._traces.get(graph_id)
+        if retained is not None and retained[2] != "dry_run":
             return TaskGraphCancelResponse(
                 graph_id=graph_id,
                 cancellation_requested=False,
             )
-        task.cancel()
+        self._pending_cancellations.pop(graph_id, None)
+        while len(self._pending_cancellations) >= self.trace_max_entries:
+            self._pending_cancellations.popitem(last=False)
+        self._pending_cancellations[graph_id] = (
+            self._now() + self.trace_ttl_s
+        )
         return TaskGraphCancelResponse(
             graph_id=graph_id,
             cancellation_requested=True,
@@ -227,6 +261,7 @@ class TaskGraphService:
                 resource_arbiter=self._resource_arbiter,
                 max_concurrency=self.max_concurrency,
             ).run(graph),
+            execution_kind="read_only",
         )
 
     async def execute_planning(self, graph: TaskGraph) -> ExecutionTrace:
@@ -242,17 +277,38 @@ class TaskGraphService:
                 resource_arbiter=self._resource_arbiter,
                 max_concurrency=self.max_concurrency,
             ).run(graph),
+            execution_kind="planning",
         )
 
     async def _execute_tracked(
         self,
         graph: TaskGraph,
         execution: Awaitable[ExecutionTrace],
+        *,
+        execution_kind: str,
     ) -> ExecutionTrace:
         if graph.graph_id in self._active_executions:
             if hasattr(execution, "close"):
                 execution.close()
             raise RuntimeError(f"TaskGraph {graph.graph_id!r} is already running")
+        try:
+            retained = self._retained_execution_trace(
+                graph,
+                execution_kind=execution_kind,
+            )
+        except BaseException:
+            if hasattr(execution, "close"):
+                execution.close()
+            raise
+        if retained is not None:
+            if hasattr(execution, "close"):
+                execution.close()
+            return retained
+        cancelled = self._take_pre_execution_cancellation(graph)
+        if cancelled is not None:
+            if hasattr(execution, "close"):
+                execution.close()
+            return cancelled
         task = asyncio.current_task()
         if task is None:
             if hasattr(execution, "close"):
@@ -262,7 +318,11 @@ class TaskGraphService:
         try:
             trace = await execution
             trace = attach_residual_replan_state(graph, trace, registry=self.registry)
-            self._store_trace(graph.graph_id, trace)
+            self._store_trace(
+                graph,
+                trace,
+                execution_kind=execution_kind,
+            )
             return trace
         finally:
             self._active_executions.pop(graph.graph_id, None)
@@ -295,15 +355,33 @@ class TaskGraphService:
         if retained is None:
             return None
         self._traces.move_to_end(graph_id)
-        return retained[1].model_copy(deep=True)
+        return retained[3].model_copy(deep=True)
 
-    def _store_trace(self, graph_id: str, trace: ExecutionTrace) -> None:
+    def _store_trace(
+        self,
+        graph: TaskGraph,
+        trace: ExecutionTrace,
+        *,
+        execution_kind: str,
+    ) -> None:
         self._purge_expired_traces()
-        self._traces.pop(graph_id, None)
+        retained = self._traces.get(graph.graph_id)
+        if (
+            execution_kind == "dry_run"
+            and retained is not None
+            and retained[2] != "dry_run"
+        ):
+            # Diagnostics must never erase an authoritative execution or
+            # cancellation receipt for this idempotency identity.
+            self._traces.move_to_end(graph.graph_id)
+            return
+        self._traces.pop(graph.graph_id, None)
         while len(self._traces) >= self.trace_max_entries:
             self._traces.popitem(last=False)
-        self._traces[graph_id] = (
+        self._traces[graph.graph_id] = (
             self._now() + self.trace_ttl_s,
+            self._graph_fingerprint(graph),
+            execution_kind,
             trace.model_copy(deep=True),
         )
 
@@ -311,11 +389,89 @@ class TaskGraphService:
         now = self._now()
         expired = [
             graph_id
-            for graph_id, (expires_at, _) in self._traces.items()
+            for graph_id, (expires_at, _, _, _) in self._traces.items()
             if expires_at < now
         ]
         for graph_id in expired:
             self._traces.pop(graph_id, None)
+
+    def _purge_expired_cancellations(self) -> None:
+        now = self._now()
+        expired = [
+            graph_id
+            for graph_id, expires_at in self._pending_cancellations.items()
+            if expires_at < now
+        ]
+        for graph_id in expired:
+            self._pending_cancellations.pop(graph_id, None)
+
+    def _take_pre_execution_cancellation(
+        self,
+        graph: TaskGraph,
+    ) -> ExecutionTrace | None:
+        """Consume an early cancel that beat the execute request to Agent."""
+
+        self._purge_expired_cancellations()
+        if self._pending_cancellations.pop(graph.graph_id, None) is None:
+            return None
+        message = "Cancellation was accepted before TaskGraph execution started"
+        trace = ExecutionTrace(
+            graph_id=graph.graph_id,
+            status="cancelled",
+            summary=message,
+            outcome_summary=message,
+            events=[
+                ExecutionEvent(
+                    type="cancelled_before_start",
+                    message=message,
+                )
+            ],
+        )
+        self._store_trace(
+            graph,
+            trace,
+            execution_kind="cancelled_before_start",
+        )
+        return trace.model_copy(deep=True)
+
+    def _retained_execution_trace(
+        self,
+        graph: TaskGraph,
+        *,
+        execution_kind: str,
+    ) -> ExecutionTrace | None:
+        self._purge_expired_traces()
+        retained = self._traces.get(graph.graph_id)
+        if retained is None:
+            return None
+        _, fingerprint, retained_kind, trace = retained
+        if retained_kind == "dry_run":
+            return None
+        if fingerprint != self._graph_fingerprint(graph):
+            raise ValueError(
+                f"TaskGraph graph_id={graph.graph_id!r} is retained for "
+                "different graph content"
+            )
+        if (
+            trace.status != "cancelled"
+            and retained_kind != execution_kind
+        ):
+            raise ValueError(
+                f"TaskGraph graph_id={graph.graph_id!r} is retained for "
+                f"different execution lane={retained_kind!r}"
+            )
+        self._traces.move_to_end(graph.graph_id)
+        return trace.model_copy(deep=True)
+
+    @staticmethod
+    def _graph_fingerprint(graph: TaskGraph) -> str:
+        canonical = json.dumps(
+            graph.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return hashlib.sha256(canonical).hexdigest()
 
     def _now(self) -> float:
         return self._clock() if self._clock is not None else time.time()

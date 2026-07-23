@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
+    InteractionSpeech,
     SkillRequest,
     SkillResult,
     SkillTrace,
@@ -14,6 +15,36 @@ from shared.chromie_contracts.interaction import (
 
 
 class InteractionContractTests(unittest.TestCase):
+    def test_interaction_execution_ids_are_normalized_and_unique(self) -> None:
+        response = InteractionResponse(
+            interaction_id="  turn-1  ",
+            speech=[{"id": "  speech-1  ", "text": "Hello."}],
+            skills=[
+                {
+                    "request_id": "skill-1",
+                    "skill_id": "chromie.test",
+                }
+            ],
+        )
+        self.assertEqual(response.interaction_id, "turn-1")
+        self.assertEqual(response.speech[0].id, "speech-1")
+
+        with self.assertRaisesRegex(ValueError, "must be unique"):
+            InteractionResponse(
+                interaction_id="turn-duplicate",
+                speech=[{"id": "same", "text": "Hello."}],
+                skills=[
+                    {
+                        "request_id": "same",
+                        "skill_id": "chromie.test",
+                    }
+                ],
+            )
+        with self.assertRaisesRegex(ValueError, "interaction_id"):
+            InteractionResponse(interaction_id=" ")
+        with self.assertRaisesRegex(ValueError, "speech id"):
+            InteractionSpeech(id=" ", text="Hello.")
+
     def test_interaction_response_round_trip_supports_speech_and_skill(self) -> None:
         response = InteractionResponse(
             speech=[{"text": "Hello, nice to see you.", "timing": "immediate"}],

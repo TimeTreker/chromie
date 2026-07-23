@@ -82,8 +82,10 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
             }
         )
 
+        dry_run = service.dry_run(graph)
         trace = await service.execute_read_only(graph)
 
+        self.assertIn(dry_run.status, {"success", "aborted"})
         self.assertEqual(trace.status, "success")
         self.assertEqual(calls[1], ("remote.plan", {"input": "result-1"}))
         self.assertEqual(service.get_trace(graph.graph_id).status, "success")
@@ -563,14 +565,82 @@ class ReadOnlyTaskGraphExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         cancellation = service.cancel_execution("cancel-graph")
         cancelled_trace = await cancel_task
+        replayed_cancelled_trace = await asyncio.wait_for(
+            service.execute_read_only(
+                graph("cancel-graph", "cancel")
+            ),
+            timeout=0.2,
+        )
         release_keep.set()
         kept_trace = await keep_task
 
         self.assertTrue(cancellation.cancellation_requested)
         self.assertEqual(cancelled_trace.status, "cancelled")
+        self.assertEqual(replayed_cancelled_trace.status, "cancelled")
         self.assertEqual(cancelled_trace.result_map()["lookup"].status, "cancelled")
         self.assertEqual(service.get_trace("cancel-graph").status, "cancelled")
         self.assertEqual(kept_trace.status, "success")
+
+    async def test_cancel_before_execute_is_consumed_without_provider_call(
+        self,
+    ) -> None:
+        calls = 0
+
+        async def call(
+            url: str,
+            tool: str,
+            args: dict[str, Any],
+            timeout_s: float,
+        ) -> dict[str, Any]:
+            nonlocal calls
+            calls += 1
+            return {"structuredContent": {"ok": True}}
+
+        registry = _registry()
+        service = TaskGraphService(
+            registry,
+            read_only_invoker=McpStreamableHttpInvoker(
+                registry,
+                call=call,
+            ),
+        )
+        graph = TaskGraph.model_validate(
+            {
+                "graph_id": "early-cancel",
+                "created_by": "user",
+                "nodes": [
+                    {
+                        "id": "lookup",
+                        "tool": "remote.lookup",
+                        "type": "query",
+                    }
+                ],
+            }
+        )
+
+        dry_run = service.dry_run(graph)
+        cancellation = service.cancel_execution(graph.graph_id)
+        trace = await service.execute_read_only(graph)
+        second_dry_run = service.dry_run(graph)
+        replay = await service.execute_read_only(graph)
+        different = graph.model_copy(
+            update={"user_request": "different retained graph content"},
+            deep=True,
+        )
+
+        self.assertTrue(cancellation.cancellation_requested)
+        self.assertEqual(dry_run.status, "success")
+        self.assertEqual(second_dry_run.status, "success")
+        self.assertEqual(trace.status, "cancelled")
+        self.assertEqual(replay.status, "cancelled")
+        self.assertEqual(trace.events[0].type, "cancelled_before_start")
+        self.assertEqual(calls, 0)
+        self.assertEqual(service.get_trace(graph.graph_id).status, "cancelled")
+        self.assertFalse(
+            service.cancel_execution(graph.graph_id).cancellation_requested
+        )
+        with self.assertRaisesRegex(ValueError, "different graph content"):
+            await service.execute_read_only(different)
 
     async def test_scheduler_status_reports_active_work(self) -> None:
         started = asyncio.Event()

@@ -43,11 +43,15 @@ outcome reconciliation, and final response composition.
 The frozen version 1 `UserTurnEnvelope`, shared deterministic reflex contract,
 host admission adapter, source/freshness context references, and local
 stop/suppression paths are implemented. The host begins stop/cancel handling
-before Router or model inference and projects only admitted envelopes into the
-Core. The Router still hosts addressedness review and mixed compatibility
-semantics, so physical extraction of the five Gateway modules remains open.
-Existing Router APIs, service names, environment variables, and log fields
-remain current compatibility surfaces.
+before Router or model inference, records the requested and effective
+cancellation scopes, and projects only admitted envelopes into the Core.
+Output, embodied-motion, foreground-interaction, and global-emergency reflex
+scopes are implemented. Exact named-goal cancellation requires a committed
+plan binding; its Core-to-runtime dispatch/reconciliation bridge remains open.
+The Router still hosts addressedness review and mixed compatibility semantics,
+so physical extraction of the five Gateway modules remains open. Existing
+Router APIs, service names, environment variables, and log fields remain
+current compatibility surfaces.
 
 ## Current interaction paths
 
@@ -238,25 +242,37 @@ blindly. This is not a long-term personal memory system. See
 ## Scheduling, interruption, and cancellation
 
 The microphone path keeps ASR decoding and routed-turn execution as separate
-lifecycles. A valid barge-in can therefore cancel stale turn processing while a
-new utterance enters ASR. If another VAD utterance closes while ASR is still
-decoding, the Orchestrator retains the newest pending audio instead of dropping
-it; at most one pending utterance is kept to bound memory and latency.
+lifecycles. A valid barge-in immediately invalidates audible output but waits
+for the transcript before choosing a cognitive or runtime cancellation scope.
+If another VAD utterance closes while ASR is still decoding, the Orchestrator
+retains the newest pending audio instead of dropping it; at most one pending
+utterance is kept to bound memory and latency.
 
 The Interaction Coordinator validates the response and submits speech and skill
 requests to the Skill Runtime. Scheduling is bounded by
 `ORCH_SKILL_MAX_CONCURRENCY` and provider/exclusive-group policy.
 
-Barge-in:
+Cancellation:
 
-1. stops interruptible playback;
-2. cancels the current interaction execution;
-3. asks cancellable providers to cancel active work;
-4. waits for required cleanup paths;
-5. preserves Soridormi stop/emergency policy for embodied work.
+1. dispatches scoped runtime cancellation and dedicated E-stop work without
+   waiting for audible-output device cleanup;
+2. classifies a fixed reflex as output, embodied motion, foreground
+   interaction, or global emergency;
+3. selects both active and queued requests and prevents selected queued work
+   from starting;
+4. asks only selected interruptible providers to cancel and records failures or
+   non-interruptible work without claiming it stopped;
+5. widens the effective scope explicitly when a provider, including current
+   Soridormi motion cancellation, exposes only global-domain cancellation;
+6. dispatches Soridormi's dedicated E-stop for global emergency, retaining its
+   result separately from safe-idle proof;
+7. calls the authenticated Agent TaskGraph cancel endpoint for selected
+   TaskGraph work and treats a missing/negative cancellation receipt as failure.
 
-One interaction's cancellation must not cancel unrelated work. Resource
-arbitration is process-local; Soridormi is the cross-process robot authority.
+Independent unselected Skill Runtime work continues; existing sequencing,
+dependency, and required-delivery barriers still apply. A request shared by
+targeted and untargeted goals is reported as a conflict. Resource arbitration
+is process-local; Soridormi is the cross-process robot authority.
 
 ## Confirmation status
 
@@ -265,6 +281,10 @@ action-specific prompt, bounded reply matching, request binding, expiry,
 single-use approval, deterministic denial, and operational-interrupt
 passthrough. Simulation-only auto-confirm exemptions remain separate. Retained
 automatic and supervised approval/denial evidence is still an alpha gate.
+One pending token may cover multiple requests. A motion stop revokes that whole
+token if any confirmed request is motion-bound or cannot be safely classified;
+this conservative widening can also revoke unrelated unused approvals and is
+recorded separately from runtime execution cancellation.
 
 ## Diagnostics
 

@@ -6,11 +6,16 @@ from typing import Any
 from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.skill_runtime import (
     RuntimeAuthorization,
+    SkillExecutionContext,
     SkillRegistry,
     SkillRuntime,
 )
 from orchestrator.runtime.soridormi_skill_provider import SoridormiMcpSkillProvider
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import (
+    InteractionResponse,
+    SkillRequest,
+    SkillTrace,
+)
 
 
 class _RecordingInvoker:
@@ -316,6 +321,45 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
             execution.results[0].reason_code,
             "execution_skill_mismatch",
         )
+
+    async def test_cancel_requires_explicit_cancelled_true(self) -> None:
+        request = SkillRequest(
+            request_id="nod-cancel",
+            skill_id="soridormi.nod_yes",
+        )
+        context = SkillExecutionContext(
+            interaction_id="interaction-cancel",
+            trace=SkillTrace(
+                interaction_id="interaction-cancel",
+                request_id=request.request_id,
+                skill_id=request.skill_id,
+                provider_id="soridormi.mcp",
+            ),
+        )
+        definition = self._runtime(_RecordingInvoker()).registry.get(
+            request.skill_id
+        )
+
+        for output in ({"cancelled": False}, {}):
+            with self.subTest(output=output):
+                provider = SoridormiMcpSkillProvider(
+                    _RecordingInvoker(
+                        overrides={
+                            "soridormi.motion.cancel": (
+                                ToolCallOutcome.success(output)
+                            )
+                        }
+                    )
+                )
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "did not confirm cancelled=true",
+                ):
+                    await provider.cancel(
+                        request,
+                        definition,
+                        context,
+                    )
 
 
 if __name__ == "__main__":

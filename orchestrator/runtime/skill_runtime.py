@@ -4,8 +4,9 @@ import asyncio
 import inspect
 import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -19,8 +20,17 @@ from shared.chromie_contracts.interaction import (
     SkillTraceEvent,
     reject_forbidden_low_level_fields,
 )
+from shared.chromie_contracts.reflex import (
+    CancellationDirective,
+    CancellationDispatchReceipt,
+    CancellationProviderFailure,
+    CancellationRequestBinding,
+    CancellationScope,
+)
 
 logger = logging.getLogger(__name__)
+
+CancellationDomain = Literal["output", "embodied_motion"]
 
 
 class SkillDefinition(BaseModel):
@@ -41,6 +51,7 @@ class SkillDefinition(BaseModel):
     timeout_ms: int = Field(default=30000, ge=1, le=120000)
     idempotent: bool = False
     requires_safety_monitor: bool = False
+    cancellation_domains: tuple[CancellationDomain, ...] = ()
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("input_schema", "output_schema", "metadata")
@@ -123,8 +134,20 @@ class SkillRegistry:
                     ),
                     idempotent=False,
                     requires_safety_monitor=False,
+                    cancellation_domains=(
+                        ("embodied_motion",)
+                        if "physical_motion" in effects
+                        else ()
+                    ),
                     metadata={
                         "upstream_skill_id": upstream_id,
+                        "effects": effects,
+                        "safety_class": safety_class,
+                        "cancellation_granularity": (
+                            "global_domain"
+                            if "physical_motion" in effects
+                            else "request"
+                        ),
                         "execution": item.get("execution"),
                         "fallback": item.get("fallback"),
                         "hardware_enabled": item.get("hardware_enabled"),
@@ -168,6 +191,12 @@ class SkillExecutionContext(BaseModel):
     confirmed: bool = False
     safety_monitor_active: bool = False
     provider_cancel_requested: bool = False
+    provider_cancel_error: str | None = None
+    provider_cancel_future: asyncio.Future[str | None] | None = None
+    provider_cancel_source_turn_id: str | None = None
+    provider_started: bool = False
+    cancellation_scope: CancellationScope = "none"
+    cancellation_reason_code: str = "cancelled"
     trace: SkillTrace
 
 
@@ -212,6 +241,12 @@ class SkillRuntimeSchedulerStatus(BaseModel):
     active_interaction_ids: list[str] = Field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class _CancellationRule:
+    directive: CancellationDirective
+    effective_scope: CancellationScope
+
+
 class SkillRuntime:
     def __init__(
         self,
@@ -233,6 +268,13 @@ class SkillRuntime:
             ],
         ] = {}
         self._active_lock = asyncio.Lock()
+        self._open_interactions: set[str] = set()
+        self._executing_interactions: set[str] = set()
+        self._scheduled: dict[
+            str,
+            dict[str, tuple[SkillRequest, SkillDefinition]],
+        ] = {}
+        self._cancellation_rules: dict[str, list[_CancellationRule]] = {}
 
     def register_provider(self, provider: SkillProvider) -> None:
         if provider.provider_id in self._providers:
@@ -242,34 +284,129 @@ class SkillRuntime:
     def provider_ids(self) -> set[str]:
         return set(self._providers)
 
+    def begin_interaction(self, interaction_id: str) -> bool:
+        """Keep scoped directives alive across one coordinator-owned execution."""
+
+        if interaction_id in self._open_interactions:
+            return False
+        self._open_interactions.add(interaction_id)
+        self._cancellation_rules.pop(interaction_id, None)
+        return True
+
+    def end_interaction(self, interaction_id: str) -> None:
+        self._open_interactions.discard(interaction_id)
+        self._scheduled.pop(interaction_id, None)
+        self._cancellation_rules.pop(interaction_id, None)
+
     async def execute(
         self,
         response: InteractionResponse,
         *,
         authorization: RuntimeAuthorization | None = None,
     ) -> SkillRuntimeResult:
-        authorization = authorization or RuntimeAuthorization()
-        scheduled = self._scheduled_requests(response)
-        validated = [self._validate_request(request, authorization) for request in scheduled]
+        auto_managed = self.begin_interaction(response.interaction_id)
+        try:
+            authorization = authorization or RuntimeAuthorization()
+            scheduled = self._scheduled_requests(response)
+            validated = [
+                self._validate_request(request, authorization)
+                for request in scheduled
+            ]
+        except BaseException:
+            if auto_managed:
+                self.end_interaction(response.interaction_id)
+            raise
         results: list[SkillResult] = []
         traces: list[SkillTrace] = []
+        execution_registered = False
 
         try:
-            pending_parallel: list[tuple[SkillRequest, SkillDefinition]] = []
-            for request, definition in validated:
-                if request.timing == "parallel" and definition.can_run_parallel:
-                    pending_parallel.append((request, definition))
-                    continue
+            async with self._active_lock:
+                if response.interaction_id in self._executing_interactions:
+                    raise ValueError(
+                        "concurrent SkillRuntime.execute calls cannot reuse "
+                        f"interaction_id={response.interaction_id!r}"
+                    )
+                self._executing_interactions.add(response.interaction_id)
+                execution_registered = True
+                interaction_scheduled = self._scheduled.setdefault(
+                    response.interaction_id,
+                    {},
+                )
+                interaction_scheduled.update(
+                    {
+                        request.request_id: (request, definition)
+                        for request, definition in validated
+                    }
+                )
+            try:
+                pending_parallel: list[tuple[SkillRequest, SkillDefinition]] = []
+                for request, definition in validated:
+                    if request.timing == "parallel" and definition.can_run_parallel:
+                        pending_parallel.append((request, definition))
+                        continue
+                    if pending_parallel:
+                        parallel_items = list(pending_parallel)
+                        batch_results, batch_traces = await self._run_parallel(
+                            response.interaction_id,
+                            parallel_items,
+                            authorization,
+                        )
+                        results.extend(batch_results)
+                        traces.extend(batch_traces)
+                        pending_parallel = []
+                        if any(
+                            self._is_runtime_cancellation(result)
+                            for result in batch_results
+                        ):
+                            return SkillRuntimeResult(
+                                interaction_id=response.interaction_id,
+                                status="cancelled",
+                                results=results,
+                                traces=traces,
+                            )
+                        if any(
+                            self._failure_blocks_following_requests(
+                                response.interaction_id,
+                                item,
+                                definition,
+                                result,
+                            )
+                            for (item, definition), result in zip(
+                                parallel_items, batch_results, strict=True
+                            )
+                        ):
+                            break
+                    result, trace = await self._run_one(
+                        response.interaction_id,
+                        request,
+                        definition,
+                        authorization,
+                    )
+                    results.append(result)
+                    traces.append(trace)
+                    if self._is_runtime_cancellation(result):
+                        return SkillRuntimeResult(
+                            interaction_id=response.interaction_id,
+                            status="cancelled",
+                            results=results,
+                            traces=traces,
+                        )
+                    if self._failure_blocks_following_requests(
+                        response.interaction_id,
+                        request,
+                        definition,
+                        result,
+                    ):
+                        break
                 if pending_parallel:
-                    parallel_items = list(pending_parallel)
                     batch_results, batch_traces = await self._run_parallel(
                         response.interaction_id,
-                        parallel_items,
+                        pending_parallel,
                         authorization,
                     )
                     results.extend(batch_results)
                     traces.extend(batch_traces)
-                    pending_parallel = []
                     if any(
                         self._is_runtime_cancellation(result)
                         for result in batch_results
@@ -280,74 +417,56 @@ class SkillRuntime:
                             results=results,
                             traces=traces,
                         )
-                    if any(
-                        self._failure_blocks_following_requests(item, result)
-                        for (item, _), result in zip(
-                            parallel_items, batch_results, strict=True
-                        )
-                    ):
-                        break
-                result, trace = await self._run_one(
-                    response.interaction_id,
-                    request,
-                    definition,
-                    authorization,
+            except asyncio.CancelledError:
+                await asyncio.shield(
+                    self.cancel_interaction(response.interaction_id)
                 )
-                results.append(result)
-                traces.append(trace)
-                if self._is_runtime_cancellation(result):
-                    return SkillRuntimeResult(
-                        interaction_id=response.interaction_id,
-                        status="cancelled",
-                        results=results,
-                        traces=traces,
-                    )
-                if self._failure_blocks_following_requests(request, result):
-                    break
-            if pending_parallel:
-                batch_results, batch_traces = await self._run_parallel(
-                    response.interaction_id,
-                    pending_parallel,
-                    authorization,
+                return SkillRuntimeResult(
+                    interaction_id=response.interaction_id,
+                    status="cancelled",
+                    results=results,
+                    traces=traces,
                 )
-                results.extend(batch_results)
-                traces.extend(batch_traces)
-                if any(
-                    self._is_runtime_cancellation(result)
-                    for result in batch_results
-                ):
-                    return SkillRuntimeResult(
-                        interaction_id=response.interaction_id,
-                        status="cancelled",
-                        results=results,
-                        traces=traces,
-                    )
-        except asyncio.CancelledError:
-            await asyncio.shield(
-                self.cancel_interaction(response.interaction_id)
+
+            cancelled_results = [
+                result for result in results if result.status == "cancelled"
+            ]
+            status = (
+                "completed"
+                if all(result.status == "completed" for result in results)
+                else "cancelled"
+                if cancelled_results
+                and all(
+                    result.status in {"completed", "cancelled"}
+                    for result in results
+                )
+                and all(
+                    str(result.reason_code or "").startswith("cancelled")
+                    for result in cancelled_results
+                )
+                else "failed"
             )
             return SkillRuntimeResult(
                 interaction_id=response.interaction_id,
-                status="cancelled",
+                status=status,
                 results=results,
                 traces=traces,
             )
+        finally:
+            if execution_registered:
+                async with self._active_lock:
+                    self._scheduled.pop(response.interaction_id, None)
+                    self._executing_interactions.discard(
+                        response.interaction_id
+                    )
+            if auto_managed:
+                self.end_interaction(response.interaction_id)
 
-        status = (
-            "completed"
-            if all(result.status == "completed" for result in results)
-            else "failed"
-        )
-        return SkillRuntimeResult(
-            interaction_id=response.interaction_id,
-            status=status,
-            results=results,
-            traces=traces,
-        )
-
-    @staticmethod
     def _failure_blocks_following_requests(
+        self,
+        interaction_id: str,
         request: SkillRequest,
+        definition: SkillDefinition,
         result: SkillResult,
     ) -> bool:
         """Honor explicit runtime barriers without making all skills fail-fast.
@@ -359,10 +478,31 @@ class SkillRuntime:
         """
 
         metadata = request.args.get("metadata")
+        reason_code = str(result.reason_code or "")
+        cancellation_scope = ""
+        if reason_code == "cancelled_before_start":
+            rule = self._matching_cancellation_rule(
+                interaction_id,
+                request,
+                definition,
+            )
+            if rule is not None:
+                cancellation_scope = rule.effective_scope
+        elif reason_code.startswith("cancelled_"):
+            cancellation_scope = reason_code.removeprefix("cancelled_")
+        elif reason_code.startswith("cancellation_failed_"):
+            cancellation_scope = reason_code.removeprefix(
+                "cancellation_failed_"
+            )
+        cancellation_closes_interaction = cancellation_scope in {
+            "current_interaction",
+            "global_emergency",
+        }
         return bool(
             isinstance(metadata, dict)
             and metadata.get("abort_remaining_on_failure") is True
             and result.status != "completed"
+            and not cancellation_closes_interaction
         )
 
     @staticmethod
@@ -373,40 +513,665 @@ class SkillRuntime:
         )
 
     async def cancel_all(self) -> None:
-        await self._cancel_matching(lambda _: True)
-
-    async def cancel_interaction(self, interaction_id: str) -> None:
-        await self._cancel_matching(
-            lambda key: key[0] == interaction_id
+        await self.cancel_scope(
+            CancellationDirective(
+                source_turn_id="skill_runtime_cancel_all",
+                requested_scope="global_emergency",
+            )
         )
 
-    async def _cancel_matching(
+    async def cancel_interaction(self, interaction_id: str) -> None:
+        await self.cancel_scope(
+            CancellationDirective(
+                source_turn_id="skill_runtime_cancel_interaction",
+                requested_scope="current_interaction",
+                foreground_interaction_id=interaction_id,
+            )
+        )
+
+    async def cancel_scope(
         self,
-        predicate: Callable[[tuple[str, str]], bool],
-    ) -> None:
+        directive: CancellationDirective,
+    ) -> CancellationDispatchReceipt:
+        """Select active and queued work using trusted runtime bindings."""
+
+        requested_scope = directive.requested_scope
         async with self._active_lock:
-            active = [
-                item
-                for key, item in self._active.items()
-                if predicate(key)
+            known_interactions = {
+                *self._open_interactions,
+                *self._scheduled,
+                *(key[0] for key in self._active),
+            }
+            if requested_scope in {
+                "output_only",
+                "current_interaction",
+                "specific_goal",
+            }:
+                base_interaction_ids = (
+                    [directive.foreground_interaction_id]
+                    if directive.foreground_interaction_id in known_interactions
+                    else []
+                )
+            else:
+                base_interaction_ids = sorted(known_interactions)
+
+            base_scheduled_items: list[
+                tuple[str, SkillRequest, SkillDefinition]
+            ] = []
+            for interaction_id in base_interaction_ids:
+                for request, definition in self._scheduled.get(
+                    interaction_id,
+                    {},
+                ).values():
+                    base_scheduled_items.append(
+                        (interaction_id, request, definition)
+                    )
+
+            effective_scope = requested_scope
+            widened = False
+            widening_reason = ""
+            stale_binding_request_ids: set[str] = set()
+            shared_owner_conflict_request_ids: set[str] = set()
+            base_selected: list[
+                tuple[str, SkillRequest, SkillDefinition]
+            ] = []
+            for interaction_id, request, definition in base_scheduled_items:
+                if requested_scope == "specific_goal":
+                    binding = self._specific_goal_binding(
+                        directive,
+                        request,
+                    )
+                    if binding == "stale":
+                        stale_binding_request_ids.add(request.request_id)
+                        continue
+                    if binding == "shared_owner_conflict":
+                        shared_owner_conflict_request_ids.add(
+                            request.request_id
+                        )
+                        continue
+                    if binding == "match":
+                        base_selected.append(
+                            (interaction_id, request, definition)
+                        )
+                    continue
+                if self._scope_matches_definition(
+                    requested_scope,
+                    definition,
+                ):
+                    base_selected.append(
+                        (interaction_id, request, definition)
+                    )
+
+            # A provider-global motion cancel has collateral effect only when
+            # an eligible provider request has actually started. Arbiter
+            # waiters and not-yet-started requests are cancelled locally and
+            # must not trigger a physical provider call or scope widening.
+            global_motion_cancel_required = any(
+                (
+                    active_item := self._active.get(
+                        (interaction_id, request.request_id)
+                    )
+                )
+                is not None
+                and (
+                    not active_item[0].done()
+                    or active_item[3].provider_cancel_future is not None
+                )
+                and active_item[3].provider_started
+                and request.cancellable
+                and definition.interruptible
+                and "embodied_motion"
+                in definition.cancellation_domains
+                and self._provider_cancellation_is_global(definition)
+                for interaction_id, request, definition in base_selected
+            )
+            all_scheduled_items = [
+                (interaction_id, request, definition)
+                for interaction_id in sorted(known_interactions)
+                for request, definition in self._scheduled.get(
+                    interaction_id,
+                    {},
+                ).values()
             ]
-        for task, request, definition, context in active:
-            if request.cancellable and definition.interruptible:
-                task.cancel()
-        await asyncio.gather(
-            *(
-                self._cancel_provider(
-                    self._providers[definition.provider_id],
+            selected_by_key = {
+                (interaction_id, request.request_id): (
+                    interaction_id,
                     request,
                     definition,
-                    context,
                 )
-                for _, request, definition, context in active
-                if request.cancellable and definition.interruptible
+                for interaction_id, request, definition in base_selected
+            }
+            selection_scope_by_key: dict[
+                tuple[str, str],
+                CancellationScope,
+            ] = {
+                key: requested_scope for key in selected_by_key
+            }
+            rules_to_install: dict[
+                str,
+                list[_CancellationRule],
+            ] = {}
+
+            if (
+                global_motion_cancel_required
+                and requested_scope
+                not in {"embodied_motion", "global_emergency"}
+            ):
+                widened = True
+                widening_reason = (
+                    "provider_supports_only_global_embodied_motion_cancel"
+                )
+                if requested_scope == "specific_goal":
+                    effective_scope = "embodied_motion"
+                for interaction_id, request, definition in all_scheduled_items:
+                    if (
+                        "embodied_motion"
+                        not in definition.cancellation_domains
+                    ):
+                        continue
+                    key = (interaction_id, request.request_id)
+                    selected_by_key[key] = (
+                        interaction_id,
+                        request,
+                        definition,
+                    )
+                    selection_scope_by_key[key] = self._dominant_scope(
+                        selection_scope_by_key.get(key, "none"),
+                        "embodied_motion",
+                    )
+                for interaction_id in sorted(known_interactions):
+                    rules_to_install.setdefault(
+                        interaction_id,
+                        [],
+                    ).append(
+                        _CancellationRule(
+                            directive=directive,
+                            effective_scope="embodied_motion",
+                        )
+                    )
+                for interaction_id in base_interaction_ids:
+                    rules_to_install.setdefault(
+                        interaction_id,
+                        [],
+                    ).append(
+                        _CancellationRule(
+                            directive=directive,
+                            effective_scope=requested_scope,
+                        )
+                    )
+            else:
+                specific_goal_bound_to_open_interaction = (
+                    requested_scope == "specific_goal"
+                    and bool(base_interaction_ids)
+                )
+                should_install = bool(base_selected) or (
+                    requested_scope
+                    in {
+                        "output_only",
+                        "embodied_motion",
+                        "current_interaction",
+                        "global_emergency",
+                    }
+                ) or specific_goal_bound_to_open_interaction
+                if should_install:
+                    for interaction_id in base_interaction_ids:
+                        rules_to_install.setdefault(
+                            interaction_id,
+                            [],
+                        ).append(
+                            _CancellationRule(
+                                directive=directive,
+                                effective_scope=requested_scope,
+                            )
+                        )
+
+            for interaction_id, new_rules in rules_to_install.items():
+                rules = self._cancellation_rules.setdefault(
+                    interaction_id,
+                    [],
+                )
+                for rule in new_rules:
+                    if rule not in rules:
+                        rules.append(rule)
+
+            completed_active_keys = {
+                key
+                for key, item in self._active.items()
+                if (
+                    item[0].done()
+                    and item[3].provider_cancel_future is None
+                )
+            }
+            for key in completed_active_keys:
+                selected_by_key.pop(key, None)
+                selection_scope_by_key.pop(key, None)
+
+            selected = list(selected_by_key.values())
+            selected_keys = set(selected_by_key)
+            active_selected = [
+                (
+                    key,
+                    item,
+                    selection_scope_by_key[key],
+                )
+                for key, item in self._active.items()
+                if (
+                    key in selected_keys
+                    and (
+                        not item[0].done()
+                        or item[3].provider_cancel_future is not None
+                    )
+                )
+            ]
+
+            locally_cancelled_items: list[
+                tuple[
+                    asyncio.Task[SkillResult],
+                    SkillRequest,
+                    SkillDefinition,
+                    SkillExecutionContext,
+                ]
+            ] = []
+            provider_cancel_items: list[
+                tuple[
+                    asyncio.Task[SkillResult],
+                    SkillRequest,
+                    SkillDefinition,
+                    SkillExecutionContext,
+                ]
+            ] = []
+            non_interruptible_keys: set[tuple[str, str]] = set()
+            active_keys: set[tuple[str, str]] = set()
+            for key, item, item_scope in active_selected:
+                task, request, definition, context = item
+                if task.done():
+                    # The local provider coroutine may already have observed
+                    # task cancellation while _run_one still awaits the
+                    # provider-cancel dispatch assigned to this context.
+                    # Keep that exact dispatch visible to concurrent callers.
+                    active_keys.add(key)
+                    context.cancellation_scope = self._dominant_scope(
+                        context.cancellation_scope,
+                        item_scope,
+                    )
+                    context.cancellation_reason_code = (
+                        f"cancelled_{context.cancellation_scope}"
+                    )
+                    provider_cancel_items.append(item)
+                    continue
+                if context.provider_started:
+                    active_keys.add(key)
+                if not context.provider_started:
+                    context.cancellation_scope = self._dominant_scope(
+                        context.cancellation_scope,
+                        item_scope,
+                    )
+                    context.cancellation_reason_code = (
+                        f"cancelled_{context.cancellation_scope}"
+                    )
+                    task.cancel()
+                    locally_cancelled_items.append(item)
+                elif request.cancellable and definition.interruptible:
+                    context.cancellation_scope = self._dominant_scope(
+                        context.cancellation_scope,
+                        item_scope,
+                    )
+                    context.cancellation_reason_code = (
+                        f"cancelled_{context.cancellation_scope}"
+                    )
+                    task.cancel()
+                    locally_cancelled_items.append(item)
+                    provider_cancel_items.append(item)
+                else:
+                    non_interruptible_keys.add(key)
+
+            provider_groups: dict[
+                tuple[str, ...],
+                list[
+                    tuple[
+                        asyncio.Task[SkillResult],
+                        SkillRequest,
+                        SkillDefinition,
+                        SkillExecutionContext,
+                    ]
+                ],
+            ] = {}
+            for item in provider_cancel_items:
+                _, request, definition, context = item
+                if self._provider_cancellation_is_global(definition):
+                    group_key = (
+                        "global_domain",
+                        definition.provider_id,
+                        *sorted(definition.cancellation_domains),
+                    )
+                else:
+                    group_key = (
+                        "request",
+                        context.interaction_id,
+                        request.request_id,
+                    )
+                provider_groups.setdefault(group_key, []).append(item)
+
+            provider_group_futures: list[
+                tuple[
+                    list[
+                        tuple[
+                            asyncio.Task[SkillResult],
+                            SkillRequest,
+                            SkillDefinition,
+                            SkillExecutionContext,
+                        ]
+                    ],
+                    asyncio.Future[str | None],
+                ]
+            ] = []
+            for group_items in provider_groups.values():
+                first_future = group_items[0][
+                    3
+                ].provider_cancel_future
+                same_future_for_all = (
+                    first_future is not None
+                    and all(
+                        item[3].provider_cancel_future is first_future
+                        for item in group_items
+                    )
+                )
+                same_source_for_all = all(
+                    item[3].provider_cancel_source_turn_id
+                    == directive.source_turn_id
+                    for item in group_items
+                )
+                prior_dispatch_succeeded = all(
+                    item[3].provider_cancel_error is None
+                    for item in group_items
+                )
+                same_dispatch = (
+                    same_future_for_all
+                    and (
+                        not first_future.done()
+                        or same_source_for_all
+                        or prior_dispatch_succeeded
+                    )
+                )
+                existing_future = (
+                    first_future if same_dispatch else None
+                )
+                if existing_future is None:
+                    representative = group_items[0]
+                    _, request, definition, context = representative
+                    existing_future = asyncio.create_task(
+                        self._invoke_provider_cancel(
+                            self._providers[definition.provider_id],
+                            request,
+                            definition,
+                            tuple(item[3] for item in group_items),
+                        )
+                    )
+                for item in group_items:
+                    item[3].provider_cancel_requested = True
+                    item[3].provider_cancel_future = existing_future
+                    item[3].provider_cancel_source_turn_id = (
+                        directive.source_turn_id
+                    )
+                provider_group_futures.append(
+                    (group_items, existing_future)
+                )
+
+            interaction_ids = sorted(
+                {
+                    *base_interaction_ids,
+                    *rules_to_install,
+                }
+            )
+            selected_binding_keys = set(selected_keys)
+            queued_keys = selected_binding_keys - active_keys
+
+        provider_results = await asyncio.gather(
+            *(
+                asyncio.shield(future)
+                for _, future in provider_group_futures
             ),
             return_exceptions=True,
         )
-        await asyncio.gather(*(item[0] for item in active), return_exceptions=True)
+        provider_failures: dict[tuple[str, str], str] = {}
+        for (group_items, _), result in zip(
+            provider_group_futures,
+            provider_results,
+            strict=True,
+        ):
+            if isinstance(result, BaseException):
+                error = f"{type(result).__name__}:{result}"
+            else:
+                error = str(result or "")
+            if not error:
+                continue
+            for _, request, _, context in group_items:
+                provider_failures[
+                    (context.interaction_id, request.request_id)
+                ] = error
+        await asyncio.gather(
+            *(item[0] for item in locally_cancelled_items),
+            return_exceptions=True,
+        )
+        for _, request, _, context in provider_cancel_items:
+            if context.provider_cancel_error:
+                provider_failures[
+                    (context.interaction_id, request.request_id)
+                ] = context.provider_cancel_error
+
+        affected_goal_ids = {
+            goal_id
+            for _, request, _ in selected
+            for goal_id in self._request_goal_ids(request)
+        }
+        cancel_requested_keys = {
+            (context.interaction_id, request.request_id)
+            for _, request, _, context in provider_cancel_items
+        }
+        binding = lambda key: CancellationRequestBinding(
+            interaction_id=key[0],
+            request_id=key[1],
+        )
+        return CancellationDispatchReceipt(
+            source_turn_id=directive.source_turn_id,
+            requested_scope=requested_scope,
+            effective_scope=effective_scope,
+            interaction_ids=tuple(sorted(interaction_ids)),
+            target_goal_ids=directive.target_goal_ids,
+            expected_plan_id=directive.expected_plan_id,
+            expected_plan_fingerprint=(
+                directive.expected_plan_fingerprint
+            ),
+            affected_goal_ids=tuple(sorted(affected_goal_ids)),
+            selected_request_ids=tuple(
+                sorted({key[1] for key in selected_binding_keys})
+            ),
+            selected_request_bindings=tuple(
+                binding(key) for key in sorted(selected_binding_keys)
+            ),
+            active_request_ids=tuple(
+                sorted({key[1] for key in active_keys})
+            ),
+            active_request_bindings=tuple(
+                binding(key) for key in sorted(active_keys)
+            ),
+            queued_request_ids=tuple(
+                sorted({key[1] for key in queued_keys})
+            ),
+            queued_request_bindings=tuple(
+                binding(key) for key in sorted(queued_keys)
+            ),
+            cancel_requested_request_ids=tuple(
+                sorted({key[1] for key in cancel_requested_keys})
+            ),
+            cancel_requested_request_bindings=tuple(
+                binding(key) for key in sorted(cancel_requested_keys)
+            ),
+            non_interruptible_request_ids=tuple(
+                sorted({key[1] for key in non_interruptible_keys})
+            ),
+            non_interruptible_request_bindings=tuple(
+                binding(key) for key in sorted(non_interruptible_keys)
+            ),
+            shared_owner_conflict_request_ids=tuple(
+                sorted(shared_owner_conflict_request_ids)
+            ),
+            stale_binding_request_ids=tuple(
+                sorted(stale_binding_request_ids)
+            ),
+            provider_cancel_failures=tuple(
+                (
+                    f"{request_id}:"
+                    f"{provider_failures[(interaction_id, request_id)]}"
+                )
+                for interaction_id, request_id in sorted(provider_failures)
+            ),
+            provider_cancel_failure_evidence=tuple(
+                CancellationProviderFailure(
+                    interaction_id=interaction_id,
+                    request_id=request_id,
+                    error=provider_failures[
+                        (interaction_id, request_id)
+                    ],
+                )
+                for interaction_id, request_id in sorted(provider_failures)
+            ),
+            widened=widened,
+            widening_reason=widening_reason,
+        )
+
+    @staticmethod
+    def _scope_matches_definition(
+        scope: CancellationScope,
+        definition: SkillDefinition,
+    ) -> bool:
+        if scope in {"current_interaction", "global_emergency"}:
+            return True
+        if scope == "output_only":
+            return "output" in definition.cancellation_domains
+        if scope == "embodied_motion":
+            return "embodied_motion" in definition.cancellation_domains
+        return False
+
+    @staticmethod
+    def _provider_cancellation_is_global(
+        definition: SkillDefinition,
+    ) -> bool:
+        return (
+            str(
+                definition.metadata.get("cancellation_granularity")
+                or "request"
+            )
+            == "global_domain"
+        )
+
+    @staticmethod
+    def _scope_priority(scope: CancellationScope) -> int:
+        return {
+            "none": 0,
+            "output_only": 10,
+            "specific_goal": 20,
+            "embodied_motion": 25,
+            "current_interaction": 30,
+            "global_emergency": 40,
+        }[scope]
+
+    @classmethod
+    def _dominant_scope(
+        cls,
+        first: CancellationScope,
+        second: CancellationScope,
+    ) -> CancellationScope:
+        return (
+            second
+            if cls._scope_priority(second) >= cls._scope_priority(first)
+            else first
+        )
+
+    @staticmethod
+    def _request_goal_ids(request: SkillRequest) -> set[str]:
+        values: set[str] = set()
+        for metadata in (
+            request.metadata,
+            request.args.get("metadata"),
+        ):
+            if not isinstance(metadata, dict):
+                continue
+            for key in ("source_goal_ids", "covers_goal_ids"):
+                raw = metadata.get(key)
+                if isinstance(raw, str):
+                    raw = [raw]
+                if not isinstance(raw, (list, tuple)):
+                    continue
+                values.update(
+                    str(item).strip()
+                    for item in raw
+                    if str(item).strip()
+                )
+        return values
+
+    @classmethod
+    def _specific_goal_binding(
+        cls,
+        directive: CancellationDirective,
+        request: SkillRequest,
+    ) -> Literal[
+        "match",
+        "no_match",
+        "stale",
+        "shared_owner_conflict",
+    ]:
+        goal_ids = cls._request_goal_ids(request)
+        targets = set(directive.target_goal_ids)
+        if not goal_ids.intersection(targets):
+            return "no_match"
+        metadata = request.metadata
+        if (
+            str(metadata.get("canonical_plan_id") or "")
+            != str(directive.expected_plan_id or "")
+            or str(
+                metadata.get("canonical_plan_fingerprint") or ""
+            )
+            != str(directive.expected_plan_fingerprint or "")
+        ):
+            return "stale"
+        if not goal_ids.issubset(targets):
+            return "shared_owner_conflict"
+        return "match"
+
+    def _matching_cancellation_rule(
+        self,
+        interaction_id: str,
+        request: SkillRequest,
+        definition: SkillDefinition,
+    ) -> _CancellationRule | None:
+        matching: list[tuple[int, _CancellationRule]] = []
+        for index, rule in enumerate(
+            self._cancellation_rules.get(interaction_id, ())
+        ):
+            if rule.effective_scope == "specific_goal":
+                if (
+                    self._specific_goal_binding(
+                        rule.directive,
+                        request,
+                    )
+                    == "match"
+                ):
+                    matching.append((index, rule))
+            elif self._scope_matches_definition(
+                rule.effective_scope,
+                definition,
+            ):
+                matching.append((index, rule))
+        if not matching:
+            return None
+        return max(
+            matching,
+            key=lambda item: (
+                self._scope_priority(item[1].effective_scope),
+                item[0],
+            ),
+        )[1]
 
     def scheduler_status(self) -> SkillRuntimeSchedulerStatus:
         snapshot = self._resource_arbiter.snapshot()
@@ -427,7 +1192,13 @@ class SkillRuntime:
         for speech in response.speech:
             request = self._speech_request(speech)
             (after if speech.timing == "after_skills" else before).append(request)
-        return [*before, *response.skills, *after]
+        scheduled = [*before, *response.skills, *after]
+        request_ids = [request.request_id for request in scheduled]
+        if len(request_ids) != len(set(request_ids)):
+            raise ValueError(
+                "scheduled request IDs must be unique within one interaction"
+            )
+        return scheduled
 
     def _speech_request(self, speech: InteractionSpeech) -> SkillRequest:
         speech_metadata = dict(speech.metadata)
@@ -571,21 +1342,109 @@ class SkillRuntime:
                 can_run_parallel=definition.can_run_parallel,
                 exclusive_group=definition.exclusive_group,
             ):
+                async with self._active_lock:
+                    context.provider_started = True
+                    trace.events.append(
+                        SkillTraceEvent(type="started")
+                    )
                 return await provider.execute(request, definition, context)
 
-        task = asyncio.create_task(invoke())
         active_key = (interaction_id, request.request_id)
         async with self._active_lock:
-            self._active[active_key] = (task, request, definition, context)
-        trace.events.append(SkillTraceEvent(type="started"))
-        try:
-            result = await asyncio.wait_for(task, timeout=timeout_s)
-        except TimeoutError:
-            cancel_error = await self._cancel_provider(
-                provider,
+            cancellation_rule = self._matching_cancellation_rule(
+                interaction_id,
                 request,
                 definition,
-                context,
+            )
+            if cancellation_rule is not None:
+                interaction_scheduled = self._scheduled.get(interaction_id)
+                if interaction_scheduled is not None:
+                    interaction_scheduled.pop(request.request_id, None)
+                finished_at = datetime.now(timezone.utc)
+                result = SkillResult(
+                    request_id=request.request_id,
+                    skill_id=request.skill_id,
+                    skill_version=definition.version,
+                    status="cancelled",
+                    provider_id=definition.provider_id,
+                    reason_code="cancelled_before_start",
+                    message=(
+                        "skill execution was cancelled before provider start "
+                        f"by scope={cancellation_rule.effective_scope}"
+                    ),
+                    trace_id=trace.trace_id,
+                    started_at=trace.started_at,
+                    finished_at=finished_at,
+                )
+                trace.status = "cancelled"
+                trace.finished_at = finished_at
+                trace.events.append(
+                    SkillTraceEvent(
+                        type="cancelled",
+                        message=result.message,
+                        data={
+                            "reason_code": "cancelled_before_start",
+                            "cancellation_scope": (
+                                cancellation_rule.effective_scope
+                            ),
+                        },
+                    )
+                )
+                return result, trace
+            task = asyncio.create_task(invoke())
+            self._active[active_key] = (task, request, definition, context)
+        try:
+            result = await asyncio.wait_for(task, timeout=timeout_s)
+            if context.cancellation_scope != "none":
+                # A provider coroutine is not allowed to turn a selected
+                # cancellation back into completion by swallowing task
+                # cancellation. The trusted cancellation dispatch is the
+                # terminal authority for this request.
+                cancel_error = (
+                    await self._cancel_provider(
+                        provider,
+                        request,
+                        definition,
+                        context,
+                    )
+                    if context.provider_started
+                    else None
+                )
+                scoped_cancel_failed = bool(cancel_error)
+                result = SkillResult(
+                    request_id=request.request_id,
+                    skill_id=request.skill_id,
+                    skill_version=definition.version,
+                    status=(
+                        "failed" if scoped_cancel_failed else "cancelled"
+                    ),
+                    provider_id=definition.provider_id,
+                    reason_code=(
+                        f"cancellation_failed_{context.cancellation_scope}"
+                        if scoped_cancel_failed
+                        else context.cancellation_reason_code
+                    ),
+                    message=(
+                        "provider execution returned after cancellation "
+                        "was selected"
+                        + (
+                            "; provider cancellation was not confirmed: "
+                            f"{cancel_error}"
+                            if cancel_error
+                            else ""
+                        )
+                    ),
+                )
+        except TimeoutError:
+            cancel_error = (
+                await self._cancel_provider(
+                    provider,
+                    request,
+                    definition,
+                    context,
+                )
+                if context.provider_started
+                else None
             )
             result = SkillResult(
                 request_id=request.request_id,
@@ -605,7 +1464,12 @@ class SkillRuntime:
             )
         except asyncio.CancelledError:
             cancel_error: str | None = None
-            if request.cancellable and definition.interruptible:
+            cancelled_before_provider = not context.provider_started
+            if (
+                context.provider_started
+                and request.cancellable
+                and definition.interruptible
+            ):
                 cancel_error = await asyncio.shield(
                     self._cancel_provider(
                         provider,
@@ -614,15 +1478,37 @@ class SkillRuntime:
                         context,
                     )
                 )
+            scoped_cancel_failed = bool(
+                cancel_error
+                and context.cancellation_reason_code != "cancelled"
+            )
             result = SkillResult(
                 request_id=request.request_id,
                 skill_id=request.skill_id,
                 skill_version=definition.version,
-                status="cancelled",
+                status="failed" if scoped_cancel_failed else "cancelled",
                 provider_id=definition.provider_id,
-                reason_code="cancelled",
+                reason_code=(
+                    f"cancellation_failed_{context.cancellation_scope}"
+                    if scoped_cancel_failed
+                    else "cancelled_before_start"
+                    if cancelled_before_provider
+                    else context.cancellation_reason_code
+                ),
                 message=(
-                    "skill execution was cancelled"
+                    (
+                        "local execution was interrupted, but provider "
+                        "cancellation was not confirmed"
+                        if scoped_cancel_failed
+                        else "skill execution was cancelled before provider start"
+                        if cancelled_before_provider
+                        else "skill execution was cancelled"
+                    )
+                    + (
+                        f" by scope={context.cancellation_scope}"
+                        if context.cancellation_scope != "none"
+                        else ""
+                    )
                     + (
                         f"; provider cancellation failed: {cancel_error}"
                         if cancel_error
@@ -643,6 +1529,9 @@ class SkillRuntime:
         finally:
             async with self._active_lock:
                 self._active.pop(active_key, None)
+                interaction_scheduled = self._scheduled.get(interaction_id)
+                if interaction_scheduled is not None:
+                    interaction_scheduled.pop(request.request_id, None)
 
         result.trace_id = trace.trace_id
         trace.status = result.status
@@ -667,23 +1556,50 @@ class SkillRuntime:
         definition: SkillDefinition,
         context: SkillExecutionContext,
     ) -> str | None:
-        if context.provider_cancel_requested:
-            return None
+        in_flight = context.provider_cancel_future
+        if in_flight is not None:
+            return await asyncio.shield(in_flight)
+        completion = asyncio.create_task(
+            self._invoke_provider_cancel(
+                provider,
+                request,
+                definition,
+                (context,),
+            )
+        )
+        context.provider_cancel_future = completion
         context.provider_cancel_requested = True
+        return await asyncio.shield(completion)
+
+    @staticmethod
+    async def _invoke_provider_cancel(
+        provider: SkillProvider,
+        request: SkillRequest,
+        definition: SkillDefinition,
+        contexts: tuple[SkillExecutionContext, ...],
+    ) -> str | None:
+        error: str | None = None
         try:
-            await provider.cancel(request, definition, context)
+            await provider.cancel(request, definition, contexts[0])
+        except asyncio.CancelledError:
+            error = (
+                "provider cancellation coroutine was cancelled"
+            )
         except Exception as exc:
-            message = str(exc) or exc.__class__.__name__
+            error = str(exc) or exc.__class__.__name__
             logger.warning(
                 "Skill provider cancellation failed request_id=%s skill_id=%s "
                 "provider_id=%s error=%s",
                 request.request_id,
                 request.skill_id,
                 definition.provider_id,
-                message,
+                error,
             )
-            return message
-        return None
+        finally:
+            for context in contexts:
+                context.provider_cancel_requested = True
+                context.provider_cancel_error = error
+        return error
 
 
 SpeechHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
@@ -832,6 +1748,7 @@ def local_speech_definition() -> SkillDefinition:
         interruptible=True,
         can_run_parallel=True,
         exclusive_group="chromie.audio",
+        cancellation_domains=("output",),
     )
 
 

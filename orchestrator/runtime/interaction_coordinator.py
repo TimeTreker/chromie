@@ -9,12 +9,20 @@ from pathlib import Path
 from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry
-from agent.app.tool_invocation import AsyncToolInvoker, McpStreamableHttpInvoker
+from agent.app.tool_invocation import (
+    AsyncToolInvoker,
+    McpStreamableHttpInvoker,
+    ToolInvocationContext,
+)
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
     SkillRequest,
     SkillResult,
+)
+from shared.chromie_contracts.reflex import (
+    CancellationDirective,
+    CancellationDispatchReceipt,
 )
 
 from .skill_runtime import (
@@ -27,7 +35,12 @@ from .skill_runtime import (
     local_speech_definition,
     session_interrupt_definition,
 )
-from .skill_adapters import TaskGraphHandler, TaskGraphSkillProvider, task_graph_skill_definition
+from .skill_adapters import (
+    TaskGraphCancelHandler,
+    TaskGraphHandler,
+    TaskGraphSkillProvider,
+    task_graph_skill_definition,
+)
 from .soridormi_skill_provider import SoridormiNamedSkillAdapter
 from .body_recovery import (
     build_body_recovery_confirmation,
@@ -71,6 +84,7 @@ class InteractionRuntimeCoordinator:
         *,
         soridormi_invoker: AsyncToolInvoker | None = None,
         task_graph_handler: TaskGraphHandler | None = None,
+        task_graph_cancel_handler: TaskGraphCancelHandler | None = None,
         auto_confirm_sim: bool = True,
     ) -> None:
         self.registry = SkillRegistry()
@@ -88,7 +102,12 @@ class InteractionRuntimeCoordinator:
         self.runtime.register_provider(SessionControlSkillProvider())
         self._task_graph_enabled = task_graph_handler is not None
         if task_graph_handler is not None:
-            self.runtime.register_provider(TaskGraphSkillProvider(task_graph_handler))
+            self.runtime.register_provider(
+                TaskGraphSkillProvider(
+                    task_graph_handler,
+                    task_graph_cancel_handler,
+                )
+            )
         self.soridormi_invoker = soridormi_invoker
         self.auto_confirm_sim = auto_confirm_sim
         self.soridormi_mode: str | None = None
@@ -127,6 +146,36 @@ class InteractionRuntimeCoordinator:
         return self.registry.get(skill_id)
 
     async def execute(
+        self,
+        response: InteractionResponse,
+        *,
+        session_id: str | None,
+        confirmed_request_ids: set[str] | None = None,
+    ) -> SkillRuntimeResult:
+        opened = self.runtime.begin_interaction(response.interaction_id)
+        try:
+            return await self._execute_open_interaction(
+                response,
+                session_id=session_id,
+                confirmed_request_ids=confirmed_request_ids,
+            )
+        finally:
+            if opened:
+                self.runtime.end_interaction(response.interaction_id)
+
+    def reserve_interaction(self, interaction_id: str) -> None:
+        """Synchronously expose a launch before any awaitable preflight."""
+
+        if not self.runtime.begin_interaction(interaction_id):
+            raise ValueError(
+                "cannot reserve an already-open interaction_id="
+                f"{interaction_id!r}"
+            )
+
+    def release_interaction(self, interaction_id: str) -> None:
+        self.runtime.end_interaction(interaction_id)
+
+    async def _execute_open_interaction(
         self,
         response: InteractionResponse,
         *,
@@ -623,6 +672,57 @@ class InteractionRuntimeCoordinator:
 
     async def cancel_all(self) -> None:
         await self.runtime.cancel_all()
+
+    async def cancel_scope(
+        self,
+        directive: CancellationDirective,
+    ) -> CancellationDispatchReceipt:
+        return await self.runtime.cancel_scope(directive)
+
+    async def emergency_stop(self, *, reason: str) -> dict[str, Any]:
+        """Dispatch Soridormi's dedicated E-stop without model mediation."""
+
+        if self.soridormi_invoker is None:
+            return {
+                "status": "unavailable",
+                "tool": "soridormi.safety.emergency_stop",
+                "reason": "soridormi_invoker_disabled",
+            }
+        try:
+            outcome = await self.soridormi_invoker.invoke(
+                "soridormi.safety.emergency_stop",
+                {"reason": str(reason or "cognitive_gateway_emergency_stop")},
+                context=ToolInvocationContext(allow_safety_controls=True),
+            )
+        except Exception as exc:
+            return {
+                "status": "failed",
+                "tool": "soridormi.safety.emergency_stop",
+                "error": f"{type(exc).__name__}:{exc}",
+            }
+        output = dict(outcome.output or {})
+        required_postconditions = ("stopped", "emergency", "safe_idle")
+        postcondition_confirmed = (
+            outcome.status == "success"
+            and all(output.get(key) is True for key in required_postconditions)
+        )
+        if outcome.status == "success" and not postcondition_confirmed:
+            return {
+                "status": "unconfirmed",
+                "provider_status": outcome.status,
+                "tool": "soridormi.safety.emergency_stop",
+                "output": output,
+                "reason": "emergency_stop_postcondition_unconfirmed",
+                "required_postconditions": list(required_postconditions),
+                "error": outcome.error,
+            }
+        return {
+            "status": outcome.status,
+            "tool": "soridormi.safety.emergency_stop",
+            "output": output,
+            "postcondition_confirmed": postcondition_confirmed,
+            "error": outcome.error,
+        }
 
     async def refresh_soridormi_catalog(self, *, force: bool = True) -> None:
         await self._ensure_soridormi_catalog(force=force)

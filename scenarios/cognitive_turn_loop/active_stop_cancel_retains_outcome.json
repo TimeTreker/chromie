@@ -3,7 +3,7 @@
   "id": "active_stop_cancel_retains_outcome",
   "suite": "cognitive_turn_loop",
   "level": "integration",
-  "description": "A deterministic stop reflex cancels an active Skill Runtime request, leaves the queued sibling not_run, retains both outcomes, and emits no stale final.",
+  "description": "A deterministic current-interaction stop cancels both the active and queued Skill Runtime requests, records the queued request as cancelled_before_start, retains both outcomes, and emits no stale final.",
   "tags": ["level-a", "stop", "cancel", "skill-runtime", "evidence-retention"],
   "input": {
     "text": "Run the long first task and then the second task.",
@@ -86,11 +86,11 @@
     "original_input_preserved": true,
     "turn_identity_preserved": true,
     "runtime_status": "cancelled",
-    "aggregate_status": "failed",
-    "evidence_statuses": ["cancelled", "not_run"],
-    "goal_statuses": ["cancelled", "not_run"],
-    "goal_state_statuses": ["cancelled", "failed"],
-    "goal_state_outcome_statuses": ["cancelled", "not_run"],
+    "aggregate_status": "cancelled",
+    "evidence_statuses": ["cancelled", "cancelled"],
+    "goal_statuses": ["cancelled", "cancelled"],
+    "goal_state_statuses": ["cancelled", "cancelled"],
+    "goal_state_outcome_statuses": ["cancelled", "cancelled"],
     "closure_status": "suppressed_stale",
     "delivery_status": "suppressed",
     "suppression_reason": "stale_turn",
@@ -102,6 +102,18 @@
     "runtime_call_count": 1,
     "stop_admission": "reflex_and_admit",
     "stop_reflex_action": "interrupt",
+    "stop_cancellation_scope": "current_interaction",
+    "cancel_selected_step_ids": [
+      "active-first",
+      "queued-second"
+    ],
+    "cancel_queued_step_ids": [
+      "queued-second"
+    ],
+    "plan_reason_codes": [
+      "cancelled_current_interaction",
+      "cancelled_before_start"
+    ],
     "provider_cancelled_step_ids": ["active-first"]
   }
 }

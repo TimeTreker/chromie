@@ -113,6 +113,10 @@ All risky or incomplete execution paths are default-off.
 
 `AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1` requires guarded execution.
 Guarded execution requires a non-empty `AGENT_TASK_GRAPH_EXECUTION_TOKEN`.
+The host Skill Runtime uses that same authenticated cancel endpoint for
+planning TaskGraphs. Enabling host/planning TaskGraph execution without the
+token makes authoritative cancellation fail closed and is not a supported
+cancellable deployment.
 
 ## Hardware profile and startup
 

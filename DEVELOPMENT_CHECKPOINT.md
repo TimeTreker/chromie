@@ -174,6 +174,23 @@ Documentation validation, compilation, and diff hygiene also passed. This is
 automatic evidence only; retained provider-backed live-text, microphone,
 speaker, simulator, safe-idle, and robot qualification remain open.
 
+The subsequent scoped-cancellation slice separates output, embodied motion,
+foreground-interaction, exact-goal runtime, and global-emergency contracts.
+The trusted Skill Runtime now selects active and queued requests, prevents
+cancelled queued work from starting, preserves independent siblings, reports
+stale/shared/non-interruptible/provider-failure evidence, widens physical
+scope when Soridormi exposes only global-domain cancellation, and the host
+dispatches the dedicated E-stop path without waiting for audio teardown. A
+global emergency also cancels every unfinished host interaction workflow even
+if runtime cancellation dispatch fails, so preflight work cannot start later.
+The July 23 scoped-cancellation gate passed 1291 primary plus 20 legacy Agent
+tests, the `deterministic_safety_controls` Level A class passed 4/4, and
+`evidence_bound_cognitive_turn_closure` passed 5/5. This is implementation plus
+automatic evidence only. The next cancellation work is the Core named-goal
+reservation/dispatch bridge, atomic receipt/outcome reconciliation into Goal
+state, partial confirmation-token rebuilding, and retained supervised
+E-stop/safe-idle evidence.
+
 The initial Runtime Observability implementation is now present behind a
 default-off policy. It provides architecture-independent Runtime Trace items,
 module-owned identity, `off`/`basic`/`debug` collection, monotonic duration

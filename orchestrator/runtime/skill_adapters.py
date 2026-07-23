@@ -113,6 +113,10 @@ class AgentResultInteractionAdapter:
 
 
 TaskGraphHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
+TaskGraphCancelHandler = Callable[
+    [str],
+    dict[str, Any] | Awaitable[dict[str, Any]],
+]
 
 
 class TaskGraphSkillProvider:
@@ -120,8 +124,13 @@ class TaskGraphSkillProvider:
 
     provider_id = "chromie.task_graph"
 
-    def __init__(self, handler: TaskGraphHandler) -> None:
+    def __init__(
+        self,
+        handler: TaskGraphHandler,
+        cancel_handler: TaskGraphCancelHandler | None = None,
+    ) -> None:
         self._handler = handler
+        self._cancel_handler = cancel_handler
         self.cancelled_request_ids: set[str] = set()
 
     async def execute(
@@ -152,6 +161,34 @@ class TaskGraphSkillProvider:
         definition: SkillDefinition,
         context: SkillExecutionContext,
     ) -> None:
+        if self._cancel_handler is None:
+            raise RuntimeError(
+                "TaskGraph cancellation endpoint is not configured"
+            )
+        graph = request.args.get("graph")
+        graph_id = (
+            str(graph.get("graph_id") or "").strip()
+            if isinstance(graph, dict)
+            else ""
+        )
+        if not graph_id:
+            raise RuntimeError(
+                "TaskGraph cancellation requires the committed graph_id"
+            )
+        raw = self._cancel_handler(graph_id)
+        receipt = await raw if inspect.isawaitable(raw) else raw
+        if not isinstance(receipt, dict):
+            raise RuntimeError(
+                "TaskGraph cancellation endpoint returned an invalid receipt"
+            )
+        if (
+            str(receipt.get("graph_id") or "").strip() != graph_id
+            or receipt.get("cancellation_requested") is not True
+        ):
+            raise RuntimeError(
+                "TaskGraph cancellation was not confirmed "
+                f"for graph_id={graph_id!r}"
+            )
         self.cancelled_request_ids.add(request.request_id)
 
 
@@ -217,4 +254,10 @@ def task_graph_skill_definition() -> SkillDefinition:
         timeout_ms=120000,
         interruptible=True,
         can_run_parallel=False,
+        cancellation_domains=("embodied_motion",),
+        metadata={
+            "effects": ["physical_motion"],
+            "safety_class": "physical_motion",
+            "cancellation_granularity": "request",
+        },
     )
