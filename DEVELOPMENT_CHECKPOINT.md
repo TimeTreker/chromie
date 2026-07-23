@@ -1,14 +1,14 @@
 # Development Checkpoint
 
-**Current release-prep base:** `0.0.1`
+**Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 **Status refresh date:** 2026-07-23
 **Current focus:** Finish Fast Planner multi-goal latency qualification and
 promote it to source-bound Target evidence: reduce final-source median cognitive
 runtime to the accepted threshold, repeat three warm runs, add
 endpoint-reported Soridormi revision identity, use a clean paired checkout,
-bind running images/models to source, and make release inputs immutable.
-Physical pilot and human voice-device validation remain separate tracks.
+bind running images/models to source. Physical pilot and human voice-device
+validation remain separate tracks.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -222,7 +222,7 @@ are retained; code does not manufacture that evidence. See
 [Runtime Trace Contract](docs/RUNTIME_TRACE.md), and
 [Accelerator Telemetry and Latency Evidence Gates](docs/ACCELERATOR_LATENCY_EVIDENCE.md).
 
-The `0.0.1` release implementation is present:
+The current development implementation is present:
 
 - unified Goal Association, complete-coverage Fast Planning, terminal Deep
   Planning, Response Composition, atomic Goal-state application, and trusted
@@ -355,20 +355,18 @@ The text-to-MuJoCo interaction scope is closed. Linux RTX 5090 GPU smoke passed
 21/21; clean seven-case synthetic and PipeWire virtual-mic bundles passed; and
 text-to-MuJoCo evidence `20260617T081411Z` passed at Chromie revision `857c15f`
 with ordered walk, nod, and turn execution in MuJoCo plus safe idle. Physical
-real-microphone/speaker evidence remains open only as a separate human
-voice-device release-support track. Automated acoustic generated-speech
+real-microphone/speaker evidence remains open as a separate human
+voice-device validation track. Automated acoustic generated-speech
 evidence `20260704T114654Z` also passed all seven cases at Chromie revision
-`842a334`, which supports the narrowed `0.0.1` generated-speech and
-Soridormi MuJoCo-executor claim but not a human voice-device claim. The
+`842a334`, which supports generated-speech regression and historical
+Soridormi MuJoCo-executor evidence but not a human voice-device claim. The
 robust-simulation and provider-readiness
 milestone is complete with live no-motion MCP conformance, three-profile
 parity, and 16/16 Soridormi-owned fault-injection scenarios.
 
-The temporary `demo-sim-2026-06-27` tag was withdrawn on 2026-06-27 before
-publication because the paired repositories needed a documentation/code
-consistency audit. Do not publish or recreate that demo tag. The intended
-replacement tag is `0.0.1`, after the Chromie and Soridormi validation
-gates pass from the intended revisions.
+The temporary `demo-sim-2026-06-27` tag was withdrawn on 2026-06-27 because
+the paired repositories needed a documentation/code consistency audit. Do not
+recreate that historical tag; no replacement tag is planned.
 
 ## Next sequence
 
@@ -411,12 +409,11 @@ completed target validation.
    `chat,robot_action`, exact Router actions remain adapter-only, and the legacy
    CapabilityAgent planner may run only with both service gates and a fresh
    authoritative emergency claim matching the request turn.
-3. Verify evidence and release provenance before any candidate packaging:
+3. Verify evidence and artifact provenance before any preview packaging:
    cognitive summaries must record the current revisions and an applied,
-   completed, safe-idle result; voice/release evidence must match source
-   revision, `VERSION`, the capability manifest, and compatibility declaration.
-   Bind the running Chromie service images and loaded models to that revision,
-   and replace mutable release image references before publication.
+   completed, safe-idle result; voice evidence must match source revision,
+   `VERSION`, the capability manifest, and compatibility declaration. Bind the
+   running Chromie service images and loaded models to that revision.
 4. Continue the general ability acceptance reconstruction described in
    [docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md](docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md):
    the first manifest/runner slice is implemented, and the next work is better
@@ -455,17 +452,14 @@ completed target validation.
 12. Keep all physical-motion gates off while validating no-motion health,
    calibration artifact ownership, stop/recovery procedures, and operator
    responsibilities.
-13. If the next supported release claims real microphone/speaker voice-device
-    operation, run the full seven-case `supervised` matrix on the reference host,
-    review audible output and MuJoCo safe-idle/recovery behavior, verify the
-    bundle with `--require-clean`, then clear the compatibility blocker.
-14. Before publishing `0.0.1`, bind the running Chromie images/models and the
-    Soridormi endpoint-reported source to the candidate revisions, replace
-    mutable image references, rerun the Chromie documentation/test/scenario
-    gates, rerun the Soridormi task-agent and locomotion-readiness gates, and
-    keep the tag claim limited to generated-speech and Soridormi
-    MuJoCo-executor evidence.
-15. For TTS selection work, keep OuteTTS as the release-locked baseline and add
+13. When evaluating real microphone/speaker operation, run the full seven-case
+    `supervised` matrix on the reference host, review audible output and MuJoCo
+    safe-idle/recovery behavior, and verify the bundle with `--require-clean`.
+14. For source-bound target evidence, bind running Chromie images/models and the
+    Soridormi endpoint-reported source to the evaluated revisions, then rerun
+    the Chromie documentation/test/scenario gates and the Soridormi task-agent
+    and locomotion-readiness gates.
+15. For TTS selection work, keep OuteTTS as the maintained baseline and add
     candidate services only behind the versioned provider contract. Run
     `python scripts/tts_provider_ab.py --check`, then compare at least two
     endpoints with the same committed matrix. Do not change the default until
@@ -590,8 +584,8 @@ First-reference-robot selection requirements are maintained in
 - Keep physical work default-off and sequential.
 - Do not expose low-level robot controls to model-facing contracts.
 - Do not report automated or dry-run output as target evidence.
-- Do not publish `0.0.1` or remove release blockers without retained
-  evidence for the exact supported scope.
+- Do not promote diagnostic or historical output beyond the exact retained
+  evidence and supported engineering scope.
 
 
 ## Historical staged cognitive checkpoints
@@ -662,8 +656,8 @@ Level A class passed at the recorded implementation checkpoint. Exact current
 counts must be taken from the latest command output rather than this document. A diagnostic execute run progressed through three of four
 daily-life cases before the final mixed case exposed the now-fixed boundaries. A fresh
 post-fix localhost rerun remains pending because the execution platform denied
-command approval. That session limitation is not a product or release blocker,
-and no Target validation or Release readiness is claimed.
+command approval. That session limitation is not a product blocker, and no target validation or
+deployment-readiness claim is made.
 
 The common safe base enables structured interaction and authoritative `chat`
 apply without Soridormi. The maintained Soridormi launcher enables that

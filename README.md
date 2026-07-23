@@ -32,9 +32,9 @@ environment-specific evidence work rather than inferred release claims.
 > The contracts and host path are automatically verified and default to
 > authoritative chat in the common safe base; the maintained Soridormi launcher
 > widens authority to simulator robot actions. Historical voice-pipeline and
-> text-to-MuJoCo evidence remains valid only for its recorded legacy revisions. A clean live rerun of the
-> current authority path is still required before target validation or
-> publication of the blocked `0.0.1` candidate. See
+> text-to-MuJoCo evidence remains valid only for its recorded legacy revisions.
+> A clean live rerun of the current authority path is still required before
+> target validation. No release version or publication target is planned. See
 > [Status](docs/STATUS.md) and [Roadmap](ROADMAP.md).
 
 中文概览见 [Chromie 中文指南](docs/PROJECT_GUIDE.zh-CN.md)。
@@ -115,7 +115,7 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
   simulator, and release acceptance tooling.
 
 Endpoint-reported Soridormi source identity, running Chromie image/model source
-binding, immutable publishable image references, current-revision goal-driven
+binding, immutable source image references, current-revision goal-driven
 live/MuJoCo evidence, physical microphone/speaker evidence, a reviewed release
 bundle, a retained multi-provider TTS comparison, verified Jetson packaging,
 and physical robot support remain open.

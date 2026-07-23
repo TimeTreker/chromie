@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from scripts.check_docs import (
+    ABANDONED_RELEASE_VERSION_RE,
     MILESTONE_TOKEN_RE,
     NUMBERED_PHASE_PATH_RE,
     NUMBERED_STEP_TOKEN_RE,
@@ -38,6 +39,15 @@ class SemanticProjectNamingTests(unittest.TestCase):
     def test_numbered_step_path_is_rejected(self) -> None:
         path = "docs/" + "step" + "10_accelerator_evidence.md"
         self.assertIsNotNone(NUMBERED_PHASE_PATH_RE.search(path))
+
+    def test_abandoned_fixed_release_version_is_rejected(self) -> None:
+        version = "0." + "0.1"
+        self.assertIsNotNone(ABANDONED_RELEASE_VERSION_RE.search(version))
+
+    def test_loopback_address_is_not_a_release_version(self) -> None:
+        self.assertIsNone(
+            ABANDONED_RELEASE_VERSION_RE.search("http://127.0.0.1:8091")
+        )
 
     def test_semantic_paths_are_allowed(self) -> None:
         self.assertIsNone(

@@ -1375,7 +1375,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 "event_count": 40,
                 "acceptance_id": "test",
                 "runner": {"dry_run": False, "mode": "supervised"},
-                "chromie": {"revision": "abc123", "version": "0.0.1", "dirty": False},
+                "chromie": {"revision": "abc123", "version": "development", "dirty": False},
                 "soridormi_manifest": {"upstream_commit": "def456"},
                 "soridormi_local_revision": "def456",
                 "soridormi_local_dirty": False,
@@ -1411,7 +1411,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 root,
                 require_clean=True,
                 expected_chromie_revision="abc123",
-                expected_chromie_version="0.0.1",
+                expected_chromie_version="development",
                 expected_soridormi_revision="def456",
             )
             self.assertTrue(report["passed"], report)
@@ -1431,7 +1431,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                         root,
                         require_clean=True,
                         expected_chromie_revision="abc123",
-                        expected_chromie_version="0.0.1",
+                        expected_chromie_version="development",
                         expected_soridormi_revision="def456",
                     )
                     self.assertFalse(
@@ -1453,7 +1453,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 "runner": {"dry_run": False, "mode": "synthetic"},
                 "chromie": {
                     "revision": "abc123",
-                    "version": "0.0.1",
+                    "version": "development",
                     "dirty": False,
                 },
                 "soridormi_manifest": {"upstream_commit": "def456"},
@@ -1494,7 +1494,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             release_report = verify_bundle(
                 root,
                 expected_chromie_revision="abc123",
-                expected_chromie_version="0.0.1",
+                expected_chromie_version="development",
                 expected_soridormi_revision="def456",
             )
             self.assertFalse(release_report["passed"])
@@ -1508,7 +1508,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 root,
                 allow_automated=True,
                 expected_chromie_revision="abc123",
-                expected_chromie_version="0.0.1",
+                expected_chromie_version="development",
                 expected_soridormi_revision="def456",
             )
             self.assertTrue(automated_report["passed"], automated_report)
@@ -1528,16 +1528,15 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
             (repo / "release").mkdir()
             (repo / "capabilities").mkdir()
-            (repo / "VERSION").write_text("0.0.1\n")
-            (repo / "release" / "0.0.1.md").write_text("# Notes\n")
+            (repo / "VERSION").write_text("development\n")
+            (repo / "release" / "development.md").write_text("# Development Scope\n")
             (repo / "release" / "compatibility.json").write_text(
                 json.dumps(
                     {
                         "schema_version": 1,
-                        "release_state": "candidate",
+                        "release_state": "development",
                         "chromie": {
-                            "version": "0.0.1",
-                            "release_tag": "0.0.1",
+                            "version": "development",
                             "supported_branch": "main",
                             "runtime_modes": ["soridormi-mujoco-sim"],
                         },
@@ -1550,7 +1549,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                             "human_supervised_voice_device_claim": True,
                             "soridormi_mujoco_sim_executor_required": True,
                         },
-                        "release_gate_blockers": ["confirmation pending"],
+                        "known_evidence_gaps": ["confirmation pending"],
                     }
                 )
             )
@@ -1580,7 +1579,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                             "revision": subprocess.check_output(
                                 ["git", "rev-parse", "HEAD"], cwd=repo, text=True
                             ).strip(),
-                            "version": "0.0.1",
+                            "version": "development",
                             "dirty": False,
                         },
                         "soridormi_manifest": {"upstream_commit": "soridormi-fixture"},
@@ -1634,7 +1633,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
 
             manifest = json.loads((bundle / "manifest.json").read_text())
             self.assertFalse(manifest["publishable"])
-            self.assertTrue((bundle / "chromie-0.0.1.tar.gz").is_file())
+            self.assertTrue((bundle / "chromie-development.tar.gz").is_file())
             self.assertTrue((bundle / "build-provenance.json").is_file())
             self.assertEqual(
                 manifest["artifacts"]["build_provenance"],
@@ -1651,9 +1650,9 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
     def test_release_compatibility_policy_is_fail_closed(self) -> None:
         valid = {
             "schema_version": 1,
-            "release_state": "candidate",
+            "release_state": "development",
             "chromie": {
-                "version": "0.0.1",
+                "version": "development",
                 "supported_branch": "main",
                 "runtime_modes": ["soridormi-mujoco-sim"],
             },
@@ -1666,14 +1665,14 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                 "human_supervised_voice_device_claim": False,
                 "soridormi_mujoco_sim_executor_required": True,
             },
-            "release_gate_blockers": ["fixture blocker"],
+            "known_evidence_gaps": ["fixture blocker"],
         }
         release_module.validate_compatibility(valid)
 
         malformed = [
             {**valid, "schema_version": 2},
             {**valid, "release_state": "published"},
-            {**valid, "release_gate_blockers": "not-a-list"},
+            {**valid, "known_evidence_gaps": "not-a-list"},
             {
                 **valid,
                 "chromie": {**valid["chromie"], "supported_branch": ""},
@@ -1791,7 +1790,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             report = verify_bundle(
                 root,
                 expected_chromie_revision="current-revision",
-                expected_chromie_version="0.0.1",
+                expected_chromie_version="development",
                 expected_soridormi_revision="current-soridormi",
             )
             self.assertFalse(report["passed"])
@@ -1836,7 +1835,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             report = verify_bundle(
                 root,
                 expected_chromie_revision="chromie",
-                expected_chromie_version="0.0.1",
+                expected_chromie_version="development",
                 expected_soridormi_revision="soridormi",
             )
 
@@ -1860,7 +1859,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             array_report = verify_bundle(
                 root,
                 expected_chromie_revision="chromie",
-                expected_chromie_version="0.0.1",
+                expected_chromie_version="development",
                 expected_soridormi_revision="soridormi",
             )
             self.assertFalse(array_report["passed"])
@@ -1877,16 +1876,15 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             evidence.mkdir()
             (repo / "release").mkdir()
             (repo / "capabilities").mkdir()
-            (repo / "VERSION").write_text("0.0.1\n")
-            (repo / "release" / "0.0.1.md").write_text("# Notes\n")
+            (repo / "VERSION").write_text("1.2.3\n")
+            (repo / "release" / "1.2.3.md").write_text("# Development Scope\n")
             (repo / "release" / "compatibility.json").write_text(
                 json.dumps(
                     {
                         "schema_version": 1,
                         "release_state": "release",
                         "chromie": {
-                            "version": "0.0.1",
-                            "release_tag": "0.0.1",
+                            "version": "1.2.3",
                             "supported_branch": "main",
                             "runtime_modes": ["soridormi-mujoco-sim"],
                         },
@@ -1899,7 +1897,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                             "human_supervised_voice_device_claim": True,
                             "soridormi_mujoco_sim_executor_required": True,
                         },
-                        "release_gate_blockers": [],
+                        "known_evidence_gaps": [],
                     }
                 )
             )
@@ -1959,14 +1957,14 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             repo = Path(temp_dir)
             (repo / "release").mkdir()
             (repo / "capabilities").mkdir()
-            (repo / "VERSION").write_text("0.0.1\n")
+            (repo / "VERSION").write_text("1.2.3\n")
             (repo / "release" / "compatibility.json").write_text(
                 json.dumps(
                     {
                         "schema_version": 1,
                         "release_state": "candidate",
                         "chromie": {
-                            "version": "0.0.1",
+                            "version": "1.2.3",
                             "supported_branch": "main",
                             "runtime_modes": ["soridormi-mujoco-sim"],
                         },
@@ -1979,7 +1977,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                             "human_supervised_voice_device_claim": True,
                             "soridormi_mujoco_sim_executor_required": True,
                         },
-                        "release_gate_blockers": ["fixture blocker"],
+                        "known_evidence_gaps": ["fixture blocker"],
                     }
                 )
             )
@@ -1999,16 +1997,15 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             repo = Path(temp_dir)
             (repo / "release").mkdir()
             (repo / "capabilities").mkdir()
-            (repo / "VERSION").write_text("0.0.1\n")
-            (repo / "release" / "0.0.1.md").write_text("# Notes\n")
+            (repo / "VERSION").write_text("1.2.3\n")
+            (repo / "release" / "1.2.3.md").write_text("# Development Scope\n")
             (repo / "release" / "compatibility.json").write_text(
                 json.dumps(
                     {
                         "schema_version": 1,
                         "release_state": "release",
                         "chromie": {
-                            "version": "0.0.1",
-                            "release_tag": "0.0.1",
+                            "version": "1.2.3",
                             "supported_branch": "main",
                             "runtime_modes": ["soridormi-mujoco-sim"],
                         },
@@ -2021,7 +2018,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                             "human_supervised_voice_device_claim": True,
                             "soridormi_mujoco_sim_executor_required": True,
                         },
-                        "release_gate_blockers": [],
+                        "known_evidence_gaps": [],
                     }
                 )
             )

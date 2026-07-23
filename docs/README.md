@@ -62,7 +62,7 @@ When documents disagree, correct the lower-authority document.
 | How are semantic goals preserved and revised across turns? | `docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
 | Where should a new collaborator resume? | `docs/HANDOFF.md` |
-| What can be published and supported? | `docs/RELEASE.md` |
+| How are development artifacts packaged? | `docs/RELEASE.md` |
 | What changed? | `CHANGELOG.md` |
 
 README files should describe their component. They should not carry global
@@ -172,7 +172,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Reference Robot Candidate Files](../commissioning/README.md)
 - [Release and Packaging](RELEASE.md)
 - [Release Assets](../release/README.md)
-- [0.0.1 Release Notes](../release/0.0.1.md)
+- [Development Scope](../release/development.md)
 
 ## Governance
 

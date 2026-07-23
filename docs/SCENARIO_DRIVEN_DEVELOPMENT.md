@@ -161,7 +161,7 @@ For a reported behavioral defect:
 2. Remove private or irrelevant data.
 3. Create the smallest scenario that reproduces the failure across the earliest
    incorrect boundary.
-4. Verify that the scenario fails on the current candidate revision.
+4. Verify that the scenario fails on the current evaluated revision.
 5. Implement the architectural fix.
 6. Verify the new scenario and all existing scenarios.
 7. Record the evidence level honestly.

@@ -1,27 +1,22 @@
 # Current Implementation Status
 
 **Status authority:** this file describes what is present in the repository snapshot.
-**Current release-prep base:** `0.0.1` scope with Soridormi MuJoCo `sim`
-execution; retained target evidence below records the exact revision that
-produced each bundle
+**Development identity:** `development`; no release version or publication target is planned.
+**Maintained execution scope:** Soridormi MuJoCo `sim`; retained evidence below records the exact revision that produced each bundle.
 **Status refresh date:** 2026-07-23
-**Current focus:** **Promote the completed diagnostic Fast Planner multi-goal
-qualification to source-bound target evidence by adding endpoint-reported
-Soridormi revision identity, using a clean paired checkout, binding running
-images/models to source, and making release inputs immutable. Physical pilot
-and human voice-device validation remain separate release-support tracks.**
-**Version:** `0.0.1` (MuJoCo-executor scope, not yet published)
-**Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
+**Current focus:** **Improve Fast Planner multi-goal latency and promote the
+functional diagnostic path to source-bound target evidence by adding
+endpoint-reported Soridormi revision identity, using a clean paired checkout,
+and binding running images/models to source. Physical pilot and human
+voice-device validation remain separate engineering tracks.**
+**Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
-current implementation, automated evidence, target evidence, and release
-readiness.
+current implementation, automatic evidence, target evidence, and deployment
+claims.
 
-The temporary `demo-sim-2026-06-27` tag was withdrawn during the paired
-Chromie/Soridormi documentation and evidence audit. Do not recreate that demo
-tag; the next release tag is `0.0.1`, and it must come only from a revision
-whose docs, automated checks, and retained Soridormi MuJoCo evidence match the
-release claim.
+The temporary `demo-sim-2026-06-27` tag remains historical and must not be
+recreated. The repository does not define a replacement tag.
 
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
@@ -440,7 +435,7 @@ On June 14, 2026, the Linux x86_64 reference host with an NVIDIA GeForce RTX
 
 At their recorded revisions, both voice-pipeline bundles passed the verifier then in use.
 The current verifier defaults to the current source and rejects them for
-current-release provenance; they remain historical automated target-host
+current-source provenance; they remain historical automated target-host
 evidence, not current goal-driven or physical microphone/speaker evidence.
 
 On June 17, 2026, the same development line retained:
@@ -518,7 +513,7 @@ Target validation or Release readiness.
 | Shared bounded scheduling and resource arbitration | Implemented | Agent and Orchestrator concurrency tests | MuJoCo interaction path exercises the policy | Parallel flags off |
 | Hardware profile detection and generated `.env.runtime` | Implemented | Profile-detection tests | RTX 5090 profile and CUDA arch 120 validated; Jetson packaging evidence is incomplete | Automatic |
 | Host hardware daemon | Legacy mock compatibility implementation | Hardware/control-plane tests | No production hardware claim | Optional; mock driver only |
-| Release packaging | `0.0.1` version, candidate notes, compatibility file, archive/checksum generator, and strict release gate implemented | Packaging/evidence unit tests | Historical voice-pipeline, text-to-MuJoCo, and acoustic evidence does not validate the current authority path. The current runners record a declared paired Soridormi checkout but no endpoint-reported executing revision; running Chromie images/models are not yet bound to host `HEAD`; maintained image references remain mutable; fresh target-validated voice and text-to-MuJoCo evidence is still required. Human voice-device scope separately requires supervised physical audio evidence | Blocked candidate preparation |
+| Development artifact rehearsal | `development` identity, development scope, compatibility file, archive/checksum generator, and preview-only artifact collection | Packaging/evidence unit tests | Historical voice-pipeline, text-to-MuJoCo, and acoustic evidence does not validate the current authority path. The current runners record a declared paired Soridormi checkout but no endpoint-reported executing revision; running Chromie images/models are not yet bound to host `HEAD`; fresh target-validated voice and text-to-MuJoCo evidence is still required. Human voice-device scope separately requires supervised physical audio evidence | Optional engineering tooling |
 
 ## Verified automated evidence
 
@@ -796,21 +791,18 @@ These legacy evidence tracks do not define the current delivery:
   hardware backend.
 - TaskGraph and Skill Runtime schedulers are process-local. Cross-process robot
   exclusivity remains Soridormi’s responsibility.
-- Release notes, compatibility metadata, archive generation, and checksums
-  exist, but there is no published GitHub release or support promise until the
-  `0.0.1` tag and release artifacts are created.
+- Development scope, compatibility metadata, archive generation, and checksums
+  exist for optional preview-only engineering artifact rehearsal. They do not
+  define a release version, publication target, or support promise.
 
-## Release classification
+## Development classification
 
-Treat this revision as a blocked **`0.0.1` release candidate**. Before fresh
-goal-driven voice/MuJoCo evidence can count toward publication, the Soridormi
-endpoint must report its executing revision, running Chromie images/models must
-be bound to the candidate source, and mutable release image references must be
-replaced. The release must then be tagged and published. It is not a production
-release, physical-robot release, or human voice-device release. Historical
-robot execution evidence is limited to Soridormi MuJoCo `sim` and does not
-validate the current semantic-authority path. See
-[Release and Packaging](RELEASE.md).
+Treat this revision as an active development snapshot. Source-bound live-text
+and MuJoCo evidence still requires endpoint-reported Soridormi identity and
+running Chromie image/model binding. Historical robot execution evidence is
+limited to its recorded Soridormi MuJoCo `sim` revisions and does not validate
+the current semantic-authority path. Optional artifact packaging is described
+in [Optional Development Artifact Packaging](RELEASE.md).
 
 ## Goal-Driven Cognitive Core runtime status
 
@@ -857,7 +849,7 @@ or a consumed replay nonce. This single-authority boundary is implemented and
 automatically verified without GPU services; see
 [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
 
-Evidence and release tooling now rejects provenance drift instead of relabeling
+Evidence and artifact tooling now rejects provenance drift instead of relabeling
 an older bundle as validation for the current source. Cognitive simulator
 validation requires an applied cognitive result, completed Soridormi `sim`
 execution, explicit safe idle, a clean declared paired checkout, and an
@@ -866,12 +858,10 @@ general-ability wrapper now accepts and forwards `--soridormi-repo`, so the
 declared paired checkout is recorded defensively even when the standalone runner
 is invoked through that wrapper. The endpoint still reports no executing
 revision, so current output remains diagnostic rather than target-validated.
-Voice evidence and release preparation likewise compare
-declared revisions and version with current source, but running Chromie
-images/models are not yet bound to host `HEAD`, and maintained image references
-remain mutable. These implemented fail-closed checks do not make the current
-snapshot release ready or replace the missing provenance bindings and fresh
-retained target run.
+Voice evidence and artifact rehearsal likewise compare declared revisions and
+development identity with current source, but running Chromie images/models are
+not yet bound to host `HEAD`. These implemented fail-closed checks do not
+replace the missing provenance bindings and fresh retained target run.
 
 An operator-supplied July 17 live-text simulator rerun at Chromie revision
 `27ed13b6114f0a0fa7fd72078012c34b4ddf0712` passed all four
@@ -879,8 +869,8 @@ An operator-supplied July 17 live-text simulator rerun at Chromie revision
 idle. This closes the immediate mixed-plan correctness defect at diagnostic
 Level C, but it does not establish successful Fast Planner operation: all four
 Fast attempts recorded model-contract failure and the final success came from
-Deep Planner recovery. Endpoint-reported Soridormi revision identity was still
-absent, so the run does not close release provenance or release readiness. The
+Deep Planner recovery. Endpoint-reported Soridormi revision identity was still absent, so the run
+remains diagnostic rather than source-bound target evidence. The
 repository implementation now follows
 [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md).
 A five-run warm benchmark of that first Fast implementation produced 20/20

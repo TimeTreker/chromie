@@ -1134,7 +1134,7 @@ python scripts/check_docs.py
 - Do not infer real-world availability from language-model common knowledge.
 - Do not require full situational planning for ordinary chat or clear direct
   skills.
-- Do not widen the current physical-robot release claim.
+- Do not widen the current physical-robot support claim.
 
 ## Exit Criteria
 

@@ -149,7 +149,7 @@ Chromie is not:
 - a low-level robot controller or replacement for vendor control loops;
 - a general-purpose distributed workflow engine;
 - a durable personal-memory platform;
-- an unattended physical-robot autonomy product in the current release line;
+- an unattended physical-robot autonomy product in the current development scope;
 - proof that every hardware profile, GPU, audio device, or robot is supported.
 
 ## Definition of success

@@ -228,43 +228,38 @@ All notable user-visible changes should be recorded here.
 - Applied Goal-state updates atomically only after trusted response preparation.
 - Added privacy-conscious operational evidence, deterministic cognitive
   scenarios, and a cognitive text-to-MuJoCo evidence entry point.
-- Hardened cognitive, voice, and release evidence provenance: target validation
-  now requires the current Chromie revision, a clean declared Soridormi
-  checkout, matching endpoint-reported Soridormi source, and applied,
-  completed, safe-idle cognitive `sim` execution; release preparation rejects
-  source, version, manifest, compatibility, or retained-evidence revision
+- Hardened cognitive, voice, and artifact evidence provenance: target
+  validation now requires the current Chromie revision, a clean declared
+  Soridormi checkout, matching endpoint-reported Soridormi source, and applied,
+  completed, safe-idle cognitive `sim` execution; artifact verification rejects
+  source, development identity, manifest, compatibility, or retained-evidence
   drift.
-- Returned `0.0.1` metadata to candidate state with explicit blockers for
-  endpoint-reported Soridormi source identity, running Chromie image/model
-  binding, immutable image references, and fresh current-revision Goal-driven
-  voice/MuJoCo evidence. No release-readiness or physical-execution claim is
-  added by these changes.
+- Replaced the abandoned fixed-version metadata with a neutral `development`
+  identity and explicit known evidence gaps. No deployment or
+  physical-execution claim is added by these changes.
 
 
-## 0.0.1 candidate snapshot - 2026-07-04
+## Development packaging and evidence snapshot - 2026-07-04
 
-This section records the July 4 candidate snapshot; `0.0.1` has not been
-published. Current corrections remain under Unreleased and the compatibility
-declaration still blocks publication.
+This section records the July 4 engineering snapshot. It is historical
+development context, not a release candidate or publication plan.
 
-- Prepared the first `0.0.1` release metadata, compatibility declaration, and
-  release notes.
-- Narrowed the release claim to generated-speech voice regression, structured
-  text/speech interaction, and MuJoCo `sim` execution through the pinned
-  Soridormi contract.
+- Added development compatibility metadata, bounded engineering scope, and
+  preview-only artifact packaging.
+- Scoped generated-speech regression, structured text/speech interaction, and
+  MuJoCo `sim` execution through the pinned Soridormi contract.
 - Added automated acoustic acceptance, which generates TTS prompt audio, plays
   it through the host output, and captures it through the configured host input
   without requiring a human speaker for every regression run.
 - Kept human microphone/speaker support, verified Jetson packaging, unattended
   deployment, and physical robot support outside the release claim.
 
-### Implemented in that candidate development line
+### Implemented in that development line
 
-- Added release reproducibility checks for immutable container references,
-  exact direct dependency pins, immutable ASR/TTS model revisions, runtime
-  image/Ollama digest capture, resolved dependency provenance, and fail-closed
-  publishable bundle generation. The maintained `latest` development aliases
-  still block publication.
+- Added artifact reproducibility checks for container references, exact direct
+  dependency pins, immutable ASR/TTS model revisions, runtime image/Ollama
+  digest capture, resolved dependency provenance, and fail-closed preview bundle
+  generation.
 - Added versioned provider conformance traces, recommendation-only hardware
   shadow coverage, safe-idle status checks, and a first-reference-robot
   commissioning checklist.
@@ -284,9 +279,8 @@ declaration still blocks publication.
   the trusted Compose network.
 - Retained passing RTX 5090 GPU smoke plus complete synthetic and PipeWire
   virtual-microphone voice-pipeline evidence; supervised physical audio remains open.
-- Aligned release and roadmap wording with sherpa-onnx as the maintained ASR
-  default and scoped supervised audio blockers to physical voice-device release
-  claims.
+- Aligned status and roadmap wording with sherpa-onnx as the maintained ASR
+  default and scoped supervised audio blockers to physical voice-device claims.
 
 - Structured `InteractionResponse` contracts with recursive low-level-field
   rejection.
@@ -312,21 +306,21 @@ declaration still blocks publication.
 - Strict evidence verifier for native mode, clean revisions, all cases,
   correlated sessions, and separation of automated evidence from supervised
   human voice-device evidence.
-- `0.0.1` version, compatibility declaration, release notes,
-  source archive generation, manifest, tests log, and checksums.
+- `development` identity, compatibility declaration, development scope, source
+  archive generation, manifest, tests log, and checksums.
 
 ### Documentation refresh
 
 - Reclassified the project from stale historical milestone documentation to the
-  current MuJoCo-executor release delivery.
-- Added a stable project charter and a focused three-milestone delivery
-  sequence: `0.0.1` with Soridormi MuJoCo execution, robust/provider-ready
-  simulation, and a physical reference pilot.
+  current MuJoCo-executor engineering scope.
+- Added a stable project charter and a focused capability sequence covering
+  Soridormi MuJoCo execution, robust/provider-ready simulation, and a physical
+  reference pilot.
 - Consolidated duplicated setup, status, and handoff prose into their owning
   documents; removed redundant `CLAUDE.md` and `LLM_CONTEXT.md` copies.
 - Reduced the Chinese guide to a maintained project overview and navigation
   entry instead of duplicating the full runbook and acceptance manual.
-- Added authoritative implementation, API, configuration, acceptance, release,
+- Added authoritative implementation, API, configuration, acceptance, artifact packaging,
   security, support, and contribution documentation.
 - Reconciled `/interaction` documentation with the native output path and explicit compatibility controls.
 - Clarified that the host hardware daemon currently uses only the mock driver.
@@ -350,4 +344,4 @@ declaration still blocks publication.
 - Physical microphone/speaker and supervised recovery evidence for
   voice-device support.
 - A future release must declare physical voice-device compatibility separately;
-  `0.0.1` intentionally does not include that claim.
+  `development` intentionally does not include that claim.

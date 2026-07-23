@@ -2,7 +2,7 @@
 """Dependency-free documentation consistency checks for Chromie.
 
 The checker intentionally verifies high-value facts that commonly drift:
-local links, documentation indexing, current milestone declarations, and HTTP
+local links, documentation indexing, current development-focus declarations, and HTTP
 route coverage in the API reference. It is not a Markdown style linter.
 """
 
@@ -108,6 +108,9 @@ NUMBERED_PHASE_PATH_RE = re.compile(
     r"(?:^|[._/-])(?:m|step)(?:0|[1-9][0-9]*)(?=$|[._/-])",
     re.IGNORECASE,
 )
+ABANDONED_RELEASE_VERSION_RE = re.compile(
+    r"(?<![0-9.])0\.0\.1(?![0-9.])"
+)
 TEXT_SCAN_SUFFIXES = {
     ".env",
     ".json",
@@ -163,6 +166,12 @@ def check_semantic_project_naming(errors: list[str]) -> None:
                 "use a capability or issue-oriented name"
             )
         text = path.read_text(encoding="utf-8", errors="replace")
+        for match in ABANDONED_RELEASE_VERSION_RE.finditer(text):
+            line = text.count("\n", 0, match.start()) + 1
+            errors.append(
+                f"{relative}:{line}: abandoned fixed release version is forbidden; "
+                "use the development identity until a future version is explicitly planned"
+            )
         forbidden_tokens = (
             (MILESTONE_TOKEN_RE, "numbered milestone"),
             (NUMBERED_STEP_TOKEN_RE, "numbered implementation-stage"),
@@ -448,7 +457,7 @@ def check_configuration_reference(errors: list[str]) -> None:
 
 
 
-def check_release_reproducibility(errors: list[str]) -> None:
+def check_artifact_reproducibility(errors: list[str]) -> None:
     errors.extend(exact_requirement_errors(ROOT))
     declared_images(ROOT, source_environment(ROOT))
     errors.extend(model_lock_errors(ROOT, source_environment(ROOT)))
@@ -462,7 +471,7 @@ def check_release_reproducibility(errors: list[str]) -> None:
         compatibility_revision = compatibility["soridormi"]["upstream_commit"]
         manifest_revision = manifest["metadata"]["upstream_commit"]
     except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
-        errors.append(f"Cannot read Soridormi release provenance: {exc}")
+        errors.append(f"Cannot read Soridormi artifact provenance: {exc}")
     else:
         if compatibility_revision != manifest_revision:
             errors.append(
@@ -470,13 +479,30 @@ def check_release_reproducibility(errors: list[str]) -> None:
                 "capabilities/soridormi.json metadata.upstream_commit"
             )
         release_state = str(compatibility.get("release_state") or "").strip()
-        blockers = compatibility.get("release_gate_blockers") or []
-        if release_state == "candidate" and not blockers:
+        gaps = compatibility.get("known_evidence_gaps")
+        chromie = compatibility.get("chromie") or {}
+        declared_version = str(chromie.get("version") or "").strip()
+        if release_state != "development":
             errors.append(
-                "release candidate must retain at least one explicit gate blocker"
+                "release/compatibility.json must remain in development state "
+                "while no publication target is configured"
             )
-        if release_state == "release" and blockers:
-            errors.append("release state cannot retain unresolved gate blockers")
+        if declared_version != "development":
+            errors.append(
+                "release/compatibility.json must use chromie.version=development"
+            )
+        if chromie.get("release_tag"):
+            errors.append(
+                "development compatibility must not declare a release_tag"
+            )
+        if not isinstance(gaps, list) or any(
+            not isinstance(item, str) or not item.strip() for item in gaps
+        ):
+            errors.append(
+                "known_evidence_gaps must be a list of non-empty strings"
+            )
+        if not (ROOT / "release" / "development.md").is_file():
+            errors.append("release/development.md is missing")
     release_text = (ROOT / "docs" / "RELEASE.md").read_text(encoding="utf-8")
     for required in ("build-provenance.json", "model-lock.json"):
         if required not in release_text:
@@ -491,7 +517,7 @@ def main() -> int:
     check_project_direction(errors)
     check_api_reference(errors)
     check_configuration_reference(errors)
-    check_release_reproducibility(errors)
+    check_artifact_reproducibility(errors)
 
     if errors:
         print("Documentation checks failed:", file=sys.stderr)
@@ -504,7 +530,7 @@ def main() -> int:
         f"{len(markdown_files())} Markdown files, project direction, "
         "local links, semantic project naming, current focus, API routes, "
         "runtime configuration coverage and safety defaults, "
-        "and reproducible release inputs."
+        "and reproducible development artifact inputs."
     )
     return 0
 

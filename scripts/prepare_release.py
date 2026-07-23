@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a reproducible Chromie release bundle after acceptance evidence."""
+"""Prepare a reproducible Chromie development artifact bundle."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ except ImportError:  # imported as scripts.prepare_release in tests/tools
     from scripts.verify_voice_evidence import verify_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "releases"
+DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "artifacts"
 
 
 def utc_now() -> str:
@@ -123,7 +123,7 @@ def create_source_archive(revision: str, version: str, destination: Path) -> Non
         cwd=ROOT,
         check=True,
     )
-    # Verify the archive is readable before publishing a checksum.
+    # Verify the archive is readable before recording a checksum.
     with tarfile.open(destination, "r:gz") as archive:
         if not archive.getmembers():
             raise RuntimeError("Generated source archive is empty")
@@ -133,6 +133,8 @@ def release_tag(version: str, compatibility: dict[str, Any]) -> str:
     configured = compatibility.get("chromie", {}).get("release_tag")
     if configured:
         return str(configured)
+    if version == "development":
+        return version
     if version.startswith(("v", "sim-")):
         return version
     return f"v{version}"
@@ -148,25 +150,37 @@ def release_notes_path(version: str, tag: str) -> Path:
         if candidate.is_file():
             return candidate
     raise FileNotFoundError(
-        "Missing release notes. Tried: "
+        "Missing development scope or release notes. Tried: "
         + ", ".join(str(path.relative_to(ROOT)) for path in candidates)
     )
 
 
 def validate_compatibility(compatibility: dict[str, Any]) -> None:
-    """Reject incomplete or internally contradictory release policy."""
+    """Reject incomplete or internally contradictory compatibility policy."""
 
     if compatibility.get("schema_version") != 1:
         raise ValueError("release/compatibility.json schema_version must be 1")
     release_state = compatibility.get("release_state")
-    if release_state not in {"candidate", "release"}:
+    if release_state not in {"development", "candidate", "release"}:
         raise ValueError(
-            "release/compatibility.json release_state must be 'candidate' or 'release'"
+            "release/compatibility.json release_state must be "
+            "'development', 'candidate', or 'release'"
         )
 
     chromie = compatibility.get("chromie")
     if not isinstance(chromie, dict):
         raise ValueError("release/compatibility.json requires a chromie object")
+    declared_version = str(chromie.get("version") or "").strip()
+    if not declared_version:
+        raise ValueError("chromie.version must be a non-empty string")
+    if release_state == "development" and declared_version != "development":
+        raise ValueError(
+            "development state requires chromie.version='development'"
+        )
+    if release_state != "development" and declared_version == "development":
+        raise ValueError(
+            "candidate or release state requires an explicit version"
+        )
     supported_branch = chromie.get("supported_branch")
     if not isinstance(supported_branch, str) or not supported_branch.strip():
         raise ValueError("chromie.supported_branch must be a non-empty string")
@@ -190,20 +204,24 @@ def validate_compatibility(compatibility: dict[str, Any]) -> None:
         raise ValueError("release/compatibility.json requires a soridormi object")
     if soridormi.get("supported_mode") not in {"sim"}:
         raise ValueError(
-            "soridormi.supported_mode must be 'sim' for the current release scope"
+            "soridormi.supported_mode must be 'sim' for the current development scope"
         )
 
-    blockers = compatibility.get("release_gate_blockers")
-    if not isinstance(blockers, list) or any(
-        not isinstance(item, str) or not item.strip() for item in blockers
+    gaps = compatibility.get("known_evidence_gaps")
+    if not isinstance(gaps, list) or any(
+        not isinstance(item, str) or not item.strip() for item in gaps
     ):
         raise ValueError(
-            "release_gate_blockers must be a list of non-empty strings"
+            "known_evidence_gaps must be a list of non-empty strings"
         )
-    if release_state == "candidate" and not blockers:
-        raise ValueError("candidate release_state requires at least one gate blocker")
-    if release_state == "release" and blockers:
-        raise ValueError("release release_state cannot retain gate blockers")
+    if release_state == "release" and gaps:
+        raise ValueError("release state cannot retain known evidence gaps")
+    if release_state == "development" and (
+        compatibility.get("chromie", {}).get("release_tag")
+    ):
+        raise ValueError(
+            "development state must not declare a release_tag"
+        )
 
     evidence_policy = compatibility.get("evidence_policy")
     if not isinstance(evidence_policy, dict):
@@ -326,19 +344,26 @@ def prepare_release(args: argparse.Namespace) -> Path:
     supported_branch = str(
         (compatibility.get("chromie") or {}).get("supported_branch") or ""
     ).strip()
+    release_state = str(compatibility.get("release_state") or "").strip()
+    if release_state == "development" and not args.preview:
+        raise RuntimeError(
+            "No release or publication target is configured for this development "
+            "snapshot; use --preview for an engineering artifact rehearsal"
+        )
     if not args.preview and supported_branch and branch != supported_branch:
         raise RuntimeError(
-            f"Release policy requires branch {supported_branch!r}; current branch "
+            f"Artifact policy requires branch {supported_branch!r}; current branch "
             f"is {branch or '<detached>'!r}"
         )
     tag = release_tag(version, compatibility)
     notes_path = release_notes_path(version, tag)
-    blockers = compatibility.get("release_gate_blockers") or []
-    if blockers and not args.preview:
+    evidence_gaps = compatibility.get("known_evidence_gaps") or []
+    if evidence_gaps and not args.preview and release_state != "release":
         raise RuntimeError(
-            "Release candidate still has tracked blockers:\n- "
-            + "\n- ".join(str(item) for item in blockers)
-            + "\nUse --preview only for a non-publishable packaging rehearsal."
+            "The development compatibility declaration still has known evidence "
+            "gaps:\n- "
+            + "\n- ".join(str(item) for item in evidence_gaps)
+            + "\nUse --preview for an engineering artifact rehearsal."
         )
     if args.skip_tests and not args.preview:
         raise ValueError("--skip-tests is allowed only with --preview")
@@ -361,7 +386,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
     )
     if evidence_report.get("provenance_errors"):
         raise RuntimeError(
-            "Acceptance evidence provenance does not match this release source:\n- "
+            "Acceptance evidence provenance does not match this source:\n- "
             + "\n- ".join(evidence_report["provenance_errors"])
         )
     if not evidence_report["passed"] and not args.preview:
@@ -371,7 +396,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
         )
     if not evidence_report.get("policy_evaluation_ready") and not args.preview:
         raise RuntimeError(
-            "Acceptance evidence is not ready for release-policy evaluation; "
+            "Acceptance evidence is not ready for policy evaluation; "
             "clean source and endpoint-reported Soridormi revision binding are required"
         )
     evidence_policy = compatibility["evidence_policy"]
@@ -379,12 +404,12 @@ def prepare_release(args: argparse.Namespace) -> Path:
     mode = evidence_report.get("mode")
     if mode not in accepted_modes:
         raise RuntimeError(
-            f"Evidence mode {mode!r} is not accepted by release/compatibility.json"
+            f"Evidence mode {mode!r} is not accepted by the compatibility policy"
         )
     if allow_automated_evidence:
         if evidence_policy.get("human_supervised_voice_device_claim") is not False:
             raise RuntimeError(
-                "--allow-automated-evidence requires release/compatibility.json "
+                "--allow-automated-evidence requires the compatibility policy "
                 "to declare evidence_policy.human_supervised_voice_device_claim=false"
             )
     sim_executor_required = evidence_policy["soridormi_mujoco_sim_executor_required"]
@@ -405,7 +430,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
         simulator_report = cognitive_evidence.get("simulator") or {}
         if simulator_report.get("provenance_errors"):
             raise RuntimeError(
-                "Cognitive simulator evidence provenance does not match this release source:\n- "
+                "Cognitive simulator evidence provenance does not match this source:\n- "
                 + "\n- ".join(simulator_report["provenance_errors"])
             )
     if (
@@ -426,13 +451,13 @@ def prepare_release(args: argparse.Namespace) -> Path:
     dirty = bool(status)
     if dirty and not args.allow_dirty and not args.preview:
         raise RuntimeError(
-            "Worktree is dirty. Commit the accepted source before preparing a release, "
-            "or use --preview for a non-publishable bundle."
+            "Worktree is dirty. Commit the evaluated source before preparing an artifact bundle, "
+            "or use --preview for a development rehearsal."
         )
 
     output_dir = Path(args.output_root).expanduser() / tag / short_revision
     if output_dir.exists() and any(output_dir.iterdir()) and not args.overwrite:
-        raise FileExistsError(f"Release output already exists: {output_dir}")
+        raise FileExistsError(f"Artifact output already exists: {output_dir}")
     if output_dir.exists() and args.overwrite:
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -450,7 +475,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
     if not provenance["complete"] and not args.preview:
         errors = provenance["source_errors"] + provenance["runtime_errors"]
         raise RuntimeError(
-            "Release build provenance is incomplete:\n- " + "\n- ".join(errors)
+            "Artifact build provenance is incomplete:\n- " + "\n- ".join(errors)
         )
 
     final_revision = git_output("rev-parse", "HEAD")
@@ -458,13 +483,13 @@ def prepare_release(args: argparse.Namespace) -> Path:
     final_status = git_output("status", "--porcelain")
     if final_revision != revision or final_branch != branch:
         raise RuntimeError(
-            "Repository HEAD or branch changed while release checks were running; "
+            "Repository HEAD or branch changed while artifact checks were running; "
             "discard this rehearsal and rerun from a stable checkout"
         )
     dirty = bool(final_status)
     if dirty and not args.preview:
         raise RuntimeError(
-            "Worktree changed while release checks were running; rerun from a "
+            "Worktree changed while artifact checks were running; rerun from a "
             "clean committed checkout"
         )
     provenance_path = output_dir / "build-provenance.json"
@@ -475,7 +500,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
 
     source_archive = output_dir / f"chromie-{version}.tar.gz"
     create_source_archive(revision, version, source_archive)
-    shutil.copy2(notes_path, output_dir / "release-notes.md")
+    shutil.copy2(notes_path, output_dir / "development-scope.md")
     shutil.copy2(ROOT / "release" / "compatibility.json", output_dir / "compatibility.json")
     model_lock_source = ROOT / "release" / "model-lock.json"
     model_lock_artifact = None
@@ -520,11 +545,12 @@ def prepare_release(args: argparse.Namespace) -> Path:
         )
     )
     publishable = (
-        voice_policy_eligible
+        release_state == "release"
+        and voice_policy_eligible
         and simulator_policy_eligible
         and not dirty
         and not args.preview
-        and not blockers
+        and not evidence_gaps
         and not args.skip_tests
         and provenance["complete"]
     )
@@ -556,7 +582,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
         },
         "artifacts": {
             "source_archive": source_archive.name,
-            "release_notes": "release-notes.md",
+            "development_scope": "development-scope.md",
             "compatibility": "compatibility.json",
             "model_lock": model_lock_artifact,
             "build_provenance": "build-provenance.json",
@@ -564,15 +590,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
             "cognitive_runtime_acceptance": cognitive_evidence_artifact,
             "tests_log": None if args.skip_tests else "tests.log",
         },
-        "publication_steps": (
-            [
-                f"git tag -s {tag} {revision}",
-                f"git push origin {tag}",
-                "Create a GitHub prerelease and attach the generated artifacts.",
-            ]
-            if publishable
-            else []
-        ),
+        "publication_steps": [],
     }
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
@@ -581,7 +599,7 @@ def prepare_release(args: argparse.Namespace) -> Path:
 
     checksum_targets = [
         source_archive,
-        output_dir / "release-notes.md",
+        output_dir / "development-scope.md",
         output_dir / "compatibility.json",
         provenance_path,
         output_dir / "voice-acceptance-summary.md",
@@ -611,15 +629,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--text-mujoco-summary",
         help=(
             "Current-revision goal-driven text-MuJoCo summary.json required by "
-            "sim-executor release policy."
+            "the configured simulator evidence policy."
         ),
     )
     parser.add_argument(
         "--allow-automated-evidence",
         action="store_true",
         help=(
-            "Allow synthetic, virtual-mic, or acoustic voice evidence for a "
-            "release whose compatibility declaration explicitly narrows the claim."
+            "Allow synthetic, virtual-mic, or acoustic voice evidence when the "
+            "compatibility declaration explicitly permits those modes."
         ),
     )
     parser.add_argument("--preview", action="store_true")
@@ -637,9 +655,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         output = prepare_release(args)
     except (ValueError, FileNotFoundError, FileExistsError, RuntimeError, subprocess.CalledProcessError) as exc:
-        print(f"[release][error] {exc}", file=sys.stderr)
+        print(f"[artifact][error] {exc}", file=sys.stderr)
         return 2
-    print(f"Release bundle prepared: {output}")
+    print(f"Development artifact bundle prepared: {output}")
     return 0
 
 

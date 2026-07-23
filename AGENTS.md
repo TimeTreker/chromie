@@ -59,9 +59,9 @@ archives, and old milestone prose are context only.
   concurrency beyond the configured worker/resource contract.
 - Do not fabricate microphone, GPU, simulator, or hardware evidence. Use
   synthetic/virtual-mic modes for automated regression and supervised mode for
-  release-closing microphone/speaker evidence with operator notes.
-- Do not remove release blockers or publish the alpha unless the corresponding
-  implementation and evidence are present.
+  physical microphone/speaker evidence with operator notes.
+- Do not convert automated or historical evidence into unsupported target,
+  hardware, or deployment claims.
 
 ## Required checks
 

@@ -2,10 +2,10 @@
 
 ## Supported versions
 
-There is no published stable release in this repository snapshot. The tracked
-`0.0.1` material is a blocked, unpublished candidate only. Security and safety fixes currently
-target the latest `main` revision; a published prerelease must add an explicit
-supported-version table here.
+The repository is an active development snapshot with no declared release
+version. Security and safety fixes target the latest `main` revision. Any
+future supported-version policy must be added explicitly rather than inferred
+from the current source tree.
 
 ## Reporting a vulnerability
 

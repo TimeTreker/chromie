@@ -759,7 +759,7 @@ mode uses host playback and configured input-device capture, so it is useful
 for low-cost microphone/speaker regression when bound to real devices, but it
 proves generated speech rather than arbitrary human pronunciation.
 
-The current narrowed `0.0.1` compatibility policy lists `synthetic`,
+The current development compatibility policy lists `synthetic`,
 `virtual-mic`, and `acoustic` as eligible generated-speech modes. That policy
 does not turn them into human voice-device evidence. Before a bundle can enter
 policy evaluation, the verifier also requires the goal-driven acceptance
@@ -896,7 +896,7 @@ the recorded `ORCH_INPUT_DEVICE` is known to be the real microphone path.
 
 ### Physical audio supervised acceptance
 
-Commit the candidate revision first, then run:
+Commit the evaluated revision first, then run:
 
 ```bash
 python scripts/voice_acceptance.py \
@@ -991,7 +991,7 @@ text and operator-visible context may contain private speech.
 
 - Do not count a dry run as simulator or hardware evidence.
 - Do not count a simulator exemption as hardware confirmation.
-- Do not publish a MuJoCo-executor release from text-input acceptance alone.
+- Do not infer broad deployment support from text-input acceptance alone.
 - Do not publish logs containing execution tokens or private environment data.
 - Record failure evidence as well as successful reruns; otherwise regressions are
   difficult to diagnose.

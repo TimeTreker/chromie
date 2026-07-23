@@ -43,7 +43,7 @@ The Goal Association model boundary now uses the exact schema and receives at
 most one bounded contract-repair attempt. The host, not the model, owns turn,
 association, goal, version, and persistence identities.
 
-Evidence and release tooling now checks provenance rather than treating any
+Evidence and artifact tooling now checks provenance rather than treating any
 older successful bundle as current validation:
 
 - cognitive simulator validation requires an applied cognitive result,
@@ -54,12 +54,11 @@ older successful bundle as current validation:
   Soridormi declarations with the current source, capability manifest, and
   compatibility declaration, but host `HEAD` does not yet bind the running
   Chromie images/models to that source;
-- release preparation fails when those revisions or versions disagree.
+- artifact rehearsal fails when those revisions or identities disagree.
 
 The fail-closed comparison controls are implemented and have automated
 coverage, but the current runners record `declared_paired_checkout` without an
-endpoint-reported Soridormi revision. Running Chromie image/model source
-binding and immutable release image references are also open. Retained
+endpoint-reported Soridormi revision. Running Chromie image/model source binding is also open. Retained
 live-text and MuJoCo evidence for the current multi-goal and single-authority
 path remains open. Do not claim target validation or release readiness from
 Level A results, a newly diagnostic-only bundle, or the historical text-to-MuJoCo bundle.
@@ -100,12 +99,12 @@ canonical gates before making a new automated-evidence claim.
 5. Build a cognitive acceptance bundle from the new simulator summary and
    require applied `chat` and `robot_action` lanes where exercised. Reject any
    bundle with absent or mismatched revisions.
-6. Keep the checked-in Soridormi capability manifest and release compatibility
-   revision aligned before previewing release packaging.
-7. Bind the running Chromie service images and loaded models to the candidate
-   revision, and replace mutable release image references with immutable ones.
-8. Do not publish `0.0.1` or clear a release blocker until the exact supported
-   scope has matching implementation, documentation, and retained evidence.
+6. Keep the checked-in Soridormi capability manifest and development
+   compatibility revision aligned before previewing artifact packaging.
+7. Bind running Chromie service images and loaded models to the evaluated
+   revision before promoting evidence to source-bound target validation.
+8. Keep unsupported deployment and hardware claims separate from automatic or
+   historical evidence.
 9. Continue physical pilot and human voice-device validation only as separate
    tracks; neither is implied by simulator evidence.
 

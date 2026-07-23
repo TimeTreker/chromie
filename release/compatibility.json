@@ -1,8 +1,7 @@
 {
   "schema_version": 1,
   "chromie": {
-    "version": "0.0.1",
-    "release_tag": "0.0.1",
+    "version": "development",
     "supported_branch": "main",
     "runtime_modes": [
       "structured-text",
@@ -10,7 +9,7 @@
       "structured-speech",
       "soridormi-mujoco-sim"
     ],
-    "release_scope": "chromie-host-control-plane-with-soridormi-mujoco-executor"
+    "development_scope": "chromie-host-control-plane-with-soridormi-mujoco-executor"
   },
   "soridormi": {
     "repository": "https://github.com/TimeTreker/soridormi.git",
@@ -18,14 +17,14 @@
     "upstream_commit": "e0b310af090cf0b9451a952eb3de6440daaf530b",
     "supported_mode": "sim"
   },
-  "unsupported_release_claims": [
+  "unsupported_claims": [
     "human physical voice-device support",
     "production physical robot support",
     "verified Jetson packaging",
     "cross-process scheduling guarantees outside Soridormi",
     "unattended deployment"
   ],
-  "release_state": "candidate",
+  "release_state": "development",
   "evidence_policy": {
     "accepted_voice_modes": [
       "synthetic",
@@ -35,10 +34,9 @@
     "human_supervised_voice_device_claim": false,
     "soridormi_mujoco_sim_executor_required": true
   },
-  "release_gate_blockers": [
+  "known_evidence_gaps": [
     "make the Soridormi MCP endpoint report its executing source revision and require it to match the clean declared paired checkout and pinned capability manifest",
-    "bind the running Chromie service images and loaded model digests to the candidate Chromie revision in retained acceptance and release provenance",
-    "replace the mutable CHROMIE_IMAGE_TAG=latest and OLLAMA_IMAGE=ollama/ollama:latest release inputs with immutable publishable references",
-    "retain clean current-revision goal-driven voice and MuJoCo evidence after the endpoint, service-image, model, and immutable-image provenance bindings are implemented"
+    "bind running Chromie service images and loaded model digests to the checked-out Chromie revision in retained acceptance evidence",
+    "retain clean current-revision goal-driven voice and MuJoCo evidence after source and runtime provenance bindings are implemented"
   ]
 }

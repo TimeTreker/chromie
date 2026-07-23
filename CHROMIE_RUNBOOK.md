@@ -524,7 +524,7 @@ run was killed before cleanup, unload the stale module with
 `pactl list short modules` followed by `pactl unload-module <id>`.
 
 For a later claim that includes human microphone/speaker operation, commit the
-candidate revision and run the real reference-host matrix:
+committed revision and run the real reference-host matrix:
 
 ```bash
 python scripts/voice_acceptance.py \
@@ -546,10 +546,10 @@ python scripts/verify_voice_evidence.py --require-clean \
 
 Automatic bundles do not prove a real microphone, speaker, human pronunciation,
 room conditions, or operator-observed simulator safety. They therefore cannot
-close a human voice-device claim. The current narrowed `0.0.1` candidate policy
-does accept clean current-revision `synthetic`, `virtual-mic`, or `acoustic`
-voice evidence when release preparation also receives target-validated
-goal-driven text-to-MuJoCo evidence; see `docs/RELEASE.md`.
+close a human voice-device claim. The current development compatibility policy accepts clean current-revision
+`synthetic`, `virtual-mic`, or `acoustic` voice evidence for bounded
+engineering review. It does not turn those modes into human voice-device
+evidence; see `docs/RELEASE.md`.
 
 ## 14. Logs
 

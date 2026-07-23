@@ -236,7 +236,7 @@ Modes:
 
 All four modes require a separately running Soridormi endpoint. A supplied
 `--soridormi-repo` records a declared paired checkout but does not prove the
-endpoint executes it; current bundles remain outside release-policy evaluation
+endpoint executes it; current bundles remain outside source-bound policy evaluation
 until the endpoint reports a matching source revision. The historical text-to-MuJoCo closure does
 not require the supervised real-microphone run.
 

@@ -12,8 +12,8 @@ response composition, legacy rollback, and evidence classification.
 **Target validation:** open. No live model-stack or MuJoCo evidence created by
 this implementation patch is claimed here.
 
-**Release readiness:** not established. This rollout does not widen the current
-`0.0.1` simulator, microphone, speaker, or physical-robot release scope.
+**Deployment readiness:** not established. This rollout does not widen
+simulator, microphone, speaker, or physical-robot support claims.
 
 This document is the operational companion to
 [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md).

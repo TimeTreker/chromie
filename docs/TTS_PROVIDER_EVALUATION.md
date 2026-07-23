@@ -13,7 +13,7 @@ claims alone. It first requires each candidate to implement the same
 `TTSProvider` contract and then runs the same functional, latency, stability,
 resource, and listening evaluation on the intended host.
 
-The current OuteTTS deployment remains the maintained release-locked baseline.
+The current OuteTTS deployment remains the maintained baseline.
 This is not a conclusion that OuteTTS is the best backend. The repository now
 contains the provider contract, an Oute adapter, isolated Fun-CosyVoice3 and
 Qwen3-TTS candidate services, and a common comparison matrix; it does not yet

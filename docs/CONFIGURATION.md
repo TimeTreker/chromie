@@ -694,7 +694,7 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | Variable | Purpose |
 |---|---|
 | `TTS_PROVIDER` | Registered provider adapter selected by the TTS service. The maintained image currently supports only `oute`; unknown values fail closed. Candidate frameworks are compared as separate contract-compatible endpoints before any default changes. |
-| `TTS_MODEL_SIZE` | OuteTTS model size, currently release-locked to `0.6B`. |
+| `TTS_MODEL_SIZE` | OuteTTS model size, currently fixed to `0.6B` in the maintained configuration. |
 | `TTS_TOKENIZER_REPO`, `TTS_TOKENIZER_REVISION` | Immutable tokenizer/config snapshot used instead of a mutable repository branch. |
 | `TTS_GGUF_REPO`, `TTS_GGUF_REVISION` | Immutable GGUF snapshot; the quantization selects an exact filename inside it. |
 | `TTS_HOST` | Service bind address; default `0.0.0.0`. |

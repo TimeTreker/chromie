@@ -2429,7 +2429,7 @@ def run_acceptance(args: argparse.Namespace) -> int:
     metadata = build_metadata(args, selected)
     if metadata["chromie"]["dirty"] and not args.allow_dirty and not args.dry_run:
         raise ValueError(
-            "Chromie worktree is dirty. Commit the candidate revision before a "
+            "Chromie worktree is dirty. Commit the evaluated revision before a "
             "release-evidence run, or use --allow-dirty only for exploratory evidence."
         )
 

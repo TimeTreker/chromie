@@ -50,7 +50,7 @@ release claim that includes real voice input/output support.
 
 ### Exit criteria
 
-- `./scripts/run_tests.sh` passes from the candidate revision;
+- `./scripts/run_tests.sh` passes from the evaluated revision;
 - automatic `synthetic` and `virtual-mic` matrices pass all seven cases;
 - the deployed text-to-MuJoCo check passes against live Soridormi MCP and MuJoCo;
 - retained text evidence shows ordered `walk_velocity`, `nod_yes`, and
@@ -64,8 +64,7 @@ operation.
 ## Open evidence track - Physical audio validation
 
 Physical voice validation is no longer a blocker for text-to-MuJoCo interaction
-closure. Before publishing a release that claims support for real microphone and
-speaker operation, retain a clean supervised bundle, operator review, and
+closure. Before claiming support for real microphone and speaker operation, retain a clean supervised bundle, operator review, and
 release evidence that cover microphone choice, room noise, ASR recognition,
 audible output, barge-in, request-bound approval and denial, cancellation, stop,
 and simulator recovery.
@@ -102,7 +101,7 @@ for the maintained OuteTTS deployment, isolated locked Fun-CosyVoice3 and
 Qwen3-TTS candidate services, and one common Mandarin, English, mixed-language,
 interruption, long-dialogue, and concurrency comparison matrix. This removes
 the architectural assumption that one framework must remain the permanent
-backend without changing the current release default.
+backend without changing the maintained default.
 
 Two dirty-tree isolated deployment runs passed all six objective cases for both
 candidates. The latest used the authorized AI-generated Chromie voice
@@ -322,14 +321,14 @@ Exit criteria:
   Soridormi `sim` execution, explicit safe idle, an exact matching Chromie
   source, manifest, clean declared paired Soridormi checkout, and a matching
   endpoint-reported Soridormi revision;
-- release preparation rejects evidence, capability-manifest, compatibility,
-  source-revision, or version provenance drift;
-- running Chromie images and loaded models are bound to the candidate revision,
-  and publishable image references are immutable;
+- artifact verification rejects evidence, capability-manifest, compatibility,
+  source-revision, or development-identity drift;
+- running Chromie images and loaded models are bound to the evaluated revision,
+  and source image references are immutable;
 - `python scripts/check_docs.py`, `./scripts/run_tests.sh`, cognitive scenarios,
-  and General Ability Level A pass from the candidate revision;
+  and General Ability Level A pass from the evaluated revision;
 - retained live-text and MuJoCo runs pass through the authoritative path before
-  target behavior or release readiness is claimed.
+  target behavior or deployment readiness is claimed.
 
 ## Open architecture track - General ability acceptance reconstruction
 
@@ -560,7 +559,7 @@ platforms, and broader autonomy are candidates only after the physical pilot.
 
 Before accepting major work, ask:
 
-1. Does it close the active milestone or a documented release blocker?
+1. Does it close the active milestone or a documented engineering blocker?
 2. Is the behavior owned by Chromie or Soridormi according to the charter?
 3. Does it preserve deterministic controls and fail-closed authorization?
 4. Is the required evidence level explicit?
