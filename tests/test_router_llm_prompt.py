@@ -161,9 +161,22 @@ class RouterLlmPromptTests(unittest.TestCase):
             route="ignore",
             intent="ambient_speech",
             confidence=0.91,
-            metadata={"semantic_addressedness_gate": True},
+            metadata={
+                "semantic_addressedness_gate": True,
+                "addressedness_speech_act": "ambient_report",
+            },
         )
         self.assertTrue(is_allowed_model_ignore(inactive, decision))
+
+        directed = decision.model_copy(
+            update={
+                "metadata": {
+                    "semantic_addressedness_gate": True,
+                    "addressedness_speech_act": "question",
+                }
+            }
+        )
+        self.assertFalse(is_allowed_model_ignore(inactive, directed))
 
         active = inactive.model_copy(
             update={
@@ -816,6 +829,172 @@ class RouterLlmPromptTests(unittest.TestCase):
 
 
 class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_inactive_direct_chinese_weather_question_fails_open_on_false_review(self) -> None:
+        class WeatherAddressednessRouter(OllamaLLMRouter):
+            def __init__(self) -> None:
+                super().__init__(
+                    ollama_url="http://example.invalid",
+                    model="quick-model",
+                    review_model="review-model",
+                    timeout_ms=800,
+                    confidence_threshold=0.55,
+                )
+                self.stages: list[str] = []
+
+            async def _chat(self, payload: dict) -> dict:
+                system = str(payload["messages"][0].get("content") or "")
+                if "You classify whether" in system:
+                    self.stages.append("addressedness_review")
+                    return {
+                        "message": {
+                            "content": (
+                                '{"addressed":false,"speech_act":"question",'
+                                '"confidence":0.95}'
+                            )
+                        }
+                    }
+                self.stages.append("quick_intent")
+                return {
+                    "message": {
+                        "content": (
+                            '{"route":"tool","intent":"weather_query",'
+                            '"confidence":0.95,"metadata":{"tool_name":"weather",'
+                            '"weather_query":{"location":"北京","date":"today",'
+                            '"units":"metric"}}}'
+                        )
+                    }
+                }
+
+        router = WeatherAddressednessRouter()
+        decision = await router.route(
+            RouteRequest(
+                text="今天北京下雨了吗？",
+                language="zh-CN",
+                context={
+                    "interaction_engagement": {
+                        "gate_enabled": True,
+                        "active": False,
+                    },
+                    "common_ability_catalog": [
+                        {
+                            "capability_id": "chromie.weather.lookup",
+                            "route": "tool",
+                            "effects": ["external_read", "weather_lookup"],
+                            "description": "Retrieve current weather or forecast for a city.",
+                        }
+                    ],
+                },
+            )
+        )
+
+        self.assertEqual(decision.route, "tool")
+        self.assertEqual(decision.intent, "weather_query")
+        self.assertTrue(decision.should_speak)
+        self.assertEqual(router.stages, ["quick_intent", "addressedness_review"])
+
+    async def test_inactive_direct_english_request_fails_open_on_false_review(self) -> None:
+        class FalseRequestRouter(OllamaLLMRouter):
+            async def _chat(self, payload: dict) -> dict:
+                del payload
+                return {
+                    "message": {
+                        "content": (
+                            '{"addressed":false,"speech_act":"request",'
+                            '"confidence":0.97}'
+                        )
+                    }
+                }
+
+        router = FalseRequestRouter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Please remember that my favorite color is blue.",
+            context={
+                "interaction_engagement": {
+                    "gate_enabled": True,
+                    "active": False,
+                }
+            },
+        )
+        original = RouteDecision(
+            route="memory",
+            intent="remember_preference",
+            confidence=0.94,
+        )
+
+        reviewed = await router._review_inactive_addressedness(request, original)
+
+        self.assertIs(reviewed, original)
+
+    async def test_inactive_question_form_fails_open_on_inconsistent_ambient_act(self) -> None:
+        class FalseQuestionRouter(OllamaLLMRouter):
+            async def _chat(self, payload: dict) -> dict:
+                del payload
+                return {
+                    "message": {
+                        "content": (
+                            '{"addressed":false,"speech_act":"ambient_report",'
+                            '"confidence":0.97}'
+                        )
+                    }
+                }
+
+        router = FalseQuestionRouter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Are you ready?",
+            context={
+                "interaction_engagement": {
+                    "gate_enabled": True,
+                    "active": False,
+                }
+            },
+        )
+        original = RouteDecision(route="chat", intent="status_question", confidence=0.91)
+
+        reviewed = await router._review_inactive_addressedness(request, original)
+
+        self.assertIs(reviewed, original)
+
+    async def test_inactive_malformed_addressedness_review_fails_open(self) -> None:
+        class MalformedReviewRouter(OllamaLLMRouter):
+            async def _chat(self, payload: dict) -> dict:
+                del payload
+                return {
+                    "message": {
+                        "content": '{"addressed":false,"confidence":0.99}'
+                    }
+                }
+
+        router = MalformedReviewRouter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Please help me.",
+            context={
+                "interaction_engagement": {
+                    "gate_enabled": True,
+                    "active": False,
+                }
+            },
+        )
+        original = RouteDecision(route="chat", intent="request_help", confidence=0.9)
+
+        reviewed = await router._review_inactive_addressedness(request, original)
+
+        self.assertIs(reviewed, original)
+
     async def test_inactive_mislabelled_chat_is_reviewed_to_ambient_ignore(self) -> None:
         class AddressednessRouter(OllamaLLMRouter):
             def __init__(self) -> None:
@@ -833,7 +1012,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 if "You classify whether" in payload["messages"][0]["content"]:
                     return {
                         "message": {
-                            "content": '{"addressed":false,"confidence":0.95}'
+                            "content": (
+                                '{"addressed":false,"speech_act":"ambient_report",'
+                                '"confidence":0.95}'
+                            )
                         }
                     }
                 return {
@@ -862,7 +1044,47 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "ignore")
         self.assertEqual(decision.intent, "ambient_speech")
         self.assertFalse(decision.should_speak)
+        self.assertEqual(
+            decision.metadata["addressedness_speech_act"],
+            "ambient_report",
+        )
         self.assertEqual(router.models, ["quick-model", "quick-model"])
+
+    async def test_inactive_contextless_reply_can_still_be_suppressed(self) -> None:
+        class ContextlessReplyRouter(OllamaLLMRouter):
+            async def _chat(self, payload: dict) -> dict:
+                del payload
+                return {
+                    "message": {
+                        "content": (
+                            '{"addressed":false,"speech_act":"reply",'
+                            '"confidence":0.93}'
+                        )
+                    }
+                }
+
+        router = ContextlessReplyRouter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(
+            text="Yeah.",
+            context={
+                "interaction_engagement": {
+                    "gate_enabled": True,
+                    "active": False,
+                }
+            },
+        )
+        original = RouteDecision(route="chat", intent="acknowledge", confidence=0.9)
+
+        reviewed = await router._review_inactive_addressedness(request, original)
+
+        self.assertEqual(reviewed.route, "ignore")
+        self.assertEqual(reviewed.intent, "ambient_speech")
+        self.assertEqual(reviewed.metadata["addressedness_speech_act"], "reply")
 
     async def test_inactive_direct_request_preserves_original_action_route(self) -> None:
         class AddressedRequestRouter(OllamaLLMRouter):
@@ -870,7 +1092,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 self.assert_payload = payload
                 return {
                     "message": {
-                        "content": '{"addressed":true,"confidence":0.99}'
+                        "content": (
+                            '{"addressed":true,"speech_act":"request",'
+                            '"confidence":0.99}'
+                        )
                     }
                 }
 
@@ -902,6 +1127,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(router.assert_payload["model"], "quick-model")
         self.assertEqual(router.assert_payload["options"]["num_ctx"], 4096)
         self.assertEqual(router.assert_payload["options"]["num_predict"], 32)
+        self.assertIn("speech_act", router.assert_payload["format"]["required"])
 
     async def test_llm_router_returns_low_confidence_raw_for_pipeline_validation(self) -> None:
         class LowConfidenceRouter(OllamaLLMRouter):

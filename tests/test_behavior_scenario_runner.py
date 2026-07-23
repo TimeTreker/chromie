@@ -26,9 +26,9 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
-        self.assertEqual(len(all_cases), 382)
+        self.assertEqual(len(all_cases), 383)
         self.assertEqual(len(adapter_cases), 4)
-        self.assertEqual(len(router_cases), 23)
+        self.assertEqual(len(router_cases), 24)
         self.assertEqual(len(router_dialogue_cases), 2)
         self.assertEqual(len(dialogue_cases), 319)
         self.assertEqual(len(load_scenarios(suites={"interaction"})), 21)
@@ -145,6 +145,23 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertIn(
             "What is the weather in Beijing today?",
             str(turns[1]["pre_context"]["history"]),
+        )
+
+    def test_router_scenario_replays_inactive_direct_question_false_review(self) -> None:
+        scenarios = load_scenarios(
+            only={"router/inactive_direct_weather_question_false_addressedness"}
+        )
+
+        report = run_scenarios_sync(scenarios)
+        actual = report["cases"][0]["actual"]
+
+        self.assertTrue(report["ok"], report["cases"][0]["errors"])
+        self.assertEqual(actual["route"], "tool")
+        self.assertEqual(actual["intent"], "weather_query")
+        self.assertTrue(actual["should_speak"])
+        self.assertEqual(
+            actual["llm_stages"],
+            ["quick_intent", "addressedness_review"],
         )
 
     def test_dialogue_scenario_checks_extracted_memory_context(self) -> None:

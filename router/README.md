@@ -59,6 +59,14 @@ Router falls back to safe chat instead of stopping, ignoring, or executing
 catalog motion. Low-confidence normal decisions delegate to `deep_thought`
 rather than being recovered by a catalog action rule.
 
+Inactive ambient suppression uses a separate structured addressedness contract.
+That classifier must identify the speech act as well as addressedness and
+confidence. Runtime policy can suppress only a high-confidence inactive
+`ambient_report`, `dictation`, `narration`, or contextless `reply`. Questions,
+requests, imperatives, greetings, unclear or malformed reviews, and utterances
+with direct question form fail open to the already validated route. This gate
+cannot authorize a tool, memory write, or physical effect.
+
 The Router has four decision stages. Only the first stage may use phrase rules
 to determine a route:
 

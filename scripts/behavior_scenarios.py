@@ -768,11 +768,14 @@ async def _run_router_turn(
 
 
 async def evaluate_router_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
+    context = scenario.stub.get("context") or {}
+    if not isinstance(context, dict):
+        raise ValueError(f"{scenario.key}: stub.context must be an object")
     decision, router = await _run_router_turn(
         scenario=scenario,
         text=scenario.text,
         language=scenario.language,
-        context={},
+        context=context,
         stub=scenario.stub,
     )
 

@@ -47,6 +47,10 @@
         {
           "key": "router/chinese_walk_after_weather_intent_repaired",
           "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
+        },
+        {
+          "key": "router/inactive_direct_weather_question_false_addressedness",
+          "rationale": "An inactive direct Chinese weather question must keep its grounded tool route when the addressedness reviewer falsely labels it unaddressed."
         }
       ],
       "live_text_cases": [

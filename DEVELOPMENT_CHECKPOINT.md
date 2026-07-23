@@ -2,7 +2,7 @@
 
 **Current release-prep base:** `0.0.1`
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-22
+**Status refresh date:** 2026-07-23
 **Current focus:** Finish Fast Planner multi-goal latency qualification and
 promote it to source-bound Target evidence: reduce final-source median cognitive
 runtime to the accepted threshold, repeat three warm runs, add
@@ -106,6 +106,21 @@ from discussion of other systems, and high-confidence semantic ambient speech
 may be ignored only outside an active exchange. Ignored ambient turns do not
 open a new engagement window. This is implemented and Level A verified; a
 retained live-microphone rerun is still required.
+
+A July 23 microphone trace exposed the inverse addressedness failure. The quick
+Router correctly selected `tool/weather_query` for `今天北京下雨了吗？`, but the
+focused fast-model reviewer returned `addressed=false` and silently discarded
+the turn before Agent, tool, or TTS work. The focused schema now requires a
+bounded speech-act class, and runtime policy suppresses only explicitly ambient
+inactive acts. Direct or unclear acts, malformed output, and question-form
+contradictions fail open to the grounded route. The retained
+`router/inactive_direct_weather_question_false_addressedness` scenario replays
+the quick decision and false review with the original inactive engagement
+shape through the real Router pipeline. It passes as Level A evidence, and a
+rebuilt live Router replay returns `tool/weather_query` for the reported
+inactive question while preserving inactive contextless-reply suppression.
+Rerun the complete microphone, Agent, weather, and TTS path before making an
+end-to-end live-behavior claim.
 
 The next supervised log exposed a different root cause behind repeated body
 actions. The Router correctly classified “想啥呢？” as

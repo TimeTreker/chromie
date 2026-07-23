@@ -145,6 +145,11 @@ may declare the expected model stage and a compact decision:
 }
 ```
 
+Standalone Router scenarios may also set `stub.context` to replay bounded host
+request context, such as `interaction_engagement`. This context is passed to
+the real Router pipeline; it must be a JSON object and should contain only the
+minimum fields needed to reproduce the boundary under test.
+
 `router_dialogue` scenarios run ordered Router turns with one bounded
 conversation-state snapshot. A turn may set `run_interaction=true` to pass the
 final Router decision through the dependency-light native InteractionRuntime

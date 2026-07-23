@@ -209,9 +209,14 @@ Level A routing evidence must continue to prove:
 
 - deterministic stop, cancel, emergency, silence, and unusable-audio paths do
   not depend on model output;
-- semantic ambient suppression is isolated to the two-field addressedness
-  contract, requires inactive host engagement plus high confidence, cannot
-  authorize effects, and fails open to the original route;
+- semantic ambient suppression is isolated to a structured addressedness and
+  speech-act contract, requires inactive host engagement plus high confidence,
+  cannot authorize effects, suppresses only explicitly ambient acts, and fails
+  open to the original route on direct-question/request contradictions;
+- the retained
+  `router/inactive_direct_weather_question_false_addressedness` scenario
+  replays the inactive host context, grounded weather-tool decision, and false
+  high-confidence question review through the real Router recovery pipeline;
 - model routes are bounded by capability-catalog candidates and schema
   finalization;
 - low-confidence, ambiguous, unsupported, or unavailable routes clarify, refuse,

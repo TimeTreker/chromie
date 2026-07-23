@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "id": "inactive_direct_weather_question_false_addressedness",
+  "suite": "router",
+  "level": "integration",
+  "description": "Regression from the 2026-07-23 microphone trace: an inactive direct Chinese weather question must keep its grounded tool route when the addressedness reviewer falsely returns addressed=false.",
+  "tags": [
+    "voice-log",
+    "chinese",
+    "weather",
+    "addressedness",
+    "inactive-engagement",
+    "false-negative"
+  ],
+  "input": {
+    "text": "今天北京下雨了吗？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "router_mode": "hybrid",
+    "context": {
+      "interaction_engagement": {
+        "gate_enabled": true,
+        "active": false,
+        "evidence": "none"
+      },
+      "common_ability_catalog": [
+        {
+          "capability_id": "chromie.weather.lookup",
+          "route": "tool",
+          "effects": [
+            "external_read",
+            "weather_lookup"
+          ],
+          "description": "Retrieve current weather or forecast for a city."
+        }
+      ]
+    },
+    "catalog": {
+      "matched": false,
+      "catalog_version": 72,
+      "capabilities": [
+        {
+          "capability_id": "chromie.weather.lookup",
+          "agent_id": "chromie.tool",
+          "description": "Retrieve current weather or forecast for a city.",
+          "route": "tool",
+          "prompt_tier": "common",
+          "available": true,
+          "interaction_executable": true,
+          "effects": [
+            "external_read",
+            "weather_lookup"
+          ],
+          "safety_class": "read_only"
+        }
+      ]
+    },
+    "llm_script": [
+      {
+        "stage": "quick_intent",
+        "decision": {
+          "route": "tool",
+          "intent": "weather_query",
+          "confidence": 0.95,
+          "language": "zh-CN",
+          "metadata": {
+            "tool_name": "weather",
+            "weather_query": {
+              "location": "北京",
+              "date": "today",
+              "units": "metric"
+            }
+          }
+        }
+      },
+      {
+        "stage": "addressedness_review",
+        "decision": {
+          "addressed": false,
+          "speech_act": "question",
+          "confidence": 0.95
+        }
+      }
+    ]
+  },
+  "expect": {
+    "route": "tool",
+    "intent": "weather_query",
+    "source": "llm",
+    "should_speak": true,
+    "llm_calls": 2,
+    "llm_stages": [
+      "quick_intent",
+      "addressedness_review"
+    ],
+    "task_types_include": [
+      "task.use_tool"
+    ],
+    "task_types_forbid": [
+      "speech.ignore",
+      "task.execute_skill"
+    ],
+    "metadata_json_forbid": [
+      "semantic_addressedness_gate",
+      "ambient_speech"
+    ]
+  }
+}

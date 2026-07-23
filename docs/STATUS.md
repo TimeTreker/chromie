@@ -4,7 +4,7 @@
 **Current release-prep base:** `0.0.1` scope with Soridormi MuJoCo `sim`
 execution; retained target evidence below records the exact revision that
 produced each bundle
-**Status refresh date:** 2026-07-22
+**Status refresh date:** 2026-07-23
 **Current focus:** **Promote the completed diagnostic Fast Planner multi-goal
 qualification to source-bound target evidence by adding endpoint-reported
 Soridormi revision identity, using a clean paired checkout, binding running
@@ -226,6 +226,30 @@ silence, and unusable-audio controls remain deterministic. Direct questions,
 requests, greetings, Chromie's name, active tasks, and recent accepted turns
 remain addressed, and ignored ambient turns do not extend engagement. This is
 Level A automated evidence, not retained live-microphone acceptance.
+The July 23 retained microphone trace exposed the inverse false-negative: the
+quick Router correctly grounded `今天北京下雨了吗？` as `tool/weather_query`, but
+the focused classifier returned high-confidence `addressed=false` and silently
+replaced it with `ambient_speech`. The addressedness schema now also requires a
+bounded speech-act class. Runtime suppression is limited to inactive ambient
+reports, dictation, narration, and contextless replies; direct or unclear acts,
+malformed review output, and direct question form fail open to the grounded
+route. This correction is implemented and automatically verified at Level A;
+a rebuilt retained live-microphone rerun remains open. The retained
+`router/inactive_direct_weather_question_false_addressedness` scenario now
+replays the inactive engagement context, grounded quick weather route, and
+false question review through the real Router pipeline.
+The July 23 canonical gate passed 1,170 primary tests plus 20 legacy Agent
+tests. The focused Router suite passed 51/51, the Router matrix passed 66/66,
+the exact retained Router scenario passed 1/1, and the
+`robust_intent_understanding` Level A class passed 8/8 within a valid 54-case
+manifest. A direct local
+`qwen3:4b` contract probe classified the weather utterance as an addressed
+question and inactive `Yeah.` as an unaddressed reply. The model probe is local
+service evidence only. After rebuilding only `chromie-router`, its public
+endpoint returned `tool/weather_query` with speech enabled for the reported
+inactive Chinese question and retained `ignore/ambient_speech` for inactive
+`Yeah.`. This is deployed Router evidence, not a retained microphone, Agent,
+weather-result, or TTS run.
 Deterministic semantic action parsing is now a rules-only or explicit
 compatibility fallback rather than the normal hybrid brain path. The
 fast Qwen-class Router now receives unlocked
@@ -407,7 +431,7 @@ Target validation or Release readiness.
 | Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
 | Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR decode and routed-turn execution have separate lifecycles, one newest utterance is retained while ASR is busy, playback remains ordered, and startup acknowledgements use an adaptive hedge plus provider/speaker-addressed cache v2, duration limit, and ASR content check. Response speech may carry a delivery/effect barrier: dependent motion waits for playback start, and failure invalidates all late chunks. TTS health and responses expose generation, codec, queue, IPC, total, and real-time-factor metrics | Concurrency/cancellation, playback-barrier/late-audio, busy-ASR queue, cleanup, model resolution, ASR accuracy, TTS worker/profile, cache identity/content/hedge, timing, benchmark, and automatic speech-path coverage | Local ASR evidence passed English/Chinese transcripts. July 22 diagnostic ASR exposed Oute enrollment-text leakage in Chinese cached cues; no physical listening-quality bundle is retained | SenseVoice CUDA default; cached cues and failed delivery barriers fail closed; Oute remains configured, with no accepted Chinese `chromie_mixed` listening claim |
 | Framework-neutral TTS provider evaluation | Contract version 1, maintained Oute adapter, isolated locked CosyVoice3/Qwen3-TTS adapters, common hashed voice and six-kind matrix, listening template, and reversible shared-GPU-safe CosyVoice trial launcher implemented. Candidate trials use declared worker concurrency, application-level readiness, full synthesis warmup, and bounded cancellation drain/reload semantics | Provider, adapter, bounded-drain/restart cancellation, speaker acoustics, reference locks, matrix, benchmark, cache-content, strict readiness, timeout, and trial-wiring tests; both candidate images run on the RTX 5090 | `20260722-chromie-ai-girl-v1` passed 6/6 transport/stability cases per candidate: CosyVoice3 median first binary/RTF 3.0987 s/0.5419 and Qwen3-TTS 5.6786 s/0.9364. Oute later failed requested-text/listening diagnostics. An earlier one-model CosyVoice launcher reached the physical microphone loop. The rebuilt strict service-only path passed application health and returned 485760 bytes of PCM; its host Orchestrator was deliberately off, so supervised listening still remains | `TTS_PROVIDER=oute`; `--tts-trial cosyvoice` is reversible, non-persistent, uses one host request for one candidate worker and a reduced cognitive resource envelope; no provider winner is selected |
-| Deterministic controls plus semantic quick Router | Implemented; interrupt/silence/unusable-audio controls remain deterministic. Normal routing uses catalog context, bounded host engagement evidence, subject-ownership/addressedness review, structural validation, semantic repair, clarification, or deep handoff. Only high-confidence bounded ambient speech may use semantic `ignore`; ignored turns do not open engagement. Retained completed tasks alone cannot turn a tiny ASR fragment into an effectful follow-up | Router rules, addressedness/engagement, low-information retained-task regression, capability routing, prompt, route-contract, replay, multi-turn, deepthinking, interaction, and regression coverage | July 21 live-text evidence predates this fix. July 22 logs diagnose the repeated ambient `capability_inquiry` and isolated `I.` failures; a retained post-fix microphone run is open | Enabled; addressedness gate on with a 45-second recent accepted-exchange window |
+| Deterministic controls plus semantic quick Router | Implemented; interrupt/silence/unusable-audio controls remain deterministic. Normal routing uses catalog context, bounded host engagement evidence, structured speech-act/addressedness review, structural validation, semantic repair, clarification, or deep handoff. Only high-confidence explicitly ambient inactive speech may use semantic `ignore`; direct/unclear contradictions fail open, ignored turns do not open engagement, and retained completed tasks alone cannot turn a tiny ASR fragment into an effectful follow-up | Router rules, addressedness/engagement, direct-question false-review, low-information retained-task, capability routing, prompt, route-contract, replay, multi-turn, deepthinking, interaction, and regression coverage | July 21 live-text evidence predates this fix. July 22 logs diagnose repeated ambient `capability_inquiry` and isolated `I.` failures; the July 23 trace diagnoses the inverse direct-weather-question false negative. A rebuilt retained post-fix microphone run is open | Enabled; addressedness gate on with a 45-second recent accepted-exchange window |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Historical compatibility evidence only; it is not the maintained semantic-authority path | Service remains available, but common cognitive `apply` does not use it as semantic authority |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle on the historical path; it is not evidence for the current cognitive authority path | Enabled in the common safe base |
 | Native structured Interaction Agent | Implemented as the strict output and compatibility surface for `InteractionSpeech`/`SkillRequest` accumulation, TaskGraph requests, and optional `SocialAttentionPlan` coordination. Under cognitive `apply`, fingerprint-bound Response Composition is part of the authoritative Goal-driven pipeline rather than a separate background observer. Attention is selected from exact named capabilities or `none`; the host validates target evidence, schemas, latency, confirmation policy, and conflicts and excludes auxiliary attention from user task proposals | Native route, TaskGraph, validation, fail-closed, fallback, response-composition goal coverage/claim/immutability, social-attention selection/none/invalid/latency/target/conflict, exact-intent, and compatibility-mode tests plus file-backed interaction scenarios | The final July 21 diagnostic 10/10 live-text simulator run exercised fingerprint-bound cognitive response composition, ordered speech transport, action requests, execution receipts, and safe closure. Auxiliary Social Attention still lacks its own retained live qualification | Structured interaction enabled; normal profiles keep attention off. Only the explicit architecture-validation overlay selects `sim_only` with calibrated right-side fallback |

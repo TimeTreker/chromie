@@ -38,6 +38,13 @@ ROUTE_NAMES = {
 
 DETERMINISTIC_ONLY_ROUTES = {"interrupt"}
 MODEL_IGNORE_INTENTS = {"not_addressed", "ambient_speech"}
+DIRECTED_SPEECH_ACTS = {"question", "request", "imperative", "greeting"}
+SUPPRESSIBLE_INACTIVE_SPEECH_ACTS = {
+    "ambient_report",
+    "dictation",
+    "narration",
+    "reply",
+}
 ROUTE_ITEM_PRIMARY_RANK = {
     "interrupt": 0,
     "robot_action": 1,
@@ -94,10 +101,12 @@ def is_allowed_model_ignore(
 
     engagement = interaction_engagement(request)
     metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
+    speech_act = str(metadata.get("addressedness_speech_act") or "").strip().casefold()
     return bool(
         decision.route == "ignore"
         and str(decision.intent or "").strip().casefold() in MODEL_IGNORE_INTENTS
         and metadata.get("semantic_addressedness_gate") is True
+        and speech_act in SUPPRESSIBLE_INACTIVE_SPEECH_ACTS
         and engagement.get("gate_enabled") is True
         and engagement.get("active") is False
         and float(decision.confidence) >= min_confidence
@@ -1271,13 +1280,27 @@ class OllamaLLMRouter:
             "type": "object",
             "properties": {
                 "addressed": {"type": "boolean"},
+                "speech_act": {
+                    "type": "string",
+                    "enum": [
+                        "question",
+                        "request",
+                        "imperative",
+                        "greeting",
+                        "reply",
+                        "ambient_report",
+                        "dictation",
+                        "narration",
+                        "unclear",
+                    ],
+                },
                 "confidence": {
                     "type": "number",
                     "minimum": 0.0,
                     "maximum": 1.0,
                 },
             },
-            "required": ["addressed", "confidence"],
+            "required": ["addressed", "speech_act", "confidence"],
             "additionalProperties": False,
         }
 
@@ -1390,10 +1413,11 @@ class OllamaLLMRouter:
                     "content": (
                         "You classify whether the latest transcript is directed to a nearby "
                         "robot named Chromie. Host evidence says there is no active "
-                        "conversation. Decide from the utterance's speech act, addressee, "
-                        "and subject, never from keywords. Questions, requests, imperatives, "
-                        "greetings, and Chromie's name are addressed even when the robot's "
-                        "name or the pronoun 'you' is omitted. Third-person reports, "
+                        "conversation. First classify speech_act, then decide addressed from "
+                        "the utterance's addressee and subject, never from keywords. Questions, "
+                        "requests, imperatives, greetings, and Chromie's name are addressed "
+                        "even when the robot's name or the pronoun 'you' is omitted. A short "
+                        "reply without an active exchange may be unaddressed. Third-person reports, "
                         "dictation, meeting talk, or narration without a second-person "
                         "addressee are ambient. Delivery to this classifier is not evidence "
                         "of addressedness. If genuinely unclear, use addressed=true.\n"
@@ -1401,10 +1425,14 @@ class OllamaLLMRouter:
                         "User asks 'How are you?' -> addressed=true.\n"
                         "User says '请帮我打开灯。' -> addressed=true.\n"
                         "User greets '你好。' -> addressed=true.\n"
+                        "With no active exchange, isolated 'Yeah.' -> "
+                        "speech_act=reply and addressed=false.\n"
                         "Nearby speaker reports '他们明天讨论传感器数据。' -> addressed=false.\n"
                         "Nearby speaker narrates 'She said the model runs locally.' -> "
                         "addressed=false.\n"
-                        "Return only addressed and calibrated confidence as JSON."
+                        "The speech_act must be question, request, imperative, greeting, "
+                        "reply, ambient_report, dictation, narration, or unclear. "
+                        "Return only addressed, speech_act, and calibrated confidence as JSON."
                     ),
                 },
                 {
@@ -2670,8 +2698,14 @@ class OllamaLLMRouter:
             content = message.get("content") if isinstance(message, dict) else None
             reviewed_payload = _extract_json_object(str(content or ""))
             addressed = reviewed_payload.get("addressed")
+            speech_act = str(reviewed_payload.get("speech_act") or "").strip().casefold()
             confidence = float(reviewed_payload.get("confidence"))
-            if not isinstance(addressed, bool) or not 0.0 <= confidence <= 1.0:
+            if (
+                not isinstance(addressed, bool)
+                or speech_act
+                not in DIRECTED_SPEECH_ACTS | SUPPRESSIBLE_INACTIVE_SPEECH_ACTS | {"unclear"}
+                or not 0.0 <= confidence <= 1.0
+            ):
                 raise ValueError("invalid addressedness response")
         except Exception as exc:
             logger.warning(
@@ -2681,7 +2715,33 @@ class OllamaLLMRouter:
                 exc,
             )
             return decision
+        # Ambient suppression is intentionally fail-open. A direct speech act,
+        # an unclear act, or question punctuation contradicts addressed=false
+        # and therefore cannot silently discard the already grounded route.
+        # This is a structural interaction contract, not normal intent routing.
+        direct_question_form = request.text.rstrip().endswith(("?", "？"))
         if addressed or confidence < 0.72:
+            return decision
+        fail_open_reason = ""
+        if speech_act in DIRECTED_SPEECH_ACTS:
+            fail_open_reason = "direct_speech_act"
+        elif speech_act == "unclear":
+            fail_open_reason = "unclear_speech_act"
+        elif direct_question_form:
+            fail_open_reason = "direct_question_form"
+        elif speech_act not in SUPPRESSIBLE_INACTIVE_SPEECH_ACTS:
+            fail_open_reason = "unsupported_speech_act"
+        if fail_open_reason:
+            logger.info(
+                "inactive addressedness review failed open sid=%s reason=%s "
+                "speech_act=%s confidence=%.2f route=%s intent=%s",
+                request.sid,
+                fail_open_reason,
+                speech_act,
+                confidence,
+                decision.route,
+                decision.intent,
+            )
             return decision
         return finalize_decision(
             RouteDecision(
@@ -2697,6 +2757,7 @@ class OllamaLLMRouter:
                 metadata={
                     "semantic_addressedness_gate": True,
                     "addressedness_confidence": confidence,
+                    "addressedness_speech_act": speech_act,
                     "host_engagement_evidence": engagement.get("evidence"),
                 },
             ),

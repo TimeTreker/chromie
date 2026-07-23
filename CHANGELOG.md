@@ -90,6 +90,17 @@ All notable user-visible changes should be recorded here.
 - Kept isolated low-information ASR fragments behind clarification even when
   completed tasks remain in bounded conversation history; only an explicit
   confirmation or clarification wait supplies strong follow-up context.
+- Fixed the addressedness reviewer silently vetoing a correctly grounded direct
+  question such as `今天北京下雨了吗？`. The focused contract now classifies
+  speech act explicitly, permits suppression only for bounded inactive ambient
+  acts, and fails open on direct, unclear, malformed, or question-form
+  contradictions while preserving inactive contextless-reply suppression.
+- Retained that July 23 failure as
+  `router/inactive_direct_weather_question_false_addressedness`: the scenario
+  replays inactive host engagement, a grounded weather-tool decision, and the
+  false `addressed=false` question review through the real Router pipeline.
+  Standalone Router fixtures can now supply bounded `stub.context` for this
+  class of host-to-Router regression.
 
 ### Goal lifecycle and truthful embodied speech
 
