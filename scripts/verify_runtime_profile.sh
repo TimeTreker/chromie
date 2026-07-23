@@ -29,12 +29,31 @@ if [ -n "${CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE:-}" ]; then
   set +a
 fi
 
+tts_backend="${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 tts_service=chromie-tts
+tts_provider=fun-cosyvoice3-0.5b
 compose_args=(--env-file .env.runtime -f docker-compose.yml)
-if [ "${CHROMIE_TTS_TRIAL_PROVIDER:-}" = "cosyvoice3" ]; then
-  tts_service=chromie-tts-cosyvoice
-  compose_args+=(--profile tts-evaluation)
-fi
+case "${tts_backend,,}" in
+  cosyvoice|cosyvoice3)
+    tts_backend=cosyvoice3
+    ;;
+  oute|outetts)
+    tts_backend=oute
+    tts_service=chromie-tts-oute
+    tts_provider=oute
+    compose_args+=(--profile tts-evaluation)
+    ;;
+  qwen|qwen3|qwen3-tts)
+    tts_backend=qwen3
+    tts_service=chromie-tts-qwen3
+    tts_provider=qwen3-tts-0.6b-base
+    compose_args+=(--profile tts-evaluation)
+    ;;
+  *)
+    echo "[profile-check][error] Unsupported CHROMIE_TTS_BACKEND=${CHROMIE_TTS_BACKEND:-}" >&2
+    exit 2
+    ;;
+esac
 
 read_manifest_field() {
   python3 - "$1" <<'PY'
@@ -103,25 +122,26 @@ done
 for name in ROUTER_MODEL ROUTER_REVIEW_MODEL; do
   check_value chromie-router "$name"
 done
-if [ "$tts_service" = "chromie-tts" ]; then
-  check_value chromie-tts TTS_CUDA_ARCH
+check_value "$tts_service" TTS_CUDA_ARCH
+actual_tts_provider="$(value_from_dump "${service_env[$tts_service]}" TTS_PROVIDER)"
+if [ "$actual_tts_provider" != "$tts_provider" ]; then
+  echo "[profile-check][error] $tts_service TTS_PROVIDER mismatch: expected='$tts_provider' container='$actual_tts_provider'" >&2
+  failures=$((failures + 1))
 fi
 
-if [ "$tts_service" = "chromie-tts" ]; then
-  tts_container_id="$(docker compose "${compose_args[@]}" ps -q chromie-tts)"
-  tts_image_id="$(docker inspect "$tts_container_id" --format '{{.Image}}')"
-  built_cuda_arch="$(docker image inspect "$tts_image_id" --format '{{index .Config.Labels "org.chromie.tts-cuda-arch"}}')"
-  built_profile="$(docker image inspect "$tts_image_id" --format '{{index .Config.Labels "org.chromie.hardware-profile"}}')"
-  if [ "$built_cuda_arch" != "${TTS_CUDA_ARCH:-}" ]; then
-    echo "[profile-check][error] chromie-tts image CUDA arch '$built_cuda_arch' does not match detected profile arch '${TTS_CUDA_ARCH:-}'." >&2
-    echo "[profile-check][hint] Rebuild with: BUILD=1 ./scripts/start_services.sh" >&2
-    failures=$((failures + 1))
-  fi
-  if [ -z "$built_profile" ] || [ "$built_profile" = "unknown" ]; then
-    echo "[profile-check][error] chromie-tts image lacks an automatic-profile build label." >&2
-    echo "[profile-check][hint] Rebuild with: BUILD=1 ./scripts/start_services.sh" >&2
-    failures=$((failures + 1))
-  fi
+tts_container_id="$(docker compose "${compose_args[@]}" ps -q "$tts_service")"
+tts_image_id="$(docker inspect "$tts_container_id" --format '{{.Image}}')"
+built_cuda_arch="$(docker image inspect "$tts_image_id" --format '{{index .Config.Labels "org.chromie.tts-cuda-arch"}}')"
+built_profile="$(docker image inspect "$tts_image_id" --format '{{index .Config.Labels "org.chromie.hardware-profile"}}')"
+if [ "$built_cuda_arch" != "${TTS_CUDA_ARCH:-}" ]; then
+  echo "[profile-check][error] $tts_service image CUDA arch '$built_cuda_arch' does not match detected profile arch '${TTS_CUDA_ARCH:-}'." >&2
+  echo "[profile-check][hint] Rebuild with: BUILD=1 ./scripts/start_services.sh" >&2
+  failures=$((failures + 1))
+fi
+if [ -z "$built_profile" ] || [ "$built_profile" = "unknown" ]; then
+  echo "[profile-check][error] $tts_service image lacks an automatic-profile build label." >&2
+  echo "[profile-check][hint] Rebuild with: BUILD=1 ./scripts/start_services.sh" >&2
+  failures=$((failures + 1))
 fi
 
 if [ "$failures" -ne 0 ]; then
@@ -131,10 +151,6 @@ fi
 
 echo "[profile-check] Auto-detected profile: ${CHROMIE_ACTIVE_PROFILE}"
 echo "[profile-check] Runtime fingerprint: ${CHROMIE_RUNTIME_ENV_FINGERPRINT}"
-if [ "$tts_service" = "chromie-tts" ]; then
-  echo "[profile-check] TTS image: built_profile=${built_profile} cuda_arch=${built_cuda_arch}"
-else
-  echo "[profile-check] TTS service: ${tts_service} (temporary evaluation provider)"
-fi
+echo "[profile-check] TTS: backend=${tts_backend} service=${tts_service} provider=${tts_provider} built_profile=${built_profile} cuda_arch=${built_cuda_arch}"
 echo "[profile-check] Active Ollama models: $(./scripts/list_runtime_ollama_models.sh | paste -sd, -)"
 echo "[profile-check] All container environments match .env.runtime."

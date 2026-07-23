@@ -1,57 +1,101 @@
 # Chromie TTS Service
 
-`chromie-tts` is Chromie's framework-neutral speech-synthesis service. It runs
-inside Docker and listens on WebSocket port `5000` by default. The service uses
-the contract in `provider.py`; the maintained image currently registers the
-release-locked OuteTTS adapter in `oute_provider.py`. The host Orchestrator owns
-playback, resampling to the selected output device, interruption, and barge-in.
+`chromie-tts` is Chromie's framework-neutral speech-synthesis endpoint on
+WebSocket port `5000`. The maintained default implementation is
+**Fun-CosyVoice3 0.5B**. The host Orchestrator continues to own response
+chunking, output-device playback, resampling, ordering, barge-in, stale-session
+suppression, and user-visible interruption semantics.
 
-An unknown `TTS_PROVIDER` value fails closed at startup. Qwen3-TTS and
-CosyVoice now implement the same lifecycle, capability, stream, cancellation,
-speaker, health, and metric contract in isolated evaluation-profile images;
-they are not registered in the maintained image or selected as the default.
-Any additional adapter must use the same boundary, which does not move
-audio-device or interruption policy out of the host.
+The provider boundary is defined in `provider.py`. An unknown or mismatched
+`TTS_PROVIDER` fails closed at startup. OuteTTS and Qwen3-TTS implement the same
+wire contract as explicit alternative backends:
 
-## Concurrency model
+| Backend | Service | Host port | Role |
+|---|---|---:|---|
+| CosyVoice3 | `chromie-tts` | 5000 | Maintained default |
+| OuteTTS | `chromie-tts-oute` | 5001 | Low-resource GGUF fallback and diagnostic reference generator |
+| Qwen3-TTS | `chromie-tts-qwen3` | 5002 | Alternative cloned-voice backend |
 
-The current OuteTTS/llama.cpp adapter owns mutable model and CUDA state in a dedicated
-child process. `TTS_WORKER_COUNT` controls how many independent model workers
-are started; the common/default configuration uses one worker, while the RTX
-5090 profile can use two. `TTS_MAX_CONCURRENT_SYNTHESIS` limits admitted
-synthesis work and should not exceed the configured worker count unless queueing
-inside the service is intentional.
+The alternatives are enabled through the `tts-evaluation` Compose profile or
+selected by `./scripts/start_chromie.sh --tts-backend ...`.
 
-For latency, the host Orchestrator can split one logical reply into multiple
-ordered synthesis requests. That allows the first chunk to play while later
-chunks wait for or use the model worker. Audible playback remains serialized by
-the Orchestrator.
+## Default voice reference
 
-Cancelling an active synthesis (normally because the Orchestrator closes the
-WebSocket during barge-in) terminates and restarts the child process. This is
-deliberate: cancelling only the asyncio waiter cannot stop native llama.cpp
-generation. The restart prevents stale speech work from occupying the sole
-model slot, although the next request must wait for the model worker to reload.
+CosyVoice3 requires an operator-authorized reference WAV, its exact transcript,
+and a nonempty license/authorization identity. Install it before the first
+startup:
+
+```bash
+python scripts/tts_reference.py install \
+  --source-wav /path/to/chromie-reference.wav \
+  --transcript '这里填写录音中逐字一致的文本。' \
+  --license-id 'user-owned-recording'
+```
+
+This creates ignored local files under:
+
+```text
+.chromie/private/tts-voice/reference.wav
+.chromie/private/tts-voice/reference.json
+```
+
+Validate them independently with:
+
+```bash
+python scripts/tts_reference.py validate
+```
+
+The metadata binds the complete WAV with SHA-256. Startup fails closed when the
+WAV, transcript, authorization identity, or digest is missing or inconsistent.
+Private voice material is never committed to Git.
+
+## Concurrency and interruption
+
+CosyVoice currently uses one resident model worker. The supported host
+concurrency is therefore `ORCH_TTS_CONCURRENCY=1`; increasing host concurrency
+would only add hidden queueing. CosyVoice emits native streamed audio chunks,
+but its upstream inference call remains synchronous inside the worker.
+
+When a request is cancelled, Chromie first holds the singleton worker lock for
+a bounded drain. A nearly complete result is discarded without unloading the
+model. If the worker does not finish within the drain bound, it is restarted
+fail-closed before another request begins. This prevents stale audio, although
+a hard cancellation can still pay a model cold-reload cost.
+
+OuteTTS owns mutable llama.cpp/DAC state in restartable worker processes and may
+use more than one worker on a high-memory diagnostic profile. Qwen3-TTS returns
+a completed native waveform through the same transport contract and declares
+its streaming capability accurately.
 
 ## WebSocket protocol
 
-Connect to `ws://<host>:5000` and send JSON text frames.
+Connect to `ws://<host>:5000` for the default provider.
 
 ### Health
 
 Request:
 
 ```json
-{"type": "ping"}
+{"type": "health"}
 ```
 
 Response:
 
 ```json
-{"type": "pong", "service": "tts"}
+{
+  "type": "pong",
+  "service": "tts",
+  "provider_contract_version": 1,
+  "provider": {"provider_id": "fun-cosyvoice3-0.5b"},
+  "provider_health": {},
+  "sample_rate": 24000,
+  "speakers": ["default"]
+}
 ```
 
-`{"type":"health"}` is also accepted.
+`{"type":"ping"}` is equivalent. Health includes immutable provider/model
+identity, declared capabilities, worker readiness, cancellation counters, and
+backend-specific metadata.
 
 ### List speakers
 
@@ -59,26 +103,9 @@ Response:
 {"type": "list_speakers"}
 ```
 
-The response reports available speaker-profile identifiers.
-
-### Create a speaker profile
-
-```json
-{
-  "type": "create_speaker",
-  "speaker_id": "demo",
-  "wav_path": "/app/speakers/demo.wav",
-  "transcript": "The exact words spoken in demo.wav.",
-  "make_default": false
-}
-```
-
-The WAV path must resolve inside the configured speaker directory. An exact
-transcript is required either in the request or in a UTF-8 `.txt` file beside
-the WAV with the same stem. OuteTTS v3 still requires word-level alignment, so
-Chromie runs its content-addressed Whisper large-v3-turbo model on CPU by
-default and rejects an alignment whose normalized transcript differs too much
-from the supplied text. Local files under `tts/speakers/` are ignored by Git.
+CosyVoice and Qwen expose the installed cloned reference as `default`. The
+reference itself is managed by `scripts/tts_reference.py`, not by a network
+speaker-creation operation.
 
 ### Stream synthesis
 
@@ -87,171 +114,78 @@ Request:
 ```json
 {
   "type": "synthesize_stream",
-  "text": "Hello from Chromie.",
-  "speaker_id": "default"
+  "request_id": "turn-123-speech-1",
+  "text": "你好，我是 Chromie。",
+  "speaker_id": "default",
+  "language_hint": "zh"
 }
 ```
 
 Response sequence:
 
-1. JSON `start` metadata including the source sample rate and provider
-   declaration;
-2. one or more binary raw PCM chunks;
-3. JSON `end` metadata including the provider declaration and comparable timing,
-   or JSON `error` on failure.
+1. JSON `start` metadata with sample rate, PCM format, channels, and provider declaration;
+2. one or more binary mono `pcm_s16le` chunks;
+3. JSON `end` metadata with comparable timing and provider metadata, or JSON `error`.
 
-The Orchestrator may resample the service's source rate to the selected speaker
-output rate.
+The Orchestrator may split one logical response into ordered synthesis requests
+and may resample the provider rate for the selected playback device.
 
-## Important length settings
+### Oute-only speaker creation
 
-`TTS_MAX_LENGTH` is a model generation-token budget, not a text character
-limit. Setting it very low can produce no audio codec tokens. Use
-`TTS_MAX_TEXT_CHARS` to bound spoken text.
-
-The service clamps the effective generation length between a safe minimum and
-`TTS_CONTEXT_SIZE` and logs adjustments.
+The optional Oute fallback service retains `create_speaker` on port `5001` for
+its private v3 speaker profiles. That operation is not part of the default
+CosyVoice endpoint. Use `./scripts/create_speaker_in_container.sh` only when
+explicitly operating the Oute fallback.
 
 ## Configuration
 
-Common settings:
+Maintained defaults:
 
 ```env
-TTS_HOST=0.0.0.0
-TTS_PORT=5000
-TTS_PROVIDER=oute
-TTS_MODEL_SIZE=0.6B
-TTS_TOKENIZER_REPO=OuteAI/OuteTTS-1.0-0.6B
-TTS_TOKENIZER_REVISION=<immutable-hugging-face-commit>
-TTS_GGUF_REPO=OuteAI/OuteTTS-1.0-0.6B-GGUF
-TTS_GGUF_REVISION=<immutable-hugging-face-commit>
-TTS_QUANTIZATION=FP16
-TTS_SAMPLE_RATE=44100
-TTS_CHUNK_MS=120
-TTS_N_GPU_LAYERS=-1
-# Generic values; RTX 4090/4090 Laptop use 4096 and RTX 5090 uses 8192.
-TTS_CONTEXT_SIZE=2048
-TTS_MAX_LENGTH=2048
-TTS_MAX_TEXT_CHARS=220
-TTS_MIN_TEXT_CHARS=1
-TTS_MAX_CONCURRENT_SYNTHESIS=1
-TTS_WORKER_COUNT=1
-TTS_GENERATION_RETRIES=1
-TTS_RESET_LLAMA_STATE=0
-TTS_AUDIO_CODEC_DEVICE=auto
-TTS_DETAILED_TIMING=1
-TTS_METRICS_WINDOW=20
-GGML_CUDA_DISABLE_GRAPHS=0
-TTS_WORKER_STARTUP_TIMEOUT_SEC=600
-TTS_SPEAKER_ID=default
-TTS_SPEAKER_ALIGNMENT_DEVICE=cpu
-TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY=0.75
+CHROMIE_TTS_BACKEND=cosyvoice3
+TTS_PROVIDER=fun-cosyvoice3-0.5b
+TTS_REFERENCE_DIR=.chromie/private/tts-voice
+COSYVOICE3_MODEL_ID=FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+ORCH_TTS_CONCURRENCY=1
+TTS_COSYVOICE_COMPACT_COGNITION=1
+TTS_COSYVOICE_OLLAMA_MODEL=qwen3:4b
 ```
 
-Speaker creation validates both transcript alignment and acoustic conditioning.
-OuteTTS v3 profiles must contain matched DAC codebooks with enough code duration
-to cover the reference recording. Malformed profiles are never selected; when
-the matching WAV and exact transcript sidecar remain available, the service
-rebuilds them through the validated path. OuteTTS 0.4.4 mutates speaker prompt
-data internally, so Chromie supplies an isolated copy per request and reloads a
-newly accepted profile in every worker.
+The compact cognition setting keeps one Ollama model resident while CosyVoice
+shares the GPU. It is a resource policy, not a change to semantic authority or
+safety contracts.
 
-The service downloads those exact snapshots and replaces OuteTTS auto-config
-paths with local immutable tokenizer and GGUF paths. The maintained lock is
-[`../release/model-lock.json`](../release/model-lock.json); enabling another
-model size requires updating code, tests, the lock, and these operational docs.
-
-The full settings list is in
-[`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md).
-
-## Performance diagnostics
-
-OuteTTS uses `ModelConfig.device` for the DAC codec while llama.cpp layer
-offload is controlled separately by `TTS_N_GPU_LAYERS`. `auto` resolves the
-codec to CUDA when Torch can see a GPU. The worker startup payload and health
-response expose the requested, configured, reported, model, parameter, and
-effective codec devices so configuration cannot silently disagree with runtime.
-
-Each successful `end` response includes:
-
-- model-generation time;
-- DAC-decode time;
-- remaining pipeline overhead;
-- PCM conversion time;
-- worker round-trip and queue time;
-- audio duration and generation/audio real-time factor.
-
-Run a repeatable no-playback benchmark with:
+Select an alternative explicitly:
 
 ```bash
-python scripts/benchmark_tts.py --repeat 2 --warmup 1 \
-  --output .chromie/evidence/tts-benchmark.json
+./scripts/start_chromie.sh --tts-backend oute
+./scripts/start_chromie.sh --tts-backend qwen3
 ```
 
-Or include it in GPU verification:
+Normal startup uses CosyVoice:
 
 ```bash
-RUN_TTS_BENCHMARK=1 ./scripts/verify_tts_gpu.sh
+./scripts/start_chromie.sh
 ```
 
-This benchmark measures throughput and time to the first binary PCM frame. The
-current service still returns the first binary frame only after one complete
-TTS request has generated and decoded; host sentence/clause chunking is what
-allows later chunks to overlap earlier playback. The benchmark does not prove
-microphone, speaker, pronunciation, or voice-quality acceptance.
+## Verification and comparison
 
-For framework comparison, validate and run the shared Mandarin, English,
-mixed-language, interruption, long-dialogue, and concurrency matrix:
+Verify the selected backend and GPU path:
 
 ```bash
-python scripts/tts_provider_ab.py --check
-python scripts/tts_provider_ab.py \
-  --provider oute=ws://127.0.0.1:5000 \
-  --provider candidate=ws://127.0.0.1:5001 \
-  --output-dir .chromie/evidence/tts-provider-ab/<run-id>
+./scripts/verify_tts_gpu.sh
 ```
 
-The runner retains WAVs and objective metrics, then creates a required listening
-review template. It does not select a winner from advertised or measured
-latency alone. See
-[`../docs/TTS_PROVIDER_EVALUATION.md`](../docs/TTS_PROVIDER_EVALUATION.md).
-
-To compare an existing authorized voice reference rather than generate one
-from OuteTTS, provide `reference.wav` and `reference.json` with matching
-`audio_sha256`, exact `text`, and nonempty `license_id`, then run:
+Run the common CosyVoice/Qwen comparison matrix:
 
 ```bash
 TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
 TTS_AB_SKIP_REFERENCE_GENERATION=1 \
-TTS_AB_RUN_ID=<run-id> \
 ./scripts/run_tts_candidate_ab.sh
 ```
 
-Keep private reference audio and generated auditions under ignored local
-paths. Successful synthesis is not approval of the voice for production.
-
-## Speaker setup and verification
-
-Repository helpers:
-
-```bash
-./scripts/record_voice.sh
-./scripts/create_speaker_in_container.sh
-./scripts/verify_tts_gpu.sh
-```
-
-After the multilingual, interruption, long-dialogue, and concurrency gate
-passes, select the installation-local profile in `.env.local`, for example:
-
-```env
-TTS_SPEAKER_ID=chromie_mixed
-```
-
-Start the service set with:
-
-```bash
-./scripts/start_services.sh
-```
-
-See [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md) before treating successful
-container startup as end-to-end microphone or playback acceptance.
+The runner retains WAVs, objective timing/stability results, and a listening
+review template. Objective completion and ASR round-trip checks do not replace
+human evaluation of Mandarin pronunciation, tones, prosody, speaker similarity,
+or audible artifacts. See
+[`../docs/TTS_PROVIDER_EVALUATION.md`](../docs/TTS_PROVIDER_EVALUATION.md).

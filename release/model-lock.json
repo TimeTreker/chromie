@@ -14,21 +14,57 @@
       "gemma4:e2b",
       "gemma4:26b"
     ],
-    "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json at release time",
+    "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json when provenance is collected",
     "router_models": [
       "qwen3:4b"
     ]
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "tts": {
-    "gguf": {
-      "repository": "OuteAI/OuteTTS-1.0-0.6B-GGUF",
-      "revision": "d85d0f1e5242c3fb04c95f55bd99ec3ebd4c2d16"
+    "default": {
+      "provider_id": "fun-cosyvoice3-0.5b",
+      "runtime": {
+        "license": "Apache-2.0",
+        "repository": "https://github.com/FunAudioLLM/CosyVoice",
+        "revision": "074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc"
+      },
+      "model": {
+        "license": "Apache-2.0",
+        "repository": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512",
+        "revision": "29e01c4e8d000f4bcd70751be16fa94bf3d85a18"
+      },
+      "voice_reference": {
+        "path": ".chromie/private/tts-voice",
+        "required": true,
+        "revision_source": "reference.json audio_sha256"
+      }
     },
-    "model_size": "0.6B",
-    "tokenizer": {
-      "repository": "OuteAI/OuteTTS-1.0-0.6B",
-      "revision": "e7bcd87b0ca47fd8c46317c8f745a5e4e19c7b5c"
+    "alternatives": {
+      "oute": {
+        "provider_id": "oute",
+        "model_size": "0.6B",
+        "tokenizer": {
+          "repository": "OuteAI/OuteTTS-1.0-0.6B",
+          "revision": "e7bcd87b0ca47fd8c46317c8f745a5e4e19c7b5c"
+        },
+        "gguf": {
+          "repository": "OuteAI/OuteTTS-1.0-0.6B-GGUF",
+          "revision": "d85d0f1e5242c3fb04c95f55bd99ec3ebd4c2d16"
+        }
+      },
+      "qwen3_tts": {
+        "provider_id": "qwen3-tts-0.6b-base",
+        "runtime": {
+          "license": "Apache-2.0",
+          "repository": "https://github.com/QwenLM/Qwen3-TTS",
+          "revision": "022e286b98fbec7e1e916cb940cdf532cd9f488e"
+        },
+        "model": {
+          "license": "Apache-2.0",
+          "repository": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+          "revision": "5d83992436eae1d760afd27aff78a71d676296fc"
+        }
+      }
     }
   }
 }

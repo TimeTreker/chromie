@@ -186,9 +186,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_TTS_CJK_CHUNK_CHARS"], "36")
         self.assertEqual(values["ORCH_TTS_CJK_MIN_CHUNK_CHARS"], "8")
 
-    def test_tts_performance_diagnostics_and_cuda_graphs_are_enabled(self) -> None:
+    def test_default_tts_is_cosyvoice_with_oute_diagnostics_retained_for_fallback(self) -> None:
         values = _common_env()
-        self.assertEqual(values["TTS_PROVIDER"], "oute")
+        self.assertEqual(values["CHROMIE_TTS_BACKEND"], "cosyvoice3")
+        self.assertEqual(values["TTS_PROVIDER"], "fun-cosyvoice3-0.5b")
+        self.assertEqual(values["TTS_REFERENCE_DIR"], ".chromie/private/tts-voice")
+        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
+        self.assertEqual(values["ORCH_TTS_CONCURRENCY"], "1")
+        # Oute remains an explicit fallback, so its diagnostic controls stay valid.
         self.assertEqual(values["TTS_AUDIO_CODEC_DEVICE"], "auto")
         self.assertEqual(values["TTS_DETAILED_TIMING"], "1")
         self.assertEqual(values["TTS_METRICS_WINDOW"], "20")
@@ -301,23 +306,27 @@ class RuntimeConfigurationTests(unittest.TestCase):
             )
             self.assertEqual(idle.returncode, 0, idle.stderr)
 
-    def test_start_chromie_has_non_persistent_cosyvoice_trial(self) -> None:
+    def test_start_chromie_uses_cosyvoice_by_default_with_explicit_fallbacks(self) -> None:
         launcher = (ROOT / "scripts" / "start_chromie.sh").read_text(
             encoding="utf-8"
         )
         services = (ROOT / "scripts" / "start_services.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn("--tts-trial cosyvoice", launcher)
-        self.assertIn("TTS_URL=ws://127.0.0.1:5001", launcher)
+        orchestrator = (ROOT / "scripts" / "start_orchestrator.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("--tts-backend NAME", launcher)
+        self.assertIn('TTS_BACKEND="${CHROMIE_TTS_BACKEND:-cosyvoice3}"', launcher)
+        self.assertIn("from scripts.tts_reference import validate_reference_dir", launcher)
+        self.assertIn("TTS_URL=ws://127.0.0.1:5000", launcher)
         self.assertIn("TTS_SPEAKER_ID=default", launcher)
         self.assertIn("ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=cosyvoice3-", launcher)
         self.assertIn("ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0", launcher)
         self.assertIn('echo "ORCH_TTS_CONCURRENCY=1"', launcher)
-        self.assertIn("TTS_COSYVOICE_TRIAL_OLLAMA_MODEL:-qwen3:4b", launcher)
+        self.assertIn("TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b", launcher)
         self.assertIn("EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1", launcher)
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", launcher)
-        self.assertIn("The configured default TTS provider is unchanged", launcher)
         self.assertIn("Chromie services are ready", launcher)
         self.assertNotIn("Chromie voice interaction is ready", launcher)
         self.assertIn("python_ws_health_check()", launcher)
@@ -331,14 +340,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertNotIn('wait_for_tcp 127.0.0.1 9001 900 "ASR"', launcher)
         self.assertIn("warm_tts_candidate", launcher)
-        self.assertIn("TTS_COSYVOICE_TRIAL_WARMUP_TEXT", launcher)
+        self.assertIn("TTS_COSYVOICE_WARMUP_TEXT", launcher)
         self.assertIn("fun-cosyvoice3-0.5b", launcher)
-        self.assertIn("TTS_SERVICE=chromie-tts-cosyvoice", services)
+        self.assertIn("TTS_SERVICE=chromie-tts", services)
+        self.assertIn("TTS_SERVICE=chromie-tts-oute", services)
+        self.assertIn("TTS_SERVICE=chromie-tts-qwen3", services)
         self.assertIn("--profile tts-evaluation", services)
-        self.assertEqual(
-            _common_env()["TTS_COSYVOICE_TRIAL_OLLAMA_MODEL"],
-            "qwen3:4b",
-        )
+        self.assertIn('TTS_URL="${TTS_URL:-ws://127.0.0.1:5000}"', orchestrator)
+        self.assertEqual(_common_env()["TTS_COSYVOICE_OLLAMA_MODEL"], "qwen3:4b")
         self.assertEqual(_common_env()["ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS"], "2")
 
         verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(

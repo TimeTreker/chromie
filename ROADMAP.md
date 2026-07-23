@@ -94,48 +94,39 @@ Exit criteria before widening voice-device or profile support:
 - retained evidence uses the four-axis status vocabulary and does not turn a
   benchmark into release readiness.
 
-## Open evidence track - Framework-neutral TTS selection
+## Active engineering track - CosyVoice quality and interruption resilience
 
-Chromie now has a versioned stream-oriented `TTSProvider` contract, an adapter
-for the maintained OuteTTS deployment, isolated locked Fun-CosyVoice3 and
-Qwen3-TTS candidate services, and one common Mandarin, English, mixed-language,
-interruption, long-dialogue, and concurrency comparison matrix. This removes
-the architectural assumption that one framework must remain the permanent
-backend without changing the maintained default.
+Chromie's framework-neutral TTS contract remains intact, but the maintained
+default is now Fun-CosyVoice3 0.5B. OuteTTS is an explicit low-resource fallback
+and Qwen3-TTS remains the principal comparison backend. The default change was
+made because repeated Oute Chinese diagnostics remained unnatural and one live
+case leaked enrollment text, while CosyVoice led ordinary first-audio and RTF in
+two equivalent isolated comparisons.
 
-Two dirty-tree isolated deployment runs passed all six objective cases for both
-candidates. The latest used the authorized AI-generated Chromie voice
-candidate. Both runs found that CosyVoice3 led ordinary first-audio/RTF while
-Qwen3-TTS recovered faster after worker termination. OuteTTS accepted the
-transcript-validated English, Chinese, and mixed profiles, but rebuilt default
-checks reproduced stochastic token exhaustion for mixed and Chinese-aligned
-profiles; doubling the RTX 5090 diagnostic budget did not fix it. The built-in
-speaker therefore remains the Oute default. The next work is blinded listening,
-approved interruption thresholds, clean source-bound repeated measurements,
-Oute cloned-speaker termination stability, and shared-resource qualification,
-not an early winner declaration.
-Qwen3-TTS and Fun-CosyVoice3 are the first online-service candidates; OuteTTS remains the
-low-resource baseline, and character-voice production tools such as GPT-SoVITS
-may be evaluated separately. Candidate names do not bypass license, immutable
-model, runtime, resource, or support review.
+Current work is not another provider-selection exercise. It is to make the
+selected default operationally strong:
 
-Exit criteria before changing the maintained TTS provider:
+- retain a Mandarin-focused blinded listening set for tones, polyphonic words,
+  numbers, units, names, technical terms, code switching, and dialogue;
+- reduce the hard-cancellation cold-reload tail without allowing stale audio;
+- measure p50/p95 latency, RTF, GPU memory, queueing, and recovery while the
+  maintained ASR and cognitive services share the host;
+- keep the authorized reference, runtime, weights, cache identity, and evidence
+  bound to exact digests;
+- preserve explicit `--tts-backend oute` and `--tts-backend qwen3` rollback
+  paths through the same contract.
 
-- at least two isolated, contract-compatible provider endpoints pass the same
-  committed matrix with immutable source and model revisions;
-- interruption stops or isolates native work and a fresh request recovers
-  within an approved bound without stale audio;
-- Chinese, English, code switching, long dialogue, and declared concurrency
-  pass on the target host while ASR, Router, Agent, and Ollama share resources;
-- cold/warm first-audio, p50/p95 total latency, RTF, GPU/host memory,
-  utilization, power, queueing, and failure causes are retained;
-- blinded listening review accepts intelligibility, naturalness, prosody,
-  pronunciation, code switching, speaker consistency, and audible artifacts;
-- software, weight, voice, output, and commercial-use license obligations are
-  reviewed for the intended deployment;
-- the selected provider has configuration, model locks, rollback, support,
-  target evidence, and release compatibility updates in the same candidate;
-- `python scripts/check_docs.py` and `./scripts/run_tests.sh` pass.
+Completion criteria:
+
+- default startup validates the local reference and reports the exact CosyVoice
+  provider/model identity;
+- application health and no-playback warm synthesis pass before microphone
+  startup;
+- cancellation never emits stale audio, and recovery meets an accepted bound;
+- Mandarin listening and term-correctness results are retained with source and
+  hardware context;
+- the full automated suite, provider matrix checks, documentation validation,
+  and fallback-path tests pass.
 
 See [TTS Provider Contract and Evaluation](docs/TTS_PROVIDER_EVALUATION.md).
 

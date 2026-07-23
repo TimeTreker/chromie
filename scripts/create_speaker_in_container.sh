@@ -17,15 +17,16 @@ if [[ "${3:-}" == "--make-default" ]] || [[ "${3:-}" == "1" ]] || [[ "${3:-}" ==
   MAKE_DEFAULT="1"
 fi
 
-# Ask the running chromie-tts websocket server to create the speaker profile.
+# This helper is specific to the optional OuteTTS fallback. CosyVoice uses
+# scripts/tts_reference.py to install its authorized reference voice.
 # This uses the exact-transcript validation and pinned Whisper alignment path
 # built into tts/server.py. The runtime image supplies FFmpeg for decoding.
-docker compose --env-file .env.runtime exec -T \
+docker compose --env-file .env.runtime -f docker-compose.yml --profile tts-evaluation exec -T \
   -e WAV_PATH="$WAV_PATH" \
   -e SPEAKER_ID="$SPEAKER_ID" \
   -e MAKE_DEFAULT="$MAKE_DEFAULT" \
   -e TRANSCRIPT_PATH="$TRANSCRIPT_PATH" \
-  chromie-tts python - <<'PY'
+  chromie-tts-oute python - <<'PY'
 import asyncio
 import json
 import os

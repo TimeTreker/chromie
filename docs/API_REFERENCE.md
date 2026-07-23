@@ -346,60 +346,55 @@ executor, so health/ping handling remains responsive while a transcription is
 active. The current supported backend and mode are `sherpa_onnx` and `final`. The pong reports `backend`, `mode`, `model`, `model_revision`, and
 `max_concurrent_transcriptions`.
 
-## TTS WebSocket protocol — port 5000
+## TTS WebSocket protocol — default port 5000
 
-Supported JSON text messages:
+The maintained endpoint on port `5000` is Fun-CosyVoice3 0.5B. Explicit
+alternatives use port `5001` for OuteTTS and port `5002` for Qwen3-TTS. All
+three expose the same provider contract for health and synthesis.
+
+Supported default-provider JSON messages:
 
 | Request type | Result |
 |---|---|
-| `health` or `ping` | `pong` with TTSProvider contract/declaration, registered adapters, sample rate, backend health, generation profile, recent performance summary, worker state, available speakers, and content-addressed `speaker_revisions` when the provider has local profiles. |
-| `list_speakers` | `speakers` with speaker IDs. |
-| `create_speaker` | `speaker_created` or `error`; the WAV path must remain inside `SPEAKER_DIR` and the request must include its exact `transcript` (or a UTF-8 sidecar with the same stem must exist). Success includes `profile_stats` for aligned words, conditioned words, DAC-code count/duration, and reference coverage; transcript agreement without valid acoustic coverage is rejected. Every generation worker reloads the accepted profile before success is returned. |
+| `health` or `ping` | `pong` with provider contract/declaration, immutable model identity, sample rate, worker readiness, cancellation counters, and `speakers=["default"]`. |
+| `list_speakers` | `speakers` with the installed cloned-reference identity. |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
-A synthesis request includes `text`, optional `speaker_id`, and optional
-`request_id`. The `start` message declares `sample_rate`, `format=pcm_s16le`,
-`channels=1`, and a versioned `provider` object. The terminal `end` repeats the
-provider declaration and includes audio duration plus comparable timing and
-provider metadata. The current Oute adapter retains its codec device,
-quantization, context, token-budget, model-generation, DAC-decode, PCM,
-worker-round-trip, queue, total-time, and real-time-factor fields for backward
-compatibility. Older clients may ignore these additive fields.
+A synthesis request includes `text`, optional `speaker_id`, optional
+`language_hint`, and optional `request_id`. The `start` message declares
+`sample_rate`, `format=pcm_s16le`, `channels=1`, and a versioned `provider`
+object. The terminal `end` repeats the provider declaration and includes audio
+duration, comparable timing, and provider metadata.
 
-The `provider` object includes `contract_version`, `provider_id`,
-`implementation`, `software_source`, `software_revision`,
-`software_license_id`, `license_review_status`, immutable
-`model_artifacts` with per-artifact license IDs, declared languages and sample
-rates, maximum concurrency, native text/audio streaming, request cancellation,
-speaker profiles, and voice-cloning support. Software and model licensing are
-separate declarations; neither field is legal approval. These are capability
-declarations, not target-quality evidence. `provider_health` carries
-backend-specific readiness without forcing Oute worker fields onto future adapters.
+The provider object includes contract version, provider ID, implementation,
+software/model provenance and declared licenses, languages, rates, maximum
+concurrency, native streaming, cancellation, speaker-profile, and voice-cloning
+capabilities. These are capability declarations, not quality or legal approval.
 
-OuteTTS 1.0's v3 speaker format requires word timestamps. Chromie uses the
-content-addressed Whisper large-v3-turbo model on the configured alignment
-device, compares its normalized transcript with the mandatory supplied text,
-and rejects the profile below the configured similarity bound. The success
-response includes `transcript_sha256`, alignment identity/device, and
-similarity without echoing either transcript.
+The default CosyVoice provider consumes a host-installed authorized reference:
 
-The selected backend implements [`TTSProvider`](TTS_PROVIDER_EVALUATION.md).
-Each current OuteTTS/llama.cpp model worker runs in a restartable child process. The
-common/default configuration uses one worker; high-memory GPU profiles may start
-more than one worker for bounded parallel synthesis. If an active synthesis is
-cancelled because its client disconnects, the owning child is terminated and
-re-created. Health responses report worker count, per-worker liveness, restart
-count, and cancellation mode.
+```bash
+python scripts/tts_reference.py install \
+  --source-wav /path/to/reference.wav \
+  --transcript '录音中的逐字文本' \
+  --license-id 'user-owned-recording'
+```
+
+It does not expose network `create_speaker`. The optional Oute fallback retains
+that legacy operation on port `5001` for Oute v3 profiles; its success response
+includes transcript-alignment and DAC acoustic-coverage diagnostics.
+
+CosyVoice emits native streamed audio but currently accepts one complete text
+request rather than incremental model tokens. Cancellation first attempts a
+bounded drain while holding the singleton worker lock; if synchronous inference
+does not finish, Chromie restarts the worker before accepting another request.
+Health reports drain/restart evidence.
 
 The host Orchestrator may split one logical speech response into multiple
-ordered `synthesize_stream` requests. This lowers time-to-first-audio and lets
-later chunks generate while earlier chunks are played, while preserving audible
-order at the playback layer.
-
-Startup-primed acknowledgement WAVs are not trusted solely because synthesis
-completed. Their cache identity includes provider/model and speaker revision,
-and the default content gate rejects overlong audio or an ASR transcript that
-does not sufficiently match the intended cue.
+ordered requests, resample provider output, serialize playback, and invalidate
+late chunks after interruption. Startup-cached acknowledgements are bound to
+provider/model/reference identity and pass duration plus ASR content gates
+before playback.
 
 ## Soridormi contract snapshot
 

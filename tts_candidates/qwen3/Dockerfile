@@ -3,6 +3,11 @@ FROM ${CUDA_IMAGE}
 
 ARG QWEN3_TTS_SOURCE_REVISION=022e286b98fbec7e1e916cb940cdf532cd9f488e
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
+ARG TTS_CUDA_ARCH=89
+ARG CHROMIE_BUILD_PROFILE=unknown
+
+LABEL org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}" \
+      org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \

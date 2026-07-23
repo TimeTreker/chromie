@@ -39,8 +39,10 @@ style and auxiliary body expression under one Social Attention purpose;
 candidate actions are discovered from catalog behavior-domain metadata rather
 than a fixed gesture list. Explicit user-requested actions remain primary goals.
 
-The current branch also implements the framework-neutral TTS provider boundary.
-The maintained OuteTTS worker path now implements `TTSProvider` contract version
+The maintained TTS default is now Fun-CosyVoice3 0.5B through the framework-neutral provider boundary. Startup requires an authorized SHA-bound local reference, uses port 5000, one host request for the singleton worker, application-level health, and a no-playback warm synthesis. OuteTTS and Qwen3-TTS remain explicit `--tts-backend` alternatives. The repeated isolated measurements favor CosyVoice for ordinary latency/RTF and Qwen for hard-cancel recovery; Mandarin listening quality and shared-load recovery remain active evidence work.
+
+Historical provider investigation follows. The current branch also implements the framework-neutral TTS provider boundary.
+The historical OuteTTS worker path implemented `TTSProvider` contract version
 1, provider/model provenance and native-streaming truth are exposed through
 health/start/end metadata, and unknown adapters fail closed. The shared A/B
 runner uses one Mandarin, English, mixed-language, interruption/recovery,
@@ -64,11 +66,7 @@ profiles are copied before Oute mutates prompt data, and every worker reloads a
 new profile. Regenerated `chromie_mixed` contains 776 code pairs across all 28
 words. At the corrected RTX 5090 8192-token setting it passed a 10/10 smoke and
 two repeated complete 6/6 multilingual/interruption/dialogue/concurrency runs.
-The installation-local `.env.local` now selects `TTS_SPEAKER_ID=chromie_mixed`;
-the private profile and recordings remain ignored, so a clean installation
-without them still uses Oute's built-in speaker. Listening quality, clean
-source-bound evidence, candidate-provider selection, and shared-resource target
-qualification remain open.
+The installation-local Oute experiment selected `TTS_SPEAKER_ID=chromie_mixed`; that private profile remains ignored and is now used only when the Oute fallback is selected. Mandarin listening quality and shared-resource recovery remain open for the maintained CosyVoice path.
 
 A subsequent live-output diagnosis found that OuteTTS leaked the bilingual
 enrollment sentence into short Chinese `chromie_mixed` acknowledgements and
@@ -76,8 +74,7 @@ spoke the remaining Chinese unnaturally. The old transport/stability matrix did
 not validate requested-text content. Fast-first cache v2 now includes
 provider/model/speaker revision identity, a four-second cue limit, and an ASR
 round-trip similarity gate before disk or memory admission. A one-session
-`--tts-trial cosyvoice` launcher path uses the authorized local reference on
-port 5001 without changing the maintained default; its human listening verdict
+historical CosyVoice trial path used the authorized local reference on port 5001 before the default switch; its human listening verdict
 and provider selection remain open. The trial image now uses the cuDNN
 9-compatible ONNX Runtime 1.18.1 instead of the 1.18.0/cuDNN 8 pairing that
 silently moved normalizer sessions to CPU, persists its WeText cache, and
@@ -86,7 +83,7 @@ passed the live ASR content gate. A separate stochastic bad short sample was
 rejected, so missing cues now receive one bounded regeneration while every
 attempt remains subject to the same fail-closed gate.
 
-The initial full-stack CosyVoice trial nevertheless terminated before opening
+The initial historical full-stack CosyVoice trial nevertheless terminated before opening
 the microphone. Under the normal qwen/gemma brain profile, the shared GPU was
 already at roughly 28 GiB; short-cue timeout cancellation restarted the
 candidate worker, retries repeatedly cold-loaded it, and the outer

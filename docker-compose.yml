@@ -92,18 +92,14 @@ services:
   chromie-tts:
     container_name: chromie-tts
     build:
-      context: ./tts
+      context: .
+      dockerfile: tts_candidates/cosyvoice/Dockerfile
       args:
-        TTS_CUDA_IMAGE: ${TTS_CUDA_IMAGE}
+        CUDA_IMAGE: ${TTS_CANDIDATE_CUDA_IMAGE:-nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04}
+        COSYVOICE3_SOURCE_REVISION: ${COSYVOICE3_SOURCE_REVISION:-074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc}
         TTS_CUDA_ARCH: ${TTS_CUDA_ARCH}
         CHROMIE_BUILD_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
         PYTORCH_INDEX_URL: ${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}
-        HTTP_PROXY: ${HTTP_PROXY:-}
-        HTTPS_PROXY: ${HTTPS_PROXY:-}
-        http_proxy: ${HTTP_PROXY:-}
-        https_proxy: ${HTTPS_PROXY:-}
-        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-        no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
     image: chromie-tts:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
     init: true
     restart: unless-stopped
@@ -123,7 +119,96 @@ services:
       TTS_CUDA_ARCH: ${TTS_CUDA_ARCH:?TTS_CUDA_ARCH must come from the detected profile}
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
-      TTS_PROVIDER: ${TTS_PROVIDER:-oute}
+      TTS_PROVIDER: ${TTS_PROVIDER:-fun-cosyvoice3-0.5b}
+      TTS_REFERENCE_WAV: /voice/reference.wav
+      TTS_REFERENCE_METADATA: /voice/reference.json
+      TTS_WORKER_STARTUP_TIMEOUT_SEC: ${TTS_WORKER_STARTUP_TIMEOUT_SEC:-1200}
+      TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC: ${TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC:-3}
+      COSYVOICE3_SOURCE_REVISION: ${COSYVOICE3_SOURCE_REVISION:-074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc}
+      COSYVOICE3_MODEL_ID: ${COSYVOICE3_MODEL_ID:-FunAudioLLM/Fun-CosyVoice3-0.5B-2512}
+      COSYVOICE3_MODEL_REVISION: ${COSYVOICE3_MODEL_REVISION:-29e01c4e8d000f4bcd70751be16fa94bf3d85a18}
+      COSYVOICE3_FP16: ${COSYVOICE3_FP16:-1}
+      COSYVOICE3_PROMPT_PREFIX: ${COSYVOICE3_PROMPT_PREFIX:-You are a helpful assistant.}
+      HF_HOME: /root/.cache/huggingface
+      HUGGINGFACE_HUB_CACHE: /root/.cache/huggingface
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+      TOKENIZERS_PARALLELISM: "false"
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      http_proxy: ${HTTP_PROXY:-}
+      https_proxy: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./hf_cache:/root/.cache/huggingface
+      - ./hf_cache/modelscope:/root/.cache/modelscope
+      - ${TTS_REFERENCE_DIR:-./.chromie/private/tts-voice}:/voice:ro
+    networks:
+      - chromie-net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          python - <<'PY'
+          import asyncio, json, websockets
+
+          async def main():
+              async with websockets.connect("ws://127.0.0.1:5000", open_timeout=5) as ws:
+                  await ws.send(json.dumps({"type": "health"}))
+                  message = await asyncio.wait_for(ws.recv(), timeout=5)
+                  payload = json.loads(message)
+                  assert payload.get("type") == "pong"
+                  assert payload.get("provider", {}).get("provider_id") == "fun-cosyvoice3-0.5b"
+
+          asyncio.run(main())
+          PY
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 1200s
+
+  chromie-tts-oute:
+    profiles: ["tts-evaluation"]
+    container_name: chromie-tts-oute
+    build:
+      context: ./tts
+      args:
+        TTS_CUDA_IMAGE: ${TTS_CUDA_IMAGE}
+        TTS_CUDA_ARCH: ${TTS_CUDA_ARCH}
+        CHROMIE_BUILD_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
+        PYTORCH_INDEX_URL: ${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        http_proxy: ${HTTP_PROXY:-}
+        https_proxy: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+        no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+    image: chromie-tts-oute:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
+    init: true
+    restart: unless-stopped
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "5001:5000"
+    environment:
+      CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
+      CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TTS_CUDA_ARCH: ${TTS_CUDA_ARCH:?TTS_CUDA_ARCH must come from the detected profile}
+      TTS_HOST: "0.0.0.0"
+      TTS_PORT: "5000"
+      TTS_PROVIDER: oute
       TTS_MODEL_SIZE: ${TTS_MODEL_SIZE}
       TTS_TOKENIZER_REPO: ${TTS_TOKENIZER_REPO}
       TTS_TOKENIZER_REVISION: ${TTS_TOKENIZER_REVISION}
@@ -137,7 +222,6 @@ services:
       TTS_THREADS: ${TTS_THREADS}
       TTS_SAMPLE_RATE: ${TTS_SAMPLE_RATE}
       TTS_CHUNK_MS: ${TTS_CHUNK_MS}
-
       TTS_MAX_CONCURRENT_SYNTHESIS: ${TTS_MAX_CONCURRENT_SYNTHESIS:-1}
       TTS_WORKER_COUNT: ${TTS_WORKER_COUNT:-1}
       TTS_TEMPERATURE: ${TTS_TEMPERATURE:-0.4}
@@ -152,26 +236,23 @@ services:
       TTS_WORKER_STARTUP_TIMEOUT_SEC: ${TTS_WORKER_STARTUP_TIMEOUT_SEC:-600}
       TTS_SPEAKER_ALIGNMENT_DEVICE: ${TTS_SPEAKER_ALIGNMENT_DEVICE:-cpu}
       TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY: ${TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY:-0.75}
-
       PYTORCH_CUDA_ALLOC_CONF: ${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
       GGML_CUDA_DISABLE_GRAPHS: ${GGML_CUDA_DISABLE_GRAPHS:-0}
       TOKENIZERS_PARALLELISM: "false"
-
       SPEAKER_DIR: /app/speakers
       HF_HOME: /root/.cache/huggingface
       HUGGINGFACE_HUB_CACHE: /root/.cache/huggingface
       HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
       TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
       HF_HUB_DISABLE_TELEMETRY: "1"
-
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       http_proxy: ${HTTP_PROXY:-}
       https_proxy: ${HTTPS_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
-      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts,chromie-llm,chromie-router,chromie-agent}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts-oute,chromie-llm,chromie-router,chromie-agent}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal,chromie-asr,chromie-tts-oute,chromie-llm,chromie-router,chromie-agent}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -191,8 +272,10 @@ services:
           async def main():
               async with websockets.connect("ws://127.0.0.1:5000", open_timeout=5) as ws:
                   await ws.send(json.dumps({"type": "health"}))
-                  msg = await asyncio.wait_for(ws.recv(), timeout=5)
-                  assert json.loads(msg).get("type") == "pong"
+                  message = await asyncio.wait_for(ws.recv(), timeout=5)
+                  payload = json.loads(message)
+                  assert payload.get("type") == "pong"
+                  assert payload.get("provider", {}).get("provider_id") == "oute"
 
           asyncio.run(main())
           PY
@@ -200,69 +283,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 180s
-
-  chromie-tts-cosyvoice:
-    profiles: ["tts-evaluation"]
-    container_name: chromie-tts-cosyvoice
-    build:
-      context: .
-      dockerfile: tts_candidates/cosyvoice/Dockerfile
-      args:
-        CUDA_IMAGE: ${TTS_CANDIDATE_CUDA_IMAGE:-nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04}
-        COSYVOICE3_SOURCE_REVISION: ${COSYVOICE3_SOURCE_REVISION:-074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc}
-    image: chromie-tts-cosyvoice:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
-    init: true
-    restart: unless-stopped
-    gpus: all
-    ports:
-      - "5001:5000"
-    environment:
-      CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
-      CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
-      TTS_HOST: "0.0.0.0"
-      TTS_PORT: "5000"
-      TTS_REFERENCE_WAV: /evaluation/reference.wav
-      TTS_REFERENCE_METADATA: /evaluation/reference.json
-      TTS_WORKER_STARTUP_TIMEOUT_SEC: ${TTS_CANDIDATE_STARTUP_TIMEOUT_SEC:-1200}
-      TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC: ${TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC:-3}
-      COSYVOICE3_SOURCE_REVISION: ${COSYVOICE3_SOURCE_REVISION:-074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc}
-      COSYVOICE3_MODEL_ID: ${COSYVOICE3_MODEL_ID:-FunAudioLLM/Fun-CosyVoice3-0.5B-2512}
-      COSYVOICE3_MODEL_REVISION: ${COSYVOICE3_MODEL_REVISION:-29e01c4e8d000f4bcd70751be16fa94bf3d85a18}
-      COSYVOICE3_FP16: ${COSYVOICE3_FP16:-1}
-      HF_HOME: /root/.cache/huggingface
-      HUGGINGFACE_HUB_CACHE: /root/.cache/huggingface
-      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
-      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
-      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
-      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
-      HTTP_PROXY: ${HTTP_PROXY:-}
-      HTTPS_PROXY: ${HTTPS_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
-    volumes:
-      - ./hf_cache:/root/.cache/huggingface
-      - ./hf_cache/modelscope:/root/.cache/modelscope
-      - ${TTS_AB_REFERENCE_DIR:-./.chromie/evidence/tts-provider-ab/reference}:/evaluation:ro
-    networks:
-      - chromie-net
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - |
-          python - <<'PY'
-          import asyncio, json, websockets
-
-          async def main():
-              async with websockets.connect("ws://127.0.0.1:5000", open_timeout=5) as ws:
-                  await ws.send(json.dumps({"type": "health"}))
-                  message = await asyncio.wait_for(ws.recv(), timeout=5)
-                  assert json.loads(message).get("type") == "pong"
-
-          asyncio.run(main())
-          PY
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 1200s
 
   chromie-tts-qwen3:
     profiles: ["tts-evaluation"]
@@ -273,6 +293,8 @@ services:
       args:
         CUDA_IMAGE: ${TTS_CANDIDATE_CUDA_IMAGE:-nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04}
         QWEN3_TTS_SOURCE_REVISION: ${QWEN3_TTS_SOURCE_REVISION:-022e286b98fbec7e1e916cb940cdf532cd9f488e}
+        TTS_CUDA_ARCH: ${TTS_CUDA_ARCH}
+        CHROMIE_BUILD_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
         PYTORCH_INDEX_URL: ${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}
     image: chromie-tts-qwen3:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
     init: true
@@ -283,8 +305,10 @@ services:
     environment:
       CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TTS_CUDA_ARCH: ${TTS_CUDA_ARCH:?TTS_CUDA_ARCH must come from the detected profile}
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
+      TTS_PROVIDER: qwen3-tts-0.6b-base
       TTS_REFERENCE_WAV: /evaluation/reference.wav
       TTS_REFERENCE_METADATA: /evaluation/reference.json
       TTS_WORKER_STARTUP_TIMEOUT_SEC: ${TTS_CANDIDATE_STARTUP_TIMEOUT_SEC:-1200}
@@ -306,7 +330,7 @@ services:
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
     volumes:
       - ./hf_cache:/root/.cache/huggingface
-      - ${TTS_AB_REFERENCE_DIR:-./.chromie/evidence/tts-provider-ab/reference}:/evaluation:ro
+      - ${TTS_REFERENCE_DIR:-./.chromie/private/tts-voice}:/evaluation:ro
     networks:
       - chromie-net
     healthcheck:
@@ -320,7 +344,9 @@ services:
               async with websockets.connect("ws://127.0.0.1:5000", open_timeout=5) as ws:
                   await ws.send(json.dumps({"type": "health"}))
                   message = await asyncio.wait_for(ws.recv(), timeout=5)
-                  assert json.loads(message).get("type") == "pong"
+                  payload = json.loads(message)
+                  assert payload.get("type") == "pong"
+                  assert payload.get("provider", {}).get("provider_id") == "qwen3-tts-0.6b-base"
 
           asyncio.run(main())
           PY

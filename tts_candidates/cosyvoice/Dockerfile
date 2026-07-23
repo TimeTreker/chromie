@@ -3,6 +3,11 @@ FROM ${CUDA_IMAGE}
 
 ARG COSYVOICE3_SOURCE_REVISION=074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
+ARG TTS_CUDA_ARCH=89
+ARG CHROMIE_BUILD_PROFILE=unknown
+
+LABEL org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}" \
+      org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \

@@ -36,7 +36,7 @@ def reference_metadata() -> tuple[Path, str, str, str]:
     )
     if not wav_path.is_file() or not metadata_path.is_file():
         raise RuntimeError(
-            "Shared TTS reference is missing; run scripts/prepare_tts_reference.py first"
+            "TTS reference is missing; install it with scripts/tts_reference.py"
         )
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     text = str(metadata.get("text") or "").strip()

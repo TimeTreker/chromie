@@ -133,27 +133,27 @@ cancellable deployment.
 | `OLLAMA_AUTO_RESTART_ON_CRASH` | `1` by default. During host warmup, restart `chromie-llm` once if Ollama reports a native `llama-server` crash such as a segmentation fault, then retry generation. |
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
-| `TTS_COSYVOICE_TRIAL_OLLAMA_MODEL` | Compact Ollama model used for every Router/Agent lane during `--tts-trial cosyvoice`; default `qwen3:4b`. The trial also forces one resident Ollama model. |
+| `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for every Router/Agent lane while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default. Limits the shared-GPU topology to one resident Ollama model while CosyVoice is selected. |
+| `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
-For a one-session CosyVoice3 listening trial with the installation-local,
-owner-authorized reference, use:
+Install and validate the operator-authorized reference before normal startup:
 
 ```bash
-./scripts/start_chromie.sh --tts-trial cosyvoice --keep-services
+python scripts/tts_reference.py install \
+  --source-wav /path/to/reference.wav \
+  --transcript '录音中的逐字文本' \
+  --license-id 'user-owned-recording'
+python scripts/tts_reference.py validate
+./scripts/start_chromie.sh
 ```
 
-The launcher selects `chromie-tts-cosyvoice` on port 5001, verifies the local
-reference authorization and hash, stops OuteTTS, uses the configured compact
-trial model for every Router/Agent lane, and limits Ollama to one resident model
-so the candidate retains GPU inference headroom. It loads already validated
-fast-first cache entries but does not generate missing cues during startup; the
-manual trial therefore exercises normal response synthesis instead of risking
-repeated candidate cold restarts before the microphone opens. Cache-prime
-timeouts in other profiles are non-fatal. The launcher points only that
-Orchestrator run at the candidate. It does not edit `.env.local`, change
-`TTS_PROVIDER`, or select a production winner. A later normal
-`./scripts/start_chromie.sh` restores the configured maintained service and
-normal model profile.
+The default launcher selects `chromie-tts` on port 5000, validates the local
+reference authorization and hash, uses one host TTS request for the singleton
+CosyVoice worker, and limits Ollama to one resident model when compact cognition
+is enabled. Select a fallback explicitly with `--tts-backend oute` or
+`--tts-backend qwen3`; the selection is scoped to that launch and does not
+rewrite `.env.local`.
 
 See [Hardware Profiles](../HARDWARE_PROFILES.md) for profile values and Jetson
 limitations. Direct hardware-profile override is intentionally unsupported;
@@ -596,7 +596,7 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_MIN_RMS` | `120`. |
 | `ORCH_BARGE_IN_MIN_RMS` | `350`. |
 | `ORCH_PLAYBACK_CHUNK_MS` | `80`. |
-| `ORCH_TTS_CONCURRENCY` | Host-side concurrent TTS requests; common/default value `1`; RTX 5090 profile uses `2` for the maintained two-worker Oute service. `--tts-trial cosyvoice` forces `1` because that candidate exposes one singleton model worker; raising host concurrency cannot create provider parallelism and only adds hidden queueing. |
+| `ORCH_TTS_CONCURRENCY` | Host-side concurrent TTS requests; maintained default `1` because CosyVoice exposes one singleton model worker. Raising host concurrency cannot create provider parallelism and only adds hidden queueing. Oute diagnostic profiles may use more workers when explicitly selected. |
 | `ORCH_TTS_WS_RETRIES` | `2`. |
 | `ORCH_TTS_WS_RETRY_DELAY_MS` | `300`. |
 | `ORCH_SESSION_TIMING_LOGS` | `true` in the host example. |
@@ -693,136 +693,72 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 
 | Variable | Purpose |
 |---|---|
-| `TTS_PROVIDER` | Registered provider adapter selected by the TTS service. The maintained image currently supports only `oute`; unknown values fail closed. Candidate frameworks are compared as separate contract-compatible endpoints before any default changes. |
-| `TTS_MODEL_SIZE` | OuteTTS model size, currently fixed to `0.6B` in the maintained configuration. |
-| `TTS_TOKENIZER_REPO`, `TTS_TOKENIZER_REVISION` | Immutable tokenizer/config snapshot used instead of a mutable repository branch. |
-| `TTS_GGUF_REPO`, `TTS_GGUF_REVISION` | Immutable GGUF snapshot; the quantization selects an exact filename inside it. |
-| `TTS_HOST` | Service bind address; default `0.0.0.0`. |
-| `TTS_QUANTIZATION` | Common default `FP16`. |
-| `TTS_N_GPU_LAYERS` | Common default `-1` for full offload. |
-| `TTS_CONTEXT_SIZE` | Profile-specific model context. RTX 5090 uses `8192` so a validated full acoustic speaker prompt still leaves bounded generation headroom. |
-| `TTS_MAX_LENGTH` | Total OuteTTS token budget for the speaker/prompt **and** generated audio-code tokens; **not** a text limit. |
-| `MIN_TTS_GENERATION_LENGTH` | Minimum safe generation budget; profiles use `1024`. |
-| `TTS_MAX_TEXT_CHARS` | Spoken text character limit. |
-| `TTS_MIN_TEXT_CHARS` | Minimum accepted text; common default `1` so short Chinese acknowledgements such as `我在。` synthesize instead of returning empty audio. |
-| `TTS_N_BATCH`, `TTS_THREADS` | Profile-specific llama.cpp settings. |
-| `TTS_SAMPLE_RATE` | PCM output rate; common default `44100`. |
-| `TTS_CHUNK_MS` | Stream chunk size; common default `120`. |
-| `TTS_MAX_CONCURRENT_SYNTHESIS` | Request semaphore; common default `1`; RTX 5090 profile uses `2`. |
-| `TTS_WORKER_COUNT` | Number of independent OuteTTS model workers; common/default value `1`; RTX 5090 profile uses `2`. |
-| `TTS_GENERATION_RETRIES` | Common default `1`. |
-| `TTS_RESET_LLAMA_STATE` | Common low-latency default `0`; RTX 5090 uses `1` so cloned-speaker requests and retries do not reuse mutable llama prompt state. |
-| `TTS_AUDIO_CODEC_DEVICE` | `auto` resolves to CUDA when available and CPU otherwise. The resolved and actual DAC devices are reported by TTS health. |
-| `TTS_DETAILED_TIMING` | Emit synchronized model-generation, DAC-decode, PCM-conversion, queue, IPC, and real-time-factor metrics; common default `1`. |
-| `TTS_METRICS_WINDOW` | Number of recent successful requests summarized in TTS health; common default `20`. |
-| `GGML_CUDA_DISABLE_GRAPHS` | Common default `0`; leave CUDA graphs enabled unless a measured compatibility problem requires disabling them. |
-| `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY` | Common defaults `0.4`, `1.1`. |
-| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Maximum wait for initial or post-cancellation model-worker startup; default `600`. |
-| `SPEAKER_DIR`, `TTS_SPEAKER_ID` | Speaker-profile storage and host selection. Local speaker WAV/JSON/transcript files are ignored by Git. Set `TTS_SPEAKER_ID` in `.env.local` only for an installation-specific private override that has passed its deployment checks. New Oute profiles require an exact transcript in the request or a UTF-8 `.txt` sidecar beside the WAV; transcript agreement and DAC acoustic coverage must both pass. Invalid profiles are rejected and are rebuilt only when the matching WAV and transcript sidecar are available. |
-| `TTS_SPEAKER_ALIGNMENT_DEVICE` | Device for OuteTTS v3's required Whisper word alignment; default `cpu` keeps one-time profile creation from competing with live GPU models. |
-| `TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY` | Minimum normalized similarity between the pinned aligner's result and supplied exact transcript; default `0.75`, with lower results rejected. |
+| `CHROMIE_TTS_BACKEND` | Maintained backend selector. Default `cosyvoice3`; explicit alternatives: `oute`, `qwen3`. |
+| `TTS_PROVIDER` | Provider identity expected inside the selected image. Default `fun-cosyvoice3-0.5b`; provider/image mismatches fail closed. |
+| `TTS_REFERENCE_DIR` | Host directory containing `reference.wav` and `reference.json`; default `.chromie/private/tts-voice`. |
+| `COSYVOICE3_SOURCE_REVISION`, `COSYVOICE3_MODEL_ID`, `COSYVOICE3_MODEL_REVISION` | Immutable default runtime and model locks. |
+| `COSYVOICE3_FP16` | Load the default model in half precision; default `1`. |
+| `COSYVOICE3_PROMPT_PREFIX` | Trusted prompt prefix prepended before the exact reference transcript. |
+| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget; default `1200` for the large offline model load. |
+| `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Bounded drain before fail-closed worker restart after cancellation; default `3` seconds. |
+| `ORCH_TTS_CONCURRENCY` | `1` for the singleton CosyVoice worker. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default; use one compact resident Ollama model while CosyVoice shares the GPU. |
+| `TTS_COSYVOICE_OLLAMA_MODEL` | Compact shared-GPU model; default `qwen3:4b`. |
+| `TTS_SPEAKER_ID` | `default` for CosyVoice/Qwen reference cloning. Oute may use installation-local profile IDs. |
 
-The optional `tts-evaluation` Compose profile adds two isolated candidate
-services without registering either in the maintained Oute image:
-
-| Variable | Purpose |
-|---|---|
-| `COSYVOICE3_SOURCE_REVISION`, `COSYVOICE3_MODEL_ID`, `COSYVOICE3_MODEL_REVISION` | Immutable Fun-CosyVoice3 runtime and `0.5B-2512` model locks. |
-| `COSYVOICE3_FP16` | Candidate-only half-precision model load; default `1`. |
-| `QWEN3_TTS_SOURCE_REVISION`, `QWEN3_TTS_MODEL_ID`, `QWEN3_TTS_MODEL_REVISION` | Immutable Qwen3-TTS runtime and `12Hz-0.6B-Base` model locks. |
-| `QWEN3_TTS_DEVICE`, `QWEN3_TTS_DTYPE`, `QWEN3_TTS_ATTENTION` | Candidate-only Qwen device, dtype, and attention implementation; defaults `cuda:0`, `bfloat16`, and `sdpa`. |
-| `TTS_CANDIDATE_STARTUP_TIMEOUT_SEC` | Model download/load allowance for candidate health; default `1200`. |
-| `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Candidate cancellation grace while holding the singleton worker lock; default `3`. A nearly complete native request is drained and discarded without reloading the model. Timeout or malformed/dead worker state still terminates and reloads fail closed before the next request. |
-
-Both candidates use the same bilingual reference WAV and metadata. By default
-the runner generates it through OuteTTS; an existing authorized reference can
-be supplied with `TTS_AB_REFERENCE_DIR` and
-`TTS_AB_SKIP_REFERENCE_GENERATION=1`. Its `reference.json` must contain the
-exact text, matching `audio_sha256`, and nonempty `license_id`. References are
-evaluation-only unless their metadata and listening review explicitly approve
-production use. The CosyVoice image uses Torch/Torchaudio 2.10 CUDA 12.8 plus the
-officially compatible TorchCodec 0.10 pairing because the upstream Torch 2.3
-CUDA 12.1 wheel has no RTX 5090 `sm_120` kernels. The CosyVoice source and model
-revisions remain the immutable locks declared above. Its CUDA 12 text-normalizer
-sessions use `onnxruntime-gpu==1.18.1`, the cuDNN 9-compatible 1.18 release;
-the earlier 1.18.0 pin expected cuDNN 8 and fell back to CPU. WeText ModelScope
-artifacts are persisted under `hf_cache/modelscope` so a normal candidate
-recreate does not download them again.
-
-Use `TTS_MAX_TEXT_CHARS` to shorten speech. Setting `TTS_MAX_LENGTH` to values
-such as 100 or 120 can produce empty audio; the server clamps unsafe values when
-possible.
-
-OuteTTS/llama.cpp runs in a restartable child process. Cancelling an active
-synthesis terminates that process and starts a clean worker, preventing stale
-native generation from occupying the only model slot. New synthesis waits for
-the replacement model worker to become ready.
-
-`TTS_PROVIDER` selects an explicitly registered implementation of
-[`TTSProvider`](TTS_PROVIDER_EVALUATION.md). The common protocol distinguishes
-provider-native text/audio streaming from transport chunking, exposes immutable
-model provenance and declared license identity, and requires cancellation to
-isolate native work. The current Oute adapter declares native streaming false;
-host sentence chunking and WebSocket PCM frames do not turn it into a native
-streaming model.
-
-The RTX 4090 and RTX 4090 Laptop profiles use a 4096-token TTS context. The RTX
-5090 profile uses 8192 plus strict per-request llama-state reset because the
-validated 10-second `chromie_mixed` acoustic prompt occupies about 1900 model
-tokens; two repeated full matrices passed with this setting. A 2048-token
-experiment left too little headroom after the speaker/prompt tokens and caused
-otherwise short sentences to stop after their first words. The service now
-records prompt/generated token counts and rejects audio when generation reaches
-`max_length`, rather than playing a known-truncated waveform. Use the benchmark
-below before lowering the context or changing quantization:
+Install the default reference:
 
 ```bash
-python scripts/benchmark_tts.py --repeat 2 --warmup 1 \
-  --output .chromie/evidence/tts-benchmark.json
+python scripts/tts_reference.py install \
+  --source-wav /path/to/reference.wav \
+  --transcript '录音中的逐字文本' \
+  --license-id 'user-owned-recording'
+python scripts/tts_reference.py validate
 ```
 
-The benchmark reports observed time to first binary audio, model generation, DAC
-decode, PCM conversion, queue delay, total time, generation/audio real-time
-factor, and whether any request exhausted the model token budget. It exits
-non-zero on token-budget exhaustion because a fast but incomplete waveform is
-not a valid performance result. It does not play audio and is not a
-voice-quality acceptance test.
+The metadata binds the full WAV with SHA-256 and records a nonempty
+authorization/license identity. Missing or inconsistent material stops the
+default provider before it opens the WebSocket endpoint.
 
-For a multi-provider comparison, use the committed common matrix:
+Select alternatives explicitly:
+
+```bash
+./scripts/start_chromie.sh --tts-backend oute
+./scripts/start_chromie.sh --tts-backend qwen3
+```
+
+The Oute fallback retains the following active controls; they do not configure
+the default CosyVoice image:
+
+- `TTS_HOST`, `TTS_MODEL_SIZE`, `TTS_TOKENIZER_REPO`, and `TTS_TOKENIZER_REVISION`;
+- `TTS_GGUF_REPO`, `TTS_GGUF_REVISION`, `TTS_QUANTIZATION`,
+  `TTS_CONTEXT_SIZE`, and `TTS_MAX_LENGTH`;
+- `TTS_SAMPLE_RATE`, `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY`,
+  `TTS_WORKER_COUNT`, and `TTS_AUDIO_CODEC_DEVICE`;
+- `SPEAKER_DIR`, `TTS_SPEAKER_ALIGNMENT_DEVICE`, and
+  `TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY`.
+
+Qwen3-TTS uses `QWEN3_TTS_SOURCE_REVISION`, `QWEN3_TTS_MODEL_ID`,
+`QWEN3_TTS_MODEL_REVISION`, `QWEN3_TTS_DEVICE`, `QWEN3_TTS_DTYPE`, and
+`QWEN3_TTS_ATTENTION`. It shares the same installed reference and contract.
+
+For a common isolated comparison:
 
 ```bash
 python scripts/tts_provider_ab.py --check
-python scripts/tts_provider_ab.py \
-  --provider oute=ws://127.0.0.1:5000 \
-  --provider candidate=ws://127.0.0.1:5001 \
-  --output-dir .chromie/evidence/tts-provider-ab/<run-id>
-```
-
-For the two pinned candidate deployments, run:
-
-```bash
-./scripts/run_tts_candidate_ab.sh
-```
-
-This normally builds the current Oute image and generates and hashes one shared
-reference. To use an existing authorized reference instead:
-
-```bash
 TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
 TTS_AB_SKIP_REFERENCE_GENERATION=1 \
-TTS_AB_RUN_ID=<run-id> \
 ./scripts/run_tts_candidate_ab.sh
 ```
 
-In either mode the runner temporarily releases Oute and Ollama GPU memory,
-starts CosyVoice3 on port 5001 and Qwen3-TTS on port 5002, runs the same matrix,
-and restores the default services on exit. It is an isolated comparison, not
-the shared-resource qualification required to change the default.
+The workflow compares CosyVoice on port 5000 with Qwen3-TTS on port 5002 and
+restores the default services afterward. Objective metrics and ASR content
+checks do not replace blinded Mandarin listening.
 
-The runner requires at least two version-1 provider endpoints and writes WAV,
-timing, stability, interruption-recovery, concurrency, and manual listening
-review artifacts. Results record run identity plus Chromie revision/dirty
-state. It does not change `TTS_PROVIDER` or declare a production winner.
+The default provider declares native streamed audio. The current WebSocket still
+accepts a complete text request rather than incremental model tokens, so
+end-to-end token-to-audio streaming is not claimed. Cancellation uses a bounded
+drain followed by worker restart when synchronous inference cannot stop.
 
 ## Ollama
 

@@ -607,21 +607,20 @@ The normal startup script uses `/tmp/chromie-orchestrator.lock`.
 - Confirm the selected service exposes `provider_contract_version=1`, a
   software-license declaration, and immutable licensed
   `provider.model_artifacts` in its `health` response.
-- The maintained image supports `TTS_PROVIDER=oute`; an unknown value is a
-  startup error, not a fallback.
+- The maintained `chromie-tts` image must report
+  `TTS_PROVIDER=fun-cosyvoice3-0.5b`; an unknown or image-mismatched value is a
+  startup error, not a fallback. Oute and Qwen are separate explicit services.
 - Validate the common matrix before a live run:
   `python scripts/tts_provider_ab.py --check`.
 - Compare at least two isolated endpoints with identical inputs:
 
   ```bash
-  python scripts/tts_provider_ab.py \
-    --provider oute=ws://127.0.0.1:5000 \
-    --provider candidate=ws://127.0.0.1:5001 \
-    --output-dir .chromie/evidence/tts-provider-ab/<run-id>
+  TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
+  TTS_AB_SKIP_REFERENCE_GENERATION=1 \
+  ./scripts/run_tts_candidate_ab.sh
   ```
 
-- Review `result.json`, every WAV, and `listening-review.json`. A fast automated
-  run is not approval to change the default.
+- Review `result.json`, every WAV, and `listening-review.json`. A fast automated run is not a Mandarin listening verdict.
 - If interruption recovery fails, inspect the provider cancellation mode,
   worker/process lifecycle, active GPU work, and whether stale PCM appeared in
   the recovery request. Host barge-in policy remains in the Orchestrator.

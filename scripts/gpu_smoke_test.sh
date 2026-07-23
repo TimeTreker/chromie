@@ -269,7 +269,8 @@ async def main():
         await ws.send(json.dumps({"type": "health"}))
         response = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
         assert response.get("type") == "pong", response
-        assert response.get("gpu_layers") == -1, response
+        assert response.get("provider", {}).get("provider_id") == "fun-cosyvoice3-0.5b", response
+        assert (response.get("provider_health") or {}).get("ready") is True, response
         print(response)
 
 asyncio.run(main())
@@ -277,8 +278,8 @@ PY
 }
 
 run_step "Check ASR WebSocket health" check_asr_websocket || true
-run_step "Check TTS WebSocket health and full GPU-layer setting" check_tts_websocket || true
-run_step "Verify TTS llama.cpp CUDA backend" ./scripts/verify_tts_gpu.sh || true
+run_step "Check CosyVoice3 WebSocket health and worker readiness" check_tts_websocket || true
+run_step "Verify default TTS GPU backend" ./scripts/verify_tts_gpu.sh || true
 
 ollama_generate() {
   python3 - <<'PY' | curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" \

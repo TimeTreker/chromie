@@ -60,27 +60,60 @@ echo "[start] Agent model: ${AGENT_MODEL:-unset}"
 echo "[start] Cognitive models: association=${AGENT_GOAL_ASSOCIATION_MODEL:-unset} fast=${AGENT_FAST_PLANNER_MODEL:-unset} deep=${AGENT_DEEP_PLANNER_MODEL:-unset} composer=${AGENT_RESPONSE_COMPOSER_MODEL:-unset}"
 echo "[start] Ollama: max_loaded=${OLLAMA_MAX_LOADED_MODELS:-unset} num_parallel=${OLLAMA_NUM_PARALLEL:-unset}"
 echo "[start] ASR: backend=sherpa_onnx mode=${ASR_MODE:-unset} model=${ASR_MODEL:-unset}"
-echo "[start] TTS model size: ${TTS_MODEL_SIZE:-unset}"
+echo "[start] TTS backend: ${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 
 COMPOSE_ARGS=(--env-file .env.runtime -f docker-compose.yml)
 
+TTS_BACKEND="${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 TTS_SERVICE=chromie-tts
-case "${CHROMIE_TTS_TRIAL_PROVIDER:-}" in
-  "") ;;
-  cosyvoice3)
-    TTS_SERVICE=chromie-tts-cosyvoice
+TTS_REFERENCE_DIR="${TTS_REFERENCE_DIR:-.chromie/private/tts-voice}"
+case "${TTS_BACKEND,,}" in
+  cosyvoice|cosyvoice3)
+    TTS_BACKEND=cosyvoice3
+    TTS_SERVICE=chromie-tts
+    export CHROMIE_TTS_BACKEND=cosyvoice3
+    export TTS_REFERENCE_DIR
+    python3 scripts/tts_reference.py validate --reference-dir "$TTS_REFERENCE_DIR"
+    echo "[start] TTS provider: CosyVoice3 (maintained default)"
+    ;;
+  oute|outetts)
+    TTS_BACKEND=oute
+    TTS_SERVICE=chromie-tts-oute
+    export CHROMIE_TTS_BACKEND=oute
     COMPOSE_ARGS+=(--profile tts-evaluation)
-    if [ -z "${TTS_AB_REFERENCE_DIR:-}" ]; then
-      echo "[start][error] TTS_AB_REFERENCE_DIR is required for the CosyVoice3 trial." >&2
-      exit 1
-    fi
-    echo "[start] TTS provider: CosyVoice3 temporary trial (default unchanged)"
+    echo "[start] TTS provider: OuteTTS (explicit fallback)"
+    ;;
+  qwen|qwen3|qwen3-tts)
+    TTS_BACKEND=qwen3
+    TTS_SERVICE=chromie-tts-qwen3
+    export CHROMIE_TTS_BACKEND=qwen3
+    export TTS_REFERENCE_DIR
+    COMPOSE_ARGS+=(--profile tts-evaluation)
+    python3 scripts/tts_reference.py validate --reference-dir "$TTS_REFERENCE_DIR"
+    echo "[start] TTS provider: Qwen3-TTS (explicit fallback)"
     ;;
   *)
-    echo "[start][error] Unsupported CHROMIE_TTS_TRIAL_PROVIDER=${CHROMIE_TTS_TRIAL_PROVIDER}" >&2
+    echo "[start][error] Unsupported CHROMIE_TTS_BACKEND=${CHROMIE_TTS_BACKEND:-}" >&2
+    echo "[start][hint] Supported providers: cosyvoice3, oute, qwen3" >&2
     exit 2
     ;;
 esac
+
+if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}" = "1" ]; then
+  COSYVOICE_BRAIN_MODEL="${TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b}"
+  export ROUTER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export ROUTER_REVIEW_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_GOAL_ASSOCIATION_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_FAST_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_DEEP_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_RESPONSE_COMPOSER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_TASK_CONTINUITY_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_SOCIAL_ATTENTION_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_RESPONSE_REVIEW_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export OLLAMA_MAX_LOADED_MODELS=1
+  echo "[start] CosyVoice shared-GPU cognition: $COSYVOICE_BRAIN_MODEL (one resident Ollama model)."
+fi
 
 # Optional comma-separated override list, for example:
 # CHROMIE_COMPOSE_OVERRIDE_FILES=docker-compose.jetson.yml,docker-compose.local.yml
@@ -117,13 +150,22 @@ unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 echo "[start] Validating resolved Docker Compose configuration..."
 docker compose "${COMPOSE_ARGS[@]}" config --quiet
 
-if [ "$TTS_SERVICE" = "chromie-tts-cosyvoice" ]; then
-  echo "[start] Stopping the maintained OuteTTS service during the temporary trial..."
-  docker compose "${COMPOSE_ARGS[@]}" stop chromie-tts chromie-tts-qwen3 >/dev/null 2>&1 || true
-else
-  docker compose "${COMPOSE_ARGS[@]}" --profile tts-evaluation stop \
-    chromie-tts-cosyvoice chromie-tts-qwen3 >/dev/null 2>&1 || true
-fi
+case "$TTS_SERVICE" in
+  chromie-tts)
+    docker compose "${COMPOSE_ARGS[@]}" --profile tts-evaluation stop \
+      chromie-tts-oute chromie-tts-qwen3 >/dev/null 2>&1 || true
+    ;;
+  chromie-tts-oute)
+    docker compose "${COMPOSE_ARGS[@]}" stop chromie-tts >/dev/null 2>&1 || true
+    docker compose "${COMPOSE_ARGS[@]}" --profile tts-evaluation stop \
+      chromie-tts-qwen3 >/dev/null 2>&1 || true
+    ;;
+  chromie-tts-qwen3)
+    docker compose "${COMPOSE_ARGS[@]}" stop chromie-tts >/dev/null 2>&1 || true
+    docker compose "${COMPOSE_ARGS[@]}" --profile tts-evaluation stop \
+      chromie-tts-oute >/dev/null 2>&1 || true
+    ;;
+esac
 
 if [[ "${REBUILD_NO_CACHE:-0}" == "1" ]]; then
   export BUILD=1

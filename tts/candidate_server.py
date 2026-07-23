@@ -26,6 +26,12 @@ logger = logging.getLogger("chromie.tts.candidate")
 HOST = os.getenv("TTS_HOST", "0.0.0.0")
 PORT = int(os.getenv("TTS_PORT", "5000"))
 provider = create_provider()
+configured_provider = str(os.getenv("TTS_PROVIDER") or "").strip().lower()
+if configured_provider and configured_provider != provider.capabilities.provider_id:
+    raise RuntimeError(
+        "TTS_PROVIDER does not match the provider image: "
+        f"{configured_provider!r} != {provider.capabilities.provider_id!r}"
+    )
 
 
 async def send_json(ws: Any, payload: dict[str, Any]) -> None:

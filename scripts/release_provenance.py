@@ -158,7 +158,10 @@ def declared_images(root: Path, env: dict[str, str]) -> list[str]:
     images = [f"{name}:{tag}" for name in PROJECT_IMAGE_NAMES]
     images.append(required_env(env, "OLLAMA_IMAGE"))
     images.append(env.get("PYTHON_IMAGE", "python:3.12.10-slim-bookworm"))
-    for dockerfile, key in (("asr/Dockerfile", "ASR_CUDA_IMAGE"), ("tts/Dockerfile", "TTS_CUDA_IMAGE")):
+    for dockerfile, key in (
+        ("asr/Dockerfile", "ASR_CUDA_IMAGE"),
+        ("tts_candidates/cosyvoice/Dockerfile", "TTS_CANDIDATE_CUDA_IMAGE"),
+    ):
         text = (root / dockerfile).read_text(encoding="utf-8") if (root / dockerfile).is_file() else ""
         match = re.search(rf"^ARG {key}=([^\s]+)", text, re.MULTILINE)
         default = match.group(1) if match else ""
@@ -260,11 +263,22 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
 
     common = env or source_environment(root)
     tts = lock.get("tts", {})
+    default_tts = tts.get("default", {})
+    alternatives = tts.get("alternatives", {})
+    oute = alternatives.get("oute", {})
+    qwen = alternatives.get("qwen3_tts", {})
     pairs = (
-        ("TTS_TOKENIZER_REPO", tts.get("tokenizer", {}).get("repository")),
-        ("TTS_TOKENIZER_REVISION", tts.get("tokenizer", {}).get("revision")),
-        ("TTS_GGUF_REPO", tts.get("gguf", {}).get("repository")),
-        ("TTS_GGUF_REVISION", tts.get("gguf", {}).get("revision")),
+        ("TTS_PROVIDER", default_tts.get("provider_id")),
+        ("COSYVOICE3_SOURCE_REVISION", default_tts.get("runtime", {}).get("revision")),
+        ("COSYVOICE3_MODEL_ID", default_tts.get("model", {}).get("repository")),
+        ("COSYVOICE3_MODEL_REVISION", default_tts.get("model", {}).get("revision")),
+        ("TTS_TOKENIZER_REPO", oute.get("tokenizer", {}).get("repository")),
+        ("TTS_TOKENIZER_REVISION", oute.get("tokenizer", {}).get("revision")),
+        ("TTS_GGUF_REPO", oute.get("gguf", {}).get("repository")),
+        ("TTS_GGUF_REVISION", oute.get("gguf", {}).get("revision")),
+        ("QWEN3_TTS_SOURCE_REVISION", qwen.get("runtime", {}).get("revision")),
+        ("QWEN3_TTS_MODEL_ID", qwen.get("model", {}).get("repository")),
+        ("QWEN3_TTS_MODEL_REVISION", qwen.get("model", {}).get("revision")),
     )
     for name, expected in pairs:
         if not expected or common.get(name) != expected:
@@ -304,7 +318,24 @@ def collect_provenance(
     model_lock = root / "release" / "model-lock.json"
 
     tracked_inputs = []
-    for relative in (*REQUIREMENT_FILES, "shared/pyproject.toml", "docker-compose.yml", "agent/Dockerfile", "asr/Dockerfile", "router/Dockerfile", "tts/Dockerfile", "release/model-lock.json"):
+    for relative in (
+        *REQUIREMENT_FILES,
+        "shared/pyproject.toml",
+        "docker-compose.yml",
+        "agent/Dockerfile",
+        "asr/Dockerfile",
+        "router/Dockerfile",
+        "tts/Dockerfile",
+        "tts/candidate_server.py",
+        "tts/candidate_provider.py",
+        "tts/streaming_worker.py",
+        "tts_candidates/cosyvoice/Dockerfile",
+        "tts_candidates/cosyvoice/provider_impl.py",
+        "tts_candidates/qwen3/Dockerfile",
+        "tts_candidates/qwen3/provider_impl.py",
+        "tts_candidates/model-lock.json",
+        "release/model-lock.json",
+    ):
         path = root / relative
         if path.is_file():
             tracked_inputs.append({"path": relative, "sha256": sha256(path)})

@@ -11,7 +11,7 @@ REBUILD_NO_CACHE=0
 KEEP_SERVICES=0
 START_ORCHESTRATOR=1
 ARCHITECTURE_VALIDATION=0
-TTS_TRIAL_PROVIDER="${CHROMIE_TTS_TRIAL_PROVIDER:-}"
+TTS_BACKEND="${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 
 usage() {
   cat <<'USAGE'
@@ -33,8 +33,7 @@ Options:
   --architecture-validation
                           Use long-context, long-output, long-timeout validation
                           budgets while retaining Social Attention inference
-  --tts-trial cosyvoice   Temporarily use CosyVoice3 with the owner-authorized
-                          local reference; does not change the default provider
+  --tts-backend NAME      Select cosyvoice3 (default), oute, or qwen3
   -h, --help              Show this help
 USAGE
 }
@@ -49,7 +48,7 @@ while [ "$#" -gt 0 ]; do
     --keep-services) KEEP_SERVICES=1; shift ;;
     --no-orchestrator) START_ORCHESTRATOR=0; shift ;;
     --architecture-validation) ARCHITECTURE_VALIDATION=1; shift ;;
-    --tts-trial) TTS_TRIAL_PROVIDER="${2:?--tts-trial requires cosyvoice}"; shift 2 ;;
+    --tts-backend) TTS_BACKEND="${2:?--tts-backend requires a provider}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[chromie][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -311,50 +310,54 @@ source .env.runtime
 set +a
 
 TTS_READY_PORT=5000
-TTS_READY_LABEL="TTS"
-TTS_TRIAL_REFERENCE_SHA=""
-case "${TTS_TRIAL_PROVIDER,,}" in
-  "")
-    unset CHROMIE_TTS_TRIAL_PROVIDER
-    ;;
+TTS_READY_LABEL="CosyVoice3 TTS"
+TTS_REFERENCE_SHA=""
+TTS_EXPECTED_PROVIDER="fun-cosyvoice3-0.5b"
+TTS_REFERENCE_DIR="${TTS_REFERENCE_DIR:-$ROOT_DIR/.chromie/private/tts-voice}"
+case "${TTS_BACKEND,,}" in
   cosyvoice|cosyvoice3)
-    TTS_TRIAL_REFERENCE_DIR="${TTS_COSYVOICE_TRIAL_REFERENCE_DIR:-$ROOT_DIR/.chromie/private/tts-voice}"
-    TTS_TRIAL_REFERENCE_SHA="$(python3 - "$TTS_TRIAL_REFERENCE_DIR" <<'PY_TTS_REFERENCE'
-from __future__ import annotations
-
-import hashlib
-import json
-import sys
+    TTS_BACKEND=cosyvoice3
+    export CHROMIE_TTS_BACKEND=cosyvoice3
+    export TTS_REFERENCE_DIR
+    TTS_REFERENCE_SHA="$(python3 - "$TTS_REFERENCE_DIR" <<'PY_TTS_REFERENCE'
 from pathlib import Path
-
-root = Path(sys.argv[1]).expanduser().resolve()
-wav_path = root / "reference.wav"
-metadata_path = root / "reference.json"
-if not wav_path.is_file() or not metadata_path.is_file():
-    raise SystemExit(
-        f"CosyVoice trial reference is incomplete: expected {wav_path} and {metadata_path}"
-    )
-metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-actual_sha = hashlib.sha256(wav_path.read_bytes()).hexdigest()
-if metadata.get("usage_authorized") is not True:
-    raise SystemExit("CosyVoice trial reference is not marked usage_authorized=true")
-if str(metadata.get("audio_sha256") or "").lower() != actual_sha:
-    raise SystemExit("CosyVoice trial reference SHA-256 does not match its metadata")
-if not str(metadata.get("text") or "").strip() or not str(metadata.get("license_id") or "").strip():
-    raise SystemExit("CosyVoice trial reference lacks text or license metadata")
-print(actual_sha)
+import sys
+from scripts.tts_reference import validate_reference_dir
+print(validate_reference_dir(Path(sys.argv[1]))["audio_sha256"])
 PY_TTS_REFERENCE
 )"
-    export CHROMIE_TTS_TRIAL_PROVIDER=cosyvoice3
-    export TTS_AB_REFERENCE_DIR="$TTS_TRIAL_REFERENCE_DIR"
+    TTS_READY_PORT=5000
+    TTS_READY_LABEL="CosyVoice3 TTS"
+    TTS_EXPECTED_PROVIDER="fun-cosyvoice3-0.5b"
+    echo "[chromie] Default TTS: CosyVoice3 reference_sha256=${TTS_REFERENCE_SHA:0:12}"
+    ;;
+  oute|outetts)
+    TTS_BACKEND=oute
+    export CHROMIE_TTS_BACKEND=oute
     TTS_READY_PORT=5001
-    TTS_READY_LABEL="CosyVoice3 trial TTS"
-    echo "[chromie] Temporary TTS trial: CosyVoice3 reference_sha256=${TTS_TRIAL_REFERENCE_SHA:0:12}"
-    echo "[chromie] The configured default TTS provider is unchanged."
+    TTS_READY_LABEL="OuteTTS fallback"
+    TTS_EXPECTED_PROVIDER="oute"
+    echo "[chromie] Explicit TTS fallback: OuteTTS"
+    ;;
+  qwen|qwen3|qwen3-tts)
+    TTS_BACKEND=qwen3
+    export CHROMIE_TTS_BACKEND=qwen3
+    export TTS_REFERENCE_DIR
+    TTS_REFERENCE_SHA="$(python3 - "$TTS_REFERENCE_DIR" <<'PY_TTS_REFERENCE'
+from pathlib import Path
+import sys
+from scripts.tts_reference import validate_reference_dir
+print(validate_reference_dir(Path(sys.argv[1]))["audio_sha256"])
+PY_TTS_REFERENCE
+)"
+    TTS_READY_PORT=5002
+    TTS_READY_LABEL="Qwen3-TTS fallback"
+    TTS_EXPECTED_PROVIDER="qwen3-tts-0.6b-base"
+    echo "[chromie] Explicit TTS fallback: Qwen3-TTS reference_sha256=${TTS_REFERENCE_SHA:0:12}"
     ;;
   *)
-    echo "[chromie][error] Unsupported --tts-trial provider: $TTS_TRIAL_PROVIDER" >&2
-    echo "[chromie][hint] Supported temporary provider: cosyvoice" >&2
+    echo "[chromie][error] Unsupported --tts-backend value: $TTS_BACKEND" >&2
+    echo "[chromie][hint] Supported providers: cosyvoice3, oute, qwen3" >&2
     exit 2
     ;;
 esac
@@ -378,23 +381,25 @@ EFFECTIVE_SOCIAL_ATTENTION_MODEL="${AGENT_SOCIAL_ATTENTION_MODEL}"
 EFFECTIVE_RESPONSE_REVIEW_MODEL="${AGENT_RESPONSE_REVIEW_MODEL}"
 EFFECTIVE_OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-2}"
 
-if [ "${CHROMIE_TTS_TRIAL_PROVIDER:-}" = "cosyvoice3" ]; then
-  COSYVOICE_TRIAL_BRAIN_MODEL="${TTS_COSYVOICE_TRIAL_OLLAMA_MODEL:-qwen3:4b}"
-  EFFECTIVE_ROUTER_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_ROUTER_REVIEW_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_AGENT_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_GOAL_ASSOCIATION_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_FAST_PLANNER_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_DEEP_PLANNER_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_RESPONSE_COMPOSER_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_TASK_CONTINUITY_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_SOCIAL_ATTENTION_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
-  EFFECTIVE_RESPONSE_REVIEW_MODEL="$COSYVOICE_TRIAL_BRAIN_MODEL"
+if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}" = "1" ]; then
+  COSYVOICE_BRAIN_MODEL="${TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b}"
+  EFFECTIVE_ROUTER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_ROUTER_REVIEW_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_AGENT_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_GOAL_ASSOCIATION_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_FAST_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_DEEP_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_RESPONSE_COMPOSER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_TASK_CONTINUITY_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_SOCIAL_ATTENTION_MODEL="$COSYVOICE_BRAIN_MODEL"
+  EFFECTIVE_RESPONSE_REVIEW_MODEL="$COSYVOICE_BRAIN_MODEL"
   EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1
-  echo "[chromie] CosyVoice trial brain: ${COSYVOICE_TRIAL_BRAIN_MODEL} (one resident Ollama model; GPU headroom reserved for TTS)."
+  echo "[chromie] CosyVoice shared-GPU cognition: ${COSYVOICE_BRAIN_MODEL} (one resident Ollama model)."
 fi
 
 cat > "$SERVICE_OVERRIDE" <<EOF_SERVICE
+CHROMIE_TTS_BACKEND=${TTS_BACKEND}
+TTS_REFERENCE_DIR=${TTS_REFERENCE_DIR}
 ROUTER_MODEL=${EFFECTIVE_ROUTER_MODEL}
 ROUTER_REVIEW_MODEL=${EFFECTIVE_ROUTER_REVIEW_MODEL}
 AGENT_MODEL=${EFFECTIVE_AGENT_MODEL}
@@ -444,6 +449,7 @@ services:
 EOF_COMPOSE
 
 cat > "$ORCH_OVERRIDE" <<EOF_ORCH
+CHROMIE_TTS_BACKEND=${TTS_BACKEND}
 ORCH_AUDIO_INPUT_MODE=device
 ORCH_AUDIO_OUTPUT_MODE=device
 ORCH_ENABLE_ROUTER=1
@@ -474,18 +480,36 @@ AGENT_RESPONSE_REVIEW_MODEL=${EFFECTIVE_RESPONSE_REVIEW_MODEL}
 OLLAMA_MAX_LOADED_MODELS=${EFFECTIVE_OLLAMA_MAX_LOADED_MODELS}
 EOF_ORCH
 
-if [ "${CHROMIE_TTS_TRIAL_PROVIDER:-}" = "cosyvoice3" ]; then
-  {
-    echo "TTS_URL=ws://127.0.0.1:5001"
-    echo "TTS_SPEAKER_ID=default"
-    echo "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=cosyvoice3-${TTS_TRIAL_REFERENCE_SHA}"
-    echo "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED=1"
-    echo "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0"
-    echo "ORCH_TTS_CONCURRENCY=1"
-  } >> "$ORCH_OVERRIDE"
-  echo "[chromie] CosyVoice trial TTS: one host request for the provider's one model worker."
-  echo "[chromie] CosyVoice trial fast-first cache: load validated entries only; startup generation disabled."
-fi
+case "$TTS_BACKEND" in
+  cosyvoice3)
+    {
+      echo "TTS_URL=ws://127.0.0.1:5000"
+      echo "TTS_SPEAKER_ID=default"
+      echo "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=cosyvoice3-${TTS_REFERENCE_SHA}"
+      echo "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED=1"
+      echo "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0"
+      echo "ORCH_TTS_CONCURRENCY=1"
+    } >> "$ORCH_OVERRIDE"
+    echo "[chromie] CosyVoice TTS: one host request for the provider's one model worker."
+    echo "[chromie] CosyVoice fast-first cache: load validated entries only; startup generation disabled."
+    ;;
+  oute)
+    {
+      echo "TTS_URL=ws://127.0.0.1:5001"
+      echo "TTS_SPEAKER_ID=${TTS_SPEAKER_ID:-default}"
+    } >> "$ORCH_OVERRIDE"
+    ;;
+  qwen3)
+    {
+      echo "TTS_URL=ws://127.0.0.1:5002"
+      echo "TTS_SPEAKER_ID=default"
+      echo "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=qwen3-tts-${TTS_REFERENCE_SHA}"
+      echo "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED=1"
+      echo "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0"
+      echo "ORCH_TTS_CONCURRENCY=1"
+    } >> "$ORCH_OVERRIDE"
+    ;;
+esac
 
 export CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE="$SERVICE_OVERRIDE"
 export CHROMIE_COMPOSE_OVERRIDE_FILES="${CHROMIE_COMPOSE_OVERRIDE_FILES:+${CHROMIE_COMPOSE_OVERRIDE_FILES},}${COMPOSE_OVERRIDE}"
@@ -502,6 +526,9 @@ else
 fi
 
 COMPOSE_ARGS=(--env-file .env.runtime -f docker-compose.yml)
+if [ "$TTS_BACKEND" != "cosyvoice3" ]; then
+  COMPOSE_ARGS+=(--profile tts-evaluation)
+fi
 IFS=',' read -ra override_files <<< "${CHROMIE_COMPOSE_OVERRIDE_FILES:-}"
 for file in "${override_files[@]}"; do
   file="$(echo "$file" | xargs)"
@@ -603,11 +630,16 @@ wait_for_http 127.0.0.1 8091 /health 300 "Router"
 wait_for_http 127.0.0.1 8092 /health 300 "Agent"
 wait_for_tcp 127.0.0.1 11434 300 "Ollama"
 
-if [ "${CHROMIE_TTS_TRIAL_PROVIDER:-}" = "cosyvoice3" ]; then
-  COSYVOICE_TRIAL_WARMUP_TEXT="${TTS_COSYVOICE_TRIAL_WARMUP_TEXT:-你好，我是 Chromie。现在语音系统已经准备好了，很高兴和你一起探索这个世界。Hello, I am ready to talk with you.}"
+if [ "$TTS_BACKEND" = "cosyvoice3" ]; then
+  COSYVOICE_WARMUP_TEXT="${TTS_COSYVOICE_WARMUP_TEXT:-你好，我是 Chromie。现在语音系统已经准备好了，很高兴和你一起探索这个世界。Hello, I am ready to talk with you.}"
   warm_tts_candidate \
-    127.0.0.1 "$TTS_READY_PORT" fun-cosyvoice3-0.5b \
-    "$COSYVOICE_TRIAL_WARMUP_TEXT" 300 "$TTS_READY_LABEL"
+    127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
+    "$COSYVOICE_WARMUP_TEXT" 300 "$TTS_READY_LABEL"
+elif [ "$TTS_BACKEND" = "qwen3" ]; then
+  QWEN3_TTS_WARMUP_TEXT="${QWEN3_TTS_WARMUP_TEXT:-你好，我是 Chromie。语音系统已经准备好了。}"
+  warm_tts_candidate \
+    127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
+    "$QWEN3_TTS_WARMUP_TEXT" 300 "$TTS_READY_LABEL"
 fi
 
 check_soridormi_from_agent_container
@@ -627,7 +659,7 @@ Chromie services are ready
 Soridormi MCP: ${HOST_MCP_URL}
 Images: defined once in .env.common/.env.local and consumed by Compose
 Pull policy: never
-TTS: ${CHROMIE_TTS_TRIAL_PROVIDER:-configured default}${CHROMIE_TTS_TRIAL_PROVIDER:+ (temporary trial; default unchanged)}
+TTS: ${TTS_BACKEND} (${TTS_EXPECTED_PROVIDER})
 
 Speak normally, for example:
   Hello Chromie.

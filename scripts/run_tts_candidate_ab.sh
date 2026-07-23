@@ -10,12 +10,12 @@ OUTPUT_DIR="${TTS_AB_OUTPUT_DIR:-.chromie/evidence/tts-provider-ab/$RUN_ID}"
 WAIT_TIMEOUT="${TTS_CANDIDATE_WAIT_TIMEOUT_SEC:-1800}"
 KEEP_CANDIDATES="${TTS_AB_KEEP_CANDIDATES:-0}"
 
-candidate_services=(chromie-tts-cosyvoice chromie-tts-qwen3)
-export TTS_AB_REFERENCE_DIR="$REFERENCE_DIR"
+export TTS_REFERENCE_DIR="$REFERENCE_DIR"
 
 restore_default() {
   if [ "$KEEP_CANDIDATES" != "1" ]; then
-    ./scripts/compose.sh --profile tts-evaluation stop "${candidate_services[@]}" || true
+    ./scripts/compose.sh --profile tts-evaluation stop \
+      chromie-tts-oute chromie-tts-qwen3 || true
     ./scripts/compose.sh up -d --no-build chromie-tts chromie-llm || true
   fi
 }
@@ -23,26 +23,29 @@ trap restore_default EXIT
 
 if [ "${TTS_AB_SKIP_REFERENCE_GENERATION:-0}" = "1" ]; then
   echo "[tts-ab] Using the existing authorized reference voice..."
-  test -s "$REFERENCE_DIR/reference.wav"
-  test -s "$REFERENCE_DIR/reference.json"
-  python -c 'import hashlib,json,os,pathlib; root=pathlib.Path(os.environ["TTS_AB_REFERENCE_DIR"]); metadata=json.loads((root / "reference.json").read_text(encoding="utf-8")); actual=hashlib.sha256((root / "reference.wav").read_bytes()).hexdigest(); assert metadata.get("audio_sha256") == actual; assert metadata.get("license_id")'
+  python scripts/tts_reference.py validate --reference-dir "$REFERENCE_DIR"
 else
-  echo "[tts-ab] Ensuring the maintained Oute provider is available for reference generation..."
-  reference_up=(up -d --wait --wait-timeout "$WAIT_TIMEOUT")
+  echo "[tts-ab] Starting the OuteTTS fallback to generate an evaluation-only reference..."
+  reference_up=(--profile tts-evaluation up -d --wait --wait-timeout "$WAIT_TIMEOUT")
   if [ "${TTS_AB_SKIP_REFERENCE_BUILD:-0}" = "1" ]; then
     reference_up+=(--no-build)
   else
     reference_up+=(--build)
   fi
-  reference_up+=(chromie-tts)
+  reference_up+=(chromie-tts-oute)
   ./scripts/compose.sh "${reference_up[@]}"
 
-  echo "[tts-ab] Generating the shared, locally owned reference voice..."
-  python scripts/prepare_tts_reference.py --output-dir "$REFERENCE_DIR"
+  echo "[tts-ab] Generating the shared evaluation reference voice..."
+  python scripts/prepare_tts_reference.py \
+    --url ws://127.0.0.1:5001 \
+    --output-dir "$REFERENCE_DIR"
 fi
 
-echo "[tts-ab] Releasing Oute and Ollama GPU memory for the isolated candidate run..."
-./scripts/compose.sh stop chromie-tts chromie-llm
+python scripts/tts_reference.py validate --reference-dir "$REFERENCE_DIR"
+
+echo "[tts-ab] Releasing OuteTTS and Ollama GPU memory for the isolated comparison..."
+./scripts/compose.sh --profile tts-evaluation stop chromie-tts-oute
+./scripts/compose.sh stop chromie-llm chromie-tts || true
 
 compose_up=(--profile tts-evaluation up -d --wait --wait-timeout "$WAIT_TIMEOUT")
 if [ "${TTS_AB_SKIP_BUILD:-0}" != "1" ]; then
@@ -50,14 +53,14 @@ if [ "${TTS_AB_SKIP_BUILD:-0}" != "1" ]; then
 else
   compose_up+=(--no-build)
 fi
-compose_up+=("${candidate_services[@]}")
+compose_up+=(chromie-tts chromie-tts-qwen3)
 
-echo "[tts-ab] Building and starting CosyVoice3 and Qwen3-TTS candidates..."
+echo "[tts-ab] Building and starting CosyVoice3 and Qwen3-TTS..."
 ./scripts/compose.sh "${compose_up[@]}"
 
 echo "[tts-ab] Running the identical committed A/B matrix..."
 python scripts/tts_provider_ab.py \
-  --provider cosyvoice3=ws://127.0.0.1:5001 \
+  --provider cosyvoice3=ws://127.0.0.1:5000 \
   --provider qwen3_tts=ws://127.0.0.1:5002 \
   --warmup "${TTS_AB_WARMUP:-1}" \
   --timeout "${TTS_AB_CASE_TIMEOUT_SEC:-300}" \

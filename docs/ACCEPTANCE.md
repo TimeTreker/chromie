@@ -251,111 +251,61 @@ round trip, ASR/TTS WebSockets, Ollama generation, model GPU placement, and
 optional non-empty TTS PCM generation. It does not evaluate microphone or
 speaker quality.
 
-### TTS provider comparison
+### TTS provider verification and comparison
 
-Level A verifies the framework-neutral provider schema, explicit registry,
-Oute adapter, streaming event rules, cancellation propagation, common matrix,
-and fail-closed A/B inputs:
+Level A verifies the framework-neutral provider schema, default CosyVoice
+adapter, Oute/Qwen alternatives, streaming event rules, cancellation
+propagation, reference binding, common matrix, and fail-closed inputs:
 
 ```bash
 python -m unittest \
   tests.test_tts_provider_contract \
   tests.test_tts_provider_ab \
   tests.test_tts_candidate_providers \
+  tests.test_tts_reference \
   tests.test_tts_benchmark \
   tests.test_fast_first_audio_cache
 python scripts/tts_provider_ab.py --check
 ```
 
-For Level B/D comparison, run at least two separately deployed endpoints that
-expose TTSProvider contract version 1:
+Validate the installed default voice before a deployed service check:
 
 ```bash
-python scripts/tts_provider_ab.py \
-  --provider oute=ws://127.0.0.1:5000 \
-  --provider candidate=ws://127.0.0.1:5001 \
-  --warmup 1 \
-  --output-dir .chromie/evidence/tts-provider-ab/<run-id>
+python scripts/tts_reference.py validate
+./scripts/start_chromie.sh --no-orchestrator --keep-services
+./scripts/verify_tts_gpu.sh
 ```
 
-The repository's pinned isolated candidate workflow is:
+The default health response must report
+`provider_id=fun-cosyvoice3-0.5b`, a ready worker, immutable runtime/model
+revisions, the bound reference SHA, CUDA visibility, and one declared worker. A
+no-playback warm synthesis must return nonempty PCM before the launcher opens the
+microphone.
+
+Run the pinned isolated CosyVoice/Qwen comparison with:
 
 ```bash
+TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
+TTS_AB_SKIP_REFERENCE_GENERATION=1 \
 ./scripts/run_tts_candidate_ab.sh
 ```
 
-It does not qualify coexistence with ASR, Router, Agent, and Ollama because it
-intentionally releases the maintained Oute and Ollama GPU allocations before
-loading both candidates.
-
-Local diagnostic run `20260722-chromie-ai-girl-v1` used the user-authorized
-AI-generated voice candidate and passed 6/6 cases for CosyVoice3 and 6/6 for
-Qwen3-TTS. Median first-binary/RTF was 3.0987 s/0.5419 and
-5.6786 s/0.9364 respectively. Post-cancel recovery first binary was 18.7919 s
-for CosyVoice3 and 8.0885 s for Qwen3-TTS, so the ordinary latency result cannot
-substitute for an approved interruption bound. The earlier generated-reference
-run showed the same tradeoff. Both were dirty-tree, isolated runs and their
-ignored local artifacts are not release evidence. The owner approved the voice
-style. A later audit found the first Oute profiles were acoustically malformed:
-the fallback loader omitted the batch tensor axis and created only one DAC code
-pair while transcript similarity still passed. The corrected loader and
-acoustic-coverage gate produced a 776-code `chromie_mixed` profile. At the RTX
-5090 8192-token setting it passed a 10/10 smoke plus two complete 6/6 runs of
-the same multilingual/interruption/dialogue/concurrency matrix. These ignored
-local dirty-tree artifacts support an installation-local speaker override only;
-they are not source-bound Target evidence or a listening-quality acceptance.
-The approval also does not accept either candidate provider's output, whose
-listening review remains required.
-
-The objective matrix accepts non-empty, correctly terminated audio; it does not
-prove that the audio speaks the requested text. The startup fast-first path has
-an additional fail-closed ASR content gate: each cue must remain within the
-configured duration and its normalized round-trip transcript must meet
-`ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY`. Unit evidence includes the
-observed regression shape where a Chinese cue instead contains the English
-voice-enrollment sentence. This is Level A component evidence, not a human
-pronunciation or speaker-quality verdict.
-
-To stage a one-session manual CosyVoice3 listening check without selecting a
-winner:
-
-```bash
-./scripts/start_chromie.sh --tts-trial cosyvoice --keep-services
-```
-
-The trial still requires a human verdict. It does not replace the common A/B
-matrix, shared-resource target evidence, interruption bound, or license review.
-For this temporary full-stack trial, all Router/Agent lanes use
-`TTS_COSYVOICE_TRIAL_OLLAMA_MODEL` (`qwen3:4b` by default), Ollama permits one
-resident model, and missing fast-first cues are not generated during startup.
-Existing cues remain subject to the duration and ASR gates. This profile is a
-voice-listening resource envelope, not evidence that the normal mixed-model
-cognitive profile was exercised. Cache-prime timeouts must remain non-fatal and
-must not cause repeated provider cold restarts.
-
-The July 22 exact-launch regression reached `Microphone started` after resolving
-an empty candidate cache in 4.1 ms with zero startup synthesis. This is live
-local startup-path evidence; it is not a recorded listening review, sustained
-interaction run, or release-closing target bundle.
-
 The committed matrix uses identical Mandarin, English, mixed-language,
-interruption/recovery, six-turn dialogue, and concurrent requests. The runner
-retains provider/model declarations, audio hashes and WAV files, first-binary
-and total latency, RTF, dialogue/concurrency results, and a mandatory listening
-review template. A run is not provider-selection evidence until the listening
-review, license review, target hardware/resource capture, approved thresholds,
-and exact source/model provenance are complete. The runner therefore never
-sets `selection_ready=true` automatically. See
-[TTS Provider Contract and Evaluation](TTS_PROVIDER_EVALUATION.md).
+interruption/recovery, six-turn dialogue, and concurrent requests. It retains
+provider/model declarations, reference identity, WAVs, first-binary/total
+latency, RTF, dialogue/concurrency status, and a listening-review template. The
+workflow temporarily releases normal shared-GPU services, so it does not prove
+sustained coexistence with ASR, Router, Agent, and Ollama.
 
-SenseVoice ASR verification starts at Level A with model-file resolution,
-normalization, mode validation, and bounded executor tests. Level B service
-health reports `backend=sherpa_onnx`, `mode`, `model`, and `model_revision`. An
-accuracy benchmark is not release readiness by itself. Voice release evidence
-must cover recognition quality, latency, resource use, provider/model failure
-clarity, and unchanged stop, cancel, emergency, silence, unusable-audio,
-confirmation, and barge-in semantics. The maintained criteria are documented
-in [SenseVoice ASR](SENSEVOICE_ASR.md).
+The repeated isolated results showed CosyVoice leading ordinary first-audio and
+RTF while Qwen recovered faster after forced worker termination. Oute later
+failed requested-text and Mandarin listening diagnostics despite valid acoustic
+conditioning. These results justify the current default but do not replace a
+Mandarin-focused blinded listening review or an approved interruption bound.
+
+The fast-first cache additionally rejects overlong or ASR-mismatched cues. This
+prevents known content leakage from entering playback; it does not prove natural
+pronunciation.
 
 ## Level C — Soridormi contract and simulator
 

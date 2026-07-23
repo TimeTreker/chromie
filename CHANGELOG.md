@@ -4,6 +4,13 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### CosyVoice3 default TTS backend
+
+- Promoted Fun-CosyVoice3 0.5B to the maintained `chromie-tts` service on port 5000 after repeated Oute Mandarin quality failures and equivalent-provider latency comparisons.
+- Added an authorized local reference installer/validator with exact transcript, license identity, and WAV SHA-256 binding; default startup now fails closed when the reference is absent or inconsistent.
+- Moved OuteTTS to the explicit `chromie-tts-oute` fallback on port 5001 and kept Qwen3-TTS as the port-5002 alternative. `--tts-backend` selects either without changing persistent configuration.
+- Aligned Compose, model locks, GPU/profile verification, application readiness, one-worker concurrency, bounded cancellation drain/restart, fast-first cache identity, tests, and documentation with the new default.
+
 ### Fixed-reflex cancellation closure
 
 - Added one atomic Conversation State reconciliation path for `output_only`,
