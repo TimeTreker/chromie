@@ -128,6 +128,20 @@ class _SafetyLockedInvoker:
         )
 
 
+class _SequenceInvoker:
+    def __init__(self, outputs: list[dict]) -> None:
+        self.outputs = list(outputs)
+        self.calls = 0
+
+    async def invoke(self, tool_name: str, arguments: dict, *, context=None):
+        del arguments, context
+        if tool_name != "soridormi.skill.list":
+            raise AssertionError(tool_name)
+        index = min(self.calls, len(self.outputs) - 1)
+        self.calls += 1
+        return _Outcome(output=self.outputs[index])
+
+
 def _registry() -> CapabilityRegistry:
     return CapabilityRegistry.from_bundles(
         [
@@ -195,6 +209,64 @@ def _registry_with_planning_tool() -> CapabilityRegistry:
 
 
 class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
+
+    async def test_live_catalog_refresh_is_atomic_and_matches_nested_contracts(self) -> None:
+        invoker = _SequenceInvoker(
+            [
+                {
+                    "mode": "sim",
+                    "skills": [
+                        {
+                            "skill_id": "nested_wave",
+                            "description": "Wave using the provider contract.",
+                            "input_schema": {
+                                "type": "object",
+                                "properties": {"count": {"type": "integer"}},
+                            },
+                            "effects": ["visual_expression"],
+                            "safety_class": "low_risk_action",
+                            "availability": {"available": True},
+                            "confirmation": {"required": False},
+                            "execution": {
+                                "can_run_parallel": False,
+                                "exclusive_group": "arm_expression",
+                                "resource_claims": ["arm_expression"],
+                                "execution_constraints": {"max_count": 3},
+                            },
+                        }
+                    ],
+                },
+                {
+                    "mode": "sim",
+                    "skills": [
+                        {"skill_id": "nested_wave", "available": True},
+                        {"skill_id": "nested_wave", "available": True},
+                    ],
+                },
+            ]
+        )
+        catalog = CapabilityCatalog(_registry(), live_invoker=invoker)
+
+        first = await catalog.snapshot(refresh=True)
+        first_version = first["catalog_version"]
+        wave = next(
+            item
+            for item in first["capabilities"]
+            if item["capability_id"] == "soridormi.nested_wave"
+        )
+        self.assertTrue(wave["available"])
+        self.assertFalse(wave["can_run_parallel"])
+        self.assertEqual(wave["exclusive_group"], "arm_expression")
+        self.assertEqual(wave["resource_claims"], ["arm_expression"])
+        self.assertEqual(
+            wave["execution_constraints"],
+            {"max_count": 3},
+        )
+
+        second = await catalog.snapshot(refresh=True)
+        self.assertEqual(second["catalog_version"], first_version)
+        self.assertEqual(second["capabilities"], first["capabilities"])
+        self.assertIn("duplicate Soridormi skill_id", second["live_refresh_error"])
     async def test_refreshes_live_named_skills_and_routes_motion(self) -> None:
         invoker = _Invoker()
         catalog = CapabilityCatalog(_registry(), live_invoker=invoker, min_score=0.10)

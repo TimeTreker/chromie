@@ -52,7 +52,13 @@ _OUTPUT_SCHEMA_DIGEST_DOMAIN = b"chromie-output-schema-v1\x00"
 
 
 def output_schema_sha256(output_schema: dict[str, Any]) -> str:
-    """Return the deterministic identity of one validated output schema."""
+    """Return the deterministic identity of an output-schema document.
+
+    This function only canonicalizes and hashes. Call
+    :func:`validate_output_schema_declaration` before treating the digest as an
+    authority commitment. Keeping hashing separate lets retained malformed
+    evidence still be recognized and rejected deterministically.
+    """
 
     if not isinstance(output_schema, dict):
         raise TypeError("output_schema must be a dictionary")
@@ -122,6 +128,105 @@ def reject_forbidden_low_level_fields(value: Any, *, path: str = "$") -> Any:
         for index, item in enumerate(value):
             reject_forbidden_low_level_fields(item, path=f"{path}[{index}]")
     return value
+
+SUPPORTED_OUTPUT_SCHEMA_TYPES = frozenset(
+    {
+        "array",
+        "boolean",
+        "integer",
+        "null",
+        "number",
+        "object",
+        "string",
+    }
+)
+
+
+def output_schema_declaration_error(
+    schema: Any,
+    *,
+    path: str = "$",
+) -> str | None:
+    """Return why a provider output schema is unsafe for model observation.
+
+    Model-visible provider data must be declared by a closed, explicit schema.
+    Open objects, empty declarations, schema composition, and untyped children
+    are rejected so a provider cannot widen what later model stages may see.
+    """
+
+    if not isinstance(schema, dict):
+        return f"{path} is not an object schema"
+    if "$ref" in schema or any(
+        key in schema for key in ("allOf", "anyOf", "oneOf")
+    ):
+        return f"{path} uses unsupported schema indirection or composition"
+    schema_type = schema.get("type")
+    if isinstance(schema_type, str):
+        schema_types = {schema_type}
+    elif isinstance(schema_type, list) and schema_type and all(
+        isinstance(item, str) for item in schema_type
+    ):
+        schema_types = set(schema_type)
+    elif schema_type is None:
+        schema_types = set()
+    else:
+        return f"{path} has an invalid type declaration"
+    unsupported = sorted(schema_types - SUPPORTED_OUTPUT_SCHEMA_TYPES)
+    if unsupported:
+        return f"{path} uses unsupported types: {unsupported}"
+    enum = schema.get("enum")
+    if "enum" in schema and (not isinstance(enum, list) or not enum):
+        return f"{path} enum must be a non-empty list"
+    properties = schema.get("properties")
+    if path == "$" and schema_type != "object":
+        return "output schema root must have type=object"
+    if path != "$" and not schema_types and "enum" not in schema:
+        return f"{path} must declare a type or enum"
+    if properties is not None and "object" not in schema_types:
+        return f"{path} declares properties without type=object"
+    if "object" in schema_types:
+        if not isinstance(properties, dict) or not properties:
+            return f"{path} must declare non-empty properties"
+        if schema.get("additionalProperties") is not False:
+            return f"{path} must set additionalProperties=false"
+        required = schema.get("required", [])
+        if not isinstance(required, list) or any(
+            not isinstance(item, str) or item not in properties
+            for item in required
+        ):
+            return f"{path} has invalid required properties"
+        for key, child in properties.items():
+            error = output_schema_declaration_error(
+                child,
+                path=f"{path}.properties.{key}",
+            )
+            if error is not None:
+                return error
+    if "items" in schema and "array" not in schema_types:
+        return f"{path} declares items without type=array"
+    if "array" in schema_types:
+        items = schema.get("items")
+        if not isinstance(items, dict):
+            return f"{path} array must declare an item schema"
+        return output_schema_declaration_error(items, path=f"{path}.items")
+    return None
+
+
+def validate_output_schema_declaration(schema: Any) -> dict[str, Any]:
+    """Validate and return one closed provider output-schema declaration."""
+
+    error = output_schema_declaration_error(schema)
+    if error is not None:
+        raise ValueError(error)
+    assert isinstance(schema, dict)
+    reject_forbidden_low_level_fields(schema)
+    raw_controller_path = find_raw_controller_array_schema(schema)
+    if raw_controller_path is not None:
+        raise ValueError(
+            "output schema exposes a raw planar controller command array at "
+            f"{raw_controller_path}"
+        )
+    return schema
 
 
 class InteractionSpeech(BaseModel):

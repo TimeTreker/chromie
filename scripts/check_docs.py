@@ -100,6 +100,10 @@ STALE_PHRASES = {
 MILESTONE_TOKEN_RE = re.compile(
     r"(?<![A-Za-z0-9])M(?:0|[1-9][0-9]*)(?=\b|_)"
 )
+NUMBERED_STEP_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9])step(?:\s+|[_-]?)(?:0|[1-9][0-9]*)(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
 NUMBERED_PHASE_PATH_RE = re.compile(
     r"(?:^|[._/-])(?:m|step)(?:0|[1-9][0-9]*)(?=$|[._/-])",
     re.IGNORECASE,
@@ -159,12 +163,17 @@ def check_semantic_project_naming(errors: list[str]) -> None:
                 "use a capability or issue-oriented name"
             )
         text = path.read_text(encoding="utf-8", errors="replace")
-        for match in MILESTONE_TOKEN_RE.finditer(text):
-            line = text.count("\n", 0, match.start()) + 1
-            errors.append(
-                f"{relative}:{line}: numbered milestone token is forbidden in "
-                "maintained source; use a semantic capability, issue, or evidence name"
-            )
+        forbidden_tokens = (
+            (MILESTONE_TOKEN_RE, "numbered milestone"),
+            (NUMBERED_STEP_TOKEN_RE, "numbered implementation-stage"),
+        )
+        for pattern, token_kind in forbidden_tokens:
+            for match in pattern.finditer(text):
+                line = text.count("\n", 0, match.start()) + 1
+                errors.append(
+                    f"{relative}:{line}: {token_kind} token is forbidden in "
+                    "maintained source; use a semantic capability, issue, or evidence name"
+                )
 
 
 def normalized_link_target(raw: str) -> str:

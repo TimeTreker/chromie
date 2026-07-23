@@ -191,6 +191,19 @@ reservation/dispatch bridge, atomic receipt/outcome reconciliation into Goal
 state, partial confirmation-token rebuilding, and retained supervised
 E-stop/safe-idle evidence.
 
+A subsequent repository-wide core-contract audit aligned implementation with
+the project charter. Provider output schemas are now closed and validated before
+commitment and again at closure; Agent-visible and trusted-runtime Soridormi
+catalog refreshes are atomic and share availability/execution/confirmation
+semantics; dynamic named-skill and TaskGraph outputs use bounded adapter-owned
+contracts; non-terminal TaskGraph receipts and missing Action Client execution
+fail closed; and normal weather or gratitude intent is no longer selected by
+user-text phrase tables. The audit gate passed 1,305 primary tests plus 20 legacy
+Agent tests, 388/388 file-backed scenarios, and 59/59 Level A cases. The semantic
+authority audit, documentation validation, compilation, shell syntax, and diff
+hygiene also passed. This remains automatic evidence rather than provider-backed
+target validation.
+
 The initial Runtime Observability implementation is now present behind a
 default-off policy. It provides architecture-independent Runtime Trace items,
 module-owned identity, `off`/`basic`/`debug` collection, monotonic duration

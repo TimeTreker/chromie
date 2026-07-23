@@ -22,6 +22,7 @@ from shared.chromie_contracts.interaction import (
     InteractionSpeech,
     SkillRequest,
     output_schema_sha256,
+    validate_output_schema_declaration,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
@@ -386,6 +387,7 @@ class CanonicalPlanRuntimeAdapter:
                 )
                 continue
             try:
+                validate_output_schema_declaration(definition.output_schema)
                 output_schema_sha256(definition.output_schema)
             except (TypeError, ValueError) as exc:
                 errors.append(

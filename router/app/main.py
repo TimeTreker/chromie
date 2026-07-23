@@ -321,77 +321,6 @@ def _has_strong_followup_context(request: RouteRequest) -> bool:
     return False
 
 
-_GRATITUDE_ZH = {"谢谢", "谢谢你", "多谢", "感谢", "感谢你", "辛苦了"}
-_GRATITUDE_EN = {
-    "thank",
-    "thanks",
-    "thank you",
-    "thanks chromie",
-    "thank you chromie",
-    "thx",
-    "appreciate it",
-}
-
-
-def _normalized_social_text(text: str) -> str:
-    return " ".join(
-        re.findall(r"[A-Za-z0-9]+|[\u4e00-\u9fff]+", text or "", flags=re.UNICODE)
-    ).strip().casefold()
-
-
-def _is_standalone_gratitude(text: str) -> bool:
-    normalized = _normalized_social_text(text)
-    if not normalized:
-        return False
-    compact = normalized.replace(" ", "")
-    if compact in _GRATITUDE_ZH:
-        return True
-    if normalized in _GRATITUDE_EN:
-        return True
-    # Keep this guard narrow. Phrases such as "no thanks" or
-    # "thank you, but stop" are dialogue/control turns and must be handled by
-    # confirmation or interrupt policy, not by gratitude acknowledgement.
-    return False
-
-
-def _gratitude_acknowledgement_decision(request: RouteRequest) -> RouteDecision:
-    language = _request_language(request)
-    zh = language.startswith("zh") or _contains_cjk(request.text)
-    speak_first = "不客气。" if zh else "You're welcome."
-    pending_tasks = request.context.get("pending_tasks")
-    pending_task_count = len(pending_tasks) if isinstance(pending_tasks, list) else 0
-    return finalize_decision(
-        RouteDecision(
-            route="chat",
-            agents=["speaker_agent"],
-            intent="gratitude_acknowledgement",
-            confidence=1.0,
-            language="zh-CN" if zh else (language if language != "auto" else "en-US"),
-            priority="low",
-            needs_agent=True,
-            should_speak=True,
-            speak_first=speak_first,
-            fast_speech={
-                "text": speak_first,
-                "purpose": "acknowledge",
-                "commitment": "prelude_only",
-                "must_not_claim_completion": True,
-            },
-            candidate_capabilities=[],
-            reason="standalone_gratitude_acknowledgement",
-            source="rules",
-            metadata={
-                "terminal_conversational_act": True,
-                "gratitude_acknowledgement": True,
-                "pending_task_count": pending_task_count,
-                "allowed_speech_act": "gratitude_acknowledgement",
-            },
-        ),
-        request,
-        source="rules",
-    )
-
-
 def _is_low_information_asr_fragment(request: RouteRequest) -> bool:
     units = _normalized_information_units(request.text)
     if not units:
@@ -1591,9 +1520,6 @@ async def route(request: RouteRequest) -> RouteDecision:
     if priority is not None:
         decision = await _review_priority_interrupt(request, priority)
         emergency_matched = True
-
-    if decision is None and _is_standalone_gratitude(request.text):
-        decision = _gratitude_acknowledgement_decision(request)
 
     if decision is None:
         snapshot_method = getattr(capability_catalog, "snapshot", None)

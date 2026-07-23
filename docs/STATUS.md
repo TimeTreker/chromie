@@ -181,6 +181,25 @@ Recoverable embodied failures use a fresh confirmation-bound child plan over
 only the failed recoverable steps rather than mutating or replaying the parent
 plan.
 
+A repository-wide contract audit then corrected several fail-open or
+authority-mismatch paths. Canonical plan commitment now rejects absent, empty,
+open, composed, untyped, or low-level provider output schemas; the same shared
+validator protects post-execution observation. Dynamic Soridormi named skills
+receive an adapter-owned closed result schema through atomic Agent-visible and
+trusted-runtime catalog refreshes. Both layers reject malformed or duplicate
+entries, preserve the last complete snapshot, and interpret nested availability,
+execution, and confirmation fields consistently. TaskGraph results expose a
+bounded terminal summary rather than an undeclared provider payload. Missing, pending, running, or unknown TaskGraph
+status is failure, not completion, and a missing legacy Action Client also
+fails instead of fabricating success. The Router no longer infers weather or
+standalone gratitude from user-text phrase tables: normal semantic intent is
+model-authored, while deterministic code only validates/repairs structured
+route contracts or clarifies. The resulting audit gate passed 1,305 primary
+tests plus 20 legacy Agent tests, 388/388 file-backed scenarios, and 59/59
+Level A cases; semantic-authority, documentation, compilation, shell-syntax,
+and diff-hygiene checks also passed. This is automatic evidence only and does
+not replace clean provider-backed target qualification.
+
 The Chromie/Soridormi task-agent boundary remains the downstream embodied-planning surface. Chromie consumes a
 richer Soridormi task API snapshot with
 `soridormi.task.get_capabilities`, `preview`, `submit`, `status`, `events`, and
@@ -234,9 +253,10 @@ timeouts by stage rather than model name, bound quick-router output to compact
 classification JSON with `ROUTER_LLM_NUM_PREDICT=512`, and convert
 schema-invalid or narrowed quick compound `actions[]` into the unified
 Goal-driven Runtime instead of executing or narrowing them. Isolated low-information
-ASR fragments clarify even if the fast model calls them chat. Weather/tool
-queries with semantic weather evidence are normalized back to the tool lane when
-the weather lookup affordance is present, even if a stale route item says chat.
+ASR fragments clarify even if the fast model calls them chat. A model-authored
+weather intent that contradicts its route is treated as an invalid structured
+contract and receives one independent semantic repair; failed or inconsistent
+repair clarifies rather than inferring tool intent from user-text keywords.
 A July 12 live voice log exposed the inverse contamination case: after a weather
 turn, a clear walking request was returned as `route=chat`,
 `intent=weather_query`. The Router now treats route/intent and exact-capability

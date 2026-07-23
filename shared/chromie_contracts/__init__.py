@@ -8,7 +8,9 @@ from .interaction import (
     SkillResult,
     SkillTrace,
     SkillTraceEvent,
+    output_schema_declaration_error,
     output_schema_sha256,
+    validate_output_schema_declaration,
 )
 from .execution_outcome import (
     ExecutionAggregateStatus,
@@ -124,7 +126,9 @@ __all__ = [
     "SkillResult",
     "SkillTrace",
     "SkillTraceEvent",
+    "output_schema_declaration_error",
     "output_schema_sha256",
+    "validate_output_schema_declaration",
     "ExecutionAggregateStatus",
     "ExecutionEvidence",
     "ExecutionEvidenceStatus",

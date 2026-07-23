@@ -737,7 +737,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(observation.status, "schema_unavailable")
         self.assertEqual(
             observation.validation_errors,
-            ["committed_output_schema_absent"],
+            ["current_output_schema_invalid"],
         )
         self.assertNotIn(secret_output, bundle.model_dump_json())
 

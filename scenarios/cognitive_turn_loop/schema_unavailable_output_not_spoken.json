@@ -3,7 +3,7 @@
   "id": "schema_unavailable_output_not_spoken",
   "suite": "cognitive_turn_loop",
   "level": "integration",
-  "description": "A completed provider result with no committed domain-output schema retains terminal status but cannot expose its payload in final speech.",
+  "description": "A provider schema that becomes invalid after request commitment retains terminal status but cannot expose its payload in final speech.",
   "tags": ["level-a", "schema-gate", "model-observation", "truthful-speech"],
   "input": {
     "text": "Run the schema-less check.",
@@ -17,9 +17,12 @@
         "skill_id": "chromie.scenario.schema_less_check",
         "provider_id": "scenario.schema-less",
         "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
-        "output_schema": {}
+        "output_schema": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"], "additionalProperties": false}
       }
     ],
+    "current_output_schemas": {
+      "chromie.scenario.schema_less_check": {}
+    },
     "plan": {
       "plan_id": "plan-level-a-schema-unavailable",
       "planner_tier": "fast",
@@ -27,7 +30,7 @@
       "coverage": "complete",
       "confidence": 0.99,
       "goal_ids": ["goal-schema-less"],
-      "goal_summary": "Run a check whose provider has no declared output schema.",
+      "goal_summary": "Run a check whose committed output schema becomes invalid before closure.",
       "steps": [
         {
           "step_id": "schema-less",
@@ -68,7 +71,7 @@
     "evidence_statuses": ["completed"],
     "goal_statuses": ["completed"],
     "observation_statuses": ["schema_unavailable"],
-    "schema_gate_reasons": ["committed_output_schema_absent"],
+    "schema_gate_reasons": ["current_output_schema_invalid"],
     "goal_state_statuses": ["done"],
     "goal_state_outcome_statuses": ["completed"],
     "closure_status": "speech_runtime_completed",

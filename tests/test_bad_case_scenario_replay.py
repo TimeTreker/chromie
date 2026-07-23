@@ -12,11 +12,8 @@ from orchestrator.runtime.deepthinking_policy import (
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.schemas.route import RouteDecision, RouteItem
-from router.app.llm_router import _weather_fast_speech_text, _weather_location_hint
 from router.app.main import (
-    _gratitude_acknowledgement_decision,
     _guard_low_information_side_effect,
-    _is_standalone_gratitude,
 )
 from router.app.schema import RouteDecision as RouterRouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.interaction import InteractionResponse
@@ -130,31 +127,14 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
         self.assertIn("需要先确认", spoken)
         self.assertTrue(prepared.metadata.get("truth_reconciled"))
 
-    def test_weather_fast_first_does_not_duplicate_today(self) -> None:
-        request = RouteRequest(text="今天重庆天气怎么样？", language="zh-CN")
+    def test_router_has_no_phrase_routed_gratitude_shortcut(self) -> None:
+        from pathlib import Path
 
-        self.assertEqual(_weather_location_hint(request.text), "重庆")
-        self.assertEqual(_weather_fast_speech_text(request), "好的，我查一下重庆今天的天气。")
+        source = Path("router/app/main.py").read_text(encoding="utf-8")
 
-    def test_thanks_during_pending_walk_is_ack_not_missing_ability(self) -> None:
-        request = RouteRequest(
-            text="Thank.",
-            language="en-US",
-            context={
-                "pending_tasks": [
-                    {"skill_id": "soridormi.walk_forward", "status": "running"}
-                ]
-            },
-        )
-
-        self.assertTrue(_is_standalone_gratitude(request.text))
-        decision = _gratitude_acknowledgement_decision(request)
-
-        self.assertEqual(decision.route, "chat")
-        self.assertEqual(decision.intent, "gratitude_acknowledgement")
-        self.assertNotEqual(decision.intent, "missing_or_unsupported_ability")
-        self.assertEqual(decision.speak_first, "You're welcome.")
-        self.assertEqual(decision.metadata.get("pending_task_count"), 1)
+        self.assertNotIn("_is_standalone_gratitude", source)
+        self.assertNotIn("_gratitude_acknowledgement_decision", source)
+        self.assertNotIn("_GRATITUDE_EN", source)
 
     def test_gratitude_ack_is_terminal_in_agent_runtime(self) -> None:
         decision = AgentRouteDecision(

@@ -76,7 +76,7 @@ should use deeper reasoning.
 
 ## Implementation sequence
 
-### Step 1 - Make proposal semantics explicit at the Soridormi boundary
+### Explicit proposal semantics at the Soridormi boundary
 
 Status in this patch: implemented for named-skill `create_plan` calls.
 
@@ -103,7 +103,7 @@ The field is intentionally sent at `soridormi.skill.create_plan`, not only at
 `execute_plan`, because Soridormi's feasibility checks and plan shaping happen
 while creating the body-owned plan.
 
-### Step 2 - Keep Soridormi named skills dynamically refreshable
+### Dynamic Soridormi named-skill discovery
 
 Status: implemented in the dynamic catalog refresh patch.
 
@@ -114,11 +114,22 @@ forces a refresh when a requested `soridormi.*` skill is unknown or previously
 absent, upserts live definitions, and marks missing live skills unavailable
 instead of silently keeping stale executable definitions.
 
+Catalog application is atomic in both the Agent-visible capability view and
+the trusted host registry: a malformed or duplicate entry rejects the whole
+refresh, preserves the last complete snapshot, and cannot leave the planner and
+executor with different partial catalogs.
+Chromie also assigns every imported named skill one versioned, closed
+adapter-result schema. Soridormi still owns the body-side plan and execution,
+while the adapter projects a successful terminal result into bounded fields
+such as completion, skill identity, mode, no-motion/recommendation state, and a
+short summary. Raw or undeclared provider payload is not committed as
+model-visible evidence.
+
 This keeps the generic `SoridormiNamedSkillAdapter` as a protocol adapter
 rather than a per-skill registry. `SoridormiMcpSkillProvider` remains only as
 a backward-compatible alias for older imports.
 
-### Step 3 - Add a conditional deep-thinking policy helper
+### Conditional deep-thinking delegation policy
 
 Status: implemented in the conditional deepthinking policy patch.
 
@@ -132,7 +143,7 @@ or frustrated user state, live-perception dependencies, high-risk physical goals
 such as navigation or manipulation, and route-specific low confidence. Simple
 exact low-risk body cues can remain fast proposals.
 
-### Step 4 - Support compound Route2 proposals without bypassing gates
+### Compound fast-route proposals with mandatory runtime gates
 
 Status: implemented in the compound Route2 proposal patch.
 
@@ -149,10 +160,10 @@ The conditional deep-thinking policy therefore treats Router action
 `capability_id` values, action-level live-perception flags, and selected
 capability risk metadata as first-class escalation evidence.
 
-### Step 5 - Implement B-level recovery as a protocol, not a loop
+### Confirmed bounded recovery protocol
 
 Status: implemented for single Soridormi `SkillResult` failures; TaskGraph
-node-level residual recovery remains Step 6 work.
+node-level residual recovery remains part of the residual-replan work.
 
 Recoverable Soridormi failures now use a bounded, request-bound recovery
 confirmation instead of a generic failure message or an automatic retry:
@@ -181,7 +192,7 @@ The confirmation timeout is conservative: if the user does not confirm, Chromie
 does not retry. Late confirmation replies expire through the same
 request-bound confirmation dialogue used for normal physical confirmations.
 
-### Step 6 - Add residual replan support
+### Residual TaskGraph replanning
 
 Status: implemented for failed/aborted TaskGraph traces and host TaskGraph skill results.
 
@@ -209,7 +220,7 @@ newly validated and re-enter confirmation, SkillRuntime, and Soridormi safety
 gates. The next plan should cover only the remaining safe goal, or stop and
 explain when no safe residual plan exists.
 
-### Step 7 - Post-interrupt review with physical auto-resume lock
+### Post-interrupt review with a physical resume lock
 
 Status: implemented for corrected `InteractionResponse` outputs and legacy
 Agent actions.
@@ -234,7 +245,7 @@ that interaction. Confirmation still only restarts the normal preflight,
 SkillRuntime, and Soridormi plan/monitor/execute path; it is not a resume of
 the pre-stop physical state.
 
-### Step 8 - Machine-readable live-perception dependencies
+### Machine-readable live-perception dependency contract
 
 Status: implemented for Router action proposals, capability-selected skills,
 and Soridormi `chromie_intent` plan metadata.
@@ -258,7 +269,7 @@ closed-loop updates. The dependency contract lists only semantic dependencies
 and expected feedback such as observation summaries, confidence, failure codes,
 and recommended next actions.
 
-### Step 9 - Soridormi proposal contract surface
+### Soridormi proposal contract manifest
 
 Status: implemented on the Chromie side by extending the Soridormi manifest and
 provider call payload.
@@ -271,7 +282,7 @@ validate, reshape, refuse, monitor, emergency-stop, and report recovery
 recommendations.
 
 
-### Step 10 - Make the Soridormi provider boundary name explicit
+### Explicit Soridormi adapter naming
 
 Status: implemented as a safe class rename plus documentation.
 
@@ -288,7 +299,7 @@ and should not require new methods in this adapter. The adapter's job is only
 to translate `soridormi.<skill_id>` requests into the shared plan/monitor/execute
 protocol while carrying proposal and trace metadata.
 
-### Step 11 - Add end-to-end architecture acceptance tests
+### End-to-end architecture acceptance coverage
 
 Status: implemented with integration coverage for the safety boundary.
 

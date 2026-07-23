@@ -33,6 +33,28 @@ logger = logging.getLogger(__name__)
 CancellationDomain = Literal["output", "embodied_motion"]
 
 
+SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "completed": {"type": "boolean"},
+        "skill_id": {"type": "string"},
+        "mode": {"type": "string"},
+        "no_motion": {"type": "boolean"},
+        "recommendation_only": {"type": "boolean"},
+        "summary": {"type": "string"},
+    },
+    "required": [
+        "completed",
+        "skill_id",
+        "mode",
+        "no_motion",
+        "recommendation_only",
+        "summary",
+    ],
+    "additionalProperties": False,
+}
+
+
 class SkillDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -90,15 +112,59 @@ class SkillRegistry:
         requires_confirmation: bool = True,
         mark_absent_unavailable: bool = True,
     ) -> None:
-        seen_skill_ids: set[str] = set()
-        for item in skills:
+        """Atomically replace the live Soridormi named-skill view.
+
+        Soridormi owns the body-side catalog, but Chromie owns the adapter
+        result contract. Every imported named skill therefore exposes the same
+        closed, model-safe execution-result schema while retaining the live
+        input, availability, scheduling, and safety metadata. A malformed or
+        duplicate entry rejects the whole refresh instead of partially
+        mutating the trusted registry.
+        """
+
+        imported: dict[str, SkillDefinition] = {}
+        for raw_item in skills:
+            if not isinstance(raw_item, dict):
+                raise ValueError("Soridormi skill catalog entries must be objects")
+            item = dict(raw_item)
             upstream_id = str(item.get("skill_id", "")).strip()
             if not upstream_id:
                 raise ValueError("Soridormi skill catalog entry has no skill_id")
-            effects = list(item.get("effects") or ["physical_motion"])
+            skill_id = f"soridormi.{upstream_id}"
+            if skill_id in imported:
+                raise ValueError(
+                    f"duplicate Soridormi skill_id in one catalog: {upstream_id}"
+                )
+
+            execution = item.get("execution")
+            execution_contract = execution if isinstance(execution, dict) else {}
+            availability = item.get("availability")
+            availability_contract = (
+                availability if isinstance(availability, dict) else {}
+            )
+            confirmation = item.get("confirmation")
+            confirmation_contract = (
+                confirmation if isinstance(confirmation, dict) else {}
+            )
+            effects_raw = item.get("effects")
+            if effects_raw is None:
+                effects = ["physical_motion"]
+            elif isinstance(effects_raw, list):
+                effects = [
+                    str(value)
+                    for value in effects_raw
+                    if str(value).strip()
+                ]
+            else:
+                raise ValueError(
+                    f"Soridormi skill {upstream_id!r} effects must be a list"
+                )
             safety_class = str(item.get("safety_class") or "physical_motion")
             provider_requires_confirmation = bool(
-                item.get("requires_confirmation", False)
+                item.get(
+                    "requires_confirmation",
+                    confirmation_contract.get("required", False),
+                )
             )
             effective_requires_confirmation = (
                 provider_requires_confirmation
@@ -110,67 +176,111 @@ class SkillRegistry:
                     )
                 )
             )
-            skill_id = f"soridormi.{upstream_id}"
-            seen_skill_ids.add(skill_id)
-            self.upsert(
-                SkillDefinition(
-                    skill_id=skill_id,
-                    version=str(item.get("version") or version),
-                    provider_id=provider_id,
-                    description=str(item.get("description") or ""),
-                    input_schema=dict(item.get("parameters_schema") or {}),
-                    available=bool(item.get("available", False)),
-                    unavailable_reason=item.get("unavailable_reason"),
-                    requires_confirmation=effective_requires_confirmation,
-                    interruptible=bool(item.get("interruptible", False)),
-                    can_run_parallel=bool(item.get("can_run_parallel", True)),
-                    exclusive_group=(
-                        str(item.get("exclusive_group") or "").strip()
-                        or "soridormi.robot_motion"
-                    ),
-                    timeout_ms=max(
-                        1,
-                        int(float(item.get("timeout_s") or 30.0) * 1000),
-                    ),
-                    idempotent=False,
-                    requires_safety_monitor=False,
-                    cancellation_domains=(
-                        ("embodied_motion",)
-                        if "physical_motion" in effects
-                        else ()
-                    ),
-                    metadata={
-                        "upstream_skill_id": upstream_id,
-                        "effects": effects,
-                        "safety_class": safety_class,
-                        "cancellation_granularity": (
-                            "global_domain"
-                            if "physical_motion" in effects
-                            else "request"
-                        ),
-                        "execution": item.get("execution"),
-                        "fallback": item.get("fallback"),
-                        "hardware_enabled": item.get("hardware_enabled"),
-                        "provider_managed_safety_monitor": True,
-                        "resource_claims": [
-                            str(value)
-                            for value in (item.get("resource_claims") or [])
-                            if str(value).strip()
-                        ],
-                        "execution_constraints": dict(
-                            item.get("execution_constraints") or {}
-                        ),
-                    },
-                )
+            timeout_s = item.get(
+                "timeout_s",
+                execution_contract.get("timeout_s", 30.0),
             )
+            can_run_parallel = item.get(
+                "can_run_parallel",
+                execution_contract.get("can_run_parallel", True),
+            )
+            exclusive_group = (
+                str(
+                    item.get("exclusive_group")
+                    or execution_contract.get("exclusive_group")
+                    or ""
+                ).strip()
+                or "soridormi.robot_motion"
+            )
+            input_schema = (
+                item.get("parameters_schema")
+                or item.get("input_schema")
+                or {}
+            )
+            if not isinstance(input_schema, dict):
+                raise ValueError(
+                    f"Soridormi skill {upstream_id!r} input schema must be an object"
+                )
+            resource_claims = item.get(
+                "resource_claims",
+                execution_contract.get("resource_claims", []),
+            )
+            if not isinstance(resource_claims, list):
+                raise ValueError(
+                    f"Soridormi skill {upstream_id!r} resource_claims must be a list"
+                )
+
+            execution_constraints = item.get(
+                "execution_constraints",
+                execution_contract.get("execution_constraints", {}),
+            )
+            if not isinstance(execution_constraints, dict):
+                raise ValueError(
+                    f"Soridormi skill {upstream_id!r} execution_constraints must be an object"
+                )
+
+            imported[skill_id] = SkillDefinition(
+                skill_id=skill_id,
+                version=str(item.get("version") or version),
+                provider_id=provider_id,
+                description=str(item.get("description") or ""),
+                input_schema=dict(input_schema),
+                output_schema=SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
+                available=bool(
+                    item.get(
+                        "available",
+                        availability_contract.get("available", True),
+                    )
+                ),
+                unavailable_reason=(
+                    item.get("unavailable_reason")
+                    or availability_contract.get("reason")
+                ),
+                requires_confirmation=effective_requires_confirmation,
+                interruptible=bool(item.get("interruptible", False)),
+                can_run_parallel=bool(can_run_parallel),
+                exclusive_group=exclusive_group,
+                timeout_ms=max(1, int(float(timeout_s or 30.0) * 1000)),
+                idempotent=False,
+                requires_safety_monitor=False,
+                cancellation_domains=(
+                    ("embodied_motion",)
+                    if "physical_motion" in effects
+                    else ()
+                ),
+                metadata={
+                    "upstream_skill_id": upstream_id,
+                    "effects": effects,
+                    "safety_class": safety_class,
+                    "cancellation_granularity": (
+                        "global_domain"
+                        if "physical_motion" in effects
+                        else "request"
+                    ),
+                    "execution": execution,
+                    "fallback": item.get("fallback"),
+                    "hardware_enabled": item.get("hardware_enabled"),
+                    "provider_managed_safety_monitor": True,
+                    "resource_claims": [
+                        str(value)
+                        for value in resource_claims
+                        if str(value).strip()
+                    ],
+                    "execution_constraints": dict(execution_constraints),
+                    "output_contract": "chromie_soridormi_named_skill_v1",
+                },
+            )
+
+        updated = dict(self._skills)
+        updated.update(imported)
         if mark_absent_unavailable:
-            for skill_id, definition in list(self._skills.items()):
+            for skill_id, definition in list(updated.items()):
                 if (
                     definition.provider_id == provider_id
                     and skill_id.startswith("soridormi.")
-                    and skill_id not in seen_skill_ids
+                    and skill_id not in imported
                 ):
-                    self._skills[skill_id] = definition.model_copy(
+                    updated[skill_id] = definition.model_copy(
                         update={
                             "available": False,
                             "unavailable_reason": (
@@ -182,6 +292,8 @@ class SkillRegistry:
                             },
                         }
                     )
+        self._skills = updated
+
 
 
 class SkillExecutionContext(BaseModel):

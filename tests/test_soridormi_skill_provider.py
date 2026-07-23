@@ -109,6 +109,17 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(execution.status, "completed")
+        self.assertEqual(
+            execution.results[0].output,
+            {
+                "completed": True,
+                "skill_id": "nod_yes",
+                "mode": "",
+                "no_motion": False,
+                "recommendation_only": False,
+                "summary": "completed nod_yes",
+            },
+        )
         create_plan_args = invoker.calls[0][1]
         self.assertEqual(
             invoker.calls[0][0],

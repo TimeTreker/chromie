@@ -10,7 +10,9 @@ from shared.chromie_contracts.interaction import (
     SkillRequest,
     SkillResult,
     SkillTrace,
+    output_schema_declaration_error,
     output_schema_sha256,
+    validate_output_schema_declaration,
 )
 
 
@@ -157,6 +159,53 @@ class InteractionContractTests(unittest.TestCase):
                 skill_id="soridormi.nod_yes",
                 committed_output_schema_sha256="not-a-sha256",
             )
+
+    def test_provider_output_schema_requires_a_closed_explicit_object(self) -> None:
+        valid = {
+            "type": "object",
+            "properties": {
+                "completed": {"type": "boolean"},
+                "summary": {"type": "string"},
+            },
+            "required": ["completed"],
+            "additionalProperties": False,
+        }
+
+        self.assertIs(validate_output_schema_declaration(valid), valid)
+        invalid = (
+            {},
+            {"type": "object", "properties": {}},
+            {
+                "type": "object",
+                "properties": {"payload": {}},
+                "additionalProperties": False,
+            },
+            {
+                "type": "object",
+                "properties": {"payload": {"type": "string"}},
+                "additionalProperties": True,
+            },
+        )
+        for schema in invalid:
+            with self.subTest(schema=schema):
+                self.assertIsNotNone(output_schema_declaration_error(schema))
+                with self.assertRaises(ValueError):
+                    validate_output_schema_declaration(schema)
+
+    def test_provider_output_schema_rejects_low_level_robot_data(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "joint_targets": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                }
+            },
+            "additionalProperties": False,
+        }
+
+        with self.assertRaisesRegex(ValueError, "forbidden low-level field"):
+            validate_output_schema_declaration(schema)
 
     def test_unknown_contract_fields_are_rejected(self) -> None:
         with self.assertRaises(ValidationError):

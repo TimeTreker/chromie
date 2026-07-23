@@ -14,6 +14,7 @@ from orchestrator.runtime.skill_runtime import (
     LocalSpeechSkillProvider,
     MockSkillProvider,
     RuntimeAuthorization,
+    SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
     SkillDefinition,
     SkillRegistry,
     SkillRuntime,
@@ -128,6 +129,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertTrue(registry.get("soridormi.nod_yes").requires_confirmation)
+        self.assertEqual(
+            registry.get("soridormi.nod_yes").output_schema,
+            SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
+        )
 
     async def test_soridormi_import_allows_declared_sim_exemption_when_host_allows_it(self) -> None:
         registry = SkillRegistry()
@@ -208,6 +213,73 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             definition.cancellation_domains,
             ("embodied_motion",),
         )
+        self.assertEqual(
+            definition.output_schema,
+            SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
+        )
+        self.assertEqual(
+            definition.metadata["output_contract"],
+            "chromie_soridormi_named_skill_v1",
+        )
+
+    async def test_soridormi_import_accepts_nested_catalog_contracts(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [
+                {
+                    "skill_id": "look_at_person",
+                    "parameters_schema": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                    "availability": {
+                        "available": True,
+                        "reason": None,
+                    },
+                    "execution": {
+                        "timeout_s": 4.0,
+                        "can_run_parallel": False,
+                        "exclusive_group": "soridormi.head",
+                        "resource_claims": ["head"],
+                    },
+                    "confirmation": {"required": False},
+                    "effects": ["physical_motion"],
+                }
+            ],
+            requires_confirmation=False,
+        )
+
+        definition = registry.get("soridormi.look_at_person")
+        self.assertTrue(definition.available)
+        self.assertEqual(definition.timeout_ms, 4000)
+        self.assertFalse(definition.can_run_parallel)
+        self.assertEqual(definition.exclusive_group, "soridormi.head")
+        self.assertEqual(definition.metadata["resource_claims"], ["head"])
+
+    async def test_soridormi_import_rejects_duplicate_catalog_atomically(self) -> None:
+        registry = SkillRegistry()
+        registry.import_soridormi_catalog(
+            [{"skill_id": "nod_yes", "available": True}],
+            requires_confirmation=False,
+        )
+        before = registry.get("soridormi.nod_yes").model_dump(mode="json")
+
+        with self.assertRaisesRegex(ValueError, "duplicate Soridormi skill_id"):
+            registry.import_soridormi_catalog(
+                [
+                    {"skill_id": "wave_hand", "available": True},
+                    {"skill_id": "wave_hand", "available": False},
+                ],
+                requires_confirmation=False,
+            )
+
+        self.assertEqual(
+            registry.get("soridormi.nod_yes").model_dump(mode="json"),
+            before,
+        )
+        with self.assertRaisesRegex(ValueError, "unknown skill"):
+            registry.get("soridormi.wave_hand")
 
     async def test_soridormi_import_marks_absent_live_skills_unavailable(self) -> None:
         registry = SkillRegistry()

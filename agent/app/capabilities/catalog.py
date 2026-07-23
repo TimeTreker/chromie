@@ -476,41 +476,130 @@ class CapabilityCatalog:
                 if not isinstance(skills, list):
                     raise RuntimeError("skill catalog response has no skills list")
                 live: dict[str, CatalogCapability] = {}
-                for item in skills:
-                    if not isinstance(item, dict):
-                        continue
+                for raw_item in skills:
+                    if not isinstance(raw_item, dict):
+                        raise ValueError(
+                            "Soridormi skill catalog entries must be objects"
+                        )
+                    item = dict(raw_item)
                     upstream_id = str(item.get("skill_id") or "").strip()
                     if not upstream_id:
-                        continue
+                        raise ValueError(
+                            "Soridormi skill catalog entry has no skill_id"
+                        )
                     # Match the host SkillRegistry namespace exactly. The
                     # provider contract returns an unprefixed opaque skill_id.
                     capability_id = f"soridormi.{upstream_id}"
-                    effects = list(item.get("effects") or ["physical_motion"])
-                    safety_class = str(item.get("safety_class") or "physical_motion")
+                    if capability_id in live:
+                        raise ValueError(
+                            "duplicate Soridormi skill_id in one catalog: "
+                            f"{upstream_id}"
+                        )
+
+                    execution = item.get("execution")
+                    execution_contract = (
+                        execution if isinstance(execution, dict) else {}
+                    )
+                    availability = item.get("availability")
+                    availability_contract = (
+                        availability if isinstance(availability, dict) else {}
+                    )
+                    confirmation = item.get("confirmation")
+                    confirmation_contract = (
+                        confirmation if isinstance(confirmation, dict) else {}
+                    )
+                    effects_raw = item.get("effects")
+                    if effects_raw is None:
+                        effects = ["physical_motion"]
+                    elif isinstance(effects_raw, list):
+                        effects = [
+                            str(value)
+                            for value in effects_raw
+                            if str(value).strip()
+                        ]
+                    else:
+                        raise ValueError(
+                            f"Soridormi skill {upstream_id!r} effects must be a list"
+                        )
+                    safety_class = str(
+                        item.get("safety_class") or "physical_motion"
+                    )
                     provider_requires_confirmation = bool(
-                        item.get("requires_confirmation", False)
+                        item.get(
+                            "requires_confirmation",
+                            confirmation_contract.get("required", False),
+                        )
                     )
                     requires_confirmation = (
                         provider_requires_confirmation
                         or safety_class in {"physical_motion", "safety_critical"}
                         or "physical_motion" in effects
                     )
+                    input_schema = (
+                        item.get("parameters_schema")
+                        or item.get("input_schema")
+                        or {}
+                    )
+                    if not isinstance(input_schema, dict):
+                        raise ValueError(
+                            f"Soridormi skill {upstream_id!r} input schema must be an object"
+                        )
+                    can_run_parallel = item.get(
+                        "can_run_parallel",
+                        execution_contract.get("can_run_parallel"),
+                    )
+                    exclusive_group = (
+                        str(
+                            item.get("exclusive_group")
+                            or execution_contract.get("exclusive_group")
+                            or ""
+                        ).strip()
+                        or None
+                    )
+                    resource_claims = item.get(
+                        "resource_claims",
+                        execution_contract.get("resource_claims", []),
+                    )
+                    if not isinstance(resource_claims, list):
+                        raise ValueError(
+                            f"Soridormi skill {upstream_id!r} resource_claims must be a list"
+                        )
+                    execution_constraints = item.get(
+                        "execution_constraints",
+                        execution_contract.get("execution_constraints", {}),
+                    )
+                    if not isinstance(execution_constraints, dict):
+                        raise ValueError(
+                            f"Soridormi skill {upstream_id!r} execution_constraints must be an object"
+                        )
+
                     capability = CatalogCapability(
                         capability_id=capability_id,
                         agent_id="soridormi.skill",
-                        description=str(item.get("description") or item.get("summary") or ""),
-                        input_schema=dict(item.get("parameters_schema") or item.get("input_schema") or {}),
+                        description=str(
+                            item.get("description") or item.get("summary") or ""
+                        ),
+                        input_schema=dict(input_schema),
                         effects=effects,
                         safety_class=safety_class,
                         requires_confirmation=requires_confirmation,
-                        available=bool(item.get("available", True)),
+                        available=bool(
+                            item.get(
+                                "available",
+                                availability_contract.get("available", True),
+                            )
+                        ),
                         route="robot_action",
                         source="soridormi.live_named_skills",
                         invocation_kind="named_skill",
                         interaction_executable=True,
-                        prompt_tier=self._prompt_tier_for_live_skill(capability_id, item),
+                        prompt_tier=self._prompt_tier_for_live_skill(
+                            capability_id, item
+                        ),
                         prompt_tier_locked=self._prompt_tier_lock_flag(item),
-                        prompt_tier_source=self._prompt_tier_source_for_live_skill(capability_id, item),
+                        prompt_tier_source=self._prompt_tier_source_for_live_skill(
+                            capability_id, item
+                        ),
                         prompt_tier_reason=self._prompt_tier_reason_from(item)
                         or self._preset_prompt_tier_reason(capability_id),
                         tags=["soridormi", "robot", "named_skill"],
@@ -532,30 +621,27 @@ class CapabilityCatalog:
                             "version": item.get("version"),
                         },
                         can_run_parallel=(
-                            bool(item.get("can_run_parallel"))
-                            if "can_run_parallel" in item
+                            bool(can_run_parallel)
+                            if can_run_parallel is not None
                             else None
                         ),
-                        parallel_metadata_declared=any(
-                            key in item
-                            for key in (
-                                "can_run_parallel",
-                                "exclusive_group",
-                                "resource_claims",
-                                "execution_constraints",
-                            )
+                        parallel_metadata_declared=(
+                            can_run_parallel is not None
+                            or exclusive_group is not None
+                            or bool(resource_claims)
+                            or bool(execution_constraints)
                         ),
-                        exclusive_group=(
-                            str(item.get("exclusive_group") or "").strip() or None
-                        ),
+                        exclusive_group=exclusive_group,
                         resource_claims=[
                             str(value)
-                            for value in (item.get("resource_claims") or [])
+                            for value in resource_claims
                             if str(value).strip()
                         ],
-                        execution_constraints=dict(item.get("execution_constraints") or {}),
+                        execution_constraints=dict(execution_constraints),
                     )
-                    live[capability_id] = self._apply_prompt_tier_policy(capability)
+                    live[capability_id] = self._apply_prompt_tier_policy(
+                        capability
+                    )
                 if live != self._live:
                     self._live = live
                     self._version += 1

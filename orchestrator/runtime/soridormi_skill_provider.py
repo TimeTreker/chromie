@@ -151,7 +151,14 @@ class SoridormiNamedSkillAdapter:
             skill_version=definition.version,
             status="completed" if completed else "failed",
             provider_id=self.provider_id,
-            output=executed.output,
+            output=(
+                self._successful_execution_output(
+                    executed.output,
+                    upstream_skill_id=upstream_skill_id,
+                )
+                if completed
+                else executed.output
+            ),
             reason_code=None if completed else "execution_incomplete",
             message=(
                 ""
@@ -159,6 +166,23 @@ class SoridormiNamedSkillAdapter:
                 else "Soridormi did not explicitly report skill completion"
             ),
         )
+
+    @staticmethod
+    def _successful_execution_output(
+        output: dict[str, Any],
+        *,
+        upstream_skill_id: str,
+    ) -> dict[str, Any]:
+        """Project successful provider output into the declared adapter schema."""
+
+        return {
+            "completed": True,
+            "skill_id": str(output.get("skill_id") or upstream_skill_id),
+            "mode": str(output.get("mode") or ""),
+            "no_motion": output.get("no_motion") is True,
+            "recommendation_only": output.get("recommendation_only") is True,
+            "summary": str(output.get("summary") or ""),
+        }
 
     def _chromie_intent_payload(
         self,

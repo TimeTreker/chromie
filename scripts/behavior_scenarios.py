@@ -43,6 +43,7 @@ from orchestrator.runtime.skill_runtime import (
     SkillRegistry,
     SkillRuntime,
     SkillRuntimeResult,
+    SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
     local_speech_definition,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
@@ -287,13 +288,23 @@ class _CognitiveScenarioRuntime:
     def __init__(self, capabilities: list[dict[str, Any]]) -> None:
         self.definitions: dict[str, SkillDefinition] = {}
         for item in capabilities:
+            skill_id = str(
+                item.get("skill_id") or item.get("capability_id") or ""
+            )
+            raw_output_schema = item.get("output_schema")
+            if raw_output_schema is None and skill_id.startswith("soridormi."):
+                # These fixtures model the upstream Soridormi catalog. Chromie's
+                # production catalog adapter owns the stable named-skill result
+                # envelope, so reproduce that materialization here instead of
+                # requiring every scenario to duplicate an adapter-owned schema.
+                raw_output_schema = SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA
             definition = SkillDefinition(
-                skill_id=str(item.get("skill_id") or item.get("capability_id") or ""),
+                skill_id=skill_id,
                 version=str(item.get("version") or "0.1.0"),
                 provider_id=str(item.get("provider_id") or "scenario.provider"),
                 description=str(item.get("description") or ""),
                 input_schema=dict(item.get("input_schema") or {}),
-                output_schema=dict(item.get("output_schema") or {}),
+                output_schema=dict(raw_output_schema or {}),
                 available=bool(item.get("available", True)),
                 unavailable_reason=item.get("unavailable_reason"),
                 requires_confirmation=bool(item.get("requires_confirmation", False)),

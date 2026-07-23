@@ -1217,6 +1217,58 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("missing_navigation_pipeline", result.results[0].message)
         self.assertEqual(spoken, ["I could not complete that task safely."])
 
+    async def test_non_terminal_task_graph_result_fails_closed(self) -> None:
+        for graph_status, expected_reason in (
+            ("", "task_graph_missing_terminal_status"),
+            ("pending", "task_graph_non_terminal_result"),
+            ("running", "task_graph_non_terminal_result"),
+            ("mystery", "task_graph_invalid_terminal_status"),
+        ):
+            with self.subTest(graph_status=graph_status):
+                spoken: list[str] = []
+
+                async def execute_graph(
+                    graph: dict[str, Any],
+                    status: str = graph_status,
+                ) -> dict[str, Any]:
+                    output = {
+                        "graph_id": graph["graph_id"],
+                        "outcome_summary": "No terminal execution evidence.",
+                    }
+                    if status:
+                        output["status"] = status
+                    return output
+
+                coordinator = InteractionRuntimeCoordinator(
+                    lambda args: spoken.append(str(args["text"]))
+                    or {"scheduled": True},
+                    task_graph_handler=execute_graph,
+                )
+                result = await coordinator.execute(
+                    InteractionResponse(
+                        skills=[
+                            {
+                                "request_id": "graph-1",
+                                "skill_id": "chromie.task_graph.execute",
+                                "args": {
+                                    "graph": {"graph_id": "nav", "nodes": []}
+                                },
+                                "timing": "sequential",
+                            }
+                        ],
+                        metadata={"language": "en-US"},
+                    ),
+                    session_id=f"sid-graph-{graph_status or 'missing'}",
+                )
+
+                self.assertEqual(result.status, "failed")
+                self.assertEqual(result.results[0].status, "failed")
+                self.assertEqual(result.results[0].reason_code, expected_reason)
+                self.assertEqual(
+                    spoken,
+                    ["I could not complete that task safely."],
+                )
+
     async def test_cancelled_task_graph_suppresses_completion_speech_and_falls_back(
         self,
     ) -> None:

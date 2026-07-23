@@ -80,13 +80,25 @@ class AgentResultExecutor:
                 status="skipped",
                 message="confirmation_required",
             )
-        if dry_run or self.action_client is None:
+        if dry_run:
             logger.info("Action dry-run: %s", action.model_dump(mode="json"))
             return ActionResult(
                 id=action.id,
                 target=action.target,
                 type=action.type,
-                status="skipped" if dry_run else "completed",
-                message="dry_run" if dry_run else "no action client configured",
+                status="skipped",
+                message="dry_run",
+            )
+        if self.action_client is None:
+            logger.error(
+                "Action execution unavailable because no action client is configured: %s",
+                action.model_dump(mode="json"),
+            )
+            return ActionResult(
+                id=action.id,
+                target=action.target,
+                type=action.type,
+                status="failed",
+                message="action_client_unavailable",
             )
         return await self.action_client.execute(session, action)

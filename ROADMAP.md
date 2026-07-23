@@ -14,8 +14,8 @@ codes are not part of the current project model.
 - Only one delivery milestone is active at a time.
 - A milestone closes only when its implementation and required evidence exist.
 - Default-off experimental work is not release support.
-- Documents, tools, tests, and evidence classes use semantic names rather than
-  development-order identifiers.
+- Documents, tools, tests, and evidence classes use semantic problem, capability,
+  and evidence names rather than numbered milestone or implementation-stage labels.
 - Future work must preserve the ownership and safety boundaries in the charter.
 
 ## Completed foundations

@@ -269,6 +269,12 @@ Cancellation:
 7. calls the authenticated Agent TaskGraph cancel endpoint for selected
    TaskGraph work and treats a missing/negative cancellation receipt as failure.
 
+TaskGraph execution itself is also terminal-evidence bound. Only explicit
+`success` completes the SkillResult; absent, `pending`, `running`, or unknown
+status fails closed. The provider exposes a closed summary/result contract to
+the cognitive turn while detailed Agent-side TaskGraph traces remain the
+authoritative execution record.
+
 Independent unselected Skill Runtime work continues; existing sequencing,
 dependency, and required-delivery barriers still apply. A request shared by
 targeted and untargeted goals is reported as a conflict. Resource arbitration

@@ -34,6 +34,14 @@ from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage, 
 from shared.chromie_contracts.social_attention import SocialAttentionPlan
 
 
+TEST_SKILL_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {"completed": {"type": "boolean"}},
+    "required": ["completed"],
+    "additionalProperties": False,
+}
+
+
 class FakeRuntime:
     def __init__(self, definitions: list[SkillDefinition] | None = None):
         self.definitions = {item.skill_id: item for item in (definitions or [])}
@@ -253,6 +261,7 @@ def blink_definition(*, confirmation: bool = False) -> SkillDefinition:
             },
             "required": ["count"],
         },
+        output_schema=TEST_SKILL_OUTPUT_SCHEMA,
         available=True,
         requires_confirmation=confirmation,
         interruptible=True,
@@ -820,6 +829,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "properties": {"count": {"type": "integer", "minimum": 1}},
                 "required": ["count"],
             },
+            output_schema=TEST_SKILL_OUTPUT_SCHEMA,
             available=True,
             requires_confirmation=False,
         )
@@ -1035,7 +1045,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertIn("canonical_plan_fingerprint", request.metadata)
         self.assertEqual(
             request.committed_output_schema_sha256,
-            output_schema_sha256({}),
+            output_schema_sha256(TEST_SKILL_OUTPUT_SCHEMA),
         )
         self.assertEqual(
             result.interaction_response.speech[0].text,
@@ -1096,6 +1106,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_runtime_rejects_undeclared_provider_output_before_commit(self):
+        definition = blink_definition().model_copy(update={"output_schema": {}})
+        adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([definition]))
+
+        errors = asyncio.run(adapter.validation_errors(execute_plan()))
+
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["type"], "runtime_invalid_output_schema")
+        self.assertEqual(errors[0]["step_id"], "blink")
+        self.assertIn("root must have type=object", errors[0]["message"])
+
     def test_singleton_parallel_batch_in_multi_step_plan_is_rejected(self):
         base = execute_plan()
         plan = base.model_copy(
@@ -1135,6 +1156,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "properties": {"duration_s": {"type": "number", "minimum": 0.1}},
                 "required": ["duration_s"],
             },
+            output_schema=TEST_SKILL_OUTPUT_SCHEMA,
             available=True,
             can_run_parallel=False,
             exclusive_group="base_motion",

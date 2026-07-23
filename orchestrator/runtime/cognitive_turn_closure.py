@@ -12,6 +12,7 @@ from shared.chromie_contracts.execution_outcome import (
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     output_schema_sha256,
+    validate_output_schema_declaration,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
@@ -178,11 +179,12 @@ class CognitiveTurnClosure:
                 continue
             schema = getattr(definition, "output_schema", None)
             try:
+                validate_output_schema_declaration(schema)
                 current_digest = output_schema_sha256(schema)
             except (TypeError, ValueError):
                 schemas[request.request_id] = {}
                 reasons[request.request_id] = (
-                    "current_output_schema_digest_invalid"
+                    "current_output_schema_invalid"
                 )
                 continue
             if current_digest != committed_digest:
@@ -192,10 +194,6 @@ class CognitiveTurnClosure:
                 )
                 continue
             schemas[request.request_id] = dict(schema)
-            if not schema:
-                reasons[request.request_id] = (
-                    "committed_output_schema_absent"
-                )
         return schemas, reasons
 
     @staticmethod

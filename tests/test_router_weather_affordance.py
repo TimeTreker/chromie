@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+import json
 import unittest
 from typing import Any
 
@@ -18,13 +20,61 @@ WEATHER_CAPABILITY = {
 
 
 class _EmptyReviewRouter(OllamaLLMRouter):
-    async def _chat_logged(self, payload: dict[str, Any], *, stage: str, request=None) -> dict[str, Any]:
+    async def _chat_logged(
+        self,
+        payload: dict[str, Any],
+        *,
+        stage: str,
+        request=None,
+    ) -> dict[str, Any]:
         return {"message": {"content": ""}, "done": True, "done_reason": "stop"}
 
 
+class _SemanticRepairRouter(OllamaLLMRouter):
+    async def _chat_logged(
+        self,
+        payload: dict[str, Any],
+        *,
+        stage: str,
+        request=None,
+    ) -> dict[str, Any]:
+        if stage != "semantic_route_repair":
+            raise AssertionError(f"unexpected review stage {stage!r}")
+        return {
+            "message": {
+                "content": json.dumps(
+                    {
+                        "route": "tool",
+                        "agents": ["tool_agent", "speaker_agent"],
+                        "intent": "weather_query",
+                        "confidence": 0.96,
+                        "language": "en-US",
+                        "fast_speech": {
+                            "text": "I’ll check the weather in Chongqing.",
+                            "purpose": "acknowledge_and_check",
+                            "commitment": "checking_only",
+                            "must_not_claim_completion": True,
+                        },
+                        "metadata": {
+                            "tool_name": "weather",
+                            "weather_query": {
+                                "location": "Chongqing",
+                                "date": "today",
+                                "units": "metric",
+                            },
+                        },
+                        "reason": "semantic repair grounded the weather request",
+                    }
+                )
+            },
+            "done": True,
+            "done_reason": "stop",
+        }
+
+
 class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
-    def _router(self) -> _EmptyReviewRouter:
-        return _EmptyReviewRouter(
+    def _router(self, cls=_EmptyReviewRouter):
+        return cls(
             ollama_url="http://example.invalid",
             model="qwen3:4b",
             review_model="qwen3:4b",
@@ -33,145 +83,21 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             confidence_threshold=0.55,
         )
 
-    def _weather_request(self, text: str = "重庆今天天气情况怎么样？") -> RouteRequest:
+    @staticmethod
+    def _request(text: str) -> RouteRequest:
         return RouteRequest(
-            sid="weather-recovery-test",
+            sid="weather-contract-test",
             text=text,
-            language="zh-CN",
+            language="en-US",
             context={
                 "common_ability_catalog": [WEATHER_CAPABILITY],
                 "prompt_capabilities_common": [WEATHER_CAPABILITY],
             },
         )
 
-    def test_weather_tool_route_requires_explicit_weather_cue(self) -> None:
-        cases = (
-            {
-                "text": "你能查天信吗？",
-                "location": "天信",
-                "expected_route": "clarify",
-            },
-            {
-                "text": "重庆今天的天气怎么样？",
-                "location": "重庆",
-                "expected_route": "tool",
-            },
-        )
-
-        for case in cases:
-            with self.subTest(text=case["text"]):
-                request = RouteRequest(text=case["text"], language="zh-CN")
-                decision = finalize_decision(
-                    RouteDecision(
-                        route="tool",
-                        agents=["tool_agent", "speaker_agent"],
-                        intent="weather_query",
-                        confidence=0.95,
-                        language="zh-CN",
-                        fast_speech=FastSpeech(
-                            text=(
-                                "好的，我查一下重庆今天的天气。"
-                                if case["expected_route"] == "tool"
-                                else "checking_only"
-                            ),
-                            purpose="acknowledge_and_check",
-                            commitment="checking_only",
-                        ),
-                        metadata={
-                            "tool_name": "weather",
-                            "weather_query": {
-                                "location": case["location"],
-                                "date": "today",
-                                "units": "metric",
-                            },
-                        },
-                        source="llm",
-                    ),
-                    request,
-                    source="llm",
-                )
-
-                result = self._router()._reject_ambiguous_weather_tool_route(
-                    request, decision
-                )
-
-                self.assertEqual(result.route, case["expected_route"])
-                if case["expected_route"] == "clarify":
-                    self.assertEqual(result.intent, "ambiguous_tool_or_asr")
-                    self.assertIn("conversation_agent", result.agents)
-                    self.assertTrue(result.metadata.get("llm_clarification_required"))
-                    self.assertEqual(
-                        result.metadata.get("rejected_weather_route", {}).get("location"),
-                        case["location"],
-                    )
-                else:
-                    self.assertEqual(result.intent, "weather_query")
-                    self.assertEqual(
-                        result.metadata.get("weather_query", {}).get("location"),
-                        case["location"],
-                    )
-
-    async def test_empty_review_recovers_weather_misroute_from_catalog_affordance(self) -> None:
-        request = self._weather_request()
-        bad_quick_decision = finalize_decision(
-            RouteDecision(
-                route="robot_action",
-                intent="physical_motion",
-                confidence=1.0,
-                language="zh-CN",
-                source="llm",
-            ),
-            request,
-            source="llm",
-        )
-
-        recovered = await self._router()._review_route_only_robot_action(
-            request,
-            bad_quick_decision,
-        )
-
-        self.assertEqual(recovered.route, "tool")
-        self.assertEqual(recovered.intent, "weather_query")
-        self.assertEqual(recovered.metadata.get("tool_name"), "weather")
-        self.assertEqual(recovered.metadata.get("tool_capability_id"), "chromie.weather.lookup")
-        self.assertEqual(recovered.metadata.get("weather_query", {}).get("location"), "重庆")
-        self.assertEqual(recovered.metadata.get("weather_query", {}).get("date"), "today")
-        self.assertEqual(recovered.fast_speech.text, "好的，我查一下重庆今天的天气。")
-        self.assertEqual(recovered.speak_first, "好的，我查一下重庆今天的天气。")
-        self.assertIn("weather affordance recovery", recovered.reason or "")
-
-    def test_weather_recovery_requires_catalog_affordance(self) -> None:
-        request = RouteRequest(
-            sid="no-weather-capability",
-            text="重庆今天天气情况怎么样？",
-            language="zh-CN",
-            context={"common_ability_catalog": []},
-        )
-        decision = finalize_decision(
-            RouteDecision(
-                route="robot_action",
-                intent="physical_motion",
-                confidence=1.0,
-                language="zh-CN",
-                source="llm",
-            ),
-            request,
-            source="llm",
-        )
-
-        recovered = self._router()._recover_weather_affordance_misroute(
-            request,
-            decision,
-            reason="unit_test",
-        )
-
-        self.assertEqual(recovered.route, "robot_action")
-        self.assertEqual(recovered.intent, "physical_motion")
-
-    def test_semantic_weather_chat_route_item_is_normalized_to_tool_lane(self) -> None:
-        request = self._weather_request("what is the weather in Chongqing today")
-        request.language = "en-US"
-        decision = finalize_decision(
+    async def test_weather_route_contract_is_repaired_by_semantic_model(self) -> None:
+        request = self._request("what is the weather in Chongqing today")
+        inconsistent = finalize_decision(
             RouteDecision(
                 route="chat",
                 routes=[
@@ -191,26 +117,53 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             source="llm",
         )
 
-        recovered = self._router()._recover_weather_affordance_misroute(
+        repaired = await self._router(_SemanticRepairRouter)._repair_route_intent_contract(
             request,
-            decision,
-            reason="unit_test_semantic_weather_chat_route",
+            inconsistent,
         )
 
-        self.assertEqual(recovered.route, "tool")
-        self.assertEqual(recovered.agents, ["tool_agent", "speaker_agent"])
-        self.assertEqual(recovered.intent, "weather_query")
-        self.assertEqual(recovered.metadata.get("tool_name"), "weather")
-        self.assertEqual(recovered.metadata.get("weather_query", {}).get("location"), "Chongqing")
-        self.assertEqual(recovered.metadata.get("weather_query", {}).get("date"), "today")
+        self.assertEqual(repaired.route, "tool")
+        self.assertEqual(repaired.intent, "weather_query")
+        self.assertEqual(repaired.metadata.get("tool_name"), "weather")
         self.assertEqual(
-            recovered.metadata.get("weather_affordance_recovery", {}).get("original_route"),
-            "chat",
+            repaired.metadata.get("weather_query", {}).get("location"),
+            "Chongqing",
+        )
+        self.assertEqual(
+            repaired.metadata.get("semantic_route_repair", {}).get("status"),
+            "repaired",
         )
 
-    def test_non_weather_robot_action_is_not_recovered_to_weather_tool(self) -> None:
-        request = self._weather_request("往前走15秒，快点。")
-        decision = finalize_decision(
+    async def test_failed_weather_contract_repair_clarifies(self) -> None:
+        request = self._request("what is the weather in Chongqing today")
+        inconsistent = finalize_decision(
+            RouteDecision(
+                route="chat",
+                intent="weather_query",
+                confidence=0.95,
+                language="en-US",
+                source="llm",
+                metadata={"tool_name": "weather"},
+            ),
+            request,
+            source="llm",
+        )
+
+        result = await self._router()._repair_route_intent_contract(
+            request,
+            inconsistent,
+        )
+
+        self.assertEqual(result.route, "clarify")
+        self.assertEqual(result.intent, "clarify_uncertain_request")
+        self.assertTrue(result.metadata.get("llm_clarification_required"))
+        self.assertIn("semantic repair failed", result.reason or "")
+
+    async def test_failed_underspecified_robot_review_never_uses_keyword_recovery(
+        self,
+    ) -> None:
+        request = self._request("重庆今天天气情况怎么样？")
+        bad_quick_decision = finalize_decision(
             RouteDecision(
                 route="robot_action",
                 intent="physical_motion",
@@ -222,14 +175,70 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             source="llm",
         )
 
-        recovered = self._router()._recover_weather_affordance_misroute(
+        result = await self._router()._review_route_only_robot_action(
             request,
-            decision,
-            reason="unit_test",
+            bad_quick_decision,
         )
 
-        self.assertEqual(recovered.route, "robot_action")
-        self.assertEqual(recovered.intent, "physical_motion")
+        self.assertEqual(result.route, "clarify")
+        self.assertEqual(result.intent, "clarify_uncertain_request")
+        self.assertEqual(result.skills if hasattr(result, "skills") else [], [])
+        self.assertIn("semantic review failed", result.reason or "")
+
+    async def test_valid_model_weather_contract_is_not_rejected_by_text_keywords(
+        self,
+    ) -> None:
+        request = self._request("你能查天信吗？")
+        decision = finalize_decision(
+            RouteDecision(
+                route="tool",
+                agents=["tool_agent", "speaker_agent"],
+                intent="weather_query",
+                confidence=0.95,
+                language="zh-CN",
+                fast_speech=FastSpeech(
+                    text="好的，我查一下。",
+                    purpose="acknowledge_and_check",
+                    commitment="checking_only",
+                    must_not_claim_completion=True,
+                ),
+                metadata={
+                    "tool_name": "weather",
+                    "weather_query": {
+                        "location": "天信",
+                        "date": "today",
+                        "units": "metric",
+                    },
+                },
+                source="llm",
+            ),
+            request,
+            source="llm",
+        )
+
+        result = await self._router()._repair_route_intent_contract(
+            request,
+            decision,
+        )
+
+        self.assertIs(result, decision)
+        self.assertEqual(result.route, "tool")
+        self.assertEqual(
+            result.metadata.get("weather_query", {}).get("location"),
+            "天信",
+        )
+
+    def test_router_source_has_no_weather_phrase_router(self) -> None:
+        source = inspect.getsource(__import__("router.app.llm_router", fromlist=["*"]))
+        for forbidden in (
+            "_is_weather_like_text",
+            "_ZH_WEATHER_TERMS",
+            "_EN_WEATHER_TERMS",
+            "_weather_location_hint",
+            "weather_route_without_explicit_weather_cue",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, source)
 
 
 if __name__ == "__main__":

@@ -385,17 +385,6 @@ class _WalkAndSocialOutcome:
                 "available": True,
                 "requires_confirmation": False,
             },
-            {
-                "skill_id": "look_at_person",
-                "description": "Look at the user for a bounded time.",
-                "parameters_schema": {
-                    "type": "object",
-                    "properties": {"duration_s": {"type": "number", "minimum": 0.1, "maximum": 10.0}},
-                    "additionalProperties": False,
-                },
-                "available": True,
-                "requires_confirmation": False,
-            },
         ],
     }
 

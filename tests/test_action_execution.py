@@ -22,6 +22,23 @@ class _RecordingActionClient:
 
 
 class ActionExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_action_client_fails_closed(self) -> None:
+        executor = AgentResultExecutor(None)
+        result = AgentResult(
+            actions=[
+                ActionCommand(
+                    target="robot_pose_controller",
+                    type="head.turn",
+                    params={"yaw_degrees": 10},
+                )
+            ]
+        )
+
+        execution = await executor.execute_actions(object(), result)
+
+        self.assertEqual(execution[0].status, "failed")
+        self.assertEqual(execution[0].message, "action_client_unavailable")
+
     async def test_confirmation_required_action_is_not_sent(self) -> None:
         client = _RecordingActionClient()
         executor = AgentResultExecutor(client)  # type: ignore[arg-type]

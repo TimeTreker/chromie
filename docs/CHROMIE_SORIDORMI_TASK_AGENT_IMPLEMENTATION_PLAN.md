@@ -102,7 +102,7 @@ and Soridormi-owned safety envelopes.
 
 ## Build order
 
-### Step 1 - Freeze the boundary contract
+### Brain/body boundary contract
 
 Goal: make the brain/body interface explicit in both repositories.
 
@@ -122,7 +122,7 @@ Chromie docs state that the Agent may propose structured goals or registered
 skills, but must not send raw robot controls or bypass Soridormi refusal
 ```
 
-### Step 2 - Prepare for Soridormi task-level MCP APIs
+### Soridormi task API readiness
 
 Goal: keep existing named-skill support while preparing Chromie to consume a
 richer Soridormi task API.
@@ -181,7 +181,7 @@ submit after confirmation, monitor/cancel, call dedicated stop tools, report a
 blocked capability, or avoid lowering a missing-capability goal into a velocity
 recipe.
 
-### Step 3 - Model structured embodied goals
+### Structured embodied goal contract
 
 Goal: define the shape of body goals Chromie may submit after user-facing
 planning.
@@ -216,7 +216,7 @@ Chromie validates structured goal payloads before invoking Soridormi and records
 why a goal was submitted, refused, cancelled, or completed
 ```
 
-### Step 4 - Extend Chromie's global TaskGraph patterns
+### Chromie's global TaskGraph orchestration
 
 Goal: represent rich embodied work as global graph nodes without expanding them
 into body-control recipes.
@@ -248,7 +248,7 @@ TaskGraph docs and tests show Chromie orchestrating user-facing subtasks while
 Soridormi owns embodied substeps
 ```
 
-### Step 5 - Decide concrete skill versus rich task routing
+### Concrete-skill versus rich-task routing policy
 
 Goal: make routing predictable.
 
@@ -280,7 +280,7 @@ Chromie does not translate "walk to the house" into walk_velocity, and does not
 translate "bring me water" into unsupported motion
 ```
 
-### Step 6 - Add acceptance-style tests
+### Task-boundary acceptance coverage
 
 Goal: test the user-facing planning boundary before adding more autonomy.
 
@@ -306,7 +306,7 @@ Soridormi's companion suite lives at
 `task_acceptance_cases/mcp_task_acceptance.yaml` and currently validates these
 task-boundary examples through the local no-motion MCP task service.
 
-### Step 7 - Integrate once Soridormi exposes the task API
+### Soridormi task API integration
 
 Goal: connect Chromie's global graph to Soridormi's task API only after the body
 runtime exposes the contract.
@@ -331,7 +331,7 @@ MuJoCo validation is required before claiming executable embodied behavior
 ```
 
 Current state: Chromie has `agent.app.soridormi_task_client.SoridormiTaskClient`
-as the narrow provider helper for this step. It creates bounded
+as the narrow provider helper for this integration boundary. It creates bounded
 `client_task_ref` values from global graph/node ids, submits
 `soridormi.task.submit`, polls the `soridormi.task_events.v1` cursor until
 Soridormi reports terminal state or `stop_polling`, preserves the latest events
@@ -357,7 +357,7 @@ trace-only report fallback when the model omits one, using the submit node's
 execution; it only ensures Chromie's global planning graph treats Soridormi's
 task contract as the source of truth.
 
-### Step 8 - Next implementation focus
+### Current task-agent integration priorities
 
 Goal: turn the task-agent bridge into user-facing planning behavior without
 leaving the project target.
@@ -404,7 +404,7 @@ Do not add these to Chromie while building this plan:
 Docs-only changes:
 
 ```bash
-rg -n "Chromie-side companion|soridormi.task.submit|Step 4" docs
+rg -n "Chromie-side companion|soridormi.task.submit|global TaskGraph orchestration" docs
 python scripts/check_docs.py
 ```
 

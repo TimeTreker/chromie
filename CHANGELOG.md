@@ -4,6 +4,27 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Core contract audit
+
+- Added one shared validator for closed, explicit provider output schemas and
+  applied it before canonical-plan commitment as well as during execution
+  closure. Empty, wildcard, composed, untyped, or low-level robot schemas now
+  fail before their data can become model-visible.
+- Made both the Agent-visible and trusted-runtime Soridormi catalog refreshes
+  atomic, aligned their nested availability/execution/confirmation parsing, and
+  assigned every dynamically imported named skill a stable adapter-owned result
+  schema. Successful body execution is projected into that bounded result
+  envelope instead of exposing an undeclared provider payload.
+- Added a closed TaskGraph result envelope and changed missing, pending,
+  running, or unknown graph states from implicit success to explicit failure.
+  Only a declared terminal `success` may produce a completed SkillResult.
+- Changed the legacy Action executor to fail closed when no Action Client is
+  configured instead of reporting an unexecuted action as completed.
+- Removed user-text weather recovery and standalone-gratitude phrase routing.
+  Normal tool and social intent now remains model-authored and
+  contract-validated; inconsistent weather contracts receive one semantic
+  repair and otherwise clarify.
+
 ### TTS provider evaluation
 
 - Added a versioned, stream-oriented `TTSProvider` contract for lifecycle,

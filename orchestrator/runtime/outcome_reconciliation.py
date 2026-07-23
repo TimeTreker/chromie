@@ -21,6 +21,7 @@ from shared.chromie_contracts.interaction import (
     SkillRequest,
     SkillResult,
     SkillTrace,
+    output_schema_declaration_error,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import (
@@ -29,17 +30,6 @@ from shared.chromie_contracts.response_composition import (
 
 
 _PRIMARY_PLAN_SOURCE = "goal_driven_canonical_plan"
-_SUPPORTED_SCHEMA_TYPES = frozenset(
-    {
-        "array",
-        "boolean",
-        "integer",
-        "null",
-        "number",
-        "object",
-        "string",
-    }
-)
 _SENSITIVE_OUTPUT_KEY_TERMS = frozenset(
     {
         "authorization",
@@ -122,65 +112,6 @@ def _sensitive_output_path(value: Any, *, path: str = "$") -> str | None:
             found = _sensitive_output_path(item, path=f"{path}[{index}]")
             if found is not None:
                 return found
-    return None
-
-
-def _model_output_schema_error(
-    schema: Any,
-    *,
-    path: str = "$",
-) -> str | None:
-    """Reject schemas that could pass undeclared provider output to a model."""
-
-    if not isinstance(schema, dict):
-        return f"{path} is not an object schema"
-    if "$ref" in schema or any(
-        key in schema for key in ("allOf", "anyOf", "oneOf")
-    ):
-        return f"{path} uses unsupported schema indirection or composition"
-    schema_type = schema.get("type")
-    if isinstance(schema_type, str):
-        schema_types = {schema_type}
-    elif isinstance(schema_type, list) and schema_type and all(
-        isinstance(item, str) for item in schema_type
-    ):
-        schema_types = set(schema_type)
-    elif schema_type is None:
-        schema_types = set()
-    else:
-        return f"{path} has an invalid type declaration"
-    unsupported_types = sorted(schema_types - _SUPPORTED_SCHEMA_TYPES)
-    if unsupported_types:
-        return f"{path} uses unsupported types: {unsupported_types}"
-    enum = schema.get("enum")
-    if "enum" in schema and (not isinstance(enum, list) or not enum):
-        return f"{path} enum must be a non-empty list"
-    properties = schema.get("properties")
-    if path == "$" and schema_type != "object":
-        return "output schema root must have type=object"
-    if path != "$" and not schema_types and "enum" not in schema:
-        return f"{path} must declare a type or enum"
-    if properties is not None and "object" not in schema_types:
-        return f"{path} declares properties without type=object"
-    if "object" in schema_types:
-        if not isinstance(properties, dict) or not properties:
-            return f"{path} must declare non-empty properties"
-        if schema.get("additionalProperties") is not False:
-            return f"{path} must set additionalProperties=false"
-        for key, child in properties.items():
-            error = _model_output_schema_error(
-                child,
-                path=f"{path}.properties.{key}",
-            )
-            if error is not None:
-                return error
-    if "items" in schema and "array" not in schema_types:
-        return f"{path} declares items without type=array"
-    if "array" in schema_types:
-        items = schema.get("items")
-        if not isinstance(items, dict):
-            return f"{path} array must declare an item schema"
-        return _model_output_schema_error(items, path=f"{path}.items")
     return None
 
 
@@ -507,7 +438,7 @@ class ExecutionOutcomeReconciler:
                 output_size_bytes=size,
                 validation_errors=["no trusted output schema is available"],
             )
-        schema_error = _model_output_schema_error(output_schema)
+        schema_error = output_schema_declaration_error(output_schema)
         if schema_error is not None:
             return ModelObservation(
                 status="schema_unavailable",
