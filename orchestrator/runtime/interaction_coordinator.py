@@ -50,6 +50,10 @@ from .interaction_preflight import annotate_preflight_validation
 from .task_proposals import annotate_task_proposal_ledger
 
 SpeechScheduler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
+SpeechCancelScheduler = Callable[
+    [SkillRequest, dict[str, Any]],
+    None | Awaitable[None],
+]
 _TASK_GRAPH_SKILL_ID = "chromie.task_graph.execute"
 
 
@@ -82,6 +86,7 @@ class InteractionRuntimeCoordinator:
         self,
         speech_scheduler: SpeechScheduler,
         *,
+        speech_cancel_scheduler: SpeechCancelScheduler | None = None,
         soridormi_invoker: AsyncToolInvoker | None = None,
         task_graph_handler: TaskGraphHandler | None = None,
         task_graph_cancel_handler: TaskGraphCancelHandler | None = None,
@@ -98,7 +103,12 @@ class InteractionRuntimeCoordinator:
                 int(os.getenv("ORCH_SKILL_MAX_CONCURRENCY", "8")),
             ),
         )
-        self.runtime.register_provider(LocalSpeechSkillProvider(speech_scheduler))
+        self.runtime.register_provider(
+            LocalSpeechSkillProvider(
+                speech_scheduler,
+                speech_cancel_scheduler,
+            )
+        )
         self.runtime.register_provider(SessionControlSkillProvider())
         self._task_graph_enabled = task_graph_handler is not None
         if task_graph_handler is not None:

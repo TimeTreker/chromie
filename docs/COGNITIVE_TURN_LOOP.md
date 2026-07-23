@@ -388,7 +388,7 @@ receive stop input
   -> begin deterministic cancellation before model work
   -> for embodied emergency, dispatch the dedicated Soridormi E-stop contract
   -> retain ReflexOutcome and provider cancellation evidence
-  -> (target) reconcile affected goals as cancelled, failed, or unknown
+  -> reconcile affected goals as cancelled, recoverable, or uncertain
   -> optionally speak one concise evidence-grounded acknowledgement
 ```
 
@@ -436,43 +436,70 @@ provider cancellation failures remain explicit unknown/not-stopped evidence. A
 request shared by targeted and untargeted goals is a deterministic scope
 conflict, not permission to cause an unreported collateral cancel.
 
-The current confirmation dialogue owns one token for a whole staged response.
-`output_only` preserves it. If a motion stop finds any confirmed motion request,
-or cannot safely classify a confirmed request, it revokes the entire shared
-token before awaiting providers. This can revoke an unrelated unused approval
-in the same token and is recorded as conservative confirmation-scope widening,
-separate from the Skill Runtime cancellation receipt. Partial token rebuilding
-is not implemented.
+The host now reconciles every fixed-reflex receipt through Conversation State in
+one transaction. Exact request bindings close a Goal only when all of its
+remaining committed work is proven cancelled. Domain-limited cancellation may
+leave a Goal `recoverable` with unaffected work still pending; provider failure,
+non-interruptible work, an unselected request under a broad scope, or a
+Host-preflight cancellation with unknown start state produces
+`cancellation_uncertain` instead of a false success. `output_only` may stop
+pre-action speech without changing the embodied Goal whose execution request was
+not selected. The receipt, request statuses, remaining request IDs, scope
+widening, and uncertainty reasons stay attached to the Goal and its pending
+execution record.
 
-Non-urgent natural-language target resolution may use the Core, but runtime
-selection remains deterministic after exact IDs and plan binding are
-available. The current Gateway does not emit `specific_goal`; the
-Core-to-active-runtime bridge and atomic receipt-to-goal reconciliation remain
-open. Named selective cancellation must not be reported as successful until
-that bridge returns terminal evidence. Until then, the host rejects state
-mutation for an execution- or confirmation-bound named Goal. Current Soridormi
-motion cancellation is global-domain: a specific physical target therefore widens to
-`embodied_motion`, with every coaffected request and goal recorded in the
-receipt.
+The confirmation dialogue normally owns one token for a whole staged response.
+Fixed reflex scopes remain conservative: `output_only` preserves that token,
+while a motion stop revokes the whole token when any confirmed request is
+motion-bound or cannot be classified safely. That synchronous revocation is
+committed with the broad runtime receipt in the same Conversation State
+transaction, so Goal state and confirmation records cannot independently claim
+different outcomes. Named `specific_goal` cancellation uses a narrower
+contract. The host removes only requests wholly owned by the
+target Goals, creates an immutable `confirmation_remainder` child plan for the
+unaffected Goals, gives its requests fresh identities, and installs a fresh
+single-use token only after the cancellation evidence and Goal-state transition
+commit. A request or plan step shared by targeted and preserved Goals is not
+separable and fails closed.
 
-The current exact-goal primitive does not retract shared playback and
-goal-owned cognitive speech does not yet propagate complete plan identity into
-its generated runtime request. That output-aware binding belongs in the open
-Core bridge; until it exists, exact named-goal speech cancellation is not a
-completed capability. Likewise, `embodied_motion` is scoped to the host
-execution ledger. Only `global_emergency` independently dispatches the
-dedicated Soridormi E-stop for motion outside or stale relative to that ledger.
+For non-urgent named cancellation, the Core resolves semantic Goal IDs only.
+The trusted host maps those IDs to the exact active interaction, committed plan
+ID and fingerprint, then dispatches `specific_goal` to Skill Runtime. Goal state
+is mutated only after the host validates one exact receipt for every
+execution-bound target, including selected requests and any stale, shared-owner,
+non-interruptible, provider-failure, dispatch-failure, or provider-widening
+evidence. The validated target cancellation, coaffected Goal transitions, and
+confirmation-token replacement are committed through one Conversation State
+transaction plus a compare-and-swap of the prepared token without an intervening
+await. State-only Goals may close without runtime dispatch. If runtime/provider
+cancellation was attempted but receipt reconciliation or durable Goal-state
+commit cannot be verified, the user-facing result is explicitly uncertain; the
+host must not claim the action never started or the Goal was cancelled. Current
+Soridormi motion cancellation is global-domain, so a specific physical target
+may widen to `embodied_motion`; every coaffected request and Goal is retained in
+the receipt and reconciled rather than reported as exact isolation.
+
+Goal-owned cognitive speech now carries source Goal IDs and exact plan identity
+into its runtime request. Unfinished speech can therefore participate in named
+cancellation. The maintained local output provider owns a shared playback
+resource, so provider cancellation may widen a target to `output_only` and
+abort all coaffected pending or active output; the receipt records that
+widening. Already completed or already heard speech cannot be retracted.
+Likewise, `embodied_motion` remains scoped to the host execution ledger. Only
+`global_emergency` independently dispatches the dedicated Soridormi E-stop for
+motion outside or stale relative to that ledger.
 
 Recognizing an emergency-stop phrase and entering generic cancellation is not
 proof that a dedicated Soridormi E-stop ran or that the robot reached safe
 idle. For embodied motion, Soridormi alone owns controller-level stop/E-stop
 execution and the resulting safe-state postcondition. The host must use that
 dedicated contract for an embodied emergency; generic task cancellation is not
-a substitute. The current host dispatches the dedicated E-stop and retains
-success, failure, or unavailable evidence in the cancellation receipt, but it
-does not yet atomically reconcile that receipt into canonical Goal state. The
-Core owns any spoken acknowledgement and cannot overrule Soridormi's safety
-authority. E-stop and safe-idle claims require explicit correlated Soridormi
+a substitute. The current host dispatches the dedicated E-stop, retains success, failure, or
+unavailable evidence in the cancellation receipt, and atomically reconciles
+ledger-bound Goal cancellation separately from the safety postcondition. A Goal
+may be cancelled while `safe_idle_verified=false`; this records the user's
+cancelled work without inventing a controller-safe-state claim. The Core owns
+any spoken acknowledgement and cannot overrule Soridormi's safety authority. E-stop and safe-idle claims require explicit correlated Soridormi
 evidence.
 
 ## 10. Failure and loop limits

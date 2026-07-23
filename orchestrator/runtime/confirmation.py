@@ -114,7 +114,18 @@ class ConfirmationDialogue:
     def pending(self) -> PendingConfirmation | None:
         return self._pending
 
-    def begin(
+    def remaining_ttl_s(
+        self,
+        pending: PendingConfirmation | None = None,
+    ) -> float:
+        """Return the bounded remaining lifetime using this dialogue's clock."""
+
+        candidate = pending or self._pending
+        if candidate is None:
+            return 0.0
+        return max(0.0, float(candidate.expires_at) - float(self._clock()))
+
+    def prepare(
         self,
         response: InteractionResponse,
         *,
@@ -152,8 +163,44 @@ class ConfirmationDialogue:
             origin_session_id=origin_session_id,
             conversation_id=conversation_id,
         )
+        return pending
+
+    def begin(
+        self,
+        response: InteractionResponse,
+        *,
+        confirmed_request_ids: set[str],
+        origin_session_id: str | None,
+        conversation_id: str | None,
+        language: str | None = None,
+        prompt_override: str | None = None,
+        ttl_s: float | None = None,
+    ) -> PendingConfirmation:
+        pending = self.prepare(
+            response,
+            confirmed_request_ids=confirmed_request_ids,
+            origin_session_id=origin_session_id,
+            conversation_id=conversation_id,
+            language=language,
+            prompt_override=prompt_override,
+            ttl_s=ttl_s,
+        )
         self._pending = pending
         return pending
+
+    def replace(
+        self,
+        *,
+        expected_confirmation_id: str,
+        pending: PendingConfirmation | None,
+    ) -> PendingConfirmation | None:
+        current = self._pending
+        if current is None or current.confirmation_id != expected_confirmation_id:
+            raise ValueError(
+                "pending confirmation changed before replacement"
+            )
+        self._pending = pending
+        return current
 
     def cancel(self) -> PendingConfirmation | None:
         pending = self._pending

@@ -1562,6 +1562,100 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(execution.status, "cancelled")
 
+    async def test_specific_speech_goal_reports_shared_output_widening(
+        self,
+    ) -> None:
+        registry = SkillRegistry()
+        for skill_id in ("chromie.speech-a", "chromie.speech-b"):
+            registry.register(
+                SkillDefinition(
+                    skill_id=skill_id,
+                    version="1.0.0",
+                    provider_id="mock.output",
+                    input_schema={
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                    interruptible=True,
+                    can_run_parallel=True,
+                    cancellation_domains=("output",),
+                    metadata={"cancellation_granularity": "global_domain"},
+                )
+            )
+        runtime = SkillRuntime(registry)
+        provider = MockSkillProvider("mock.output", delay_s=10.0)
+        runtime.register_provider(provider)
+        plan_metadata = {
+            "canonical_plan_id": "plan-speech",
+            "canonical_plan_fingerprint": "fingerprint-speech",
+        }
+        first = asyncio.create_task(
+            runtime.execute(
+                InteractionResponse(
+                    interaction_id="speech-a",
+                    skills=[
+                        {
+                            "request_id": "speech-request-a",
+                            "skill_id": "chromie.speech-a",
+                            "metadata": {
+                                **plan_metadata,
+                                "source_goal_ids": ["goal-speech-a"],
+                            },
+                        }
+                    ],
+                )
+            )
+        )
+        second = asyncio.create_task(
+            runtime.execute(
+                InteractionResponse(
+                    interaction_id="speech-b",
+                    skills=[
+                        {
+                            "request_id": "speech-request-b",
+                            "skill_id": "chromie.speech-b",
+                            "metadata": {
+                                **plan_metadata,
+                                "source_goal_ids": ["goal-speech-b"],
+                            },
+                        }
+                    ],
+                )
+            )
+        )
+        for _ in range(100):
+            if len(provider.calls) == 2:
+                break
+            await asyncio.sleep(0.001)
+
+        receipt = await runtime.cancel_scope(
+            CancellationDirective(
+                source_turn_id="turn-cancel-speech-a",
+                requested_scope="specific_goal",
+                foreground_interaction_id="speech-a",
+                target_goal_ids=("goal-speech-a",),
+                expected_plan_id="plan-speech",
+                expected_plan_fingerprint="fingerprint-speech",
+            )
+        )
+        await asyncio.gather(first, second)
+
+        self.assertTrue(receipt.widened)
+        self.assertEqual(receipt.effective_scope, "output_only")
+        self.assertEqual(
+            receipt.widening_reason,
+            "provider_supports_only_global_output_cancel",
+        )
+        self.assertEqual(
+            receipt.selected_request_ids,
+            ("speech-request-a", "speech-request-b"),
+        )
+        self.assertEqual(
+            receipt.affected_goal_ids,
+            ("goal-speech-a", "goal-speech-b"),
+        )
+
     async def test_current_interaction_scope_does_not_cancel_another_interaction(
         self,
     ) -> None:

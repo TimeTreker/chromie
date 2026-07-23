@@ -4,6 +4,44 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Fixed-reflex cancellation closure
+
+- Added one atomic Conversation State reconciliation path for `output_only`,
+  `embodied_motion`, `current_interaction`, and `global_emergency` receipts.
+  Request-level cancellation now closes only the Goals whose remaining committed
+  requests are proven stopped.
+- Preserved domain-excluded work as recoverable, kept embodied execution unchanged
+  when only pre-action speech is stopped, and retained provider failures,
+  non-interruptible requests, missing broad-scope selections, and Host-preflight
+  cancellation as explicit uncertainty rather than success.
+- Committed synchronously revoked broad confirmation tokens with the runtime
+  receipt in the same durable transaction. Persistence failure rolls Goal state
+  back while the host records the final state as uncertain.
+- Separated global-emergency Goal cancellation from Soridormi safe-idle evidence;
+  an E-stop dispatch can cancel ledger-bound work without claiming a verified
+  safe controller state.
+
+### Named-Goal cancellation closure
+
+- Added the trusted Core-to-runtime bridge for non-urgent named cancellation:
+  the Core selects semantic Goal IDs while the host resolves exact interaction,
+  plan, fingerprint, and request bindings before dispatching `specific_goal`.
+- Added exact receipt validation and one Conversation State transaction that
+  applies target cancellation, provider-scope collateral Goal transitions, and
+  confirmation-state changes only after trusted runtime evidence is available.
+- Added partial confirmation rebuilding for separable multi-Goal responses. The
+  parent plan remains immutable; unaffected work receives a fresh child plan,
+  new request identities, and a new single-use token. Shared-owner steps fail
+  closed instead of being split implicitly.
+- Propagated Goal/plan authority through cognitive speech requests and made the
+  shared local output provider report truthful `output_only` widening rather
+  than pretending to retract one request from global playback.
+- Distinguished pre-dispatch rejection from post-dispatch uncertainty. If a
+  provider cancellation was attempted but receipt reconciliation or durable
+  Goal-state commit fails, Chromie reports the final state as uncertain instead
+  of claiming the action never started. Shared-owner confirmation requests leave
+  both the original token and Goal state unchanged.
+
 ### Core contract audit
 
 - Added one shared validator for closed, explicit provider output schemas and

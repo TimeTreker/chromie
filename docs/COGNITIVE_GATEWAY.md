@@ -246,8 +246,9 @@ The reflex may begin before the complete envelope or model review is ready.
 Recording must never delay stopping, and stopping must not erase the turn or
 leave the cancellation unaudited. Later semantic correction must never undo an
 already-applied stop or silently resume physical work. The current host records
-the dispatch receipt with the reflex turn; atomic receipt-to-canonical-goal
-reconciliation remains open.
+the dispatch receipt with the reflex turn. Exact named-Goal cancellation has a
+separate implemented receipt-to-Goal transaction; automatic reconciliation of
+broad fixed reflex receipts into every affected canonical Goal remains open.
 
 Output invalidation, scoped Skill Runtime cancellation, and the dedicated
 E-stop are dispatched in one safety-first phase. Device/audio teardown may wait
@@ -276,23 +277,21 @@ It first assigns one closed cancellation scope:
 | `Emergency stop`, `急停` | `global_emergency` | Every unfinished request and host interaction workflow plus a dispatch attempt through the dedicated Soridormi E-stop path |
 
 `ReflexOutcome` carries only the fixed reflex scopes. The trusted runtime
-contract accepts `specific_goal` only from a caller that supplies authoritative
-goal IDs plus the exact committed plan ID and fingerprint. A model may help the
-Core resolve a non-urgent phrase such as “cancel the delivery but keep the
-music”, but it never invents runtime request IDs, delays an emergency stop, or
-authorizes automatic resumption. The current Gateway reflex does not emit
-`specific_goal`, and automatic Core-to-active-runtime dispatch for named
-selective cancellation remains open. Until that bridge returns trusted
-evidence, such input stays cognitive and must not be reported as having stopped
-execution. The host therefore fails closed before mutating an execution- or
-confirmation-bound Goal; state-only goals may still be cancelled through the
-existing semantic-state transaction.
+contract accepts `specific_goal` only from the Core-managed cognitive path. The
+Core resolves semantic Goal IDs; the host supplies the exact committed
+interaction, plan ID, fingerprint, and runtime request binding. The model never
+invents runtime request IDs, delays an emergency stop, or authorizes automatic
+resumption. The host validates exact dispatch receipts before atomically
+applying target and provider-coaffected Goal transitions. A missing, stale,
+shared-owner, non-interruptible, or provider-failed receipt leaves Goal state
+unchanged and produces a conservative response.
 
-The current `specific_goal` primitive does not claim exact retraction of shared
-host playback. Goal-owned cognitive speech does not yet carry the complete plan
-binding into its generated runtime request, so the future Core bridge must bind
-that identity and explicitly coordinate output invalidation before named-goal
-speech cancellation can be reported as complete.
+Goal-owned cognitive speech carries the same Goal and plan binding into Skill
+Runtime. The local playback provider is shared rather than request-isolated, so
+a named speech cancellation may widen to `output_only`; the host invalidates
+the shared output resource and the receipt identifies all coaffected Goals.
+This does not claim that already completed or already heard speech can be
+retracted.
 
 The runtime selects both running and queued requests. A selected queued request
 is closed as `cancelled` with `reason_code=cancelled_before_start` and is never
@@ -306,14 +305,14 @@ If one canonical step is jointly owned by a target goal and an untargeted goal,
 exact isolation is impossible: the runtime reports a shared-owner conflict and
 does not pretend that only one goal was affected.
 
-Pending confirmation currently has one approval token for the entire staged
-response. `output_only` preserves that token. A motion stop revokes the whole
-token when any confirmed request is motion-bound, or when a confirmed request
-cannot be classified safely; this may also revoke an unrelated, not-yet-used
-approval in the same token. That is an explicit fail-closed widening, not
-partial request cancellation. The revoked confirmation is recorded with the
-reflex turn and is not represented as a Skill Runtime execution selection.
-Partial token reconstruction remains future work.
+Pending confirmation has one approval token for the staged response. Fixed
+reflex behavior remains conservative: `output_only` preserves that token, while
+a motion stop revokes the whole token when any confirmed request is
+motion-bound or cannot be classified safely. Named `specific_goal` cancellation
+can narrow a pending multi-Goal confirmation. It rejects shared-owner steps,
+removes the targeted requests, creates an immutable child plan and fresh request
+identities for the preserved Goals, and replaces the old token only after the
+Conversation State cancellation transaction succeeds.
 
 Exact isolation also depends on provider granularity. Current Soridormi motion
 cancellation is global-domain, so a specific physical target widens to

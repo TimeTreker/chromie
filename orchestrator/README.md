@@ -46,8 +46,12 @@ stop/suppression paths are implemented. The host begins stop/cancel handling
 before Router or model inference, records the requested and effective
 cancellation scopes, and projects only admitted envelopes into the Core.
 Output, embodied-motion, foreground-interaction, and global-emergency reflex
-scopes are implemented. Exact named-goal cancellation requires a committed
-plan binding; its Core-to-runtime dispatch/reconciliation bridge remains open.
+scopes are implemented. Exact named-Goal cancellation is also implemented in
+the cognitive path: the Core selects semantic Goal IDs, the host resolves exact
+plan/runtime bindings, validates Skill Runtime receipts, atomically reconciles
+Goal state, and rebuilds an unaffected confirmation remainder when possible.
+A shared-owner pending request fails closed without changing its token, while a
+post-dispatch reconciliation failure is surfaced as an uncertain final state.
 The Router still hosts addressedness review and mixed compatibility semantics,
 so physical extraction of the five Gateway modules remains open. Existing
 Router APIs, service names, environment variables, and log fields remain

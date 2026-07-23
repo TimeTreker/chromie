@@ -219,9 +219,14 @@ by Router compatibility rules; pending approval is revoked before the first
 await and a later utterance cannot preempt the active reflex lifecycle.
 Fixed cancellation scopes, active/queued dispatch receipts, and the dedicated
 Soridormi E-stop dispatch path are implemented and automatically verified.
-Core-to-runtime named-goal cancellation, atomic receipt-to-goal reconciliation,
-retained E-stop/safe-idle evidence, and physical five-module extraction remain
-open.
+The cognitive path also resolves named Goals to exact plan/runtime bindings,
+dispatches `specific_goal`, atomically reconciles validated receipts into Goal
+state, and rebuilds unaffected pending confirmation work as a fresh child plan
+and token. Broad fixed-reflex receipts now reconcile request-level cancellation,
+partial work, provider uncertainty, Host-preflight cancellation, conservative
+confirmation revocation, and provider widening into canonical Goal state through
+one durable transaction. Retained E-stop/safe-idle evidence and physical
+five-module extraction remain open.
 
 Exit criteria before treating the Gateway/Core migration as complete:
 

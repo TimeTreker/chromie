@@ -103,6 +103,9 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 - native strict `POST /interaction` plus explicit compatibility rollback;
 - trusted Skill Runtime with validation, confirmation, timeout, cancellation,
   bounded scheduling, and traces;
+- evidence-bound named-Goal cancellation that resolves semantic targets to exact
+  runtime bindings, reconciles provider widening atomically, and preserves
+  separable pending siblings through a fresh child confirmation plan and token;
 - manager-owned effectful-turn closure that correlates exact immutable plans,
   committed requests, schemas, results, and traces; retains exact per-goal
   terminal outcomes; suppresses stale final speech; and emits a validated

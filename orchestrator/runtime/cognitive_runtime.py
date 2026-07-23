@@ -1043,6 +1043,9 @@ class CanonicalPlanRuntimeAdapter:
                     "must_not_claim_completion"
                 ],
                 "covers_goal_ids": projected["covers_goal_ids"],
+                "source_goal_ids": projected["covers_goal_ids"],
+                "canonical_plan_id": plan.plan_id,
+                "canonical_plan_fingerprint": fingerprint,
                 "claims": projected["claims"],
                 "wait_for_playback_start": True,
                 "playback_start_required_for_delivery": True,

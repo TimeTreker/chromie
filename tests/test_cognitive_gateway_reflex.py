@@ -380,6 +380,30 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                     }
                 )
 
+            def apply_reflex_cancellation_receipt(
+                self,
+                receipt: CancellationDispatchReceipt,
+                *,
+                revoked_confirmation: dict[str, Any],
+                sid: str,
+                user_text: str,
+                intent: str,
+                source: str,
+            ) -> list[dict[str, Any]]:
+                if "output_invalidation" not in events:
+                    raise AssertionError(
+                        "Goal reconciliation must not delay interruption"
+                    )
+                events.append("fixed_reflex_receipt_reconciled")
+                if revoked_confirmation.get("confirmation_id"):
+                    events.append("confirmation_scope_cancelled")
+                return [
+                    {
+                        "operation": "fixed_reflex_receipt_reconciliation",
+                        "applied": True,
+                    }
+                ]
+
             def resolve_confirmation_scope(
                 self,
                 *,
@@ -483,6 +507,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(recorded_turn["intent"], expected_intent)
         self.assertEqual(recorded_turn["metadata"]["source"], "cognitive_gateway_reflex")
         self.assertEqual(recorded_turn["metadata"]["reflex_outcome"]["action"], "interrupt")
+        self.assertEqual(
+            recorded_turn["metadata"]["cancellation_goal_reconciliation"]["status"],
+            "reconciled",
+        )
         envelope = recorded_turn["metadata"]["user_turn_envelope"]
         self.assertEqual(envelope["schema_version"], 1)
         self.assertEqual(envelope["turn_id"], "sid-stop")

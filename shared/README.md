@@ -15,8 +15,9 @@ acceptance tools. It includes:
   `SkillResult`, and `SkillTrace` contracts;
 - deterministic `ReflexOutcome`, `CancellationDirective`, and
   `CancellationDispatchReceipt` contracts. Fixed reflex scopes remain separate
-  from exact plan/fingerprint-bound goal cancellation; dispatch, provider, and
-  dedicated E-stop evidence remain separately represented;
+  from exact plan/fingerprint-bound goal cancellation, while both paths reconcile
+  trusted receipts into canonical Goal state; dispatch, provider, and dedicated
+  E-stop/safe-idle evidence remain separately represented;
 - shared `TaskProposal`, `TaskProposalLedger`, and preflight-summary contracts
   for Router/Agent/Orchestrator proposal merge diagnostics;
 - Goal, Goal Association, semantic task-operation, and active-goal contracts;

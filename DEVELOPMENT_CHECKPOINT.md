@@ -185,11 +185,20 @@ global emergency also cancels every unfinished host interaction workflow even
 if runtime cancellation dispatch fails, so preflight work cannot start later.
 The July 23 scoped-cancellation gate passed 1291 primary plus 20 legacy Agent
 tests, the `deterministic_safety_controls` Level A class passed 4/4, and
-`evidence_bound_cognitive_turn_closure` passed 5/5. This is implementation plus
-automatic evidence only. The next cancellation work is the Core named-goal
-reservation/dispatch bridge, atomic receipt/outcome reconciliation into Goal
-state, partial confirmation-token rebuilding, and retained supervised
-E-stop/safe-idle evidence.
+`evidence_bound_cognitive_turn_closure` passed 5/5. A later named-Goal closure
+slice added Core-to-runtime `specific_goal` dispatch, exact receipt validation,
+atomic target/coaffected Goal reconciliation, Goal/plan binding for cognitive
+speech, provider-global output widening, and immutable confirmation-remainder
+child plans with fresh single-use tokens. Provider failure, stale binding,
+shared ownership, and non-interruptible work fail closed before Goal-state
+mutation. Post-dispatch reconciliation failures are reported as uncertain rather
+than as not started, and shared-owner confirmation conflicts preserve the old
+token and Goal state. The completed gate passed 1,317 primary tests plus 20
+legacy Agent tests, 388/388 file-backed scenarios, and 59/59 Level A cases;
+semantic-authority, documentation, compilation, shell-syntax, and diff-hygiene
+checks also passed. This is automatic evidence only; retained supervised
+active-task, E-stop, safe-idle, audio-output, and simulator evidence remains
+open.
 
 A subsequent repository-wide core-contract audit aligned implementation with
 the project charter. Provider output schemas are now closed and validated before
@@ -203,6 +212,21 @@ Agent tests, 388/388 file-backed scenarios, and 59/59 Level A cases. The semanti
 authority audit, documentation validation, compilation, shell syntax, and diff
 hygiene also passed. This remains automatic evidence rather than provider-backed
 target validation.
+
+The fixed-reflex cancellation lifecycle is now closed across Host dispatch,
+Skill Runtime receipts, confirmation revocation, and Conversation State. The
+host atomically reconciles `output_only`, `embodied_motion`,
+`current_interaction`, and `global_emergency` receipts into exact Goal-owned
+request state. Fully cancelled Goals become terminal; unaffected work remains,
+partial cancellation stays recoverable, and provider failure,
+non-interruptible work, broad-scope request gaps, or Host-preflight
+unknown-start cancellation remain explicitly uncertain. Output-only cancellation
+can stop pre-action speech without cancelling embodied execution, and global
+E-stop evidence remains separate from `safe_idle` proof. The focused and full
+automatic gates passed 1,324 primary tests, 20 legacy Agent tests, 388/388
+file-backed scenarios, and 59/59 Level A cases. This remains automatic evidence;
+retained active-task, E-stop, safe-idle, simulator, and hardware evidence are
+still separate validation work.
 
 The initial Runtime Observability implementation is now present behind a
 default-off policy. It provides architecture-independent Runtime Trace items,

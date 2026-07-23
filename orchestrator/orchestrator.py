@@ -39,6 +39,12 @@ from orchestrator.runtime.body_recovery import (
     build_body_recovery_confirmation,
 )
 from orchestrator.runtime.confirmation import ConfirmationDialogue
+from orchestrator.runtime.named_goal_cancellation import (
+    ActiveGoalCancellationRequiresRuntimeDispatch,
+    NamedGoalCancellationClosureError,
+    cancellation_target_goal_ids,
+    dispatch_named_goal_cancellation,
+)
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveEvidenceRecorder,
@@ -125,15 +131,6 @@ ASR_TRACE_MODULE = TraceModule(
     component_type="speech_recognition",
     implementation="ChromieOrchestrator",
 )
-
-
-class _ActiveGoalCancellationRequiresRuntimeDispatch(ValueError):
-    def __init__(self, goal_ids: list[str]) -> None:
-        self.goal_ids = tuple(sorted(goal_ids))
-        super().__init__(
-            "active_goal_cancellation_requires_runtime_dispatch:"
-            + ",".join(self.goal_ids)
-        )
 
 
 def trace_session_async(module: TraceModule, operation: str, session_arg: str):
@@ -695,6 +692,7 @@ class VoiceAssistant:
             )
         self.interaction_runtime = InteractionRuntimeCoordinator(
             self._schedule_interaction_speech,
+            speech_cancel_scheduler=self._cancel_interaction_speech,
             soridormi_invoker=soridormi_invoker,
             task_graph_handler=self._execute_planning_task_graph,
             task_graph_cancel_handler=self._cancel_planning_task_graph,
@@ -1915,6 +1913,57 @@ class VoiceAssistant:
             "orders": [item["order"] for item in scheduled],
             "last_order": last["order"],
         }
+
+    async def _cancel_interaction_speech(
+        self,
+        request: SkillRequest,
+        scheduled: dict[str, Any],
+    ) -> None:
+        """Cancel one goal-bound speech request at the shared output boundary.
+
+        Pending chunks are invalidated by exact generation/order.  Once any
+        chunk may have started, Chromie's playback resource is global, so the
+        only truthful cancellation is a shared output abort.  Skill Runtime
+        marks that provider as global-domain and records every coaffected Goal.
+        """
+
+        metadata = request.args.get("metadata")
+        session_id = (
+            metadata.get("session_id")
+            if isinstance(metadata, dict)
+            else None
+        )
+        cancelled_orders = self._cancel_scheduled_playback_before_start(
+            scheduled,
+            session_id=session_id,
+            reason="named_goal_speech_cancelled",
+        )
+        raw_orders = scheduled.get("orders")
+        if not isinstance(raw_orders, list):
+            raw_orders = [scheduled.get("order")]
+        expected_orders = {
+            int(item)
+            for item in raw_orders
+            if isinstance(item, int)
+            or (isinstance(item, str) and item.isdigit())
+        }
+        needs_global_abort = bool(
+            not scheduled
+            or scheduled.get("scheduled") is not True
+            or scheduled.get("playback_started") is True
+            or expected_orders - set(cancelled_orders)
+        )
+        if needs_global_abort:
+            self._invalidate_output_state(cancel_cognitive_work=False)
+            await self.abort_output_stream()
+        self.session_log(
+            session_id,
+            "interaction_speech_cancelled: request_id=%s pending_orders=%s "
+            "global_abort=%s",
+            request.request_id,
+            ",".join(str(item) for item in sorted(cancelled_orders)),
+            needs_global_abort,
+        )
 
     async def _schedule_interaction_speech(
         self,
@@ -3329,6 +3378,91 @@ class VoiceAssistant:
         )
         return decision.model_copy(update={"metadata": metadata})
 
+    def _named_goal_cancellation_failure_response(
+        self,
+        exc: Exception,
+        *,
+        user_text: str,
+    ) -> InteractionResponse | None:
+        """Render only evidence-qualified named-cancellation failures."""
+
+        zh = self._looks_zh(user_text)
+        if isinstance(exc, ActiveGoalCancellationRequiresRuntimeDispatch):
+            return self._host_speech_response(
+                (
+                    "我还不能可靠地把这个目标和正在执行的任务一起停下，"
+                    "所以没有把它标记为已取消。"
+                )
+                if zh
+                else (
+                    "I could not reliably stop the selected goal together "
+                    "with its active execution, so I did not mark it cancelled."
+                ),
+                style="warning",
+                source="host_specific_goal_cancel_not_dispatched",
+            )
+        if not isinstance(exc, NamedGoalCancellationClosureError):
+            return None
+        if exc.stage == "confirmation_scope_conflict":
+            text = (
+                "这个待确认动作同时属于多个目标，无法只取消其中一个；"
+                "我保留了原确认和目标状态。"
+                if zh
+                else (
+                    "That pending action is shared by multiple goals, so I "
+                    "could not cancel only one of them. I kept the original "
+                    "confirmation and goal state unchanged."
+                )
+            )
+            source = "host_specific_goal_cancel_scope_conflict"
+        elif exc.runtime_dispatch_attempted:
+            text = (
+                "我已尝试发送取消请求，但无法可靠地核对并写回这个目标的最终状态；"
+                "当前结果是不确定的。"
+                if zh
+                else (
+                    "I attempted to cancel the selected goal, but I could not "
+                    "reliably verify and reconcile its final state. The result "
+                    "is uncertain."
+                )
+            )
+            source = "host_specific_goal_cancel_result_uncertain"
+        else:
+            text = (
+                "我无法安全地更新这个目标及其确认状态，因此保留了原状态。"
+                if zh
+                else (
+                    "I could not safely update the selected goal and its "
+                    "confirmation state, so I left the original state unchanged."
+                )
+            )
+            source = "host_specific_goal_cancel_state_unchanged"
+        return self._host_speech_response(
+            text,
+            style="warning",
+            source=source,
+        )
+
+    async def _dispatch_named_goal_cancellation(
+        self,
+        resolution: CognitiveRuntimeResolution,
+        *,
+        session_id: str,
+        user_text: str,
+        decision: RouteDecision,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Bridge the Core's semantic target to trusted cancellation closure."""
+
+        return await dispatch_named_goal_cancellation(
+            conversation_state=self.conversation_state,
+            interaction_runtime=self.interaction_runtime,
+            confirmation_dialogue=getattr(self, "confirmation_dialogue", None),
+            resolution=resolution,
+            session_id=session_id,
+            user_text=user_text,
+            decision=decision,
+        )
+
     def _apply_cognitive_goal_state(
         self,
         resolution: CognitiveRuntimeResolution,
@@ -3388,7 +3522,7 @@ class VoiceAssistant:
                 ):
                     runtime_bound.append(goal_id)
             if runtime_bound:
-                raise _ActiveGoalCancellationRequiresRuntimeDispatch(
+                raise ActiveGoalCancellationRequiresRuntimeDispatch(
                     runtime_bound
                 )
         results = self.conversation_state.apply_goal_association_resolution(
@@ -3531,28 +3665,102 @@ class VoiceAssistant:
                     "metadata": response_metadata,
                 },
             )
-            response = self.interaction_runtime.prepare_response(
-                response, session_id=session_id
-            )
-            goal_state_results = self._apply_cognitive_goal_state(
-                resolution,
-                session_id=session_id,
-                user_text=user_text,
-                decision=decision,
-            )
-            response.metadata = {
-                **response.metadata,
-                "goal_state_results": goal_state_results,
-            }
-            resolution.goal_state_results = goal_state_results
-            resolution.metadata = {
-                **resolution.metadata,
-                "host_commit_status": "prepared_and_goal_state_committed",
-            }
+            cancellation_goal_ids = cancellation_target_goal_ids(resolution)
+            if cancellation_goal_ids:
+                goal_state_results, cancellation_metadata = (
+                    await self._dispatch_named_goal_cancellation(
+                        resolution,
+                        session_id=session_id,
+                        user_text=user_text,
+                        decision=decision,
+                    )
+                )
+                zh = self._looks_zh(user_text)
+                coaffected = cancellation_metadata.get("coaffected_goal_ids") or []
+                replacement_prompt = str(
+                    cancellation_metadata.get(
+                        "replacement_confirmation_prompt"
+                    )
+                    or ""
+                ).strip()
+                if coaffected:
+                    text = (
+                        "已取消你指定的目标。由于执行器只支持更宽的停止范围，"
+                        "相关的正在执行工作也已停止。"
+                        if zh
+                        else (
+                            "I cancelled the selected goal. Because the provider "
+                            "supports only a wider stop scope, related active work "
+                            "was stopped as well."
+                        )
+                    )
+                else:
+                    text = (
+                        "已取消你指定的目标。"
+                        if zh
+                        else "I cancelled the selected goal."
+                    )
+                if replacement_prompt:
+                    text = f"{text} {replacement_prompt}"
+                response = self._host_speech_response(
+                    text,
+                    style="brief",
+                    source="host_named_goal_cancellation_reconciled",
+                )
+                response = response.model_copy(
+                    deep=True,
+                    update={
+                        "metadata": self._metadata_with_turn_envelope(
+                            {
+                                **response.metadata,
+                                "cognitive_runtime_apply": True,
+                                "goal_state_results": goal_state_results,
+                                "named_goal_cancellation": cancellation_metadata,
+                                "cognitive_runtime_resolution": summary,
+                            },
+                            turn_envelope,
+                        )
+                    },
+                )
+                response = self.interaction_runtime.prepare_response(
+                    response, session_id=session_id
+                )
+                resolution.interaction_response = response
+                resolution.goal_state_results = goal_state_results
+                resolution.metadata = {
+                    **resolution.metadata,
+                    "host_commit_status": (
+                        "named_goal_cancellation_dispatched_and_reconciled"
+                    ),
+                    "named_goal_cancellation": cancellation_metadata,
+                }
+            else:
+                response = self.interaction_runtime.prepare_response(
+                    response, session_id=session_id
+                )
+                goal_state_results = self._apply_cognitive_goal_state(
+                    resolution,
+                    session_id=session_id,
+                    user_text=user_text,
+                    decision=decision,
+                )
+                response.metadata = {
+                    **response.metadata,
+                    "goal_state_results": goal_state_results,
+                }
+                resolution.goal_state_results = goal_state_results
+                resolution.metadata = {
+                    **resolution.metadata,
+                    "host_commit_status": "prepared_and_goal_state_committed",
+                }
         except Exception as exc:
-            cancellation_dispatch_required = isinstance(
-                exc,
-                _ActiveGoalCancellationRequiresRuntimeDispatch,
+            cancellation_failure_response = (
+                self._named_goal_cancellation_failure_response(
+                    exc,
+                    user_text=user_text,
+                )
+                if cancellation_goal_ids
+                else None
             )
             self.session_log(
                 session_id,
@@ -3583,21 +3791,8 @@ class VoiceAssistant:
             metadata["cognitive_runtime_mode"] = "apply"
             decision = decision.model_copy(update={"metadata": metadata})
             safe_response = (
-                self._host_speech_response(
-                    (
-                        "我还不能可靠地把这个目标和正在执行的任务一起停下，"
-                        "所以没有把它标记为已取消。"
-                    )
-                    if self._looks_zh(user_text)
-                    else (
-                        "I could not reliably stop the selected goal together "
-                        "with its active execution, so I did not mark it cancelled."
-                    ),
-                    style="warning",
-                    source="host_specific_goal_cancel_not_dispatched",
-                )
-                if cancellation_dispatch_required
-                else self._agent_exception_safe_response(
+                cancellation_failure_response
+                or self._agent_exception_safe_response(
                     decision, user_text=user_text
                 )
                 or self._host_speech_response(
@@ -4108,25 +4303,44 @@ class VoiceAssistant:
                     reflex_outcome,
                     source_turn_id=session_id,
                 )
-            finally:
-                cancelled_confirmation = (
-                    self._reconcile_revoked_confirmation_for_reflex(
-                        revoked_confirmation,
-                        session_id,
-                        cancellation_scope=(
-                            reflex_outcome.cancellation_scope
-                        ),
-                    )
+            except BaseException:
+                # The approval token was already revoked synchronously. If the
+                # operational dispatch itself cannot return a receipt, retain
+                # that revocation through the compatibility state path before
+                # propagating the failure.
+                self._reconcile_revoked_confirmation_for_reflex(
+                    revoked_confirmation,
+                    session_id,
+                    cancellation_scope=reflex_outcome.cancellation_scope,
                 )
+                raise
+            cancellation_reconciliation = (
+                self._reconcile_reflex_cancellation_receipt(
+                    cancellation_receipt,
+                    revoked_confirmation,
+                    session_id,
+                    user_text=user_text,
+                    cancellation_scope=reflex_outcome.cancellation_scope,
+                    intent=reflex_outcome.intent,
+                )
+            )
+            cancelled_confirmation = dict(
+                cancellation_reconciliation.get(
+                    "cancelled_confirmation"
+                )
+                or {}
+            )
+            reflex_metadata = dict(reflex_outcome.metadata)
             if cancelled_confirmation:
-                reflex_outcome = reflex_outcome.model_copy(
-                    update={
-                        "metadata": {
-                            **reflex_outcome.metadata,
-                            "cancelled_confirmation": cancelled_confirmation,
-                        }
-                    }
+                reflex_metadata["cancelled_confirmation"] = (
+                    cancelled_confirmation
                 )
+            reflex_metadata["cancellation_goal_reconciliation"] = (
+                cancellation_reconciliation
+            )
+            reflex_outcome = reflex_outcome.model_copy(
+                update={"metadata": reflex_metadata}
+            )
             turn_capture = gateway.with_reflex_outcome(
                 turn_capture,
                 reflex_outcome,
@@ -4144,6 +4358,9 @@ class VoiceAssistant:
                         "reflex_outcome": reflex_outcome.model_dump(mode="json"),
                         "cancellation_dispatch_receipt": (
                             cancellation_receipt.model_dump(mode="json")
+                        ),
+                        "cancellation_goal_reconciliation": (
+                            cancellation_reconciliation
                         ),
                     },
                     turn_envelope,
@@ -5164,18 +5381,16 @@ class VoiceAssistant:
         cancel = getattr(dialogue, "cancel", None)
         return cancel() if callable(cancel) else None
 
-    def _reconcile_revoked_confirmation_for_reflex(
+    def _revoked_confirmation_evidence_for_reflex(
         self,
         pending: Any | None,
-        session_id: str,
         *,
         cancellation_scope: str,
     ) -> dict[str, Any]:
-        """Persist cancellation only after the operational reflex has begun."""
+        """Describe a synchronously revoked token without mutating Goal state."""
 
         if pending is None:
             return {}
-
         confirmation_id = str(getattr(pending, "confirmation_id", "") or "")
         fingerprint = str(getattr(pending, "fingerprint", "") or "")
         confirmed_request_ids = sorted(
@@ -5215,6 +5430,37 @@ class VoiceAssistant:
                 or unknown_request_ids
             )
         )
+        return {
+            "confirmation_id": confirmation_id,
+            "fingerprint": fingerprint,
+            "cancellation_scope": cancellation_scope,
+            "confirmed_request_ids": confirmed_request_ids,
+            "motion_request_ids": sorted(motion_request_ids),
+            "unknown_request_ids": sorted(unknown_request_ids),
+            "confirmation_scope_widened": confirmation_scope_widened,
+            "widening_reason": (
+                "shared_confirmation_token_revoked_conservatively"
+                if confirmation_scope_widened
+                else ""
+            ),
+        }
+
+    def _reconcile_revoked_confirmation_for_reflex(
+        self,
+        pending: Any | None,
+        session_id: str,
+        *,
+        cancellation_scope: str,
+    ) -> dict[str, Any]:
+        """Compatibility fallback when atomic receipt reconciliation is absent."""
+
+        evidence = self._revoked_confirmation_evidence_for_reflex(
+            pending,
+            cancellation_scope=cancellation_scope,
+        )
+        confirmation_id = str(evidence.get("confirmation_id") or "")
+        if not confirmation_id:
+            return evidence
         conversation_state = getattr(self, "conversation_state", None)
         resolved = False
         resolve_confirmation_scope = getattr(
@@ -5222,14 +5468,14 @@ class VoiceAssistant:
             "resolve_confirmation_scope",
             None,
         )
-        if confirmation_id and callable(resolve_confirmation_scope):
+        if callable(resolve_confirmation_scope):
             resolved = bool(
                 resolve_confirmation_scope(
                     confirmation_id=confirmation_id,
                     decision="operational_interrupt",
                 )
             )
-        if confirmation_id and not resolved:
+        if not resolved:
             update_pending_task_status = getattr(
                 conversation_state,
                 "update_pending_task_status",
@@ -5247,25 +5493,105 @@ class VoiceAssistant:
             "cognitive_gateway_confirmation_cancelled: "
             "confirmation_id=%s fingerprint=%s scope=%s widened=%s",
             confirmation_id or "<unknown>",
-            fingerprint or "<unknown>",
+            str(evidence.get("fingerprint") or "<unknown>"),
             cancellation_scope,
-            confirmation_scope_widened,
+            bool(evidence.get("confirmation_scope_widened")),
         )
+        return evidence
+
+    def _reconcile_reflex_cancellation_receipt(
+        self,
+        receipt: CancellationDispatchReceipt,
+        pending: Any | None,
+        session_id: str,
+        *,
+        user_text: str,
+        cancellation_scope: str,
+        intent: str,
+    ) -> dict[str, Any]:
+        """Commit a broad fixed-reflex receipt and confirmation as one state update."""
+
+        confirmation_evidence = self._revoked_confirmation_evidence_for_reflex(
+            pending,
+            cancellation_scope=cancellation_scope,
+        )
+        apply_receipt = getattr(
+            getattr(self, "conversation_state", None),
+            "apply_reflex_cancellation_receipt",
+            None,
+        )
+        if not callable(apply_receipt):
+            cancelled_confirmation = self._reconcile_revoked_confirmation_for_reflex(
+                pending,
+                session_id,
+                cancellation_scope=cancellation_scope,
+            )
+            return {
+                "status": "compatibility_fallback",
+                "goal_state_results": [],
+                "cancelled_confirmation": cancelled_confirmation,
+            }
+        try:
+            results = apply_receipt(
+                receipt,
+                revoked_confirmation=confirmation_evidence,
+                sid=session_id,
+                user_text=user_text,
+                intent=intent,
+                source="cognitive_gateway_fixed_reflex",
+            )
+        except Exception as exc:
+            cancelled_confirmation = self._reconcile_revoked_confirmation_for_reflex(
+                pending,
+                session_id,
+                cancellation_scope=cancellation_scope,
+            )
+            self.session_log(
+                session_id,
+                "cognitive_gateway_reflex_goal_reconciliation_failed: "
+                "scope=%s error=%s:%s",
+                cancellation_scope,
+                type(exc).__name__,
+                str(exc)[:300],
+            )
+            return {
+                "status": "uncertain",
+                "goal_state_results": [],
+                "cancelled_confirmation": cancelled_confirmation,
+                "error": f"{type(exc).__name__}:{str(exc)[:300]}",
+            }
+        rejected = [
+            item
+            for item in results
+            if item.get("applied") is False
+            and item.get("reason") != "operation_already_applied"
+        ]
+        if rejected:
+            cancelled_confirmation = self._reconcile_revoked_confirmation_for_reflex(
+                pending,
+                session_id,
+                cancellation_scope=cancellation_scope,
+            )
+            return {
+                "status": "uncertain",
+                "goal_state_results": results,
+                "cancelled_confirmation": cancelled_confirmation,
+                "error": "atomic_reflex_cancellation_state_commit_rejected",
+            }
+        if confirmation_evidence:
+            self.session_log(
+                session_id,
+                "cognitive_gateway_confirmation_cancelled: "
+                "confirmation_id=%s fingerprint=%s scope=%s widened=%s",
+                str(confirmation_evidence.get("confirmation_id") or "<unknown>"),
+                str(confirmation_evidence.get("fingerprint") or "<unknown>"),
+                cancellation_scope,
+                bool(confirmation_evidence.get("confirmation_scope_widened")),
+            )
         return {
-            "confirmation_id": confirmation_id,
-            "fingerprint": fingerprint,
-            "cancellation_scope": cancellation_scope,
-            "confirmed_request_ids": confirmed_request_ids,
-            "motion_request_ids": sorted(motion_request_ids),
-            "unknown_request_ids": sorted(unknown_request_ids),
-            "confirmation_scope_widened": (
-                confirmation_scope_widened
-            ),
-            "widening_reason": (
-                "shared_confirmation_token_revoked_conservatively"
-                if confirmation_scope_widened
-                else ""
-            ),
+            "status": "reconciled",
+            "goal_state_results": results,
+            "cancelled_confirmation": confirmation_evidence,
         }
 
     def _router_exception_safe_response(

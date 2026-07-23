@@ -113,6 +113,21 @@ class ConfirmationDialogueTests(unittest.TestCase):
         self.assertEqual(ambiguous.decision, "ambiguous")
         self.assertIsNone(ambiguous.response)
 
+    def test_remaining_ttl_uses_dialogue_clock(self) -> None:
+        now = [100.0]
+        dialogue = ConfirmationDialogue(ttl_s=20, clock=lambda: now[0])
+        pending = dialogue.begin(
+            _response(),
+            confirmed_request_ids={"nod-1"},
+            origin_session_id="sid-1",
+            conversation_id="conversation-1",
+        )
+
+        now[0] = 107.5
+
+        self.assertEqual(dialogue.remaining_ttl_s(pending), 12.5)
+        self.assertEqual(dialogue.remaining_ttl_s(), 12.5)
+
     def test_expired_or_changed_request_cannot_be_approved(self) -> None:
         now = [100.0]
         dialogue = ConfirmationDialogue(ttl_s=5, clock=lambda: now[0])

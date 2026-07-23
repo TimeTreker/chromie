@@ -714,29 +714,35 @@ class SkillRuntime:
                         (interaction_id, request, definition)
                     )
 
-            # A provider-global motion cancel has collateral effect only when
-            # an eligible provider request has actually started. Arbiter
-            # waiters and not-yet-started requests are cancelled locally and
-            # must not trigger a physical provider call or scope widening.
-            global_motion_cancel_required = any(
-                (
-                    active_item := self._active.get(
-                        (interaction_id, request.request_id)
+            # Provider-global cancellation has collateral effect only when an
+            # eligible provider request has actually started. Arbiter waiters
+            # and not-yet-started requests are cancelled locally and must not
+            # trigger a provider call or scope widening.
+            global_domains_required: set[CancellationDomain] = set()
+            for interaction_id, request, definition in base_selected:
+                active_item = self._active.get(
+                    (interaction_id, request.request_id)
+                )
+                if (
+                    active_item is None
+                    or (
+                        active_item[0].done()
+                        and active_item[3].provider_cancel_future is None
                     )
+                    or not active_item[3].provider_started
+                    or not request.cancellable
+                    or not definition.interruptible
+                    or not self._provider_cancellation_is_global(definition)
+                ):
+                    continue
+                global_domains_required.update(
+                    definition.cancellation_domains
                 )
-                is not None
-                and (
-                    not active_item[0].done()
-                    or active_item[3].provider_cancel_future is not None
-                )
-                and active_item[3].provider_started
-                and request.cancellable
-                and definition.interruptible
-                and "embodied_motion"
-                in definition.cancellation_domains
-                and self._provider_cancellation_is_global(definition)
-                for interaction_id, request, definition in base_selected
-            )
+
+            domain_scope: dict[CancellationDomain, CancellationScope] = {
+                "output": "output_only",
+                "embodied_motion": "embodied_motion",
+            }
             all_scheduled_items = [
                 (interaction_id, request, definition)
                 for interaction_id in sorted(known_interactions)
@@ -764,22 +770,30 @@ class SkillRuntime:
                 list[_CancellationRule],
             ] = {}
 
-            if (
-                global_motion_cancel_required
-                and requested_scope
-                not in {"embodied_motion", "global_emergency"}
-            ):
+            if global_domains_required and requested_scope != "global_emergency":
                 widened = True
+                ordered_domains = sorted(global_domains_required)
                 widening_reason = (
                     "provider_supports_only_global_embodied_motion_cancel"
+                    if ordered_domains == ["embodied_motion"]
+                    else "provider_supports_only_global_output_cancel"
+                    if ordered_domains == ["output"]
+                    else (
+                        "provider_supports_only_global_domain_cancel:"
+                        + ",".join(ordered_domains)
+                    )
                 )
-                if requested_scope == "specific_goal":
-                    effective_scope = "embodied_motion"
+                global_scopes = {
+                    domain_scope[item]
+                    for item in global_domains_required
+                }
+                if requested_scope == "specific_goal" and len(global_scopes) == 1:
+                    effective_scope = next(iter(global_scopes))
                 for interaction_id, request, definition in all_scheduled_items:
-                    if (
-                        "embodied_motion"
-                        not in definition.cancellation_domains
-                    ):
+                    matching_domains = global_domains_required.intersection(
+                        definition.cancellation_domains
+                    )
+                    if not matching_domains:
                         continue
                     key = (interaction_id, request.request_id)
                     selected_by_key[key] = (
@@ -787,20 +801,28 @@ class SkillRuntime:
                         request,
                         definition,
                     )
+                    item_scope = max(
+                        (domain_scope[item] for item in matching_domains),
+                        key=self._scope_priority,
+                    )
                     selection_scope_by_key[key] = self._dominant_scope(
                         selection_scope_by_key.get(key, "none"),
-                        "embodied_motion",
+                        item_scope,
                     )
                 for interaction_id in sorted(known_interactions):
-                    rules_to_install.setdefault(
-                        interaction_id,
-                        [],
-                    ).append(
-                        _CancellationRule(
-                            directive=directive,
-                            effective_scope="embodied_motion",
+                    for item_scope in sorted(
+                        global_scopes,
+                        key=self._scope_priority,
+                    ):
+                        rules_to_install.setdefault(
+                            interaction_id,
+                            [],
+                        ).append(
+                            _CancellationRule(
+                                directive=directive,
+                                effective_scope=item_scope,
+                            )
                         )
-                    )
                 for interaction_id in base_interaction_ids:
                     rules_to_install.setdefault(
                         interaction_id,
@@ -1317,6 +1339,16 @@ class SkillRuntime:
         playback_barrier = speech_metadata.get("wait_for_playback_start") is True
         if playback_barrier:
             speech_metadata["abort_remaining_on_failure"] = True
+        authority_metadata = {
+            key: speech_metadata[key]
+            for key in (
+                "source_goal_ids",
+                "covers_goal_ids",
+                "canonical_plan_id",
+                "canonical_plan_fingerprint",
+            )
+            if key in speech_metadata
+        }
         return SkillRequest(
             request_id=speech.id,
             skill_id="chromie.speak",
@@ -1335,6 +1367,7 @@ class SkillRuntime:
             ),
             timeout_ms=speech.timeout_ms,
             cancellable=speech.interruptible,
+            metadata=authority_metadata,
         )
 
     def _validate_request(
@@ -1715,13 +1748,22 @@ class SkillRuntime:
 
 
 SpeechHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
+SpeechCancelHandler = Callable[
+    [SkillRequest, dict[str, Any]],
+    None | Awaitable[None],
+]
 
 
 class LocalSpeechSkillProvider:
     provider_id = "chromie.local_speech"
 
-    def __init__(self, handler: SpeechHandler) -> None:
+    def __init__(
+        self,
+        handler: SpeechHandler,
+        cancel_handler: SpeechCancelHandler | None = None,
+    ) -> None:
         self._handler = handler
+        self._cancel_handler = cancel_handler
         self.cancelled_request_ids: set[str] = set()
 
     async def execute(
@@ -1770,6 +1812,15 @@ class LocalSpeechSkillProvider:
         context: SkillExecutionContext,
     ) -> None:
         self.cancelled_request_ids.add(request.request_id)
+        if self._cancel_handler is None:
+            return
+        # The host speech handler may still be awaiting playback-start evidence
+        # when its task is cancelled, so no completed scheduling receipt is
+        # guaranteed here.  The host therefore treats missing receipt data as
+        # requiring a conservative global output abort.
+        raw = self._cancel_handler(request, {})
+        if inspect.isawaitable(raw):
+            await raw
 
 
 class SessionControlSkillProvider:
@@ -1861,6 +1912,7 @@ def local_speech_definition() -> SkillDefinition:
         can_run_parallel=True,
         exclusive_group="chromie.audio",
         cancellation_domains=("output",),
+        metadata={"cancellation_granularity": "global_domain"},
     )
 
 
