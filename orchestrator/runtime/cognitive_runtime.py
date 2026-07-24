@@ -312,8 +312,40 @@ class CanonicalPlanRuntimeAdapter:
         schema_version=1,
     )
 
-    def __init__(self, interaction_runtime: Any) -> None:
+    def __init__(
+        self,
+        interaction_runtime: Any,
+        *,
+        social_attention_mode: str = "off",
+    ) -> None:
         self.interaction_runtime = interaction_runtime
+        normalized_mode = str(social_attention_mode or "off").strip().lower()
+        self.social_attention_mode = (
+            normalized_mode
+            if normalized_mode in {"off", "report_only", "sim_only", "on"}
+            else "off"
+        )
+
+    def _effective_social_attention_mode(
+        self,
+        composition: CoordinatedResponsePlan,
+    ) -> str:
+        policy_payload = composition.metadata.get("social_attention_policy")
+        agent_mode = str(
+            policy_payload.get("mode") if isinstance(policy_payload, dict) else "off"
+        ).strip().lower()
+        if agent_mode not in {"off", "report_only", "sim_only", "on"}:
+            agent_mode = "off"
+        # Both the Agent-side policy and the Host-side launch policy must allow
+        # the behavior. The more restrictive mode wins; a compromised/stale
+        # composition cannot widen the local runtime policy.
+        if "off" in {self.social_attention_mode, agent_mode}:
+            return "off"
+        if "report_only" in {self.social_attention_mode, agent_mode}:
+            return "report_only"
+        if "sim_only" in {self.social_attention_mode, agent_mode}:
+            return "sim_only"
+        return "on"
 
     @staticmethod
     def lane_for_plan(plan: CanonicalPlan) -> CognitiveLane:
@@ -1105,7 +1137,12 @@ class CanonicalPlanRuntimeAdapter:
         omitted_attention: list[str] = []
         attention = composition.social_attention_plan
         runtime_context = context if isinstance(context, dict) else {}
-        if attention is not None and attention.decision == "express":
+        policy_mode = self._effective_social_attention_mode(composition)
+        if attention is not None and attention.decision == "express" and policy_mode == "off":
+            omitted_attention.append("policy_off")
+        elif attention is not None and attention.decision == "express" and policy_mode == "report_only":
+            omitted_attention.append("policy_report_only")
+        elif attention is not None and attention.decision == "express":
             target_error = self._attention_target_error(attention, runtime_context)
             if target_error:
                 omitted_attention.append(target_error)
@@ -1136,6 +1173,14 @@ class CanonicalPlanRuntimeAdapter:
                         if definition.requires_confirmation:
                             omitted_attention.append(
                                 f"confirmation_required:{behavior.skill_id}"
+                            )
+                            continue
+                        if (
+                            policy_mode == "sim_only"
+                            and str(definition.metadata.get("mode") or "") != "sim"
+                        ):
+                            omitted_attention.append(
+                                f"non_sim_social_skill:{behavior.skill_id}"
                             )
                             continue
                         schema_errors = validate_args_for_schema(
@@ -1198,6 +1243,7 @@ class CanonicalPlanRuntimeAdapter:
                                         mode="json", exclude_none=True
                                     ),
                                     "reason": behavior.reason,
+                                    "social_attention_policy_mode": policy_mode,
                                 },
                             )
                         )
@@ -1239,6 +1285,7 @@ class CanonicalPlanRuntimeAdapter:
                 else None
             ),
             "omitted_social_attention": omitted_attention,
+            "social_attention_policy_mode": policy_mode,
             "omitted_pre_execution_speech_phases": (
                 omitted_pre_execution_speech_phases
             ),

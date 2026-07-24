@@ -210,6 +210,9 @@ class SkillRegistry:
                     f"Soridormi skill {upstream_id!r} resource_claims must be a list"
                 )
 
+            upstream_metadata = item.get("metadata")
+            if not isinstance(upstream_metadata, dict):
+                upstream_metadata = {}
             execution_constraints = item.get(
                 "execution_constraints",
                 execution_contract.get("execution_constraints", {}),
@@ -268,6 +271,12 @@ class SkillRegistry:
                     ],
                     "execution_constraints": dict(execution_constraints),
                     "output_contract": "chromie_soridormi_named_skill_v1",
+                    "mode": str(upstream_metadata.get("mode") or ""),
+                    "behavior_domains": [
+                        str(value)
+                        for value in upstream_metadata.get("behavior_domains", [])
+                        if str(value).strip()
+                    ],
                 },
             )
 

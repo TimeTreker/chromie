@@ -176,6 +176,11 @@ class ResponseComposerResolver:
                         "resolver": "response_composer",
                         "task_plan_immutable": True,
                         "social_attention_validation_reasons": social_reasons,
+                        "social_attention_policy": {
+                            "mode": self._social_attention_mode(request.context),
+                            "execution_enabled": self._social_attention_mode(request.context)
+                            in {"sim_only", "on"},
+                        },
                         "contract_schema": "ResponseComposerModelOutput",
                         "contract_repair_attempted": contract_repair_attempted,
                         "contract_repair_succeeded": contract_repair_attempted,
@@ -408,6 +413,9 @@ class ResponseComposerResolver:
         plan: CanonicalPlan,
         context: dict[str, Any],
     ) -> tuple[SocialAttentionPlan | None, list[str]]:
+        mode = self._social_attention_mode(context)
+        if mode == "off":
+            return None, (["policy_off"] if value is not None else [])
         if value is None:
             return None, []
         try:
@@ -426,6 +434,8 @@ class ResponseComposerResolver:
                 "speech_expression": proposed.speech_expression.model_dump(
                     mode="json", exclude_none=True
                 ),
+                "policy_mode": mode,
+                "execution_permitted": mode in {"sim_only", "on"},
             }
         )
         if proposed.decision == "none":
@@ -453,6 +463,12 @@ class ResponseComposerResolver:
                 continue
             if bool(candidate.get("requires_confirmation")):
                 reasons.append(f"confirmation_required:{behavior.skill_id}")
+                continue
+            if (
+                mode == "sim_only"
+                and str((candidate.get("metadata") or {}).get("mode") or "") != "sim"
+            ):
+                reasons.append(f"non_sim_social_skill:{behavior.skill_id}")
                 continue
             schema = candidate.get("input_schema")
             if not isinstance(schema, dict):
@@ -492,6 +508,13 @@ class ResponseComposerResolver:
                 "metadata": {**metadata, "validation_reasons": reasons},
             }
         ), reasons
+
+
+    @staticmethod
+    def _social_attention_mode(context: dict[str, Any]) -> str:
+        policy = context.get("social_attention_policy")
+        raw = str(policy.get("mode") if isinstance(policy, dict) else "off").strip().lower()
+        return raw if raw in {"off", "report_only", "sim_only", "on"} else "off"
 
     @staticmethod
     def _validate_target(plan: SocialAttentionPlan, context: dict[str, Any]) -> str | None:
@@ -604,6 +627,7 @@ class ResponseComposerResolver:
             f"User turn:\n{request.text}\n\n"
             f"Immutable CanonicalPlan JSON:\n{self._bounded(plan.model_dump(mode='json'), 14000)}\n\n"
             f"Active goals JSON:\n{self._bounded(context.get('active_goal_snapshots') or [], 4500)}\n\n"
+            f"Social-attention policy JSON:\n{self._bounded(context.get('social_attention_policy') or {'mode': 'off'}, 800)}\n\n"
             f"Social-attention candidates JSON:\n{self._bounded(context.get('social_attention_candidates') or [], 8000)}\n\n"
             f"Attention target evidence JSON:\n{self._bounded(context.get('social_attention_target_evidence') or {'available': False}, 2500)}\n\n"
             f"Previous Response Composer output when revising:\n{self._bounded(previous_raw, 5000) if previous_raw is not None else 'null'}\n\n"
@@ -614,7 +638,7 @@ class ResponseComposerResolver:
             "For execute plans this is pre-execution composition: use only none/heard/evaluating/waiting_for_user commitments, set must_not_claim_completion=true, and omit final. "
             "For mixed plans, coordinate executable and conversational goals in one natural response: use prospective wording for pending physical steps, do not narrate them with stage directions such as *Blinks twice*, do not claim completion, omit final while work is pending, and include a specific waiting_for_user clarification stage for every clarify outcome. "
             "For clarify, name the actual unresolved need naturally. At least one response stage must set speech_act=clarify or ask_clarification and commitment_state=waiting_for_user as direct stage fields, never inside metadata; waiting_for_user is a commitment_state, not a speech_act. When the CanonicalPlan has no goal_ids, every covers_goal_ids list must be empty. For alternatives, explain the change and request approval. "
-            "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Infer a purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any speech_expression adaptation; do not put a second answer inside SocialAttentionPlan. Select body behaviors only from the supplied social-attention candidates, and choose decision=none when neutral language and stillness are more natural, safer, unsupported, or unnecessary. "
+            "Social attention is a high-level auxiliary behavior domain, never a user goal or task step and never a replacement for one. The supplied social_attention_policy is authoritative: mode=off requires no SocialAttentionPlan and neutral response language; report_only may retain an advisory plan but cannot authorize body execution; sim_only may select only candidates whose metadata.mode is sim; on may select any supplied reviewed candidate. Set behavior_domain=social_attention and interaction_role=auxiliary_expression. Infer a purpose such as listening, acknowledgement, engagement, empathy, turn-taking, or deference. The actual ResponsePlan text must reflect any permitted speech_expression adaptation; do not put a second answer inside SocialAttentionPlan. Select body behaviors only from the supplied social-attention candidates, and choose decision=none when neutral language and stillness are more natural, safer, unsupported, or unnecessary. "
             "response_plan must be a JSON object with only immediate, pre_action, progress, and final fields; it is never a bare list. "
             "The decoder enforces the exact ResponseComposerModelOutput JSON Schema. Return JSON with response_plan, optional social_attention_plan, confidence, and rationale only."
         )

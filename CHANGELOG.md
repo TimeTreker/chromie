@@ -4,6 +4,20 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Social Attention policy closure
+
+- Made `AGENT_SOCIAL_ATTENTION_MODE` authoritative across the Goal-driven
+  Response Composer path. `off` now withholds candidates and drops any model
+  attention plan; `report_only` retains advisory evidence without execution;
+  `sim_only` exposes and executes only simulator-tagged behaviors; `on` permits
+  reviewed provider behaviors.
+- Added a second Host-side policy gate before auxiliary attention becomes a
+  `SkillRequest`. The Host combines its launch policy with the Agent-reported
+  policy using the more restrictive mode, so stale or compromised composition
+  metadata cannot widen execution authority.
+- Preserved provider `mode` and behavior-domain metadata in trusted runtime
+  definitions so the Host can independently recheck `sim_only` eligibility.
+
 ### Evidence-bound tool-result interpretation
 
 - Made the no-active-Goal segmentation schema expose its non-empty semantic

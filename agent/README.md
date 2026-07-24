@@ -120,7 +120,7 @@ Risk-bearing behavior is default-off.
 | `AGENT_RESPONSE_REVIEW_MODEL` | `gemma4:e2b` | Semantic reviewer model; defaults to the main Agent model so weak replies are judged with enough context. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
 | `AGENT_RESPONSE_REVIEW_MODE` | `auto` | In `auto`, skip the extra spoken-response review for clearly low-risk chat replies while still reviewing task/capability/action-risk replies. Use `always` for diagnostics. |
-| `AGENT_SOCIAL_ATTENTION_MODE` | `off` | Model-authored optional social-attention policy: `off`, `report_only`, `sim_only`, or `on`. The model may select a bounded named gesture or `none`; runtime validates target evidence, schemas, resources, and confirmation policy. |
+| `AGENT_SOCIAL_ATTENTION_MODE` | `off` | Model-authored optional social-attention policy: `off`, `report_only`, `sim_only`, or `on`. Candidate discovery and Response Composer validation enforce the mode; the Host rechecks the more restrictive local/Agent policy before execution. Runtime also validates target evidence, schemas, resources, and confirmation policy. |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | `qwen3:4b` | Dedicated model for structured `SocialAttentionPlan` output. |
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | `0` | Deprecated compatibility input retained for diagnostics. Social Attention is never awaited after the primary response; the effective wait is always `0`. |
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named skills | Exact catalog IDs eligible for model selection; this list does not force any gesture. |

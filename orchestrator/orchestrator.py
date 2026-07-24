@@ -729,7 +729,14 @@ class VoiceAssistant:
         self.cognitive_gateway = GatewayCoreCompatibilityAdapter()
         self.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=self.agent_client,
-            adapter=CanonicalPlanRuntimeAdapter(self.interaction_runtime),
+            adapter=CanonicalPlanRuntimeAdapter(
+                self.interaction_runtime,
+                social_attention_mode=(
+                    os.getenv("CHROMIE_SOCIAL_ATTENTION_MODE")
+                    or os.getenv("AGENT_SOCIAL_ATTENTION_MODE")
+                    or "off"
+                ),
+            ),
             policy=self.cognitive_runtime_policy,
             # Goal state is committed by the host only after the canonical plan
             # and composed response have also passed trusted-runtime preparation.

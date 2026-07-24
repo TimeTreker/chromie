@@ -511,7 +511,7 @@ retained. See
 | `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
-| `AGENT_SOCIAL_ATTENTION_MODE` | Structured model-driven attention policy: `off`, `report_only`, `sim_only`, or `on`. Default `off`. `report_only` retains the advisory plan without adding skills. |
+| `AGENT_SOCIAL_ATTENTION_MODE` | Structured model-driven attention policy: `off`, `report_only`, `sim_only`, or `on`. Default `off`. `off` withholds candidates; `report_only` retains an advisory plan without adding skills; `sim_only` permits only simulator-tagged capabilities; `on` permits reviewed provider capabilities. The Host independently rechecks the resolved launch mode before materializing any auxiliary SkillRequest. |
 | `CHROMIE_SOCIAL_ATTENTION_MODE` | Optional host-launcher override used by `scripts/start_chromie.sh`. Normal profiles inherit the project-wide `off` default; `--architecture-validation` selects the `architecture` overlay, which explicitly sets `sim_only`. |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
 | `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. The architecture-validation overlay raises it to `120000` so qualification tests model capability before latency tuning. |

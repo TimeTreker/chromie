@@ -1288,10 +1288,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 metadata={"auxiliary_social_attention": True},
             ),
             confidence=0.9,
+            metadata={
+                "social_attention_policy": {
+                    "mode": "on",
+                    "execution_enabled": True,
+                }
+            },
         )
         response = asyncio.run(
             CanonicalPlanRuntimeAdapter(
-                FakeRuntime([attention_definition])
+                FakeRuntime([attention_definition]),
+                social_attention_mode="on",
             ).build_response(
                 plan=plan,
                 composition=composition,
@@ -1366,10 +1373,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 metadata={"auxiliary_social_attention": True},
             ),
             confidence=0.9,
+            metadata={
+                "social_attention_policy": {
+                    "mode": "on",
+                    "execution_enabled": True,
+                }
+            },
         )
         response = asyncio.run(
             CanonicalPlanRuntimeAdapter(
-                FakeRuntime([attention_definition])
+                FakeRuntime([attention_definition]),
+                social_attention_mode="on",
             ).build_response(
                 plan=plan,
                 composition=composition,
@@ -1425,10 +1439,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 metadata={"auxiliary_social_attention": True},
             ),
             confidence=0.9,
+            metadata={
+                "social_attention_policy": {
+                    "mode": "on",
+                    "execution_enabled": True,
+                }
+            },
         )
         response = asyncio.run(
             CanonicalPlanRuntimeAdapter(
-                FakeRuntime([blink_definition(), attention_definition])
+                FakeRuntime([blink_definition(), attention_definition]),
+                social_attention_mode="on",
             ).build_response(
                 plan=plan,
                 composition=composition,

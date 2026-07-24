@@ -87,7 +87,15 @@ def plan(*, disposition="respond", goals=None, steps=None, response_text="你好
 
 
 def request(canonical_plan: CanonicalPlan, *, context=None):
-    merged = {"canonical_plan_resolution": canonical_plan.model_dump(mode="json")}
+    merged = {
+        "canonical_plan_resolution": canonical_plan.model_dump(mode="json"),
+        "social_attention_policy": {
+            "mode": "on",
+            "planning_enabled": True,
+            "execution_enabled": True,
+            "simulator_only": False,
+        },
+    }
     merged.update(context or {})
     return AgentRunRequest(
         sid="sid-pr6",

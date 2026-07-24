@@ -295,11 +295,20 @@ class InteractionRuntime(_AgentPipeline):
     async def _ensure_social_attention_candidates(
         self,
         request: AgentRunRequest,
-        *,
-        allow_when_off: bool = False,
     ) -> None:
         mode = self.services.effective_social_attention_mode()
-        if mode == "off" and not allow_when_off:
+        # Policy is host-owned runtime context, not a model preference. Clear any
+        # caller-supplied/stale candidates before rebuilding the eligible view.
+        request.context["social_attention_policy"] = {
+            "mode": mode,
+            "planning_enabled": mode != "off",
+            "execution_enabled": mode in {"sim_only", "on"},
+            "simulator_only": mode == "sim_only",
+        }
+        request.context.pop("social_attention_candidates", None)
+        request.context.pop("social_attention_candidate_source", None)
+        request.context.pop("social_attention_target_evidence", None)
+        if mode == "off":
             return
         catalog = self.services.capability_catalog
         if catalog is None:
@@ -381,8 +390,7 @@ class InteractionRuntime(_AgentPipeline):
             if payload.get("interaction_executable") is not True:
                 continue
             if (
-                not allow_when_off
-                and mode == "sim_only"
+                mode == "sim_only"
                 and str((payload.get("metadata") or {}).get("mode") or "") != "sim"
             ):
                 continue
@@ -408,8 +416,8 @@ class InteractionRuntime(_AgentPipeline):
         self,
         request: AgentRunRequest,
     ) -> None:
-        """Attach advisory social candidates and target evidence for PR6 composition."""
-        await self._ensure_social_attention_candidates(request, allow_when_off=True)
+        """Attach policy-filtered candidates and target evidence for composition."""
+        await self._ensure_social_attention_candidates(request)
 
     def _social_attention_target_evidence(self, request: AgentRunRequest) -> dict[str, Any]:
         for key in ("social_attention_target", "active_user_target", "perceived_user_target"):

@@ -29,6 +29,15 @@ path.
 
 ## Resume point
 
+A July 24 Social Attention policy audit found that the authoritative Response
+Composer endpoint loaded candidates even when the configured mode was `off`,
+and the Host materializer did not independently recheck the mode. The policy is
+now carried as host-owned context and enforced at candidate discovery, composer
+validation, and trusted materialization. `off`, `report_only`, `sim_only`, and
+`on` have distinct fail-closed behavior; the Host combines its local launch mode
+with the Agent-reported mode using the more restrictive result. Automated policy
+closure is complete, while retained live voice/simulator evidence remains open.
+
 The Fast Planner functional implementation in
 [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
 has a passing final-working-tree diagnostic run. On July 21, the four daily-life
