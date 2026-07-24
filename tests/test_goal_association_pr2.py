@@ -309,12 +309,65 @@ class GoalAssociationResolverTests(unittest.TestCase):
         self.assertNotIn("associations", schema["properties"])
         self.assertNotIn("GoalAssociationModelAssociation", schema.get("$defs", {}))
         self.assertFalse(schema["additionalProperties"])
+        self.assertEqual(len(schema["oneOf"]), 2)
+        self.assertEqual(
+            schema["oneOf"][0]["properties"]["clarification"]["minLength"],
+            1,
+        )
+        self.assertEqual(
+            schema["oneOf"][0]["properties"]["new_goals"]["maxItems"],
+            0,
+        )
+        self.assertEqual(
+            schema["oneOf"][1]["properties"]["clarification"]["maxLength"],
+            0,
+        )
+        self.assertEqual(
+            schema["oneOf"][1]["properties"]["new_goals"]["minItems"],
+            1,
+        )
         prompt = ollama.prompts[0][0]
         self.assertIn("contract intentionally has no associations field", prompt)
         self.assertIn("one new goal for each independently satisfiable user responsibility", prompt)
+        self.assertIn("standalone social interaction", prompt)
         self.assertIn("physical action and a conversational answer are independent goals", prompt)
         self.assertNotIn("Apply continuity before creation", ollama.prompts[0][1]["system"])
         self.assertIn("association with existing work is impossible", ollama.prompts[0][1]["system"])
+
+    def test_empty_greeting_segmentation_repairs_to_one_conversational_goal(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "new_goals": [],
+                    "clarification": "",
+                    "confidence": 0.95,
+                    "reason_summary": "No responsibilities to segment.",
+                },
+                {
+                    "new_goals": [
+                        {"description": "Respond naturally to the user's greeting"}
+                    ],
+                    "clarification": "",
+                    "confidence": 0.98,
+                    "reason_summary": "The greeting is one conversational goal.",
+                },
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request("Hello.", language="en-US")
+            )
+        )
+
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(result.clarification, "")
+        self.assertEqual(
+            [goal.description for goal in result.new_goals],
+            ["Respond naturally to the user's greeting"],
+        )
+        self.assertTrue(result.metadata["contract_repair"]["succeeded"])
+        self.assertIn("standalone social interaction", ollama.prompts[1][0])
 
     def test_no_active_goal_fabricated_association_repairs_under_segmentation_contract(self):
         invalid_live_output = {

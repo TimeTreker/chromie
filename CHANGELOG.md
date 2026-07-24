@@ -4,6 +4,25 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Evidence-bound tool-result interpretation
+
+- Made the no-active-Goal segmentation schema expose its non-empty semantic
+  invariant to the constrained decoder. A standalone greeting or other social
+  act must now become one model-authored conversational Goal, or a non-empty
+  clarification, instead of reaching generic fail-closed speech with two empty
+  alternatives.
+- Added a general `ToolResultInterpretation` contract and Agent stage. Complete
+  schema-validated tool output remains retained as evidence, while the model
+  selects exact evidence IDs and JSON Pointers and produces only the direct,
+  summarized, or explicitly requested detailed answer.
+- Added trusted validation for selected fact references, unsupported numeric
+  claims, internal identifiers, raw-payload narration, sentence count, and
+  spoken length. Invalid interpretation uses an adapter-owned compact fallback
+  or the conservative post-execution response.
+- Routed built-in weather results and canonical Skill Runtime observations
+  through the same boundary. A narrow weather question now becomes one short
+  answer instead of a field-by-field report and multiple TTS utterances.
+
 ### Git-controlled built-in Chromie voices
 
 - Added a validated multi-speaker CosyVoice catalog with `chromie_zh`,

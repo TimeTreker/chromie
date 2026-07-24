@@ -434,6 +434,29 @@ class GoalAssociationResolver:
 
         constrain(schema)
         if output_type is GoalSegmentationModelOutput:
+            # Pydantic model validators are not represented in model_json_schema().
+            # Without an explicit structural alternative the constrained decoder
+            # may legally emit both an empty new_goals list and an empty
+            # clarification, even though that payload is rejected after
+            # generation.  Make the same semantic invariant visible to the
+            # decoder: every accepted turn must either describe at least one new
+            # Goal or ask one non-empty clarification question.
+            schema["oneOf"] = [
+                {
+                    "properties": {
+                        "clarification": {"type": "string", "minLength": 1},
+                        "new_goals": {"type": "array", "maxItems": 0},
+                    },
+                    "required": ["clarification", "new_goals"],
+                },
+                {
+                    "properties": {
+                        "clarification": {"type": "string", "maxLength": 0},
+                        "new_goals": {"type": "array", "minItems": 1},
+                    },
+                    "required": ["clarification", "new_goals"],
+                },
+            ]
             return schema
 
         schema["oneOf"] = [
@@ -527,6 +550,7 @@ class GoalAssociationResolver:
             "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
             "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, skills, or plans.\n\n"
             "Create one new goal for each independently satisfiable user responsibility. Emit exactly one new_goals item containing only description for each responsibility. "
+            "A standalone social interaction such as a greeting, thanks, reassurance request, or casual check-in is itself one satisfiable conversational Goal: respond naturally to that social act. Do not treat it as an empty turn. "
             "A physical action and a conversational answer are independent goals. Ordered physical actions are independent goals when either can succeed or fail separately. "
             "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
@@ -563,6 +587,7 @@ class GoalAssociationResolver:
             state_instructions = (
                 "There are no active Goals. Existing-goal associations are structurally invalid and must not appear. "
                 "Re-segment every independently satisfiable responsibility into new_goals, or return only a clarification when the meaning is materially ambiguous. "
+                "A standalone social interaction is one conversational Goal and must not be returned as an empty goal list. "
             )
             output_instructions = (
                 "The exact GoalSegmentationModelOutput JSON Schema is enforced by the Ollama decoder out-of-band. "

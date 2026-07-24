@@ -56,6 +56,9 @@ fi
 if is_enabled "${AGENT_RESPONSE_COMPOSER_ENABLED:-1}"; then
   append_model "${AGENT_RESPONSE_COMPOSER_MODEL:-}"
 fi
+if is_enabled "${AGENT_TOOL_RESULT_INTERPRETER_ENABLED:-1}"; then
+  append_model "${AGENT_TOOL_RESULT_INTERPRETER_MODEL:-}"
+fi
 if is_enabled "${AGENT_TASK_CONTINUITY_ENABLED:-1}"; then
   append_model "${AGENT_TASK_CONTINUITY_MODEL:-}"
 fi

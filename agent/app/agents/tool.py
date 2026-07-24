@@ -6,10 +6,26 @@ from typing import Any
 from ..clients.weather_client import (
     WeatherLookupError,
     WeatherQuery,
-    format_weather_report,
+    WeatherReport,
+    weather_code_text,
 )
 from ..schema import AgentResult, AgentRunRequest
 from .base import BaseAgent
+
+try:
+    from chromie_contracts.tool_result import (
+        ToolResultEvidence,
+        ToolResultInterpretation,
+        ToolResultInterpretationRequest,
+        canonical_value_sha256,
+    )
+except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.tool_result import (
+        ToolResultEvidence,
+        ToolResultInterpretation,
+        ToolResultInterpretationRequest,
+        canonical_value_sha256,
+    )
 
 logger = logging.getLogger("chromie.agent.tool")
 
@@ -176,9 +192,23 @@ class ToolAgent(BaseAgent):
             report.daily_low_c,
             report.weather_code,
         )
-        result.add_speak_immediate(
-            format_weather_report(report, language=self.language(request), units=query.units),
-            style="brief",
+        spoken_response, evidence, interpretation = await self._compose_weather_response(
+            request,
+            query=query,
+            report=report,
+        )
+        result.add_speak_immediate(spoken_response, style="brief")
+        result.metadata.setdefault("tool_results", []).append(
+            {
+                "tool_id": evidence.tool_id,
+                "evidence_id": evidence.evidence_id,
+                "status": evidence.status,
+                "data": evidence.data,
+                "output_sha256": evidence.output_sha256,
+            }
+        )
+        result.metadata["tool_result_interpretation"] = interpretation.model_dump(
+            mode="json"
         )
         result.trace.append(
             "tool_agent: weather_lookup_completed "
@@ -186,6 +216,154 @@ class ToolAgent(BaseAgent):
         )
         result.handled_by.append(self.name)
         return result
+
+    async def _compose_weather_response(
+        self,
+        request: AgentRunRequest,
+        *,
+        query: WeatherQuery,
+        report: WeatherReport,
+    ) -> tuple[str, ToolResultEvidence, ToolResultInterpretation]:
+        fallback = self._brief_weather_fallback(
+            report,
+            language=self.language(request),
+            units=query.units,
+        )
+        report_payload = {
+            "location_name": report.location_name,
+            "date": report.date,
+            "condition": weather_code_text(
+                report.weather_code,
+                zh=self.is_zh(request),
+            ),
+            "current_temperature_c": report.current_temperature_c,
+            "apparent_temperature_c": report.apparent_temperature_c,
+            "daily_high_c": report.daily_high_c,
+            "daily_low_c": report.daily_low_c,
+            "precipitation_probability_max": report.precipitation_probability_max,
+            "precipitation_sum_mm": report.precipitation_sum_mm,
+            "wind_speed_kmh": report.wind_speed_kmh,
+            "requested_units": query.units,
+        }
+        evidence = ToolResultEvidence(
+            evidence_id=f"weather_{request.sid or 'turn'}",
+            tool_id="chromie.weather.lookup",
+            status="completed",
+            data=report_payload,
+            output_sha256=canonical_value_sha256(report_payload),
+        )
+        interpreter = self.services.tool_result_interpreter
+        if interpreter is None:
+            interpretation = ToolResultInterpretation(
+                status="fallback",
+                spoken_response=fallback,
+                answer_mode="summary",
+                rationale="Tool result interpreter is disabled; trusted weather fallback used.",
+                metadata={
+                    "resolver": "tool_result_interpreter",
+                    "fallback": True,
+                    "reason": "interpreter_disabled",
+                    "full_tool_result_retained": True,
+                },
+            )
+            return fallback, evidence, interpretation
+
+        interpretation_request = ToolResultInterpretationRequest(
+            sid=request.sid or "",
+            user_request=request.text,
+            language=self.language(request),
+            evidence=[evidence],
+            fallback_response=fallback,
+            max_spoken_chars=48 if self.is_zh(request) else 180,
+            detailed_max_spoken_chars=180 if self.is_zh(request) else 420,
+            max_sentences=2,
+            detailed_max_sentences=4,
+            context={
+                "route": request.route_decision.route,
+                "intent": request.route_decision.intent,
+            },
+        )
+        interpretation = await interpreter.interpret(interpretation_request)
+        spoken = interpretation.spoken_response or fallback
+        logger.info(
+            "weather_response_interpreted sid=%s chars=%s status=%s mode=%s selected_facts=%s",
+            request.sid,
+            len(spoken),
+            interpretation.status,
+            interpretation.answer_mode,
+            len(interpretation.selected_facts),
+        )
+        return spoken, evidence, interpretation
+
+    @staticmethod
+    def _bounded_json(value: Any, max_chars: int) -> str:
+        import json
+
+        text = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        return text if len(text) <= max_chars else text[:max_chars].rstrip() + "..."
+
+    @staticmethod
+    def _brief_weather_fallback(
+        report: WeatherReport,
+        *,
+        language: str,
+        units: str,
+    ) -> str:
+        """Bounded grounded fallback when semantic composition is unavailable."""
+
+        zh = language.lower().startswith("zh")
+        imperial = units == "imperial"
+
+        def temperature(value: float | None) -> float | None:
+            if value is None:
+                return None
+            return value * 9.0 / 5.0 + 32.0 if imperial else value
+
+        current = temperature(report.current_temperature_c)
+        apparent = temperature(report.apparent_temperature_c)
+        high = temperature(report.daily_high_c)
+        unit = "℉" if imperial else "℃"
+        unit_en = "°F" if imperial else "°C"
+        condition = weather_code_text(report.weather_code, zh=zh)
+
+        if zh:
+            facts: list[str] = []
+            if current is not None:
+                facts.append(f"现在{current:.0f}{unit}")
+            if apparent is not None and (
+                current is None or abs(apparent - current) >= 2.0
+            ):
+                facts.append(f"体感{apparent:.0f}{unit}")
+            if high is not None:
+                facts.append(f"最高{high:.0f}{unit}")
+            suffix = "，".join(facts[:3])
+            return (
+                f"{report.location_name}今天{condition}，{suffix}。"
+                if suffix
+                else f"{report.location_name}今天{condition}。"
+            )
+
+        facts = []
+        if current is not None:
+            facts.append(f"{current:.0f}{unit_en} now")
+        if apparent is not None and (
+            current is None or abs(apparent - current) >= 3.0
+        ):
+            facts.append(f"feels like {apparent:.0f}{unit_en}")
+        if high is not None:
+            facts.append(f"high {high:.0f}{unit_en}")
+        suffix = ", ".join(facts[:3])
+        return (
+            f"Today in {report.location_name}: {condition}, {suffix}."
+            if suffix
+            else f"Today in {report.location_name}: {condition}."
+        )
 
     async def _extract_weather_query(self, request: AgentRunRequest) -> WeatherQuery:
         language = self.language(request)

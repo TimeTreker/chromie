@@ -7,17 +7,20 @@ from agent.app.agents import AgentServices
 from agent.app.agents.tool import ToolAgent
 from agent.app.clients.weather_client import WeatherQuery, WeatherReport, format_weather_report
 from agent.app.schema import AgentResult, AgentRunRequest, RouteDecision
+from agent.app.tool_result_interpreter import ToolResultInterpreter
 
 
 class _FakeOllama:
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self.payload = payload
+    def __init__(self, payload: dict[str, Any] | list[dict[str, Any]]) -> None:
+        self.payloads = list(payload) if isinstance(payload, list) else [payload]
         self.prompts: list[str] = []
+        self.response_formats: list[Any] = []
 
     async def generate(self, prompt: str, *, system=None, options=None, response_format="text") -> dict[str, Any]:
         self.prompts.append(prompt)
-        assert response_format == "json"
-        return dict(self.payload)
+        self.response_formats.append(response_format)
+        index = min(len(self.prompts) - 1, len(self.payloads) - 1)
+        return dict(self.payloads[index])
 
 
 class _FakeWeatherClient:
@@ -130,6 +133,157 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(weather.queries[0].location, "重庆")
         self.assertIn("重庆今天", result.speak_immediate[0].text)
         self.assertIn("35℃", result.speak_immediate[0].text)
+
+    async def test_weather_tool_composes_a_direct_concise_answer_to_comfort_question(self) -> None:
+        weather = _FakeWeatherClient()
+        ollama = _FakeOllama(
+            {"location": "重庆", "date": "today", "units": "metric"}
+        )
+        interpreter_ollama = _FakeOllama(
+            {
+                "spoken_response": "很热，重庆现在约32℃，体感36℃，最高35℃。",
+                "answer_mode": "direct",
+                "selected_facts": [
+                    {"evidence_id": "weather_turn", "json_pointer": "/current_temperature_c"},
+                    {"evidence_id": "weather_turn", "json_pointer": "/apparent_temperature_c"},
+                    {"evidence_id": "weather_turn", "json_pointer": "/daily_high_c"},
+                ],
+                "confidence": 0.96,
+                "rationale": "The user asked whether it is hot.",
+            }
+        )
+        agent = ToolAgent(
+            AgentServices(
+                ollama=ollama,
+                weather_client=weather,
+                tool_result_interpreter=ToolResultInterpreter(interpreter_ollama),
+            )
+        )
+        request = AgentRunRequest(
+            text="今天重庆天热不热？",
+            language="zh-CN",
+            route_decision=RouteDecision(
+                route="tool",
+                intent="weather_query",
+                confidence=0.95,
+                language="zh-CN",
+                agents=["tool_agent", "speaker_agent"],
+                metadata={
+                    "tool_name": "weather",
+                    "weather_query": {
+                        "location": "重庆",
+                        "date": "today",
+                        "units": "metric",
+                    },
+                },
+            ),
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "很热，重庆现在约32℃，体感36℃，最高35℃。",
+        )
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(len(interpreter_ollama.prompts), 1)
+        self.assertIn("infer what information the user actually needs", interpreter_ollama.prompts[0])
+        self.assertIsInstance(interpreter_ollama.response_formats[0], dict)
+        self.assertEqual(result.metadata["tool_result_interpretation"]["answer_mode"], "direct")
+        self.assertEqual(len(result.metadata["tool_results"]), 1)
+
+    async def test_weather_tool_uses_one_short_grounded_fallback_when_composer_is_invalid(self) -> None:
+        weather = _FakeWeatherClient()
+        ollama = _FakeOllama(
+            {"location": "重庆", "date": "today", "units": "metric"}
+        )
+        interpreter_ollama = _FakeOllama(
+            {
+                "spoken_response": "",
+                "answer_mode": "summary",
+                "selected_facts": [],
+                "confidence": 0.0,
+                "rationale": "",
+            }
+        )
+        agent = ToolAgent(
+            AgentServices(
+                ollama=ollama,
+                weather_client=weather,
+                tool_result_interpreter=ToolResultInterpreter(interpreter_ollama),
+            )
+        )
+        request = AgentRunRequest(
+            text="重庆今天怎么样？",
+            language="zh-CN",
+            route_decision=RouteDecision(
+                route="tool",
+                intent="weather_query",
+                confidence=0.95,
+                language="zh-CN",
+                agents=["tool_agent"],
+                metadata={"tool_name": "weather"},
+            ),
+        )
+
+        result = await agent.run(request, AgentResult())
+        speech = result.speak_immediate[0].text
+
+        self.assertEqual(speech, "重庆今天小雨，现在32℃，体感36℃，最高35℃。")
+        self.assertLessEqual(len(speech), 36)
+        self.assertNotIn("降水概率", speech)
+        self.assertNotIn("风速", speech)
+
+    async def test_weather_tool_rejects_overlong_chinese_composer_output(self) -> None:
+        weather = _FakeWeatherClient()
+        ollama = _FakeOllama(
+            {"location": "重庆", "date": "today", "units": "metric"}
+        )
+        interpreter_ollama = _FakeOllama(
+            {
+                "spoken_response": (
+                    "重庆今天有小雨，现在大约32摄氏度，体感36摄氏度，"
+                    "最高35摄氏度，降水概率40%，风速9公里每小时。"
+                ),
+                "answer_mode": "summary",
+                "selected_facts": [
+                    {"evidence_id": "weather_turn", "json_pointer": "/current_temperature_c"},
+                    {"evidence_id": "weather_turn", "json_pointer": "/apparent_temperature_c"},
+                    {"evidence_id": "weather_turn", "json_pointer": "/daily_high_c"},
+                    {"evidence_id": "weather_turn", "json_pointer": "/precipitation_probability_max"},
+                    {"evidence_id": "weather_turn", "json_pointer": "/wind_speed_kmh"},
+                ],
+                "confidence": 0.9,
+                "rationale": "Too verbose.",
+            }
+        )
+        agent = ToolAgent(
+            AgentServices(
+                ollama=ollama,
+                weather_client=weather,
+                tool_result_interpreter=ToolResultInterpreter(interpreter_ollama),
+            )
+        )
+        request = AgentRunRequest(
+            text="重庆今天热不热？",
+            language="zh-CN",
+            route_decision=RouteDecision(
+                route="tool",
+                intent="weather_query",
+                confidence=0.95,
+                language="zh-CN",
+                agents=["tool_agent"],
+                metadata={"tool_name": "weather"},
+            ),
+        )
+
+        result = await agent.run(request, AgentResult())
+
+        self.assertEqual(
+            result.speak_immediate[0].text,
+            "重庆今天小雨，现在32℃，体感36℃，最高35℃。",
+        )
+
 
 
 class WeatherFormattingTests(unittest.TestCase):

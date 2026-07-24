@@ -11,6 +11,10 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import ResponseCompositionResolution
 from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
+from shared.chromie_contracts.tool_result import (
+    ToolResultInterpretation,
+    ToolResultInterpretationRequest,
+)
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 try:
@@ -238,6 +242,41 @@ class AgentClient:
                 result = ResponseCompositionResolution.model_validate_json(body)
             runtime_tracer.merge_fragment_from_metadata(result.metadata)
             span.set_attribute("result_status", result.status)
+            return result
+
+    async def interpret_tool_result(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        request: ToolResultInterpretationRequest,
+        timeout_ms: int | None = None,
+    ) -> ToolResultInterpretation:
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="interpret_tool_result",
+            kind="tool_call",
+            attributes={
+                "endpoint": "/tool-result/interpret",
+                "timeout_ms": effective_timeout_ms,
+                "evidence_count": len(request.evidence),
+            },
+        ) as span:
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/tool-result/interpret",
+                json=request.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent tool-result endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = ToolResultInterpretation.model_validate_json(body)
+            span.set_attribute("result_status", result.status)
+            span.set_attribute("selected_fact_count", len(result.selected_facts))
             return result
 
     async def resolve_goal_association(

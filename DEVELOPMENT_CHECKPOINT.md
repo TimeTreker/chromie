@@ -2,7 +2,7 @@
 
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-23
+**Status refresh date:** 2026-07-24
 **Current focus:** Finish Fast Planner multi-goal latency qualification and
 promote it to source-bound Target evidence: reduce final-source median cognitive
 runtime to the accepted threshold, repeat three warm runs, add
@@ -13,6 +13,19 @@ validation remain separate tracks.
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
 milestone intent.
+
+A July 24 live voice trace exposed two user-visible response-quality defects.
+The Router correctly grounded `Hello.` as `chat/greeting`, but the no-active-Goal
+model returned both an empty `new_goals` list and empty clarification. The
+segmentation decoder schema now requires at least one model-authored Goal or one
+non-empty clarification and explicitly treats a standalone social act as a
+conversational Goal. The same trace showed a successful weather lookup being
+read field by field. The new generic Tool Result Interpretation boundary keeps
+the complete schema-validated output as evidence, lets the model select exact
+evidence fields relevant to the user's request, and validates grounding and
+spoken budgets before one concise answer is accepted. Weather is the first
+built-in caller; canonical Skill Runtime observations use the same post-execution
+path.
 
 ## Resume point
 

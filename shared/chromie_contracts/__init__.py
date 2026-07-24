@@ -111,6 +111,16 @@ from .semantic_task import (
     TaskContextSnapshot,
 )
 
+from .tool_result import (
+    ToolAnswerMode,
+    ToolResultEvidence,
+    ToolResultFactReference,
+    ToolResultInterpretation,
+    ToolResultInterpretationRequest,
+    ToolResultStatus,
+    canonical_value_sha256,
+)
+
 __all__ = [
     "RouteRequest",
     "RouteDecision",
@@ -214,6 +224,13 @@ __all__ = [
     "PlanDisposition",
     "PlanParameterResolution",
     "PlannerTier",
+    "ToolAnswerMode",
+    "ToolResultEvidence",
+    "ToolResultFactReference",
+    "ToolResultInterpretation",
+    "ToolResultInterpretationRequest",
+    "ToolResultStatus",
+    "canonical_value_sha256",
 ]
 
 from .plan import (

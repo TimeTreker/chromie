@@ -1999,6 +1999,21 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(len(chunk) <= 36 for chunk in chunks))
         self.assertEqual("".join(chunks), text)
 
+    def test_tts_splitter_keeps_compact_chinese_weather_answer_in_one_request(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.tts_text_chunking_enabled = True
+        assistant.tts_first_chunk_chars = 16
+        assistant.tts_chunk_chars = 120
+        assistant.tts_cjk_chunk_chars = 36
+        assistant.tts_min_chunk_chars = 20
+        assistant.tts_cjk_min_chunk_chars = 8
+        assistant.tts_flush_chars = 160
+        assistant.tts_max_text_chars = 220
+
+        text = "很热，重庆现在约37℃，体感42℃，最高39℃。"
+
+        self.assertEqual(assistant.split_tts_text(text), [text])
+
     def test_tts_splitter_does_not_make_tiny_fragment_without_sentence_boundary(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.tts_text_chunking_enabled = True

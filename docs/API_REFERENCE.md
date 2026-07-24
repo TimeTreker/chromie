@@ -146,6 +146,7 @@ running.
 | `POST` | `/fast-plan` | Produce a complete common-catalog `CanonicalPlan` or terminal Deep Planner escalation. |
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`, including bounded same-tier revision. |
 | `POST` | `/compose-response-plan` | Bind goal-scoped speech and optional auxiliary attention to an immutable terminal plan. |
+| `POST` | `/tool-result/interpret` | Select exact grounded facts from complete tool evidence and synthesize a concise spoken answer. |
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
@@ -169,6 +170,7 @@ inspection endpoints, not Router execution authorization.
 | `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; exact Router actions are materialized without LLM reinterpretation, and the legacy CapabilityAgent planner requires explicit emergency authority. |
 | `POST` | `/task-continuity` | Return a validated `SemanticTaskOperationSet` proposal for the current utterance and active-task snapshot. |
 | `POST` | `/compose-response-plan` | Compose goal-scoped speech and optional auxiliary social attention around an immutable terminal `CanonicalPlan`. |
+| `POST` | `/tool-result/interpret` | Interpret complete bounded tool evidence for the user request without exposing the raw payload. |
 
 The interaction, goal-association, and task-continuity endpoints accept the same request shape:
 
@@ -184,6 +186,8 @@ The interaction, goal-association, and task-continuity endpoints accept the same
 `POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association advisory, Fast Planner escalation, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. Typed `plan_relation` and `user_confirmation_required` fields enforce confirmation for safe adjustments and alternatives before the host transfers those judgments to canonical metadata. Deterministic validation feedback may trigger at most `AGENT_DEEP_PLANNER_MAX_REPLANS` same-tier revisions.
 
 `POST /compose-response-plan` is available when `AGENT_RESPONSE_COMPOSER_ENABLED=1`. It requires a terminal `CanonicalPlan` in request context and returns `ResponseCompositionResolution`. Ollama receives the exact `ResponseComposerModelOutput` schema: a `ResponsePlan`, optional `SocialAttentionPlan`, confidence, and rationale, with response-stage Goal IDs constrained to the immutable plan. The host constructs composition identity, embeds the immutable plan and its SHA-256 fingerprint, requires every plan goal to be covered by response stages, and forbids pre-execution completion claims. One invalid schema result may receive a bounded same-stage repair using the original JSON and exact validation errors; a second invalid result fails closed. Social attention is independently validated against exact capability IDs, schemas, target evidence, confirmation policy, and primary-plan resource conflicts; invalid optional behavior is dropped without changing speech or task planning. The unified host invokes this stage in both observation and authoritative apply; composition failure fails closed after authority acquisition.
+
+`POST /tool-result/interpret` is available when `AGENT_TOOL_RESULT_INTERPRETER_ENABLED=1`. It accepts the original user request plus one or more complete bounded `ToolResultEvidence` objects. The model returns a direct, summary, or detailed spoken response and exact evidence-ID/JSON-Pointer fact references. Trusted validation rejects stale or collection-valued references, unsupported numeric claims, internal identifiers, raw-payload narration, and speech outside the selected budgets. The full tool result remains in the execution bundle or Agent metadata; only the validated synthesis is spoken.
 
 `POST /goal-association` is available only when
 `AGENT_GOAL_ASSOCIATION_ENABLED=1` and Agent LLM use is enabled. It applies

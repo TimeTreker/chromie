@@ -8,6 +8,12 @@ from typing import Any
 
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.semantic_task import SemanticGoal
+from shared.chromie_contracts.tool_result import (
+    ToolResultEvidence,
+    ToolResultInterpretation,
+    ToolResultInterpretationRequest,
+    canonical_value_sha256,
+)
 from shared.chromie_runtime.runtime_trace import TRACE_CARRIER_KEY, runtime_tracer
 
 try:
@@ -105,6 +111,53 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
             item["module"]["name"] for item in snapshot.trace["items"]
         }
         self.assertIn("orchestrator.agent_client", modules)
+
+    async def test_tool_result_interpretation_posts_complete_evidence(self) -> None:
+        data = {"temperature_c": 37.0, "apparent_temperature_c": 42.0}
+        request = ToolResultInterpretationRequest(
+            sid="tool-client",
+            user_request="Is it hot?",
+            language="en-US",
+            evidence=[
+                ToolResultEvidence(
+                    evidence_id="weather-result",
+                    tool_id="chromie.weather.lookup",
+                    status="completed",
+                    data=data,
+                    output_sha256=canonical_value_sha256(data),
+                )
+            ],
+        )
+        expected = ToolResultInterpretation(
+            status="resolved",
+            spoken_response="Yes, it is hot at 37°C.",
+            answer_mode="direct",
+            selected_facts=[
+                {
+                    "evidence_id": "weather-result",
+                    "json_pointer": "/temperature_c",
+                }
+            ],
+            confidence=0.95,
+        )
+        session = _FakeSession(_FakeResponse(text=expected.model_dump_json()))
+
+        result = await AgentClient("http://agent.local").interpret_tool_result(
+            session,  # type: ignore[arg-type]
+            request=request,
+            timeout_ms=5500,
+        )
+
+        self.assertEqual(result.spoken_response, expected.spoken_response)
+        self.assertEqual(
+            session.posts[0]["url"],
+            "http://agent.local/tool-result/interpret",
+        )
+        self.assertEqual(
+            session.posts[0]["json"]["evidence"][0]["data"],
+            data,
+        )
+        self.assertAlmostEqual(session.posts[0]["timeout"].total, 5.5)
 
     async def test_execute_planning_task_graph_posts_graph_payload(self) -> None:
         trace = {

@@ -15,6 +15,11 @@ from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, Ca
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .clients.ollama_client import OllamaClient
 from .clients.weather_client import OpenMeteoWeatherClient
+
+try:
+    from chromie_contracts.tool_result import ToolResultInterpretationRequest
+except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.tool_result import ToolResultInterpretationRequest
 from .interaction import (
     AgentResultInteractionAdapter,
     InteractionOutputCoordinator,
@@ -26,6 +31,7 @@ from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
 from .deep_planner import DeepPlannerResolver
 from .response_composer import ResponseComposerResolver
+from .tool_result_interpreter import ToolResultInterpreter
 from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .task_graph import (
     ExecutionTrace,
@@ -364,6 +370,31 @@ class Settings(BaseModel):
     response_composer_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_RESPONSE_COMPOSER_NUM_PREDICT", "1024")), ge=128, le=4096
     )
+    tool_result_interpreter_enabled: bool = Field(
+        default_factory=lambda: os.getenv("AGENT_TOOL_RESULT_INTERPRETER_ENABLED", "1").strip().lower()
+        not in {"0", "false", "no", "off"}
+    )
+    tool_result_interpreter_model: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_TOOL_RESULT_INTERPRETER_MODEL",
+            os.getenv("AGENT_RESPONSE_COMPOSER_MODEL", "gemma4:e2b"),
+        )
+    )
+    tool_result_interpreter_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_TIMEOUT_MS", "4500")),
+        ge=100,
+        le=120000,
+    )
+    tool_result_interpreter_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX", "4096")),
+        ge=2048,
+        le=131072,
+    )
+    tool_result_interpreter_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_TOOL_RESULT_INTERPRETER_NUM_PREDICT", "256")),
+        ge=128,
+        le=4096,
+    )
     task_continuity_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_TASK_CONTINUITY_NUM_PREDICT", "256")),
         ge=128,
@@ -455,6 +486,25 @@ task_graph_planner = (
     if settings.enable_task_graph_planning and settings.use_llm
     else None
 )
+tool_result_interpreter_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.tool_result_interpreter_model,
+        timeout_ms=settings.tool_result_interpreter_timeout_ms,
+        purpose="tool_result_interpreter",
+    )
+    if settings.use_llm and settings.tool_result_interpreter_enabled
+    else None
+)
+tool_result_interpreter = (
+    ToolResultInterpreter(
+        tool_result_interpreter_client,
+        num_ctx=settings.tool_result_interpreter_num_ctx,
+        num_predict=settings.tool_result_interpreter_num_predict,
+    )
+    if tool_result_interpreter_client is not None
+    else None
+)
 services = AgentServices(
     ollama=ollama_client,
     response_reviewer=response_reviewer_client,
@@ -479,6 +529,7 @@ services = AgentServices(
     capability_catalog=capability_catalog,
     capability_match_limit=settings.capability_match_limit,
     weather_client=weather_client,
+    tool_result_interpreter=tool_result_interpreter,
 )
 runtime = AgentRuntime(services)
 interaction_runtime = InteractionRuntime(services)
@@ -689,6 +740,12 @@ async def health() -> HealthResponse:
         deep_planner_model=(settings.deep_planner_model if deep_planner_resolver is not None else None),
         response_composer_enabled=response_composer_resolver is not None,
         response_composer_model=(settings.response_composer_model if response_composer_resolver is not None else None),
+        tool_result_interpreter_enabled=tool_result_interpreter is not None,
+        tool_result_interpreter_model=(
+            settings.tool_result_interpreter_model
+            if tool_result_interpreter is not None
+            else None
+        ),
         task_continuity_model=(
             settings.task_continuity_model if task_continuity_resolver is not None else None
         ),
@@ -745,6 +802,13 @@ async def compose_response_plan(request: AgentRunRequest):
         raise HTTPException(status_code=503, detail="Response composer is disabled")
     await interaction_runtime.prepare_response_composition_context(request)
     return await response_composer_resolver.resolve(request)
+
+
+@app.post("/tool-result/interpret")
+async def interpret_tool_result(request: ToolResultInterpretationRequest):
+    if tool_result_interpreter is None:
+        raise HTTPException(status_code=503, detail="Tool result interpreter is disabled")
+    return await tool_result_interpreter.interpret(request)
 
 
 @app.post("/goal-association")

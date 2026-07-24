@@ -39,6 +39,7 @@ class AgentServices:
     capability_catalog: "CapabilityCatalog | None" = None
     capability_match_limit: int = 8
     weather_client: Any | None = None
+    tool_result_interpreter: Any | None = None
 
     def effective_social_attention_mode(self) -> str:
         raw = (self.social_attention_mode or self.expressive_body_cues or "off").strip().lower()

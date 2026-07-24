@@ -3,7 +3,7 @@
 **Status authority:** this file describes what is present in the repository snapshot.
 **Development identity:** `development`; no release version or publication target is planned.
 **Maintained execution scope:** Soridormi MuJoCo `sim`; retained evidence below records the exact revision that produced each bundle.
-**Status refresh date:** 2026-07-23
+**Status refresh date:** 2026-07-24
 **Current focus:** **Improve Fast Planner multi-goal latency and promote the
 functional diagnostic path to source-bound target evidence by adding
 endpoint-reported Soridormi revision identity, using a clean paired checkout,
@@ -20,6 +20,18 @@ recreated. The repository does not define a replacement tag.
 
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
+
+The current branch closes two July 24 live-conversation regressions. With no
+active Goals, the constrained Goal Segmentation schema now requires a social
+turn such as a greeting to produce at least one model-authored conversational
+Goal or a non-empty clarification. Tool output now crosses a general
+evidence-bound interpretation stage: complete closed-schema observations remain
+retained, the model selects only exact evidence fields relevant to the user's
+need, and trusted validation rejects unknown fact references, unsupported
+numbers, raw payload narration, internal identifiers, and excessive spoken
+length. Built-in weather and post-execution canonical Skill Runtime observations
+share this boundary; deterministic output remains a conservative fallback rather
+than the normal user response.
 
 The repository contains a default-off Runtime Trace implementation. The shared
 tracer provides module-owned generic spans, monotonic duration, wall-clock

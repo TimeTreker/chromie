@@ -86,8 +86,14 @@ from orchestrator.schemas.agent import AgentResult, SpeechItem
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
+    InteractionSpeech,
     SkillRequest,
     SkillResult,
+)
+from shared.chromie_contracts.tool_result import (
+    ToolResultEvidence,
+    ToolResultInterpretationRequest,
+    canonical_value_sha256,
 )
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
@@ -316,6 +322,9 @@ class VoiceAssistant:
             raise ValueError("ORCH_RESPONSE_COMPOSER_MODE must be off or report_only")
         self.response_composer_timeout_ms = env_int(
             "ORCH_RESPONSE_COMPOSER_TIMEOUT_MS", 5000, minimum=100
+        )
+        self.tool_result_interpreter_timeout_ms = env_int(
+            "ORCH_TOOL_RESULT_INTERPRETER_TIMEOUT_MS", 5500, minimum=100
         )
         self.goal_association_mode = os.getenv(
             "ORCH_GOAL_ASSOCIATION_MODE",
@@ -6152,11 +6161,18 @@ class VoiceAssistant:
             return "waiting_for_recovery_confirmation"
 
         try:
-            final_response = compose_outcome_response(
-                bundle,
-                plan,
-                str(response.metadata.get("language") or "en-US"),
+            final_response = await self._compose_evidence_bound_tool_result_response(
+                source_response=response,
+                bundle=bundle,
+                plan=plan,
+                session_id=session_id,
             )
+            if final_response is None:
+                final_response = compose_outcome_response(
+                    bundle,
+                    plan,
+                    str(response.metadata.get("language") or "en-US"),
+                )
         except Exception as exc:
             self.session_log(
                 session_id,
@@ -6189,6 +6205,179 @@ class VoiceAssistant:
             goal_state_results=goal_state_results,
         )
         return delivery_status
+
+    async def _compose_evidence_bound_tool_result_response(
+        self,
+        *,
+        source_response: InteractionResponse,
+        bundle: Any,
+        plan: Any,
+        session_id: str | None,
+    ) -> InteractionResponse | None:
+        """Ask the Agent to interpret bounded tool output before speaking it.
+
+        Complete observations stay in the immutable ExecutionOutcomeBundle. The
+        model receives only schema-validated ModelObservation data and selects
+        exact fact pointers. The Host rechecks those pointers and correlations
+        before accepting one concise spoken answer.
+        """
+
+        evidence: list[ToolResultEvidence] = []
+        for item in bundle.evidence:
+            observation = item.observation
+            if (
+                observation is None
+                or observation.status != "available"
+                or not observation.schema_validated
+                or not observation.data
+            ):
+                continue
+            evidence.append(
+                ToolResultEvidence(
+                    evidence_id=item.evidence_id,
+                    tool_id=item.skill_id,
+                    status=item.status,
+                    data=observation.data,
+                    output_sha256=canonical_value_sha256(observation.data),
+                )
+            )
+        if not evidence:
+            return None
+
+        metadata = source_response.metadata if isinstance(source_response.metadata, dict) else {}
+        envelope = metadata.get("user_turn_envelope")
+        normalized_input = (
+            envelope.get("normalized_input")
+            if isinstance(envelope, dict)
+            else None
+        )
+        user_request = (
+            str(normalized_input.get("text") or "").strip()
+            if isinstance(normalized_input, dict)
+            else ""
+        )
+        if not user_request:
+            return None
+        language = str(
+            metadata.get("language")
+            or (normalized_input.get("language") if isinstance(normalized_input, dict) else "")
+            or "en-US"
+        )
+        interpretation_request = ToolResultInterpretationRequest(
+            sid=str(session_id or ""),
+            user_request=user_request,
+            language=language,
+            evidence=evidence,
+            max_spoken_chars=96 if language.lower().startswith("zh") else 240,
+            detailed_max_spoken_chars=320 if language.lower().startswith("zh") else 700,
+            max_sentences=2,
+            detailed_max_sentences=5,
+            context={
+                "aggregate_status": bundle.aggregate_status,
+                "goal_statuses": [
+                    {"goal_id": item.goal_id, "status": item.status}
+                    for item in bundle.goal_outcomes
+                ],
+            },
+        )
+        try:
+            session = await self.get_http_session()
+            interpretation = await self.agent_client.interpret_tool_result(
+                session,
+                request=interpretation_request,
+                timeout_ms=self.tool_result_interpreter_timeout_ms,
+            )
+        except Exception as exc:
+            self.session_log(
+                session_id,
+                "tool_result_interpretation_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+            return None
+        if interpretation.status not in {"resolved", "fallback"}:
+            return None
+
+        evidence_by_id = {item.evidence_id: item for item in evidence}
+        for reference in interpretation.selected_facts:
+            selected = evidence_by_id.get(reference.evidence_id)
+            if selected is None:
+                raise ValueError("tool result interpretation references unknown evidence")
+            self._resolve_tool_result_pointer(selected.data, reference.json_pointer)
+
+        fingerprint = str(bundle.outcome_id).replace(" ", "")[:12] or "result"
+        goal_ids = list(plan.executable_goal_ids())
+        status = (
+            "ok"
+            if bundle.aggregate_status == "completed"
+            else "refused"
+            if bundle.aggregate_status == "refused"
+            else "error"
+        )
+        return InteractionResponse(
+            interaction_id=bundle.interaction_id,
+            status=status,
+            speech=[
+                InteractionSpeech(
+                    id=f"speech_tool_result_{fingerprint}",
+                    text=interpretation.spoken_response,
+                    timing="immediate",
+                    style="brief" if status == "ok" else "warning",
+                    priority="normal",
+                    interruptible=True,
+                    metadata={
+                        "source": "evidence_bound_tool_result_interpretation",
+                        "phase": "post_execution",
+                        "wait_for_playback_start": True,
+                        "playback_start_required_for_delivery": True,
+                        "covers_goal_ids": goal_ids,
+                        "selected_facts": [
+                            item.model_dump(mode="json")
+                            for item in interpretation.selected_facts
+                        ],
+                        "answer_mode": interpretation.answer_mode,
+                        "full_tool_result_retained": True,
+                    },
+                )
+            ],
+            skills=[],
+            requires_confirmation=False,
+            reason=(
+                None
+                if bundle.aggregate_status == "completed"
+                else f"post_execution_{bundle.aggregate_status}"
+            ),
+            metadata={
+                "source": "evidence_bound_tool_result_interpretation",
+                "phase": "post_execution",
+                "language": language,
+                "canonical_plan_id": plan.plan_id,
+                "canonical_plan_fingerprint": bundle.canonical_plan_fingerprint,
+                "execution_outcome_bundle": bundle.model_dump(mode="json"),
+                "aggregate_status": bundle.aggregate_status,
+                "interpretation": interpretation.model_dump(mode="json"),
+                "full_tool_result_retained": True,
+            },
+        )
+
+    @staticmethod
+    def _resolve_tool_result_pointer(document: Any, pointer: str) -> Any:
+        current = document
+        for raw_part in pointer.split("/")[1:]:
+            part = raw_part.replace("~1", "/").replace("~0", "~")
+            if isinstance(current, dict):
+                if part not in current:
+                    raise ValueError("tool result fact pointer does not exist")
+                current = current[part]
+            elif isinstance(current, list):
+                if not part.isdigit() or int(part) >= len(current):
+                    raise ValueError("tool result fact pointer index does not exist")
+                current = current[int(part)]
+            else:
+                raise ValueError("tool result fact pointer traverses a scalar")
+        if isinstance(current, (dict, list)):
+            raise ValueError("tool result fact pointer must resolve to a scalar")
+        return current
 
     def _launch_interaction(
         self,

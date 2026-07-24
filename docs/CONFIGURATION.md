@@ -289,6 +289,12 @@ normalization fallback.
 | `AGENT_RESPONSE_COMPOSER_NUM_PREDICT` | `1024`; structured response/social-plan JSON budget. |
 | `ORCH_RESPONSE_COMPOSER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Unified `apply` requires a validated composition bound to the terminal plan. |
 | `ORCH_RESPONSE_COMPOSER_TIMEOUT_MS` | `5000`; host timeout for report-only composition. |
+| `AGENT_TOOL_RESULT_INTERPRETER_ENABLED` | `1`; enables generic evidence-bound interpretation after tool retrieval and for post-execution observations. |
+| `AGENT_TOOL_RESULT_INTERPRETER_MODEL` | Hardware-profile-owned model, normally the same quality family as Response Composer. |
+| `AGENT_TOOL_RESULT_INTERPRETER_TIMEOUT_MS` | `4500`; model timeout for relevance selection and concise spoken synthesis. |
+| `AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX` | `4096`; bounded user-request plus tool-evidence context. |
+| `AGENT_TOOL_RESULT_INTERPRETER_NUM_PREDICT` | `256`; compact structured answer and fact-reference budget. |
+| `ORCH_TOOL_RESULT_INTERPRETER_TIMEOUT_MS` | `5500`; Host-to-Agent deadline for post-execution tool-result interpretation. |
 
 Fast and Deep Planning send an exact flat `PlannerModelOutput` schema to
 Ollama. The model does not author the canonical plan identity, schema version,

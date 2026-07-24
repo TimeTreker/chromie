@@ -366,6 +366,8 @@ class HealthResponse(BaseModel):
     deep_planner_model: str | None = None
     response_composer_enabled: bool = False
     response_composer_model: str | None = None
+    tool_result_interpreter_enabled: bool = False
+    tool_result_interpreter_model: str | None = None
     task_continuity_model: str | None = None
     social_attention_mode: str = "off"
     social_attention_model: str | None = None
