@@ -320,7 +320,8 @@ case "${TTS_BACKEND,,}" in
     TTS_BACKEND=cosyvoice3
     export CHROMIE_TTS_BACKEND=cosyvoice3
     export TTS_VOICE_ROOT
-    readarray -t TTS_CATALOG_PARTS < <(python3 - "$TTS_VOICE_ROOT" <<'PY_TTS_CATALOG'
+    TTS_CATALOG_OUTPUT=""
+    if ! TTS_CATALOG_OUTPUT="$(python3 - "$TTS_VOICE_ROOT" <<'PY_TTS_CATALOG'
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path.cwd() / "tts"))
@@ -330,7 +331,21 @@ print(catalog.revision)
 print(catalog.default_speaker_id)
 print(",".join(catalog.speaker_ids()))
 PY_TTS_CATALOG
-)
+)"; then
+      echo "[chromie][error] CosyVoice3 voice catalog is missing or invalid: $TTS_VOICE_ROOT" >&2
+      echo "[chromie][hint] Generate it from the local AI-generated voices:" >&2
+      echo "  python scripts/promote_builtin_tts_voices.py --source-dir .chromie/private/tts-voice" >&2
+      echo "[chromie][hint] Then commit assets/tts/voices so clean clones remain runnable." >&2
+      exit 1
+    fi
+    readarray -t TTS_CATALOG_PARTS <<<"$TTS_CATALOG_OUTPUT"
+    if [ "${#TTS_CATALOG_PARTS[@]}" -lt 3 ] \
+      || [ -z "${TTS_CATALOG_PARTS[0]:-}" ] \
+      || [ -z "${TTS_CATALOG_PARTS[1]:-}" ] \
+      || [ -z "${TTS_CATALOG_PARTS[2]:-}" ]; then
+      echo "[chromie][error] CosyVoice3 voice catalog validation returned incomplete identity." >&2
+      exit 1
+    fi
     TTS_CATALOG_REVISION="${TTS_CATALOG_PARTS[0]}"
     TTS_REFERENCE_SHA="$TTS_CATALOG_REVISION"
     TTS_READY_PORT=5000

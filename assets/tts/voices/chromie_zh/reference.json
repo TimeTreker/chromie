@@ -1,0 +1,17 @@
+{
+  "audio_file": "reference.wav",
+  "audio_sha256": "9eb3f0b43bad5eac583700e64b1952faf15aace25c87d5cbff820edf5c0e1b81",
+  "contributor": "project_owner",
+  "languages": [
+    "zh"
+  ],
+  "license_id": "project-ai-generated-voice",
+  "operator_supplied": false,
+  "purpose": "chromie-built-in-cosyvoice-reference",
+  "redistribution_permitted": true,
+  "schema_version": 1,
+  "source": "ai_generated",
+  "source_file": "chromie_zh.wav",
+  "speaker_id": "chromie_zh",
+  "text": "你好，我是 Chromie。很高兴和你一起探索这个世界。无论是安静地聊天，还是认真完成任务，我都会仔细倾听，并用清楚、自然、温柔的声音回答你。"
+}

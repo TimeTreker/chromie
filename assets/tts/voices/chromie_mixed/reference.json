@@ -1,0 +1,19 @@
+{
+  "audio_file": "reference.wav",
+  "audio_sha256": "b64bf30929220e03ee310c5a43ee87dddd765050fb959833e96ef95fa377e415",
+  "contributor": "project_owner",
+  "languages": [
+    "zh",
+    "en",
+    "mixed"
+  ],
+  "license_id": "project-ai-generated-voice",
+  "operator_supplied": false,
+  "purpose": "chromie-built-in-cosyvoice-reference",
+  "redistribution_permitted": true,
+  "schema_version": 1,
+  "source": "ai_generated",
+  "source_file": "chromie_mixed.wav",
+  "speaker_id": "chromie_mixed",
+  "text": "你好，我是 Chromie。很高兴和你一起探索这个世界。Hello, I’m Chromie. I’m happy to explore the world with you."
+}

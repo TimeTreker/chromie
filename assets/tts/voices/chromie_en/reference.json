@@ -1,0 +1,17 @@
+{
+  "audio_file": "reference.wav",
+  "audio_sha256": "90412af964185d7a2f15cb9850d3ae21a534a78c90e59a1493c02e071f18f110",
+  "contributor": "project_owner",
+  "languages": [
+    "en"
+  ],
+  "license_id": "project-ai-generated-voice",
+  "operator_supplied": false,
+  "purpose": "chromie-built-in-cosyvoice-reference",
+  "redistribution_permitted": true,
+  "schema_version": 1,
+  "source": "ai_generated",
+  "source_file": "chromie_en.wav",
+  "speaker_id": "chromie_en",
+  "text": "Hello, I’m Chromie. I’m happy to explore the world with you. Whether we are having a quiet conversation or carefully completing a task, I will listen closely and answer in a clear, natural, and gentle voice."
+}

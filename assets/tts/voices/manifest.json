@@ -1,0 +1,15 @@
+{
+  "default_speaker_id": "chromie_mixed",
+  "language_routes": {
+    "en": "chromie_en",
+    "mixed": "chromie_mixed",
+    "zh": "chromie_zh"
+  },
+  "purpose": "chromie-built-in-voice-catalog",
+  "schema_version": 1,
+  "speakers": [
+    "chromie_zh",
+    "chromie_en",
+    "chromie_mixed"
+  ]
+}
