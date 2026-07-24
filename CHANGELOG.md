@@ -4,6 +4,19 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Response-only chat planning and complete CosyVoice warmup
+
+- Made Fast and Deep planner schemas enforce the source-route effect envelope.
+  Conversational `chat` turns receive no executable capability catalog, permit
+  no plan steps, and cannot become robot-action plans.
+- Closed the model-facing per-goal outcome contract so `execute` outcomes cannot
+  carry `response_text`; invalid execute-plus-speech output is rejected during
+  bounded planner repair instead of failing after canonical materialization.
+- Warm `chromie_zh`, `chromie_en`, and `chromie_mixed` explicitly before the
+  microphone opens. The old default-plus-Chinese warmup left the English and
+  mixed reference paths cold, causing the first English greeting to take about
+  twenty seconds under shared GPU load.
+
 ### Portable TTS voice bind paths
 
 - Normalize `TTS_VOICE_ROOT` to an absolute host path in normal startup,

@@ -261,6 +261,31 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.steps, [])
 
+
+    def test_chat_route_schema_is_response_only(self):
+        raw = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 0.93,
+            "goal_summary": "greet",
+            "response_text": "Hello!",
+            "steps": [],
+            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+        }
+        ollama = FakeOllama(raw)
+        plan = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request("Hello.", route="chat", goal_ids=["goal-greet"])
+            )
+        )
+        self.assertEqual(plan.disposition, "respond")
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertEqual(schema["properties"]["steps"]["maxItems"], 0)
+        self.assertEqual(
+            schema["properties"]["disposition"]["enum"],
+            ["respond", "escalate"],
+        )
+
     def test_contract_repair_receives_all_compound_shape_defects(self):
         invalid = {
             "disposition": "respond",

@@ -327,6 +327,70 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 goal_ids,
             )
 
+
+    def test_chat_route_schema_rejects_effectful_outcomes(self):
+        schema = DeepPlannerResolver._response_schema(
+            ["goal-greet"], response_only=True
+        )
+        self.assertEqual(schema["properties"]["steps"]["maxItems"], 0)
+        self.assertEqual(
+            schema["properties"]["disposition"]["enum"],
+            ["respond", "clarify", "unavailable", "refused"],
+        )
+        outcome = schema["$defs"]["PlannerModelGoalOutcome"]
+        self.assertNotIn("execute", outcome["properties"]["disposition"]["enum"])
+
+    def test_model_outcome_rejects_execute_response_text_before_materialization(self):
+        with self.assertRaisesRegex(
+            ValueError, "execute goal outcome must not carry response_text"
+        ):
+            validate_planner_model_output(
+                {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "confidence": 0.95,
+                    "response_text": "",
+                    "steps": [
+                        {
+                            "step_id": "blink",
+                            "skill_id": "soridormi.blink_eyes",
+                            "args": {"count": 1},
+                            "source_goal_ids": ["goal-greet"],
+                        }
+                    ],
+                    "goal_outcomes": {
+                        "goal-greet": {
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "response_text": "Hello!",
+                            "unresolved": [],
+                            "step_ids": ["blink"],
+                            "satisfaction": {
+                                "score": 1.0,
+                                "status": "exact",
+                                "satisfied_goal_ids": ["goal-greet"],
+                                "unmet_goal_ids": [],
+                                "unmet_requirements": [],
+                                "rationale": "Complete.",
+                            },
+                            "rationale": "Greet.",
+                        }
+                    },
+                    "goal_satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": ["goal-greet"],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": [],
+                        "rationale": "Complete.",
+                    },
+                    "plan_relation": "exact",
+                    "user_confirmation_required": False,
+                },
+                planner_tier="deep",
+                expected_goal_ids_for_turn=["goal-greet"],
+            )
+
     def test_goal_outcome_schema_uses_exact_unique_goal_key_map(self):
         schema = DeepPlannerResolver._response_schema(["goal-look", "goal-blink"])
 

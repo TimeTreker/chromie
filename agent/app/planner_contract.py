@@ -131,6 +131,11 @@ class PlannerModelGoalOutcome(BaseModel):
                 raise ValueError(
                     "execute goal outcome requires complete coverage and step_ids"
                 )
+            if self.response_text.strip():
+                raise ValueError(
+                    "execute goal outcome must not carry response_text; "
+                    "Response Composer owns pre-execution speech"
+                )
         elif self.disposition == "respond":
             if self.coverage != "complete" or not self.response_text.strip():
                 raise ValueError(
@@ -506,6 +511,7 @@ def canonical_plan_response_schema(
     planner_tier: PlannerTier,
     expected_goal_ids: list[str],
     allowed_skill_ids: list[str],
+    response_only: bool = False,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
@@ -531,16 +537,24 @@ def canonical_plan_response_schema(
     disposition = properties.get("disposition")
     if isinstance(disposition, dict):
         disposition["enum"] = (
-            ["respond", "execute", "mixed", "escalate"]
-            if planner_tier == "fast"
-            else [
-                "respond",
-                "execute",
-                "mixed",
-                "clarify",
-                "unavailable",
-                "refused",
-            ]
+            (
+                ["respond", "escalate"]
+                if planner_tier == "fast"
+                else ["respond", "clarify", "unavailable", "refused"]
+            )
+            if response_only
+            else (
+                ["respond", "execute", "mixed", "escalate"]
+                if planner_tier == "fast"
+                else [
+                    "respond",
+                    "execute",
+                    "mixed",
+                    "clarify",
+                    "unavailable",
+                    "refused",
+                ]
+            )
         )
 
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
@@ -608,8 +622,54 @@ def canonical_plan_response_schema(
         outcome_disposition = (
             outcome_schema.get("properties", {}).get("disposition")
         )
-        if isinstance(outcome_disposition, dict) and planner_tier == "fast":
-            outcome_disposition["enum"] = ["respond", "execute"]
+        if isinstance(outcome_disposition, dict):
+            if response_only:
+                outcome_disposition["enum"] = (
+                    ["respond"]
+                    if planner_tier == "fast"
+                    else ["respond", "clarify", "unavailable", "refused"]
+                )
+            elif planner_tier == "fast":
+                outcome_disposition["enum"] = ["respond", "execute"]
+
+        outcome_properties = outcome_schema.get("properties", {})
+        base_branches: list[dict[str, Any]] = []
+        allowed_outcomes = (
+            (["respond"] if planner_tier == "fast" else ["respond", "clarify", "unavailable", "refused"])
+            if response_only
+            else (
+                ["respond", "execute"]
+                if planner_tier == "fast"
+                else [
+                    "respond",
+                    "execute",
+                    "clarify",
+                    "unavailable",
+                    "refused",
+                ]
+            )
+        )
+        for outcome_name in allowed_outcomes:
+            branch: dict[str, Any] = {
+                "properties": {"disposition": {"enum": [outcome_name]}}
+            }
+            branch_props = branch["properties"]
+            if outcome_name == "execute":
+                branch_props["coverage"] = {"enum": ["complete"]}
+                branch_props["response_text"] = {"maxLength": 0}
+                branch_props["step_ids"] = {"minItems": 1}
+            elif outcome_name == "respond":
+                branch_props["coverage"] = {"enum": ["complete"]}
+                branch_props["response_text"] = {"minLength": 1}
+                branch_props["step_ids"] = {"maxItems": 0}
+            elif outcome_name == "clarify":
+                branch_props["coverage"] = {"enum": ["partial", "uncertain"]}
+                branch_props["step_ids"] = {"maxItems": 0}
+            else:
+                branch_props["step_ids"] = {"maxItems": 0}
+            base_branches.append(branch)
+        if base_branches:
+            outcome_schema["oneOf"] = base_branches
 
     goal_list_fields = {
         "goal_ids",
@@ -642,6 +702,15 @@ def canonical_plan_response_schema(
                 constrain(value)
 
     constrain(schema)
+    if response_only:
+        steps_schema = properties.get("steps")
+        if isinstance(steps_schema, dict):
+            steps_schema["maxItems"] = 0
+            steps_schema["description"] = (
+                "The source route is conversational and authorizes no "
+                "executable effects; return no plan steps."
+            )
+
     step_schema = schema.get("$defs", {}).get("PlannerModelStep")
     if isinstance(step_schema, dict):
         step_required = step_schema.setdefault("required", [])
@@ -655,6 +724,7 @@ def fast_multi_goal_response_schema(
     *,
     expected_goal_ids: list[str],
     allowed_skill_ids: list[str],
+    response_only: bool = False,
 ) -> dict[str, Any]:
     """Return a decoder-tight, model-authored multi-goal plan schema.
 
@@ -694,7 +764,11 @@ def fast_multi_goal_response_schema(
 
     disposition = properties.get("disposition")
     if isinstance(disposition, dict):
-        disposition["enum"] = ["respond", "execute", "mixed", "escalate"]
+        disposition["enum"] = (
+            ["respond", "escalate"]
+            if response_only
+            else ["respond", "execute", "mixed", "escalate"]
+        )
 
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_skills = list(dict.fromkeys(allowed_skill_ids))
@@ -737,6 +811,15 @@ def fast_multi_goal_response_schema(
             "count argument represents repeated motions; never duplicate a "
             "step to implement count. Conversational respond goals have no step."
         )
+
+    if response_only:
+        response_only_steps = properties.get("steps")
+        if isinstance(response_only_steps, dict):
+            response_only_steps["maxItems"] = 0
+            response_only_steps["description"] = (
+                "The source route is conversational and authorizes no "
+                "executable effects; return no plan steps."
+            )
 
     goal_outcomes = properties.get("goal_outcomes")
     if isinstance(goal_outcomes, dict):
@@ -792,7 +875,15 @@ def fast_multi_goal_response_schema(
                 outcome_unresolved["items"]["maxLength"] = 240
         outcome_disposition = outcome_properties.get("disposition")
         if isinstance(outcome_disposition, dict):
-            outcome_disposition["enum"] = ["respond", "execute", "escalate"]
+            outcome_disposition["enum"] = (
+                ["respond", "escalate"]
+                if response_only
+                else ["respond", "execute", "escalate"]
+            )
+        if response_only:
+            step_ids = outcome_properties.get("step_ids")
+            if isinstance(step_ids, dict):
+                step_ids["maxItems"] = 0
         satisfaction = outcome_properties.get("satisfaction")
         if isinstance(satisfaction, dict):
             satisfaction.clear()

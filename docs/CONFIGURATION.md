@@ -698,6 +698,8 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `COSYVOICE3_FP16` | Load the default model in half precision; default `1`. |
 | `COSYVOICE3_PROMPT_PREFIX` | Trusted prompt prefix prepended before the exact reference transcript. |
 | `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget; default `1200` for the large offline model load. |
+| `TTS_COSYVOICE_WARMUP_TIMEOUT_SEC` | `300`; per-profile no-playback synthesis budget used before microphone startup. |
+| `TTS_COSYVOICE_ZH_WARMUP_TEXT`, `TTS_COSYVOICE_EN_WARMUP_TEXT`, `TTS_COSYVOICE_MIXED_WARMUP_TEXT` | Short startup probes that explicitly prime every committed CosyVoice language/reference profile. |
 | `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Bounded drain before fail-closed worker restart after cancellation; default `3` seconds. |
 | `ORCH_TTS_CONCURRENCY` | `1` for the singleton CosyVoice worker. |
 | `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default; use one compact resident Ollama model while CosyVoice shares the GPU. |

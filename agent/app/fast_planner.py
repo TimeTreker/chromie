@@ -110,6 +110,9 @@ class FastPlannerResolver:
             and item.interaction_executable
             and is_planner_step_skill(item.capability_id)
         ]
+        response_only = str(request.route_decision.route or "").strip() == "chat"
+        if response_only:
+            executable = []
         capability_payload = [
             {
                 "capability_id": item.capability_id,
@@ -135,6 +138,7 @@ class FastPlannerResolver:
                 allowed_skill_ids=[
                     item["capability_id"] for item in capability_payload
                 ],
+                response_only=response_only,
             )
             if multi_goal_contract
             else canonical_plan_response_schema(
@@ -143,6 +147,7 @@ class FastPlannerResolver:
                 allowed_skill_ids=[
                     item["capability_id"] for item in capability_payload
                 ],
+                response_only=response_only,
             )
         )
         options = {
@@ -443,6 +448,14 @@ class FastPlannerResolver:
             "source_ref must be an exact goal-text span containing that same "
             "number. "
         )
+        route_effect_contract = (
+            "The authoritative source route is chat. This turn is response-only: "
+            "do not select or invent executable skills, physical effects, or plan "
+            "steps. Answer conversational goals with respond outcomes; escalate "
+            "only when semantic reasoning is genuinely insufficient. "
+            if str(request.route_decision.route or "").strip() == "chat"
+            else ""
+        )
         concise_output_contract = (
             "Keep goal summaries, step reasons, satisfaction rationales, and "
             "outcome rationales concise: one short sentence each. Do not "
@@ -458,6 +471,7 @@ class FastPlannerResolver:
                 "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a skill, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
                 "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. "
                 f"{argument_grounding_contract}"
+                f"{route_effect_contract}"
                 f"{concise_output_contract}"
                 "Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
                 "This is prospective planning: no action has executed yet. A planned step or response counts as satisfying its goal if it would succeed. For each keyed goal outcome, judge only that one goal; never put sibling goals or pending execution in unmet_goal_ids or unmet_requirements. Complete terminal outcomes use exact satisfaction with both unmet lists empty. "
@@ -487,6 +501,7 @@ class FastPlannerResolver:
             "Fast Planner may emit disposition=mixed only for a completely covered simple combination of common unlocked execute goals and direct conversational respond goals. A mixed plan requires at least one execute outcome, at least one respond outcome, complete per-goal satisfaction, and exact step ownership. "
             "For complete direct execution, use exact supplied skill IDs and schema-valid args. "
             f"{argument_grounding_contract}"
+            f"{route_effect_contract}"
             f"{concise_output_contract}"
             "User-facing speech is owned by Response Composer, not a plan step. Represent each conversational responsibility with disposition=respond and an actual response_text now; never substitute chromie.speak or a body gesture. "
             "Every executable step must use source_goal_ids copied from the canonical goals. Do not use capability_id, parameters, action, input_schema, route, or step_type as plan-step fields. "

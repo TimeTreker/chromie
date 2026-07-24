@@ -33,6 +33,16 @@ length. Built-in weather and post-execution canonical Skill Runtime observations
 share this boundary; deterministic output remains a conservative fallback rather
 than the normal user response.
 
+A later July 24 voice rerun exposed two planner-boundary failures after the
+Router had correctly selected `chat/greeting`: one greeting became a physical
+Deep Planner plan and another emitted `execute` plus `response_text`. Planner
+schemas now receive the source-route effect envelope, remove executable skills
+for `chat`, permit no steps, and constrain execute outcomes to empty response
+text. The same trace showed a 19.7-second first English CosyVoice synthesis
+followed by a 2.25-second warm result. Startup now primes all three committed
+voice profiles explicitly before microphone input rather than warming only the
+Chinese route behind `speaker_id=default`.
+
 The repository contains a default-off Runtime Trace implementation. The shared
 tracer provides module-owned generic spans, monotonic duration, wall-clock
 correlation, async context propagation, cross-service Orchestrator-to-Agent

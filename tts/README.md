@@ -53,6 +53,13 @@ concurrency is therefore `ORCH_TTS_CONCURRENCY=1`; increasing host concurrency
 would only add hidden queueing. CosyVoice emits native streamed audio chunks,
 but its upstream inference call remains synchronous inside the worker.
 
+CosyVoice lazily initializes language- and reference-specific inference paths.
+Normal startup therefore performs one no-playback synthesis for each committed
+profile (`chromie_zh`, `chromie_en`, and `chromie_mixed`) before the microphone
+opens. Warming only `speaker_id=default` with a Chinese language hint primes the
+Chinese profile but leaves the first English or mixed request cold under shared
+GPU load.
+
 When a request is cancelled, Chromie first holds the singleton worker lock for
 a bounded drain. A nearly complete result is discarded without unloading the
 model. If the worker does not finish within the drain bound, it is restarted

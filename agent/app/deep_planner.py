@@ -99,6 +99,9 @@ class DeepPlannerResolver:
             and item.interaction_executable
             and is_planner_step_skill(item.capability_id)
         ]
+        response_only = str(request.route_decision.route or "").strip() == "chat"
+        if response_only:
+            executable = []
         payload = [self._capability_payload(item) for item in executable[: self.max_capabilities]]
         expected_goal_ids_for_turn = expected_goal_ids(
             request.context if isinstance(request.context, dict) else {}
@@ -106,6 +109,7 @@ class DeepPlannerResolver:
         response_schema = self._response_schema(
             expected_goal_ids_for_turn,
             allowed_skill_ids=[item["capability_id"] for item in payload],
+            response_only=response_only,
         )
         generation_options = {
             "temperature": 0,
@@ -341,11 +345,13 @@ class DeepPlannerResolver:
         expected_goal_ids: list[str],
         *,
         allowed_skill_ids: list[str] | None = None,
+        response_only: bool = False,
     ) -> dict[str, Any]:
         return canonical_plan_response_schema(
             planner_tier="deep",
             expected_goal_ids=expected_goal_ids,
             allowed_skill_ids=list(allowed_skill_ids or []),
+            response_only=response_only,
         )
 
     @staticmethod
@@ -372,6 +378,13 @@ class DeepPlannerResolver:
         combined_feedback = [*feedback, *(runtime_feedback if isinstance(runtime_feedback, list) else [])]
         feedback_section = self._bounded(combined_feedback, 5000) if combined_feedback else "[]"
         previous_section = self._bounded(previous_raw, 5000) if previous_raw is not None else "null"
+        route_effect_contract = (
+            "The authoritative source route is chat. This turn is response-only: "
+            "do not select or invent executable skills, physical effects, or plan "
+            "steps. Use respond, clarify, unavailable, or refused outcomes only. "
+            if str(request.route_decision.route or "").strip() == "chat"
+            else ""
+        )
         return (
             f"Fast-plan advisory JSON:\n{self._bounded(fast_plan, 1800)}\n\n"
             f"Goal association advisory JSON:\n{self._bounded(association, 3200)}\n\n"
@@ -381,6 +394,7 @@ class DeepPlannerResolver:
             f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
             "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
             "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. "
+            f"{route_effect_contract}"
             "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, and concurrency. Resolve low-consequence "
             "parameters semantically when justified; otherwise return a specific natural clarification. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
             "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "

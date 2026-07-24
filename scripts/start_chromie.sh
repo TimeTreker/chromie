@@ -188,9 +188,10 @@ wait_for_ws_health() {
 
 warm_tts_candidate() {
   local host="$1" port="$2" expected_provider="$3" text="$4" timeout_s="$5" label="$6"
+  local speaker_id="${7:-default}" language_hint="${8:-auto}"
   local output
-  echo "[chromie] Warming $label with a no-playback synthesis under the full service load..."
-  output="$(python3 - "$host" "$port" "$expected_provider" "$text" "$timeout_s" <<'PYTTSWARM'
+  echo "[chromie] Warming $label speaker=$speaker_id language=$language_hint with no playback..."
+  output="$(python3 - "$host" "$port" "$expected_provider" "$text" "$timeout_s" "$speaker_id" "$language_hint" <<'PYTTSWARM'
 import asyncio
 import json
 import sys
@@ -199,10 +200,19 @@ import uuid
 import websockets
 
 
-async def synthesize() -> tuple[int, str]:
-    host, raw_port, expected_provider, text, _raw_timeout = sys.argv[1:]
+async def synthesize() -> tuple[int, str, str]:
+    (
+        host,
+        raw_port,
+        expected_provider,
+        text,
+        _raw_timeout,
+        speaker_id,
+        language_hint,
+    ) = sys.argv[1:]
     audio_bytes = 0
     observed_provider = ""
+    observed_speaker = ""
     async with websockets.connect(
         f"ws://{host}:{int(raw_port)}",
         max_size=10**7,
@@ -214,10 +224,10 @@ async def synthesize() -> tuple[int, str]:
             json.dumps(
                 {
                     "type": "synthesize_stream",
-                    "request_id": f"startup-warm-{uuid.uuid4().hex}",
+                    "request_id": f"startup-warm-{speaker_id}-{uuid.uuid4().hex}",
                     "text": text,
-                    "speaker_id": "default",
-                    "language_hint": "zh",
+                    "speaker_id": speaker_id,
+                    "language_hint": language_hint,
                 },
                 ensure_ascii=False,
             )
@@ -235,26 +245,35 @@ async def synthesize() -> tuple[int, str]:
             provider = payload.get("provider")
             if isinstance(provider, dict):
                 observed_provider = str(provider.get("provider_id") or "")
+            metadata = payload.get("provider_metadata")
+            if isinstance(metadata, dict):
+                observed_speaker = str(metadata.get("speaker_id") or "")
             if observed_provider != expected_provider:
                 raise RuntimeError(
                     f"expected provider {expected_provider!r}, got {observed_provider!r}"
                 )
+            if observed_speaker and observed_speaker != speaker_id:
+                raise RuntimeError(
+                    f"expected speaker {speaker_id!r}, got {observed_speaker!r}"
+                )
             if audio_bytes <= 0:
                 raise RuntimeError("TTS warm-up completed without PCM audio")
-            return audio_bytes, observed_provider
+            return audio_bytes, observed_provider, observed_speaker or speaker_id
     raise RuntimeError("TTS warm-up socket closed before completion")
 
 
 async def main() -> None:
     timeout_s = max(1.0, float(sys.argv[5]))
-    audio_bytes, provider = await asyncio.wait_for(synthesize(), timeout=timeout_s)
-    print(f"provider={provider} pcm_bytes={audio_bytes}")
+    audio_bytes, provider, speaker = await asyncio.wait_for(
+        synthesize(), timeout=timeout_s
+    )
+    print(f"provider={provider} speaker={speaker} pcm_bytes={audio_bytes}")
 
 
 asyncio.run(main())
 PYTTSWARM
 )" || {
-    echo "[chromie][error] $label failed its full synthesis readiness probe." >&2
+    echo "[chromie][error] $label failed its synthesis readiness probe for speaker=$speaker_id." >&2
     return 1
   }
   echo "[chromie] $label is synthesis-ready ($output)."
@@ -665,15 +684,31 @@ wait_for_http 127.0.0.1 8092 /health 300 "Agent"
 wait_for_tcp 127.0.0.1 11434 300 "Ollama"
 
 if [ "$TTS_BACKEND" = "cosyvoice3" ]; then
-  COSYVOICE_WARMUP_TEXT="${TTS_COSYVOICE_WARMUP_TEXT:-你好，我是 Chromie。现在语音系统已经准备好了，很高兴和你一起探索这个世界。Hello, I am ready to talk with you.}"
+  # CosyVoice lazily initializes language/reference-specific inference paths.
+  # Warming only speaker=default with a Chinese hint primes chromie_zh but leaves
+  # the first real English and mixed requests cold. Prime every committed voice
+  # before the Router/Orchestrator starts accepting microphone turns.
+  COSYVOICE_WARMUP_TIMEOUT_SEC="${TTS_COSYVOICE_WARMUP_TIMEOUT_SEC:-300}"
+  COSYVOICE_ZH_WARMUP_TEXT="${TTS_COSYVOICE_ZH_WARMUP_TEXT:-你好。}"
+  COSYVOICE_EN_WARMUP_TEXT="${TTS_COSYVOICE_EN_WARMUP_TEXT:-Hello.}"
+  COSYVOICE_MIXED_WARMUP_TEXT="${TTS_COSYVOICE_MIXED_WARMUP_TEXT:-你好，Hello.}"
   warm_tts_candidate \
     127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
-    "$COSYVOICE_WARMUP_TEXT" 300 "$TTS_READY_LABEL"
+    "$COSYVOICE_ZH_WARMUP_TEXT" "$COSYVOICE_WARMUP_TIMEOUT_SEC" \
+    "$TTS_READY_LABEL" chromie_zh zh
+  warm_tts_candidate \
+    127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
+    "$COSYVOICE_EN_WARMUP_TEXT" "$COSYVOICE_WARMUP_TIMEOUT_SEC" \
+    "$TTS_READY_LABEL" chromie_en en
+  warm_tts_candidate \
+    127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
+    "$COSYVOICE_MIXED_WARMUP_TEXT" "$COSYVOICE_WARMUP_TIMEOUT_SEC" \
+    "$TTS_READY_LABEL" chromie_mixed mixed
 elif [ "$TTS_BACKEND" = "qwen3" ]; then
   QWEN3_TTS_WARMUP_TEXT="${QWEN3_TTS_WARMUP_TEXT:-你好，我是 Chromie。语音系统已经准备好了。}"
   warm_tts_candidate \
     127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
-    "$QWEN3_TTS_WARMUP_TEXT" 300 "$TTS_READY_LABEL"
+    "$QWEN3_TTS_WARMUP_TEXT" 300 "$TTS_READY_LABEL" default zh
 fi
 
 check_soridormi_from_agent_container
