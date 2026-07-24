@@ -35,6 +35,27 @@ Chromie's brain context has these layers:
 | Experience journal | Durable local JSONL | Appended | Evidence for future tuning and tests |
 | Update proposals | Durable local JSONL | Proposed only | Human-reviewed changes to strategies, goals, prompts, or tests |
 
+## Accepted Social Interaction Extension
+
+The next mind-profile extension will carry Chromie's owner-approved Social
+Attention tendencies. Courtesy, expressiveness, initiative, restraint, and
+repetition or cooldown guidance belong here because they describe personality
+and interaction style. They do not describe whether the attached body is
+simulated or physical.
+
+A courteous profile may use more acknowledgement, gaze, nodding, or other
+context-sensitive expression; a neutral profile uses fewer cues; a reserved
+profile normally prefers stillness. These are model-facing tendencies rather
+than fixed gesture frequencies, so every turn may still choose no auxiliary
+behavior. Urgent stop, emergency, and primary task requirements remain stronger
+than personality expression.
+
+The current shared contract does not yet contain these fields. Their accepted
+implementation plan and evidence criteria are maintained in
+[Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
+Soridormi continues to own backend selection, body-specific control,
+calibration, and safety.
+
 The current default profile lives in
 [`shared/chromie_contracts/mind.py`](../shared/chromie_contracts/mind.py).
 Operators can provide a JSON replacement with `ORCH_MIND_PROFILE_PATH`, but the

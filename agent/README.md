@@ -120,12 +120,13 @@ Risk-bearing behavior is default-off.
 | `AGENT_RESPONSE_REVIEW_MODEL` | `gemma4:e2b` | Semantic reviewer model; defaults to the main Agent model so weak replies are judged with enough context. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
 | `AGENT_RESPONSE_REVIEW_MODE` | `auto` | In `auto`, skip the extra spoken-response review for clearly low-risk chat replies while still reviewing task/capability/action-risk replies. Use `always` for diagnostics. |
-| `AGENT_SOCIAL_ATTENTION_MODE` | `off` | Model-authored optional social-attention policy: `off`, `report_only`, `sim_only`, or `on`. Candidate discovery and Response Composer validation enforce the mode; the Host rechecks the more restrictive local/Agent policy before execution. Runtime also validates target evidence, schemas, resources, and confirmation policy. |
+| `AGENT_SOCIAL_ATTENTION_MODE` | `off` (current) | Current compatibility gate accepts `off`, `report_only`, `sim_only`, or `on`. The accepted target removes `sim_only`, defaults to `on`, and makes Social Attention depend on mind/personality and interaction context. Soridormi/provider configuration, not the Agent, selects simulation or physical execution. See [Social Attention Behavior Domain](../docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | `qwen3:4b` | Dedicated model for structured `SocialAttentionPlan` output. |
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | `0` | Deprecated compatibility input retained for diagnostics. Social Attention is never awaited after the primary response; the effective wait is always `0`. |
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named skills | Exact catalog IDs eligible for model selection; this list does not force any gesture. |
 | `AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET` | `none` | Optional installation-calibrated target used only when live perception is absent. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Deprecated compatibility alias used only when `AGENT_SOCIAL_ATTENTION_MODE` is unset. |
+
 | `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | When `1`, require semantic review for executable robot-action plans and fail closed if that optional reviewer is unavailable; exact Router capability substitutions also require a reviewer revision. At the default `0`, this extra review gate is skipped. |
 | `AGENT_CONVERSATION_NUM_CTX` | `2048` | Context window for normal conversation prompts. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | `64` | Output budget for normal conversation replies. |

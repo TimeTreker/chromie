@@ -130,6 +130,35 @@ Completion criteria:
 
 See [TTS Provider Contract and Evaluation](docs/TTS_PROVIDER_EVALUATION.md).
 
+## Open architecture track - Embodiment-independent Social Attention
+
+Chromie should decide social intent, style, and optional semantic expression
+without knowing whether Soridormi currently targets a simulator or a physical
+robot. Soridormi remains responsible for backend selection, body-specific
+control, calibration, safety, and execution evidence. Social Attention
+frequency and intensity should come from Chromie's owner-approved mind profile
+and live interaction context rather than deployment mode.
+
+The authoritative decision, migration sequence, and acceptance criteria are in
+[Social Attention Behavior Domain](docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
+
+Exit criteria:
+
+- remove `sim_only` from Chromie's Social Attention policy and all maintained
+  launch or validation configuration;
+- make `on` the maintained default while retaining `off` and `report_only` for
+  owner preference, diagnostics, and controlled comparisons;
+- model courtesy, expressiveness, initiative, restraint, cooldown, and
+  repetition policy in the owner-approved mind profile;
+- keep capability discovery and model planning independent of provider
+  simulator or hardware metadata;
+- preserve explicit user actions as primary goals and prevent auxiliary
+  expression from delaying speech, urgent work, stop, or emergency behavior;
+- prove backend invariance with contract and scenario tests, then retain live
+  Soridormi evidence through the configured provider;
+- pass documentation, semantic-authority, scenario, focused, and full
+  regression gates.
+
 ## Open architecture track - Orchestrator task proposal merge
 
 Router, quick intent, and deepthinking stages may all propose tasks, but

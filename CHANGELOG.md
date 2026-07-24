@@ -4,6 +4,19 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Embodiment-independent Social Attention architecture
+
+- Established that Chromie must not distinguish simulator and physical robot
+  backends when planning Social Attention. Chromie owns semantic interaction
+  intent; Soridormi owns backend selection, body adaptation, and physical
+  safety.
+- Reframed Social Attention frequency and intensity as owner-approved mind and
+  personality policy: courteous profiles may express more, neutral profiles
+  less, and reserved profiles may normally choose stillness.
+- Opened the implementation topic to remove `sim_only`, make Social Attention
+  enabled by default, and add bounded courtesy, expressiveness, initiative,
+  restraint, cooldown, and repetition guidance to the mind profile.
+
 ### Response-only chat planning and complete CosyVoice warmup
 
 - Made Fast and Deep planner schemas enforce the source-route effect envelope.

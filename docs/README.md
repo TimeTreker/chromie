@@ -57,7 +57,7 @@ When documents disagree, correct the lower-authority document.
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | How is the automated suite kept free of stale wrappers and duplicate coverage? | `docs/TEST_SUITE_MAINTENANCE.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
-| How are contextual language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
+| How are embodiment-independent, personality-driven language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
 | How are semantic goals preserved and revised across turns? | `docs/SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |

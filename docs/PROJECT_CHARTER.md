@@ -105,7 +105,11 @@ and its migration status is reported in [STATUS.md](STATUS.md).
 ## Engineering principles
 
 1. **High-level contracts stay stable.** Simulation and physical providers
-   should implement the same named-skill and result semantics.
+   should implement the same named-skill and result semantics. Chromie's
+   cognitive, personality, and Social Attention policies must not branch on
+   whether the active Soridormi provider is simulated or physical. Backend
+   selection, body adaptation, calibration, and physical safety remain below
+   the Chromie semantic boundary.
 2. **Robot thinking belongs to the Cognitive Core, models, and contracts.**
    Outside deterministic operational controls, normal conversation, memory,
    tool, robot-action,

@@ -3,12 +3,12 @@
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 **Status refresh date:** 2026-07-24
-**Current focus:** Finish Fast Planner multi-goal latency qualification and
-promote it to source-bound Target evidence: reduce final-source median cognitive
-runtime to the accepted threshold, repeat three warm runs, add
-endpoint-reported Soridormi revision identity, use a clean paired checkout,
-bind running images/models to source. Physical pilot and human voice-device
-validation remain separate tracks.
+**Current focus:** Implement embodiment-independent Social Attention: remove
+simulation-aware policy from Chromie, enable Social Attention by default, move
+courtesy and expressiveness into the owner-approved mind profile, and keep
+simulator-versus-physical selection plus body safety entirely in Soridormi and
+its providers. Fast Planner latency qualification and retained TTS evidence
+remain open engineering tracks after this architecture correction.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -29,14 +29,18 @@ path.
 
 ## Resume point
 
-A July 24 Social Attention policy audit found that the authoritative Response
-Composer endpoint loaded candidates even when the configured mode was `off`,
-and the Host materializer did not independently recheck the mode. The policy is
-now carried as host-owned context and enforced at candidate discovery, composer
-validation, and trusted materialization. `off`, `report_only`, `sim_only`, and
-`on` have distinct fail-closed behavior; the Host combines its local launch mode
-with the Agent-reported mode using the more restrictive result. Automated policy
-closure is complete, while retained live voice/simulator evidence remains open.
+The previous Social Attention closure correctly made the configured policy
+fail-closed across candidate discovery, Response Composer validation, and Host
+materialization. A follow-up architecture review accepted a stronger boundary:
+Chromie must not know whether Soridormi is using simulation or a physical body.
+The current `sim_only` mode and default-off configuration therefore represent
+transitional architecture debt rather than the target design. Resume with the
+implementation topic in
+[Social Attention Behavior Domain](docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md):
+remove `sim_only`, make `on` the maintained default, move courtesy and
+expressiveness into `MindProfile`, and prove that provider deployment metadata
+does not change Chromie's semantic Social Attention plan. Retained live
+interaction evidence remains open.
 
 The Fast Planner functional implementation in
 [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
