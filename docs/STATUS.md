@@ -42,7 +42,7 @@ and model-artifact license declarations,
 language/rate capabilities, native-streaming truth, request cancellation,
 speaker operations, health, PCM events, and comparable completion metrics. The
 maintained `chromie-tts` endpoint now runs Fun-CosyVoice3 0.5B with an
-authorized SHA-bound local reference. Unknown or image-mismatched provider
+SHA-bound source-controlled Chromie voice catalog. Unknown or image-mismatched provider
 selections fail closed. The OuteTTS/llama.cpp and Qwen3-TTS 0.6B Base images
 remain explicit profile-gated alternatives with exact runtime/model locks. A committed A/B matrix and runner
 apply the same Mandarin, English, mixed-language, interruption/recovery,
@@ -79,7 +79,7 @@ leaked English sentence. The earlier Oute matrix therefore remains transport
 and stability evidence, not requested-text or listening-quality evidence.
 Fast-first cache v2 now binds entries to endpoint, provider/model, speaker, and
 speaker revision; duration and ASR round-trip content gates reject bad cues
-before disk or memory admission. The normal launcher now uses the authorized local reference with CosyVoice on port 5000; `--tts-backend oute` and `--tts-backend qwen3` select explicit alternatives. The candidate's former ONNX Runtime 1.18.0/cuDNN 9 mismatch
+before disk or memory admission. The normal launcher now uses the committed Chromie voice catalog with CosyVoice on port 5000; `--tts-backend oute` and `--tts-backend qwen3` select explicit alternatives. The candidate's former ONNX Runtime 1.18.0/cuDNN 9 mismatch
 is fixed with the compatible 1.18.1 runtime, WeText artifacts survive container
 recreation, and a rebuilt live candidate initialized `CUDAExecutionProvider`.
 All six English/Chinese short cues then passed the duration and ASR content

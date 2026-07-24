@@ -66,14 +66,24 @@ COMPOSE_ARGS=(--env-file .env.runtime -f docker-compose.yml)
 
 TTS_BACKEND="${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 TTS_SERVICE=chromie-tts
-TTS_REFERENCE_DIR="${TTS_REFERENCE_DIR:-.chromie/private/tts-voice}"
+TTS_VOICE_ROOT="${TTS_VOICE_ROOT:-assets/tts/voices}"
 case "${TTS_BACKEND,,}" in
   cosyvoice|cosyvoice3)
     TTS_BACKEND=cosyvoice3
     TTS_SERVICE=chromie-tts
     export CHROMIE_TTS_BACKEND=cosyvoice3
-    export TTS_REFERENCE_DIR
-    python3 scripts/tts_reference.py validate --reference-dir "$TTS_REFERENCE_DIR"
+    export TTS_VOICE_ROOT
+    python3 - "$TTS_VOICE_ROOT" <<'PY_TTS_CATALOG'
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path.cwd() / "tts"))
+from voice_catalog import validate_voice_catalog
+catalog = validate_voice_catalog(Path(sys.argv[1]))
+print(
+    f"[tts-voices] valid root={catalog.root} default={catalog.default_speaker_id} "
+    f"revision={catalog.revision} speakers={','.join(catalog.speaker_ids())}"
+)
+PY_TTS_CATALOG
     echo "[start] TTS provider: CosyVoice3 (maintained default)"
     ;;
   oute|outetts)
@@ -87,9 +97,9 @@ case "${TTS_BACKEND,,}" in
     TTS_BACKEND=qwen3
     TTS_SERVICE=chromie-tts-qwen3
     export CHROMIE_TTS_BACKEND=qwen3
-    export TTS_REFERENCE_DIR
+    export TTS_VOICE_ROOT
     COMPOSE_ARGS+=(--profile tts-evaluation)
-    python3 scripts/tts_reference.py validate --reference-dir "$TTS_REFERENCE_DIR"
+    python3 scripts/tts_reference.py validate --reference-dir "$TTS_VOICE_ROOT/chromie_mixed"
     echo "[start] TTS provider: Qwen3-TTS (explicit fallback)"
     ;;
   *)

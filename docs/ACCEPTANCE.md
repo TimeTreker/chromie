@@ -285,8 +285,6 @@ microphone.
 Run the pinned isolated CosyVoice/Qwen comparison with:
 
 ```bash
-TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
-TTS_AB_SKIP_REFERENCE_GENERATION=1 \
 ./scripts/run_tts_candidate_ab.sh
 ```
 

@@ -312,24 +312,31 @@ set +a
 TTS_READY_PORT=5000
 TTS_READY_LABEL="CosyVoice3 TTS"
 TTS_REFERENCE_SHA=""
+TTS_CATALOG_REVISION=""
 TTS_EXPECTED_PROVIDER="fun-cosyvoice3-0.5b"
-TTS_REFERENCE_DIR="${TTS_REFERENCE_DIR:-$ROOT_DIR/.chromie/private/tts-voice}"
+TTS_VOICE_ROOT="${TTS_VOICE_ROOT:-$ROOT_DIR/assets/tts/voices}"
 case "${TTS_BACKEND,,}" in
   cosyvoice|cosyvoice3)
     TTS_BACKEND=cosyvoice3
     export CHROMIE_TTS_BACKEND=cosyvoice3
-    export TTS_REFERENCE_DIR
-    TTS_REFERENCE_SHA="$(python3 - "$TTS_REFERENCE_DIR" <<'PY_TTS_REFERENCE'
+    export TTS_VOICE_ROOT
+    readarray -t TTS_CATALOG_PARTS < <(python3 - "$TTS_VOICE_ROOT" <<'PY_TTS_CATALOG'
 from pathlib import Path
 import sys
-from scripts.tts_reference import validate_reference_dir
-print(validate_reference_dir(Path(sys.argv[1]))["audio_sha256"])
-PY_TTS_REFERENCE
-)"
+sys.path.insert(0, str(Path.cwd() / "tts"))
+from voice_catalog import validate_voice_catalog
+catalog = validate_voice_catalog(Path(sys.argv[1]))
+print(catalog.revision)
+print(catalog.default_speaker_id)
+print(",".join(catalog.speaker_ids()))
+PY_TTS_CATALOG
+)
+    TTS_CATALOG_REVISION="${TTS_CATALOG_PARTS[0]}"
+    TTS_REFERENCE_SHA="$TTS_CATALOG_REVISION"
     TTS_READY_PORT=5000
     TTS_READY_LABEL="CosyVoice3 TTS"
     TTS_EXPECTED_PROVIDER="fun-cosyvoice3-0.5b"
-    echo "[chromie] Default TTS: CosyVoice3 reference_sha256=${TTS_REFERENCE_SHA:0:12}"
+    echo "[chromie] Default TTS: CosyVoice3 catalog=${TTS_CATALOG_REVISION:0:12} default=${TTS_CATALOG_PARTS[1]} speakers=${TTS_CATALOG_PARTS[2]}"
     ;;
   oute|outetts)
     TTS_BACKEND=oute
@@ -342,8 +349,8 @@ PY_TTS_REFERENCE
   qwen|qwen3|qwen3-tts)
     TTS_BACKEND=qwen3
     export CHROMIE_TTS_BACKEND=qwen3
-    export TTS_REFERENCE_DIR
-    TTS_REFERENCE_SHA="$(python3 - "$TTS_REFERENCE_DIR" <<'PY_TTS_REFERENCE'
+    export TTS_VOICE_ROOT
+    TTS_REFERENCE_SHA="$(python3 - "$TTS_VOICE_ROOT/chromie_mixed" <<'PY_TTS_REFERENCE'
 from pathlib import Path
 import sys
 from scripts.tts_reference import validate_reference_dir
@@ -399,7 +406,8 @@ fi
 
 cat > "$SERVICE_OVERRIDE" <<EOF_SERVICE
 CHROMIE_TTS_BACKEND=${TTS_BACKEND}
-TTS_REFERENCE_DIR=${TTS_REFERENCE_DIR}
+TTS_VOICE_ROOT=${TTS_VOICE_ROOT}
+TTS_DEFAULT_SPEAKER=${TTS_DEFAULT_SPEAKER:-chromie_mixed}
 ROUTER_MODEL=${EFFECTIVE_ROUTER_MODEL}
 ROUTER_REVIEW_MODEL=${EFFECTIVE_ROUTER_REVIEW_MODEL}
 AGENT_MODEL=${EFFECTIVE_AGENT_MODEL}
@@ -485,7 +493,7 @@ case "$TTS_BACKEND" in
     {
       echo "TTS_URL=ws://127.0.0.1:5000"
       echo "TTS_SPEAKER_ID=default"
-      echo "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=cosyvoice3-${TTS_REFERENCE_SHA}"
+      echo "ORCH_FAST_FIRST_AUDIO_CACHE_REVISION=cosyvoice3-catalog-${TTS_CATALOG_REVISION}"
       echo "ORCH_FAST_FIRST_AUDIO_CONTENT_GATE_ENABLED=1"
       echo "ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0"
       echo "ORCH_TTS_CONCURRENCY=1"

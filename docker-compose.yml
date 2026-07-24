@@ -120,8 +120,8 @@ services:
       TTS_HOST: "0.0.0.0"
       TTS_PORT: "5000"
       TTS_PROVIDER: ${TTS_PROVIDER:-fun-cosyvoice3-0.5b}
-      TTS_REFERENCE_WAV: /voice/reference.wav
-      TTS_REFERENCE_METADATA: /voice/reference.json
+      TTS_VOICE_ROOT: /voices
+      TTS_DEFAULT_SPEAKER: ${TTS_DEFAULT_SPEAKER:-chromie_mixed}
       TTS_WORKER_STARTUP_TIMEOUT_SEC: ${TTS_WORKER_STARTUP_TIMEOUT_SEC:-1200}
       TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC: ${TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC:-3}
       COSYVOICE3_SOURCE_REVISION: ${COSYVOICE3_SOURCE_REVISION:-074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc}
@@ -148,7 +148,7 @@ services:
     volumes:
       - ./hf_cache:/root/.cache/huggingface
       - ./hf_cache/modelscope:/root/.cache/modelscope
-      - ${TTS_REFERENCE_DIR:-./.chromie/private/tts-voice}:/voice:ro
+      - ${TTS_VOICE_ROOT:-./assets/tts/voices}:/voices:ro
     networks:
       - chromie-net
     healthcheck:
@@ -330,7 +330,7 @@ services:
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
     volumes:
       - ./hf_cache:/root/.cache/huggingface
-      - ${TTS_REFERENCE_DIR:-./.chromie/private/tts-voice}:/evaluation:ro
+      - ${TTS_VOICE_ROOT:-./assets/tts/voices}/chromie_mixed:/evaluation:ro
     networks:
       - chromie-net
     healthcheck:

@@ -96,7 +96,7 @@ RUN pip install \
 
 ENV PYTHONPATH=/opt/CosyVoice:/opt/CosyVoice/third_party/Matcha-TTS
 WORKDIR /app
-COPY tts/provider.py tts/streaming_worker.py tts/candidate_provider.py tts/candidate_server.py ./
+COPY tts/provider.py tts/streaming_worker.py tts/candidate_provider.py tts/candidate_server.py tts/voice_catalog.py ./
 COPY tts_candidates/cosyvoice/provider_impl.py ./
 
 EXPOSE 5000

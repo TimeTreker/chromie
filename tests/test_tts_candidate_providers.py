@@ -305,7 +305,8 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('profiles: ["tts-evaluation"]', compose)
         self.assertIn('"5001:5000"', compose)
         self.assertIn('"5002:5000"', compose)
-        self.assertIn("TTS_REFERENCE_DIR", compose)
+        self.assertIn("TTS_VOICE_ROOT", compose)
+        self.assertIn("assets/tts/voices", compose)
         self.assertIn("./hf_cache/modelscope:/root/.cache/modelscope", compose)
         self.assertIn("TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC", compose)
         self.assertIn("Qwen/Qwen3-TTS-12Hz-0.6B-Base", compose)
@@ -314,6 +315,62 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("onnxruntime-gpu==1.18.1", cosy_dockerfile)
         self.assertNotIn("onnxruntime-gpu==1.18.0", cosy_dockerfile)
+
+
+    def test_cosyvoice_catalog_exposes_and_routes_builtin_speakers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            speaker_ids = ("chromie_zh", "chromie_en", "chromie_mixed")
+            manifest = {
+                "schema_version": 1,
+                "default_speaker_id": "chromie_mixed",
+                "speakers": list(speaker_ids),
+                "language_routes": {
+                    "zh": "chromie_zh",
+                    "en": "chromie_en",
+                    "mixed": "chromie_mixed",
+                },
+            }
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            for index, speaker_id in enumerate(speaker_ids, start=1):
+                profile = root / speaker_id
+                profile.mkdir()
+                wav_path = profile / "reference.wav"
+                wav_path.write_bytes(
+                    b"RIFF" + (64).to_bytes(4, "little") + b"WAVE" + bytes([index]) * 64
+                )
+                audio_sha = hashlib.sha256(wav_path.read_bytes()).hexdigest()
+                (profile / "reference.json").write_text(
+                    json.dumps(
+                        {
+                            "speaker_id": speaker_id,
+                            "text": f"reference {speaker_id}",
+                            "audio_sha256": audio_sha,
+                            "license_id": "project-ai-generated-voice",
+                            "languages": ["zh" if speaker_id == "chromie_zh" else "en"],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+            cosy = load_provider_impl(
+                "tts_candidates/cosyvoice/provider_impl.py",
+                "cosy_catalog_fixture",
+            )
+            with patch.dict(os.environ, {"TTS_VOICE_ROOT": str(root)}, clear=False):
+                voices = cosy.runtime_voices()
+            self.assertEqual(voices.default_speaker_id, "chromie_mixed")
+            self.assertEqual(
+                voices.resolve(
+                    speaker_id="default", language_hint="zh-CN", text="你好"
+                ).speaker_id,
+                "chromie_zh",
+            )
+            self.assertEqual(
+                voices.resolve(
+                    speaker_id="chromie_en", language_hint="zh", text="你好"
+                ).speaker_id,
+                "chromie_en",
+            )
 
     def test_candidate_reference_metadata_preserves_authorized_license(self) -> None:
         for relative, name in (

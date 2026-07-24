@@ -4,6 +4,19 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Git-controlled built-in Chromie voices
+
+- Added a validated multi-speaker CosyVoice catalog with `chromie_zh`,
+  `chromie_en`, and `chromie_mixed`; the mixed profile is the fallback while
+  `speaker_id=default` routes Chinese and English requests by language.
+- Added a one-time promotion tool that copies the project owner's existing
+  AI-generated WAVs from ignored installation state into `assets/tts/voices`,
+  generates exact transcript/hash/provenance metadata, and produces the catalog
+  manifest for commit.
+- Removed the default runtime dependency on `.chromie/private/tts-voice`; clean
+  clones use the committed assets. Qwen comparison uses the same committed
+  `chromie_mixed` reference.
+
 ### CosyVoice3 default TTS backend
 
 - Promoted Fun-CosyVoice3 0.5B to the maintained `chromie-tts` service on port 5000 after repeated Oute Mandarin quality failures and equivalent-provider latency comparisons.

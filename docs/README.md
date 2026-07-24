@@ -77,6 +77,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Runtime Trace Contract](RUNTIME_TRACE.md)
 - [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md)
 - [TTS Provider Contract and Evaluation](TTS_PROVIDER_EVALUATION.md)
+- [Built-In TTS Voice Catalog](../assets/tts/voices/README.md)
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)

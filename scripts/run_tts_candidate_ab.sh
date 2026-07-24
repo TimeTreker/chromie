@@ -5,12 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 RUN_ID="${TTS_AB_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
-REFERENCE_DIR="${TTS_AB_REFERENCE_DIR:-.chromie/evidence/tts-provider-ab/reference}"
 OUTPUT_DIR="${TTS_AB_OUTPUT_DIR:-.chromie/evidence/tts-provider-ab/$RUN_ID}"
 WAIT_TIMEOUT="${TTS_CANDIDATE_WAIT_TIMEOUT_SEC:-1800}"
 KEEP_CANDIDATES="${TTS_AB_KEEP_CANDIDATES:-0}"
-
-export TTS_REFERENCE_DIR="$REFERENCE_DIR"
+export TTS_VOICE_ROOT="${TTS_VOICE_ROOT:-assets/tts/voices}"
 
 restore_default() {
   if [ "$KEEP_CANDIDATES" != "1" ]; then
@@ -21,27 +19,17 @@ restore_default() {
 }
 trap restore_default EXIT
 
-if [ "${TTS_AB_SKIP_REFERENCE_GENERATION:-0}" = "1" ]; then
-  echo "[tts-ab] Using the existing authorized reference voice..."
-  python scripts/tts_reference.py validate --reference-dir "$REFERENCE_DIR"
-else
-  echo "[tts-ab] Starting the OuteTTS fallback to generate an evaluation-only reference..."
-  reference_up=(--profile tts-evaluation up -d --wait --wait-timeout "$WAIT_TIMEOUT")
-  if [ "${TTS_AB_SKIP_REFERENCE_BUILD:-0}" = "1" ]; then
-    reference_up+=(--no-build)
-  else
-    reference_up+=(--build)
-  fi
-  reference_up+=(chromie-tts-oute)
-  ./scripts/compose.sh "${reference_up[@]}"
-
-  echo "[tts-ab] Generating the shared evaluation reference voice..."
-  python scripts/prepare_tts_reference.py \
-    --url ws://127.0.0.1:5001 \
-    --output-dir "$REFERENCE_DIR"
-fi
-
-python scripts/tts_reference.py validate --reference-dir "$REFERENCE_DIR"
+python3 - "$TTS_VOICE_ROOT" <<'PY_TTS_CATALOG'
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path.cwd() / "tts"))
+from voice_catalog import validate_voice_catalog
+catalog = validate_voice_catalog(Path(sys.argv[1]))
+print(
+    f"[tts-ab] voice catalog revision={catalog.revision} "
+    f"default={catalog.default_speaker_id} speakers={','.join(catalog.speaker_ids())}"
+)
+PY_TTS_CATALOG
 
 echo "[tts-ab] Releasing OuteTTS and Ollama GPU memory for the isolated comparison..."
 ./scripts/compose.sh --profile tts-evaluation stop chromie-tts-oute
@@ -55,7 +43,7 @@ else
 fi
 compose_up+=(chromie-tts chromie-tts-qwen3)
 
-echo "[tts-ab] Building and starting CosyVoice3 and Qwen3-TTS..."
+echo "[tts-ab] Building and starting CosyVoice3 and Qwen3-TTS with chromie_mixed..."
 ./scripts/compose.sh "${compose_up[@]}"
 
 echo "[tts-ab] Running the identical committed A/B matrix..."

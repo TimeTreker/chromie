@@ -190,7 +190,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         values = _common_env()
         self.assertEqual(values["CHROMIE_TTS_BACKEND"], "cosyvoice3")
         self.assertEqual(values["TTS_PROVIDER"], "fun-cosyvoice3-0.5b")
-        self.assertEqual(values["TTS_REFERENCE_DIR"], ".chromie/private/tts-voice")
+        self.assertEqual(values["TTS_VOICE_ROOT"], "assets/tts/voices")
+        self.assertEqual(values["TTS_DEFAULT_SPEAKER"], "chromie_mixed")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
         self.assertEqual(values["ORCH_TTS_CONCURRENCY"], "1")
         # Oute remains an explicit fallback, so its diagnostic controls stay valid.

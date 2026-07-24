@@ -118,7 +118,7 @@ selected default operationally strong:
 
 Completion criteria:
 
-- default startup validates the local reference and reports the exact CosyVoice
+- default startup validates the committed voice catalog and reports the exact CosyVoice
   provider/model identity;
 - application health and no-playback warm synthesis pass before microphone
   startup;

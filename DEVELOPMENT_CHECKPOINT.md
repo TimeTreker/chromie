@@ -39,7 +39,7 @@ style and auxiliary body expression under one Social Attention purpose;
 candidate actions are discovered from catalog behavior-domain metadata rather
 than a fixed gesture list. Explicit user-requested actions remain primary goals.
 
-The maintained TTS default is now Fun-CosyVoice3 0.5B through the framework-neutral provider boundary. Startup requires an authorized SHA-bound local reference, uses port 5000, one host request for the singleton worker, application-level health, and a no-playback warm synthesis. OuteTTS and Qwen3-TTS remain explicit `--tts-backend` alternatives. The repeated isolated measurements favor CosyVoice for ordinary latency/RTF and Qwen for hard-cancel recovery; Mandarin listening quality and shared-load recovery remain active evidence work.
+The maintained TTS default is now Fun-CosyVoice3 0.5B through the framework-neutral provider boundary. Startup validates the Git-controlled `chromie_zh`/`chromie_en`/`chromie_mixed` catalog, uses port 5000, one host request for the singleton worker, application-level health, and a no-playback warm synthesis. OuteTTS and Qwen3-TTS remain explicit `--tts-backend` alternatives. The repeated isolated measurements favor CosyVoice for ordinary latency/RTF and Qwen for hard-cancel recovery; Mandarin listening quality and shared-load recovery remain active evidence work.
 
 Historical provider investigation follows. The current branch also implements the framework-neutral TTS provider boundary.
 The historical OuteTTS worker path implemented `TTSProvider` contract version

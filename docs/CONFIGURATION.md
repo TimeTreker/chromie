@@ -137,23 +137,14 @@ cancellable deployment.
 | `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default. Limits the shared-GPU topology to one resident Ollama model while CosyVoice is selected. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
-Install and validate the operator-authorized reference before normal startup:
-
-```bash
-python scripts/tts_reference.py install \
-  --source-wav /path/to/reference.wav \
-  --transcript '录音中的逐字文本' \
-  --license-id 'user-owned-recording'
-python scripts/tts_reference.py validate
-./scripts/start_chromie.sh
-```
-
-The default launcher selects `chromie-tts` on port 5000, validates the local
-reference authorization and hash, uses one host TTS request for the singleton
-CosyVoice worker, and limits Ollama to one resident model when compact cognition
-is enabled. Select a fallback explicitly with `--tts-backend oute` or
-`--tts-backend qwen3`; the selection is scoped to that launch and does not
-rewrite `.env.local`.
+The default launcher selects `chromie-tts` on port 5000 and validates the
+source-controlled `assets/tts/voices` catalog before service creation.
+`chromie_mixed` is the catalog default; `speaker_id=default` routes `zh` and
+`en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
+request for the singleton CosyVoice worker and limits Ollama to one resident
+model when compact cognition is enabled. Select a fallback explicitly with
+`--tts-backend oute` or `--tts-backend qwen3`; the selection is scoped to that
+launch and does not rewrite `.env.local`.
 
 See [Hardware Profiles](../HARDWARE_PROFILES.md) for profile values and Jetson
 limitations. Direct hardware-profile override is intentionally unsupported;
@@ -695,7 +686,8 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 |---|---|
 | `CHROMIE_TTS_BACKEND` | Maintained backend selector. Default `cosyvoice3`; explicit alternatives: `oute`, `qwen3`. |
 | `TTS_PROVIDER` | Provider identity expected inside the selected image. Default `fun-cosyvoice3-0.5b`; provider/image mismatches fail closed. |
-| `TTS_REFERENCE_DIR` | Host directory containing `reference.wav` and `reference.json`; default `.chromie/private/tts-voice`. |
+| `TTS_VOICE_ROOT` | Host directory containing the validated multi-speaker catalog; default `assets/tts/voices`. |
+| `TTS_DEFAULT_SPEAKER` | Catalog fallback speaker; default `chromie_mixed`. Explicit `speaker_id=default` may still route by language. |
 | `COSYVOICE3_SOURCE_REVISION`, `COSYVOICE3_MODEL_ID`, `COSYVOICE3_MODEL_REVISION` | Immutable default runtime and model locks. |
 | `COSYVOICE3_FP16` | Load the default model in half precision; default `1`. |
 | `COSYVOICE3_PROMPT_PREFIX` | Trusted prompt prefix prepended before the exact reference transcript. |
@@ -706,19 +698,18 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact shared-GPU model; default `qwen3:4b`. |
 | `TTS_SPEAKER_ID` | `default` for CosyVoice/Qwen reference cloning. Oute may use installation-local profile IDs. |
 
-Install the default reference:
+Promote the existing AI-generated voices once when creating the catalog:
 
 ```bash
-python scripts/tts_reference.py install \
-  --source-wav /path/to/reference.wav \
-  --transcript '录音中的逐字文本' \
-  --license-id 'user-owned-recording'
-python scripts/tts_reference.py validate
+python scripts/promote_builtin_tts_voices.py \
+  --source-dir .chromie/private/tts-voice
+git add assets/tts/voices
 ```
 
-The metadata binds the full WAV with SHA-256 and records a nonempty
-authorization/license identity. Missing or inconsistent material stops the
-default provider before it opens the WebSocket endpoint.
+Each profile metadata file binds the complete WAV, exact prompt transcript,
+project provenance identifier, supported languages, and SHA-256 digest. A
+missing or inconsistent committed profile stops the default provider before it
+opens the WebSocket endpoint.
 
 Select alternatives explicitly:
 
@@ -740,14 +731,12 @@ the default CosyVoice image:
 
 Qwen3-TTS uses `QWEN3_TTS_SOURCE_REVISION`, `QWEN3_TTS_MODEL_ID`,
 `QWEN3_TTS_MODEL_REVISION`, `QWEN3_TTS_DEVICE`, `QWEN3_TTS_DTYPE`, and
-`QWEN3_TTS_ATTENTION`. It shares the same installed reference and contract.
+`QWEN3_TTS_ATTENTION`. It uses the committed `chromie_mixed` reference and the same transport contract.
 
 For a common isolated comparison:
 
 ```bash
 python scripts/tts_provider_ab.py --check
-TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
-TTS_AB_SKIP_REFERENCE_GENERATION=1 \
 ./scripts/run_tts_candidate_ab.sh
 ```
 

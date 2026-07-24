@@ -19,7 +19,7 @@ CosyVoice is selected as the current engineering default because it combines:
 
 - native streamed audio chunks;
 - a dedicated Chinese-capable model and text front end;
-- zero-shot voice cloning from an authorized local reference;
+- zero-shot voice cloning from the source-controlled Chromie voice catalog;
 - lower ordinary first-audio latency and RTF than the current Qwen3-TTS adapter
   in Chromie's repeated isolated comparisons.
 
@@ -74,21 +74,24 @@ WebSocket request carries one complete text chunk. Therefore native input
 streaming remains capability metadata until an incremental token-to-audio input
 transport is implemented and measured end to end.
 
-## Default voice installation
+## Built-in voice catalog
 
-The default CosyVoice service requires an authorized local reference:
+The default CosyVoice service reads the Git-controlled catalog under
+`assets/tts/voices`. It contains `chromie_zh`, `chromie_en`, and
+`chromie_mixed`; the mixed profile is the catalog default, while a request with
+`speaker_id=default` routes Chinese and English text to the language-specific
+profiles. Every profile binds its AI-generated WAV to the exact prompt text and
+SHA-256 digest.
+
+The initial repository migration is performed once on the owner's checkout:
 
 ```bash
-python scripts/tts_reference.py install \
-  --source-wav /path/to/reference.wav \
-  --transcript '录音中的逐字文本' \
-  --license-id 'user-owned-recording'
-python scripts/tts_reference.py validate
+python scripts/promote_builtin_tts_voices.py \
+  --source-dir .chromie/private/tts-voice
+git add assets/tts/voices
 ```
 
-The ignored `reference.json` stores the exact transcript, WAV SHA-256, and
-authorization/license identity. Startup fails closed when the binding is
-missing or invalid.
+Future clones consume only the committed catalog and do not depend on `.chromie`.
 
 ## Common evaluation matrix
 
@@ -110,15 +113,14 @@ python scripts/tts_provider_ab.py --check
 Run the pinned CosyVoice/Qwen comparison:
 
 ```bash
-TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
-TTS_AB_SKIP_REFERENCE_GENERATION=1 \
 ./scripts/run_tts_candidate_ab.sh
 ```
 
-The workflow temporarily releases the normal shared-GPU services, starts
-CosyVoice on port 5000 and Qwen3-TTS on port 5002, applies the same reference and
-cases, and restores the default topology on exit. It is isolated provider
-evidence, not a shared-load voice-quality conclusion.
+The workflow validates the committed catalog, temporarily releases the normal
+shared-GPU services, starts CosyVoice on port 5000 and Qwen3-TTS on port 5002,
+uses `chromie_mixed` for the cross-provider comparison, and restores the default
+topology on exit. It is isolated provider evidence, not a shared-load
+voice-quality conclusion.
 
 ## Retained diagnostic results
 

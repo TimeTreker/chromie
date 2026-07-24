@@ -19,35 +19,32 @@ wire contract as explicit alternative backends:
 The alternatives are enabled through the `tts-evaluation` Compose profile or
 selected by `./scripts/start_chromie.sh --tts-backend ...`.
 
-## Default voice reference
+## Built-in voice catalog
 
-CosyVoice3 requires an operator-authorized reference WAV, its exact transcript,
-and a nonempty license/authorization identity. Install it before the first
-startup:
-
-```bash
-python scripts/tts_reference.py install \
-  --source-wav /path/to/chromie-reference.wav \
-  --transcript '这里填写录音中逐字一致的文本。' \
-  --license-id 'user-owned-recording'
-```
-
-This creates ignored local files under:
+CosyVoice3 reads the source-controlled catalog under `assets/tts/voices`:
 
 ```text
-.chromie/private/tts-voice/reference.wav
-.chromie/private/tts-voice/reference.json
+assets/tts/voices/
+├── manifest.json
+├── chromie_zh/reference.wav + reference.json
+├── chromie_en/reference.wav + reference.json
+└── chromie_mixed/reference.wav + reference.json
 ```
 
-Validate them independently with:
+`chromie_mixed` is the catalog default. Requests using `speaker_id=default`
+route Chinese to `chromie_zh`, English to `chromie_en`, and mixed or unknown
+text to `chromie_mixed`. Explicit speaker IDs bypass language routing.
+
+The project owner's existing AI-generated assets are promoted once with:
 
 ```bash
-python scripts/tts_reference.py validate
+python scripts/promote_builtin_tts_voices.py \
+  --source-dir .chromie/private/tts-voice
+git add assets/tts/voices
 ```
 
-The metadata binds the complete WAV with SHA-256. Startup fails closed when the
-WAV, transcript, authorization identity, or digest is missing or inconsistent.
-Private voice material is never committed to Git.
+Each profile carries its exact prompt transcript and SHA-256 binding. After the
+voice commit is pushed, a clean clone has no `.chromie` voice dependency.
 
 ## Concurrency and interruption
 
@@ -89,7 +86,7 @@ Response:
   "provider": {"provider_id": "fun-cosyvoice3-0.5b"},
   "provider_health": {},
   "sample_rate": 24000,
-  "speakers": ["default"]
+  "speakers": ["default", "chromie_en", "chromie_mixed", "chromie_zh"]
 }
 ```
 
@@ -103,9 +100,9 @@ backend-specific metadata.
 {"type": "list_speakers"}
 ```
 
-CosyVoice and Qwen expose the installed cloned reference as `default`. The
-reference itself is managed by `scripts/tts_reference.py`, not by a network
-speaker-creation operation.
+CosyVoice exposes the three built-in profiles plus `default`. `default` is a
+language-routed logical ID; Qwen uses the committed `chromie_mixed` profile.
+The network endpoint does not mutate the source-controlled catalog.
 
 ### Stream synthesis
 
@@ -144,7 +141,8 @@ Maintained defaults:
 ```env
 CHROMIE_TTS_BACKEND=cosyvoice3
 TTS_PROVIDER=fun-cosyvoice3-0.5b
-TTS_REFERENCE_DIR=.chromie/private/tts-voice
+TTS_VOICE_ROOT=assets/tts/voices
+TTS_DEFAULT_SPEAKER=chromie_mixed
 COSYVOICE3_MODEL_ID=FunAudioLLM/Fun-CosyVoice3-0.5B-2512
 ORCH_TTS_CONCURRENCY=1
 TTS_COSYVOICE_COMPACT_COGNITION=1
@@ -179,8 +177,6 @@ Verify the selected backend and GPU path:
 Run the common CosyVoice/Qwen comparison matrix:
 
 ```bash
-TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
-TTS_AB_SKIP_REFERENCE_GENERATION=1 \
 ./scripts/run_tts_candidate_ab.sh
 ```
 
