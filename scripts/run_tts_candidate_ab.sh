@@ -8,7 +8,19 @@ RUN_ID="${TTS_AB_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 OUTPUT_DIR="${TTS_AB_OUTPUT_DIR:-.chromie/evidence/tts-provider-ab/$RUN_ID}"
 WAIT_TIMEOUT="${TTS_CANDIDATE_WAIT_TIMEOUT_SEC:-1800}"
 KEEP_CANDIDATES="${TTS_AB_KEEP_CANDIDATES:-0}"
-export TTS_VOICE_ROOT="${TTS_VOICE_ROOT:-assets/tts/voices}"
+TTS_VOICE_ROOT="${TTS_VOICE_ROOT:-assets/tts/voices}"
+TTS_VOICE_ROOT="$(python3 - "$ROOT_DIR" "$TTS_VOICE_ROOT" <<'PY_TTS_VOICE_ROOT'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).resolve()
+voice_root = Path(sys.argv[2]).expanduser()
+if not voice_root.is_absolute():
+    voice_root = root / voice_root
+print(voice_root.resolve())
+PY_TTS_VOICE_ROOT
+)"
+export TTS_VOICE_ROOT
 
 restore_default() {
   if [ "$KEEP_CANDIDATES" != "1" ]; then

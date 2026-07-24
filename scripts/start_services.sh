@@ -67,6 +67,17 @@ COMPOSE_ARGS=(--env-file .env.runtime -f docker-compose.yml)
 TTS_BACKEND="${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 TTS_SERVICE=chromie-tts
 TTS_VOICE_ROOT="${TTS_VOICE_ROOT:-assets/tts/voices}"
+TTS_VOICE_ROOT="$(python3 - "$ROOT_DIR" "$TTS_VOICE_ROOT" <<'PY_TTS_VOICE_ROOT'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).resolve()
+voice_root = Path(sys.argv[2]).expanduser()
+if not voice_root.is_absolute():
+    voice_root = root / voice_root
+print(voice_root.resolve())
+PY_TTS_VOICE_ROOT
+)"
 case "${TTS_BACKEND,,}" in
   cosyvoice|cosyvoice3)
     TTS_BACKEND=cosyvoice3

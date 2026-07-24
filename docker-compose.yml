@@ -148,7 +148,10 @@ services:
     volumes:
       - ./hf_cache:/root/.cache/huggingface
       - ./hf_cache/modelscope:/root/.cache/modelscope
-      - ${TTS_VOICE_ROOT:-./assets/tts/voices}:/voices:ro
+      - type: bind
+        source: ${TTS_VOICE_ROOT:-./assets/tts/voices}
+        target: /voices
+        read_only: true
     networks:
       - chromie-net
     healthcheck:
@@ -330,7 +333,10 @@ services:
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
     volumes:
       - ./hf_cache:/root/.cache/huggingface
-      - ${TTS_VOICE_ROOT:-./assets/tts/voices}/chromie_mixed:/evaluation:ro
+      - type: bind
+        source: ${TTS_VOICE_ROOT:-./assets/tts/voices}/chromie_mixed
+        target: /evaluation
+        read_only: true
     networks:
       - chromie-net
     healthcheck:

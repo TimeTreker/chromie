@@ -4,6 +4,16 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Portable TTS voice bind paths
+
+- Normalize `TTS_VOICE_ROOT` to an absolute host path in normal startup,
+  service-only startup, and candidate A/B runs before Docker Compose
+  interpolation.
+- Use explicit Compose bind mounts for the CosyVoice catalog and Qwen mixed
+  reference, preventing relative catalog paths from being interpreted as named
+  volumes.
+- Fail cleanly on invalid catalogs without cascading into an unbound Bash array.
+
 ### Social Attention policy closure
 
 - Made `AGENT_SOCIAL_ATTENTION_MODE` authoritative across the Goal-driven

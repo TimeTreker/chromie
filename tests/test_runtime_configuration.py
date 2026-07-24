@@ -327,6 +327,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('echo "ORCH_TTS_CONCURRENCY=1"', launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b", launcher)
         self.assertIn("EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1", launcher)
+        self.assertIn('voice_root = root / voice_root', launcher)
+        self.assertIn('voice_root = root / voice_root', services)
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", launcher)
         self.assertIn("Chromie services are ready", launcher)
         self.assertNotIn("Chromie voice interaction is ready", launcher)
