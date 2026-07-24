@@ -93,7 +93,7 @@ def request(canonical_plan: CanonicalPlan, *, context=None):
             "mode": "on",
             "planning_enabled": True,
             "execution_enabled": True,
-            "simulator_only": False,
+            "embodiment_independent": True,
         },
     }
     merged.update(context or {})

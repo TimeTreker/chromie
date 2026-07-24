@@ -79,8 +79,9 @@ These are personality tendencies, not deterministic gesture tables. Even a
 courteous profile may choose `none`, and an urgent stop or safety turn must
 suppress decorative expression.
 
-The exact structured fields will be implemented in the shared `MindProfile`
-contract. They remain owner-approved configuration rather than
+The shared `MindProfile.social_interaction_style` contract now carries bounded
+courtesy, expressiveness, initiative, restraint, cooldown, and repetition
+guidance. It remains owner-approved configuration rather than
 experience-auto-mutable behavior.
 
 ## Two interaction roles
@@ -160,9 +161,10 @@ Current-compatible example shape:
 ## Capability discovery
 
 Capabilities declare one or more behavior domains. The checked-in
-`capabilities/behavior_domains.json` supplements provider metadata for current
-Soridormi skills. Candidate discovery selects available,
-interaction-executable catalog entries tagged `social_attention`.
+`capabilities/behavior_domains.json` supplements the semantic taxonomy for
+current Soridormi named skills. Candidate discovery selects available,
+interaction-executable catalog entries tagged `social_attention` without using
+simulator or hardware provider metadata.
 
 `AGENT_SOCIAL_ATTENTION_CAPABILITIES` is an optional operator allow-list or
 extension, not the primary fixed candidate list. Its default is empty.
@@ -186,9 +188,10 @@ The host may:
 - reject low-level motor fields;
 - detect resource conflicts with the primary plan;
 - cap auxiliary behavior count;
-- apply emergency, latency, cooldown, and repetition suppression;
+- apply emergency and latency suppression;
+- require auxiliary body requests to remain parallel and conflict-free;
 - drop invalid auxiliary expression;
-- record execution and user-outcome evidence.
+- record accepted-request evidence separately from execution and user outcomes.
 
 The host may not:
 
@@ -196,7 +199,7 @@ The host may not:
 - replace an explicit requested action;
 - generate a gesture sequence from a social purpose;
 - invent a conversational answer or emotional interpretation;
-- let auxiliary expression delay or override the user task;
+- let auxiliary expression delay speech, emergency handling, or the user task;
 - select, suppress, or authorize Social Attention because the active body is a
   simulator or a physical robot.
 
@@ -216,86 +219,50 @@ A physical provider may clamp or reject an otherwise valid semantic request
 when the body cannot execute it safely. That is a provider execution result, not
 an alternate Chromie cognition mode.
 
-## Runtime policy target
-
-The accepted target runtime gate is:
+## Runtime policy
 
 | Mode | Meaning |
 |---|---|
-| `off` | Diagnostic or owner-selected suppression; do not plan auxiliary Social Attention. |
-| `report_only` | Plan and retain advisory evidence, but do not materialize auxiliary body skills. |
-| `on` | Plan and, after normal validation, materialize auxiliary Social Attention. |
+| `off` | Owner-selected or diagnostic suppression; do not plan auxiliary Social Attention. |
+| `report_only` | Compose and retain advisory evidence, but do not materialize auxiliary body requests. |
+| `on` | Compose and, after normal validation, materialize optional auxiliary Social Attention. |
 
-The maintained default should become `on`. Contextual selection may still
-produce `decision=none`.
+The maintained default is `on`. A legacy simulator-scoped environment value is
+normalized to `on` at the configuration boundary because body-backend selection
+belongs to Soridormi/provider. Unknown explicit values fail closed to `off`.
+Contextual model selection may always produce `decision=none`.
 
-The current implementation still accepts `sim_only` and defaults to `off`.
-That is now explicit architecture debt. The new implementation topic will remove
-`sim_only`, remove provider-mode filtering from Chromie's Social Attention path,
-change the maintained default to `on`, and fail clearly on stale `sim_only`
-configuration rather than silently preserving the wrong ownership model.
+## Implemented closure
 
-## Open implementation topic
+The implementation now:
 
-**Topic:** Embodiment-independent Social Attention and personality policy.
+1. exposes only `off`, `report_only`, and `on` in the public contract;
+2. supplies owner-approved Social Interaction Style and bounded recent accepted
+   auxiliary-request evidence to Response Composer;
+3. discovers and validates candidates without inspecting provider backend mode;
+4. accepts installation calibration only when a provider supplies it as explicit
+   target evidence;
+5. requires auxiliary body requests to use `timing=parallel`, need no user
+   confirmation, and avoid primary resource conflicts;
+6. preserves explicit user actions as CanonicalPlan goals and never treats
+   auxiliary requests as completion evidence;
+7. keeps named-skill IDs and semantic argument schemas stable across Soridormi
+   backends; and
+8. leaves controller adaptation, calibration, motion limits, collision safety,
+   stop, recovery, safe idle, and execution evidence below the Chromie boundary.
 
-The implementation sequence is:
-
-1. Simplify the policy contract to `off`, `report_only`, and `on`; remove
-   `sim_only` from shared literals, launch configuration, Agent policy context,
-   Response Composer validation, Host materialization, and tests.
-2. Change the maintained Social Attention default from `off` to `on`; retain
-   `off` and `report_only` for diagnostics, owner preference, and controlled
-   comparisons.
-3. Add an owner-approved social interaction style to `MindProfile`, including
-   bounded courtesy, expressiveness, initiative, restraint, and repetition or
-   cooldown guidance.
-4. Supply that style and recent auxiliary-behavior evidence to Response
-   Composer without introducing phrase rules or fixed gesture mappings.
-5. Keep candidate discovery semantic and backend-independent; remove
-   `metadata.mode=sim` eligibility checks from Chromie.
-6. Keep simulator/physical selection and body-specific safety entirely in
-   Soridormi/provider configuration.
-7. Add scenario, contract, and end-to-end tests for personality tendencies,
-   contextual `none`, emergency suppression, repetition control, explicit-goal
-   priority, and backend invariance.
-8. Retain live interaction evidence showing that the same Chromie plan contract
-   works through the currently configured Soridormi backend.
-
-## Acceptance criteria
-
-The topic closes when:
-
-- production Chromie configuration and policy schemas no longer contain a
-  `sim_only` Social Attention mode;
-- default startup enables Social Attention without a special architecture or
-  simulator overlay;
-- changing provider metadata between simulator and physical deployment does not
-  change Chromie's candidate set or social plan when semantic capabilities,
-  availability, and interaction context are otherwise identical;
-- for capabilities exposed by multiple Soridormi backends, the same named skill
-  and semantic arguments remain valid, with body-specific adaptation below the
-  Chromie boundary;
-- courtesy and expressiveness come from the owner-approved mind profile and
-  influence model choice without becoming deterministic gesture frequencies;
-- courteous, neutral, and reserved scenarios show different aggregate
-  tendencies while every individual turn may still choose `none`;
-- explicit user actions remain primary goals, emergency work suppresses
-  auxiliary expression, and auxiliary behavior never delays first useful
-  speech;
-- automated contract, scenario, semantic-authority, documentation, and full
-  regression gates pass;
-- retained live evidence confirms contextually appropriate Social Attention and
-  truthful execution reporting.
+Automated contract and file-backed parity coverage is included. Retained live
+provider-backed qualification remains separate evidence work.
 
 ## Testing
 
 Black-box tests classify both explicit and auxiliary actions in the stable
 `social_attention` observation domain while preserving their different
-interaction roles. Abstract requests such as "show that you are listening"
-should be judged for contextual appropriateness without requiring one specific
-skill. Concrete requests such as "blink twice" require the exact observable
-count.
+interaction roles. The same named-skill and semantic-argument scenario must
+remain invariant when provider backend metadata changes. Abstract requests such
+as "show that you are listening" should be judged for contextual appropriateness
+without requiring one specific skill. Concrete requests such as "blink twice"
+require the exact observable count and remain primary goals.
 
 Backend-invariance tests should run the same semantic catalog and interaction
 context with different provider deployment metadata and require the same

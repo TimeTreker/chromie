@@ -734,7 +734,7 @@ class VoiceAssistant:
                 social_attention_mode=(
                     os.getenv("CHROMIE_SOCIAL_ATTENTION_MODE")
                     or os.getenv("AGENT_SOCIAL_ATTENTION_MODE")
-                    or "off"
+                    or "on"
                 ),
             ),
             policy=self.cognitive_runtime_policy,

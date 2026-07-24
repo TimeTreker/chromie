@@ -143,16 +143,75 @@ class RobotIdentity(BaseModel):
         return normalized
 
 
+class SocialInteractionStyle(BaseModel):
+    """Owner-approved semantic guidance for bounded social expression."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    owner_approved: bool = True
+    change_policy: Literal["owner_approval_required"] = "owner_approval_required"
+    bounded_courtesy: str = (
+        "Be warm, respectful, and concise. Courtesy supports the user's purpose "
+        "and must not add a social ritual that delays requested help."
+    )
+    expressiveness: str = (
+        "Use subtle, proportional, context-supported expression. Deliberate "
+        "stillness and neutral language are valid choices."
+    )
+    initiative: str = (
+        "Add at most one coherent auxiliary social objective when it clearly "
+        "helps the interaction and can remain parallel, bounded, and optional."
+    )
+    restraint: str = (
+        "Never compete with an explicit user action, emergency handling, speech, "
+        "or the primary task. Do not invent intimacy, emotion, or target evidence."
+    )
+    cooldown_guidance: str = (
+        "After an expressive auxiliary behavior, prefer neutral presence or "
+        "stillness until context materially changes or renewed expression is useful."
+    )
+    repetition_guidance: str = (
+        "Use recent auxiliary-behavior evidence to avoid repeating the same named "
+        "skill and semantic-argument pattern without a scene-specific reason."
+    )
+
+    @field_validator(
+        "bounded_courtesy",
+        "expressiveness",
+        "initiative",
+        "restraint",
+        "cooldown_guidance",
+        "repetition_guidance",
+    )
+    @classmethod
+    def normalize_guidance(cls, value: str) -> str:
+        normalized = _compact_text(value, limit=800)
+        if not normalized:
+            raise ValueError("social interaction style guidance must not be empty")
+        return normalized
+
+    @field_validator("owner_approved")
+    @classmethod
+    def require_owner_approval(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("social interaction style must be owner-approved")
+        return value
+
+
 class MindProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile_id: str = "chromie_default_mind"
-    version: str = "0.1.2"
+    version: str = "0.2.0"
     owner_approved: bool = True
     owner_approval_note: str = (
-        "Core principles are changed only through human owner review and commit."
+        "Core principles and Social Interaction Style change only through human "
+        "owner review and commit."
     )
     identity: RobotIdentity = Field(default_factory=RobotIdentity)
+    social_interaction_style: SocialInteractionStyle = Field(
+        default_factory=SocialInteractionStyle
+    )
     core_principles: list[CorePrinciple] = Field(default_factory=list)
     long_term_goals: list[LongTermGoal] = Field(default_factory=list)
     reflex_policy: list[str] = Field(default_factory=list)
@@ -231,6 +290,9 @@ class MindProfile(BaseModel):
                 exclude={"model_identity_boundary", "internal_components"},
             ),
             "self_model": self.self_model(),
+            "social_interaction_style": self.social_interaction_style.model_dump(
+                mode="json"
+            ),
             "core_principles": principles,
             "long_term_goals": goals,
             "reflex_policy": list(self.reflex_policy),
@@ -254,6 +316,11 @@ class MindProfile(BaseModel):
                 f"{item.component_id} ({item.kind}; roles={', '.join(item.roles)}; "
                 f"speaker_entity={item.speaker_entity}; body_owner={item.body_owner})"
                 for item in self.identity.internal_components
+            ),
+            (
+                "Social interaction style, owner-approved: bounded courtesy; "
+                "proportional expressiveness; limited initiative; primary-task "
+                "restraint; cooldown; repetition avoidance."
             ),
             "Core principles, owner-approved and not experience-mutable:",
         ]
@@ -374,7 +441,10 @@ def default_mind_profile() -> MindProfile:
         long_term_goals=[
             LongTermGoal(
                 goal_id="useful_companion_robot",
-                statement="Become a useful, safe, honest companion robot in simulation first, then through validated sim-to-real transfer.",
+                statement=(
+                    "Become a useful, safe, honest companion robot through validated "
+                    "provider capabilities and stable embodiment contracts."
+                ),
                 priority="high",
                 success_signals=["validated demo tasks", "safe idle after actions", "clear user feedback"],
             ),

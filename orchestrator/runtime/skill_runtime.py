@@ -271,7 +271,6 @@ class SkillRegistry:
                     ],
                     "execution_constraints": dict(execution_constraints),
                     "output_contract": "chromie_soridormi_named_skill_v1",
-                    "mode": str(upstream_metadata.get("mode") or ""),
                     "behavior_domains": [
                         str(value)
                         for value in upstream_metadata.get("behavior_domains", [])

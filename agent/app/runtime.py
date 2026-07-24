@@ -302,8 +302,8 @@ class InteractionRuntime(_AgentPipeline):
         request.context["social_attention_policy"] = {
             "mode": mode,
             "planning_enabled": mode != "off",
-            "execution_enabled": mode in {"sim_only", "on"},
-            "simulator_only": mode == "sim_only",
+            "execution_enabled": mode == "on",
+            "embodiment_independent": True,
         }
         request.context.pop("social_attention_candidates", None)
         request.context.pop("social_attention_candidate_source", None)
@@ -389,11 +389,6 @@ class InteractionRuntime(_AgentPipeline):
                 continue
             if payload.get("interaction_executable") is not True:
                 continue
-            if (
-                mode == "sim_only"
-                and str((payload.get("metadata") or {}).get("mode") or "") != "sim"
-            ):
-                continue
             domains = {
                 str(value).strip().lower()
                 for value in payload.get("behavior_domains") or []
@@ -416,7 +411,25 @@ class InteractionRuntime(_AgentPipeline):
         self,
         request: AgentRunRequest,
     ) -> None:
-        """Attach policy-filtered candidates and target evidence for composition."""
+        """Attach bounded owner policy, evidence, and candidate context."""
+
+        mind = request.context.get("mind")
+        style = mind.get("social_interaction_style") if isinstance(mind, dict) else None
+        if isinstance(style, dict) and style.get("owner_approved") is True:
+            request.context["social_interaction_style"] = dict(style)
+        else:
+            request.context.pop("social_interaction_style", None)
+
+        recent = request.context.get("recent_auxiliary_behavior_evidence")
+        if isinstance(recent, list):
+            request.context["recent_auxiliary_behavior_evidence"] = [
+                dict(item)
+                for item in recent[-12:]
+                if isinstance(item, dict)
+            ]
+        else:
+            request.context["recent_auxiliary_behavior_evidence"] = []
+
         await self._ensure_social_attention_candidates(request)
 
     def _social_attention_target_evidence(self, request: AgentRunRequest) -> dict[str, Any]:
@@ -426,7 +439,8 @@ class InteractionRuntime(_AgentPipeline):
                 explicit_source = str(value.get("source") or "").strip()
                 source = (
                     explicit_source
-                    if explicit_source in {"live_perception", "conversation_context"}
+                    if explicit_source
+                    in {"live_perception", "conversation_context", "installation_calibration"}
                     else "live_perception"
                     if "perception" in key or "perceived" in key
                     else "conversation_context"
@@ -442,21 +456,7 @@ class InteractionRuntime(_AgentPipeline):
                     "target": target,
                 }
 
-        target_ref = (self.services.social_attention_fallback_target or "none").strip()
-        if target_ref.lower() in {"", "none", "off", "disabled"}:
-            return {"available": False}
-        target: dict[str, Any] = {
-            "target_ref": target_ref,
-            "source": "installation_calibration",
-            "confidence": max(0.0, min(1.0, float(self.services.social_attention_fallback_confidence))),
-        }
-        direction = (self.services.social_attention_fallback_direction or "").strip()
-        if direction:
-            target["relative_direction"] = direction
-        yaw = self.services.social_attention_fallback_yaw_rad
-        if isinstance(yaw, (int, float)):
-            target["suggested_args"] = {"target_yaw_rad": float(yaw)}
-        return {"available": True, "source": "installation_calibration", "target": target}
+        return {"available": False}
 
     def _start_social_attention_plan(
         self,

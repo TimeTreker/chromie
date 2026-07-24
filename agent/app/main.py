@@ -18,8 +18,16 @@ from .clients.weather_client import OpenMeteoWeatherClient
 
 try:
     from chromie_contracts.tool_result import ToolResultInterpretationRequest
+    from chromie_contracts.social_attention import (
+        SocialAttentionMode,
+        normalize_social_attention_mode,
+    )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.tool_result import ToolResultInterpretationRequest
+    from shared.chromie_contracts.social_attention import (
+        SocialAttentionMode,
+        normalize_social_attention_mode,
+    )
 from .interaction import (
     AgentResultInteractionAdapter,
     InteractionOutputCoordinator,
@@ -83,13 +91,24 @@ class Settings(BaseModel):
         not in {"0", "false", "no", "off"}
     )
     max_speak_chars: int = Field(default_factory=lambda: int(os.getenv("AGENT_MAX_SPEAK_CHARS", "140")))
-    expressive_body_cues: Literal["off", "sim_only", "on"] = Field(
-        default_factory=lambda: os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "off")
+    expressive_body_cues: Literal["off", "on"] = Field(
+        default_factory=lambda: (
+            "on"
+            if normalize_social_attention_mode(
+                os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "off"),
+                default="off",
+            )
+            == "on"
+            else "off"
+        )
     )
-    social_attention_mode: Literal["off", "report_only", "sim_only", "on"] = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_SOCIAL_ATTENTION_MODE",
-            os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "off"),
+    social_attention_mode: SocialAttentionMode = Field(
+        default_factory=lambda: normalize_social_attention_mode(
+            os.getenv(
+                "AGENT_SOCIAL_ATTENTION_MODE",
+                os.getenv("AGENT_EXPRESSIVE_BODY_CUES", "on"),
+            ),
+            default="on",
         )
     )
     social_attention_model: str = Field(
@@ -131,24 +150,6 @@ class Settings(BaseModel):
             ).split(",")
             if item.strip()
         )
-    )
-    social_attention_fallback_target: str = Field(
-        default_factory=lambda: os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET", "none")
-    )
-    social_attention_fallback_direction: str | None = Field(
-        default_factory=lambda: os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION") or None
-    )
-    social_attention_fallback_yaw_rad: float | None = Field(
-        default_factory=lambda: (
-            float(os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD"))
-            if os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD") not in {None, ""}
-            else None
-        )
-    )
-    social_attention_fallback_confidence: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_SOCIAL_ATTENTION_FALLBACK_CONFIDENCE", "0.0")),
-        ge=0.0,
-        le=1.0,
     )
     require_capability_plan_review: bool = Field(
         default_factory=lambda: os.getenv("AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW", "0").strip().lower()
@@ -519,10 +520,6 @@ services = AgentServices(
     social_attention_max_behaviors=settings.social_attention_max_behaviors,
     social_attention_wait_after_response_ms=settings.social_attention_wait_after_response_ms,
     social_attention_capability_ids=settings.social_attention_capability_ids,
-    social_attention_fallback_target=settings.social_attention_fallback_target,
-    social_attention_fallback_direction=settings.social_attention_fallback_direction,
-    social_attention_fallback_yaw_rad=settings.social_attention_fallback_yaw_rad,
-    social_attention_fallback_confidence=settings.social_attention_fallback_confidence,
     require_capability_plan_review=settings.require_capability_plan_review,
     legacy_capability_fallback_enabled=settings.legacy_capability_fallback_enabled,
     task_graph_planner=task_graph_planner,

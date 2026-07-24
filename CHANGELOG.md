@@ -4,18 +4,25 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
-### Embodiment-independent Social Attention architecture
+### Embodiment-independent Social Attention and personality policy
 
-- Established that Chromie must not distinguish simulator and physical robot
-  backends when planning Social Attention. Chromie owns semantic interaction
-  intent; Soridormi owns backend selection, body adaptation, and physical
-  safety.
-- Reframed Social Attention frequency and intensity as owner-approved mind and
-  personality policy: courteous profiles may express more, neutral profiles
-  less, and reserved profiles may normally choose stillness.
-- Opened the implementation topic to remove `sim_only`, make Social Attention
-  enabled by default, and add bounded courtesy, expressiveness, initiative,
-  restraint, cooldown, and repetition guidance to the mind profile.
+- Reduced the public policy to `off`, `report_only`, and `on`, with `on` as the
+  maintained default. Legacy simulator-scoped configuration migrates to `on`
+  only at the environment boundary.
+- Added the owner-approved `SocialInteractionStyle` to `MindProfile`, covering
+  bounded courtesy, expressiveness, initiative, restraint, cooldown, and
+  repetition guidance.
+- Supplied the style and bounded recent accepted auxiliary-request evidence to
+  Response Composer without treating request acceptance as execution evidence.
+- Removed provider backend filtering and Chromie-owned installation calibration
+  from candidate discovery, Composer validation, compatibility planning, Host
+  materialization, launch profiles, and maintained scenarios.
+- Required auxiliary Social Attention to remain parallel, optional, and
+  conflict-free. Explicit user actions, speech, stop, emergency handling, and
+  primary execution retain priority.
+- Preserved backend-stable named-skill and semantic-argument contracts while
+  leaving controller adaptation, calibration, motion limits, collision safety,
+  stop, recovery, and execution evidence in Soridormi/provider.
 
 ### Response-only chat planning and complete CosyVoice warmup
 
@@ -39,20 +46,6 @@ All notable user-visible changes should be recorded here.
   reference, preventing relative catalog paths from being interpreted as named
   volumes.
 - Fail cleanly on invalid catalogs without cascading into an unbound Bash array.
-
-### Social Attention policy closure
-
-- Made `AGENT_SOCIAL_ATTENTION_MODE` authoritative across the Goal-driven
-  Response Composer path. `off` now withholds candidates and drops any model
-  attention plan; `report_only` retains advisory evidence without execution;
-  `sim_only` exposes and executes only simulator-tagged behaviors; `on` permits
-  reviewed provider behaviors.
-- Added a second Host-side policy gate before auxiliary attention becomes a
-  `SkillRequest`. The Host combines its launch policy with the Agent-reported
-  policy using the more restrictive mode, so stale or compromised composition
-  metadata cannot widen execution authority.
-- Preserved provider `mode` and behavior-domain metadata in trusted runtime
-  definitions so the Host can independently recheck `sim_only` eligibility.
 
 ### Evidence-bound tool-result interpretation
 

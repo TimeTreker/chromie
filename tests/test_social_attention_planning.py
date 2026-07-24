@@ -120,12 +120,12 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             },
             effects=["physical_motion"],
             safety_class="physical_motion",
-            requires_confirmation=True,
+            requires_confirmation=False,
             available=True,
             route="robot_action",
             interaction_executable=True,
             score=0.5,
-            metadata={"mode": "sim"},
+            metadata={"provider_backend": "opaque"},
             can_run_parallel=True,
             parallel_metadata_declared=True,
             exclusive_group="head_expression",
@@ -150,14 +150,14 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             route="robot_action",
             interaction_executable=True,
             score=0.4,
-            metadata={"mode": "sim"},
+            metadata={"provider_backend": "opaque"},
             can_run_parallel=True,
             parallel_metadata_declared=True,
             exclusive_group="face_expression",
             resource_claims=["face_expression"],
         )
 
-    async def test_model_selects_subtle_attention_with_calibrated_target(self) -> None:
+    async def test_model_selects_subtle_attention_with_provider_target_evidence(self) -> None:
         attention = _AttentionOllama(
             {
                 "decision": "express",
@@ -180,20 +180,26 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 "reason": "The user directly engaged Chromie.",
             }
         )
+        request = self._request()
+        request.context["social_attention_target"] = {
+            "source": "installation_calibration",
+            "target": {
+                "target_ref": "calibrated_right_side",
+                "relative_direction": "right",
+                "confidence": 0.7,
+                "suggested_args": {"target_yaw_rad": 0.35},
+            },
+        }
         response = await InteractionRuntime(
             AgentServices(
                 ollama=_ConversationOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 capability_catalog=_Catalog([self._express_attention()]),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.express_attention",),
-                social_attention_fallback_target="calibrated_right_side",
-                social_attention_fallback_direction="right",
-                social_attention_fallback_yaw_rad=0.35,
-                social_attention_fallback_confidence=0.7,
             )
-        ).run(self._request())
+        ).run(request)
 
         self.assertEqual(response.skills[0].skill_id, "soridormi.express_attention")
         self.assertEqual(response.skills[0].timing, "parallel")
@@ -209,7 +215,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 ollama=_ConversationOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 capability_catalog=_Catalog([self._blink()]),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=_FailingAttentionOllama(),  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.blink_eyes",),
                 social_attention_num_ctx=32768,
@@ -257,7 +263,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 ollama=_ConversationOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 capability_catalog=_Catalog([self._blink()]),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.blink_eyes",),
             )
@@ -293,7 +299,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 ollama=_ConversationOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 capability_catalog=_Catalog([self._blink()]),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.blink_eyes",),
             )
@@ -332,7 +338,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 ollama=_ConversationOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 capability_catalog=_Catalog([self._blink()]),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.blink_eyes",),
                 social_attention_wait_after_response_ms=120000,
@@ -346,7 +352,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
 
 
 
-    async def test_live_target_evidence_overrides_installation_calibration(self) -> None:
+    async def test_live_target_evidence_is_used_when_supplied(self) -> None:
         attention = _AttentionOllama(
             {
                 "decision": "express",
@@ -380,13 +386,9 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 ollama=_ConversationOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 capability_catalog=_Catalog([self._express_attention()]),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.express_attention",),
-                social_attention_fallback_target="calibrated_right_side",
-                social_attention_fallback_direction="right",
-                social_attention_fallback_yaw_rad=0.35,
-                social_attention_fallback_confidence=0.7,
             )
         ).run(request)
 
@@ -396,7 +398,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(target["target_ref"], "tracked_user_7")
         self.assertNotIn("calibrated_right_side", attention.prompts[0].split('attention_target_evidence', 1)[1].split('eligible_social_capabilities', 1)[0])
 
-    async def test_calibrated_target_mismatch_is_rejected(self) -> None:
+    async def test_provider_target_mismatch_is_rejected(self) -> None:
         attention = _AttentionOllama(
             {
                 "decision": "express",
@@ -419,20 +421,25 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 "reason": "Optional attention.",
             }
         )
+        request = self._request()
+        request.context["social_attention_target"] = {
+            "source": "installation_calibration",
+            "target": {
+                "target_ref": "calibrated_right_side",
+                "relative_direction": "right",
+                "confidence": 0.7,
+            },
+        }
         response = await InteractionRuntime(
             AgentServices(
                 ollama=_ConversationOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 capability_catalog=_Catalog([self._express_attention()]),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.express_attention",),
-                social_attention_fallback_target="calibrated_right_side",
-                social_attention_fallback_direction="right",
-                social_attention_fallback_yaw_rad=0.35,
-                social_attention_fallback_confidence=0.7,
             )
-        ).run(self._request())
+        ).run(request)
 
         self.assertEqual(response.skills, [])
         self.assertEqual(response.metadata["social_attention_status"], "not_applied")
@@ -443,7 +450,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
 
     def test_parallel_social_behavior_is_rejected_on_resource_conflict(self) -> None:
         services = AgentServices(
-            social_attention_mode="sim_only",
+            social_attention_mode="on",
             social_attention_capability_ids=("soridormi.blink_eyes",),
         )
         planner = SocialAttentionPlanner(services)
@@ -546,7 +553,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 ollama=_ConversationOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 capability_catalog=_DomainCatalog([blink]),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=attention,  # type: ignore[arg-type]
                 social_attention_capability_ids=(),
             )

@@ -38,10 +38,10 @@
         "score": 0.4,
         "can_run_parallel": true,
         "resource_claims": ["face_expression"],
-        "metadata": {"mode": "sim"}
+        "metadata": {"provider_backend": "opaque"}
       }
     ],
-    "social_attention_mode": "sim_only",
+    "social_attention_mode": "on",
     "social_attention_capability_ids": ["soridormi.blink_eyes"],
     "ollama_reply": "Here is the sentence clearly.",
     "social_attention_reply": {

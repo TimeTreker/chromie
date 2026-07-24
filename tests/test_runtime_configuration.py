@@ -107,6 +107,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_CAPABILITY_REVIEW_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW"], "0")
         self.assertEqual(values["AGENT_EXPRESSIVE_BODY_CUES"], "off")
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODE"], "on")
+        self.assertFalse(
+            any(name.startswith("AGENT_SOCIAL_ATTENTION_FALLBACK_") for name in values)
+        )
         self.assertEqual(values["AGENT_CAPABILITY_MANIFESTS"], "")
         self.assertEqual(values["SORIDORMI_MCP_URL"], "")
 
@@ -117,6 +121,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
     def test_agent_code_fallback_matches_documented_low_latency_defaults(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             settings = agent_main.Settings()
+        self.assertEqual(settings.social_attention_mode, "on")
         self.assertFalse(settings.response_review_enabled)
         self.assertEqual(settings.max_speak_chars, 140)
         self.assertEqual(settings.fast_planner_num_ctx, 8192)
@@ -391,10 +396,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("--architecture-validation", source)
         self.assertIn("Social Attention remains active", source)
         self.assertIn(
-            "${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-off}}",
+            "${CHROMIE_SOCIAL_ATTENTION_MODE:-${AGENT_SOCIAL_ATTENTION_MODE:-on}}",
             source,
         )
-        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=sim_only", overlay)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_CTX=32768", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_PREDICT=4096", overlay)
@@ -415,9 +420,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=off", common)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", common)
         self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", common)
-        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=sim_only", overlay)
+        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS=0", overlay)
         self.assertIn('stub.get("social_attention_wait_after_response_ms", 0)', scenarios)
         self.assertNotIn('stub.get("social_attention_wait_after_response_ms", 150)', scenarios)

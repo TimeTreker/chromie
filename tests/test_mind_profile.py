@@ -26,7 +26,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.kind, "embodied robot")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.1.2")
+        self.assertEqual(profile.version, "0.2.0")
         self.assertIn("keep people company", profile.identity.short_self_description)
         self.assertIn("internal components", profile.identity.model_identity_boundary)
         self.assertIn("she", profile.identity.pronouns)
@@ -48,10 +48,22 @@ class MindProfileTests(unittest.TestCase):
         self.assertIn("Self model", profile.prompt_summary())
         self.assertIn("Chromie", profile.prompt_summary())
         self.assertIn("language_reasoner", profile.prompt_summary())
+        self.assertIn("Social interaction style", profile.prompt_summary())
         context = profile.prompt_context()
         self.assertEqual(context["identity"]["name"], "Chromie")
         self.assertEqual(context["self_model"]["speaker_entity"]["entity_id"], "chromie")
         self.assertEqual(context["self_model"]["acting_entity_id"], "chromie")
+        self.assertTrue(
+            context["social_interaction_style"]["owner_approved"]
+        )
+        self.assertIn(
+            "explicit user action",
+            context["social_interaction_style"]["restraint"],
+        )
+        self.assertIn(
+            "recent auxiliary-behavior evidence",
+            context["social_interaction_style"]["repetition_guidance"],
+        )
         self.assertEqual(
             context["self_model"]["social_presentation"]["self_reference"],
             "Chromie",

@@ -262,17 +262,21 @@ the goal and no particular gesture is mandatory. Blinking, gaze, a small nod,
 or remaining still are possible model-selected expressions, not fixed responses
 attached to every utterance.
 
-The interaction model receives the current turn, recent context, eligible named
-social capabilities, target evidence, and provider/resource metadata. It may
-produce a structured `SocialAttentionPlan` with `decision=express` or
-`decision=none`. It must not create a new user task, claim perception that is
-not present, or invent a target. Live perception wins over installation
-calibration; a calibrated position is only a fallback when perception is absent.
+The interaction model receives the current turn, recent context, the
+owner-approved Social Interaction Style, bounded recent auxiliary-request
+evidence, eligible named social capabilities, target evidence, and semantic
+resource metadata. It may produce a structured `SocialAttentionPlan` with
+`decision=express` or `decision=none`. It must not create a new user task, claim
+perception that is not present, invent a target, or infer the body backend.
+Provider-supplied calibration may be used only when it is present as target
+evidence; Chromie has no installation-calibration default.
 
 Deterministic runtime code validates exact skill IDs, schemas, target evidence,
-confirmation policy, execution availability, latency budget, and resource
-conflicts. Auxiliary attention skills are not user task proposals and must be
-suppressed when they would interfere with the primary action. Do not implement
+confirmation policy, execution availability, latency budget, parallel timing,
+and resource conflicts. Auxiliary attention skills are not user task proposals
+and must be suppressed when they would interfere with speech, emergency
+handling, or the primary action. Backend selection, calibration, motion limits,
+collision safety, stop, and recovery remain provider-owned. Do not implement
 normal attention through rules such as "blink twice after every reply" or
 "always look right."
 

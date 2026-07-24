@@ -141,6 +141,11 @@ class ComposeConfigurationTests(unittest.TestCase):
 
         self.assertIn("AGENT_EXPRESSIVE_BODY_CUES: ${AGENT_EXPRESSIVE_BODY_CUES:-off}", agent_block)
         self.assertIn(
+            "AGENT_SOCIAL_ATTENTION_MODE: ${AGENT_SOCIAL_ATTENTION_MODE:-on}",
+            agent_block,
+        )
+        self.assertNotIn("AGENT_SOCIAL_ATTENTION_FALLBACK_", agent_block)
+        self.assertIn(
             "AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW: ${AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW:-0}",
             agent_block,
         )

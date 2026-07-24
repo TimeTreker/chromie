@@ -16,7 +16,10 @@ from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
-from shared.chromie_contracts.social_attention import SocialAttentionPlan
+from shared.chromie_contracts.social_attention import (
+    SocialAttentionPlan,
+    normalize_social_attention_mode,
+)
 
 
 class _Catalog:
@@ -140,7 +143,7 @@ def _composition(mode: str, *, skill_id: str = "soridormi.sim_attention"):
         metadata={
             "social_attention_policy": {
                 "mode": mode,
-                "execution_enabled": mode in {"sim_only", "on"},
+                "execution_enabled": mode == "on",
             }
         },
     )
@@ -167,12 +170,6 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
         self.assertEqual(
             {item["capability_id"] for item in report["social_attention_candidates"]},
             {"soridormi.sim_attention", "soridormi.hardware_attention"},
-        )
-
-        sim = asyncio.run(run("sim_only"))
-        self.assertEqual(
-            [item["capability_id"] for item in sim["social_attention_candidates"]],
-            ["soridormi.sim_attention"],
         )
 
         enabled = asyncio.run(run("on"))
@@ -279,20 +276,27 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
         self.assertEqual(response.metadata["social_attention_policy_mode"], "off")
         self.assertIn("policy_off", response.metadata["omitted_social_attention"])
 
-    def test_sim_only_host_rechecks_runtime_definition_mode(self):
+    def test_legacy_simulator_scoped_configuration_migrates_to_on(self):
+        self.assertEqual(
+            normalize_social_attention_mode("sim" + "_only"),
+            "on",
+        )
+
+    def test_host_accepts_reviewed_skill_independent_of_backend_metadata(self):
         hardware = SkillDefinition(
             skill_id="soridormi.hardware_attention",
             provider_id="soridormi.mcp",
             input_schema={"type": "object", "properties": {}},
             available=True,
             requires_confirmation=False,
-            metadata={"mode": "hardware"},
+            metadata={"provider_backend": "physical"},
+        )
+        adapter = CanonicalPlanRuntimeAdapter(
+            _Runtime([hardware]),
+            social_attention_mode="on",
         )
         response = asyncio.run(
-            CanonicalPlanRuntimeAdapter(
-                _Runtime([hardware]),
-                social_attention_mode="sim_only",
-            ).build_response(
+            adapter.build_response(
                 plan=_plan(),
                 composition=_composition(
                     "on", skill_id="soridormi.hardware_attention"
@@ -302,22 +306,26 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                 context={},
             )
         )
-        self.assertEqual(response.skills, [])
-        self.assertIn(
-            "non_sim_social_skill:soridormi.hardware_attention",
-            response.metadata["omitted_social_attention"],
+        self.assertEqual(
+            [item.skill_id for item in response.skills],
+            ["soridormi.hardware_attention"],
         )
+        evidence = adapter.recent_auxiliary_behavior_evidence()
+        self.assertEqual(evidence[-1]["skill_id"], "soridormi.hardware_attention")
+        self.assertEqual(evidence[-1]["execution_claim"], "not_observed")
+        self.assertEqual(evidence[-1]["session_id"], "social-policy")
+        self.assertEqual(adapter.recent_auxiliary_behavior_evidence("other-session"), [])
 
-    def test_registry_preserves_provider_mode_for_host_recheck(self):
+    def test_registry_preserves_semantic_taxonomy_not_backend_mode(self):
         registry = SkillRegistry()
         registry.import_soridormi_catalog(
             [
                 {
                     "skill_id": "sim_attention",
-                    "description": "Simulator attention",
+                    "description": "Attention",
                     "parameters_schema": {"type": "object", "properties": {}},
                     "metadata": {
-                        "mode": "sim",
+                        "mode": "physical",
                         "behavior_domains": ["social_attention"],
                     },
                     "requires_confirmation": False,
@@ -327,7 +335,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
             requires_confirmation=False,
         )
         definition = registry.get("soridormi.sim_attention")
-        self.assertEqual(definition.metadata["mode"], "sim")
+        self.assertNotIn("mode", definition.metadata)
         self.assertEqual(
             definition.metadata["behavior_domains"], ["social_attention"]
         )

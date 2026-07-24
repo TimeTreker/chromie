@@ -47,6 +47,7 @@ from .mind import (
     MindProfile,
     MindUpdateProposal,
     RobotIdentity,
+    SocialInteractionStyle,
     default_mind_profile,
 )
 from .session import SessionContext
@@ -86,9 +87,11 @@ from .user_turn import (
 )
 from .social_attention import (
     SocialAttentionBehavior,
+    SocialAttentionMode,
     SocialAttentionPlan,
     SocialAttentionSpeechExpression,
     SocialAttentionTarget,
+    normalize_social_attention_mode,
 )
 from .goal import (
     ActiveGoalSnapshot,
@@ -167,6 +170,7 @@ __all__ = [
     "MindProfile",
     "MindUpdateProposal",
     "RobotIdentity",
+    "SocialInteractionStyle",
     "default_mind_profile",
     "SessionContext",
     "ResponseCompositionStatus",
@@ -198,9 +202,11 @@ __all__ = [
     "UserTurnEnvelope",
     "normalize_turn_text",
     "SocialAttentionBehavior",
+    "SocialAttentionMode",
     "SocialAttentionPlan",
     "SocialAttentionSpeechExpression",
     "SocialAttentionTarget",
+    "normalize_social_attention_mode",
     "ActiveGoalSnapshot",
     "GoalAssociation",
     "GoalAssociationResolution",

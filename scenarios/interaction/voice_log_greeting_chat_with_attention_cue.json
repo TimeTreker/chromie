@@ -3,7 +3,7 @@
   "id": "voice_log_greeting_chat_with_attention_cue",
   "suite": "interaction",
   "level": "integration",
-  "description": "A plain greeting stays chat speech while a separate model-authored social-attention plan may coordinate a subtle simulator cue toward the calibrated user position.",
+  "description": "A plain greeting stays chat speech while a separate model-authored plan may optionally coordinate one subtle provider-backed cue; no greeting phrase rule selects the behavior.",
   "tags": [
     "voice-log",
     "greeting",
@@ -28,7 +28,7 @@
       {
         "capability_id": "soridormi.express_attention",
         "agent_id": "soridormi.skill",
-        "description": "Small head-only attention/listening gesture using a bounded neutral-home MuJoCo trajectory.",
+        "description": "Bounded named attention/listening behavior with provider-owned motion realization.",
         "input_schema": {
           "type": "object",
           "properties": {
@@ -41,7 +41,7 @@
         },
         "effects": ["physical_motion"],
         "safety_class": "physical_motion",
-        "requires_confirmation": true,
+        "requires_confirmation": false,
         "available": true,
         "interaction_executable": true,
         "route": "robot_action",
@@ -50,17 +50,23 @@
         "exclusive_group": "head_expression",
         "resource_claims": ["head_expression"],
         "metadata": {
-          "mode": "sim"
+          "provider_backend": "opaque"
         }
       }
     ],
-    "expressive_body_cues": "sim_only",
-    "social_attention_mode": "sim_only",
+    "expressive_body_cues": "off",
+    "social_attention_mode": "on",
     "social_attention_capability_ids": ["soridormi.express_attention"],
-    "social_attention_fallback_target": "calibrated_right_side",
-    "social_attention_fallback_direction": "right",
-    "social_attention_fallback_yaw_rad": 0.35,
-    "social_attention_fallback_confidence": 0.7,
+    "context": {
+      "social_attention_target": {
+        "source": "installation_calibration",
+        "target": {
+          "target_ref": "calibrated_right_side",
+          "relative_direction": "right",
+          "confidence": 0.7
+        }
+      }
+    },
     "ollama_reply": "Hello. I am doing well.",
     "social_attention_reply": {
       "decision": "express",
@@ -99,6 +105,6 @@
     ],
     "skill_metadata_json_contains": ["social_attention_plan", "calibrated_right_side"],
     "metadata_json_contains": ["social_attention_plan", "social_attention_skills", "installation_calibration"],
-    "requires_confirmation": true
+    "requires_confirmation": false
   }
 }

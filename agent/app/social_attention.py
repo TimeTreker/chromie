@@ -181,11 +181,11 @@ class SocialAttentionPlanner:
             "Choose decision=none when speech alone is natural, when a gesture would be repetitive, distracting, "
             "unsafe, unsupported, or likely to conflict with the primary task. Do not add a gesture merely because "
             "one is available.\n"
-            "If live target evidence exists, prefer it. Installation calibration is only a fallback when live "
-            "perception is absent. Never invent a perceived person or target location.\n"
+            "Use only supplied target evidence. Provider-supplied calibration is evidence, not a Chromie default; "
+            "never invent a perceived person, target location, or body calibration.\n"
             "Do not create or change the user's primary task. Do not add speech, tool calls, memory writes, or raw "
             "joint/motor controls. Select only exact skill_id values from eligible_social_capabilities and provide "
-            "schema-valid args. Prefer timing=parallel for behavior intended to accompany speech.\n"
+            "schema-valid semantic args. Every auxiliary behavior must use timing=parallel and remain optional.\n"
             "Return one JSON object with keys decision, target, behaviors, confidence, reason, and optional metadata. "
             "decision is none or express. target contains target_ref, source, relative_direction, confidence, metadata. "
             "Each behavior contains skill_id, args, timing, and reason.\n\n"
@@ -238,11 +238,10 @@ class SocialAttentionPlanner:
             if candidate.get("available") is False or candidate.get("interaction_executable") is not True:
                 reasons.append(f"unavailable_skill:{behavior.skill_id}")
                 continue
-            mode = self.services.effective_social_attention_mode()
-            capability_mode = str((candidate.get("metadata") or {}).get("mode") or "")
-            if mode == "sim_only" and capability_mode != "sim":
-                reasons.append(f"not_sim_skill:{behavior.skill_id}")
+            if behavior.timing != "parallel":
+                reasons.append(f"auxiliary_must_be_parallel:{behavior.skill_id}")
                 continue
+            mode = self.services.effective_social_attention_mode()
             if mode == "on" and bool(candidate.get("requires_confirmation")):
                 reasons.append(f"confirmation_required:{behavior.skill_id}")
                 continue

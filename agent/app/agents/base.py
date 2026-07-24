@@ -9,6 +9,11 @@ from typing import TYPE_CHECKING, Any
 from ..clients.ollama_client import OllamaClient
 from ..schema import AgentResult, AgentRunRequest
 
+try:
+    from chromie_contracts.social_attention import normalize_social_attention_mode
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.social_attention import normalize_social_attention_mode
+
 if TYPE_CHECKING:
     from ..capabilities.catalog import CapabilityCatalog
     from ..task_graph.planner import TaskGraphPlanner
@@ -22,17 +27,13 @@ class AgentServices:
     use_llm: bool = True
     max_speak_chars: int = 120
     expressive_body_cues: str = "off"
-    social_attention_mode: str = ""
+    social_attention_mode: str = "on"
     social_attention_ollama: OllamaClient | None = None
     social_attention_num_ctx: int = 4096
     social_attention_num_predict: int = 160
     social_attention_max_behaviors: int = 2
     social_attention_wait_after_response_ms: int = 0
     social_attention_capability_ids: tuple[str, ...] = ()
-    social_attention_fallback_target: str = "none"
-    social_attention_fallback_direction: str | None = None
-    social_attention_fallback_yaw_rad: float | None = None
-    social_attention_fallback_confidence: float = 0.0
     require_capability_plan_review: bool = False
     legacy_capability_fallback_enabled: bool = False
     task_graph_planner: "TaskGraphPlanner | None" = None
@@ -42,10 +43,8 @@ class AgentServices:
     tool_result_interpreter: Any | None = None
 
     def effective_social_attention_mode(self) -> str:
-        raw = (self.social_attention_mode or self.expressive_body_cues or "off").strip().lower()
-        if raw not in {"off", "report_only", "sim_only", "on"}:
-            return "off"
-        return raw
+        raw = self.social_attention_mode or self.expressive_body_cues
+        return normalize_social_attention_mode(raw, default="on")
 
 
 logger = logging.getLogger("chromie.agent.base")

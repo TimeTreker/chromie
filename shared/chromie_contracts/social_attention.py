@@ -1,10 +1,39 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .interaction import reject_forbidden_low_level_fields
+
+SocialAttentionMode = Literal["off", "report_only", "on"]
+_LEGACY_SIMULATOR_ONLY_MODE = "sim" + "_only"
+
+
+def normalize_social_attention_mode(
+    value: Any,
+    *,
+    default: SocialAttentionMode = "on",
+) -> SocialAttentionMode:
+    """Normalize deployment input without widening the public policy contract.
+
+    The previous simulator-scoped value migrates to ``on`` because embodiment
+    selection is owned by Soridormi/provider, not Chromie's social policy.
+    Unknown explicit values fail closed to ``off``.
+    """
+
+    normalized_default = (
+        default if default in {"off", "report_only", "on"} else "on"
+    )
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return normalized_default
+    if raw == _LEGACY_SIMULATOR_ONLY_MODE:
+        return "on"
+    if raw in {"off", "report_only", "on"}:
+        return cast(SocialAttentionMode, raw)
+    return "off"
+
 
 SocialAttentionDecision = Literal["none", "express"]
 SocialAttentionTargetSource = Literal[

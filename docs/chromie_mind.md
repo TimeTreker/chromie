@@ -7,6 +7,8 @@ contracts. The first version provides:
 
 - an owner-approved default mind profile;
 - an owner-approved structured self model for the speaking, perceiving, acting, and body-owning entity;
+- an owner-approved Social Interaction Style for bounded courtesy,
+  expressiveness, initiative, restraint, cooldown, and repetition guidance;
 - core principles that cannot be changed by experience;
 - long-term goals that can be tuned by reviewed experience;
 - prompt-safe context for Router, conversation, and deepthinking;
@@ -28,6 +30,7 @@ Chromie's brain context has these layers:
 | Layer | Persistence | Changed by experience? | Purpose |
 |---|---:|---:|---|
 | Identity | Long-lived | No | Stable name, robot nature, gender/pronouns, and age/persona wording |
+| Social Interaction Style | Long-lived | No | Owner-approved bounded social expression and repetition restraint |
 | Core principles | Long-lived | No | Safety, honesty, generalization-first behavior, owner-approved boundaries |
 | Long-term goals | Long-lived | With review | Direction for usefulness, learning, and uncertainty handling |
 | Session memory | Current conversation | Yes, bounded | Current task, recent turns, pending work |
@@ -97,7 +100,7 @@ job it is performing. Turn-specific targets belong inside `Current Job` and
 
 `Global Context Group` tells the model who Chromie is and what upper principles
 she obeys. It includes Robot Identity, Worldview, Lifeview, Valueview, core
-principles, reflex policy, deliberation policy, and experience boundaries.
+principles, Social Interaction Style, reflex policy, deliberation policy, and experience boundaries.
 Identity, age/persona wording, and core principles come from the owner-approved
 mind profile.
 
@@ -135,6 +138,9 @@ The Orchestrator builds a context object for every routed turn. It now includes:
 
 - `mind`: bounded profile summary and structured policy fields;
 - `mind.identity`: stable owner-approved descriptive fields;
+- `mind.social_interaction_style`: owner-approved courtesy, expression,
+  initiative, restraint, cooldown, and repetition guidance supplied to Response
+  Composer together with bounded recent auxiliary-request evidence;
 - `mind.self_model`: structured speaker, perceiver, actor, body owner, internal
   components, and capability-evidence source used by Router, conversation,
   deepthinking, and direct-fallback prompts;

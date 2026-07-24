@@ -261,11 +261,11 @@ not require the supervised real-microphone run.
   speech uses a short original line and still applies the same walking safety
   normalization. Chromie waits until that speech is actually audible before
   starting the body walk, so the song and walk overlap.
-- Chat-only speech is speech-only by default. Architecture validation can opt in
-  to reviewed simulator-only gestures with `AGENT_SOCIAL_ATTENTION_MODE=sim_only`;
-  leave it `off` for latency-sensitive or strict behavior tests. The older
-  `AGENT_EXPRESSIVE_BODY_CUES` name is only a compatibility alias when the main
-  setting is absent.
+- Chat-only turns may include optional model-authored Social Attention. The
+  maintained mode is `on`; use `report_only` to retain advisory plans without
+  body requests or `off` to suppress auxiliary planning. These settings do not
+  select a simulator or physical body. The older `AGENT_EXPRESSIVE_BODY_CUES`
+  name is only a compatibility alias.
 - Compound requests should preserve order unless a safety or validation rule
   refuses the request.
 

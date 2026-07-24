@@ -101,6 +101,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Use native structured output for `/interaction`; set `legacy-adapter` only for rollback. |
+| `AGENT_SOCIAL_ATTENTION_MODE` | `on` | Embodiment-independent auxiliary interaction policy. Supported values are `off`, `report_only`, and `on`. A legacy simulator-scoped value is migrated to `on`; Soridormi/provider remains responsible for simulator-versus-physical backend selection and all body safety. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | Opt in to legacy adapter fallback after native schema validation fails. Default-off preserves fail-closed behavior. |
 | `AGENT_ENABLE_TASK_GRAPH_PLANNING` | `0` | Let tool routes ask the LLM for a validated TaskGraph. |
 | `AGENT_ENABLE_READ_ONLY_TASK_GRAPH_EXECUTION` | `0` | Enable the read-only execution endpoint. |
@@ -511,20 +512,16 @@ retained. See
 | `AGENT_CONVERSATION_NUM_PREDICT` | Output token budget for normal conversation replies; common default `64`. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | Ollama context window for deep-thinking prompts with session memory; default `8192`. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | Output token budget for deep-thinking replies; default `384`. |
-| `AGENT_SOCIAL_ATTENTION_MODE` | Current compatibility policy accepts `off`, `report_only`, `sim_only`, or `on` and defaults to `off`. The accepted target is backend-independent `off`, `report_only`, or `on`, with `on` as the maintained default. `sim_only` is scheduled for removal because Soridormi, not Chromie, owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
-| `CHROMIE_SOCIAL_ATTENTION_MODE` | Current host-launcher override used by `scripts/start_chromie.sh`. It is an operational Social Attention gate, not a simulator or hardware selector. The accepted target uses only `off`, `report_only`, or `on`; Soridormi/provider configuration owns deployment backend selection. |
+| `AGENT_SOCIAL_ATTENTION_MODE` | Embodiment-independent policy with values `off`, `report_only`, or `on`; maintained default `on`. A legacy simulator-scoped input is migrated to `on` at the environment boundary. Soridormi/provider owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
+| `CHROMIE_SOCIAL_ATTENTION_MODE` | Optional host-launcher override with the same `off`, `report_only`, or `on` semantics. It is never a body-backend selector. |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
 | `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. The architecture-validation overlay raises it to `120000` so qualification tests model capability before latency tuning. |
 | `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `4096`. |
 | `AGENT_SOCIAL_ATTENTION_NUM_PREDICT` | JSON output budget for social-attention planning; default `160`. |
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | Deprecated compatibility input retained for diagnostics; default `0`. The runtime never awaits Social Attention after the primary response, and reports an effective wait of `0`. |
 | `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
-| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Optional comma-separated exact catalog IDs added to behavior-domain discovery. Default empty. Normal candidates are available interaction-executable catalog entries tagged `social_attention`; availability never forces selection. |
-| `AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET` | Optional installation-calibrated target reference. Default `none`; live target evidence overrides calibration. |
-| `AGENT_SOCIAL_ATTENTION_FALLBACK_DIRECTION` | Optional calibrated relative direction associated with the fallback target. |
-| `AGENT_SOCIAL_ATTENTION_FALLBACK_YAW_RAD` | Optional calibrated yaw supplied as target evidence for compatible schemas. |
-| `AGENT_SOCIAL_ATTENTION_FALLBACK_CONFIDENCE` | Confidence attached to installation calibration; default `0.0`. |
-| `AGENT_EXPRESSIVE_BODY_CUES` | Deprecated compatibility alias used only when `AGENT_SOCIAL_ATTENTION_MODE` is unset. |
+| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Optional comma-separated exact catalog IDs added to behavior-domain discovery. Default empty. Normal candidates are available interaction-executable entries tagged `social_attention`; provider backend metadata is ignored. |
+| `AGENT_EXPRESSIVE_BODY_CUES` | Deprecated compatibility alias. The main Social Attention mode takes precedence. |
 
 | `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Common low-latency default `0`; set to `1` for stricter review where executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If the Router selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |

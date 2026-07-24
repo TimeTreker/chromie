@@ -237,10 +237,10 @@ class _AttentionCatalog:
                     effects=["physical_motion"],
                     safety_class="physical_motion",
                     interaction_executable=True,
-                    requires_confirmation=True,
+                    requires_confirmation=False,
                     route="robot_action",
                     score=0.0,
-                    metadata={"mode": "sim"},
+                    metadata={"provider_backend": "opaque"},
                 )
             ],
         )
@@ -297,10 +297,10 @@ class _SpeechCatalog:
                     effects=["physical_motion"],
                     safety_class="physical_motion",
                     interaction_executable=True,
-                    requires_confirmation=True,
+                    requires_confirmation=False,
                     route="robot_action",
                     score=0.0,
-                    metadata={"mode": "sim"},
+                    metadata={"provider_backend": "opaque"},
                 ),
             ],
         )
@@ -695,6 +695,18 @@ def _request(
     )
 
 
+def _with_provider_social_target(request: AgentRunRequest) -> AgentRunRequest:
+    request.context["social_attention_target"] = {
+        "source": "installation_calibration",
+        "target": {
+            "target_ref": "calibrated_right_side",
+            "relative_direction": "right",
+            "confidence": 0.7,
+        },
+    }
+    return request
+
+
 class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_native_runtime_emits_named_skill_without_result_adapter(self) -> None:
         request = _legacy_request(
@@ -880,20 +892,17 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             intent="general_conversation",
             agents=["conversation_agent", "speaker_agent"],
         )
+        request = _with_provider_social_target(request)
         response = await InteractionRuntime(
             _legacy_services(
                 ollama=_AgreementOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
-                expressive_body_cues="sim_only",
-                social_attention_mode="sim_only",
+                expressive_body_cues="off",
+                social_attention_mode="on",
                 social_attention_ollama=_SocialAttentionOllama(),  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.express_attention",),
-                social_attention_fallback_target="calibrated_right_side",
-                social_attention_fallback_direction="right",
-                social_attention_fallback_yaw_rad=0.35,
-                social_attention_fallback_confidence=0.7,
             )
         ).run(request)
 
@@ -906,7 +915,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
         )
         self.assertEqual(response.skills[0].timing, "parallel")
-        self.assertTrue(response.skills[0].requires_confirmation)
+        self.assertFalse(response.skills[0].requires_confirmation)
         self.assertEqual(
             response.skills[0].metadata["source"],
             "social_attention_plan",
@@ -920,20 +929,17 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             intent="general_conversation",
             agents=["conversation_agent", "speaker_agent"],
         )
+        request = _with_provider_social_target(request)
         response = await InteractionRuntime(
             _legacy_services(
                 ollama=_ChatOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
-                expressive_body_cues="sim_only",
-                social_attention_mode="sim_only",
+                expressive_body_cues="off",
+                social_attention_mode="on",
                 social_attention_ollama=_SocialAttentionOllama(),  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.express_attention",),
-                social_attention_fallback_target="calibrated_right_side",
-                social_attention_fallback_direction="right",
-                social_attention_fallback_yaw_rad=0.35,
-                social_attention_fallback_confidence=0.7,
             )
         ).run(request)
 
@@ -961,20 +967,17 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             intent="general_conversation",
             agents=["conversation_agent", "speaker_agent"],
         )
+        request = _with_provider_social_target(request)
         response = await InteractionRuntime(
             _legacy_services(
                 ollama=_JokeOllama(),  # type: ignore[arg-type]
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_SpeechCatalog(),  # type: ignore[arg-type]
-                expressive_body_cues="sim_only",
-                social_attention_mode="sim_only",
+                expressive_body_cues="off",
+                social_attention_mode="on",
                 social_attention_ollama=_SocialAttentionOllama(),  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.express_attention",),
-                social_attention_fallback_target="calibrated_right_side",
-                social_attention_fallback_direction="right",
-                social_attention_fallback_yaw_rad=0.35,
-                social_attention_fallback_confidence=0.7,
             )
         ).run(request)
 
@@ -1056,7 +1059,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_ChatCatalog(),  # type: ignore[arg-type]
-                expressive_body_cues="sim_only",
+                expressive_body_cues="on",
             )
         ).run(request)
 
@@ -1164,7 +1167,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 use_llm=True,
                 max_speak_chars=160,
                 capability_catalog=_AttentionCatalog(),  # type: ignore[arg-type]
-                social_attention_mode="sim_only",
+                social_attention_mode="on",
                 social_attention_ollama=_SocialAttentionNoneOllama(),  # type: ignore[arg-type]
                 social_attention_capability_ids=("soridormi.express_attention",),
             )

@@ -1217,7 +1217,6 @@ async def _run_interaction_turn(
         "social_attention_replies",
         stub.get("social_attention_reply"),
     )
-    fallback_yaw = stub.get("social_attention_fallback_yaw_rad")
     legacy_capability_equivalence = (
         str(route_decision.get("route") or "") == "robot_action"
         and "capability_agent" in list(route_decision.get("agents") or [])
@@ -1244,18 +1243,6 @@ async def _run_interaction_turn(
             for item in (stub.get("social_attention_capability_ids") or [])
             if str(item).strip()
         ),
-        social_attention_fallback_target=str(
-            stub.get("social_attention_fallback_target") or "none"
-        ),
-        social_attention_fallback_direction=(
-            str(stub.get("social_attention_fallback_direction") or "").strip() or None
-        ),
-        social_attention_fallback_yaw_rad=(
-            float(fallback_yaw) if isinstance(fallback_yaw, (int, float)) else None
-        ),
-        social_attention_fallback_confidence=float(
-            stub.get("social_attention_fallback_confidence", 0.0)
-        ),
         social_attention_wait_after_response_ms=int(
             stub.get("social_attention_wait_after_response_ms", 0)
         ),
@@ -1263,6 +1250,11 @@ async def _run_interaction_turn(
         legacy_capability_fallback_enabled=legacy_capability_equivalence,
     )
     request_context = dict(context or {})
+    stub_context = stub.get("context")
+    if stub_context is not None and not isinstance(stub_context, dict):
+        raise ValueError(f"{scenario_key}: stub.context must be an object")
+    if isinstance(stub_context, dict):
+        request_context.update(stub_context)
     if legacy_capability_equivalence:
         request_context["semantic_authority"] = {
             "owner": "legacy_capability_fallback",

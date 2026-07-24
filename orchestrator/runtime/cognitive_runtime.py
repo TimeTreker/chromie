@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +30,7 @@ from shared.chromie_contracts.response_composition import (
     ResponseCompositionResolution,
     canonical_plan_fingerprint,
 )
+from shared.chromie_contracts.social_attention import normalize_social_attention_mode
 from shared.chromie_contracts.user_turn import UserTurnEnvelope
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
@@ -316,14 +317,16 @@ class CanonicalPlanRuntimeAdapter:
         self,
         interaction_runtime: Any,
         *,
-        social_attention_mode: str = "off",
+        social_attention_mode: str = "on",
+        recent_auxiliary_evidence_limit: int = 12,
     ) -> None:
         self.interaction_runtime = interaction_runtime
-        normalized_mode = str(social_attention_mode or "off").strip().lower()
-        self.social_attention_mode = (
-            normalized_mode
-            if normalized_mode in {"off", "report_only", "sim_only", "on"}
-            else "off"
+        self.social_attention_mode = normalize_social_attention_mode(
+            social_attention_mode,
+            default="on",
+        )
+        self._recent_auxiliary_behavior_evidence: deque[dict[str, Any]] = deque(
+            maxlen=max(1, int(recent_auxiliary_evidence_limit))
         )
 
     def _effective_social_attention_mode(
@@ -331,11 +334,10 @@ class CanonicalPlanRuntimeAdapter:
         composition: CoordinatedResponsePlan,
     ) -> str:
         policy_payload = composition.metadata.get("social_attention_policy")
-        agent_mode = str(
-            policy_payload.get("mode") if isinstance(policy_payload, dict) else "off"
-        ).strip().lower()
-        if agent_mode not in {"off", "report_only", "sim_only", "on"}:
-            agent_mode = "off"
+        agent_mode = normalize_social_attention_mode(
+            policy_payload.get("mode") if isinstance(policy_payload, dict) else "off",
+            default="off",
+        )
         # Both the Agent-side policy and the Host-side launch policy must allow
         # the behavior. The more restrictive mode wins; a compromised/stale
         # composition cannot widen the local runtime policy.
@@ -343,9 +345,46 @@ class CanonicalPlanRuntimeAdapter:
             return "off"
         if "report_only" in {self.social_attention_mode, agent_mode}:
             return "report_only"
-        if "sim_only" in {self.social_attention_mode, agent_mode}:
-            return "sim_only"
         return "on"
+
+    def recent_auxiliary_behavior_evidence(
+        self,
+        session_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return bounded host evidence without implying provider completion."""
+
+        evidence = [dict(item) for item in self._recent_auxiliary_behavior_evidence]
+        if session_id is None:
+            return evidence
+        return [item for item in evidence if item.get("session_id") == session_id]
+
+    def _record_auxiliary_behavior_request(
+        self,
+        request: SkillRequest,
+        *,
+        session_id: str,
+    ) -> None:
+        if not request.metadata.get("auxiliary_social_attention"):
+            return
+        if any(
+            item.get("request_id") == request.request_id
+            for item in self._recent_auxiliary_behavior_evidence
+        ):
+            return
+        self._recent_auxiliary_behavior_evidence.append(
+            {
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+                "session_id": session_id,
+                "evidence_kind": "host_accepted_auxiliary_request",
+                "execution_claim": "not_observed",
+                "request_id": request.request_id,
+                "skill_id": request.skill_id,
+                "semantic_args": dict(request.args),
+                "purpose": request.metadata.get("social_attention_purpose"),
+                "canonical_plan_id": request.metadata.get("canonical_plan_id"),
+                "policy_mode": request.metadata.get("social_attention_policy_mode"),
+            }
+        )
 
     @staticmethod
     def lane_for_plan(plan: CanonicalPlan) -> CognitiveLane:
@@ -1175,12 +1214,9 @@ class CanonicalPlanRuntimeAdapter:
                                 f"confirmation_required:{behavior.skill_id}"
                             )
                             continue
-                        if (
-                            policy_mode == "sim_only"
-                            and str(definition.metadata.get("mode") or "") != "sim"
-                        ):
+                        if behavior.timing != "parallel":
                             omitted_attention.append(
-                                f"non_sim_social_skill:{behavior.skill_id}"
+                                f"auxiliary_must_be_parallel:{behavior.skill_id}"
                             )
                             continue
                         schema_errors = validate_args_for_schema(
@@ -1253,6 +1289,12 @@ class CanonicalPlanRuntimeAdapter:
                             f"invalid:{behavior.skill_id}:{type(exc).__name__}"
                         )
 
+        for request in skills:
+            self._record_auxiliary_behavior_request(
+                request,
+                session_id=session_id,
+            )
+
         status_map = {
             "respond": "ok",
             "execute": "ok",
@@ -1286,6 +1328,9 @@ class CanonicalPlanRuntimeAdapter:
             ),
             "omitted_social_attention": omitted_attention,
             "social_attention_policy_mode": policy_mode,
+            "recent_auxiliary_behavior_evidence": (
+                self.recent_auxiliary_behavior_evidence(session_id)
+            ),
             "omitted_pre_execution_speech_phases": (
                 omitted_pre_execution_speech_phases
             ),
@@ -1813,6 +1858,16 @@ class GoalDrivenRuntimeCoordinator:
             composition_context = dict(planning_context)
             composition_context["canonical_plan_resolution"] = terminal_plan.model_dump(
                 mode="json", exclude_none=True
+            )
+            recent_auxiliary_evidence = getattr(
+                self.adapter,
+                "recent_auxiliary_behavior_evidence",
+                None,
+            )
+            composition_context["recent_auxiliary_behavior_evidence"] = (
+                recent_auxiliary_evidence(sid)
+                if callable(recent_auxiliary_evidence)
+                else []
             )
             stage = time.perf_counter()
             composition_resolution = await self.agent_client.compose_response_plan(

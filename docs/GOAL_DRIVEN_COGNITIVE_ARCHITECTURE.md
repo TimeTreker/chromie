@@ -968,8 +968,14 @@ evidence.
 Capabilities may declare multiple behavior domains. Gaze, blink, nod, head
 orientation, posture, and bow are current Social Attention candidates, but the
 same underlying motion can serve perception, navigation, or another domain in a
-different plan. `capabilities/behavior_domains.json` supplements provider
-metadata; it does not choose behavior.
+different plan. `capabilities/behavior_domains.json` supplies semantic taxonomy;
+simulator or hardware provider metadata never participates in candidate
+discovery or social policy.
+
+Soridormi backends preserve the same named-skill and semantic-argument
+contracts. Backend selection, controller adaptation, calibration, motion
+limits, collision safety, stop, and recovery are provider responsibilities and
+are not represented in Chromie's Social Attention policy.
 
 ### 12.5 Target evidence and conflict policy
 
@@ -980,9 +986,12 @@ Target priority is:
 3. calibrated installation fallback;
 4. no targeted behavior.
 
-Invalid or conflicting auxiliary body behaviors are dropped. A speech-only
-adaptation may remain when body behavior is rejected. Auxiliary expression never
-delays the primary task.
+Invalid, sequential, or conflicting auxiliary body behaviors are dropped. A
+speech-only adaptation may remain when body behavior is rejected. Auxiliary
+expression never delays speech, emergency handling, or primary task execution.
+The Response Composer receives the owner-approved Social Interaction Style and
+bounded recent accepted-request evidence for cooldown and repetition restraint;
+that evidence never proves provider completion.
 
 See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
 

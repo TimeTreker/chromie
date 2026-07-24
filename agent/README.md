@@ -112,7 +112,9 @@ trusted network boundary.
 
 ## Feature gates
 
-Risk-bearing behavior is default-off.
+Risk-bearing task execution remains default-off. Social Attention is maintained
+`on` as an optional, bounded interaction policy; it cannot widen task or body
+execution authority.
 
 | Variable | Default | Effect |
 |---|---:|---|
@@ -120,12 +122,11 @@ Risk-bearing behavior is default-off.
 | `AGENT_RESPONSE_REVIEW_MODEL` | `gemma4:e2b` | Semantic reviewer model; defaults to the main Agent model so weak replies are judged with enough context. |
 | `AGENT_RESPONSE_REVIEW_TIMEOUT_MS` | `4000` | Timeout for the semantic response-review call. |
 | `AGENT_RESPONSE_REVIEW_MODE` | `auto` | In `auto`, skip the extra spoken-response review for clearly low-risk chat replies while still reviewing task/capability/action-risk replies. Use `always` for diagnostics. |
-| `AGENT_SOCIAL_ATTENTION_MODE` | `off` (current) | Current compatibility gate accepts `off`, `report_only`, `sim_only`, or `on`. The accepted target removes `sim_only`, defaults to `on`, and makes Social Attention depend on mind/personality and interaction context. Soridormi/provider configuration, not the Agent, selects simulation or physical execution. See [Social Attention Behavior Domain](../docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
+| `AGENT_SOCIAL_ATTENTION_MODE` | `on` | Embodiment-independent auxiliary interaction gate: `off`, `report_only`, or `on`. It never selects a simulator or physical backend; Soridormi/provider owns backend selection and body safety. See [Social Attention Behavior Domain](../docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
 | `AGENT_SOCIAL_ATTENTION_MODEL` | `qwen3:4b` | Dedicated model for structured `SocialAttentionPlan` output. |
 | `AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS` | `0` | Deprecated compatibility input retained for diagnostics. Social Attention is never awaited after the primary response; the effective wait is always `0`. |
-| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named skills | Exact catalog IDs eligible for model selection; this list does not force any gesture. |
-| `AGENT_SOCIAL_ATTENTION_FALLBACK_TARGET` | `none` | Optional installation-calibrated target used only when live perception is absent. |
-| `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Deprecated compatibility alias used only when `AGENT_SOCIAL_ATTENTION_MODE` is unset. |
+| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named skills | Exact catalog IDs eligible for semantic selection; this list does not force any gesture. |
+| `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Deprecated compatibility alias. The main Social Attention mode takes precedence. |
 
 | `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | When `1`, require semantic review for executable robot-action plans and fail closed if that optional reviewer is unavailable; exact Router capability substitutions also require a reviewer revision. At the default `0`, this extra review gate is skipped. |
 | `AGENT_CONVERSATION_NUM_CTX` | `2048` | Context window for normal conversation prompts. |
@@ -176,12 +177,14 @@ availability, resource compatibility, confirmation policy, and latency.
 
 Auxiliary skills carry `metadata.auxiliary_social_attention=true` and
 `metadata.interaction_role=auxiliary_expression`. They are excluded from user
-task proposals and are dropped rather than delaying or conflicting with the
-primary task. A concrete user request such as "blink twice" remains a normal,
-non-droppable CanonicalPlan goal even though its observable behavior belongs to
-the same domain. Project and normal voice-MuJoCo defaults remain off. The
-architecture-validation profile explicitly enables `sim_only`; live target
-evidence overrides installation calibration.
+task proposals and are dropped rather than delaying or conflicting with speech,
+emergency handling, or the primary task. A concrete user request such as "blink
+twice" remains a normal, non-droppable CanonicalPlan goal even though its
+observable behavior belongs to the same domain. The maintained policy is `on`;
+`report_only` retains advisory plans without body requests and `off` suppresses
+auxiliary planning. Provider-supplied target evidence may include installation
+calibration, but Chromie does not define a fallback target or select the body
+backend.
 
 See [Social Attention Behavior Domain](../docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
 
