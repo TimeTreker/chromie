@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from orchestrator.runtime.experience import ExperienceManager
@@ -12,6 +14,7 @@ from shared.chromie_contracts.interaction import InteractionResponse, SkillResul
 from shared.chromie_contracts.mind import (
     CorePrinciple,
     MindProfile,
+    SocialInteractionStyle,
     MindUpdateProposal,
     default_mind_profile,
 )
@@ -26,7 +29,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.kind, "embodied robot")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.2.0")
+        self.assertEqual(profile.version, "0.3.0")
         self.assertIn("keep people company", profile.identity.short_self_description)
         self.assertIn("internal components", profile.identity.model_identity_boundary)
         self.assertIn("she", profile.identity.pronouns)
@@ -79,6 +82,36 @@ class MindProfileTests(unittest.TestCase):
         self.assertIn(
             "generalization_first_ai",
             {item["id"] for item in profile.prompt_context()["core_principles"]},
+        )
+
+
+    def test_social_interaction_style_presets_are_operator_selectable(self) -> None:
+        courteous = SocialInteractionStyle(preset="courteous")
+        neutral = SocialInteractionStyle(preset="neutral")
+        reserved = SocialInteractionStyle(preset="reserved")
+
+        self.assertEqual(courteous.preset, "courteous")
+        self.assertIn("greetings", courteous.bounded_courtesy)
+        self.assertIn("normal baseline", neutral.expressiveness)
+        self.assertIn("Prefer stillness", reserved.expressiveness)
+        self.assertNotEqual(courteous.expressiveness, reserved.expressiveness)
+
+    def test_custom_social_interaction_style_requires_complete_guidance(self) -> None:
+        with self.assertRaisesRegex(ValueError, "custom social interaction style"):
+            SocialInteractionStyle(preset="custom")
+
+    def test_mind_manager_applies_operator_style_preset_from_env(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"ORCH_SOCIAL_INTERACTION_STYLE_PRESET": "reserved"},
+            clear=False,
+        ):
+            manager = MindManager.from_env()
+
+        self.assertEqual(manager.profile.social_interaction_style.preset, "reserved")
+        self.assertIn(
+            "Prefer stillness",
+            manager.profile.social_interaction_style.expressiveness,
         )
 
     def test_rejects_experience_mutable_core_principle(self) -> None:

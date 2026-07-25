@@ -47,6 +47,7 @@ from .mind import (
     MindProfile,
     MindUpdateProposal,
     RobotIdentity,
+    SocialInteractionPreset,
     SocialInteractionStyle,
     default_mind_profile,
 )
@@ -170,6 +171,7 @@ __all__ = [
     "MindProfile",
     "MindUpdateProposal",
     "RobotIdentity",
+    "SocialInteractionPreset",
     "SocialInteractionStyle",
     "default_mind_profile",
     "SessionContext",

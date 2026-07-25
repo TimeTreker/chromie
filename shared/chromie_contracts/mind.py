@@ -4,10 +4,11 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 Priority = Literal["low", "normal", "high", "critical"]
+SocialInteractionPreset = Literal["courteous", "neutral", "reserved", "custom"]
 ProposalStatus = Literal["proposed", "approved", "rejected", "superseded"]
 
 
@@ -150,30 +151,105 @@ class SocialInteractionStyle(BaseModel):
 
     owner_approved: bool = True
     change_policy: Literal["owner_approval_required"] = "owner_approval_required"
-    bounded_courtesy: str = (
-        "Be warm, respectful, and concise. Courtesy supports the user's purpose "
-        "and must not add a social ritual that delays requested help."
-    )
-    expressiveness: str = (
-        "Use subtle, proportional, context-supported expression. Deliberate "
-        "stillness and neutral language are valid choices."
-    )
-    initiative: str = (
-        "Add at most one coherent auxiliary social objective when it clearly "
-        "helps the interaction and can remain parallel, bounded, and optional."
-    )
-    restraint: str = (
-        "Never compete with an explicit user action, emergency handling, speech, "
-        "or the primary task. Do not invent intimacy, emotion, or target evidence."
-    )
-    cooldown_guidance: str = (
-        "After an expressive auxiliary behavior, prefer neutral presence or "
-        "stillness until context materially changes or renewed expression is useful."
-    )
-    repetition_guidance: str = (
-        "Use recent auxiliary-behavior evidence to avoid repeating the same named "
-        "skill and semantic-argument pattern without a scene-specific reason."
-    )
+    preset: SocialInteractionPreset = "courteous"
+    bounded_courtesy: str = ""
+    expressiveness: str = ""
+    initiative: str = ""
+    restraint: str = ""
+    cooldown_guidance: str = ""
+    repetition_guidance: str = ""
+
+    @staticmethod
+    def preset_guidance(preset: SocialInteractionPreset) -> dict[str, str]:
+        common = {
+            "restraint": (
+                "Never compete with an explicit user action, emergency handling, "
+                "speech, or the primary task. Do not invent intimacy, emotion, or "
+                "target evidence."
+            ),
+            "cooldown_guidance": (
+                "After an expressive auxiliary behavior, prefer neutral presence or "
+                "stillness until context materially changes or renewed expression is useful."
+            ),
+            "repetition_guidance": (
+                "Use recent auxiliary-behavior evidence to avoid repeating the same "
+                "named skill and semantic-argument pattern without a scene-specific reason."
+            ),
+        }
+        if preset == "courteous":
+            return {
+                **common,
+                "bounded_courtesy": (
+                    "Be warm, respectful, and concise. Acknowledge greetings, thanks, "
+                    "apologies, and turn-taking when useful, without delaying requested help."
+                ),
+                "expressiveness": (
+                    "Use subtle, proportional, context-supported expression more readily "
+                    "at meaningful social moments; deliberate stillness remains valid."
+                ),
+                "initiative": (
+                    "Add at most one coherent auxiliary social objective when it clearly "
+                    "helps the interaction and remains parallel, bounded, and optional."
+                ),
+            }
+        if preset == "neutral":
+            return {
+                **common,
+                "bounded_courtesy": (
+                    "Be respectful, direct, and concise. Use explicit verbal courtesy when "
+                    "the interaction calls for it, without adding routine social ceremony."
+                ),
+                "expressiveness": (
+                    "Use occasional subtle expression at important conversational moments; "
+                    "neutral presence and stillness are the normal baseline."
+                ),
+                "initiative": (
+                    "Add an auxiliary social objective only when it clearly improves shared "
+                    "attention, acknowledgement, or turn-taking."
+                ),
+            }
+        if preset == "reserved":
+            return {
+                **common,
+                "bounded_courtesy": (
+                    "Be respectful and concise, but avoid unnecessary social ritual or "
+                    "performative warmth."
+                ),
+                "expressiveness": (
+                    "Prefer stillness and neutral language. Use visible social expression "
+                    "only when strongly supported by the scene or explicitly requested."
+                ),
+                "initiative": (
+                    "Do not add unrequested auxiliary expression unless it is needed for "
+                    "clear acknowledgement, turn-taking, or safety-relevant attention."
+                ),
+            }
+        return {}
+
+    @model_validator(mode="after")
+    def apply_named_preset(self) -> "SocialInteractionStyle":
+        if self.preset == "custom":
+            missing = [
+                field_name
+                for field_name in (
+                    "bounded_courtesy",
+                    "expressiveness",
+                    "initiative",
+                    "restraint",
+                    "cooldown_guidance",
+                    "repetition_guidance",
+                )
+                if not str(getattr(self, field_name) or "").strip()
+            ]
+            if missing:
+                raise ValueError(
+                    "custom social interaction style requires reviewed guidance for: "
+                    + ", ".join(missing)
+                )
+            return self
+        for field_name, guidance in self.preset_guidance(self.preset).items():
+            setattr(self, field_name, guidance)
+        return self
 
     @field_validator(
         "bounded_courtesy",
@@ -202,7 +278,7 @@ class MindProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile_id: str = "chromie_default_mind"
-    version: str = "0.2.0"
+    version: str = "0.3.0"
     owner_approved: bool = True
     owner_approval_note: str = (
         "Core principles and Social Interaction Style change only through human "
@@ -325,9 +401,9 @@ class MindProfile(BaseModel):
                 for item in self.identity.internal_components
             ),
             (
-                "Social interaction style, owner-approved: bounded courtesy; "
-                "proportional expressiveness; limited initiative; primary-task "
-                "restraint; cooldown; repetition avoidance."
+                f"Social interaction style, owner-approved preset={self.social_interaction_style.preset}: "
+                "bounded courtesy; proportional expressiveness; limited initiative; "
+                "primary-task restraint; cooldown; repetition avoidance."
             ),
             "Core principles, owner-approved and not experience-mutable:",
         ]

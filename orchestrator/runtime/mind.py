@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from shared.chromie_contracts.mind import MindProfile, default_mind_profile
+from shared.chromie_contracts.mind import MindProfile, SocialInteractionStyle, default_mind_profile
 
 
 class MindManager:
@@ -29,6 +29,15 @@ class MindManager:
         if profile_path and not profile_path.is_absolute() and project_root is not None:
             profile_path = project_root / profile_path
         profile = cls._load_profile(profile_path) if profile_path else default_mind_profile()
+        social_style_preset = os.getenv("ORCH_SOCIAL_INTERACTION_STYLE_PRESET", "").strip().lower()
+        if social_style_preset:
+            profile = profile.model_copy(
+                update={
+                    "social_interaction_style": SocialInteractionStyle(
+                        preset=social_style_preset
+                    )
+                }
+            )
         return cls(
             profile,
             profile_path=profile_path,

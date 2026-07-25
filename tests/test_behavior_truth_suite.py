@@ -19,7 +19,7 @@ class BehaviorTruthSuiteTests(unittest.IsolatedAsyncioTestCase):
             "adapter": 4,
             "router": 24,
             "router_dialogue": 2,
-            "interaction": 21,
+            "interaction": 29,
             "dialogue": 319,
         }
 

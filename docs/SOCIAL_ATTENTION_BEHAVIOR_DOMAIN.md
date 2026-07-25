@@ -67,7 +67,7 @@ continuous tendencies such as:
   distracting, or artificial;
 - cooldown and repetition limits that keep behavior natural.
 
-Named presets may be offered as profile authoring conveniences:
+Named presets are available as profile-authoring and ordinary deployment conveniences through `ORCH_SOCIAL_INTERACTION_STYLE_PRESET`:
 
 | Style | Typical behavior |
 |---|---|
@@ -79,10 +79,7 @@ These are personality tendencies, not deterministic gesture tables. Even a
 courteous profile may choose `none`, and an urgent stop or safety turn must
 suppress decorative expression.
 
-The shared `MindProfile.social_interaction_style` contract now carries bounded
-courtesy, expressiveness, initiative, restraint, cooldown, and repetition
-guidance. It remains owner-approved configuration rather than
-experience-auto-mutable behavior.
+The shared `MindProfile.social_interaction_style` contract carries the selected preset plus bounded courtesy, expressiveness, initiative, restraint, cooldown, and repetition guidance. It remains owner-approved/operator-selected configuration rather than experience-auto-mutable behavior. A full reviewed profile may use `preset=custom`; ordinary deployments may select `courteous`, `neutral`, or `reserved`.
 
 ## Two interaction roles
 

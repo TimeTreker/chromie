@@ -1,6 +1,3 @@
-- Completed the Social Attention architecture closure audit: stale calibration fallback language is removed and offline guards now enforce semantic-only target evidence, owner-approved MindProfiles, and the `on` health default.
-- Aligned active MindProfile approval enforcement and Agent health defaults with the owner-approved, Social Attention-on runtime contract.
-- Moved all Social Attention calibration, body-coordinate, joint-target, and controller-parameter ownership below the Chromie boundary; model-facing target evidence is semantic only.
 # Changelog
 
 - Removed legacy CapabilityAgent semantic skill substitution and argument reinterpretation; compatibility planning now preserves the exact model-selected named skill and schema-valid arguments.
@@ -11,7 +8,18 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Social Attention closure and regression matrix
+
+- Added owner/operator-selectable `courteous`, `neutral`, and `reserved` Social Interaction Style presets, with reviewed `custom` guidance available through a full MindProfile JSON.
+- Added `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` as the ordinary deployment input while preserving owner approval, primary-task priority, and provider-owned safety.
+- Added eight deterministic end-to-end Social Attention regression scenarios covering greeting, thanks, neutral factual turns, reserved stillness, cooldown/repetition, impatient users, explicit no-gesture requests, and `report_only` non-execution.
+- Corrected stale mind documentation that still described Social Interaction Style as unimplemented, and extended the semantic-authority audit to guard the preset contract and regression matrix.
+
 ### Backend-neutral ability and confirmation boundary
+
+- Completed the Social Attention architecture closure audit: stale calibration fallback language is removed and offline guards now enforce semantic-only target evidence, owner-approved MindProfiles, and the `on` health default.
+- Aligned active MindProfile approval enforcement and Agent health defaults with the owner-approved, Social Attention-on runtime contract.
+- Moved all Social Attention calibration, body-coordinate, joint-target, and controller-parameter ownership below the Chromie boundary; model-facing target evidence is semantic only.
 
 - Removed backend-scoped states from Chromie's static ability
   ontology. Provider-backed body skills are no longer activated from Host dry-run,

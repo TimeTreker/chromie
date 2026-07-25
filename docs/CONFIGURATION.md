@@ -416,6 +416,7 @@ conversation.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_MIND_PROFILE_PATH` | Optional JSON mind profile. When unset, Chromie uses the owner-approved default in `shared/chromie_contracts/mind.py`. Relative paths resolve from the project root. |
+| `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` | Optional owner/operator-selected preset: `courteous`, `neutral`, or `reserved`. It overrides only `MindProfile.social_interaction_style`; use `ORCH_MIND_PROFILE_PATH` with `preset=custom` for reviewed custom guidance. |
 | `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600`; maximum prompt-summary size attached to Router and Agent context. |
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1`; append interaction outcomes to the local experience journal. |
 | `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl`; relative paths resolve from the project root. |

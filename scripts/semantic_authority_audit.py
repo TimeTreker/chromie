@@ -217,6 +217,31 @@ def audit() -> dict[str, Any]:
     mind_contract = _read("shared/chromie_contracts/mind.py")
     if "active mind profile must be owner-approved" not in mind_contract:
         errors.append("MindProfile does not enforce owner approval")
+    for required in (
+        'preset: SocialInteractionPreset = "courteous"',
+        'ORCH_SOCIAL_INTERACTION_STYLE_PRESET',
+        'custom social interaction style requires reviewed guidance',
+    ):
+        if required not in mind_contract and required != 'ORCH_SOCIAL_INTERACTION_STYLE_PRESET':
+            errors.append(f"Social Interaction Style contract missing: {required}")
+    mind_runtime = _read("orchestrator/runtime/mind.py")
+    if 'ORCH_SOCIAL_INTERACTION_STYLE_PRESET' not in mind_runtime:
+        errors.append("Mind runtime does not expose the operator style preset")
+    social_style_scenarios = list((ROOT / "scenarios" / "interaction").glob("social_attention_*"))
+    required_style_cases = {
+        "social_attention_courteous_greeting.json",
+        "social_attention_neutral_information.json",
+        "social_attention_reserved_greeting.json",
+        "social_attention_cooldown_suppresses_repeat.json",
+        "social_attention_user_requests_stillness.json",
+    }
+    present_style_cases = {path.name for path in social_style_scenarios}
+    missing_style_cases = sorted(required_style_cases - present_style_cases)
+    if missing_style_cases:
+        errors.append(
+            "Social Attention style regression matrix is incomplete: "
+            + ", ".join(missing_style_cases)
+        )
 
     abilities = _read("orchestrator/runtime/abilities.py")
     legacy_thinking_ability = "social.thinking" + "_pose"

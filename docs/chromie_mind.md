@@ -38,42 +38,36 @@ Chromie's brain context has these layers:
 | Experience journal | Durable local JSONL | Appended | Evidence for future tuning and tests |
 | Update proposals | Durable local JSONL | Proposed only | Human-reviewed changes to strategies, goals, prompts, or tests |
 
-## Accepted Social Interaction Extension
+## Social Interaction Style configuration
 
-The next mind-profile extension will carry Chromie's owner-approved Social
-Attention tendencies. Courtesy, expressiveness, initiative, restraint, and
-repetition or cooldown guidance belong here because they describe personality
-and interaction style. They do not describe whether the attached body is
-simulated or physical.
+`MindProfile.social_interaction_style` is implemented and supplied to Response
+Composer on every eligible turn. It carries owner-approved courtesy,
+expressiveness, initiative, restraint, cooldown, and repetition guidance. These
+fields describe personality and interaction style; they never describe whether
+the attached body is simulated or physical.
 
-A courteous profile may use more acknowledgement, gaze, nodding, or other
-context-sensitive expression; a neutral profile uses fewer cues; a reserved
-profile normally prefers stillness. These are model-facing tendencies rather
-than fixed gesture frequencies, so every turn may still choose no auxiliary
-behavior. Urgent stop, emergency, and primary task requirements remain stronger
-than personality expression.
+Ordinary deployments can select a reviewed preset without authoring a complete
+mind profile:
 
-The current shared contract does not yet contain these fields. Their accepted
-implementation plan and evidence criteria are maintained in
-[Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
+```bash
+ORCH_SOCIAL_INTERACTION_STYLE_PRESET=courteous  # or neutral / reserved
+```
+
+- `courteous` more readily acknowledges greetings, thanks, apologies, and
+  meaningful turn-taking with subtle optional expression;
+- `neutral` uses expression at important moments while keeping stillness as the
+  normal baseline;
+- `reserved` normally prefers stillness and concise respectful language.
+
+Presets remain semantic tendencies, not gesture tables. Every turn may still
+choose `none`, and emergency handling, explicit actions, speech, and the primary
+task always have higher priority. For a reviewed custom style, provide a JSON
+profile through `ORCH_MIND_PROFILE_PATH` and set
+`social_interaction_style.preset` to `custom` together with all six guidance
+fields.
+
 Soridormi continues to own backend selection, body-specific control,
-calibration, and safety.
-
-The current default profile lives in
-[`shared/chromie_contracts/mind.py`](../shared/chromie_contracts/mind.py).
-Operators can provide a JSON replacement with `ORCH_MIND_PROFILE_PATH`, but the
-schema rejects core principles that are marked experience-mutable or do not
-require owner approval. The owner-approved profile may retain implementation and persona metadata, but the prompt-facing self model exposes one stable speaking, perceiving, acting, and body-owning entity named Chromie. Its social presentation foregrounds name, personality, relationship, and current context; system category, embodiment category, age labels, and internal architecture remain background context and are not ordinary self-introduction material. Language and reasoning models appear as internal components with bounded roles rather than alternate speakers or body owners. This keeps conversation natural without falsely asserting that Chromie is human. Conversation, Router, DeepThinking, and
-direct-fallback prompts use this same ontology together with the supplied
-runtime capability catalog and provider state. The model therefore answers
-self-description and capability questions from general context; there is no
-identity-question branch, fixed identity reply, or phrase/regex mapping for
-normal capability interpretation. The default core principles also make
-generalization ability explicit: normal robot behavior should be driven by LLM
-meaning-understanding, bounded context, capability descriptions, schemas, and
-task memory rather than brittle phrase rules. Phrase and pattern rules remain
-reserved for the fast deterministic emergency/noise filter and other explicit
-operational safety boundaries.
+calibration, limits, stop, and recovery.
 
 ## Prompt Context Groups
 

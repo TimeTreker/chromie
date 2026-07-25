@@ -142,6 +142,7 @@ class SocialInteractionStyleTests(unittest.TestCase):
 
         style = item.context["social_interaction_style"]
         self.assertTrue(style["owner_approved"])
+        self.assertEqual(style["preset"], "courteous")
         self.assertIn("explicit user action", style["restraint"])
         self.assertEqual(len(item.context["recent_auxiliary_behavior_evidence"]), 12)
         self.assertEqual(
