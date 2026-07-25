@@ -147,6 +147,14 @@ timeouts, provider degradation, multi-user context, and resource pressure.
 Stress benchmarks report rates and distributions instead of pretending one run
 proves stability.
 
+The implemented workload layer reuses unchanged normalized scenarios and Phase 5
+E2E evidence profiles. It records sample/session counts, seed, concurrency,
+participant assignment, descriptive harness conditions, model/Prompt/MindProfile
+and revision identity, evidence completeness, latency, violation families, and
+session drift. Workload metadata has no production Runtime authority. No target
+gesture rate, turn-count action rule, forced schedule, or automatic model winner
+is defined.
+
 ### 4.5 Regression benchmarks
 
 Every confirmed historical behavior bug receives a retained scenario at the

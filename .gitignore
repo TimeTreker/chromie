@@ -32,3 +32,8 @@ htmlcov/
 .DS_Store
 .vscode/
 .idea/
+
+# Generated Benchmark inventory, reports, and local execution artifacts
+/benchmarks/manifests/existing_scenarios.json
+/benchmarks/reports/*
+!/benchmarks/reports/.gitkeep

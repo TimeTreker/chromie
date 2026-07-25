@@ -18,16 +18,12 @@
 - Model-facing Social Attention contracts now expose semantic target identity/direction only; backend identity and provider calibration values remain inside Soridormi.
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-25
-**Current focus:** Begin the reviewed Social Attention benchmark expansion after
-closing the Router-removal and embodiment-independence architecture audits. The
-Benchmark must measure model behavior without introducing phrase-, scenario-, or
-fixed-action policy into the Host. Historical notes below retain their original
-terminology and evidence provenance. The completed embodiment work strips backend
-identity and calibrated body arguments from
-model-facing Chromie contracts. Fast Planner
-latency qualification and retained TTS evidence remain open engineering tracks
-after this architecture correction.
+**Status refresh date:** 2026-07-26
+**Current focus:** Begin Benchmark Phase 7 scenario migration and legacy cleanup.
+The reviewed Social Attention dataset, E2E evidence profiles, and six
+stress/distribution workload families are implemented. Preserve stable scenario
+IDs, source provenance, existing commands, and evidence parity; do not add
+Runtime behavior policy while reorganizing evaluation assets.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -46,26 +42,17 @@ spoken budgets before one concise answer is accepted. Weather is the first
 built-in caller; canonical Skill Runtime observations use the same post-execution
 path.
 
-## Next topic: Chromie Benchmark Suite Phase 1
+## Next topic: Chromie Benchmark Suite Phase 7
 
-Implement only the benchmark foundation described in
-`docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md`:
+Migrate or index maintained scenario sources into the target Benchmark hierarchy
+only after proving normalized count, ID, adapter, and evidence parity. Keep old
+entrypoints until explicit removal gates exist. Do not mix migration with Runtime
+behavior or Prompt changes.
 
-1. add `benchmarks/` skeleton and versioned schemas;
-2. inventory and classify existing scenarios without moving them;
-3. add deterministic validation and coverage reports;
-4. add tests and a CI-safe entrypoint;
-5. preserve all existing runners and evidence claims.
-
-Do not add phrase-specific behavior, benchmark-ID branches, fixed gesture
-mappings, or runtime quotas. Model-dependent cognition stays in LLM prompts and
-bounded context; the Host validates contracts, safety, authorization, and
-observable evidence.
-
-Recommended commit for the next patch:
+Recommended commit:
 
 ```text
-Add benchmark manifest and scenario inventory
+Migrate maintained scenarios into the benchmark suite
 ```
 
 ## Resume point

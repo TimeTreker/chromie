@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/stress-suite-result-v1.json",
+  "title": "Chromie Stress Suite Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run",
+    "workload",
+    "evidence_profile",
+    "summary",
+    "distribution",
+    "qualification",
+    "results"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run": {"type": "object"},
+    "workload": {"type": "object"},
+    "evidence_profile": {"type": "object"},
+    "summary": {"type": "object"},
+    "distribution": {"type": "object"},
+    "qualification": {
+      "type": "object",
+      "required": [
+        "release_qualified",
+        "human_approval_required",
+        "metrics_are_observational",
+        "runtime_policy_authority",
+        "state"
+      ],
+      "properties": {
+        "release_qualified": {"const": false},
+        "human_approval_required": {"const": true},
+        "metrics_are_observational": {"const": true},
+        "runtime_policy_authority": {"const": false},
+        "state": {"type": "string"}
+      }
+    },
+    "results": {"type": "array"}
+  }
+}

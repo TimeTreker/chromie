@@ -58,9 +58,21 @@ Completed end-to-end execution and evidence-profile milestone:
   promoting incomplete evidence;
 - automatic qualification reports remain explicitly non-release-qualified.
 
-Next active milestone: Phase 6 stress and behavior-distribution evaluation. Add
-repeated-session, concurrency, interruption, timeout, and degraded-provider runs
-with explicit sample sizes and conditions, without introducing runtime quotas.
+Completed stress and behavior-distribution milestone:
+
+- six versioned workloads cover long sessions, repetition/cooldown, interruption,
+  concurrency, provider degradation/recovery, and synthetic multi-user isolation;
+- seeded sample plans declare session count, concurrency, participants, E2E
+  evidence profile, and run conditions without changing semantic scenarios;
+- reports expose sample counts, confidence intervals, evidence/status, primary
+  success, behavior distributions, duplicate cues, explicit violation families,
+  latency p50/p95, and session drift;
+- comparison shows model, Prompt, MindProfile, provider, and code deltas without
+  selecting a winner or creating Runtime quotas.
+
+Next active milestone: Phase 7 scenario migration and legacy cleanup. Preserve
+stable IDs, provenance, existing entrypoints, and evidence parity while moving
+maintained sources toward the target Benchmark hierarchy.
 
 ## Planning model
 

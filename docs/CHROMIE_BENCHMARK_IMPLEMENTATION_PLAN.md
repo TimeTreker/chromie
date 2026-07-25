@@ -239,6 +239,21 @@ Exit criteria:
 - duplicate/cooldown, stillness, safety, and leakage violations remain zero;
 - behavior-frequency changes are visible without prescribing one gesture rate.
 
+Implemented evidence:
+
+- six versioned workload families covering long sessions, repetition/cooldown,
+  interruption, concurrency, provider degradation/recovery, and synthetic
+  multi-user context isolation;
+- deterministic seeded sampling with explicit session count, concurrency,
+  participant assignment, E2E evidence profile, and descriptive conditions;
+- distribution reports for status, primary success, auxiliary decisions, semantic
+  behaviors, duplicate cues, explicit violation families, evidence, latency,
+  session drift, and 95% Wilson intervals with denominators;
+- compatible model/Prompt/MindProfile/provider/code comparisons that expose
+  absolute metrics and baseline deltas without selecting a winner;
+- manifest guards against Runtime policy, Prompt overrides, gesture quotas,
+  target rates, forced-action schedules, and automatic release qualification.
+
 Suggested commit:
 
 ```text
@@ -291,8 +306,7 @@ Connect experience mining to reviewed benchmark authoring
 
 ## Recommended immediate next patch
 
-Implement Phase 6 only: add repeated-session, interruption, timeout, degraded
-provider, and distribution evaluation on top of retained Phase 5 E2E reports.
-Make sample size, run conditions, model/prompt/profile revisions, and confidence
-explicit. Do not turn observed behavior frequencies into runtime quotas or forced
-action schedules.
+Implement Phase 7 only: migrate or index maintained legacy scenarios into the
+target Benchmark hierarchy after proving adapter and count parity. Preserve
+stable IDs, provenance, old entrypoints, and evidence claims until compatibility
+removal gates are explicit. Do not combine migration with new Runtime behavior.

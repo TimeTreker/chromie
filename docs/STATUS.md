@@ -13,10 +13,11 @@
 **Development identity:** `development`; no release version or publication target is planned.
 **Maintained execution scope:** Soridormi MuJoCo `sim`; retained evidence below records the exact revision that produced each bundle.
 **Status refresh date:** 2026-07-25
-**Current focus:** **Expand the reviewed Social Attention benchmark dataset on
-top of the closed Cognitive Gateway and Goal-Driven Cognitive Core architecture.
-Preserve acceptable behavior regions, deterministic safety invariants, provider-
-owned embodiment adaptation, and model-owned social judgment.**
+**Current focus:** **Begin Benchmark Phase 7 scenario migration and legacy
+cleanup after completing reviewed Social Attention content, E2E evidence profiles,
+and observational stress/distribution evaluation. Preserve stable IDs, source
+provenance, existing entrypoints, and evidence claims while avoiding Runtime
+behavior changes.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
@@ -30,9 +31,12 @@ The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
 The final Router-removal closure audit passes the maintained `./scripts/run_tests.sh`
-entrypoint with 1,357 primary tests plus 20 legacy Agent tests, the 399-scenario
-Benchmark inventory with 27 Benchmark tests, documentation validation, Router
-removal guards, Compose parsing, Python compilation, and diff-hygiene checks.
+entrypoint with 1,357 primary tests plus 20 legacy Agent tests. The Benchmark
+foundation now inventories 527 entries, normalizes 526 semantic scenarios,
+retains 128 reviewed Social Attention cases, and adds E2E evidence profiles plus
+six stress workload families. Benchmark validation, documentation validation,
+Router removal guards, Compose parsing, Python compilation, and diff-hygiene
+checks remain maintained gates.
 
 The current branch closes two July 24 live-conversation regressions. With no
 active Goals, the constrained Goal Segmentation schema now requires a social

@@ -240,3 +240,45 @@ failure, or malformed final output retains available partial evidence and
 artifacts instead of hanging or silently discarding the trace. Automatic
 reports never claim final release qualification. See
 [`docs/E2E_BENCHMARK_EXECUTION.md`](../docs/E2E_BENCHMARK_EXECUTION.md).
+
+
+## Stress and behavior-distribution evaluation
+
+`stress/` repeats unchanged normalized scenarios under six versioned workloads:
+long session, repetition/cooldown, interruption, concurrency, provider
+degradation, and synthetic multi-user context isolation. Each workload reuses a
+Phase 5 E2E evidence profile and declares sample count, sessions, concurrency,
+seed, selectors, descriptive conditions, and observational dimensions.
+
+Validate workloads with:
+
+```bash
+python -m benchmarks.stress.validate --check
+```
+
+Run one workload with:
+
+```bash
+python -m benchmarks.stress.run \
+  --normalized benchmarks/reports/normalized_scenarios.json \
+  --workload long_session_social_attention \
+  --command "python scripts/my_e2e_adapter.py" \
+  --model local-model \
+  --prompt-revision prompt-v1 \
+  --mind-profile courteous
+```
+
+Compare compatible reports with:
+
+```bash
+python -m benchmarks.stress.compare \
+  --input benchmarks/reports/model-a.json \
+  --input benchmarks/reports/model-b.json
+```
+
+Reports include explicit denominators, evidence/status distributions, primary
+task success, auxiliary and semantic behavior distributions, duplicate-cue
+observations, invariant/forbidden-behavior families, latency p50/p95, session
+drift, and 95% Wilson intervals. They do not define a target gesture frequency,
+select a model winner, or carry Runtime policy authority. See
+[`docs/STRESS_BENCHMARK_EVALUATION.md`](../docs/STRESS_BENCHMARK_EVALUATION.md).

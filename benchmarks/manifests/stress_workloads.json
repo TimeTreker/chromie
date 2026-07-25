@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "runtime_policy_authority": false,
+  "metrics_are_observational": true,
+  "release_qualification": "human_approval_required",
+  "comparison_dimensions": [
+    "model",
+    "prompt_revision",
+    "mind_profile",
+    "provider_revision",
+    "code_revision",
+    "evidence_profile"
+  ],
+  "workloads": [
+    {
+      "id": "long_session_social_attention",
+      "kind": "long_session",
+      "evidence_profile": "live_service_text",
+      "sample_count": 200,
+      "session_count": 1,
+      "concurrency": 1,
+      "seed": 1601,
+      "selector": {
+        "datasets": ["social_attention"]
+      },
+      "sequence": {
+        "strategy": "seeded_shuffle",
+        "repeat_block_size": 1
+      },
+      "participants": [],
+      "conditions": {
+        "session_turn_budget": 200,
+        "intended_duration_minutes": 120,
+        "context_retention": "continuous"
+      },
+      "observations": [
+        "sample_count",
+        "status_distribution",
+        "primary_task_success",
+        "auxiliary_decision_distribution",
+        "semantic_behavior_distribution",
+        "duplicate_auxiliary_rate",
+        "cooldown_violation_rate",
+        "stillness_violation_rate",
+        "safety_violation_rate",
+        "execution_leakage_rate",
+        "latency_distribution",
+        "evidence_completeness",
+        "session_drift"
+      ],
+      "description": "Observe response, evidence, latency, and Social Attention drift across one long continuous session."
+    },
+    {
+      "id": "repetition_cooldown_pressure",
+      "kind": "repetition_cooldown",
+      "evidence_profile": "live_service_text",
+      "sample_count": 96,
+      "session_count": 1,
+      "concurrency": 1,
+      "seed": 1602,
+      "selector": {
+        "datasets": ["social_attention"],
+        "cohorts": ["repetition_cooldown", "greetings_farewells"]
+      },
+      "sequence": {
+        "strategy": "repeat_each",
+        "repeat_block_size": 3
+      },
+      "participants": [],
+      "conditions": {
+        "cooldown_pressure": "rapid_repetition",
+        "semantic_variation": "bounded"
+      },
+      "observations": [
+        "sample_count",
+        "status_distribution",
+        "primary_task_success",
+        "auxiliary_decision_distribution",
+        "semantic_behavior_distribution",
+        "duplicate_auxiliary_rate",
+        "cooldown_violation_rate",
+        "latency_distribution",
+        "evidence_completeness",
+        "session_drift"
+      ],
+      "description": "Repeat greeting and acknowledgement opportunities to expose duplicate cues and cooldown drift without prescribing a gesture frequency."
+    },
+    {
+      "id": "interruption_burst",
+      "kind": "interruption",
+      "evidence_profile": "live_service_text",
+      "sample_count": 64,
+      "session_count": 4,
+      "concurrency": 1,
+      "seed": 1603,
+      "selector": {
+        "datasets": ["social_attention"],
+        "cohorts": ["interruption_stop", "multi_turn"]
+      },
+      "sequence": {
+        "strategy": "seeded_shuffle",
+        "repeat_block_size": 1
+      },
+      "participants": [],
+      "conditions": {
+        "interruption_density": "high",
+        "foreground_work_state": "mixed"
+      },
+      "observations": [
+        "sample_count",
+        "status_distribution",
+        "primary_task_success",
+        "auxiliary_decision_distribution",
+        "semantic_behavior_distribution",
+        "stillness_violation_rate",
+        "safety_violation_rate",
+        "execution_leakage_rate",
+        "latency_distribution",
+        "evidence_completeness"
+      ],
+      "description": "Exercise stop, cancel, barge-in, and topic replacement while preserving deterministic control priority and correlated evidence."
+    },
+    {
+      "id": "concurrent_multi_goal",
+      "kind": "concurrency",
+      "evidence_profile": "live_service_text",
+      "sample_count": 80,
+      "session_count": 4,
+      "concurrency": 4,
+      "seed": 1604,
+      "selector": {
+        "datasets": ["social_attention"],
+        "cohorts": ["explicit_robot_actions", "tool_use", "multi_turn"]
+      },
+      "sequence": {
+        "strategy": "seeded_shuffle",
+        "repeat_block_size": 1
+      },
+      "participants": [],
+      "conditions": {
+        "parallel_sessions": 4,
+        "foreground_work": "tool_and_embodied_requests"
+      },
+      "observations": [
+        "sample_count",
+        "status_distribution",
+        "primary_task_success",
+        "auxiliary_decision_distribution",
+        "semantic_behavior_distribution",
+        "duplicate_auxiliary_rate",
+        "safety_violation_rate",
+        "execution_leakage_rate",
+        "latency_distribution",
+        "evidence_completeness",
+        "session_drift"
+      ],
+      "description": "Run independent sessions concurrently to observe goal isolation, stale output, resource conflicts, and latency under load."
+    },
+    {
+      "id": "provider_degradation_recovery",
+      "kind": "provider_degradation",
+      "evidence_profile": "live_service_text",
+      "sample_count": 48,
+      "session_count": 4,
+      "concurrency": 2,
+      "seed": 1605,
+      "selector": {
+        "datasets": ["social_attention"],
+        "cohorts": ["safety_conflict", "tool_use"]
+      },
+      "sequence": {
+        "strategy": "round_robin",
+        "repeat_block_size": 1
+      },
+      "participants": [],
+      "conditions": {
+        "provider_availability_pattern": [
+          "available",
+          "timeout",
+          "unavailable",
+          "recovered"
+        ],
+        "fault_injection_owner": "benchmark_adapter"
+      },
+      "observations": [
+        "sample_count",
+        "status_distribution",
+        "primary_task_success",
+        "auxiliary_decision_distribution",
+        "semantic_behavior_distribution",
+        "safety_violation_rate",
+        "execution_leakage_rate",
+        "latency_distribution",
+        "evidence_completeness",
+        "session_drift"
+      ],
+      "description": "Let the benchmark adapter vary provider availability and observe truthful fallback, recovery, evidence, and primary-task continuity."
+    },
+    {
+      "id": "multi_user_context_isolation",
+      "kind": "multi_user",
+      "evidence_profile": "live_service_text",
+      "sample_count": 72,
+      "session_count": 4,
+      "concurrency": 2,
+      "seed": 1606,
+      "selector": {
+        "datasets": ["social_attention"],
+        "cohorts": ["multi_turn", "user_preferences"]
+      },
+      "sequence": {
+        "strategy": "seeded_shuffle",
+        "repeat_block_size": 1
+      },
+      "participants": ["speaker_a", "speaker_b"],
+      "conditions": {
+        "participant_assignment": "alternating",
+        "identity_context": "isolated_by_participant"
+      },
+      "observations": [
+        "sample_count",
+        "status_distribution",
+        "primary_task_success",
+        "auxiliary_decision_distribution",
+        "semantic_behavior_distribution",
+        "participant_isolation_violation_rate",
+        "latency_distribution",
+        "evidence_completeness",
+        "session_drift"
+      ],
+      "description": "Alternate two synthetic participant identities and observe preference, context, and personalization isolation without claiming speaker recognition support."
+    }
+  ]
+}

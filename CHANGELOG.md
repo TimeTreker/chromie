@@ -8,6 +8,12 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Stress and behavior-distribution Benchmark evaluation
+
+- Added six versioned workload families for long sessions, repetition/cooldown, interruption, concurrency, provider degradation, and synthetic multi-user context isolation.
+- Added deterministic seeded sampling, E2E evidence-profile reuse, bounded concurrent execution, explicit run conditions, partial-evidence preservation, and observational distribution reports with sample counts and 95% intervals.
+- Added compatible model/Prompt/MindProfile/provider/code comparison without selecting a winner, auto-qualifying a release, prescribing gesture rates, or adding production Runtime behavior rules.
+
 ### End-to-end Benchmark execution and evidence profiles
 
 - Added six explicit E2E evidence profiles spanning replay, live model, deployed text, virtual audio, MuJoCo simulation, and supervised physical execution without changing semantic scenario contracts.
