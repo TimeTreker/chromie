@@ -34,18 +34,23 @@ The next new development topic is the staged Benchmark Suite described in
 [docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md](docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md).
 
 Completed foundation: manifest/inventory, common scenario/result contracts,
-module/integration runners, and deployment-neutral runtime component adapters.
-Before expanding the Social Attention dataset, align those adapters with the
-settled Cognitive Gateway / Goal-Driven Cognitive Core architecture.
+module/integration runners, deployment-neutral runtime component adapters, and
+the first reviewed Social Attention dataset.
 
-Exit criteria:
+Completed Social Attention dataset milestone:
 
-- Cognitive Gateway is the first-class ingress benchmark component;
-- semantic goal interpretation and planning remain Goal-Driven Cognitive Core concerns;
-- legacy `scenarios/goal_interpretation/` assets are retained only as compatibility regressions;
-- manifests, examples, environment variables, tests, and reports do not present a
-  generic Goal Interpretation as the current architecture;
-- no production Runtime behavior or compatibility wire contract changes.
+- 128 reviewed cases across 16 non-duplicate everyday, safety, mode, style,
+  bilingual, ASR-ambiguity, and historical-regression cohorts;
+- declared minimum coverage for style, mode, politeness, and language axes;
+- acceptable behavior regions always retain `none` as valid;
+- fixed gesture expectations, backend/calibration leakage, off/report-only
+  execution leakage, stillness violations, and near-duplicate inputs fail closed;
+- dataset validation, common-contract normalization, inventory, and focused tests
+  run through the CI-safe Benchmark entrypoint.
+
+Next active milestone: Phase 5 end-to-end execution and evidence profiles. Reuse
+the same semantic scenarios across replay, live-model, live-service, simulator,
+and later physical evidence without adding runtime quotas or fixed behavior rules.
 
 ## Planning model
 

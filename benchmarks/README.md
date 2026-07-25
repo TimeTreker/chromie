@@ -180,3 +180,32 @@ for source compatibility and historical comparison. Inventory classifies them as
 `goal_interpretation` and `cognitive_core_dialogue` datasets; their directory names define
 the current architecture. New benchmark component profiles must not reintroduce a
 removed first-class Router boundary.
+
+## Reviewed Social Attention dataset v1
+
+`datasets/social_attention/cases.json` is the first comprehensive reviewed
+behavior dataset. It contains 128 integration-layer cases across 16 cohorts,
+with explicit coverage for style, mode, politeness, language, recent auxiliary
+evidence, stillness, unavailable capabilities, safety conflicts, and historical
+regressions.
+
+The dataset is validated against `manifests/social_attention_v1.json`. Every case:
+
+- expresses acceptable semantic behavior regions rather than one required gesture;
+- keeps `none` as a valid auxiliary decision;
+- separates deterministic invariants from qualitative review;
+- uses backend-neutral `social_attention.*` capability labels;
+- records LLM-generated/reviewed provenance without claiming release qualification;
+- requires human approval and evidence before release qualification.
+
+Validate it with:
+
+```bash
+python -m benchmarks.datasets.social_attention.validate --check
+```
+
+Generate its deterministic coverage report with:
+
+```bash
+python -m benchmarks.datasets.social_attention.validate
+```

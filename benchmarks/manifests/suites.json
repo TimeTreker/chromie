@@ -129,6 +129,19 @@
       ]
     },
     {
+      "name": "social_attention_v1",
+      "path": "benchmarks/datasets/social_attention",
+      "glob": "cases.json",
+      "layer": "integration",
+      "datasets": [
+        "social_attention"
+      ],
+      "evidence_levels": [
+        "static",
+        "live_model"
+      ]
+    },
+    {
       "name": "general_ability",
       "path": "scripts/general_ability_acceptance.py",
       "kind": "acceptance_entrypoint",

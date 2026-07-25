@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "dataset_id": "chromie.social_attention.v1",
+  "source_path": "benchmarks/datasets/social_attention/cases.json",
+  "expected_case_count": 128,
+  "minimum_case_count": 100,
+  "maximum_case_count": 150,
+  "authoring_policy": {
+    "allowed_origins": ["llm_generated", "manually_authored", "mined_regression"],
+    "required_review_status": "reviewed",
+    "required_release_qualification": "human_approval_required",
+    "runtime_policy_authority": false
+  },
+  "allowed_axes": {
+    "cohort": [
+      "greetings_farewells",
+      "daily_conversation",
+      "question_answering",
+      "tool_use",
+      "explicit_robot_actions",
+      "multi_turn",
+      "interruption_stop",
+      "emotion_empathy",
+      "style_matrix",
+      "user_preferences",
+      "repetition_cooldown",
+      "modes",
+      "safety_conflict",
+      "bilingual",
+      "asr_ambiguity",
+      "historical_regression"
+    ],
+    "style": ["courteous", "neutral", "reserved", "custom"],
+    "mode": ["off", "report_only", "on"],
+    "politeness": ["high", "normal", "low", "hostile", "unknown"],
+    "language": ["en-US", "zh-CN", "mixed", "unknown"]
+  },
+  "minimum_coverage": {
+    "cohort": {
+      "greetings_farewells": 8,
+      "daily_conversation": 8,
+      "question_answering": 8,
+      "tool_use": 8,
+      "explicit_robot_actions": 8,
+      "multi_turn": 8,
+      "interruption_stop": 8,
+      "emotion_empathy": 8,
+      "style_matrix": 8,
+      "user_preferences": 8,
+      "repetition_cooldown": 8,
+      "modes": 8,
+      "safety_conflict": 8,
+      "bilingual": 8,
+      "asr_ambiguity": 8,
+      "historical_regression": 8
+    },
+    "style": {
+      "courteous": 24,
+      "neutral": 32,
+      "reserved": 24,
+      "custom": 8
+    },
+    "mode": {
+      "off": 8,
+      "report_only": 8,
+      "on": 100
+    },
+    "politeness": {
+      "high": 8,
+      "normal": 64,
+      "low": 4,
+      "hostile": 3,
+      "unknown": 8
+    },
+    "language": {
+      "en-US": 100,
+      "zh-CN": 5,
+      "mixed": 4,
+      "unknown": 1
+    }
+  },
+  "required_global_invariants": [
+    "primary_response_not_delayed",
+    "explicit_user_request_has_priority",
+    "auxiliary_behavior_is_parallel_only",
+    "provider_contract_respected",
+    "choosing_none_is_valid"
+  ],
+  "required_distribution_observations": [
+    "record_auxiliary_decision",
+    "record_auxiliary_semantic_class",
+    "record_style_preset",
+    "record_user_politeness",
+    "record_latency_ms"
+  ]
+}

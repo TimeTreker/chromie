@@ -1,6 +1,6 @@
 # Chromie Benchmark Suite Implementation Plan
 
-Status: Approved staged plan
+Status: Phase 4 implemented; Phase 5 is the next active milestone
 Depends on: current scenario runner, general-ability acceptance framework,
 Social Attention closure, runtime evidence contracts
 
@@ -169,6 +169,16 @@ Exit criteria:
 - focused module and interaction runs pass;
 - reports expose style-conditioned behavior distributions.
 
+Implemented evidence:
+
+- 128 reviewed cases across 16 cohorts;
+- deterministic coverage requirements for style, mode, politeness, and language;
+- exact and lexical near-duplicate validation;
+- common-contract normalization for every case;
+- fixed action/skill expectation, backend leakage, stillness, off-mode, and
+  report-only guards;
+- deterministic coverage report and focused CI tests.
+
 Suggested commit:
 
 ```text
@@ -270,7 +280,7 @@ Connect experience mining to reviewed benchmark authoring
 
 ## Recommended immediate next patch
 
-Implement Phase 1 only: directory skeleton, schemas, deterministic inventory,
-coverage report, tests, documentation, and CI entrypoint. Do not move existing
-scenario files and do not add the 120-case dataset in the same patch. This keeps
-the foundation reviewable before large generated content lands.
+Implement Phase 5 only: add end-to-end text execution and evidence profiles on
+top of the reviewed Social Attention dataset. Preserve the same semantic case
+contracts across replay, live-model, live-service, simulator, and later physical
+evidence levels. Do not add runtime behavior quotas or fixed gesture mappings.

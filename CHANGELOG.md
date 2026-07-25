@@ -8,6 +8,12 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Comprehensive Social Attention benchmark dataset
+
+- Added 128 reviewed Social Attention cases across 16 cohorts covering everyday interaction, tools, explicit robot actions, multi-turn context, interruption, empathy, style, user preferences, repetition/cooldown, policy modes, safety conflicts, bilingual input, ASR ambiguity, and historical regressions.
+- Added deterministic coverage, normalization, duplicate, fixed-gesture, backend-leakage, stillness, `off`, and `report_only` validation without introducing production behavior policy.
+- Added a deterministic coverage report, CI-safe validation command, and focused dataset tests; all cases keep `none` as a valid auxiliary decision and retain human approval for final release qualification.
+
 ### Router removal final repository audit
 
 - Re-ran the maintained full test entrypoint after applying the complete Router-removal sequence and repaired all remaining environment, Compose, trace, scenario, and contract drift.
