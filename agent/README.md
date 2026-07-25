@@ -182,9 +182,9 @@ emergency handling, or the primary task. A concrete user request such as "blink
 twice" remains a normal, non-droppable CanonicalPlan goal even though its
 observable behavior belongs to the same domain. The maintained policy is `on`;
 `report_only` retains advisory plans without body requests and `off` suppresses
-auxiliary planning. Provider-supplied target evidence may include installation
-calibration, but Chromie does not define a fallback target or select the body
-backend.
+auxiliary planning. Target evidence is semantic only. Chromie does not accept installation calibration,
+body coordinates, joint targets, or controller parameters in Social Attention
+planning; Soridormi resolves the semantic request for its active embodiment.
 
 See [Social Attention Behavior Domain](../docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
 

@@ -268,8 +268,8 @@ evidence, eligible named social capabilities, target evidence, and semantic
 resource metadata. It may produce a structured `SocialAttentionPlan` with
 `decision=express` or `decision=none`. It must not create a new user task, claim
 perception that is not present, invent a target, or infer the body backend.
-Provider-supplied calibration may be used only when it is present as target
-evidence; Chromie has no installation-calibration default.
+Target evidence is semantic only. Installation calibration, body coordinates,
+joint targets, and controller parameters remain entirely below the Chromie boundary.
 
 Deterministic runtime code validates exact skill IDs, schemas, target evidence,
 confirmation policy, execution availability, latency budget, parallel timing,

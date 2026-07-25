@@ -1,3 +1,4 @@
+- [x] Move remaining Social Attention calibration and embodiment-specific argument ownership entirely into Soridormi/provider contracts.
 # Chromie Roadmap
 
 

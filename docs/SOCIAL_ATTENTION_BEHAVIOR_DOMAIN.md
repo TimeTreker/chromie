@@ -246,8 +246,7 @@ The implementation now:
 2. supplies owner-approved Social Interaction Style and bounded recent accepted
    auxiliary-request evidence to Response Composer;
 3. discovers and validates candidates without inspecting provider backend mode;
-4. accepts installation calibration only when a provider supplies it as explicit
-   target evidence;
+4. accepts only semantic target identity and relative direction as target evidence;
 5. requires auxiliary body requests to use `timing=parallel`, need no user
    confirmation, and avoid primary resource conflicts;
 6. preserves explicit user actions as CanonicalPlan goals and never treats

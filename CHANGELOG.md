@@ -1,3 +1,4 @@
+- Moved all Social Attention calibration, body-coordinate, joint-target, and controller-parameter ownership below the Chromie boundary; model-facing target evidence is semantic only.
 # Changelog
 
 - Removed legacy CapabilityAgent semantic skill substitution and argument reinterpretation; compatibility planning now preserves the exact model-selected named skill and schema-valid arguments.

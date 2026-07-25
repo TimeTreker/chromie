@@ -235,8 +235,8 @@ carry `metadata.source=social_attention_plan`,
 `metadata.auxiliary_social_attention=true`, and purpose/function metadata; they
 are excluded from user task proposals. Runtime validation checks exact catalog
 membership, schemas, target evidence, resource conflicts, confirmation policy,
-and a bounded latency budget. Installation calibration is only a fallback when
-live target evidence is absent. Concrete user-requested actions remain primary
+and a bounded latency budget. Target evidence is semantic only; installation calibration and body-specific
+coordinates are never part of the Chromie planning contract. Concrete user-requested actions remain primary
 CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and tool requests are routed through the model-assisted
 Router, capability catalog, Agent capability planner, schemas, and Skill
 Runtime validation rather than hidden phrase parsers. Plain walking requests
