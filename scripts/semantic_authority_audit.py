@@ -188,6 +188,36 @@ def audit() -> dict[str, Any]:
             "optional body-cue metadata"
         )
 
+    social_runtime = _read("agent/app/runtime.py")
+    social_prompt = _read("agent/app/social_attention.py")
+    social_docs = "\n".join(
+        _read(relative)
+        for relative in (
+            "docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md",
+            "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md",
+            "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md",
+            "agent/README.md",
+        )
+    )
+    for forbidden in (
+        "calibrated installation fallback",
+        "use live target evidence before installation calibration",
+        "Provider-supplied calibration is evidence",
+    ):
+        if forbidden in social_runtime or forbidden in social_prompt or forbidden in social_docs:
+            errors.append(
+                "Social Attention boundary still exposes provider calibration semantics: "
+                f"{forbidden}"
+            )
+
+    health_schema = _read("agent/app/schema.py")
+    if 'social_attention_mode: str = "on"' not in health_schema:
+        errors.append("Agent health schema default is not Social Attention on")
+
+    mind_contract = _read("shared/chromie_contracts/mind.py")
+    if "active mind profile must be owner-approved" not in mind_contract:
+        errors.append("MindProfile does not enforce owner approval")
+
     abilities = _read("orchestrator/runtime/abilities.py")
     legacy_thinking_ability = "social.thinking" + "_pose"
     if legacy_thinking_ability in abilities:

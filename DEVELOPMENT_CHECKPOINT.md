@@ -1,5 +1,6 @@
-- Step 6 complete: active MindProfiles now require owner approval and health/configuration defaults consistently report Social Attention `on`.
-- Step 5 complete: Social Attention target evidence is semantic-only; calibration and embodiment-specific arguments are exclusively Soridormi/provider responsibilities.
+- Final architecture closure: architecture documentation and offline semantic-authority guards now match the final embodiment-independent Social Attention implementation.
+- Mind and health contract alignment: active MindProfiles now require owner approval and health/configuration defaults consistently report Social Attention `on`.
+- Provider calibration ownership: Social Attention target evidence is semantic-only; calibration and embodiment-specific arguments are exclusively Soridormi/provider responsibilities.
 # Development Checkpoint
 
 - Legacy compatibility planning no longer substitutes nearby provider skills or converts/clamps one skill's arguments into another skill's schema.
@@ -54,9 +55,8 @@ candidate discovery ignores provider backend identity; Chromie-owned fallback
 calibration is removed; and auxiliary requests are parallel-only, optional, and
 lower priority than speech, emergency handling, and primary goals. The legacy
 Host-generated deep-thought body gesture, fixed static ability, and optional-cue
-coordinator semantics are now deleted. Removing model-facing backend identity and
-calibrated arguments is the next correction slice. Retained live provider evidence
-remains open.
+coordinator semantics are now deleted. Model-facing backend identity and calibrated
+arguments are also removed. Retained live provider evidence remains open.
 
 The Fast Planner functional implementation in
 [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
@@ -385,7 +385,7 @@ The current development implementation is present:
   `--soridormi-repo` and passes it to the standalone live-text runner, while
   endpoint-reported executing revision identity remains open;
 - model-authored optional social-attention plans that may choose subtle named
-  behavior or `none`, use live target evidence before installation calibration,
+  behavior or `none`, use semantic target evidence without installation calibration,
   stay outside user task proposals, and fail closed on schema/resource/latency
   conflicts; semantic safe defaults remain available for underspecified
   low-consequence parameters;

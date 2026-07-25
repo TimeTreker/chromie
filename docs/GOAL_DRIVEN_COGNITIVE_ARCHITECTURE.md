@@ -983,8 +983,10 @@ Target priority is:
 
 1. live perceived user;
 2. structured conversational target;
-3. calibrated installation fallback;
-4. no targeted behavior.
+3. no targeted behavior.
+
+Chromie never accepts installation calibration or body coordinates as target
+evidence. Soridormi resolves the semantic target for its active embodiment.
 
 Invalid, sequential, or conflicting auxiliary body behaviors are dropped. A
 speech-only adaptation may remain when body behavior is rejected. Auxiliary

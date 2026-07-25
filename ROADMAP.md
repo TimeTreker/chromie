@@ -1,3 +1,4 @@
+- [x] Finalize Social Attention architecture documentation and regression guards.
 - [x] Reconcile MindProfile approval and Social Attention health defaults across contracts, runtime, tests, and docs.
 - [x] Move remaining Social Attention calibration and embodiment-specific argument ownership entirely into Soridormi/provider contracts.
 # Chromie Roadmap
@@ -164,11 +165,9 @@ Implemented scope:
   semantic-argument behavior.
 
 The legacy Host-generated deep-thought body gesture and its coordinator bypass
-are deleted. Remaining architecture work: remove backend identity from model-facing
-catalog projections and move calibrated yaw/pitch handling fully behind the
-provider boundary. Then retain
-live Soridormi interaction evidence and run the full release-quality regression
-gate.
+are deleted. Backend identity and calibrated body arguments are absent from the
+model-facing Social Attention boundary. Remaining work is retained live Soridormi
+interaction evidence and the full release-quality regression gate.
 
 ## Open architecture track - Orchestrator task proposal merge
 
