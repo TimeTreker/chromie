@@ -2606,7 +2606,7 @@ class ConversationStateManager:
         """Decide whether this user turn starts a new conversation.
 
         This does not record the current user text. It only performs boundary
-        detection so the context snapshot sent to router/agent contains previous
+        detection so the context snapshot sent to the Cognitive Core contains previous
         turns from the correct conversation, not the current turn duplicated.
         """
         if not self.enabled:

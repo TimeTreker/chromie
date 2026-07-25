@@ -409,7 +409,7 @@ class VoiceAssistant:
         self.abilities = build_default_ability_registry(
             enable_agent=self.enable_agent,
         )
-        self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "3000")))
+        self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "9000")))
         self.action_client = ActionClient(self.action_executor_url, int(os.getenv("ORCH_ACTION_TIMEOUT_MS", "5000")))
         self.asr_timeout_s = max(
             0.001,
@@ -991,7 +991,7 @@ class VoiceAssistant:
         # the Router's dynamic wording as audit metadata, but do not let the
         # downstream Agent repeat it after the hedge fires.
         if decision.speak_first:
-            metadata["router_speak_first_suppressed_by_audio_hedge"] = decision.speak_first
+            metadata["goal_interpretation_speak_first_suppressed_by_audio_hedge"] = decision.speak_first
             decision.speak_first = None
 
         async def delayed_schedule() -> dict[str, Any]:
@@ -2701,7 +2701,7 @@ class VoiceAssistant:
             "speak_first_safe": bool(speak_first_safe),
         }
 
-    def _router_fast_speech_text(
+    def _goal_interpretation_fast_speech_text(
         self,
         decision: RouteDecision,
         *,
@@ -2746,7 +2746,7 @@ class VoiceAssistant:
         # Backward-compatible name used by older tests/call sites. The actual
         # source of fast-first speech is now the Core-generated fast_speech
         # field or an immediate_speech route item, not an Orchestrator template.
-        return self._router_fast_speech_text(decision)
+        return self._goal_interpretation_fast_speech_text(decision)
 
     async def _schedule_deep_thought_ack(
         self,
@@ -2852,7 +2852,7 @@ class VoiceAssistant:
         ):
             return None
 
-        router_text = self._router_fast_speech_text(
+        router_text = self._goal_interpretation_fast_speech_text(
             decision,
             task_snapshots=task_snapshots,
         )
@@ -2867,7 +2867,7 @@ class VoiceAssistant:
         if decision.route == "deep_thought":
             return self._deep_thought_ack_text(decision, user_text)
 
-        # Do not invent route-specific fast-first wording here. The quick Router
+        # Do not invent route-specific fast-first wording here. The fast Goal Interpreter
         # is responsible for natural, context-aware immediate speech. If it did
         # not provide one, stay silent and let the downstream Agent/Tool speak.
         return None
@@ -3077,7 +3077,7 @@ class VoiceAssistant:
     ) -> dict[str, Any]:
         if decision.route == "robot_action" and decision.actions:
             claim = SemanticAuthorityClaim(
-                owner="router_action_adapter",
+                owner="goal_interpretation_action_adapter",
                 role="adapter",
                 turn_id=session_id,
                 reason=reason,

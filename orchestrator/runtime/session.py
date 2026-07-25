@@ -95,8 +95,8 @@ class SessionTracker:
         "vad_valid_end",
         "asr_final",
         "context_snapshot",
-        "router_start",
-        "router_done",
+        "goal_interpretation_start",
+        "goal_interpretation_done",
         "fast_first_response_schedule",
         "fast_first_response_scheduled",
         "fast_first_response_skipped",
@@ -653,7 +653,7 @@ class SessionTracker:
         if event_name == "tts_playback_start_waiter_resolved" and self._field_value(rendered, "started").casefold() == "false":
             return logging.WARNING
 
-        if event_name == "router_done":
+        if event_name == "goal_interpretation_done":
             route = self._field_value(rendered, "route").casefold()
             intent = self._field_value(rendered, "intent").casefold()
             if route == "robot_action" and intent == "capability:chromie.speak":

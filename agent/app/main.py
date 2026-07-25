@@ -44,6 +44,7 @@ from .schema import AgentResult, AgentRunRequest, HealthResponse
 from .cognitive_core.goal_interpreter import (
     RouteDecision as CoreRouteDecision,
     RouteRequest as CoreRouteRequest,
+    initialize_goal_interpreter,
     interpret_turn,
 )
 from .task_graph import (
@@ -700,6 +701,11 @@ def require_task_graph_diagnostics_auth(authorization: str | None) -> None:
             status_code=401,
             detail="invalid TaskGraph diagnostics authorization",
         )
+
+
+@app.on_event("startup")
+async def initialize_cognitive_core() -> None:
+    await initialize_goal_interpreter()
 
 
 @app.get("/health", response_model=HealthResponse)

@@ -18,9 +18,9 @@ def _repo(tmp_path: Path) -> tuple[Path, Path]:
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts/general_ability_acceptance.py").write_text("# entrypoint\n", encoding="utf-8")
     config = {
-        "schema_version": 1, "benchmark_version": "1.0", "allowed_datasets": ["router", "general_ability"],
+        "schema_version": 1, "benchmark_version": "1.0", "allowed_datasets": ["goal_interpretation", "general_ability"],
         "sources": [
-            {"name": "router", "path": "scenarios/goal_interpretation", "glob": "**/*.json", "layer": "module", "datasets": ["router"], "evidence_levels": ["static"]},
+            {"name": "goal_interpretation", "path": "scenarios/goal_interpretation", "glob": "**/*.json", "layer": "module", "datasets": ["goal_interpretation"], "evidence_levels": ["static"]},
             {"name": "general", "path": "scripts/general_ability_acceptance.py", "kind": "acceptance_entrypoint", "layer": "e2e", "datasets": ["general_ability"], "evidence_levels": ["live_service"]}
         ]
     }
@@ -66,4 +66,4 @@ def test_broken_inventory_reference_is_rejected(tmp_path: Path) -> None:
     inventory = build_inventory(root, config)
     inventory["scenarios"][0]["source_path"] = "missing.json"
     with pytest.raises(InventoryError, match="broken source reference"):
-        validate_inventory(root, inventory, {"router", "general_ability"})
+        validate_inventory(root, inventory, {"goal_interpretation", "general_ability"})

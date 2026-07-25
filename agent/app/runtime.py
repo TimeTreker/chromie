@@ -168,7 +168,7 @@ class _AgentPipeline:
             result.status = "ok"
             intent = str(decision.intent or "").strip()
             is_greeting = intent == "greeting"
-            result.reason = decision.reason or f"terminal_router_{intent or 'acknowledgement'}"
+            result.reason = decision.reason or f"terminal_goal_interpretation_{intent or 'acknowledgement'}"
             if decision.speak_first:
                 result.add_speak_immediate(
                     decision.speak_first,
@@ -176,20 +176,20 @@ class _AgentPipeline:
                     priority=decision.priority,
                 )
                 result.trace.append(
-                    "runtime: terminal router greeting emitted speak_first"
+                    "runtime: terminal goal interpretation greeting emitted speak_first"
                     if is_greeting
-                    else "runtime: terminal router acknowledgement emitted speak_first"
+                    else "runtime: terminal goal interpretation acknowledgement emitted speak_first"
                 )
             else:
                 result.trace.append(
-                    "runtime: terminal router greeting already spoken by fast-first"
+                    "runtime: terminal goal interpretation greeting already spoken by fast-first"
                     if is_greeting
-                    else "runtime: terminal router acknowledgement already spoken by fast-first"
+                    else "runtime: terminal goal interpretation acknowledgement already spoken by fast-first"
                 )
             result.trace.append(
-                "runtime: terminal router greeting fast-first; skipped agent rewrite"
+                "runtime: terminal goal interpretation greeting fast-first; skipped agent rewrite"
                 if is_greeting
-                else "runtime: terminal router acknowledgement; skipped agent rewrite"
+                else "runtime: terminal goal interpretation acknowledgement; skipped agent rewrite"
             )
             return result
 
@@ -199,7 +199,7 @@ class _AgentPipeline:
                 style="brief",
                 priority=decision.priority,
             )
-            result.trace.append("runtime: added router speak_first")
+            result.trace.append("runtime: added goal interpretation speak_first")
 
         for agent_name in selected_agents(request):
             agent = self.agents.get(agent_name)

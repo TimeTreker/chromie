@@ -18,21 +18,21 @@ from scripts.behavior_scenarios import (
 class BehaviorScenarioRunnerTests(unittest.TestCase):
     def test_loads_one_file_per_scenario_and_filters_by_suite_or_key(self) -> None:
         all_cases = load_scenarios()
-        router_cases = load_scenarios(suites={"router"})
+        router_cases = load_scenarios(suites={"goal_interpretation"})
         adapter_cases = load_scenarios(suites={"adapter"})
         dialogue_cases = load_scenarios(suites={"dialogue"})
-        router_dialogue_cases = load_scenarios(suites={"router_dialogue"})
+        cognitive_core_dialogue_cases = load_scenarios(suites={"cognitive_core_dialogue"})
         cognitive_turn_loop_cases = load_scenarios(
             suites={"cognitive_turn_loop"}
         )
-        selected = load_scenarios(only={"router/normal_greeting"})
+        selected = load_scenarios(only={"goal_interpretation/goal_interpretation_normal_greeting"})
 
         dialogue_keys = [case.key for case in dialogue_cases]
 
         self.assertEqual(len(all_cases), 396)
         self.assertEqual(len(adapter_cases), 4)
         self.assertEqual(len(router_cases), 24)
-        self.assertEqual(len(router_dialogue_cases), 2)
+        self.assertEqual(len(cognitive_core_dialogue_cases), 2)
         self.assertEqual(len(dialogue_cases), 319)
         self.assertEqual(len(load_scenarios(suites={"interaction"})), 29)
         cognitive_cases = load_scenarios(suites={"cognitive_runtime"})
@@ -52,7 +52,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertIn("dialogue/voice_log_20260630_planner_regression", dialogue_keys)
         self.assertIn("dialogue/daily_child_nearby_motion_hold", dialogue_keys)
         self.assertIn("dialogue/daily_power_cable_motion_hold", dialogue_keys)
-        self.assertEqual([case.key for case in selected], ["router/normal_greeting"])
+        self.assertEqual([case.key for case in selected], ["goal_interpretation/goal_interpretation_normal_greeting"])
         for case in all_cases:
             self.assertEqual(case.path.stem, case.scenario_id)
 
@@ -64,7 +64,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
                     {
                         "schema_version": 1,
                         "id": "right_name",
-                        "suite": "router",
+                        "suite": "goal_interpretation",
                         "input": {"text": "hello"},
                         "expect": {"route": "chat"},
                     }
@@ -78,32 +78,32 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
     def test_report_compare_marks_improvements_and_regressions(self) -> None:
         baseline = {
             "cases": [
-                {"key": "router/a", "ok": True},
-                {"key": "router/b", "ok": False},
-                {"key": "router/old", "ok": True},
+                {"key": "goal_interpretation/a", "ok": True},
+                {"key": "goal_interpretation/b", "ok": False},
+                {"key": "goal_interpretation/old", "ok": True},
             ]
         }
         current = {
             "cases": [
-                {"key": "router/a", "ok": False},
-                {"key": "router/b", "ok": True},
-                {"key": "router/new", "ok": True},
+                {"key": "goal_interpretation/a", "ok": False},
+                {"key": "goal_interpretation/b", "ok": True},
+                {"key": "goal_interpretation/new", "ok": True},
             ]
         }
 
         comparison = compare_reports(current, baseline)
 
-        self.assertEqual(comparison["regressions"], ["router/a"])
-        self.assertEqual(comparison["improvements"], ["router/b"])
-        self.assertEqual(comparison["new_cases"], ["router/new"])
-        self.assertEqual(comparison["removed_cases"], ["router/old"])
+        self.assertEqual(comparison["regressions"], ["goal_interpretation/a"])
+        self.assertEqual(comparison["improvements"], ["goal_interpretation/b"])
+        self.assertEqual(comparison["new_cases"], ["goal_interpretation/new"])
+        self.assertEqual(comparison["removed_cases"], ["goal_interpretation/old"])
 
     def test_cli_writes_json_report_for_selected_scenario(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             code = scenario_runner.main(
                 [
                     "--suite",
-                    "router",
+                    "goal_interpretation",
                     "--only",
                     "polite_stop",
                     "--report-dir",
@@ -129,9 +129,9 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertIn("soridormi.walk_velocity", str(turns[1]["pre_context"]["session_memory"]))
 
 
-    def test_router_dialogue_replays_weather_then_repeated_walk(self) -> None:
+    def test_cognitive_core_dialogue_replays_weather_then_repeated_walk(self) -> None:
         scenarios = load_scenarios(
-            only={"router_dialogue/weather_then_repeated_walk_stays_grounded"}
+            only={"cognitive_core_dialogue/weather_then_repeated_walk_stays_grounded"}
         )
 
         report = run_scenarios_sync(scenarios)
@@ -157,7 +157,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
     def test_router_scenario_replays_inactive_direct_question_false_review(self) -> None:
         scenarios = load_scenarios(
-            only={"router/inactive_direct_weather_question_false_addressedness"}
+            only={"goal_interpretation/inactive_direct_weather_question_false_addressedness"}
         )
 
         report = run_scenarios_sync(scenarios)

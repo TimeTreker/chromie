@@ -139,7 +139,7 @@ class ExperienceManager:
         if learning_signal:
             proposed_change = (
                 "Review the proposal/preflight mismatch and consider updating "
-                "router merge examples, deepthinking output contracts, scenario "
+                "goal interpretation merge examples, deepthinking output contracts, scenario "
                 "coverage, or skill-selection preferences. Do not change core "
                 "principles or physical safety rules without owner approval."
             )

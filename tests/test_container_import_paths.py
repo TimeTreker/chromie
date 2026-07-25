@@ -28,8 +28,8 @@ class ContainerImportPathTests(unittest.TestCase):
                 "import app.agents.capability; print('ok')",
             ),
             (
-                "router",
-                ROOT / "router" / "app",
+                "goal_interpretation",
+                ROOT / "goal_interpretation" / "app",
                 "import app.goal_interpreter; print('ok')",
             ),
         )
@@ -62,7 +62,7 @@ class ContainerImportPathTests(unittest.TestCase):
                 self.assertIn("ok", result.stdout)
 
     def test_router_dockerfile_copies_runtime_package(self) -> None:
-        dockerfile = (ROOT / "router" / "Dockerfile").read_text()
+        dockerfile = (ROOT / "goal_interpretation" / "Dockerfile").read_text()
         self.assertIn("COPY shared/chromie_runtime ./chromie_runtime", dockerfile)
 
     def test_semantic_authority_audit_runs_from_repository_root(self) -> None:

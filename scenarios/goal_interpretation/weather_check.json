@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "id": "weather_check",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
-  "description": "Weather question is understood by the quick LLM router and uses the tool lane without robot motion.",
+  "description": "Weather question is understood by the quick Goal Interpreter model and uses the tool lane without robot motion.",
   "tags": ["tool", "normal"],
   "input": {
     "text": "Can you check whether it will rain today?"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": false
     },

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from orchestrator.schemas.route import RouteDecision as OrchestratorRouteDecision
-from agent.app.cognitive_core.goal_interpreter.goal_interpreter import OllamaGoalInterpreter
+from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 

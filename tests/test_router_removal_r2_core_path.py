@@ -14,5 +14,5 @@ def test_gateway_is_not_named_compatibility_adapter() -> None:
     root = Path(__file__).resolve().parents[1]
     source = (root / "orchestrator/runtime/cognitive_gateway.py").read_text(encoding="utf-8")
     assert "class CognitiveGateway" in source
-    assert "GatewayCoreCompatibilityAdapter" not in source
+    assert "CognitiveGateway" not in source
     assert "compatibility_router.attention_review" not in source

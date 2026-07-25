@@ -413,23 +413,6 @@ services:
       start_period: 30s
 
   chromie-agent:
-        condition: service_healthy
-    networks:
-      - chromie-net
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - |
-          python - <<'PY'
-          import urllib.request
-          urllib.request.urlopen("http://127.0.0.1:8091/health", timeout=5).read()
-          PY
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-
-  chromie-agent:
     container_name: chromie-agent
     build:
       context: .
@@ -452,6 +435,11 @@ services:
       CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
       AGENT_HOST: "0.0.0.0"
       AGENT_PORT: "8092"
+      AGENT_GOAL_INTERPRETER_MODE: ${AGENT_GOAL_INTERPRETER_MODE:-hybrid}
+      AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD: ${AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD:-0.55}
+      AGENT_GOAL_INTERPRETER_LOG_LEVEL: ${AGENT_GOAL_INTERPRETER_LOG_LEVEL:-INFO}
+      CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW: ${CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW:-0}
+      CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT: ${CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT:-0}
 
       AGENT_USE_LLM: ${AGENT_USE_LLM:-1}
       AGENT_MODEL: ${AGENT_MODEL:-gemma4:e2b}

@@ -4,7 +4,7 @@ import asyncio
 import unittest
 
 from orchestrator.orchestrator import VoiceAssistant
-from orchestrator.runtime.cognitive_gateway import GatewayCoreCompatibilityAdapter
+from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 from orchestrator.schemas.route import RouteDecision
 from shared.chromie_contracts.goal import GoalAssociationResolution
@@ -86,14 +86,14 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             source="llm",
             language="zh-CN",
         )
-        gateway = GatewayCoreCompatibilityAdapter()
+        gateway = CognitiveGateway()
         capture = gateway.capture(
             "你好。",
             session_id="sid",
             conversation_id="conversation-test",
             channel="text",
         )
-        turn_envelope = gateway.for_route(
+        turn_envelope = gateway.for_core_review(
             capture,
             context={"history": []},
             decision=decision,

@@ -465,7 +465,7 @@ class FastPlannerResolver:
         if len(expected_goal_ids(context)) > 1:
             return (
                 f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
-                f"Router advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
+                f"Goal Interpretation advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
                 f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
                 f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
                 "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a skill, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
@@ -491,7 +491,7 @@ class FastPlannerResolver:
             )
         return (
             f"Goal association advisory JSON:\n{self._bounded(association, 3000)}\n\n"
-            f"Router advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
+            f"Goal Interpretation advisory JSON:\n{self._bounded(advisory, 900)}\n\n"
             f"Executable common capability catalog JSON:\n{self._bounded(capabilities, 9000)}\n\n"
             f"Previous Fast Planner output when doing a semantic replan:\n{self._bounded(previous_raw, 3500) if previous_raw is not None else 'null'}\n\n"
             "When validation errors are present and the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and every listed defect. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "

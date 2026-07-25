@@ -114,7 +114,7 @@ python -m benchmarks.integration.run \
 ```
 
 The adapter receives one JSON request on stdin containing `scenario` and `run`,
-and returns one observation object on stdout. This boundary allows later Router,
+and returns one observation object on stdout. This boundary allows later Cognitive Gateway,
 Planner, Composer, and deployed-runtime adapters without coupling benchmark code
 to one backend or adding benchmark-specific production branches.
 
@@ -146,7 +146,7 @@ skills.
 Example using a deployed Cognitive Gateway adapter endpoint:
 
 ```bash
-export CHROMIE_BENCHMARK_COGNITIVE_GATEWAY_URL=http://127.0.0.1:8091/benchmark/cognitive-gateway
+export CHROMIE_BENCHMARK_COGNITIVE_GATEWAY_CALLABLE=my_harness.gateway:invoke
 python -m benchmarks.modules.run \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --mode live_model \
@@ -179,4 +179,4 @@ The legacy `scenarios/goal_interpretation/` and `scenarios/cognitive_core_dialog
 for source compatibility and historical comparison. Inventory classifies them as
 `goal_interpretation` and `cognitive_core_dialogue` datasets; their directory names define
 the current architecture. New benchmark component profiles must not reintroduce a
-generic first-class `router` boundary.
+removed first-class Router boundary.

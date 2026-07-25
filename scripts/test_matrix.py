@@ -58,20 +58,20 @@ GROUPS: dict[str, TestGroup] = {
             (sys.executable, "scripts/tts_provider_ab.py", "--check"),
         ),
     ),
-    "router": TestGroup(
-        "Deterministic hard filter, capability routing, model routing, and regressions.",
+    "goal-interpretation": TestGroup(
+        "Protective filtering, capability grounding, Goal Interpretation, and regressions.",
         (
             _unittest(
                 "tests.test_router_core",
                 "tests.test_router_capability_routing",
                 "tests.test_router_regression_evaluator",
                 "tests.test_llm_capability_routing",
-                "tests.test_capability_router_actions",
+                "tests.test_capability_goal_interpretation_actions",
             ),
         ),
     ),
     "behavior": TestGroup(
-        "Unit-tested file-backed behavior scenarios for Router and InteractionRuntime.",
+        "Unit-tested file-backed behavior scenarios for Goal Interpretation and InteractionRuntime.",
         (
             _unittest(
                 "tests.test_behavior_scenario_runner",
@@ -229,7 +229,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "docs",
         "asr",
         "tts",
-        "router",
+        "goal-interpretation",
         "behavior",
         "general-ability",
         "cognitive-runtime",
@@ -245,7 +245,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "docs",
         "asr",
         "tts",
-        "router",
+        "goal-interpretation",
         "behavior",
         "general-ability",
         "cognitive-runtime",
@@ -257,7 +257,7 @@ COMBOS: dict[str, tuple[str, ...]] = {
         "release",
     ),
     "embodiment": ("agent", "skill-runtime", "taskgraph", "soridormi"),
-    "frontend-voice": ("asr", "tts", "router", "behavior", "general-ability", "agent", "skill-runtime"),
+    "frontend-voice": ("asr", "tts", "goal-interpretation", "behavior", "general-ability", "agent", "skill-runtime"),
 }
 
 

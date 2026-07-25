@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "weather_then_repeated_walk_stays_grounded",
-  "suite": "router_dialogue",
+  "suite": "cognitive_core_dialogue",
   "level": "integration",
   "description": "After a weather query, repeated walking requests must remain grounded to the walking skill even when the mocked quick model repeatedly emits the stale weather intent.",
   "tags": [
@@ -10,10 +10,10 @@
     "weather-context-pollution",
     "repeatability",
     "walk",
-    "router-agent-contract"
+    "cognitive-core-agent-contract"
   ],
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "catalog_version": 72,
       "capabilities": [

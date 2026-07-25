@@ -371,7 +371,7 @@ def _decision_has_fast_speech(decision: RouteDecision) -> bool:
     )
 
 
-def _decision_needs_router_fast_speech(decision: RouteDecision) -> bool:
+def _decision_needs_goal_interpretation_fast_speech(decision: RouteDecision) -> bool:
     if _decision_has_fast_speech(decision):
         return False
     if decision.route in FAST_SPEECH_REPAIR_ROUTES:
@@ -379,7 +379,7 @@ def _decision_needs_router_fast_speech(decision: RouteDecision) -> bool:
     return any(item.route in FAST_SPEECH_REPAIR_ROUTES for item in (decision.routes or []))
 
 
-def _decision_with_router_fast_speech(
+def _decision_with_goal_interpretation_fast_speech(
     decision: RouteDecision,
     fast_speech: FastSpeech,
     *,
@@ -626,11 +626,10 @@ def _prompt_feature_flags(text: str) -> dict[str, bool]:
     lowered = text.casefold()
     return {
         "has_fast_speech_contract": "fast_speech" in lowered,
-        "has_tool_route_contract": "route=tool" in lowered
-        or '"route":"tool"' in lowered
-        or '"route": "tool"' in lowered,
-        "has_weather_query_contract": "weather_query" in lowered,
-        "has_weather_tool_instruction": "weather" in lowered and "tool" in lowered,
+        "has_tool_route_contract": "valid routes:" in lowered and "tool" in lowered,
+        "has_external_lookup_guidance": "current external facts" in lowered
+        and "trusted lookup capability" in lowered,
+        "has_no_topic_mapping_guidance": "do not map a topic keyword" in lowered,
     }
 
 
@@ -822,9 +821,9 @@ def _router_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
 
 
 def _router_fast_context_section(mind: Any) -> str:
-    """Minimal context for the quick Router.
+    """Minimal context for the fast Goal Interpreter.
 
-    The quick Router should decide whether a task needs the full mind profile;
+    The fast Goal Interpreter should decide whether a task needs the full mind profile;
     it should not always pay for worldview/lifeview/valueview tokens itself.
     Deepthinking and capability prompts still receive richer mind context.
     """
@@ -851,7 +850,7 @@ def _router_fast_context_section(mind: Any) -> str:
                 "kind": raw_identity.get("kind"),
             }
     return (
-        "Fast Router Context:\n"
+        "Fast Goal Interpretation Context:\n"
         f"{_bounded_json(identity or {'entity_id': 'chromie', 'name': 'Chromie'}, max_chars=180)}\n"
         "The full owner-approved mind profile, worldview, lifeview, valueview, "
         "long-term goals, and core principles are downstream only. "
@@ -963,7 +962,7 @@ class OllamaGoalInterpreter:
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(32, num_predict)
         self.keep_alive = (keep_alive or "").strip() or None
-        self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "router_system.txt"
+        self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "goal_interpreter_system.txt"
         self.debug_raw_output = _env_flag("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW") or _env_flag("AGENT_GOAL_INTERPRETER_DEBUG_RAW")
         self.debug_prompt = _env_flag("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT") or _env_flag("AGENT_GOAL_INTERPRETER_DEBUG_PROMPT")
 
@@ -971,7 +970,7 @@ class OllamaGoalInterpreter:
         try:
             return self.prompt_path.read_text(encoding="utf-8").strip()
         except FileNotFoundError:
-            logger.warning("Router system prompt not found: %s", self.prompt_path)
+            logger.warning("Goal Interpreter system prompt not found: %s", self.prompt_path)
             return (
                 "You are Chromie's routing classifier. Return only a JSON object "
                 "matching the provided schema."
@@ -1047,7 +1046,7 @@ class OllamaGoalInterpreter:
                     "content": (
                         "Current Job:\n"
                         "- You are the legacy routing path's fast-speech repairer.\n"
-                        "- A previous router decision selected a route that will use a downstream Agent/Tool and needs a short immediate user-facing prelude.\n"
+                        "- A previous interpretation decision selected a route that will use a downstream Agent/Tool and needs a short immediate user-facing prelude.\n"
                         "- Generate only the missing fast_speech. Do not change route, intent, metadata, tool arguments, skills, or safety policy.\n"
                         "- The text should sound like Chromie herself: natural, warm, concise, and in the user's language when clear.\n\n"
                         "Safety Contract:\n"
@@ -1068,7 +1067,7 @@ class OllamaGoalInterpreter:
                     "content": (
                         f"Latest user input: {request.text}\n"
                         f"Language hint: {request.language or 'auto'}\n"
-                        f"Existing router decision JSON: {decision_json}\n"
+                        f"Existing interpretation decision JSON: {decision_json}\n"
                         f"Bounded session context JSON: {session_context}\n"
                         f"Common ability catalog JSON: {abilities_json}"
                     ),
@@ -1299,7 +1298,7 @@ class OllamaGoalInterpreter:
                         f"- Bounded session context JSON: {session_context}\n\n"
                         "Current Job:\n"
                         "- Repair a realtime robot route after the deterministic emergency/noise filter already passed.\n"
-                        "- The quick router incorrectly returned a deterministic-only route; choose the best non-deterministic route from semantic meaning, context, and common abilities.\n"
+                        "- The fast goal interpreter incorrectly returned a deterministic-only route; choose the best non-deterministic route from semantic meaning, context, and common abilities.\n"
                         "- Decide from meaning and common ability descriptions, not phrase rules.\n\n"
                         "Task Context Group:\n"
                         "- If the user is asking Chromie to perform an available interaction_executable physical capability now, choose robot_action.\n"
@@ -1426,7 +1425,7 @@ class OllamaGoalInterpreter:
                     "content": (
                         "Current Job:\n"
                         "- Repair a malformed route for Chromie after the emergency/noise filter already passed.\n"
-                        "- The quick router returned robot_action with a placeholder capability intent instead of a real capability ID.\n"
+                        "- The fast goal interpreter returned robot_action with a placeholder capability intent instead of a real capability ID.\n"
                         "- Decide from semantic meaning, bounded context, and common abilities, not phrase rules.\n\n"
                         "Task Context Group:\n"
                         "- Speech-only conversation and questions about whether an ability is available are chat; use a semantic intent such as capability_inquiry when appropriate.\n"
@@ -1555,10 +1554,10 @@ class OllamaGoalInterpreter:
             **_prompt_feature_flags(all_text),
             **_catalog_observability_profile(request),
         }
-        logger.info("router_prompt_profile %s", _json_log(profile, max_chars=2200))
+        logger.info("goal_interpreter_prompt_profile %s", _json_log(profile, max_chars=2200))
         if self.debug_prompt:
             logger.info(
-                "router_prompt_debug stage=%s sid=%s system=%r user=%r",
+                "goal_interpreter_prompt_debug stage=%s sid=%s system=%r user=%r",
                 stage,
                 request.sid if request is not None else None,
                 system_text[:12000],
@@ -1583,10 +1582,10 @@ class OllamaGoalInterpreter:
             "eval_count": data.get("eval_count"),
             **_raw_router_output_summary(content),
         }
-        logger.info("router_llm_raw_summary %s", _json_log(summary, max_chars=2200))
+        logger.info("goal_interpreter_llm_raw_summary %s", _json_log(summary, max_chars=2200))
         if self.debug_raw_output:
             logger.info(
-                "router_llm_raw_output stage=%s sid=%s raw=%r",
+                "goal_interpreter_llm_raw_output stage=%s sid=%s raw=%r",
                 stage,
                 request.sid if request is not None else None,
                 content[:8000],
@@ -1618,7 +1617,7 @@ class OllamaGoalInterpreter:
             "changed_intent": bool(raw_summary and (raw_summary.get("raw_intent") not in {None, "", decision.intent})),
             "reason": decision.reason,
         }
-        logger.info("router_normalize_result %s", _json_log(summary, max_chars=2200))
+        logger.info("goal_interpreter_normalize_result %s", _json_log(summary, max_chars=2200))
 
     async def warm_model(self, *, timeout_s: float | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -1704,7 +1703,7 @@ class OllamaGoalInterpreter:
                 parsed["intent"] = item_intent
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
-            ) + "LLM returned route_items; router selected compatibility route"
+            ) + "LLM returned route_items; goal interpreter selected a compatible route result"
         if route_items:
             metadata = parsed.get("metadata")
             if not isinstance(metadata, dict):
@@ -1720,13 +1719,13 @@ class OllamaGoalInterpreter:
             parsed["route"] = route_from_intent
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
-            ) + "LLM returned intent-only route JSON; router normalized route"
+            ) + "LLM returned intent-only route JSON; goal interpreter normalized route"
         elif "route" not in parsed and intent_capability_id:
             parsed["route"] = _route_for_capability_id(intent_capability_id, request)
             parsed["intent"] = f"capability:{intent_capability_id}"
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
-            ) + "LLM returned intent-only capability JSON; router normalized capability route"
+            ) + "LLM returned intent-only capability JSON; goal interpreter normalized capability route"
         elif route_value and route_value not in ROUTE_NAMES and (
             routed_capability_id or intent_capability_id
         ):
@@ -1735,18 +1734,18 @@ class OllamaGoalInterpreter:
             parsed["intent"] = f"capability:{selected_capability_id}"
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
-            ) + "LLM returned capability/skill id in route field; router normalized capability route"
+            ) + "LLM returned capability/skill id in route field; goal interpreter normalized capability route"
         elif intent_capability_id:
             parsed["route"] = _route_for_capability_id(intent_capability_id, request)
             parsed["intent"] = f"capability:{intent_capability_id}"
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
-            ) + "LLM returned exact capability id as intent; router normalized capability intent"
+            ) + "LLM returned exact capability id as intent; goal interpreter normalized capability intent"
         if "confidence" not in parsed and parsed.get("route") not in {"interrupt", "ignore"}:
             parsed["confidence"] = max(0.72, self.confidence_threshold)
             parsed["reason"] = (
                 f"{parsed.get('reason')}; " if parsed.get("reason") else ""
-            ) + "LLM returned route-only JSON; router applied default confidence"
+            ) + "LLM returned route-only JSON; goal interpreter applied default confidence"
         decision = RouteDecision.model_validate(parsed)
         finalized = finalize_decision(decision, request, source="llm")
         self._log_decision_summary(request, finalized, stage=stage, raw_summary=raw_summary)
@@ -1905,24 +1904,24 @@ class OllamaGoalInterpreter:
         request: RouteRequest,
         decision: RouteDecision,
     ) -> RouteDecision:
-        if not _decision_needs_router_fast_speech(decision):
+        if not _decision_needs_goal_interpretation_fast_speech(decision):
             return decision
         if decision.route == "tool" and not self.tool_fast_speech_repair_enabled:
             logger.info(
-                "router_fast_speech_missing route=%s intent=%s repair=tool_disabled",
+                "goal_interpreter_fast_speech_missing route=%s intent=%s repair=tool_disabled",
                 decision.route,
                 decision.intent,
             )
             return decision
         if not self.slow_review_recovery_enabled:
             logger.info(
-                "router_fast_speech_missing route=%s intent=%s repair=disabled",
+                "goal_interpreter_fast_speech_missing route=%s intent=%s repair=disabled",
                 decision.route,
                 decision.intent,
             )
             return decision
         logger.info(
-            "router_fast_speech_repair_start route=%s intent=%s sid=%s",
+            "goal_interpreter_fast_speech_repair_start route=%s intent=%s sid=%s",
             decision.route,
             decision.intent,
             request.sid,
@@ -1937,7 +1936,7 @@ class OllamaGoalInterpreter:
             raw_fast_speech = parsed.get("fast_speech")
             if raw_fast_speech is None:
                 logger.info(
-                    "router_fast_speech_repair_done route=%s intent=%s added=false reason=model_returned_null",
+                    "goal_interpreter_fast_speech_repair_done route=%s intent=%s added=false reason=model_returned_null",
                     decision.route,
                     decision.intent,
                 )
@@ -1945,27 +1944,27 @@ class OllamaGoalInterpreter:
             fast_speech = FastSpeech.model_validate(raw_fast_speech)
             if not str(fast_speech.text or "").strip():
                 logger.info(
-                    "router_fast_speech_repair_done route=%s intent=%s added=false reason=empty_text",
+                    "goal_interpreter_fast_speech_repair_done route=%s intent=%s added=false reason=empty_text",
                     decision.route,
                     decision.intent,
                 )
                 return decision
         except Exception as exc:
             logger.warning(
-                "router_fast_speech_repair_failed route=%s intent=%s error=%s",
+                "goal_interpreter_fast_speech_repair_failed route=%s intent=%s error=%s",
                 decision.route,
                 decision.intent,
                 exc,
             )
             return decision
-        repaired = _decision_with_router_fast_speech(
+        repaired = _decision_with_goal_interpretation_fast_speech(
             decision,
             fast_speech,
-            reason_suffix="router_llm repaired missing fast_speech",
+            reason_suffix="goal_interpreter repaired missing fast_speech",
             stage="fast_speech_repair",
         )
         logger.info(
-            "router_fast_speech_repair_done route=%s intent=%s added=true text_chars=%s",
+            "goal_interpreter_fast_speech_repair_done route=%s intent=%s added=true text_chars=%s",
             decision.route,
             decision.intent,
             len(fast_speech.text),
@@ -2225,7 +2224,7 @@ class OllamaGoalInterpreter:
         decision: RouteDecision,
     ) -> RouteDecision:
         reason_prefix = (
-            f"quick router returned deterministic-only route {decision.route} "
+            f"fast goal interpreter returned deterministic-only route {decision.route} "
             "after deterministic emergency/noise filter did not match"
         )
         if not self.slow_review_recovery_enabled:
@@ -2277,7 +2276,7 @@ class OllamaGoalInterpreter:
                 )
                 return repaired_decision
         logger.info(
-            "LLM router returned invalid deterministic-only route %s after priority filter; using safe chat fallback",
+            "Goal Interpreter model returned invalid deterministic-only route %s after priority filter; using safe chat fallback",
             decision.route,
         )
         return fallback_decision(request, reason=reason_prefix)
@@ -2288,7 +2287,7 @@ class OllamaGoalInterpreter:
         decision: RouteDecision,
     ) -> RouteDecision:
         reason_prefix = (
-            "quick router returned robot_action with placeholder capability intent "
+            "fast goal interpreter returned robot_action with placeholder capability intent "
             f"{decision.intent!r}"
         )
         if not self.slow_review_recovery_enabled:
@@ -2458,7 +2457,7 @@ class OllamaGoalInterpreter:
             candidates = raw_candidates if isinstance(raw_candidates, list) else []
         reason_parts = [
             reason_prefix
-            or f"quick router confidence {decision.confidence:.2f} below threshold {self.confidence_threshold:.2f}",
+            or f"fast goal interpreter confidence {decision.confidence:.2f} below threshold {self.confidence_threshold:.2f}",
             f"quick_route={decision.route}",
             f"quick_intent={decision.intent}",
         ]
@@ -2509,7 +2508,7 @@ class OllamaGoalInterpreter:
         try:
             data = await self._chat_logged(payload, stage="quick_intent", request=request)
         except Exception as exc:
-            logger.warning("Ollama router request failed: %s: %s", type(exc).__name__, exc)
+            logger.warning("Ollama Goal Interpreter request failed: %s: %s", type(exc).__name__, exc)
             if self.slow_review_recovery_enabled and self.review_model:
                 try:
                     reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
@@ -2523,9 +2522,9 @@ class OllamaGoalInterpreter:
                     ):
                         reviewed_decision.reason = (
                             f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-                        ) + f"primary router error {type(exc).__name__}; review_model:{self.review_model} recovered route"
+                        ) + f"primary goal interpreter error {type(exc).__name__}; review_model:{self.review_model} recovered route"
                         logger.info(
-                            "LLM review model recovered primary router error to %s/%s",
+                            "LLM review model recovered primary goal interpreter error to %s/%s",
                             reviewed_decision.route,
                             reviewed_decision.intent,
                         )
@@ -2540,13 +2539,13 @@ class OllamaGoalInterpreter:
             content = data.get("message", {}).get("content", "")
             decision = self._decision_from_response(request, data, stage="quick_intent")
         except (ValueError, ValidationError) as exc:
-            logger.warning("Invalid LLM router response: %s; content=%r", exc, content[:500])
+            logger.warning("Invalid Goal Interpreter model response: %s; content=%r", exc, content[:500])
             try:
                 relaxed = await self._chat_logged(self.build_payload(request, relaxed_json=True), stage="quick_intent_relaxed", request=request)
                 decision = self._decision_from_response(request, relaxed, stage="quick_intent_relaxed")
-                logger.info("LLM router recovered with relaxed JSON response")
+                logger.info("Goal Interpreter model recovered with relaxed JSON response")
             except Exception as relaxed_exc:
-                logger.warning("Relaxed LLM router retry failed: %s", relaxed_exc)
+                logger.warning("Relaxed Goal Interpreter model retry failed: %s", relaxed_exc)
                 return fallback_decision(request, reason=f"invalid_goal_interpreter_response: {exc}")
 
         if (
@@ -2563,7 +2562,7 @@ class OllamaGoalInterpreter:
                 decision = reviewed
             else:
                 logger.info(
-                    "LLM router returned ambiguous deep_thought without intent or reason; using safe fallback"
+                    "Goal Interpreter model returned ambiguous deep_thought without intent or reason; using safe fallback"
                 )
                 return fallback_decision(
                     request,

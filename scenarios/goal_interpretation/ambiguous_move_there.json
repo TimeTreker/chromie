@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "ambiguous_move_there",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "Ambiguous location reference clarifies rather than executing motion.",
   "tags": ["clarify", "motion-safety", "ambiguous"],
@@ -9,7 +9,7 @@
     "text": "Can you move over there a little?"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": false
     },

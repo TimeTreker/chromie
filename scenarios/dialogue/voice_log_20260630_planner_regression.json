@@ -3,11 +3,11 @@
   "id": "voice_log_20260630_planner_regression",
   "suite": "dialogue",
   "level": "integration",
-  "description": "Regression scenarios extracted from the 2026-06-30 voice log where router/planner failures turned greetings and walking requests into unrelated body skills.",
+  "description": "Regression scenarios extracted from the 2026-06-30 voice log where goal_interpretation/planner failures turned greetings and walking requests into unrelated body skills.",
   "tags": [
     "log-regression",
     "voice-log",
-    "router",
+    "goal_interpretation",
     "planner",
     "semantic-review",
     "intent-preservation"

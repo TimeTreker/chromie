@@ -48,7 +48,7 @@ Options:
   --goal-driven-runtime      Use the maintained goal-driven apply path; default
   --legacy-agent-runtime     Use Agent /interaction compatibility mode explicitly
   --evidence-dir DIR         Write evidence to a specific directory
-  --expect-route ROUTE       Post-run assertion for Router route: chat, deep_thought,
+  --expect-route ROUTE       Post-run assertion for Goal Interpretation route: chat, deep_thought,
                              robot_action, tool, memory, clarify, interrupt,
                              or ignore
   --expect-no-skills         Post-run assertion for no Soridormi skill emission

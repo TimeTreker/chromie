@@ -205,7 +205,7 @@ class DeepThinkingAgent(BaseAgent):
             "The capability catalog describes executable abilities and schemas, not authorization; never invent executable capabilities, low-level motor commands, or raw joint actions. "
             "If you understand a desired human-like ability but no supplied executable skill safely matches it, emit a task_proposals item with status missing_ability and emit only truthful chromie.speak text; do not fake the action. "
             "Speech is not a special final text channel; it is the chromie.speak skill. "
-            "If upstream routing context includes quick_router_review_request, review the quick Router's proposals as an adult safety reviewer. "
+            "If upstream routing context includes fast_goal_interpreter_review_request, review the fast Goal Interpreter's proposals as an adult safety reviewer. "
             "If upstream routing selected one exact catalog-backed physical capability such as capability:soridormi.walk_forward, do not replace it with speech-only thinking; either accept the proposal or emit the same exact skill task with safe/confirmed args. "
             "Low-information ASR fragments and clarification intents should remain clarification, not body actions or thinking body cues. "
             "Set quick_review.decision to accept when the quick plan is correct, revise when it is partly right but needs changed tasks/arguments/order, or supersede when it misunderstood the user. "
@@ -286,7 +286,7 @@ class DeepThinkingAgent(BaseAgent):
             "For cognitive answers, usually emit exactly one chromie.speak task.\n"
             "For physical/tool actions, emit a chromie.speak acknowledgement only if useful, plus the exact executable candidate skill task.\n"
             "If no supplied capability safely matches, emit one chromie.speak clarification or limitation plus a task_proposals missing_ability item.\n"
-            "When Upstream routing context includes quick_router_review_request, fill quick_review. Use accept only when the quick proposal is semantically correct. Use revise or supersede when replacing it, and include superseded_task_ids from the supplied quick_task_proposals when known.\n"
+            "When Upstream routing context includes fast_goal_interpreter_review_request, fill quick_review. Use accept only when the quick proposal is semantically correct. Use revise or supersede when replacing it, and include superseded_task_ids from the supplied quick_task_proposals when known.\n"
             "Do not copy placeholder values from the skeleton."
         )
 
@@ -559,14 +559,14 @@ class DeepThinkingAgent(BaseAgent):
             if plan.reason:
                 metadata["deepthinking_reason"] = self._bounded_text(plan.reason, 300)
             if plan.quick_review.decision != "none":
-                metadata["quick_router_review_decision"] = plan.quick_review.decision
+                metadata["fast_goal_interpreter_review_decision"] = plan.quick_review.decision
                 if plan.quick_review.reason:
-                    metadata["quick_router_review_reason"] = self._bounded_text(
+                    metadata["fast_goal_interpreter_review_reason"] = self._bounded_text(
                         plan.quick_review.reason,
                         300,
                     )
                 if plan.quick_review.superseded_task_ids:
-                    metadata["quick_router_review_superseded_task_ids"] = list(
+                    metadata["fast_goal_interpreter_review_superseded_task_ids"] = list(
                         plan.quick_review.superseded_task_ids[:12]
                     )
             metadata["language"] = self.language(request)
@@ -592,7 +592,7 @@ class DeepThinkingAgent(BaseAgent):
     ) -> list[dict[str, Any]]:
         if plan.quick_review.decision not in {"revise", "supersede"}:
             return []
-        review_request = (request.route_decision.metadata or {}).get("quick_router_review_request")
+        review_request = (request.route_decision.metadata or {}).get("fast_goal_interpreter_review_request")
         if not isinstance(review_request, dict):
             return []
         raw_proposals = review_request.get("quick_task_proposals")
@@ -1271,10 +1271,10 @@ class DeepThinkingAgent(BaseAgent):
             parts.append(f"reason={decision.reason}")
         if decision.speak_first:
             parts.append(f"speak_first={decision.speak_first}")
-        review_request = (decision.metadata or {}).get("quick_router_review_request")
+        review_request = (decision.metadata or {}).get("fast_goal_interpreter_review_request")
         if isinstance(review_request, dict):
             parts.append(
-                "quick_router_review_request="
+                "fast_goal_interpreter_review_request="
                 + self._bounded_json_for_prompt(review_request, max_chars=2600)
             )
         return "；".join(parts) if zh else "; ".join(parts)

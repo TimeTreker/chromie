@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "walk_forward_stale_weather_route_repaired",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "integration",
   "description": "A stale high-confidence weather intent on a clear walking request must be rejected and semantically repaired to the exact walking skill.",
   "tags": [
@@ -16,7 +16,7 @@
     "language": "en-US"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "catalog_version": 70,
       "capabilities": [

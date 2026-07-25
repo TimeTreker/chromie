@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "chat_clarify_route_contract_repaired",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "integration",
   "description": "A route=chat decision carrying intent=clarify is structurally inconsistent and must be semantically repaired instead of being sent to the conversation lane unchanged.",
   "tags": ["router-contract", "semantic-repair", "clarify", "model-authority"],
@@ -10,7 +10,7 @@
     "language": "en-US"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {"catalog_version": 75, "capabilities": []},
     "llm_script": [
       {

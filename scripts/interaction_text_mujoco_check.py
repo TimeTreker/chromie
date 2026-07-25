@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Text-to-MuJoCo interaction check without microphone or ASR.
 
-This runner feeds user text into the deployed Router and, by default, the
+This runner feeds user text into the deployed Cognitive Core and, by default, the
 maintained goal-driven cognitive runtime. It executes the resulting structured
 response through the host trusted Skill Runtime and optionally plays Chromie
 speech through the configured speaker. An explicit legacy Agent ``/interaction``
@@ -113,7 +113,7 @@ def validate_contract(
             errors.append(f"route={route.route!r}, expected 'robot_action'")
         if route_actions and route_actions != expected_skills:
             errors.append(
-                "router actions mismatch: "
+                "goal interpretation actions mismatch: "
                 f"expected {expected_skills!r}, got {route_actions!r}"
             )
         if skill_ids != expected_skills:
@@ -124,7 +124,7 @@ def validate_contract(
 
     if expect_no_skills:
         if route_actions:
-            errors.append(f"router emitted Soridormi actions, expected none: {route_actions!r}")
+            errors.append(f"goal interpretation emitted Soridormi actions, expected none: {route_actions!r}")
         if skill_ids:
             errors.append(f"interaction emitted Soridormi skills, expected none: {skill_ids!r}")
 
@@ -461,9 +461,7 @@ def _apply_soridormi_skill_timeout(response: Any, timeout_s: float | None) -> An
 
 
 def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None:
-    os.environ["AGENT_URL"] = args.router_url
     os.environ["AGENT_URL"] = args.agent_url
-    os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_INTERACTION_RESPONSE"] = "1"
     os.environ["ORCH_ENABLE_SORIDORMI_SKILLS"] = "1"
@@ -538,10 +536,8 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
     try:
         health_start = time.perf_counter()
         session = await assistant.get_http_session()
-        router_health = await assistant.router_client.health(session)
         agent_health = await assistant.agent_client.health(session)
         timings_ms["health_ms"] = (time.perf_counter() - health_start) * 1000.0
-        _write_json(evidence_dir / "router_health.json", router_health)
         _write_json(evidence_dir / "agent_health.json", agent_health)
 
         if "soridormi" not in set(agent_health.get("capability_sources") or []):
@@ -581,7 +577,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         context["robot_state"] = robot_state
 
         route_start = time.perf_counter()
-        route = await assistant.router_client.route(
+        route = await assistant.agent_client.interpret_turn(
             session,
             text=args.text,
             sid=sid,
@@ -617,7 +613,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                 conversation_id=context.get("conversation_id"),
                 channel="text",
             )
-            turn_envelope = gateway.for_route(
+            turn_envelope = gateway.for_core_review(
                 turn_capture,
                 context=context,
                 decision=route,
@@ -858,7 +854,6 @@ def build_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("text", nargs="?", default=DEFAULT_TEXT)
-    parser.add_argument("--router-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8091"))
     parser.add_argument("--agent-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8092"))
     parser.add_argument(
         "--soridormi-mcp-url",
@@ -929,7 +924,7 @@ def build_parser() -> argparse.ArgumentParser:
             "interrupt",
             "ignore",
         ],
-        help="Optional post-run assertion; this is not sent to Router or Agent.",
+        help="Optional post-run assertion; this is not sent to the Cognitive Core or Agent runtime.",
     )
     parser.add_argument(
         "--expect-no-skills",

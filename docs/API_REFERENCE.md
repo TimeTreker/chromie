@@ -42,7 +42,7 @@ running.
 | `GET` | `/agents` | List specialized agents and ownership notes. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named skills and refresh status. |
-| `POST` | `/capabilities/search` | Rank relevant capabilities for Router and normal InteractionRuntime. |
+| `POST` | `/capabilities/search` | Rank relevant capabilities for Goal Interpretation and normal InteractionRuntime. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog or query-specific LLM context. |
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
 | `POST` | `/fast-plan` | Produce a complete common-catalog `CanonicalPlan` or terminal Deep Planner escalation. |
@@ -52,7 +52,7 @@ running.
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
-Router uses unlocked `common` entries for the fast compact Qwen prompt as
+Goal Interpretation uses unlocked `common` entries for the fast compact Qwen prompt as
 `common_ability_catalog`; deepthinking may use the full catalog. Safety-locked
 entries remain visible in the full catalog but are excluded from the fast
 common prompt even when an experience overlay requests `common`. The initial
@@ -62,14 +62,14 @@ preset is data in `capabilities/prompt_tiers.json`, not a Python skill list.
 schemas exclude it as response transport. A mixed conversational/body turn uses
 a goal-scoped `respond` outcome plus executable body steps; the Response
 Composer owns the speech plan. Search scores are relevance signals for catalog
-inspection endpoints, not Router execution authorization.
+inspection endpoints, not Goal Interpretation execution authorization.
 
 ### Conversation and interaction
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/run` | Established `AgentRequest -> AgentResult` compatibility path. CapabilityAgent semantic planning is emergency-only; exact Router actions are adapter input. |
-| `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; exact Router actions are materialized without LLM reinterpretation, and the legacy CapabilityAgent planner requires explicit emergency authority. |
+| `POST` | `/run` | Established `AgentRequest -> AgentResult` compatibility path. CapabilityAgent semantic planning is emergency-only; exact Goal Interpretation actions are adapter input. |
+| `POST` | `/interaction` | Return a natively accumulated and strictly revalidated shared `InteractionResponse`; exact Goal Interpretation actions are materialized without LLM reinterpretation, and the legacy CapabilityAgent planner requires explicit emergency authority. |
 | `POST` | `/task-continuity` | Return a validated `SemanticTaskOperationSet` proposal for the current utterance and active-task snapshot. |
 | `POST` | `/compose-response-plan` | Compose goal-scoped speech and optional auxiliary social attention around an immutable terminal `CanonicalPlan`. |
 | `POST` | `/tool-result/interpret` | Interpret complete bounded tool evidence for the user request without exposing the raw payload. |
@@ -104,7 +104,7 @@ atomically commit the validated association.
 
 `POST /task-continuity` is available only when
 `AGENT_TASK_CONTINUITY_ENABLED=1` and Agent LLM use is enabled. It treats the
-Router decision as advisory context, replaces model-provided operation IDs with
+Goal Interpretation decision as advisory context, replaces model-provided operation IDs with
 stable request-bound IDs, rejects below-threshold or unknown-task operations,
 and may return an immediate `ResponsePlan`. It never applies task changes,
 authorizes side effects, or claims execution. The host decides whether to call
@@ -115,7 +115,7 @@ The host context now includes compact prompt-memory fields:
 `session_memory.memory_summary`, `session_memory.extracted_memory`, and
 top-level `extracted_memory`. These are process-local session/task memory
 summaries, not durable user-profile memory and not authorization for side
-effects. Quick Router prompts sanitize raw `history` and `conversation` fields
+effects. Fast Goal Interpretation prompts sanitize raw `history` and `conversation` fields
 from their bounded context payload and rely on these compact memory fields
 instead.
 For explicit `memory` routes, `memory_agent` emits an `extracted_memory`
@@ -140,7 +140,7 @@ membership, schemas, target evidence, resource conflicts, confirmation policy,
 and a bounded latency budget. Target evidence is semantic only; installation calibration and body-specific
 coordinates are never part of the Chromie planning contract. Concrete user-requested actions remain primary
 CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and tool requests are routed through the model-assisted
-Router, capability catalog, Agent capability planner, schemas, and Skill
+Goal Interpretation, capability catalog, Agent capability planner, schemas, and Skill
 Runtime validation rather than hidden phrase parsers. Plain walking requests
 use a normal safe forward speed of `0.18 m/s`;
 requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`

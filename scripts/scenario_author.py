@@ -185,9 +185,9 @@ def command_edit(args: argparse.Namespace) -> int:
 
 
 def _scenario_schema_summary(suite: str) -> str:
-    if suite == "router":
+    if suite == "goal_interpretation":
         return (
-            "Router scenarios must set stub.router_mode, optional stub.catalog, "
+            "Goal Interpretation scenarios must set stub.interpretation_mode, optional stub.catalog, "
             "optional stub.llm_decision, and expect route/intent/source/task_types/"
             "metadata/llm_calls. Use task_types_forbid for unsafe motion checks."
         )

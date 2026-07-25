@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
   "id": "compound_unresolved_handoff_to_capability_planner",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "integration",
-  "description": "A quick Router that invents one compound skill for a walk-and-blink request must hand the complete utterance to semantic capability planning instead of declaring the ability missing.",
+  "description": "A fast Goal Interpreter that invents one compound skill for a walk-and-blink request must hand the complete utterance to semantic capability planning instead of declaring the ability missing.",
   "tags": ["compound-action", "semantic-planning", "walk", "blink", "no-terminal-fallback"],
   "input": {
     "text": "哎，你能往前跑个15秒，然后同时眨眨眼睛吗？边跑边眨眼睛。",
     "language": "zh-CN"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",

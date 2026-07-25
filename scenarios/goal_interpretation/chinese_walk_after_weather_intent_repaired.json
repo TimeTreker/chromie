@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "chinese_walk_after_weather_intent_repaired",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "integration",
   "description": "The Chinese walking request observed in live logs must not inherit the previous weather intent; semantic repair must ground it to the bounded walking skill.",
   "tags": [
@@ -17,7 +17,7 @@
     "language": "zh-CN"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "catalog_version": 73,
       "capabilities": [

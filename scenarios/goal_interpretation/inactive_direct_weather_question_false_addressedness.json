@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "inactive_direct_weather_question_false_addressedness",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "integration",
   "description": "Regression from the 2026-07-23 microphone trace: an inactive direct Chinese weather question must keep its grounded tool route when the addressedness reviewer falsely returns addressed=false.",
   "tags": [
@@ -17,7 +17,7 @@
     "language": "zh-CN"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "context": {
       "interaction_engagement": {
         "gate_enabled": true,

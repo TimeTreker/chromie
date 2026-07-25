@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_cognitive_gateway_is_the_ingress_component_profile() -> None:
     assert "cognitive_gateway" in COMPONENT_PROFILES
-    assert "router" not in COMPONENT_PROFILES
+    assert "goal_interpretation" not in COMPONENT_PROFILES
     profile = COMPONENT_PROFILES["cognitive_gateway"]
     assert profile.url_env == "CHROMIE_BENCHMARK_COGNITIVE_GATEWAY_URL"
     assert profile.callable_env == "CHROMIE_BENCHMARK_COGNITIVE_GATEWAY_CALLABLE"
@@ -23,7 +23,7 @@ def test_runtime_adapter_manifest_uses_gateway_terminology() -> None:
     )
     names = {item["name"] for item in payload["components"]}
     assert "cognitive_gateway" in names
-    assert "router" not in names
+    assert "goal_interpretation" not in names
 
 
 def test_goal_interpretation_paths_use_current_architecture_taxonomy() -> None:

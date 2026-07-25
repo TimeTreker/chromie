@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "id": "voice_log_chinese_blink_wrong_walk_not_catalog_corrected",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live text check: if the quick Router LLM wrongly selects walking for Chinese blink ASR with high confidence, deterministic catalog scoring must not rewrite it to blink_eyes.",
+  "description": "Regression from the 2026-07-03 live text check: if the fast Goal Interpreter LLM wrongly selects walking for Chinese blink ASR with high confidence, deterministic catalog scoring must not rewrite it to blink_eyes.",
   "tags": [
     "voice-log",
     "zh-CN",
-    "router-agent-contract",
+    "cognitive-core-agent-contract",
     "robot-action",
     "blink",
     "model-authority"
@@ -17,7 +17,7 @@
     "language": "zh-CN"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",

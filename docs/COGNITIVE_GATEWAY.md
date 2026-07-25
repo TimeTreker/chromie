@@ -326,70 +326,42 @@ Skill Runtime. It is not an unconditional controller stop for motion started
 outside that ledger. `global_emergency` is the scope that additionally
 dispatches Soridormi's dedicated E-stop regardless of the host request ledger.
 
-## 7. Compatibility with the current Router
+## 7. Implemented ownership and topology
 
-The repository currently exposes these compatibility names and surfaces:
+The independent Router service, `/route` API, Router client, container, and
+Router-owned model configuration have been removed. The maintained path is:
 
-- the former independent routing service and component directory;
-- `POST /route`, `GET /routes`, and `RouteDecision`;
-- `AGENT_GOAL_INTERPRETER_*` configuration and `router_*` logs;
-- routes such as `chat`, `tool`, `memory`, `robot_action`, `interrupt`, and
-  `ignore`.
+```text
+transport input
+  -> host Cognitive Gateway
+  -> immutable UserTurnEnvelope
+  -> Agent-owned Goal Interpretation and Goal-Driven Cognitive Core
+  -> validated planning, execution, reconciliation, and response composition
+```
 
-They remain valid current interfaces until a separate migration changes them.
-This decision does not rename an API, environment variable, container, file,
-log field, or deployment unit.
+The Gateway remains a narrow ingress boundary. Goal Interpretation may emit a
+structured advisory decision for downstream contracts, but the Gateway itself
+never authors an ordinary intent, goal, capability choice, plan, or response.
+Historical `RouteDecision` names may remain inside versioned data contracts
+until a separate contract-version migration; they do not represent an active
+Router component or service.
 
-The current service mixes responsibilities that the target architecture
-separates: parts of Input Normalization, Protective Reflex, Attention Review,
-semantic classification, capability grounding, and compatibility route
-production. Therefore:
+## 8. Completed migration
 
-- current Router behavior is the compatibility implementation, not the whole
-  Cognitive Gateway;
-- Router is not a synonym for the Goal-Driven Cognitive Core;
-- Cognitive Gateway is not a cosmetic rename of the mixed service;
-- `RouteDecision` may bridge current consumers, but is not the target
-  `UserTurnEnvelope` contract;
-- existing logs and APIs remain evidence under their current names; the host
-  now dual-records the envelope and correlation IDs while compatibility
-  surfaces remain deployed.
+The migration is complete at the production-topology and authority boundaries:
 
-## 8. Migration state and path
+1. the shared `ReflexOutcome` and `UserTurnEnvelope` contracts are authoritative;
+2. Protective Reflex runs locally before model-dependent cognition;
+3. only admitted envelopes enter the Goal-Driven Cognitive Core;
+4. Goal Interpretation is Agent-owned and shares the Agent service lifecycle;
+5. the Orchestrator has no Router client, URL, health dependency, or fallback authority;
+6. deployment, diagnostics, Benchmark adapters, and current documentation no
+   longer expose a first-class Router component;
+7. historical evidence retains its original terminology and revision scope.
 
-Migration is contract-first and behavior-preserving. The state markers below
-describe repository implementation only; retained environment evidence remains
-owned by [STATUS.md](STATUS.md).
-
-1. **Implemented:** adopt Cognitive Gateway / 认知网关 in architecture documents
-   while retaining current Router compatibility names.
-2. **Implemented:** use shared frozen version 1 `ReflexOutcome` and
-   `UserTurnEnvelope` contracts with immutable input, quality, attention,
-   context provenance, admission, and correlation fields.
-3. **Implemented:** run the shared Protective Reflex locally in the host,
-   reuse it in Router compatibility rules, revoke pending approval before the
-   first await, and keep the reflex lifecycle from being cancelled by a later
-   utterance.
-4. **Implemented logical boundary:** build and dual-record the envelope for
-   reflex, confirmation, direct-fallback, compatibility-route, and suppression
-   outcomes; project only admitted envelopes into the Core.
-5. **Implemented for configured authoritative lanes:** send admitted turns
-   through Goal Association and canonical planning under one Core semantic
-   authority, then return structured goal-scoped results through deterministic
-   outcome reconciliation and a speech-only final response.
-6. **Open module extraction:** separate Attention Review from ordinary Router
-   intent/capability work, and extract the five logical modules without
-   changing the implemented envelope contract.
-7. **Open topology migration:** derive `RouteDecision` only for compatibility
-   consumers and widen Core authority to remaining supported lanes only with
-   rollback and retained evidence.
-8. **Open evidence and deprecation:** retain live-text, stop/cancellation,
-   dedicated E-stop/safe-idle, tool-result, simulator, rollback, and
-   source-provenance evidence before deprecating Router APIs or operational
-   names.
-
-No migration step may broaden model authority, weaken confirmation, expose
-low-level robot controls, or move embodied safety out of Soridormi.
+No future change may reintroduce a Router service, broaden model authority,
+weaken confirmation, expose low-level robot controls, or move embodied safety
+out of Soridormi.
 
 ## 9. Invariants
 
@@ -413,8 +385,7 @@ low-level robot controls, or move embodied safety out of Soridormi.
     evidence and downstream outcome reconciliation.
 11. Physical TaskGraph work remains sequential and validated; admission cannot
     relax execution safety or resource policy.
-12. Compatibility names remain truthful until implementation, evidence, and
-    migration are complete.
+12. Historical compatibility names are evidence-only and must not re-enter current topology or authority.
 
 ## 10. Acceptance cases
 
@@ -433,11 +404,10 @@ evidence status is reported separately in [STATUS.md](STATUS.md).
 | Unusable or empty audio | Produce a deterministic unusable/suppressed record | No model, tool, action, or TTS work starts |
 | Completed weather goal followed by unrelated action | Assemble only genuinely active goals | Core does not inherit stale weather meaning or authority |
 | Tool success, partial failure, or timeout | Preserve turn and correlations | Goal-scoped outcomes return to Core for closure, replan, clarification, or truthful report |
-| Compatibility client calls `POST /route` | Preserve current API during migration | Parity evidence exists before deprecation |
 
-Acceptance asserts required and forbidden behavior. A Router unit test alone
-cannot prove stop-to-provider cancellation, and a planner test alone cannot
-prove result reconciliation or final spoken truth.
+Acceptance asserts required and forbidden behavior. A Goal Interpretation unit
+test alone cannot prove stop-to-provider cancellation, and a planner test alone
+cannot prove result reconciliation or final spoken truth.
 
 ## 11. Terminology summary
 
@@ -448,4 +418,4 @@ prove result reconciliation or final spoken truth.
 | Protective Reflex / 保护性反射 | Immediate deterministic operational-control path |
 | Goal-Driven Cognitive Core / 目标驱动认知核心 | Semantic goal understanding, planning, delegation, reconciliation, and response authority |
 | Goal Interpretation | Agent-owned Cognitive Core boundary; no independent routing service |
-| `RouteDecision` | Current compatibility routing contract, not the target cognitive object |
+| `RouteDecision` | Historical/versioned advisory contract name used inside the Core path; not an active Router service |

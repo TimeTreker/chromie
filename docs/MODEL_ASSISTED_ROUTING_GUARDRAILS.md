@@ -120,7 +120,7 @@ validation, but it must not automatically resume interrupted physical work.
    Stop, cancel, emergency, ignore, silence, and unusable-audio paths must stay
    rule-based and deterministic. These hard filters should stay narrow and
    high-confidence; ambiguous or negated stop-related text should continue to
-   quick intent routing. In code, `router/app/rules.py` is reserved for this
+   quick intent routing. In code, `goal_interpretation/app/rules.py` is reserved for this
    narrow hard-control layer and may only produce `interrupt` or `ignore`,
    including obvious repeated filler or acknowledgment ASR hallucinations. Broad
    phrase routing and regex action parsing must not become normal hybrid

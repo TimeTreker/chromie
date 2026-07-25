@@ -53,7 +53,7 @@ Host Orchestrator
         -> exact plan/request/result join -> per-goal outcome reconciliation
         -> speech-only final response -> TTS -> speaker
 
-Docker: ASR, legacy routing path/Gateway backend, Agent, Ollama, TTS
+Docker: ASR, Agent (Cognitive Core), Ollama, TTS
 Soridormi: embodied planning, simulator/robot execution, monitoring, stop,
            emergency stop, recovery, and hardware commissioning
 ```
@@ -65,16 +65,15 @@ meaning, capability grounding, planning, delegation, result reconciliation,
 and final response remain the responsibility of the Goal-driven Cognitive
 Core. The frozen version 1 `UserTurnEnvelope`, host admission adapter, local
 protective-reflex/suppression paths, and configured-lane Core projection are
-implemented. Physical extraction of the five logical Gateway modules is still
-open; the existing `router` service and `/route` API remain compatibility
-surfaces.
+implemented. The five Gateway responsibilities are explicit logical modules in the host.
+There is no independent Router service or `/route` compatibility API.
 
 Chromie never gives raw motor, joint, actuator, or torque controls to the
 language model. The legacy `hardware/` daemon is mock compatibility only.
 
 ## What works
 
-- realtime microphone, VAD, ASR, routing, TTS, playback, and barge-in;
+- realtime microphone, VAD, ASR, Cognitive Gateway admission, Goal Interpretation, TTS, playback, and barge-in;
 - a versioned stream-oriented TTSProvider contract with Fun-CosyVoice3 0.5B
   as the maintained default, an authorized local cloned-voice reference,
   application-level readiness, bounded cancellation drain/restart behavior, and
@@ -88,14 +87,13 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
   inference, deterministic local suppression, and bounded model-assisted
   addressedness that can only suppress an inactive ambient turn and fails open
   to admitted cognition;
-- three-stage route flow: emergency filter, Qwen quick intent routing, and
-  larger-model deepthought handoff when quick confidence is low or planning is
-  needed;
-- multi-route quick-router output that keeps the top-level `route` as a
-  compatibility primary route while splitting independent chat, memory,
-  deepthought, tool, and skill work into route items with separate policies;
-- staged task/action proposals merged into `RouteDecision.metadata.task_list`
-  and shared task proposals before Agent and Skill Runtime validation;
+- safety-first ingress followed by fast Goal Interpretation and a larger-model
+  deep-planning handoff when confidence is low or broader reasoning is needed;
+- structured Goal Interpretation output that can represent independent chat,
+  memory, deep-planning, tool, and skill responsibilities without making the
+  Host a semantic authority;
+- staged task/action proposals merged into shared task proposals before
+  deterministic Agent and Skill Runtime validation;
 - single-authority goal-driven cognition with exact turn-bound authority claims,
   atomic Goal-state application, and fail-closed trusted adaptation;
 - native strict `POST /interaction` plus explicit compatibility rollback;

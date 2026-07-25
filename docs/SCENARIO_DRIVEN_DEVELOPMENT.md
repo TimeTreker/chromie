@@ -65,14 +65,14 @@ boundaries.
 
 Dependency-light tests of schemas, versions, lifecycle, validation, and replay.
 
-### 3.2 Router scenarios
+### 3.2 Goal Interpretation scenarios
 
 Model outputs are mocked or replayed to verify goal-preserving routing,
 coverage, escalation, and normalization.
 
 ### 3.3 Interaction scenarios
 
-A Router decision is passed through the Agent interaction runtime and checked
+A Goal Interpretation decision is passed through the Agent interaction runtime and checked
 for speech, plans, skills, confirmations, and metadata.
 
 ### 3.4 Dialogue scenarios
@@ -87,7 +87,7 @@ queueing, and degraded input handling.
 
 ### 3.6 Live-text scenarios
 
-The deployed Router, Agent, tools, and simulator are exercised with text input
+The deployed Agent/Cognitive Core, tools, and simulator are exercised with text input
 and retained traces.
 
 ### 3.7 Simulator and physical evidence
@@ -226,7 +226,7 @@ Contracts, mocked models, simulated providers, and local deterministic tests.
 
 ### Level B — Deployed live-text evidence
 
-Real Router and Agent models, real tool/provider interfaces, text input, and
+Real Goal Interpretation and Agent models, real tool/provider interfaces, text input, and
 retained traces.
 
 ### Level C — Simulator evidence

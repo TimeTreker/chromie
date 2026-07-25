@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "chinese_nod_blink_generic_chat_repaired",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "integration",
   "description": "The live Chinese compound body request must be semantically rechecked when the quick model emits a generic chat acknowledgement, then grounded to both exact abilities without phrase-rule recovery.",
   "tags": [
@@ -18,7 +18,7 @@
     "language": "zh-CN"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "catalog_version": 74,
       "capabilities": [

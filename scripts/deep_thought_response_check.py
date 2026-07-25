@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Deep-thought response scenario check.
 
-This runner feeds text directly into the host Orchestrator's routed text path
+This runner feeds text directly into the host Orchestrator's admitted cognitive path
 so it exercises the same pre-agent behavior used by live voice turns:
 
-- Router selects ``deep_thought``.
+- Goal Interpretation selects the deep-planning lane.
 - Chromie schedules the immediate thinking acknowledgement.
 - Chromie does not inject a Host-authored body gesture.
 - The deepthinking Agent returns a final spoken response.
@@ -33,7 +33,7 @@ if str(ROOT) not in sys.path:
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "deep-thought"
 DEFAULT_TEXT = (
     "Please think carefully and split the implementation plan for adding "
-    "social.look_at_user: router trigger, ability registry mapping, "
+    "social.look_at_user: cognitive trigger, ability registry mapping, "
     "Soridormi skill binding, and tests."
 )
 
@@ -76,8 +76,8 @@ def validate_deep_thought_events(
     min_scheduled_tts: int,
 ) -> list[str]:
     errors: list[str] = []
-    if not _event_contains(events, "router_done:", "route=deep_thought"):
-        errors.append("router did not report route=deep_thought")
+    if not _event_contains(events, "goal_interpretation_done:", "route=deep_thought"):
+        errors.append("Goal Interpretation did not report route=deep_thought")
     if not _event_contains(events, "deep_thought_ack_schedule:"):
         errors.append("deep-thought thinking acknowledgement was not scheduled")
     if not _event_contains(events, "deep_thought_ack_scheduled:"):
@@ -125,7 +125,6 @@ def validate_deep_thought_events(
 
 
 def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None:
-    os.environ["AGENT_URL"] = args.router_url
     os.environ["AGENT_URL"] = args.agent_url
     os.environ.setdefault("ORCH_AGENT_TIMEOUT_MS", "10000")
     os.environ.setdefault("ORCH_AGENT_TIMEOUT_MS", "120000")
@@ -212,7 +211,6 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run a no-microphone deep_thought acknowledgement/final-response check."
     )
     parser.add_argument("text", nargs="?", default=DEFAULT_TEXT)
-    parser.add_argument("--router-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8091"))
     parser.add_argument("--agent-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8092"))
     parser.add_argument(
         "--soridormi-mcp-url",

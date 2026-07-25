@@ -88,7 +88,7 @@ of physical requests as normal skill proposals instead of dropping them into
 unstructured reply text.
 When Goal Interpretation compound `actions[]` include per-action confidence, the native
 runtime preserves it in each emitted `SkillRequest.metadata` as
-`router_action_confidence` for trace and evidence review.
+`goal_interpretation_action_confidence` for trace and evidence review.
 
 TaskGraph endpoints:
 

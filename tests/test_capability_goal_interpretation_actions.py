@@ -58,7 +58,7 @@ def _catalog() -> CapabilityCatalog:
 
 
 class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_router_actions_become_sequential_skill_requests_without_llm(self) -> None:
+    async def test_goal_interpretation_actions_become_sequential_skill_requests_without_llm(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
                 ollama=None,
@@ -102,7 +102,7 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[2].args["amplitude"], "small")
         self.assertEqual(response.skills[2].args["duration_s"], 1.4)
         for index, skill in enumerate(response.skills):
-            self.assertEqual(skill.metadata["source"], "router_actions")
+            self.assertEqual(skill.metadata["source"], "goal_interpretation_actions")
             self.assertEqual(skill.metadata["source_component"], "agent.capability")
             self.assertEqual(skill.metadata["execution_mode"], "proposed")
             self.assertEqual(skill.metadata["execution_semantics"], "proposal_from_route2")
@@ -116,7 +116,7 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(skill.metadata["router_action_sequence"], index)
         self.assertEqual(response.speech[0].text, "I will run the selected actions in order.")
 
-    async def test_router_speak_first_suppresses_generic_direct_plan_speech(self) -> None:
+    async def test_goal_interpretation_speak_first_suppresses_generic_direct_plan_speech(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
                 ollama=None,

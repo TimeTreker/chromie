@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "low_confidence_do_it",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "Low-confidence body-action handoff delegates to deep thought instead of letting catalog context authorize motion.",
   "tags": ["deep-thought", "low-confidence", "filler-regression"],
@@ -9,7 +9,7 @@
     "text": "Please do it."
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": true,
       "capabilities": [

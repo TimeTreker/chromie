@@ -39,7 +39,7 @@ PROPOSAL_STATES = {
 def annotate_task_proposal_ledger(response: InteractionResponse) -> InteractionResponse:
     """Attach a host-side proposal/commit ledger without changing execution.
 
-    Router and deep-thinking stages may propose tasks, but the host executes
+    Goal Interpretation and deep-thinking stages may propose tasks, but the host executes
     only concrete InteractionResponse skills/speech that pass later runtime
     gates. The ledger records that distinction so later smart merge work has a
     durable audit surface.

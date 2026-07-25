@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "goal_interpretation_normal_greeting",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "Ordinary greeting stays conversational.",
   "tags": [
@@ -12,7 +12,7 @@
     "text": "Hello Chromie, how are you today?"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": false
     },

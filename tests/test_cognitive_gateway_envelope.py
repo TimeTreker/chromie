@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import (
-    GatewayCoreCompatibilityAdapter,
+    CognitiveGateway,
     USER_TURN_ENVELOPE_CONTEXT_KEY,
 )
 from orchestrator.runtime.cognitive_runtime import (
@@ -118,9 +118,9 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
             )
 
 
-class GatewayCoreCompatibilityAdapterTests(unittest.TestCase):
+class CognitiveGatewayTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.adapter = GatewayCoreCompatibilityAdapter(
+        self.adapter = CognitiveGateway(
             clock=lambda: datetime(2026, 7, 23, 1, 2, 3, tzinfo=timezone.utc)
         )
 
@@ -145,7 +145,7 @@ class GatewayCoreCompatibilityAdapterTests(unittest.TestCase):
             language="en-US",
         )
 
-        envelope = self.adapter.for_route(
+        envelope = self.adapter.for_core_review(
             capture,
             context=context,
             decision=decision,
@@ -206,7 +206,7 @@ class GatewayCoreCompatibilityAdapterTests(unittest.TestCase):
             },
         )
 
-        envelope = self.adapter.for_route(
+        envelope = self.adapter.for_core_review(
             capture,
             context={"history": []},
             decision=decision,
@@ -276,7 +276,7 @@ class GatewayCoreHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_core_rejects_a_suppressed_envelope_before_any_agent_call(
         self,
     ) -> None:
-        adapter = GatewayCoreCompatibilityAdapter()
+        adapter = CognitiveGateway()
         capture = adapter.capture(
             "Background television speech.",
             session_id="turn-suppressed",
@@ -290,7 +290,7 @@ class GatewayCoreHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
             source="llm",
             should_speak=False,
         )
-        envelope = adapter.for_route(
+        envelope = adapter.for_core_review(
             capture,
             context={"history": []},
             decision=decision,
@@ -316,7 +316,7 @@ class GatewayCoreHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_host_projects_the_envelope_into_the_core_without_router_mutation(
         self,
     ) -> None:
-        adapter = GatewayCoreCompatibilityAdapter(
+        adapter = CognitiveGateway(
             clock=lambda: datetime(2026, 7, 23, 1, 2, 3, tzinfo=timezone.utc)
         )
         capture = adapter.capture(

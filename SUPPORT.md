@@ -10,7 +10,6 @@ Run and include the non-secret output of:
 ```bash
 ./scripts/show_profile.sh
 docker compose --env-file .env.runtime ps
-curl -fsS http://127.0.0.1:8091/health
 curl -fsS http://127.0.0.1:8092/health
 ./scripts/run_tests.sh
 ```

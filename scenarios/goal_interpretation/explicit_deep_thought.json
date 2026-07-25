@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "id": "explicit_deep_thought",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
-  "description": "Explicit careful-reasoning request is understood by the quick LLM router and delegates to deep thought without a route-level thinking acknowledgement.",
+  "description": "Explicit careful-reasoning request is understood by the quick Goal Interpreter model and delegates to deep thought without a route-level thinking acknowledgement.",
   "tags": ["deep-thought", "planning"],
   "input": {
     "text": "Please think deeply and design a test strategy."
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": false
     },

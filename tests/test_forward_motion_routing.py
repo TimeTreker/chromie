@@ -7,7 +7,7 @@ from agent.app.capabilities.catalog import CapabilityCatalog
 from tests.test_capability_catalog_service import _Invoker, _registry
 from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
-from tests.test_router_capability_routing import _Catalog, _LlmRouter
+from tests.test_goal_interpreter_capability_routing import _Catalog, _LlmRouter
 
 
 class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):

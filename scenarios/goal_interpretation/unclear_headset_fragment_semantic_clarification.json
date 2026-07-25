@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "unclear_headset_fragment_semantic_clarification",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "integration",
   "description": "A low-confidence referential headset fragment must be semantically reviewed and clarified instead of receiving a fabricated understanding acknowledgement.",
   "tags": [
@@ -16,7 +16,7 @@
     "language": "zh-CN"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "catalog_version": 71,
       "capabilities": []

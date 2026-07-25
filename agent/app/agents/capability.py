@@ -140,7 +140,7 @@ class CapabilityAgent(BaseAgent):
             self._capability_payload(match) for match in executable
         ]
         direct_actions = list(request.route_decision.actions or [])
-        # Exact Router actions are already-selected adapter input, not a second
+        # Exact Goal Interpretation actions are already-selected adapter input, not a second
         # semantic plan. Materialize them deterministically even when an LLM is
         # available; the CapabilityAgent must not reinterpret the utterance.
         if direct_actions:
@@ -152,7 +152,7 @@ class CapabilityAgent(BaseAgent):
                 key=lambda item: int(item.get("sequence", 0)),
             )
             route_stage = self._selected_route_stage(request)
-            for router_action_index, action in enumerate(ordered_direct_actions):
+            for goal_interpretation_action_index, action in enumerate(ordered_direct_actions):
                 capability_id = str(action.get("capability_id") or "").strip()
                 match = allowed.get(capability_id)
                 if match is None:
@@ -161,7 +161,7 @@ class CapabilityAgent(BaseAgent):
                     result.metadata["invalid_selected_capability_id"] = capability_id
                     self.trace(
                         result,
-                        f"router action capability is unavailable or non-executable: {capability_id}",
+                        f"Goal Interpretation action capability is unavailable or non-executable: {capability_id}",
                     )
                     return result
                 args = action.get("args")
@@ -196,12 +196,12 @@ class CapabilityAgent(BaseAgent):
                     }
                     self.trace(
                         result,
-                        f"router action args failed schema validation for {capability_id}: {arg_errors}",
+                        f"Goal Interpretation action args failed schema validation for {capability_id}: {arg_errors}",
                     )
                     return result
                 sequence = int(action.get("sequence", len(selected_ids)))
                 metadata = {
-                    "source": "router_actions",
+                    "source": "goal_interpretation_actions",
                     "source_component": "agent.capability",
                     "execution_mode": "proposed",
                     "execution_semantics": "proposal_from_route2",
@@ -212,10 +212,10 @@ class CapabilityAgent(BaseAgent):
                     "route_source": request.route_decision.source,
                     "route_intent": request.route_decision.intent,
                     "route_confidence": request.route_decision.confidence,
-                    "router_action_index": router_action_index,
-                    "router_action_count": len(ordered_direct_actions),
-                    "router_compound_action_plan": len(ordered_direct_actions) > 1,
-                    "router_action_sequence": sequence,
+                    "goal_interpretation_action_index": goal_interpretation_action_index,
+                    "goal_interpretation_action_count": len(ordered_direct_actions),
+                    "goal_interpretation_compound_action_plan": len(ordered_direct_actions) > 1,
+                    "goal_interpretation_action_sequence": sequence,
                     "capability_safety_class": match.safety_class,
                     "capability_effects": list(match.effects or []),
                     "capability_requires_confirmation": match.requires_confirmation,
@@ -224,20 +224,20 @@ class CapabilityAgent(BaseAgent):
                 }
                 action_confidence = action.get("confidence")
                 if isinstance(action_confidence, (int, float)) and not isinstance(action_confidence, bool):
-                    metadata["router_action_confidence"] = max(
+                    metadata["goal_interpretation_action_confidence"] = max(
                         0.0,
                         min(1.0, float(action_confidence)),
                     )
                 timing = str(action.get("timing") or "").strip()
                 if timing not in {"parallel", "sequential"}:
                     timing = "sequential"
-                metadata["router_action_timing"] = timing
+                metadata["goal_interpretation_action_timing"] = timing
                 score = self._catalog_score(match)
                 if score is not None:
                     metadata["catalog_score"] = score
                 reason = str(action.get("reason") or "").strip()
                 if reason:
-                    metadata["router_action_reason"] = reason[:200]
+                    metadata["goal_interpretation_action_reason"] = reason[:200]
                 perception_dependency = live_perception_dependency_from_metadata(
                     action,
                     match.metadata,
@@ -269,7 +269,7 @@ class CapabilityAgent(BaseAgent):
                     result.add_speak_immediate(speech, style="brief")
                 result.metadata["capability_handled"] = True
                 result.metadata["capability_decision"] = "execute"
-                result.metadata["semantic_authority_owner"] = "router_action_adapter"
+                result.metadata["semantic_authority_owner"] = "goal_interpretation_action_adapter"
                 result.metadata["semantic_authority_role"] = "adapter"
                 result.metadata["planning_result"] = (
                     "direct_skill" if len(selected_ids) == 1 else "composed_plan"
@@ -302,10 +302,10 @@ class CapabilityAgent(BaseAgent):
                 result.metadata["invalid_selected_capability_id"] = selected_id
                 self.trace(
                     result,
-                    f"router-selected capability is unavailable or non-executable: {selected_id}",
+                    f"Goal-Interpreter-selected capability is unavailable or non-executable: {selected_id}",
                 )
                 return result
-            self.trace(result, f"router-selected capability is available: {selected_id}")
+            self.trace(result, f"Goal-Interpreter-selected capability is available: {selected_id}")
         if not executable:
             result.metadata["capability_search"] = search.model_dump(mode="json")
             self.trace(result, "no interaction-executable capability matched")
@@ -703,18 +703,18 @@ class CapabilityAgent(BaseAgent):
 
         zh = self.is_zh(request)
         candidate_payload = [self._capability_payload(match) for match in candidates]
-        selected_id = self._router_selected_capability_id(request)
+        selected_id = self._goal_interpretation_selected_capability_id(request)
         selected_line = (
-            f"- Router-selected exact skill_id: {selected_id}\n"
+            f"- Goal-Interpreter-selected exact skill_id: {selected_id}\n"
             if selected_id
-            else "- Router-selected exact skill_id: none\n"
+            else "- Goal-Interpreter-selected exact skill_id: none\n"
         )
         review_prompt = (
             "Session Context Group:\n"
             f"- Language: {self.language(request)}\n"
             f"- Extracted memory:\n{self._bounded_text(self._format_memory_context(request, zh=zh), 900)}\n"
             f"- Task context:\n{self._bounded_text(self._format_task_context(request, zh=zh), 900)}\n"
-            f"- Router decision context JSON: {self._format_route_context(request)}\n\n"
+            f"- Goal Interpretation decision context JSON: {self._format_route_context(request)}\n\n"
             "Current Job:\n"
             "- You are Chromie's semantic capability-plan reviewer.\n"
             "- Judge whether the proposed skill sequence directly preserves and satisfies the user's intended physical/tool action.\n"
@@ -732,7 +732,7 @@ class CapabilityAgent(BaseAgent):
             f"- Proposed capability plan JSON: {plan.model_dump_json()}\n\n"
             "Cost Function:\n"
             "- Accept only when the plan is complete, every selected skill is semantically necessary, its arguments fit the schema, and requested timing is compatible with supplied provider/resource evidence.\n"
-            "- If the Router selected an exact skill_id and the proposed plan replaced it, do not use decision=accept. Revise to an executable plan that preserves the routed intent, or return clarify/unsupported with no skills.\n"
+            "- If the Goal Interpretation selected an exact skill_id and the proposed plan replaced it, do not use decision=accept. Revise to an executable plan that preserves the routed intent, or return clarify/unsupported with no skills.\n"
             "- Reject or revise plans that substitute a different behavior class for the user's intent, such as social acknowledgement, gaze, or attention when the user requested locomotion or another body task.\n"
             "- Prefer a clarification over executing a skill that merely seems generally robot-like but does not satisfy the request.\n"
             "- Preserve the no-raw-motor boundary and never invent skills outside the supplied API surface.\n\n"
@@ -1178,7 +1178,7 @@ class CapabilityAgent(BaseAgent):
                     return stage
         return "quick_intent"
 
-    def _router_selected_capability_id(self, request: AgentRunRequest) -> str:
+    def _goal_interpretation_selected_capability_id(self, request: AgentRunRequest) -> str:
         intent = (request.route_decision.intent or "").strip()
         if not intent.startswith("capability:"):
             return ""
@@ -1194,7 +1194,7 @@ class CapabilityAgent(BaseAgent):
             return False
         if request.route_decision.route != "robot_action":
             return False
-        selected_id = self._router_selected_capability_id(request)
+        selected_id = self._goal_interpretation_selected_capability_id(request)
         if not selected_id:
             return False
         candidate_ids = {str(getattr(match, "capability_id", "")) for match in candidates}
@@ -1419,9 +1419,9 @@ class CapabilityAgent(BaseAgent):
         if intent.startswith("capability:"):
             selected_id = intent[len("capability:") :].strip()
         selected_line = (
-            f"Router-selected exact skill_id: {selected_id}\n"
+            f"Goal-Interpreter-selected exact skill_id: {selected_id}\n"
             if selected_id
-            else "Router-selected exact skill_id: none\n"
+            else "Goal-Interpreter-selected exact skill_id: none\n"
         )
         system = (
             "You are Chromie's capability selection agent. The prompt is organized as Global Context Group, Session Context Group, Current Job, Task Context Group, Cost Function, and Output Contract. "
@@ -1444,7 +1444,7 @@ class CapabilityAgent(BaseAgent):
             f"- Session id: {request.sid or ''}\n"
             f"- Extracted memory:\n{memory_block}\n"
             f"- Task context:\n{task_context_block}\n"
-            f"- Router decision context JSON: {route_context_block}\n"
+            f"- Goal Interpretation decision context JSON: {route_context_block}\n"
             f"- Bounded session/runtime context JSON: {session_context_block}\n\n"
             "Current Job:\n"
             "- You are now acting as Chromie's capability planner.\n"
@@ -1461,7 +1461,7 @@ class CapabilityAgent(BaseAgent):
             "- Ability interpretation: choose only from the provided skill_id values and satisfy that candidate's input_schema.\n"
             "- Treat can_run_parallel, exclusive_group, resource_claims, and execution_constraints as provider/runtime evidence about whether skills may overlap.\n"
             "- Do not infer concurrency from a skill name. If the evidence does not support overlap, do not claim simultaneous execution.\n"
-            "- If Router-selected exact skill_id is best, use it; if another candidate better satisfies the action/schema, choose that candidate.\n"
+            "- If Goal-Interpreter-selected exact skill_id is best, use it; if another candidate better satisfies the action/schema, choose that candidate.\n"
             "- Treat modifiers such as direction, duration, distance, count, speed, urgency, target, and object references as semantic parameter intent. Ground them to schema fields when the schema exposes a compatible field.\n"
             "- If the schema does not expose a field for a user modifier, do not invent that field; place the unsupported modifier in unmapped_intent and explain briefly in speech when it matters.\n"
             "- Polite ability-shaped requests can be action requests when they ask Chromie to perform a listed physical action now.\n"

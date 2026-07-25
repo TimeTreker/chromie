@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "id": "weather_then_chinese_nod_blink_stays_grounded",
-  "suite": "router_dialogue",
+  "suite": "cognitive_core_dialogue",
   "level": "integration",
   "description": "After a weather turn, a Chinese nod-and-blink request that the quick model labels as generic chat must be re-grounded to both physical skills and must not inherit weather semantics.",
   "tags": ["voice-log", "multi-turn", "weather-context-pollution", "zh-CN", "nod", "blink"],
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "catalog_version": 76,
       "capabilities": [

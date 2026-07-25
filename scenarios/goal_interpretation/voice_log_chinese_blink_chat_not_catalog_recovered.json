@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "id": "voice_log_chinese_blink_chat_not_catalog_recovered",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the 2026-07-03 live voice log: if the quick Router LLM treats noisy Chinese blink ASR as chat, catalog search must not recover it into an executable blink skill.",
+  "description": "Regression from the 2026-07-03 live voice log: if the fast Goal Interpreter LLM treats noisy Chinese blink ASR as chat, catalog search must not recover it into an executable blink skill.",
   "tags": [
     "voice-log",
     "zh-CN",
-    "router-agent-contract",
+    "cognitive-core-agent-contract",
     "blink",
     "model-authority"
   ],
@@ -16,7 +16,7 @@
     "language": "zh-CN"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",

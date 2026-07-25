@@ -43,7 +43,7 @@ LEVEL_A_CLAIM = (
     "services, microphone, speaker, simulator execution, or robot behavior."
 )
 LIVE_TEXT_PREVIEW_CLAIM = (
-    "Live text preview evidence through Router, the selected semantic runtime, "
+    "Live text preview evidence through Cognitive Gateway and the selected semantic runtime, "
     "and Soridormi status preflight. This does not prove microphone, speaker, "
     "or executed motion."
 )
@@ -718,7 +718,6 @@ def _live_case_namespace(
     expected_route = case.expected_routes[0] if len(case.expected_routes) == 1 else None
     return argparse.Namespace(
         text=case.text,
-        router_url=args.router_url,
         agent_url=args.agent_url,
         soridormi_mcp_url=args.soridormi_mcp_url,
         soridormi_repo=args.soridormi_repo,
@@ -945,7 +944,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-failures", action="store_true", help="Return success even when checks fail.")
     parser.add_argument("--evidence-dir", help="Directory for retained evidence summary.")
 
-    parser.add_argument("--router-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8091"))
     parser.add_argument("--agent-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8092"))
     parser.add_argument(
         "--soridormi-mcp-url",

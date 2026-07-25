@@ -19,9 +19,9 @@ Create and validate scenarios with:
 
 ```bash
 python scripts/scenario_author.py templates
-python scripts/scenario_author.py new --suite router --id draft_case \
+python scripts/scenario_author.py new --suite goal_interpretation --id draft_case \
   --text "Hello Chromie."
-python scripts/scenario_author.py edit --suite router --id draft_case
+python scripts/scenario_author.py edit --suite goal_interpretation --id draft_case
 python scripts/scenario_author.py validate scenarios/goal_interpretation/draft_case.json
 python scripts/scenario_author.py validate-all
 ```
@@ -40,8 +40,8 @@ the deterministic judge.
 
 ```text
 scenarios/
-  router/           Router module and scripted-model recovery scenarios
-  router_dialogue/  Multi-turn Router-to-Agent replay scenarios
+  goal_interpretation/  Goal Interpretation module and scripted-model recovery scenarios
+  cognitive_core_dialogue/  Multi-turn Cognitive Core replay scenarios
   interaction/      InteractionRuntime scenarios
   dialogue/         Multi-turn InteractionRuntime conversation scenarios
   cognitive_runtime/ Goal-driven planning and coordinated-response scenarios
@@ -50,7 +50,7 @@ scenarios/
 ```
 
 Each file contains exactly one scenario object. The file stem must match the
-scenario `id`; for example `router/normal_greeting.json` must contain
+scenario `id`; for example `goal_interpretation/normal_greeting.json` must contain
 `"id": "normal_greeting"`.
 
 `dialogue` scenarios contain ordered turns instead of a single `input.text`.
@@ -115,9 +115,9 @@ contain deterministic expectations. Normal regression runs must not depend on
 an LLM to decide whether the robot behaved correctly.
 
 
-### Scripted Router recovery scenarios
+### Scripted Goal Interpretation recovery scenarios
 
-Router fixtures may use `stub.llm_script` instead of one final
+Goal Interpretation fixtures may use `stub.llm_script` instead of one final
 `stub.llm_decision`. The scenario runner then executes the real
 `OllamaGoalInterpreter.route()` normalization, review, semantic-repair, and validation
 pipeline while replacing only external model completions. Each scripted item
@@ -146,14 +146,14 @@ may declare the expected model stage and a compact decision:
 }
 ```
 
-Standalone Router scenarios may also set `stub.context` to replay bounded host
+Standalone Goal Interpretation scenarios may also set `stub.context` to replay bounded host
 request context, such as `interaction_engagement`. This context is passed to
-the real Router pipeline; it must be a JSON object and should contain only the
+the real Goal Interpretation pipeline; it must be a JSON object and should contain only the
 minimum fields needed to reproduce the boundary under test.
 
-`router_dialogue` scenarios run ordered Router turns with one bounded
+`cognitive_core_dialogue` scenarios run ordered Cognitive Core turns with one bounded
 conversation-state snapshot. A turn may set `run_interaction=true` to pass the
-final Router decision through the dependency-light native InteractionRuntime
+final Goal Interpretation decision through the dependency-light native InteractionRuntime
 and assert emitted skills and arguments. This is deterministic Level A replay,
 not a live-model, microphone, simulator, or robot claim.
 
@@ -200,7 +200,7 @@ supported action plus unavailable manipulation, and three-goal
 execute/respond/clarify combinations. They assert per-goal step ownership,
 timing, arguments, speech coverage, and final interaction status.
 
-With deployed Router, Agent, Ollama, and Soridormi services, preview or execute
+With deployed Agent/Cognitive Core, Ollama, and Soridormi services, preview or execute
 the live text probes through the goal-driven runtime:
 
 ```bash
@@ -228,7 +228,7 @@ does not identify the source executing behind the MCP endpoint.
 
 That runner reports the evidence level and claim scope for each run. A passing
 Level A general-ability run is deterministic regression evidence only; it does
-not prove live Router/Agent services, microphone/speaker behavior, simulator
+not prove live Cognitive Core/Agent services, microphone/speaker behavior, simulator
 execution, or robot hardware behavior. The reconstruction plan is documented in
 [General Ability Test Reconstruction](../docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md).
 

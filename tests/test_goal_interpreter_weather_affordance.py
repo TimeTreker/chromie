@@ -5,7 +5,7 @@ import json
 import unittest
 from typing import Any
 
-from agent.app.cognitive_core.goal_interpreter.goal_interpreter import OllamaGoalInterpreter
+from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import FastSpeech, RouteDecision, RouteItem, RouteRequest, finalize_decision
 
 
@@ -228,8 +228,8 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             "天信",
         )
 
-    def test_router_source_has_no_weather_phrase_router(self) -> None:
-        source = inspect.getsource(__import__("router.app.goal_interpreter", fromlist=["*"]))
+    def test_goal_interpreter_source_has_no_weather_phrase_rule(self) -> None:
+        source = inspect.getsource(__import__("agent.app.cognitive_core.goal_interpreter.engine", fromlist=["*"]))
         for forbidden in (
             "_is_weather_like_text",
             "_ZH_WEATHER_TERMS",

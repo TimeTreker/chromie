@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "id": "compound_low_confidence_action_delegates",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "A compound quick-router plan must delegate to deepthinking when one required action is below per-action confidence threshold instead of executing the high-confidence subset.",
   "tags": [
-    "router-agent-contract",
+    "cognitive-core-agent-contract",
     "compound",
     "per-action-confidence",
     "deep-thought-handoff",
@@ -16,7 +16,7 @@
     "language": "en-US"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
@@ -92,7 +92,7 @@
     "task_types_forbid": ["task.execute_skill", "speech.speak"],
     "metadata_true": ["thinking_ack_allowed"],
     "metadata_json_contains": [
-      "quick_router_review_request",
+      "fast_goal_interpreter_review_request",
       "not_committed",
       "quick_validator_default_speak_first",
       "action[1] confidence 0.31 below threshold"

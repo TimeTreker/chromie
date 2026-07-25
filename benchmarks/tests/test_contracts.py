@@ -32,7 +32,7 @@ def test_legacy_list_preserves_declared_id_and_expectation() -> None:
         [{"scenario_id": "router.weather.zh", "user_text": "重庆天气如何？", "expected_route": "tool"}],
         source_path="scenarios/goal_interpretation/weather.json",
         layer="module",
-        datasets=["router", "tool_use"],
+        datasets=["goal_interpretation", "tool_use"],
         evidence_requirements=["replay"],
     )
     assert cases[0]["id"] == "router.weather.zh"
@@ -63,13 +63,13 @@ def test_stable_derived_id_does_not_depend_on_key_order() -> None:
         {"input": "hello", "expected": "chat"},
         source_path="scenarios/goal_interpretation/anonymous.json",
         layer="module",
-        datasets=["router"],
+        datasets=["goal_interpretation"],
     )[0]["id"]
     second = normalize_payload(
         {"expected": "chat", "input": "hello"},
         source_path="scenarios/goal_interpretation/anonymous.json",
         layer="module",
-        datasets=["router"],
+        datasets=["goal_interpretation"],
     )[0]["id"]
     assert first == second
 
@@ -80,7 +80,7 @@ def test_unrecognized_input_fails_closed() -> None:
             {"id": "broken", "expected": "anything"},
             source_path="broken.json",
             layer="module",
-            datasets=["router"],
+            datasets=["goal_interpretation"],
         )
 
 
@@ -97,7 +97,7 @@ def test_inventory_normalization_detects_duplicate_normalized_ids(tmp_path: Path
                 "source_path": f"scenarios/{name}.json",
                 "source_kind": "scenario_file",
                 "layer": "module",
-                "datasets": ["router"],
+                "datasets": ["goal_interpretation"],
                 "evidence_levels": ["static"],
             }
             for name in ("a", "b")

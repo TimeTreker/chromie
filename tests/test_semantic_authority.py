@@ -22,7 +22,7 @@ from shared.chromie_contracts.semantic_authority import (
     semantic_authority_from_context,
     semantic_authority_route_matrix,
 )
-from tests.test_capability_router_actions import _catalog
+from tests.test_capability_goal_interpretation_actions import _catalog
 from tests.test_cognitive_runtime_pr7 import FakeRuntime, ScriptedClient, new_goal_association
 
 
@@ -96,14 +96,14 @@ class SemanticAuthorityContractTests(unittest.TestCase):
         second = context_with_semantic_authority(
             first,
             SemanticAuthorityClaim(
-                owner="router_action_adapter",
+                owner="goal_interpretation_action_adapter",
                 role="adapter",
                 turn_id="turn",
             ),
         )
         claim = semantic_authority_from_context(second)
         self.assertIsNotNone(claim)
-        self.assertEqual(claim.owner, "router_action_adapter")
+        self.assertEqual(claim.owner, "goal_interpretation_action_adapter")
         self.assertEqual(claim.role, "adapter")
         self.assertEqual(
             [key for key in second if key == "semantic_authority"],
@@ -119,7 +119,7 @@ class SemanticAuthorityContractTests(unittest.TestCase):
                 "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
                 "orchestrator.handle_routed_text/apply (mapped lane excluded)",
                 "orchestrator.handle_routed_text/report_only",
-                "agent./interaction with exact Router actions",
+                "agent./interaction with exact Goal Interpretation actions",
                 "agent./interaction or /run emergency compatibility",
                 "post_interrupt_correction/apply (mapped lane allowlisted)",
                 "post_interrupt_correction/compatibility (mapped lane excluded)",
@@ -192,7 +192,7 @@ class SemanticAuthorityContractTests(unittest.TestCase):
                 {}, session_id="fallback", decision=fallback, reason="test"
             )
         )
-        self.assertEqual((direct_claim.owner, direct_claim.role), ("router_action_adapter", "adapter"))
+        self.assertEqual((direct_claim.owner, direct_claim.role), ("goal_interpretation_action_adapter", "adapter"))
         self.assertEqual(
             (fallback_claim.owner, fallback_claim.role, fallback_claim.emergency_fallback),
             ("legacy_capability_fallback", "authoritative", True),
@@ -265,7 +265,7 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["semantic_authority_role"], "none")
         self.assertIs(response.metadata["semantic_authority_accepted"], False)
 
-    async def test_exact_router_actions_are_adapter_only_even_with_llm(self) -> None:
+    async def test_exact_goal_interpretation_actions_are_adapter_only_even_with_llm(self) -> None:
         ollama = _CountingCapabilityOllama()
         runtime = InteractionRuntime(
             AgentServices(
@@ -294,7 +294,7 @@ class CapabilityAuthorityBoundaryTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             response.metadata["semantic_authority_owner"],
-            "router_action_adapter",
+            "goal_interpretation_action_adapter",
         )
         self.assertEqual(response.metadata["semantic_authority_role"], "adapter")
 

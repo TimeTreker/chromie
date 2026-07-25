@@ -289,7 +289,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     ) -> tuple[list[str], dict[str, Any]]:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         events: list[str] = []
-        network_calls = {"confirmation": 0, "session": 0, "router": 0, "model": 0}
+        network_calls = {"confirmation": 0, "session": 0, "goal_interpretation": 0, "model": 0}
         recorded_turn: dict[str, Any] = {}
         approval_during_provider_cancel: list[str] = []
 
@@ -353,7 +353,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         class _Router:
             async def route(self, *args: Any, **kwargs: Any) -> None:
-                network_calls["router"] += 1
+                network_calls["goal_interpretation"] += 1
                 raise AssertionError("Router must not run for a local stop reflex")
 
         class _Sessions:
@@ -487,7 +487,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             network_calls,
-            {"confirmation": 0, "session": 0, "router": 0, "model": 0},
+            {"confirmation": 0, "session": 0, "goal_interpretation": 0, "model": 0},
         )
         self.assertLess(
             events.index("output_invalidation"),

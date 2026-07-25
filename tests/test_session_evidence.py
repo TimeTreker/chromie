@@ -16,12 +16,12 @@ class SessionEvidenceTests(unittest.TestCase):
             path = Path(temp_dir) / "events.jsonl"
             tracker = SessionTracker(event_log_path=path)
             sid = tracker.create()
-            tracker.log(sid, "router_done: route=%s confidence=%.2f", "chat", 0.91)
+            tracker.log(sid, "goal_interpretation_done: route=%s confidence=%.2f", "chat", 0.91)
 
             records = [json.loads(line) for line in path.read_text().splitlines()]
             self.assertEqual(records[0]["event"], "session_start")
             self.assertEqual(records[0]["sid"], sid)
-            self.assertEqual(records[1]["event"], "router_done")
+            self.assertEqual(records[1]["event"], "goal_interpretation_done")
             self.assertIn("route=chat", records[1]["message"])
             self.assertGreaterEqual(records[1]["elapsed_ms"], 0.0)
 
@@ -33,7 +33,7 @@ class SessionEvidenceTests(unittest.TestCase):
             tracker.log(sid, "asr_final: asr_ms=%.1f text_chars=%s text=%r", 12.0, 12, "Please walk.")
             tracker.log(
                 sid,
-                "router_done: router_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
+                "goal_interpretation_done: router_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
                 50.0,
                 "robot_action",
                 "capability_agent,speaker_agent",
@@ -74,7 +74,7 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertEqual(len(workflow), 1)
             message = workflow[0]["message"]
             self.assertIn("asr_final:", message)
-            self.assertIn("router_done:", message)
+            self.assertIn("goal_interpretation_done:", message)
             self.assertIn("agent_start:", message)
             self.assertIn("interaction_done:", message)
             self.assertIn("skill_runtime_done:", message)
@@ -92,7 +92,7 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertEqual(graph["nodes"][0]["event"], "session_start")
             self.assertIn("delta_from_previous_ms", graph["nodes"][1])
             self.assertTrue(
-                any(node["event"] == "router_done" for node in graph["nodes"])
+                any(node["event"] == "goal_interpretation_done" for node in graph["nodes"])
             )
             node_records = [record for record in records if record["event"] == "session_workflow_node"]
             self.assertEqual(node_records, [])
@@ -119,7 +119,7 @@ class SessionEvidenceTests(unittest.TestCase):
             with self.assertLogs("orchestrator.runtime.session", level="WARNING") as warning_logs:
                 tracker.log(
                     sid,
-                    "router_done: route=%s agents=%s intent=%s confidence=%.2f",
+                    "goal_interpretation_done: route=%s agents=%s intent=%s confidence=%.2f",
                     "robot_action",
                     "capability_agent,speaker_agent",
                     "capability:chromie.speak",
@@ -140,7 +140,7 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertTrue(any("ERROR" in line for line in error_logs.output))
 
             records = [json.loads(line) for line in path.read_text().splitlines()]
-            router_records = [record for record in records if record["event"] == "router_done"]
+            router_records = [record for record in records if record["event"] == "goal_interpretation_done"]
             skill_records = [record for record in records if record["event"] == "skill_result"]
             self.assertEqual(router_records[-1]["severity"], "warning")
             self.assertEqual(skill_records[-1]["severity"], "error")

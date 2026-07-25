@@ -107,8 +107,8 @@ class ChromieCliTests(unittest.TestCase):
                             "timestamp_utc": "2026-06-27T00:00:01+00:00",
                             "sid": "sid-1",
                             "elapsed_ms": 100.0,
-                            "event": "router_done",
-                            "message": "router_done: route=chat confidence=0.91",
+                            "event": "goal_interpretation_done",
+                            "message": "goal_interpretation_done: route=chat confidence=0.91",
                         },
                         {
                             "timestamp_utc": "2026-06-27T00:00:02+00:00",
@@ -138,7 +138,7 @@ class ChromieCliTests(unittest.TestCase):
         self.assertEqual(artifact["kind"], "session_events_jsonl")
         self.assertEqual(artifact["identifiers"]["session"], ["sid-1", "sid-2"])
         messages = [record["message"] for record in artifact["records"]]
-        self.assertIn("router_done: route=chat confidence=0.91", messages)
+        self.assertIn("goal_interpretation_done: route=chat confidence=0.91", messages)
         self.assertEqual(stderr, "")
 
     def test_trace_view_adds_bounded_jsonl_event_timeline(self) -> None:
@@ -159,9 +159,9 @@ class ChromieCliTests(unittest.TestCase):
                         {
                             "sid": "sid-timeline",
                             "elapsed_ms": 110.0,
-                            "event": "router_done",
+                            "event": "goal_interpretation_done",
                             "status": "ok",
-                            "message": "router_done: route=interrupt intent=stop_current_output",
+                            "message": "goal_interpretation_done: route=interrupt intent=stop_current_output",
                         },
                         {
                             "sid": "sid-timeline",
@@ -205,7 +205,7 @@ class ChromieCliTests(unittest.TestCase):
         self.assertEqual(timeline["record_count"], 4)
         self.assertEqual(
             timeline["events"],
-            ["session_start", "router_done", "skill_runtime_done"],
+            ["session_start", "goal_interpretation_done", "skill_runtime_done"],
         )
         self.assertEqual(timeline["event_counts"]["session_start"], 1)
         self.assertEqual(timeline["status_counts"], {"ok": 2, "cancelled": 1})
@@ -247,10 +247,10 @@ class ChromieCliTests(unittest.TestCase):
                     {
                         "id": "n2",
                         "index": 2,
-                        "event": "router_done",
+                        "event": "goal_interpretation_done",
                         "elapsed_ms": 420.0,
                         "delta_from_previous_ms": 300.0,
-                        "message": "router_done: route=robot_action",
+                        "message": "goal_interpretation_done: route=robot_action",
                     },
                     {
                         "id": "n3",

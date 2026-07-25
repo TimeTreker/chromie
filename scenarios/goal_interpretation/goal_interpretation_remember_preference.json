@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "id": "goal_interpretation_remember_preference",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
-  "description": "Simple memory request is understood by the quick LLM router and routes to memory, not body motion.",
+  "description": "Simple memory request is understood by the quick Goal Interpreter model and routes to memory, not body motion.",
   "tags": [
     "memory",
     "normal"
@@ -12,7 +12,7 @@
     "text": "Remember that my favorite color is blue."
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": false
     },

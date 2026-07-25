@@ -13,7 +13,7 @@ class DeepThoughtResponseCheckTests(unittest.TestCase):
     def test_validate_deep_thought_events_accepts_speech_only_prelude(self) -> None:
         errors = validate_deep_thought_events(
             [
-                _event("router_done: router_ms=1.0 route=deep_thought agents=deepthinking_agent,speaker_agent"),
+                _event("goal_interpretation_done: router_ms=1.0 route=deep_thought agents=deepthinking_agent,speaker_agent"),
                 _event("deep_thought_ack_schedule: chars=33 text='Okay, let me think about that.'"),
                 _event("deep_thought_ack_scheduled: order=0 chunks=1 generation=0"),
                 _event("interaction_done: agent_ms=12.0 speech=1 skills=0 confirmation=False"),
@@ -29,7 +29,7 @@ class DeepThoughtResponseCheckTests(unittest.TestCase):
         legacy_event = "deep_thought_body" + "_cue_launch:"
         errors = validate_deep_thought_events(
             [
-                _event("router_done: router_ms=1.0 route=deep_thought agents=deepthinking_agent,speaker_agent"),
+                _event("goal_interpretation_done: router_ms=1.0 route=deep_thought agents=deepthinking_agent,speaker_agent"),
                 _event("deep_thought_ack_schedule: chars=33 text='Okay, let me think about that.'"),
                 _event("deep_thought_ack_scheduled: order=0 chunks=1 generation=0"),
                 _event(f"{legacy_event} skill_id=soridormi.express_attention"),
@@ -45,7 +45,7 @@ class DeepThoughtResponseCheckTests(unittest.TestCase):
     def test_validate_deep_thought_events_reports_missing_human_response(self) -> None:
         errors = validate_deep_thought_events(
             [
-                _event("router_done: router_ms=1.0 route=chat agents=speaker_agent"),
+                _event("goal_interpretation_done: router_ms=1.0 route=chat agents=speaker_agent"),
                 _event("session_done: scheduled_tts=0 queued_tts=0 played_tts=0 failed_tts=0 skipped_tts=0 response_chars=0 total_ms=30.0"),
             ],
             require_agent_success=True,

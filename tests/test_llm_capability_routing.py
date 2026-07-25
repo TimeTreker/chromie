@@ -4,7 +4,7 @@ import unittest
 
 from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
 from agent.app.cognitive_core.goal_interpreter.fallback import fallback_decision
-from agent.app.cognitive_core.goal_interpreter.main import _validate_llm_capability_decision
+from agent.app.cognitive_core.goal_interpreter.engine import _validate_llm_capability_decision
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 

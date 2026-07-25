@@ -11,7 +11,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from agent.app import main as agent_main
-from agent.app.cognitive_core.goal_interpreter.main import Settings as RouterSettings
+from agent.app.cognitive_core.goal_interpreter.engine import Settings as GoalInterpreterSettings
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,23 +31,23 @@ def _common_env() -> dict[str, str]:
 class RuntimeConfigurationTests(unittest.TestCase):
     def test_router_safety_rules_cannot_be_disabled_by_environment(self) -> None:
         with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_RULES_FIRST": "0"}, clear=False):
-            self.assertTrue(RouterSettings().rules_first)
+            self.assertTrue(GoalInterpreterSettings().rules_first)
 
     def test_standalone_service_fallbacks_match_documented_common_budgets(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(RouterSettings().capability_catalog_timeout_ms, 400)
+            self.assertEqual(GoalInterpreterSettings().capability_catalog_timeout_ms, 400)
         asr_source = (ROOT / "asr" / "server.py").read_text(encoding="utf-8")
         orchestrator_source = (ROOT / "orchestrator" / "orchestrator.py").read_text(
             encoding="utf-8"
         )
         self.assertIn('SHERPA_ONNX_NUM_THREADS", "2"', asr_source)
-        self.assertIn('ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "9000"', orchestrator_source)
+        self.assertIn('ORCH_AGENT_TIMEOUT_MS", "9000"', orchestrator_source)
         self.assertIn('OLLAMA_KEEP_ALIVE", "24h"', orchestrator_source)
 
     def test_router_host_budget_exceeds_router_internal_budget(self) -> None:
         values = _common_env()
         self.assertGreater(
-            int(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"]),
+            int(values["ORCH_AGENT_TIMEOUT_MS"]),
             int(values["AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS"])
             + int(values["AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS"])
             + int(values["AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS"]),
@@ -377,12 +377,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertIn("python_http_check()", source)
         self.assertIn(
-            'wait_for_http 127.0.0.1 8091 /health 300 "Router"', source
-        )
-        self.assertIn(
             'wait_for_http 127.0.0.1 8092 /health 300 "Agent"', source
         )
-        self.assertNotIn('wait_for_tcp 127.0.0.1 8091 300 "Router"', source)
         self.assertNotIn('wait_for_tcp 127.0.0.1 8092 300 "Agent"', source)
 
     def test_architecture_validation_preserves_social_attention(self) -> None:

@@ -318,7 +318,7 @@ reports, dictation, narration, and contextless replies; direct or unclear acts,
 malformed review output, and direct question form fail open to the grounded
 route. This correction is implemented and automatically verified at Level A;
 a rebuilt retained live-microphone rerun remains open. The retained
-`router/inactive_direct_weather_question_false_addressedness` scenario now
+`goal_interpretation/inactive_direct_weather_question_false_addressedness` scenario now
 replays the inactive engagement context, grounded quick weather route, and
 false question review through the real Router pipeline.
 The July 23 canonical gate passed 1,170 primary tests plus 20 legacy Agent

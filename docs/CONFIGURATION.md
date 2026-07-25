@@ -391,7 +391,7 @@ module, not by the fast Router model. Soft deterministic validators may correct
 impossible or unsafe route choices between stages, but they must not answer the
 user or select normal intent by phrase matching.
 
-The hard filter implementation is intentionally narrow in `router/app/rules.py`.
+The hard filter implementation is intentionally narrow in `goal_interpretation/app/rules.py`.
 It is the only Router stage allowed to use phrase patterns to determine a route,
 and it can only produce `interrupt` or `ignore`, including repeated filler or
 acknowledgment ASR hallucinations. Normal robot, tool, memory, conversation, and

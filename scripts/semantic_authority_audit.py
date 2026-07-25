@@ -38,7 +38,7 @@ def audit() -> dict[str, Any]:
         "orchestrator.handle_routed_text/apply (mapped lane allowlisted)",
         "orchestrator.handle_routed_text/apply (mapped lane excluded)",
         "orchestrator.handle_routed_text/report_only",
-        "agent./interaction with exact Router actions",
+        "agent./interaction with exact Goal Interpretation actions",
         "agent./interaction or /run emergency compatibility",
         "post_interrupt_correction/apply (mapped lane allowlisted)",
         "post_interrupt_correction/compatibility (mapped lane excluded)",
@@ -259,7 +259,7 @@ def audit() -> dict[str, Any]:
         "entrypoints": matrix,
         "maintained_defaults": maintained_defaults,
         "offline_equivalence_evidence": {
-            "exact_router_actions": (
+            "exact_goal_interpretation_actions": (
                 "deterministic adapter path; semantic LLM call forbidden"
             ),
             "legacy_capability_planner": (

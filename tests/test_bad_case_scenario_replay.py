@@ -12,7 +12,7 @@ from orchestrator.runtime.deepthinking_policy import (
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.schemas.route import RouteDecision, RouteItem
-from agent.app.cognitive_core.goal_interpreter.main import (
+from agent.app.cognitive_core.goal_interpreter.engine import (
     _guard_low_information_side_effect,
 )
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as RouterRouteDecision, RouteRequest, finalize_decision
@@ -130,7 +130,7 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
     def test_router_has_no_phrase_routed_gratitude_shortcut(self) -> None:
         from pathlib import Path
 
-        source = Path("router/app/main.py").read_text(encoding="utf-8")
+        source = Path("agent/app/cognitive_core/goal_interpreter/engine.py").read_text(encoding="utf-8")
 
         self.assertNotIn("_is_standalone_gratitude", source)
         self.assertNotIn("_gratitude_acknowledgement_decision", source)

@@ -15,7 +15,7 @@ class ScenarioAuthorTests(unittest.TestCase):
     def test_new_creates_scenarios_from_templates(self) -> None:
         cases = (
             {
-                "suite": "router",
+                "suite": "goal_interpretation",
                 "scenario_id": "draft_greeting",
                 "text": "Hello there.",
                 "extra_args": [
@@ -59,7 +59,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                 self.assertEqual(code, 0)
                 self.assertEqual(scenario.scenario_id, case["scenario_id"])
                 self.assertEqual(scenario.suite, case["suite"])
-                if case["suite"] == "router":
+                if case["suite"] == "goal_interpretation":
                     self.assertEqual(scenario.text, case["text"])
                     self.assertEqual(scenario.tags, ("normal",))
                 else:
@@ -71,7 +71,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                 [
                     "new",
                     "--suite",
-                    "router",
+                    "goal_interpretation",
                     "--id",
                     "Bad-ID",
                     "--scenario-root",
@@ -117,7 +117,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                 [
                     "new",
                     "--suite",
-                    "router",
+                    "goal_interpretation",
                     "--id",
                     "draft_edit",
                     "--text",
@@ -133,7 +133,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                     [
                         "edit",
                         "--suite",
-                        "router",
+                        "goal_interpretation",
                         "--id",
                         "draft_edit",
                         "--scenario-root",
@@ -159,7 +159,7 @@ class ScenarioAuthorTests(unittest.TestCase):
     def test_prompt_mentions_suite_specific_expectations(self) -> None:
         cases = (
             {
-                "suite": "router",
+                "suite": "goal_interpretation",
                 "count": "3",
                 "focus": "normal greetings and ambiguous commands",
                 "expected": (

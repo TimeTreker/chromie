@@ -252,8 +252,6 @@ supervised simulator run.
 
 ```bash
 ./scripts/compose.sh ps
-curl -fsS http://127.0.0.1:8091/health | python -m json.tool
-curl -fsS http://127.0.0.1:8092/health | python -m json.tool
 curl -fsS http://127.0.0.1:8092/health | python -m json.tool
 curl -fsS http://127.0.0.1:8092/capabilities | python -m json.tool
 curl -fsS http://127.0.0.1:11434/api/tags | python -m json.tool

@@ -205,14 +205,12 @@ def chromie_manifests() -> list[AgentManifest]:
                     "prompt_tier": "common",
                     "prompt_tier_reason": (
                         "Weather/current forecast questions are common spoken "
-                        "tool requests and must be visible to the fast router."
+                        "tool requests and should be visible in the common capability context."
                     ),
                     "when_to_use": (
                         "Use when the user asks about current, today's, tomorrow's, "
                         "or upcoming weather or forecast for a city/location."
                     ),
-                    "router_contract": "route=tool; intent=weather_query",
-                    "router_intent": "weather_query",
                     "tool_name": "weather",
                     "semantic_type": "weather_lookup",
                     "fast_speech_guidance": (

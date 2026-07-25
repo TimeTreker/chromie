@@ -66,9 +66,9 @@ class ConversationAgent(BaseAgent):
 
         if request.route_decision.speak_first:
             result.add_speak_immediate(request.route_decision.speak_first, style="brief")
-            self.trace(result, "used router speak_first")
+            self.trace(result, "used Goal Interpretation speak_first")
             logger.info(
-                "conversation_agent_done sid=%s mode=router_speak_first elapsed_ms=%.1f text=%r",
+                "conversation_agent_done sid=%s mode=goal_interpretation_speak_first elapsed_ms=%.1f text=%r",
                 request.sid,
                 (time.perf_counter() - started) * 1000.0,
                 request.route_decision.speak_first,

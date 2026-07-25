@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "id": "compound_walk_blink_joke_while_walking",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "Regression from the 2026-07-03 text-MuJoCo run: a compound physical request with a spoken joke must keep speech as a skill task instead of collapsing to walk/blink only.",
   "tags": [
     "voice-log",
-    "router-agent-contract",
+    "cognitive-core-agent-contract",
     "robot-action",
     "compound",
     "speech-skill",
@@ -19,7 +19,7 @@
     "language": "en-US"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
@@ -92,13 +92,13 @@
     "intent": "compound_common_catalog_task",
     "source": "llm",
     "task_types_include": ["task.execute_skill", "speech.speak"],
-    "metadata_true": ["quick_router_compound_tasks"],
+    "metadata_true": ["fast_goal_interpreter_compound_tasks"],
     "metadata_json_contains": [
       "soridormi.walk_forward",
       "chromie.speak",
       "soridormi.blink_eyes",
       "Why did the robot bring a map?",
-      "quick_router_action_min_confidence"
+      "fast_goal_interpreter_action_min_confidence"
     ],
     "llm_calls": 1
   }

@@ -489,7 +489,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
+        self.assertEqual(decision.intent, "deep_planner_goal_interpreter_unavailable")
         assert goal_interpreter.request is not None
         self.assertEqual(goal_interpreter.request.context["candidate_capabilities"], [])
 
@@ -533,10 +533,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.source, "fallback")
-        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
+        self.assertEqual(decision.intent, "deep_planner_goal_interpreter_unavailable")
         self.assertNotIn("capability_agent", decision.agents)
         self.assertNotIn("conversation_agent", decision.agents)
-        self.assertIn("LLM router unavailable", decision.reason or "")
+        self.assertIn("Goal Interpreter model unavailable", decision.reason or "")
         self.assertIn("delegating to deep_thought", decision.reason or "")
         self.assertEqual(decision.candidate_capabilities, [])
         self.assertNotIn(
@@ -1013,12 +1013,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.actions, [])
         self.assertIn("capability_agent", decision.agents)
         self.assertEqual(
-            decision.metadata["quick_router_action_handoff"]["status"],
+            decision.metadata["fast_goal_interpreter_action_handoff"]["status"],
             "planner_required",
         )
         self.assertIn(
             "unknown args",
-            " ".join(decision.metadata["quick_router_action_handoff"]["errors"]),
+            " ".join(decision.metadata["fast_goal_interpreter_action_handoff"]["errors"]),
         )
         self.assertNotIn("deepthinking_agent", decision.agents)
 
@@ -1108,7 +1108,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
         self.assertEqual(decision.actions, [])
-        self.assertNotIn("quick_router_action_handoff", decision.metadata)
+        self.assertNotIn("fast_goal_interpreter_action_handoff", decision.metadata)
         self.assertNotIn("compound_common_catalog_task", str(decision.metadata))
 
     async def test_hybrid_low_confidence_handoff_uses_llm_speak_first_thinking_ack(self) -> None:
@@ -1822,7 +1822,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             decision = await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
 
         self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
+        self.assertEqual(decision.intent, "deep_planner_goal_interpreter_unavailable")
         self.assertEqual(decision.source, "fallback")
         self.assertIn("delegating to deep_thought", decision.reason or "")
         self.assertEqual(
@@ -1830,7 +1830,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             ["cognition.delegate_deep_thought", "cognition.deep_think"],
         )
 
-    async def test_quick_router_fallback_delegates_to_deep_thought_without_phrase_rules(self) -> None:
+    async def test_fast_goal_interpreter_fallback_delegates_to_deep_thought_without_phrase_rules(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1872,7 +1872,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(decision.route, "deep_thought")
-        self.assertEqual(decision.intent, "deep_thought_router_unavailable")
+        self.assertEqual(decision.intent, "deep_planner_goal_interpreter_unavailable")
         self.assertEqual(decision.source, "fallback")
         self.assertFalse(decision.metadata.get("thinking_ack_allowed", True))
 

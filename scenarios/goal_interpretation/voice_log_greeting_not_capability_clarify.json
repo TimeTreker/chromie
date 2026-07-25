@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
   "id": "voice_log_greeting_not_capability_clarify",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "Regression from the 2026-07-05 live voice log: a plain greeting must not become a capability clarification just because the prompt catalog contains robot motion skills.",
   "tags": [
     "voice-log",
     "greeting",
-    "router-agent-contract",
+    "cognitive-core-agent-contract",
     "capability-hallucination"
   ],
   "input": {
     "text": "Hello, how are you."
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": false,
       "suggested_route": "chat",

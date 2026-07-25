@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "polite_stop",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "A polite bare stop stays on the deterministic current-interaction interrupt path.",
   "tags": ["interrupt", "safety", "polite"],
@@ -9,7 +9,7 @@
     "text": "Could you please stop?"
   },
   "stub": {
-    "router_mode": "hybrid"
+    "interpretation_mode": "hybrid"
   },
   "expect": {
     "route": "interrupt",

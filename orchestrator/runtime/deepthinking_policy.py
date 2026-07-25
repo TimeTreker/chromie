@@ -178,7 +178,7 @@ class DeepThinkingDelegationPolicy:
             # second host-side delegation to the generic DeepThinkingAgent would
             # bypass the CapabilityAgent that owns schema, provider, parameter,
             # and alternative-plan reasoning.  Confidence may intentionally be
-            # zero because the quick Router declined to bind one exact skill.
+            # zero because the fast Goal Interpreter declined to bind one exact skill.
             return self._result(decision, should_delegate=False)
 
         context = context or {}
@@ -229,7 +229,7 @@ class DeepThinkingDelegationPolicy:
         if decision.intent == "semantic_capability_planning":
             return True
         metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        for key in ("core_semantic_handoff", "quick_router_action_handoff"):
+        for key in ("core_semantic_handoff", "fast_goal_interpreter_action_handoff"):
             handoff = metadata.get(key)
             if not isinstance(handoff, Mapping):
                 continue
@@ -329,7 +329,7 @@ class DeepThinkingDelegationPolicy:
         """Let SkillRuntime/Soridormi adjudicate simple exact physical proposals.
 
         An exact catalog intent such as ``capability:soridormi.walk_forward`` with
-        no router-authored action args is already grounded to an available
+        no Goal-Interpreter-authored action args is already grounded to an available
         affordance, but it is still only a proposal.  Sending that through
         deepthinking solely because it is physical can discard the proposal and
         produce a confusing speech-only fallback.  CapabilityAgent,

@@ -91,7 +91,7 @@ Recommended top-level shape:
       "sid": "1ae17a72",
       "asr_text": "Walk forward for 15 seconds, quickly.",
       "operator_text": null,
-      "router": {
+      "goal_interpretation": {
         "route": "robot_action",
         "intent": "capability:soridormi.walk_forward",
         "confidence": 0.95,

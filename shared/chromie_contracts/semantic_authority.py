@@ -9,7 +9,7 @@ SEMANTIC_AUTHORITY_CONTEXT_KEY = "semantic_authority"
 SemanticAuthorityOwner = Literal[
     "goal_driven_runtime",
     "legacy_capability_fallback",
-    "router_action_adapter",
+    "goal_interpretation_action_adapter",
     "legacy_agent_pipeline",
 ]
 SemanticAuthorityRole = Literal["authoritative", "observer", "adapter"]
@@ -53,8 +53,8 @@ class SemanticAuthorityClaim(BaseModel):
                     "legacy_capability_fallback requires authoritative role and "
                     "emergency_fallback=true"
                 )
-        if self.owner == "router_action_adapter" and self.role != "adapter":
-            raise ValueError("router_action_adapter must use adapter role")
+        if self.owner == "goal_interpretation_action_adapter" and self.role != "adapter":
+            raise ValueError("goal_interpretation_action_adapter must use adapter role")
         if self.owner == "legacy_agent_pipeline" and self.role != "authoritative":
             raise ValueError("legacy_agent_pipeline must use authoritative role")
         return self
@@ -113,7 +113,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
                 "Goal-driven authority acquisition"
             ),
             "planner_path": (
-                "existing routed Agent path; exact Router actions remain "
+                "existing routed Agent path; exact Goal Interpretation actions remain "
                 "adapter-only"
             ),
             "fallback": "not_applicable_before_authority_acquisition",
@@ -126,8 +126,8 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "fallback": "legacy_agent_pipeline_remains_the_only_authority",
         },
         {
-            "entrypoint": "agent./interaction with exact Router actions",
-            "owner": "router_action_adapter",
+            "entrypoint": "agent./interaction with exact Goal Interpretation actions",
+            "owner": "goal_interpretation_action_adapter",
             "role": "adapter",
             "planner_path": "schema validation and SkillRequest materialization only",
             "fallback": "none",
@@ -165,7 +165,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
                 "ORCH_COGNITIVE_APPLY_LANES, before Goal-driven authority acquisition"
             ),
             "planner_path": (
-                "existing post-interrupt Agent path; exact Router actions remain "
+                "existing post-interrupt Agent path; exact Goal Interpretation actions remain "
                 "adapter-only and physical resume stays locked"
             ),
             "fallback": "not_applicable_before_authority_acquisition",

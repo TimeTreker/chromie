@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "factual_sun_round_rules_only_no_motion",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "Rules-only fallback must not treat weak factual word overlap such as round/hot as a physical turn action.",
   "tags": ["factual", "rules-only", "no-motion"],
@@ -10,7 +10,7 @@
     "language": "en-US"
   },
   "stub": {
-    "router_mode": "rules_only",
+    "interpretation_mode": "rules_only",
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",

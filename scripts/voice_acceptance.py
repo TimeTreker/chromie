@@ -232,7 +232,7 @@ CASES: dict[str, AcceptanceCase] = {
         ),
         (
             "ASR emits final text.",
-            "Router and goal-driven cognitive runtime complete.",
+            "Goal Interpretation and the goal-driven cognitive runtime complete.",
             "Interaction reports zero skills and TTS playback completes.",
         ),
         (SpokenStep("Tell me one short fact about the Moon.", (("moon",),)),),
@@ -359,7 +359,7 @@ CASES: dict[str, AcceptanceCase] = {
             "If emergency stop is exercised, follow Soridormi recovery before more motion.",
         ),
         (
-            "Router takes the deterministic interrupt route.",
+            "Protective Reflex takes the deterministic interrupt path.",
             "Active speech and work stop without waiting for model discretion.",
             "Safety/recovery state is recorded by the operator.",
         ),
@@ -898,9 +898,9 @@ def friendly_event_line(event: dict[str, Any]) -> str | None:
     prefix = f"[{sid}]"
     if name == "asr_final":
         return f"{prefix} ASR heard: {extract_asr_text(event)!r}"
-    if name == "router_done":
+    if name == "goal_interpretation_done":
         return (
-            f"{prefix} Router: route={message_field(message, 'route') or '?'} "
+            f"{prefix} Goal Interpretation: route={message_field(message, 'route') or '?'} "
             f"intent={message_field(message, 'intent') or '?'}"
         )
     if name in {"interaction_done", "cognitive_interaction_ready"}:
@@ -1539,7 +1539,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             interrupt_route = next(
                 (
                     index
-                    for index, item, _ in rows("router_done")
+                    for index, item, _ in rows("goal_interpretation_done")
                     if index > interrupt_asr
                     and str(item.get("sid") or "") == new_sid
                     and field(item, "route") == "interrupt"
@@ -1623,7 +1623,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         "follow-up",
     }:
         require("asr_final")
-        require("router_done")
+        require("goal_interpretation_done")
         interaction_messages = require_interaction()
     else:
         interaction_messages = []
@@ -1849,7 +1849,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
                 route_index = next(
                     (
                         index
-                        for index, item, _ in rows("router_done")
+                        for index, item, _ in rows("goal_interpretation_done")
                         if index > asr_index
                         and str(item.get("sid") or "") == asr_sid
                         and field(item, "route") == "interrupt"
@@ -1897,13 +1897,13 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
         deterministic = any(
             str(item.get("sid") or "") == stop_sid
             and field(item, "route") == "interrupt"
-            for _index, item, _message in rows("router_done")
+            for _index, item, _message in rows("goal_interpretation_done")
         )
         checks.append(
             CheckResult(
                 "deterministic stop route",
                 deterministic,
-                "router_done must report route=interrupt",
+                "goal_interpretation_done must report route=interrupt",
             )
         )
         checks.append(

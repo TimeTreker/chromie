@@ -14,7 +14,7 @@ class _ExplodingOllama:
 
 
 class FastFirstTerminalGreetingTests(unittest.IsolatedAsyncioTestCase):
-    async def test_terminal_router_greeting_skips_agent_rewrite(self) -> None:
+    async def test_terminal_goal_interpretation_greeting_skips_agent_rewrite(self) -> None:
         cases = (
             {
                 "name": "already_scheduled",

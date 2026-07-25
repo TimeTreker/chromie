@@ -65,7 +65,7 @@ current compatibility surfaces.
 microphone -> host VAD -> ASR -> Cognitive Gateway
   -> matched stop/cancel: interrupt current work and retain the envelope/outcome
   -> local suppression: record the envelope and start no ordinary cognition
-  -> otherwise: compatibility attention/route review -> admitted UserTurnEnvelope
+  -> otherwise: attention review -> admitted UserTurnEnvelope
   -> Goal Association -> Fast Planner -> terminal Deep Planner when required
   -> prospective Response Composer -> host-built strict InteractionResponse
   -> InteractionCoordinator -> Skill Runtime

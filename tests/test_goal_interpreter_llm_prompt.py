@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from agent.app.cognitive_core.goal_interpreter.goal_interpreter import (
+from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
     _catalog_observability_profile,
     _payload_message_texts,
@@ -13,8 +13,8 @@ from agent.app.cognitive_core.goal_interpreter.goal_interpreter import (
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 
-class RouterLlmPromptTests(unittest.TestCase):
-    def test_system_prompt_names_router_role_and_context_boundaries(self) -> None:
+class GoalInterpreterLlmPromptTests(unittest.TestCase):
+    def test_system_prompt_names_goal_interpreter_role_and_context_boundaries(self) -> None:
         router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -24,7 +24,7 @@ class RouterLlmPromptTests(unittest.TestCase):
 
         prompt = router.load_system_prompt()
 
-        self.assertIn("compatibility quick-intent and lane proposer", prompt)
+        self.assertIn("fast Goal Interpretation model", prompt)
         self.assertNotIn("robot-brain", prompt)
         self.assertIn("Prompt Architecture", prompt)
         self.assertIn("Global Context Group", prompt)
@@ -35,34 +35,34 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertLess(prompt.index("Global Context Group"), prompt.index("Current Job"))
         self.assertLess(prompt.index("Current Job"), prompt.index("Task Context"))
         self.assertIn("Generalization-first principle", prompt)
-        self.assertIn("Do not replace normal routing", prompt)
+        self.assertIn("Do not replace normal semantic interpretation", prompt)
         self.assertIn("Only deterministic", prompt)
         self.assertIn("emergency/noise controls", prompt)
         self.assertIn("phrase, pattern, regex", prompt)
-        self.assertIn("propose a quick intent", prompt)
-        self.assertIn("split compatibility lanes", prompt)
-        self.assertIn("Migration advisories", prompt)
-        self.assertIn("final goal meaning", prompt)
+        self.assertIn("interpret the user turn", prompt)
+        self.assertIn("bounded semantic lanes", prompt)
+        self.assertIn("cognitive evidence", prompt)
+        self.assertIn("final plan", prompt)
         self.assertIn("Route Taxonomy", prompt)
-        self.assertIn("current weather/forecast", prompt)
-        self.assertIn("Compatibility Tool And Affordance Proposal", prompt)
-        self.assertIn("intent=weather_query", prompt)
-        self.assertIn("metadata.weather_query", prompt)
-        self.assertIn("Do not answer weather from memory", prompt)
+        self.assertIn("trusted external or changing-fact lookup", prompt)
+        self.assertIn("Tool And Affordance Proposal", prompt)
+        self.assertIn("current external facts", prompt)
+        self.assertIn("trusted lookup capability", prompt)
+        self.assertIn("do not map a topic keyword", prompt)
+        self.assertNotIn("weather lookup uses route=tool", prompt)
         self.assertIn("deep_thought", prompt)
         self.assertIn("complex reasoning", prompt)
         self.assertIn("task-session work", prompt)
-        self.assertIn("compatibility route", prompt)
         self.assertIn("separately validated", prompt)
         self.assertIn("long-horizon goals", prompt)
         self.assertIn("routes[]", prompt)
-        self.assertIn("independent jobs", prompt)
+        self.assertIn("independent responsibilities", prompt)
         self.assertIn("Uncertainty And Confirmation Acting Rule", prompt)
         self.assertIn("clarification", prompt)
         self.assertIn("weak lexical or", prompt)
         self.assertIn("substitute a", prompt)
         self.assertNotIn("thinking_mode", prompt)
-        self.assertIn("Compatibility Tool And Affordance Proposal", prompt)
+        self.assertIn("Tool And Affordance Proposal", prompt)
         self.assertIn("body/tool affordance", prompt)
         self.assertIn("not a phrase table", prompt)
         self.assertIn("CapabilityAgent", prompt)
@@ -73,7 +73,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("ordered actions[]", prompt)
         self.assertIn("confidence", prompt)
         self.assertIn("agreement/disagreement", prompt)
-        self.assertIn("weather_query", prompt)
+        self.assertNotIn("intent=weather_query", prompt)
         self.assertIn("Catalog entries", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
         self.assertIn("status=missing_ability", prompt)
@@ -87,10 +87,10 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Do not", prompt)
         self.assertIn("chain-of-thought", prompt)
         self.assertIn("progress text", prompt)
-        self.assertLess(len(prompt), 4900)
+        self.assertLess(len(prompt), 5200)
 
 
-    def test_router_observability_profiles_prompt_and_raw_weather_output(self) -> None:
+    def test_goal_interpreter_observability_profiles_prompt_and_raw_tool_output(self) -> None:
         router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
@@ -124,11 +124,12 @@ class RouterLlmPromptTests(unittest.TestCase):
             '"metadata":{"tool_name":"weather","weather_query":{"location":"重庆","date":"today"}}}'
         )
 
-        self.assertIn("Compatibility Tool And Affordance Proposal", system_text)
+        self.assertIn("Tool And Affordance Proposal", system_text)
         self.assertIn("今天重庆天气怎么样？", user_text)
         self.assertTrue(flags["has_fast_speech_contract"])
         self.assertTrue(flags["has_tool_route_contract"])
-        self.assertTrue(flags["has_weather_query_contract"])
+        self.assertTrue(flags["has_external_lookup_guidance"])
+        self.assertTrue(flags["has_no_topic_mapping_guidance"])
         self.assertEqual(catalog_profile["common_ability_count"], 1)
         self.assertEqual(raw_summary["raw_route"], "tool")
         self.assertEqual(raw_summary["raw_intent"], "weather_query")
@@ -269,7 +270,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         contract_prompt = router.load_system_prompt() + "\n" + prompt
 
         self.assertIn("Global Context Group", prompt)
-        self.assertIn("Fast Router Context", prompt)
+        self.assertIn("Fast Goal Interpretation Context", prompt)
         self.assertIn("full owner-approved mind profile", prompt)
         self.assertIn("context_profile", prompt)
         self.assertIn("fast_minimal", prompt)
@@ -286,8 +287,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertLess(prompt.index("Task Context Group"), prompt.index("Output Contract"))
         self.assertIn("Decide from meaning, bounded context", prompt)
         self.assertIn("deterministic emergency/noise filter", prompt)
-        self.assertIn("compatibility quick-intent and lane proposer", prompt)
-        self.assertIn("migration advisory", prompt)
+        self.assertIn("fast goal-interpretation and lane proposer", prompt)
+        self.assertIn("bounded cognitive evidence", prompt)
         self.assertIn("not final goal meaning", prompt)
         self.assertIn("Return calibrated confidence", prompt)
         self.assertIn("fast_speech", prompt)
@@ -296,7 +297,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertNotIn("not " + "recommendations", prompt)
         self.assertIn("metadata.desired_abilities", prompt)
-        self.assertIn("Compatibility Affordance Proposal", prompt)
+        self.assertIn("Capability Affordance Proposal", prompt)
         self.assertIn("not authoritative grounding", prompt)
         self.assertIn("compact body/tool affordance interface", prompt)
         self.assertIn("not a phrase table", prompt)
@@ -764,7 +765,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(len(decision.routes), 3)
         self.assertEqual(decision.metadata["route_item_count"], 3)
-        self.assertIn("dominant compatibility route", decision.reason or "")
+        self.assertIn("dominant interpretation route", decision.reason or "")
         from agent.app.cognitive_core.goal_interpreter.schema import annotate_pipeline_stage_outputs
 
         annotated = annotate_pipeline_stage_outputs(decision)
@@ -825,7 +826,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(handoff.intent, "deep_thought_low_confidence")
         self.assertEqual(handoff.confidence, 0.42)
         self.assertEqual(handoff.speak_first, "Give me a moment to think about that.")
-        self.assertIn("quick router confidence", handoff.reason or "")
+        self.assertIn("fast goal interpreter confidence", handoff.reason or "")
         self.assertIn("quick_route=robot_action", handoff.reason or "")
         self.assertIn("deepthinking_agent", handoff.agents)
         self.assertEqual(handoff.metadata["task_relation"], "continue_task")

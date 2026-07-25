@@ -4,7 +4,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from agent.app.cognitive_core.goal_interpreter.config import router_mode_from_env
+from agent.app.cognitive_core.goal_interpreter.config import goal_interpretation_mode_from_env
 from agent.app.cognitive_core.goal_interpreter.fallback import fallback_decision
 from agent.app.cognitive_core.goal_interpreter.rules import route_by_priority_rules
 from agent.app.cognitive_core.goal_interpreter.schema import RouteRequest
@@ -160,8 +160,8 @@ class RouterCoreTests(unittest.TestCase):
 
     def test_router_use_llm_controls_default_mode(self) -> None:
         with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_USE_LLM": "0"}, clear=True):
-            self.assertEqual(router_mode_from_env(), "rules_only")
+            self.assertEqual(goal_interpretation_mode_from_env(), "rules_only")
         with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_USE_LLM": "1"}, clear=True):
-            self.assertEqual(router_mode_from_env(), "hybrid")
+            self.assertEqual(goal_interpretation_mode_from_env(), "hybrid")
         with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_USE_LLM": "0", "AGENT_GOAL_INTERPRETER_MODE": "llm_only"}, clear=True):
-            self.assertEqual(router_mode_from_env(), "llm_only")
+            self.assertEqual(goal_interpretation_mode_from_env(), "llm_only")

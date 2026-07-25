@@ -316,7 +316,7 @@ They are indexed first, then migrated without changing their semantic IDs.
 | `scenarios/cognitive_runtime/` | `integration/goal_driven_runtime` |
 | `scenarios/interaction/` | `integration/interaction` and selected `e2e/text` |
 | `scenarios/dialogue/` | `integration/multi_turn` |
-| `scenarios/cognitive_core_dialogue/` | `integration/router_dialogue` |
+| `scenarios/cognitive_core_dialogue/` | `integration/cognitive_core_dialogue` |
 | `scenarios/adapter/` | contract/compatibility regression |
 | `tests/scenarios/` | module, integration, or historical-regression datasets according to behavior |
 | `scripts/general_ability_acceptance.py` manifests | E2E ability cohorts and evidence qualification |

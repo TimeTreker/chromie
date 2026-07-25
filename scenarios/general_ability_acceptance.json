@@ -21,11 +21,11 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "router/song_discourse_marker_not_walk",
+          "key": "goal_interpretation/song_discourse_marker_not_walk",
           "rationale": "A discourse marker must not become locomotion."
         },
         {
-          "key": "router/voice_log_chinese_blink_chat_not_catalog_recovered",
+          "key": "goal_interpretation/voice_log_chinese_blink_chat_not_catalog_recovered",
           "rationale": "Chinese chat text with body-like words must not be forced into an unrelated action."
         },
         {
@@ -37,19 +37,19 @@
           "rationale": "Noisy or uncertain hearing should remain honest and clarifyable."
         },
         {
-          "key": "router/unclear_headset_fragment_semantic_clarification",
+          "key": "goal_interpretation/unclear_headset_fragment_semantic_clarification",
           "rationale": "A low-confidence referential fragment must clarify instead of fabricating understanding."
         },
         {
-          "key": "router_dialogue/weather_then_repeated_walk_stays_grounded",
+          "key": "cognitive_core_dialogue/weather_then_repeated_walk_stays_grounded",
           "rationale": "A prior weather turn must not contaminate repeated physical-action interpretation."
         },
         {
-          "key": "router/chinese_walk_after_weather_intent_repaired",
+          "key": "goal_interpretation/chinese_walk_after_weather_intent_repaired",
           "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
         },
         {
-          "key": "router/inactive_direct_weather_question_false_addressedness",
+          "key": "goal_interpretation/inactive_direct_weather_question_false_addressedness",
           "rationale": "An inactive direct Chinese weather question must keep its grounded tool route when the addressedness reviewer falsely labels it unaddressed."
         }
       ],
@@ -100,19 +100,19 @@
           "rationale": "Unavailable or weak review output must not substitute a different body skill."
         },
         {
-          "key": "router/compound_walk_blink_joke_while_walking",
+          "key": "goal_interpretation/compound_walk_blink_joke_while_walking",
           "rationale": "Mixed speech and body requests should keep each lane grounded."
         },
         {
-          "key": "router/walk_forward_stale_weather_route_repaired",
+          "key": "goal_interpretation/walk_forward_stale_weather_route_repaired",
           "rationale": "An internally inconsistent stale weather route is semantically repaired to the exact walking affordance."
         },
         {
-          "key": "router_dialogue/weather_then_repeated_walk_stays_grounded",
+          "key": "cognitive_core_dialogue/weather_then_repeated_walk_stays_grounded",
           "rationale": "The same walking request remains grounded across repeated turns after a weather query."
         },
         {
-          "key": "router/chinese_walk_after_weather_intent_repaired",
+          "key": "goal_interpretation/chinese_walk_after_weather_intent_repaired",
           "rationale": "The Chinese live-log walking request must not inherit a stale weather intent."
         }
       ],
@@ -172,7 +172,7 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "router/ambiguous_move_there",
+          "key": "goal_interpretation/ambiguous_move_there",
           "rationale": "Unresolved location reference should not execute."
         },
         {
@@ -377,15 +377,15 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "router/factual_sun_round_rules_only_no_motion",
+          "key": "goal_interpretation/factual_sun_round_rules_only_no_motion",
           "rationale": "A factual statement with weak motion-word overlap must stay in conversation and must not trigger physical action."
         },
         {
-          "key": "router/llm_unavailable_factual_moon_delegates",
+          "key": "goal_interpretation/llm_unavailable_factual_moon_delegates",
           "rationale": "A factual question remains on a cognitive lane when quick routing is unavailable instead of falling through to catalog motion."
         },
         {
-          "key": "router/weather_check",
+          "key": "goal_interpretation/weather_check",
           "rationale": "Weather intent should use the tool lane when available."
         },
         {
@@ -424,7 +424,7 @@
       ],
       "level_a_scenarios": [
         {
-          "key": "router/polite_stop",
+          "key": "goal_interpretation/polite_stop",
           "rationale": "A polite bare stop should deterministically cancel the current foreground interaction rather than relying on model judgment."
         },
         {

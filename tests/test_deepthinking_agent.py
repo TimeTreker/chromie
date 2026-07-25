@@ -461,7 +461,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(missing[0].metadata["intent"], "pick up the bottle")
         self.assertEqual(missing[0].metadata["confidence"], 0.93)
 
-    async def test_quick_router_review_supersedes_route_proposals(self) -> None:
+    async def test_fast_goal_interpreter_review_supersedes_route_proposals(self) -> None:
         ollama = _CapturingOllama(
             {
                 "tasks": [
@@ -503,7 +503,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                     "language": "en-US",
                     "source": "llm",
                     "metadata": {
-                        "quick_router_review_request": {
+                        "fast_goal_interpreter_review_request": {
                             "schema_version": 1,
                             "execution_state": "not_committed",
                             "quick_route": "robot_action",
@@ -532,8 +532,8 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
         response = result.to_response()
 
         self.assertEqual(response.speech[0].text, "Thanks for the warning. I will hold still.")
-        self.assertEqual(response.metadata["quick_router_review_decision"], "supersede")
-        self.assertIn("quick_router_review_request", ollama.calls[0]["prompt"])
+        self.assertEqual(response.metadata["fast_goal_interpreter_review_decision"], "supersede")
+        self.assertIn("fast_goal_interpreter_review_request", ollama.calls[0]["prompt"])
         self.assertIn("soridormi.look_at_window", ollama.calls[0]["prompt"])
         proposals = [
             TaskProposal.model_validate(item)

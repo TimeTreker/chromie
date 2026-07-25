@@ -28,7 +28,7 @@ from agent.app.interaction import AgentResultInteractionAdapter
 from agent.app.runtime import InteractionRuntime
 from agent.app.schema import AgentResult, AgentRunRequest
 from orchestrator.orchestrator import VoiceAssistant
-from orchestrator.runtime.cognitive_gateway import GatewayCoreCompatibilityAdapter
+from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.cognitive_runtime import (
@@ -60,13 +60,13 @@ from shared.chromie_contracts.response_composition import (
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan
 from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
-from agent.app.cognitive_core.goal_interpreter.goal_interpreter import OllamaGoalInterpreter
+from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
 SUPPORTED_SUITES = {
-    "router", "router_dialogue", "interaction", "dialogue", "adapter",
+    "goal_interpretation", "cognitive_core_dialogue", "interaction", "dialogue", "adapter",
     "cognitive_runtime", "cognitive_turn_loop",
 }
 
@@ -90,7 +90,7 @@ class BehaviorScenario:
         return f"{self.suite}/{self.scenario_id}"
 
 
-class _RouterCatalog:
+class _GoalInterpretationCatalog:
     def __init__(
         self,
         result: CapabilityCatalogResult,
@@ -109,7 +109,7 @@ class _RouterCatalog:
         return self.snapshot_data
 
 
-class _RouterLlm:
+class _GoalInterpretationLlm:
     def __init__(self, decision: RouteDecision | None) -> None:
         self.decision = decision
         self.calls = 0
@@ -119,14 +119,14 @@ class _RouterLlm:
         self.calls += 1
         self.stages.append("quick_intent")
         if self.decision is None:
-            raise AssertionError(f"LLM router should not be called for {request.text!r}")
+            raise AssertionError(f"Goal Interpretation model should not be called for {request.text!r}")
         return self.decision
 
 
-class _ScriptedOllamaRouter(OllamaGoalInterpreter):
-    """Run the real Router recovery pipeline with deterministic model output.
+class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
+    """Run the real Goal Interpretation recovery pipeline with deterministic model output.
 
-    This is intentionally closer to a live Router turn than `_RouterLlm`: the
+    This is intentionally closer to a live Goal Interpretation turn than `_GoalInterpretationLlm`: the
     quick decision, review, semantic repair, normalization, and validators all
     run through `OllamaGoalInterpreter.route()`. Only the external model completion is
     replaced by a file-backed script.
@@ -135,8 +135,8 @@ class _ScriptedOllamaRouter(OllamaGoalInterpreter):
     def __init__(self, script: list[dict[str, Any]]) -> None:
         super().__init__(
             ollama_url="http://scenario.invalid",
-            model="scenario-fast-router",
-            review_model="scenario-review-router",
+            model="scenario-fast-goal-interpreter",
+            review_model="scenario-review-goal-interpreter",
             timeout_ms=1000,
             review_timeout_ms=1000,
             confidence_threshold=0.55,
@@ -715,7 +715,7 @@ def load_scenario_file(path: Path) -> BehaviorScenario:
     if not isinstance(stub, dict) or not isinstance(expect, dict):
         raise ValueError(f"{path}: stub and expect must be objects")
 
-    if suite in {"dialogue", "router_dialogue"}:
+    if suite in {"dialogue", "cognitive_core_dialogue"}:
         turns = _validate_dialogue_turns(
             raw.get("turns"),
             path=path,
@@ -795,7 +795,7 @@ def load_scenarios(
     return selected
 
 
-def _router_catalog_from_stub(scenario: BehaviorScenario) -> CapabilityCatalogResult:
+def _goal_interpretation_catalog_from_stub(scenario: BehaviorScenario) -> CapabilityCatalogResult:
     catalog = scenario.stub.get("catalog") or {}
     if not isinstance(catalog, dict):
         raise ValueError(f"{scenario.key}: stub.catalog must be an object")
@@ -822,7 +822,7 @@ def _router_catalog_from_stub(scenario: BehaviorScenario) -> CapabilityCatalogRe
     )
 
 
-def _router_snapshot_from_stub(scenario: BehaviorScenario) -> dict[str, Any]:
+def _goal_interpretation_snapshot_from_stub(scenario: BehaviorScenario) -> dict[str, Any]:
     catalog = scenario.stub.get("catalog") or {}
     if not isinstance(catalog, dict):
         raise ValueError(f"{scenario.key}: stub.catalog must be an object")
@@ -841,7 +841,7 @@ def _router_snapshot_from_stub(scenario: BehaviorScenario) -> dict[str, Any]:
     }
 
 
-def _router_decision_from_stub(scenario: BehaviorScenario) -> RouteDecision | None:
+def _goal_interpretation_decision_from_stub(scenario: BehaviorScenario) -> RouteDecision | None:
     raw = scenario.stub.get("llm_decision")
     if raw is None:
         return None
@@ -850,7 +850,7 @@ def _router_decision_from_stub(scenario: BehaviorScenario) -> RouteDecision | No
     return RouteDecision.model_validate(raw)
 
 
-def _router_script_from_stub(
+def _goal_interpretation_script_from_stub(
     scenario_key: str,
     stub: dict[str, Any],
 ) -> list[dict[str, Any]] | None:
@@ -882,7 +882,7 @@ def _expect_equal(errors: list[str], label: str, actual: Any, expected: Any) -> 
         errors.append(f"{label}={actual!r}, expected {expected!r}")
 
 
-def _evaluate_router_expectations(
+def _evaluate_goal_interpretation_expectations(
     scenario: BehaviorScenario,
     *,
     decision: RouteDecision,
@@ -961,43 +961,43 @@ def _evaluate_router_expectations(
     return errors
 
 
-def _scenario_router_from_stub(
+def _scenario_goal_interpreter_from_stub(
     scenario_key: str,
     stub: dict[str, Any],
     *,
     fallback_decision: RouteDecision | None = None,
-) -> _RouterLlm | _ScriptedOllamaRouter:
-    script = _router_script_from_stub(scenario_key, stub)
+) -> _GoalInterpretationLlm | _ScriptedGoalInterpreter:
+    script = _goal_interpretation_script_from_stub(scenario_key, stub)
     if script is not None:
-        return _ScriptedOllamaRouter(script)
+        return _ScriptedGoalInterpreter(script)
     raw_decision = stub.get("llm_decision")
     if raw_decision is None:
-        return _RouterLlm(fallback_decision)
+        return _GoalInterpretationLlm(fallback_decision)
     if not isinstance(raw_decision, dict):
         raise ValueError(f"{scenario_key}: stub.llm_decision must be an object or null")
-    return _RouterLlm(RouteDecision.model_validate(raw_decision))
+    return _GoalInterpretationLlm(RouteDecision.model_validate(raw_decision))
 
 
-async def _run_router_turn(
+async def _run_goal_interpretation_turn(
     *,
     scenario: BehaviorScenario,
     text: str,
     language: str | None,
     context: dict[str, Any] | None,
     stub: dict[str, Any],
-) -> tuple[RouteDecision, _RouterLlm | _ScriptedOllamaRouter]:
+) -> tuple[RouteDecision, _GoalInterpretationLlm | _ScriptedGoalInterpreter]:
     from agent.app.cognitive_core.goal_interpreter import engine as main
 
-    router = _scenario_router_from_stub(
+    router = _scenario_goal_interpreter_from_stub(
         scenario.key,
         stub,
-        fallback_decision=_router_decision_from_stub(scenario),
+        fallback_decision=_goal_interpretation_decision_from_stub(scenario),
     )
-    mode = str(stub.get("router_mode") or "hybrid")
+    mode = str(stub.get("interpretation_mode") or "hybrid")
     stub_scenario = BehaviorScenario(
         path=scenario.path,
         scenario_id=scenario.scenario_id,
-        suite="router",
+        suite="goal_interpretation",
         level=scenario.level,
         text=text,
         language=language,
@@ -1009,9 +1009,9 @@ async def _run_router_turn(
     with patch.object(main.settings, "mode", mode), patch.object(
         main,
         "capability_catalog",
-        _RouterCatalog(
-            _router_catalog_from_stub(stub_scenario),
-            snapshot=_router_snapshot_from_stub(stub_scenario),
+        _GoalInterpretationCatalog(
+            _goal_interpretation_catalog_from_stub(stub_scenario),
+            snapshot=_goal_interpretation_snapshot_from_stub(stub_scenario),
         ),
     ), patch.object(main, "goal_interpreter", router):
         decision = await main.interpret_turn(
@@ -1024,11 +1024,11 @@ async def _run_router_turn(
     return decision, router
 
 
-async def evaluate_router_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
+async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
     context = scenario.stub.get("context") or {}
     if not isinstance(context, dict):
         raise ValueError(f"{scenario.key}: stub.context must be an object")
-    decision, router = await _run_router_turn(
+    decision, router = await _run_goal_interpretation_turn(
         scenario=scenario,
         text=scenario.text,
         language=scenario.language,
@@ -1037,7 +1037,7 @@ async def evaluate_router_scenario(scenario: BehaviorScenario) -> dict[str, Any]
     )
 
     task_types = _task_types_from_decision(decision)
-    errors = _evaluate_router_expectations(
+    errors = _evaluate_goal_interpretation_expectations(
         scenario,
         decision=decision,
         llm_calls=router.calls,
@@ -1605,7 +1605,7 @@ async def evaluate_dialogue_scenario(scenario: BehaviorScenario) -> dict[str, An
     }
 
 
-async def evaluate_router_dialogue_scenario(
+async def evaluate_cognitive_core_dialogue_scenario(
     scenario: BehaviorScenario,
 ) -> dict[str, Any]:
     manager = ConversationStateManager(
@@ -1631,7 +1631,7 @@ async def evaluate_router_dialogue_scenario(
             pre_snapshot.get("active_task_snapshots") or [],
         )
 
-        decision, router = await _run_router_turn(
+        decision, router = await _run_goal_interpretation_turn(
             scenario=scenario,
             text=text,
             language=language,
@@ -1639,7 +1639,7 @@ async def evaluate_router_dialogue_scenario(
             stub=stub,
         )
         expect = turn.get("expect") or {}
-        errors = _evaluate_router_expectations(
+        errors = _evaluate_goal_interpretation_expectations(
             scenario,
             decision=decision,
             llm_calls=router.calls,
@@ -1892,7 +1892,7 @@ async def evaluate_cognitive_turn_loop_scenario(
     runtime = _CognitiveTurnScenarioRuntime(stub)
     sessions = SessionTracker(enabled=True)
     session_id = sessions.create()
-    gateway = GatewayCoreCompatibilityAdapter()
+    gateway = CognitiveGateway()
     capture = gateway.capture(
         scenario.text,
         session_id=session_id,
@@ -2235,10 +2235,10 @@ async def evaluate_cognitive_turn_loop_scenario(
 
 
 async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
-    if scenario.suite == "router":
-        return await evaluate_router_scenario(scenario)
-    if scenario.suite == "router_dialogue":
-        return await evaluate_router_dialogue_scenario(scenario)
+    if scenario.suite == "goal_interpretation":
+        return await evaluate_goal_interpretation_scenario(scenario)
+    if scenario.suite == "cognitive_core_dialogue":
+        return await evaluate_cognitive_core_dialogue_scenario(scenario)
     if scenario.suite == "interaction":
         return await evaluate_interaction_scenario(scenario)
     if scenario.suite == "adapter":

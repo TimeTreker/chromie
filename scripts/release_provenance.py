@@ -322,7 +322,6 @@ def collect_provenance(
         "docker-compose.yml",
         "agent/Dockerfile",
         "asr/Dockerfile",
-        "router/Dockerfile",
         "tts/Dockerfile",
         "tts/candidate_server.py",
         "tts/candidate_provider.py",

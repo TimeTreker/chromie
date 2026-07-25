@@ -115,7 +115,7 @@ class ComposeConfigurationTests(unittest.TestCase):
         )[0]
 
         self.assertIn("      context: .", router_block)
-        self.assertIn("      dockerfile: router/Dockerfile", router_block)
+        self.assertIn("      dockerfile: goal_interpretation/Dockerfile", router_block)
 
     def test_agent_service_uses_main_model_for_response_review_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")

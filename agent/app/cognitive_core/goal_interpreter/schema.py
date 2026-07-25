@@ -67,7 +67,7 @@ class FastSpeech(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def accept_bare_text(cls, value: Any) -> Any:
-        """Tolerate small-router/review JSON that emits fast_speech as text.
+        """Tolerate small-model/review JSON that emits fast_speech as text.
 
         The prompt asks for an object, but qwen3:4b occasionally returns
         ``"fast_speech": "..."``.  Treat that as a shorthand for
@@ -84,7 +84,7 @@ class FastSpeech(BaseModel):
         """Drop enum/contract labels that a small LLM placed in text.
 
         Values such as ``checking_only`` are routing contract metadata, not
-        playable speech.  Clearing the text lets the router repair path or the
+        playable speech.  Clearing the text lets the goal-interpreter repair path or the
         downstream LLM produce natural language instead of speaking the marker.
         """
 
@@ -109,7 +109,7 @@ class RouteItem(BaseModel):
     """One semantic route item inside a multi-route decision.
 
     The top-level RouteDecision.route remains for compatibility. Route items
-    let the quick Router split one utterance into independently governed lanes:
+    let the fast Goal Interpreter split one utterance into independently governed lanes:
     immediate speech, memory, deep thought, tools, or embodied skills.
     """
 
@@ -458,7 +458,7 @@ def normalize_route_items(decision: RouteDecision) -> RouteDecision:
         decision.route = dominant  # type: ignore[assignment]
         decision.reason = (
             f"{decision.reason}; " if decision.reason else ""
-        ) + "validator selected dominant compatibility route from route_items"
+        ) + "validator selected dominant interpretation route from route_items"
     route_item_dicts = [
         item.model_dump(mode="json", exclude_none=True)
         for item in route_items
@@ -1068,7 +1068,7 @@ def annotate_pipeline_stage_outputs(
 def _drop_inherited_route_item_metadata(decision: RouteDecision) -> RouteDecision:
     """Remove stale route-item/task metadata before terminal turn acts.
 
-    Some router recovery paths are created from a rejected LLM decision and keep
+    Some goal-interpreter recovery paths are created from a rejected LLM decision and keep
     its metadata for observability.  That metadata can include generated
     ``route_items`` for the rejected decision.  If a terminal clarification then
     calls ``normalize_route_items`` with those stale items still present, the

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.router_regression import (
+from scripts.goal_interpretation_regression import (
     candidate_capabilities,
     evaluate_case,
     selected_capabilities,

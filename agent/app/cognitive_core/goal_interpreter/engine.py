@@ -8,8 +8,6 @@ import time
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI
-from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field
 
 from .capability_catalog import CapabilityCatalogClient, CapabilityCatalogResult
@@ -22,7 +20,6 @@ from .model_interpreter import (
 )
 from .rules import route_by_priority_rules
 from .schema import (
-    HealthResponse,
     RouteDecision,
     RouteRequest,
     annotate_pipeline_stage_outputs,
@@ -33,8 +30,6 @@ from .schema import (
 
 
 class Settings(BaseModel):
-    host: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_HOST", "0.0.0.0"))
-    port: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_PORT", "8091")))
     mode: Literal["rules_only", "llm_only", "hybrid"] = Field(
         default_factory=goal_interpretation_mode_from_env
     )
@@ -118,12 +113,6 @@ logger = logging.getLogger("chromie.agent.goal_interpreter")
 PROMPT_CATALOG_COMMON_LIMIT = 48
 PROMPT_CATALOG_ALL_LIMIT = 96
 
-app = FastAPI(
-    title="Chromie Goal Interpreter",
-    version="0.1.0",
-    default_response_class=ORJSONResponse,
-)
-
 capability_catalog = CapabilityCatalogClient(
     settings.capability_catalog_url,
     timeout_ms=settings.capability_catalog_timeout_ms,
@@ -132,8 +121,7 @@ capability_catalog = CapabilityCatalogClient(
 )
 
 
-@app.on_event("startup")
-async def warm_capability_catalog_snapshot() -> None:
+async def initialize_goal_interpreter() -> None:
     try:
         await capability_catalog.snapshot(refresh=True)
     except Exception as exc:
@@ -148,14 +136,14 @@ async def warm_capability_catalog_snapshot() -> None:
             )
         except Exception as exc:
             logger.warning(
-                "router LLM startup warm failed: model=%s error_type=%s error=%s",
+                "Goal Interpreter LLM startup warm failed: model=%s error_type=%s error=%s",
                 settings.model,
                 type(exc).__name__,
                 exc,
             )
         else:
             logger.info(
-                "router LLM startup warm succeeded: model=%s keep_alive=%s",
+                "Goal Interpreter LLM startup warm succeeded: model=%s keep_alive=%s",
                 settings.model,
                 settings.llm_keep_alive or "default",
             )
@@ -176,85 +164,6 @@ goal_interpreter = OllamaGoalInterpreter(
     keep_alive=settings.llm_keep_alive,
     prompt_path=Path(__file__).parent / "prompts" / "goal_interpreter_system.txt",
 )
-
-
-@app.get("/health", response_model=HealthResponse)
-async def health() -> HealthResponse:
-    return HealthResponse(
-        ok=True,
-        mode=settings.mode,
-        model=settings.model,
-        ollama_url=settings.ollama_url,
-        rules_first=settings.rules_first,
-    )
-
-
-@app.get("/routes")
-async def routes() -> dict:
-    return {
-        "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
-        "route_item_lanes": [
-            "immediate_speech",
-            "conversation",
-            "post_turn",
-            "deepthought",
-            "skill_runtime",
-            "tool",
-            "deterministic_control",
-            "none",
-        ],
-        "context_profiles": [
-            "none",
-            "fast_minimal",
-            "session_compact",
-            "capability_safety",
-            "full_mind",
-        ],
-        "lanes": [
-            {
-                "id": "emergency_filter",
-                "description": "Deterministic stop, cancel, silence, emergency, and unusable-audio handling before model routing.",
-                "routes": ["interrupt", "ignore"],
-                "llm": False,
-            },
-            {
-                "id": "post_interrupt_review",
-                "description": "Optional semantic review after an interrupt has already been applied, used only to confirm or correct likely stop/cancel mishearing.",
-                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
-                "llm": settings.mode in {"hybrid", "llm_only"} and settings.post_interrupt_review_enabled,
-            },
-            {
-                "id": "quick_intent",
-                "description": "Capability-catalog bounded quick intent, subject ownership, and addressedness routing with the fast Router model.",
-                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
-                "llm": settings.mode in {"hybrid", "llm_only"},
-            },
-            {
-                "id": "route_validation",
-                "description": "Deterministic validators correct capability-contract, availability, and safety impossibilities without answering the user.",
-                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
-                "llm": False,
-            },
-            {
-                "id": "deep_thought",
-                "description": "Delegated planning/reasoning when the quick router is low confidence or explicitly chooses deep_thought.",
-                "routes": ["deep_thought"],
-                "llm": False,
-            },
-        ],
-        "mode": settings.mode,
-        "agents": [
-            "capability_agent",
-            "conversation_agent",
-            "deepthinking_agent",
-            "speaker_agent",
-            "safety_agent",
-            "tool_agent",
-            "memory_agent",
-            "vision_agent",
-        ],
-    }
-
 
 
 def _normalized_information_units(text: str) -> str:
@@ -439,7 +348,7 @@ def _missing_capability_decision(
 ) -> RouteDecision:
     """Hand unresolved effectful meaning to semantic capability planning.
 
-    A quick Router failure to bind one exact catalog skill is not evidence that
+    A fast Goal Interpreter failure to bind one exact catalog skill is not evidence that
     the requested outcome is unsupported.  The bounded CapabilityAgent has the
     complete utterance plus the full executable capability/provider surface and
     is responsible for deciding exact execution, an alternative proposal,
@@ -946,9 +855,9 @@ def _validate_llm_capability_decision(
                         decision.intent = "compound_common_catalog_task"
                     decision.metadata = {
                         **(decision.metadata or {}),
-                        "quick_router_action_handoff": {
+                        "fast_goal_interpreter_action_handoff": {
                             "status": "planner_required",
-                            "reason": "quick_router_actions_failed_schema_validation",
+                            "reason": "fast_goal_interpreter_actions_failed_schema_validation",
                             "action_hints": planner_action_hints,
                             "errors": planner_handoff_reasons[:8],
                         },
@@ -976,7 +885,7 @@ def _validate_llm_capability_decision(
                     request,
                     decision,
                     reason_prefix=(
-                        "quick router compound action list needs deep_thought review: "
+                        "fast goal interpreter compound action list needs deep_thought review: "
                         + "; ".join([*invalid_reasons, *low_confidence_reasons][:4])
                     ),
                 )
@@ -1002,9 +911,9 @@ def _validate_llm_capability_decision(
                     ) + "validator normalized placeholder intent for valid compound actions"
             decision.metadata = {
                 **(decision.metadata or {}),
-                "quick_router_action_count": len(normalized_actions),
-                "quick_router_compound_tasks": len(normalized_actions) > 1,
-                "quick_router_action_min_confidence": min(
+                "fast_goal_interpreter_action_count": len(normalized_actions),
+                "fast_goal_interpreter_compound_tasks": len(normalized_actions) > 1,
+                "fast_goal_interpreter_action_min_confidence": min(
                     float(item["confidence"]) for item in normalized_actions
                 ),
             }
@@ -1055,7 +964,7 @@ def _validate_llm_capability_decision(
                 request,
                 decision,
                 reason_prefix=(
-                    "quick router selected a capability outside the fast common "
+                    "fast goal interpreter selected a capability outside the fast common "
                     f"ability catalog: {selected_id}"
                 ),
             )
@@ -1147,7 +1056,7 @@ def _deep_thought_from_low_confidence(
         candidates = raw_candidates if isinstance(raw_candidates, list) else []
     reason_parts = [
         reason_prefix
-        or f"quick router confidence {decision.confidence:.2f} below threshold {settings.confidence_threshold:.2f}",
+        or f"fast goal interpreter confidence {decision.confidence:.2f} below threshold {settings.confidence_threshold:.2f}",
         f"quick_route={decision.route}",
         f"quick_intent={decision.intent}",
     ]
@@ -1211,7 +1120,7 @@ def _deep_thought_from_low_confidence(
                 **inherited_metadata,
                 "thinking_ack_allowed": thinking_ack_allowed,
                 "thinking_ack_source": thinking_ack_source,
-                "quick_router_review_request": quick_review_request,
+                "fast_goal_interpreter_review_request": quick_review_request,
             },
         ),
         request,
@@ -1228,7 +1137,7 @@ def _recover_invalid_operational_llm_decision(
     return fallback_decision(
         request,
         reason=(
-            f"quick router returned deterministic-only route {decision.route}; "
+            f"fast goal interpreter returned deterministic-only route {decision.route}; "
             "emergency filter did not match"
         ),
     )
@@ -1255,7 +1164,7 @@ def _recover_unmatched_capability_clarification(
     return fallback_decision(
         request,
         reason=(
-            "quick router asked for capability clarification without a "
+            "fast goal interpreter asked for capability clarification without a "
             f"query-matched capability; quick_intent={decision.intent}"
         ),
     )
@@ -1285,7 +1194,7 @@ def _attach_stage_context(
     prompt_capabilities_common: list[dict[str, Any]] | None = None,
     prompt_capabilities_all: list[dict[str, Any]] | None = None,
 ) -> None:
-    previous = request.context.get("router_stage_context")
+    previous = request.context.get("goal_interpretation_stage_context")
     candidate_capabilities = list(catalog_result.matches or [])
     common = _unique_capabilities(list(prompt_capabilities_common or []))
     full = _unique_capabilities(list(prompt_capabilities_all or []))
@@ -1304,7 +1213,7 @@ def _attach_stage_context(
         "prompt_capabilities_all": full,
         "prompt_catalog_scope": "common",
         "capability_catalog_version": catalog_result.catalog_version,
-        "router_stage_context": {
+        "goal_interpretation_stage_context": {
             **(previous if isinstance(previous, dict) else {}),
             "emergency_filter": {
                 "matched": emergency_matched,
@@ -1474,14 +1383,14 @@ async def _review_priority_interrupt(
     )
 
 
-def _deep_thought_router_unavailable_decision(
+def _deep_planner_goal_interpreter_unavailable_decision(
     request: RouteRequest,
     result: CapabilityCatalogResult,
     *,
     llm_decision: RouteDecision,
 ) -> RouteDecision | None:
     reason_parts = [
-        "LLM router unavailable; delegating to deep_thought instead of deterministic semantic routing",
+        "Goal Interpreter model unavailable; delegating to deep_thought instead of deterministic semantic routing",
         f"catalog_version={result.catalog_version}",
     ]
     if llm_decision.reason:
@@ -1493,7 +1402,7 @@ def _deep_thought_router_unavailable_decision(
                 "deepthinking_agent",
                 "speaker_agent",
             ],
-            intent="deep_thought_router_unavailable",
+            intent="deep_planner_goal_interpreter_unavailable",
             confidence=0.50,
             language=request.language or "auto",
             priority="normal",
@@ -1610,7 +1519,7 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
                         source="fallback",
                     )
                 else:
-                    decision = _deep_thought_router_unavailable_decision(
+                    decision = _deep_planner_goal_interpreter_unavailable_decision(
                         request,
                         catalog_result,
                         llm_decision=llm_decision,
@@ -1643,9 +1552,3 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
         elapsed_ms,
     )
     return decision
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=False)

@@ -168,7 +168,7 @@ class SocialAttentionPlanner:
             "route": request.route_decision.route,
             "intent": request.route_decision.intent,
             "priority": request.route_decision.priority,
-            "router_actions": list(request.route_decision.actions or []),
+            "goal_interpretation_actions": list(request.route_decision.actions or []),
             "recent_history": list(request.history[-4:]),
             "attention_target_evidence": request.context.get("social_attention_target_evidence")
             or {"available": False},

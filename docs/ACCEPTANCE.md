@@ -18,7 +18,7 @@ A higher level does not replace lower-level regression tests.
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
-| Router/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
+| Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |
@@ -30,10 +30,10 @@ Retained reference-host evidence from June 14 and June 17, 2026:
 | Evidence ID | Revision | Result | Scope |
 |---|---|---|---|
 | GPU `20260614T130944Z` | `280c36a` | 21 passed, 0 failed | RTX 5090 service/GPU smoke, Ollama GPU placement, ASR/TTS health, generated PCM |
-| Synthetic voice pipeline `20260614T132934Z` | `f0e22ba` | 7/7 passed | Synthetic framed PCM through VAD, ASR, Router, Agent, Skill Runtime, TTS, and MuJoCo |
+| Synthetic voice pipeline `20260614T132934Z` | `f0e22ba` | 7/7 passed | Synthetic framed PCM through VAD, ASR, the former Router revision, Agent, Skill Runtime, TTS, and MuJoCo |
 | Virtual-microphone voice pipeline `20260614T133155Z` | `f0e22ba` | 7/7 passed | PipeWire virtual-microphone capture through the same interaction and MuJoCo path |
-| Synthetic voice pipeline `20260617T075825Z` | `4604a03` | 7/7 passed | Clean synthetic framed PCM through VAD, ASR, Router, Agent live Soridormi catalog, host confirmation, Skill Runtime, TTS, and MuJoCo |
-| Text-MuJoCo `20260617T081411Z` | `857c15f` | passed | Direct text input through Router, Agent `/interaction`, host Skill Runtime, live Soridormi MCP, ordered walk/nod/turn execution, and safe-idle status |
+| Synthetic voice pipeline `20260617T075825Z` | `4604a03` | 7/7 passed | Clean synthetic framed PCM through VAD, ASR, the former Router revision, Agent live Soridormi catalog, host confirmation, Skill Runtime, TTS, and MuJoCo |
+| Text-MuJoCo `20260617T081411Z` | `857c15f` | passed | Direct text input through the former Router revision and Agent `/interaction`, host Skill Runtime, live Soridormi MCP, ordered walk/nod/turn execution, and safe-idle status |
 
 The retained voice-pipeline automated bundles are historical evidence for their recorded
 revisions and legacy semantic path; they are not current goal-driven validation.
@@ -75,10 +75,10 @@ For roadmap-aligned module and combination checks, use:
 
 ```bash
 python scripts/test_matrix.py --list
-python scripts/test_matrix.py router
+python scripts/test_matrix.py goal-interpretation
 python scripts/test_matrix.py behavior
 python scripts/test_matrix.py general-ability
-python scripts/test_matrix.py asr tts router
+python scripts/test_matrix.py asr tts goal-interpretation
 python scripts/test_matrix.py local-modules
 python scripts/test_matrix.py voice-mujoco-sim
 python scripts/tts_provider_ab.py --check
@@ -152,7 +152,7 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
 ```
 
 Use `--execute` only for supervised simulator runs. Live text preview checks the
-Router, Agent, and Soridormi status/preflight boundary but does not execute
+Goal Interpretation, Agent, and Soridormi status/preflight boundary but does not execute
 motion; live text execution can support a Level C simulator claim only when the
 summary shows successful Skill Runtime execution and safe idle. Neither mode is
 microphone, speaker, or physical hardware evidence.
@@ -192,9 +192,9 @@ The reconstruction design and staged implementation plan are maintained in
 To grow the scenario library, use the authoring helper:
 
 ```bash
-python scripts/scenario_author.py new --suite router --id draft_case \
+python scripts/scenario_author.py new --suite goal_interpretation --id draft_case \
   --text "Hello Chromie."
-python scripts/scenario_author.py edit --suite router --id draft_case
+python scripts/scenario_author.py edit --suite goal_interpretation --id draft_case
 python scripts/scenario_author.py validate-all
 python scripts/scenario_author.py prompt --suite interaction --count 20
 ```
@@ -212,7 +212,7 @@ Host behavior rules.
 
 ## Model-assisted routing guardrails
 
-The fast Router model is accepted only as an advisory semantic classifier.
+The fast Goal Interpretation model is accepted only as an advisory semantic interpreter.
 Level A routing evidence must continue to prove:
 
 - deterministic stop, cancel, emergency, silence, and unusable-audio paths do
@@ -222,9 +222,9 @@ Level A routing evidence must continue to prove:
   cannot authorize effects, suppresses only explicitly ambient acts, and fails
   open to the original route on direct-question/request contradictions;
 - the retained
-  `router/inactive_direct_weather_question_false_addressedness` scenario
+  `goal_interpretation/inactive_direct_weather_question_false_addressedness` scenario
   replays the inactive host context, grounded weather-tool decision, and false
-  high-confidence question review through the real Router recovery pipeline;
+  high-confidence question review through the real Goal Interpretation recovery pipeline;
 - model routes are bounded by capability-catalog candidates and schema
   finalization;
 - low-confidence, ambiguous, unsupported, or unavailable routes clarify, refuse,
@@ -242,7 +242,6 @@ See
 ```bash
 ./scripts/start_services.sh
 ./scripts/compose.sh ps
-curl -fsS http://127.0.0.1:8091/health
 curl -fsS http://127.0.0.1:8092/health
 curl -fsS http://127.0.0.1:11434/api/tags
 ./scripts/verify_tts_gpu.sh
@@ -254,7 +253,7 @@ For a complete GPU smoke pass:
 START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
 ```
 
-This checks host/container GPU visibility, Compose health, Router-to-Agent
+This checks host/container GPU visibility, Compose health, Cognitive-Core-to-Agent
 round trip, ASR/TTS WebSockets, Ollama generation, model GPU placement, and
 optional non-empty TTS PCM generation. It does not evaluate microphone or
 speaker quality.
@@ -301,7 +300,7 @@ interruption/recovery, six-turn dialogue, and concurrent requests. It retains
 provider/model declarations, reference identity, WAVs, first-binary/total
 latency, RTF, dialogue/concurrency status, and a listening-review template. The
 workflow temporarily releases normal shared-GPU services, so it does not prove
-sustained coexistence with ASR, Router, Agent, and Ollama.
+sustained coexistence with ASR, Agent/Cognitive Core, and Ollama.
 
 The repeated isolated results showed CosyVoice leading ordinary first-audio and
 RTF while Qwen recovered faster after forced worker termination. Oute later
@@ -367,7 +366,7 @@ calls hang. Add representative live text probes to
 instead.
 
 For a deployed text-to-MuJoCo check that skips microphone and ASR while keeping
-Router, the goal-driven runtime, the host trusted Skill Runtime, live Soridormi
+Goal Interpretation, the goal-driven runtime, the host trusted Skill Runtime, live Soridormi
 MCP, and optional real speaker playback, start Chromie with the Soridormi
 manifest loaded and run:
 
@@ -766,7 +765,7 @@ WebSocket service and stores it under:
 It then injects a private framed PCM16 stream through the Orchestrator process's
 stdin. No network injection endpoint is opened. The Orchestrator resamples the
 packet, feeds normal VAD frames, sends the resulting utterance to ASR, and uses
-the same Router, Agent, Skill Runtime, TTS, and Soridormi paths as a microphone
+the same Cognitive Gateway, Agent/Cognitive Core, Skill Runtime, TTS, and Soridormi paths as a microphone
 session.
 
 This mode is the recommended first run because it removes pronunciation,
@@ -864,7 +863,7 @@ python scripts/voice_acceptance.py \
 
 For each utterance the runner displays a countdown and `SPEAK NOW`, waits for
 `asr_final`, shows expected and recognized text, and prints the current
-session's Router, interaction, skill, playback, cancellation, and completion
+session's Goal Interpretation, interaction, skill, playback, cancellation, and completion
 events. It asks for an audible/visual operator verdict only after all machine
 checks pass. Missing ASR or required runtime events automatically fail the case.
 
@@ -926,7 +925,7 @@ For every case retain:
 - repository and Soridormi revisions;
 - `.env.runtime` profile name without secrets;
 - audio device names, sample rates, and VAD thresholds;
-- Router decision, Agent/interaction metadata, skill results, and correlated IDs;
+- Goal Interpretation decision, Agent/interaction metadata, skill results, and correlated IDs;
 - confirmation ID, exact request fingerprint, expiry, and approval or denial;
 - timing logs and operator pass/fail notes;
 - simulator/hardware state before and after the case;

@@ -22,7 +22,7 @@ def _scenario(**expectation_overrides):
         "schema_version": 1,
         "id": "case.001",
         "layer": "module",
-        "datasets": ["router"],
+        "datasets": ["goal_interpretation"],
         "source": {"path": "case.json", "adapter": "test"},
         "inputs": {"user_text": "example"},
         "context": {},
@@ -105,7 +105,7 @@ def test_command_executor_uses_json_boundary(tmp_path: Path) -> None:
 def test_select_cases_filters_without_duplicating_scenarios() -> None:
     cases = [_scenario(), {**_scenario(), "id": "case.002", "layer": "integration", "datasets": ["interaction"]}]
     assert [item["id"] for item in select_cases(cases, layers={"integration"})] == ["case.002"]
-    assert [item["id"] for item in select_cases(cases, datasets={"router"})] == ["case.001"]
+    assert [item["id"] for item in select_cases(cases, datasets={"goal_interpretation"})] == ["case.001"]
 
 
 def test_replay_file_contract(tmp_path: Path) -> None:

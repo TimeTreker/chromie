@@ -84,7 +84,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                                 "root_cause_boundaries": ["Router/intent"],
                                 "level_a_scenarios": [
                                     {
-                                        "key": "router/polite_stop",
+                                        "key": "goal_interpretation/polite_stop",
                                         "rationale": "Polite stop remains interrupt.",
                                     }
                                 ],
@@ -112,7 +112,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("deterministic file-backed evidence", summary["claim_scope"])
         self.assertEqual(summary["case_count"], 1)
         self.assertEqual(summary["ability_classes"][0]["id"], "controls")
-        self.assertEqual(summary["ability_classes"][0]["cases"][0]["key"], "router/polite_stop")
+        self.assertEqual(summary["ability_classes"][0]["cases"][0]["key"], "goal_interpretation/polite_stop")
 
 
     def test_daily_multi_goal_level_a_class_passes(self) -> None:

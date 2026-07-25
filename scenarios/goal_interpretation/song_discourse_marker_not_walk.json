@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "song_discourse_marker_not_walk",
-  "suite": "router",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "Speech-only song requests with the discourse marker 'go ahead' must stay chat even when walking appears as a catalog hint.",
   "tags": ["chat", "speech-only", "no-motion"],
@@ -10,7 +10,7 @@
     "language": "en-US"
   },
   "stub": {
-    "router_mode": "hybrid",
+    "interpretation_mode": "hybrid",
     "catalog": {
       "matched": true,
       "suggested_route": "robot_action",
