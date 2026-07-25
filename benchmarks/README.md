@@ -117,3 +117,52 @@ The adapter receives one JSON request on stdin containing `scenario` and `run`,
 and returns one observation object on stdout. This boundary allows later Router,
 Planner, Composer, and deployed-runtime adapters without coupling benchmark code
 to one backend or adding benchmark-specific production branches.
+
+## Phase 4 runtime component adapters
+
+`runtime_adapters/` connects the generic `live_model` runner to real Chromie
+component boundaries without importing benchmark policy into production code.
+Supported component profiles are:
+
+- `router`;
+- `planner`;
+- `response_composer`;
+- `mind_profile`;
+- `capability_projection`;
+- `social_attention`.
+
+Each profile supports exactly one explicitly configured transport:
+
+- an HTTP JSON endpoint through its `CHROMIE_BENCHMARK_*_URL` variable; or
+- a Python callable using `module.path:function` through its
+  `CHROMIE_BENCHMARK_*_CALLABLE` variable.
+
+No deployment URL, port, backend identity, model, or prompt revision is embedded
+in the manifest. The component receives the full normalized scenario and run
+profile and must return a Benchmark execution observation. The adapter does not
+infer expected behavior from user text and does not translate phrases into
+skills.
+
+Example using a deployed Router adapter endpoint:
+
+```bash
+export CHROMIE_BENCHMARK_ROUTER_URL=http://127.0.0.1:8091/benchmark/router
+python -m benchmarks.modules.run \
+  --normalized benchmarks/reports/normalized_scenarios.json \
+  --mode live_model \
+  --command "python scripts/benchmark_runtime_adapter.py --component router" \
+  --model local-router-model \
+  --prompt-revision router-prompt-revision \
+  --output benchmarks/reports/router-live.json
+```
+
+Example using an in-process test harness callable:
+
+```bash
+export CHROMIE_BENCHMARK_SOCIAL_ATTENTION_CALLABLE=\
+my_harness.social_attention:invoke
+python scripts/benchmark_runtime_adapter.py --component social_attention
+```
+
+The callable or HTTP endpoint is an explicit test harness boundary. Production
+modules remain unaware of scenario IDs and benchmark execution.

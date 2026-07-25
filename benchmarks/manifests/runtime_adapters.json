@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "name": "router",
+      "layers": ["module", "integration"],
+      "url_env": "CHROMIE_BENCHMARK_ROUTER_URL",
+      "callable_env": "CHROMIE_BENCHMARK_ROUTER_CALLABLE"
+    },
+    {
+      "name": "planner",
+      "layers": ["module", "integration"],
+      "url_env": "CHROMIE_BENCHMARK_PLANNER_URL",
+      "callable_env": "CHROMIE_BENCHMARK_PLANNER_CALLABLE"
+    },
+    {
+      "name": "response_composer",
+      "layers": ["module", "integration"],
+      "url_env": "CHROMIE_BENCHMARK_RESPONSE_COMPOSER_URL",
+      "callable_env": "CHROMIE_BENCHMARK_RESPONSE_COMPOSER_CALLABLE"
+    },
+    {
+      "name": "mind_profile",
+      "layers": ["module", "integration"],
+      "url_env": "CHROMIE_BENCHMARK_MIND_PROFILE_URL",
+      "callable_env": "CHROMIE_BENCHMARK_MIND_PROFILE_CALLABLE"
+    },
+    {
+      "name": "capability_projection",
+      "layers": ["module", "integration"],
+      "url_env": "CHROMIE_BENCHMARK_CAPABILITY_PROJECTION_URL",
+      "callable_env": "CHROMIE_BENCHMARK_CAPABILITY_PROJECTION_CALLABLE"
+    },
+    {
+      "name": "social_attention",
+      "layers": ["module", "integration"],
+      "url_env": "CHROMIE_BENCHMARK_SOCIAL_ATTENTION_URL",
+      "callable_env": "CHROMIE_BENCHMARK_SOCIAL_ATTENTION_CALLABLE"
+    }
+  ]
+}
