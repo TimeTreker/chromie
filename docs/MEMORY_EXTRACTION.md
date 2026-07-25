@@ -7,7 +7,7 @@ First deterministic slice implemented. The host Orchestrator has process-local
 support. `ConversationStateManager` exposes `memory_summary` and
 `extracted_memory` through `session_memory`, records compact task/context
 memory from structured metadata, and records trusted Skill Runtime outcomes as
-task outcome memory. Quick Router prompts sanitize raw history/conversation
+task outcome memory. Fast Goal Interpreter prompts sanitize raw history/conversation
 fields and use compact session memory instead. Deepthinking prompts consume the
 extracted memory block. Ordinary conversation prompts now use extracted memory
 plus a tiny recent-turn fallback for immediate reference resolution; capability
@@ -60,7 +60,7 @@ Memory entries should carry an explicit scope:
 
 | Scope | Lifetime | Examples |
 |---|---:|---|
-| `turn` | Current request only | ASR text, route decision, quick-router proposal |
+| `turn` | Current request only | ASR text, route decision, fast-interpreter proposal |
 | `session` | Current conversation | Current topic, recent correction, active question |
 | `task` | Until task closes or expires | Goal, constraints, accepted/revised proposals |
 | `preference` | Durable only with policy/consent | Language preference, interaction style |
@@ -132,7 +132,7 @@ When uncertain, store a lower-confidence memory or skip the write.
 Every model-facing component should receive a role-appropriate compact memory
 block.
 
-For the quick Router, keep it very small:
+For the fast Goal Interpreter, keep it very small:
 
 ```text
 Memory Summary:
@@ -197,7 +197,7 @@ Memory is interpretive context, not authority.
 4. Future: add an optional LLM-assisted extractor only after the deterministic
    path is covered, with strict JSON output and low temperature.
 5. Implemented first slice: `MemoryPromptBuilder` feeds `session_memory`,
-   sanitized Router prompts, direct fallback context, conversation prompts,
+   sanitized Goal Interpreter prompts, direct fallback context, conversation prompts,
    capability planning/review prompts, and deepthinking prompts.
 6. Implemented first slice: direct fallback and ordinary conversation prompts
    keep only a tiny recent-turn fallback for immediate reference resolution;
@@ -205,7 +205,7 @@ Memory is interpretive context, not authority.
    instead of raw history.
 7. Implemented first slice: focused tests cover extracted-memory storage,
    reset and hard-idle expiry, keyed correction updates, explicit memory-route
-   updates, trusted outcome memory, Router prompt sanitization,
+   updates, trusted outcome memory, Goal Interpreter prompt sanitization,
    conversation/capability prompt migration, and deepthinking memory visibility.
 8. Implemented first offline-review slice: episode evaluation can write compact
    reviewed experience notes in `offline_reviews.jsonl` without injecting raw
@@ -219,7 +219,7 @@ The first implemented slice should prove:
 
 - the next turn receives compact extracted memory for a multi-turn task;
 - raw transcript turns are not injected into deepthinking as the normal path;
-- quick Router receives a small memory summary, not the full chat;
+- fast Goal Interpreter receives a small memory summary, not the full chat;
 - a user correction revises the memory summary used by the next turn;
 - runtime-confirmed outcomes can update task memory;
 - model speech alone cannot mark a physical action as completed;

@@ -1,14 +1,14 @@
-# Catalog-Aware Router Tiers
+# Catalog-Aware Goal Interpretation Tiers
 
-This document records Chromie's catalog-aware routing contract for the fast
-Router model and the deepthinking path.
+This document records Chromie's catalog-aware goal-interpretation contract for the fast
+Goal Interpreter model and the deepthinking path.
 
 ## Principle
 
 The skill catalog is a bounded menu of executable abilities. It is not the
 normal intent-understanding brain.
 
-For ordinary language, the Router should let the model infer meaning from the
+For ordinary language, the Goal Interpreter should let the model infer meaning from the
 user text, bounded context, and compact skill descriptions. Deterministic code
 may partition, validate, reject, clarify, or fail closed, but it must not grow
 into a rule table that chooses normal activities by phrase matching.
@@ -27,7 +27,7 @@ Catalog entries carry a `prompt_tier`:
 
 | Tier | Used By | Purpose |
 |---|---|---|
-| `common` | Second Router / `qwen3:4b` | Usually used daily skills that should fit in the fast prompt. |
+| `common` | Fast Goal Interpreter / `qwen3:4b` | Usually used daily skills that should fit in the fast prompt. |
 | `rare` | Deepthinking / larger Agent model | Seldom-used, operational, planning, commissioning, or specialized skills. |
 
 Catalog entries also carry:
@@ -37,7 +37,7 @@ Catalog entries also carry:
 - `prompt_tier_source`: `preset`, `provider`, `experience`, or `safety_lock`;
 - `prompt_tier_reason`: short audit text explaining the source decision.
 
-The fast Router receives only unlocked `common` entries as
+The fast Goal Interpreter receives only unlocked `common` entries as
 `common_ability_catalog`. Deepthinking receives the full compact catalog,
 including common, rare, and safety-locked entries.
 
@@ -60,9 +60,9 @@ journal and append candidate/skip events to
 `.chromie/experience/capability_prompt_tier_audit.jsonl`. The Agent can load
 that overlay with `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`.
 
-## Second Router Contract
+## Fast Goal Interpreter Contract
 
-The quick Router sees:
+The fast Goal Interpreter sees:
 
 - latest ASR text;
 - bounded session, memory, task, and robot/world context;
@@ -92,13 +92,13 @@ the unlocked common catalog is available, validation delegates to `deep_thought`
 instead of treating that rare, locked, or full-catalog ability as an immediate
 fast-lane action.
 
-When the quick Router understands a desired ability but no unlocked common
+When the fast Goal Interpreter understands a desired ability but no unlocked common
 executable skill safely matches it, it should choose `deep_thought` or
 `clarify` and may include `metadata.desired_abilities[]` with `ability_id`,
 `intent`, `status=missing_ability`, `confidence`, and `reason`. These entries
 become shared task-proposal ledger records, but they never execute.
 
-When delegating to `deep_thought`, the quick Router may include `speak_first`.
+When delegating to `deep_thought`, the fast Goal Interpreter may include `speak_first`.
 That text is a model-chosen speech task/prelude, such as a natural request for a
 moment to think. It must not claim that a physical action, tool result, memory
 write, or completion has happened.
@@ -140,17 +140,17 @@ meaning decision belongs to the LLM stage that saw the catalog.
 
 ## Failure Posture
 
-If the fast Router is uncertain, it should delegate rather than guess.
+If the fast Goal Interpreter is uncertain, it should delegate rather than guess.
 
-If the fast Router returns no safe skill or any required action is below the
-Router confidence threshold, the Orchestrator may speak a safe thinking prelude
+If the fast Goal Interpreter returns no safe skill or any required action is below the
+Goal Interpreter confidence threshold, the Orchestrator may speak a safe thinking prelude
 and let deepthinking continue. If there is no safe model-provided prelude,
 Chromie should stay silent or use the existing fail-closed fallback for that
 path.
 
-If the fast Router is unavailable, deterministic code may preserve context,
+If the fast Goal Interpreter is unavailable, deterministic code may preserve context,
 delegate, or fail closed, but should not replace the model with per-query
 catalog matching as the normal semantic chooser.
 
-See [Quick Router Task Planning](FAST_COGNITIVE_PLANNING.md) for the
+See [Fast Goal Interpreter Task Planning](FAST_COGNITIVE_PLANNING.md) for the
 per-action confidence contract and low-confidence handoff plan.

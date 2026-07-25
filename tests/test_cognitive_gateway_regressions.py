@@ -195,7 +195,7 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
             "Please explain the word stop.",
         )
 
-    async def test_deterministic_ignore_stays_suppressed_without_router_result(
+    async def test_deterministic_ignore_stays_suppressed_without_goal_interpreter_result(
         self,
     ) -> None:
         for core_mode in ("unavailable", "raises"):

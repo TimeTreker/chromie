@@ -46,11 +46,11 @@ class TaskContinuityResolverTests(unittest.IsolatedAsyncioTestCase):
                 metadata={
                     "semantic_task_operations": [
                         {
-                            "operation_id": "router-advisory",
+                            "operation_id": "goal-interpreter-advisory",
                             "operation": "create",
                             "confidence": 0.7,
                             "goal": {
-                                "description": "A router guess.",
+                                "description": "A Goal Interpreter proposal.",
                                 "source_text": text,
                             },
                         }
@@ -274,7 +274,7 @@ class OrchestratorTaskContinuityTests(unittest.IsolatedAsyncioTestCase):
             ],
         }
 
-    async def test_apply_mode_replaces_router_operations_and_sets_authority(self) -> None:
+    async def test_apply_mode_replaces_goal_interpretation_operations_and_sets_authority(self) -> None:
         operation = SemanticTaskOperation(
             operation_id="task-continuity:sid:0:abc",
             operation="modify",
@@ -302,7 +302,7 @@ class OrchestratorTaskContinuityTests(unittest.IsolatedAsyncioTestCase):
             metadata={
                 "semantic_task_operations": [
                     {
-                        "operation_id": "router-old",
+                        "operation_id": "goal-interpreter-old",
                         "operation": "create",
                         "confidence": 0.8,
                         "goal": {
@@ -330,12 +330,12 @@ class OrchestratorTaskContinuityTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("response_plan", metadata)
 
-    async def test_report_only_mode_does_not_change_router_operation(self) -> None:
+    async def test_report_only_mode_does_not_change_goal_interpretation_operation(self) -> None:
         result = SemanticTaskOperationSet(confidence=0.9)
         assistant = self._assistant("report_only", result)
-        router_operations = [
+        goal_interpretation_operations = [
             {
-                "operation_id": "router-create",
+                "operation_id": "goal-interpreter-create",
                 "operation": "create",
                 "confidence": 0.8,
                 "goal": {
@@ -348,7 +348,7 @@ class OrchestratorTaskContinuityTests(unittest.IsolatedAsyncioTestCase):
             route="deep_thought",
             intent="new request",
             confidence=0.9,
-            metadata={"semantic_task_operations": router_operations},
+            metadata={"semantic_task_operations": goal_interpretation_operations},
         )
 
         reviewed = await assistant._review_task_continuity(
@@ -361,7 +361,7 @@ class OrchestratorTaskContinuityTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             reviewed.metadata["semantic_task_operations"],
-            router_operations,
+            goal_interpretation_operations,
         )
         self.assertEqual(
             reviewed.metadata["task_continuity_resolution"]["status"],

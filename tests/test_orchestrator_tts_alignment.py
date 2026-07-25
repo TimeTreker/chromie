@@ -459,7 +459,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
-    def test_fast_first_response_text_uses_router_generated_speech(self) -> None:
+    def test_fast_first_response_text_uses_goal_interpreter_generated_speech(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
         assistant.core_generated_fast_speech_enabled = True

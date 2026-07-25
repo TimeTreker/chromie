@@ -637,7 +637,7 @@ def _route_item_count(value: Any) -> int:
     return len(value) if isinstance(value, list) else 0
 
 
-def _raw_router_output_summary(content: str) -> dict[str, Any]:
+def _raw_interpreter_output_summary(content: str) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "raw_chars": len(content or ""),
         "raw_hash": _short_hash(content or ""),
@@ -808,7 +808,7 @@ def _compact_active_task_snapshots(
     return compact
 
 
-def _router_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
+def _goal_interpretation_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
     prompt_context = _context_without_prompt_globals(context)
     memory = prompt_context.get("session_memory")
     if isinstance(memory, dict):
@@ -820,7 +820,7 @@ def _router_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
     return prompt_context
 
 
-def _router_fast_context_section(mind: Any) -> str:
+def _goal_interpretation_fast_context_section(mind: Any) -> str:
     """Minimal context for the fast Goal Interpreter.
 
     The fast Goal Interpreter should decide whether a task needs the full mind profile;
@@ -858,7 +858,7 @@ def _router_fast_context_section(mind: Any) -> str:
     )
 
 
-def _router_global_context_section(mind: Any) -> str:
+def _goal_interpretation_global_context_section(mind: Any) -> str:
     if not isinstance(mind, dict) or not mind:
         mind = {}
     identity = mind.get("identity") if isinstance(mind.get("identity"), dict) else {}
@@ -991,7 +991,7 @@ class OllamaGoalInterpreter:
             max_chars=2200,
         )
         mind = request.context.get("mind", {})
-        session_context = _router_prompt_context(request.context)
+        session_context = _goal_interpretation_prompt_context(request.context)
         context_json = _bounded_json(session_context, max_chars=520)
         active_tasks_json = _bounded_json_array(
             _compact_active_task_snapshots(request.context),
@@ -999,7 +999,7 @@ class OllamaGoalInterpreter:
         )
         return (
             "Global Context Group:\n"
-            f"{_router_fast_context_section(mind)}\n\n"
+            f"{_goal_interpretation_fast_context_section(mind)}\n\n"
             "Session Context Group:\n"
             f"language={request.language or 'auto'} sid={request.sid or ''}\n"
             f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n"
@@ -1033,7 +1033,7 @@ class OllamaGoalInterpreter:
             _compact_candidate_capabilities(_review_capabilities_from_request(request), limit=12),
             max_chars=1800,
         )
-        session_context = _bounded_json(_router_prompt_context(request.context), max_chars=1200)
+        session_context = _bounded_json(_goal_interpretation_prompt_context(request.context), max_chars=1200)
         return {
             "model": self.model,
             "stream": False,
@@ -1152,7 +1152,7 @@ class OllamaGoalInterpreter:
             separators=(",", ":"),
         )
         mind = request.context.get("mind", {})
-        session_context = _bounded_json(_router_prompt_context(request.context), max_chars=2400)
+        session_context = _bounded_json(_goal_interpretation_prompt_context(request.context), max_chars=2400)
         return {
             "model": self.review_model or self.model,
             "stream": False,
@@ -1164,7 +1164,7 @@ class OllamaGoalInterpreter:
                     "role": "system",
                     "content": (
                         "Global Context Group:\n"
-                        f"{_router_global_context_section(mind)}\n\n"
+                        f"{_goal_interpretation_global_context_section(mind)}\n\n"
                         "Session Context Group:\n"
                         f"- Language hint: {request.language or 'auto'}\n"
                         f"- Bounded session context JSON: {session_context}\n\n"
@@ -1280,7 +1280,7 @@ class OllamaGoalInterpreter:
             separators=(",", ":"),
         )
         mind = request.context.get("mind", {})
-        session_context = _bounded_json(_router_prompt_context(request.context), max_chars=2400)
+        session_context = _bounded_json(_goal_interpretation_prompt_context(request.context), max_chars=2400)
         return {
             "model": self.model,
             "stream": False,
@@ -1292,7 +1292,7 @@ class OllamaGoalInterpreter:
                     "role": "system",
                     "content": (
                         "Global Context Group:\n"
-                        f"{_router_global_context_section(mind)}\n\n"
+                        f"{_goal_interpretation_global_context_section(mind)}\n\n"
                         "Session Context Group:\n"
                         f"- Language hint: {request.language or 'auto'}\n"
                         f"- Bounded session context JSON: {session_context}\n\n"
@@ -1348,7 +1348,7 @@ class OllamaGoalInterpreter:
             max_chars=3000,
         )
         session_context = _bounded_json(
-            _router_prompt_context(request.context),
+            _goal_interpretation_prompt_context(request.context),
             max_chars=2400,
         )
         decision_json = _bounded_json(
@@ -1491,7 +1491,7 @@ class OllamaGoalInterpreter:
                     "role": "system",
                     "content": (
                         "Global Context Group:\n"
-                        f"{_router_global_context_section(mind)}\n\n"
+                        f"{_goal_interpretation_global_context_section(mind)}\n\n"
                         "Session Context Group:\n"
                         f"- Language hint: {request.language or 'auto'}\n"
                         f"- Bounded session context JSON: {session_context}\n"
@@ -1580,7 +1580,7 @@ class OllamaGoalInterpreter:
             "done_reason": data.get("done_reason"),
             "prompt_eval_count": data.get("prompt_eval_count"),
             "eval_count": data.get("eval_count"),
-            **_raw_router_output_summary(content),
+            **_raw_interpreter_output_summary(content),
         }
         logger.info("goal_interpreter_llm_raw_summary %s", _json_log(summary, max_chars=2200))
         if self.debug_raw_output:
@@ -1692,7 +1692,7 @@ class OllamaGoalInterpreter:
         stage: str = "llm",
     ) -> RouteDecision:
         content = data.get("message", {}).get("content", "")
-        raw_summary = _raw_router_output_summary(str(content or ""))
+        raw_summary = _raw_interpreter_output_summary(str(content or ""))
         parsed = _extract_json_object(content)
         route_items = _route_items_from_parsed(parsed)
         dominant_route = _dominant_route_from_items(route_items)
@@ -2247,7 +2247,7 @@ class OllamaGoalInterpreter:
                     if reviewed_decision.confidence >= self.confidence_threshold:
                         reviewed_decision.reason = (
                             f"{reviewed_decision.reason}; " if reviewed_decision.reason else ""
-                        ) + f"{reason_prefix}; review_model:{self.review_model} recovered quick-router mistake"
+                        ) + f"{reason_prefix}; review_model:{self.review_model} recovered fast-interpreter mistake"
                         logger.info(
                             "LLM review model recovered invalid deterministic-only route %s to %s",
                             decision.route,
@@ -2268,7 +2268,7 @@ class OllamaGoalInterpreter:
             if not is_disallowed_model_control_route(request, repaired_decision):
                 repaired_decision.reason = (
                     f"{repaired_decision.reason}; " if repaired_decision.reason else ""
-                ) + f"{reason_prefix}; fast_model:{self.model} repaired quick-router mistake"
+                ) + f"{reason_prefix}; fast_model:{self.model} repaired fast-interpreter mistake"
                 logger.info(
                     "LLM fast repair recovered invalid deterministic-only route %s to %s",
                     decision.route,

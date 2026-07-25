@@ -58,64 +58,51 @@ class ComposeConfigurationTests(unittest.TestCase):
         )
         self.assertIn("OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}", llm_block)
 
-    def test_router_service_uses_fast_llm_by_default(self) -> None:
+    def test_agent_embeds_fast_goal_interpreter_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        router_block = compose.split("  chromie-agent:", 1)[1].split(
-            "\n  chromie-agent:",
-            1,
-        )[0]
+        agent_block = compose.split("  chromie-agent:", 1)[1].split("\nnetworks:", 1)[0]
 
-        self.assertIn("AGENT_GOAL_INTERPRETER_USE_LLM: ${AGENT_GOAL_INTERPRETER_USE_LLM:-1}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_MODEL: ${AGENT_GOAL_INTERPRETER_MODEL:-qwen3:4b}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE: ${AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE:-24h}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP: ${AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP:-1}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS:-60000}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL: ${AGENT_GOAL_INTERPRETER_REVIEW_MODEL:-gemma4:e2b}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_TIMEOUT_MS:-5400}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS:-5400}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX: ${AGENT_GOAL_INTERPRETER_LLM_NUM_CTX:-4096}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT: ${AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT:-512}", router_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS:-2500}", router_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_USE_LLM: ${AGENT_GOAL_INTERPRETER_USE_LLM:-1}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_MODEL: ${AGENT_GOAL_INTERPRETER_MODEL:-qwen3:4b}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE: ${AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE:-24h}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP: ${AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP:-1}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS:-60000}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL: ${AGENT_GOAL_INTERPRETER_REVIEW_MODEL:-gemma4:e2b}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_TIMEOUT_MS:-5400}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS:-5400}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX: ${AGENT_GOAL_INTERPRETER_LLM_NUM_CTX:-4096}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT: ${AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT:-512}", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS:-2500}", agent_block)
         self.assertIn(
             "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS: ${AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS:-5000}",
-            router_block,
+            agent_block,
         )
         self.assertIn(
             "AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED: ${AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED:-0}",
-            router_block,
+            agent_block,
         )
         self.assertIn(
             "AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED: ${AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED:-1}",
-            router_block,
+            agent_block,
         )
         self.assertIn(
             "AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED: ${AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED:-1}",
-            router_block,
+            agent_block,
         )
         self.assertIn(
             "AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED: ${AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED:-0}",
-            router_block,
+            agent_block,
         )
 
-    def test_router_waits_for_agent_catalog_service_before_starting(self) -> None:
+    def test_agent_is_the_only_cognitive_service_and_owns_goal_interpretation(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        router_block = compose.split("  chromie-agent:", 1)[1].split(
-            "\n  chromie-agent:",
-            1,
-        )[0]
-
-        self.assertIn("chromie-agent:", router_block)
-        self.assertIn("condition: service_healthy", router_block)
-
-    def test_router_build_context_includes_shared_contracts(self) -> None:
-        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        router_block = compose.split("  chromie-agent:", 1)[1].split(
-            "\n  chromie-agent:",
-            1,
-        )[0]
-
-        self.assertIn("      context: .", router_block)
-        self.assertIn("      dockerfile: goal_interpretation/Dockerfile", router_block)
+        self.assertEqual(compose.count("\n  chromie-agent:\n"), 1)
+        self.assertNotIn("chromie-router", compose)
+        self.assertNotIn("8091", compose)
+        agent_block = compose.split("  chromie-agent:", 1)[1].split("\nnetworks:", 1)[0]
+        self.assertIn("      context: .", agent_block)
+        self.assertIn("      dockerfile: agent/Dockerfile", agent_block)
+        self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", agent_block)
 
     def test_agent_service_uses_main_model_for_response_review_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")

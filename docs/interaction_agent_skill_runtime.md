@@ -293,13 +293,13 @@ Implemented behavior:
 - rejection when required confirmation is absent;
 - TaskGraph graph-bound confirmation grants on the Agent side.
 - an explicit host-generated, action-specific spoken prompt;
-- bounded affirmative and negative phrase matching before Router or Agent use;
+- bounded affirmative and negative phrase matching before ordinary Cognitive Core or Agent use;
 - SHA-256 binding to the exact interaction, request IDs, versions, arguments,
   timing, timeout, and metadata;
 - short-lived, single-use approval with changed-request and replay rejection;
 - fail-closed denial for ambiguity, expiry, or negative replies;
 - operational stop, cancel, and emergency phrases cancel the pending approval
-  and pass through to the deterministic Router control path;
+  and pass through to the deterministic Protective Reflex control path;
 - correlated `confirmation_requested`, `confirmation_reply`,
   `confirmation_authorized`, and `confirmation_rejected` evidence events.
 
@@ -351,14 +351,14 @@ python scripts/general_ability_acceptance.py --mode live-text \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-It covers Router, goal-driven Agent planning/composition output, strict
+It covers Goal Interpretation, goal-driven Agent planning/composition output, strict
 contracts, live Soridormi preflight, and representative ability-class
 assertions. Use
 `scripts/interaction_text_mujoco_check.py --no-speaker` for retained
 text-to-simulator evidence. These paths deliberately do not prove microphone
 capture, real TTS playback, or hardware motion.
 
-The deployed text-to-MuJoCo check exercises the Router service, goal-driven
+The deployed text-to-MuJoCo check exercises the embedded Goal Interpreter, goal-driven
 association/planning/composition endpoints, trusted Skill Runtime, live
 Soridormi MCP, and optional real speaker output while skipping microphone and
 ASR. The old Agent `/interaction` path is available only with
@@ -374,7 +374,7 @@ python scripts/interaction_text_mujoco_check.py \
 
 This natural rehearsal sends only the text request into Chromie. The
 `--expect-*` flags below are optional regression assertions checked after
-Router, Agent, and Soridormi have produced their outputs:
+Goal Interpretation, Agent, and Soridormi have produced their outputs:
 
 ```bash
 python scripts/interaction_text_mujoco_check.py \

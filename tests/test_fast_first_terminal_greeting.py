@@ -10,7 +10,7 @@ from agent.app.schema import AgentRunRequest
 
 class _ExplodingOllama:
     async def generate(self, *args: Any, **kwargs: Any) -> str:  # pragma: no cover - must not be called
-        raise AssertionError("terminal router greeting must not call conversation LLM")
+        raise AssertionError("terminal goal interpretation greeting must not call conversation LLM")
 
 
 class FastFirstTerminalGreetingTests(unittest.IsolatedAsyncioTestCase):
@@ -28,7 +28,7 @@ class FastFirstTerminalGreetingTests(unittest.IsolatedAsyncioTestCase):
                 },
                 "speak_first": None,
                 "expected_speech": [],
-                "trace": "runtime: terminal router greeting already spoken by fast-first",
+                "trace": "runtime: terminal goal interpretation greeting already spoken by fast-first",
             },
             {
                 "name": "speak_first_not_pre_scheduled",
@@ -36,7 +36,7 @@ class FastFirstTerminalGreetingTests(unittest.IsolatedAsyncioTestCase):
                 "metadata": {},
                 "speak_first": "Hi!",
                 "expected_speech": ["Hi!"],
-                "trace": "runtime: terminal router greeting fast-first; skipped agent rewrite",
+                "trace": "runtime: terminal goal interpretation greeting fast-first; skipped agent rewrite",
             },
         )
 

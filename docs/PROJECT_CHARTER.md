@@ -97,10 +97,10 @@ commands are still user inputs, but their immediate protective effect must not
 wait for model inference; the resulting control and evidence can then be
 incorporated into goal and response state.
 
-The deployed service currently named Router is a compatibility implementation
-that still combines Gateway responsibilities with semantic/advisory routing.
-That service topology must not be mistaken for the intended ownership boundary,
-and its migration status is reported in [STATUS.md](STATUS.md).
+The independent Router service and compatibility authority have been removed.
+The fast Goal Interpreter now runs inside the Agent-owned Goal-Driven Cognitive
+Core and receives only admitted `UserTurnEnvelope` projections. It does not own
+Gateway admission, Host authorization, execution, safety, or provider evidence.
 
 ## Engineering principles
 

@@ -25,6 +25,8 @@ Router architecture. Historical Git and regression provenance may still mention
 the former component, but no current architecture or production dependency may
 do so.
 
+The final closure audit also removed stale 8091 developer-tool/configuration contracts, integrated-container tests, Router-named metadata/provenance fields, and unused Host-authored weather acknowledgement composition. The maintained full test entrypoint and Benchmark checks must pass before the Social Attention benchmark expansion begins.
+
 ## Chromie Benchmark Suite
 
 The next new development topic is the staged Benchmark Suite described in

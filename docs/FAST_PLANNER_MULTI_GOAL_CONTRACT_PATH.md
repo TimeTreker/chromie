@@ -108,13 +108,13 @@ the deterministic validator necessarily rejected. Mocked tests supplied ideal
 complete objects and did not reproduce that live decoder gap.
 
 The earliest wrong boundary is therefore the Fast Planner model-facing contract
-and its decoder/validator alignment. It is not Router, Soridormi, Skill Runtime,
+and its decoder/validator alignment. It is not Goal Interpreter, Soridormi, Skill Runtime,
 or provider execution.
 
 An earlier July 21 tuning snapshot was exercised in three consecutive warm
 four-case runs and reported 12/12 Fast-terminal passes with a 15.355-second
 aggregate median. That result was superseded by the later generic numeric
-provenance validator, stricter decoder contract, and Router/Response Composer
+provenance validator, stricter decoder contract, and Goal Interpreter/Response Composer
 envelope corrections; it is historical diagnostic context, not qualification
 evidence for the final working tree.
 
@@ -475,7 +475,6 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
   --ability-class multi_goal_daily_life \
   --goal-driven-runtime apply \
   --execute \
-  --router-url http://127.0.0.1:8091 \
   --agent-url http://127.0.0.1:8092 \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --evidence-dir .chromie/acceptance/gpu-live/multi-goal-fast-model-plan \

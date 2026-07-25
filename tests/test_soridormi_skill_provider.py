@@ -191,7 +191,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
                             "route_stage": "quick_intent",
                             "route_task_source_stage": "capability_catalog",
                             "route_confidence": 0.92,
-                            "router_source": "router.v2",
+                            "goal_interpretation_source": "goal_interpreter.v1",
                         },
                     }
                 ],
@@ -212,7 +212,7 @@ class SoridormiSkillProviderTests(unittest.IsolatedAsyncioTestCase):
             "capability_catalog",
         )
         self.assertEqual(chromie_intent["route_confidence"], 0.92)
-        self.assertEqual(chromie_intent["router_source"], "router.v2")
+        self.assertEqual(chromie_intent["goal_interpretation_source"], "goal_interpreter.v1")
 
 
     async def test_named_skill_propagates_live_perception_contract(self) -> None:

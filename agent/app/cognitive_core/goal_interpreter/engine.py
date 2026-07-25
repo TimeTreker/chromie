@@ -166,6 +166,74 @@ goal_interpreter = OllamaGoalInterpreter(
 )
 
 
+def interpretation_profile() -> dict[str, Any]:
+    """Describe the internal Goal Interpretation stages without exposing a service."""
+
+    return {
+        "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
+        "route_item_lanes": [
+            "immediate_speech",
+            "conversation",
+            "post_turn",
+            "deepthought",
+            "skill_runtime",
+            "tool",
+            "deterministic_control",
+            "none",
+        ],
+        "context_profiles": [
+            "none",
+            "fast_minimal",
+            "session_compact",
+            "capability_safety",
+            "full_mind",
+        ],
+        "lanes": [
+            {
+                "id": "emergency_filter",
+                "description": "Deterministic stop, cancel, silence, emergency, and unusable-audio handling before model interpretation.",
+                "routes": ["interrupt", "ignore"],
+                "llm": False,
+            },
+            {
+                "id": "post_interrupt_review",
+                "description": "Optional semantic review after an interrupt has already been applied.",
+                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify", "interrupt", "ignore"],
+                "llm": settings.mode in {"hybrid", "llm_only"} and settings.post_interrupt_review_enabled,
+            },
+            {
+                "id": "quick_intent",
+                "description": "Capability-catalog-bounded fast Goal Interpretation inside the Agent service.",
+                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
+                "llm": settings.mode in {"hybrid", "llm_only"},
+            },
+            {
+                "id": "route_validation",
+                "description": "Deterministic validators reject contract, availability, and safety impossibilities without choosing ordinary meaning.",
+                "routes": ["chat", "deep_thought", "robot_action", "tool", "memory", "clarify"],
+                "llm": False,
+            },
+            {
+                "id": "deep_thought",
+                "description": "Delegated planning and reasoning when fast interpretation is uncertain or selects deep_thought.",
+                "routes": ["deep_thought"],
+                "llm": False,
+            },
+        ],
+        "mode": settings.mode,
+        "agents": [
+            "capability_agent",
+            "conversation_agent",
+            "deepthinking_agent",
+            "speaker_agent",
+            "safety_agent",
+            "tool_agent",
+            "memory_agent",
+            "vision_agent",
+        ],
+    }
+
+
 def _normalized_information_units(text: str) -> str:
     """Return compact user-visible information units for ambiguity gating.
 
@@ -584,7 +652,7 @@ def _action_confidence(action: dict[str, Any], fallback: float) -> float | None:
         return None
 
 
-def _router_action_schema_errors(args: Any, schema: Any) -> list[str]:
+def _goal_interpretation_action_schema_errors(args: Any, schema: Any) -> list[str]:
     if not isinstance(args, dict):
         return ["args is not an object"]
     if not isinstance(schema, dict):
@@ -793,7 +861,7 @@ def _validate_llm_capability_decision(
                 if capability_id == "chromie.speak" and not str(args.get("text") or "").strip():
                     invalid_reasons.append(f"action[{index}] chromie.speak missing args.text")
                     continue
-                schema_errors = _router_action_schema_errors(
+                schema_errors = _goal_interpretation_action_schema_errors(
                     args,
                     selected.get("input_schema"),
                 )

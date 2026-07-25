@@ -988,7 +988,7 @@ async def _run_goal_interpretation_turn(
 ) -> tuple[RouteDecision, _GoalInterpretationLlm | _ScriptedGoalInterpreter]:
     from agent.app.cognitive_core.goal_interpreter import engine as main
 
-    router = _scenario_goal_interpreter_from_stub(
+    interpreter = _scenario_goal_interpreter_from_stub(
         scenario.key,
         stub,
         fallback_decision=_goal_interpretation_decision_from_stub(scenario),
@@ -1013,7 +1013,7 @@ async def _run_goal_interpretation_turn(
             _goal_interpretation_catalog_from_stub(stub_scenario),
             snapshot=_goal_interpretation_snapshot_from_stub(stub_scenario),
         ),
-    ), patch.object(main, "goal_interpreter", router):
+    ), patch.object(main, "goal_interpreter", interpreter):
         decision = await main.interpret_turn(
             RouteRequest(
                 text=text,
@@ -1021,14 +1021,14 @@ async def _run_goal_interpretation_turn(
                 context=dict(context or {}),
             )
         )
-    return decision, router
+    return decision, interpreter
 
 
 async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
     context = scenario.stub.get("context") or {}
     if not isinstance(context, dict):
         raise ValueError(f"{scenario.key}: stub.context must be an object")
-    decision, router = await _run_goal_interpretation_turn(
+    decision, interpreter = await _run_goal_interpretation_turn(
         scenario=scenario,
         text=scenario.text,
         language=scenario.language,
@@ -1040,8 +1040,8 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
     errors = _evaluate_goal_interpretation_expectations(
         scenario,
         decision=decision,
-        llm_calls=router.calls,
-        llm_stages=router.stages,
+        llm_calls=interpreter.calls,
+        llm_stages=interpreter.stages,
     )
     return {
         "ok": not errors,
@@ -1053,8 +1053,8 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
             "confidence": decision.confidence,
             "interrupt_current": decision.interrupt_current,
             "should_speak": decision.should_speak,
-            "llm_calls": router.calls,
-            "llm_stages": list(router.stages),
+            "llm_calls": interpreter.calls,
+            "llm_stages": list(interpreter.stages),
             "actions": list(decision.actions or []),
             "task_types": task_types,
             "metadata": decision.metadata,
@@ -1631,7 +1631,7 @@ async def evaluate_cognitive_core_dialogue_scenario(
             pre_snapshot.get("active_task_snapshots") or [],
         )
 
-        decision, router = await _run_goal_interpretation_turn(
+        decision, interpreter = await _run_goal_interpretation_turn(
             scenario=scenario,
             text=text,
             language=language,
@@ -1642,8 +1642,8 @@ async def evaluate_cognitive_core_dialogue_scenario(
         errors = _evaluate_goal_interpretation_expectations(
             scenario,
             decision=decision,
-            llm_calls=router.calls,
-            llm_stages=router.stages,
+            llm_calls=interpreter.calls,
+            llm_stages=interpreter.stages,
             expect=expect if isinstance(expect, dict) else {},
         )
 
@@ -1724,7 +1724,7 @@ async def evaluate_cognitive_core_dialogue_scenario(
                     "actions": list(decision.actions or []),
                     "metadata": decision.metadata,
                 },
-                "llm_stages": list(router.stages),
+                "llm_stages": list(interpreter.stages),
                 "interaction": interaction_actual,
                 "pre_context": _context_report(pre_snapshot),
                 "post_context": _context_report(post_snapshot),

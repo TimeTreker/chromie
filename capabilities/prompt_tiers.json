@@ -65,7 +65,7 @@
     },
     "chromie.weather.lookup": {
       "prompt_tier": "common",
-      "reason": "Weather/current forecast questions are common read-only tool requests and must be visible to the fast Router."
+      "reason": "Current weather and forecast lookup is a common read-only capability that should be visible to fast Goal Interpretation."
     }
   }
 }

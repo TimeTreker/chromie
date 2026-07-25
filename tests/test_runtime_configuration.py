@@ -29,7 +29,7 @@ def _common_env() -> dict[str, str]:
 
 
 class RuntimeConfigurationTests(unittest.TestCase):
-    def test_router_safety_rules_cannot_be_disabled_by_environment(self) -> None:
+    def test_goal_interpreter_safety_rules_cannot_be_disabled_by_environment(self) -> None:
         with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_RULES_FIRST": "0"}, clear=False):
             self.assertTrue(GoalInterpreterSettings().rules_first)
 
@@ -44,7 +44,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('ORCH_AGENT_TIMEOUT_MS", "9000"', orchestrator_source)
         self.assertIn('OLLAMA_KEEP_ALIVE", "24h"', orchestrator_source)
 
-    def test_router_host_budget_exceeds_router_internal_budget(self) -> None:
+    def test_goal_interpreter_host_budget_exceeds_internal_budget(self) -> None:
         values = _common_env()
         self.assertGreater(
             int(values["ORCH_AGENT_TIMEOUT_MS"]),
@@ -53,7 +53,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             + int(values["AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS"]),
         )
 
-    def test_router_uses_fast_llm_by_default(self) -> None:
+    def test_goal_interpreter_uses_fast_llm_by_default(self) -> None:
         values = _common_env()
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_USE_LLM"], "1")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "qwen3:4b")
@@ -92,7 +92,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         ):
             self.assertIn(f"{name}:", compose)
 
-    def test_ollama_keeps_router_and_agent_models_loaded_without_extra_parallelism(self) -> None:
+    def test_ollama_keeps_goal_interpreter_and_agent_models_loaded_without_extra_parallelism(self) -> None:
         values = _common_env()
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
         self.assertEqual(values["OLLAMA_NUM_PARALLEL"], "1")
@@ -223,7 +223,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_EPISODE_LOG_PATH"], ".chromie/experience/episodes.jsonl")
         self.assertEqual(values["ORCH_EPISODE_MAX_TURNS"], "12")
 
-    def test_orchestrator_warms_router_and_agent_models_when_router_llm_enabled(self) -> None:
+    def test_orchestrator_warms_goal_interpreter_and_agent_models_when_interpreter_llm_enabled(self) -> None:
         source = (ROOT / "scripts" / "start_orchestrator.sh").read_text(
             encoding="utf-8"
         )

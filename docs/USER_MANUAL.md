@@ -34,7 +34,7 @@ paired launcher from the Chromie repository:
 ./scripts/start_voice_mujoco.sh --soridormi-repo ../soridormi
 ```
 
-This starts Soridormi MuJoCo, Soridormi runtime MCP, Chromie ASR/TTS/Router/Agent,
+This starts Soridormi MuJoCo, Soridormi runtime MCP, Chromie ASR/TTS/Agent (including the embedded Goal Interpreter),
 and the host Orchestrator. After it prints `Chromie voice-to-MuJoCo is ready`,
 say a supervised request such as:
 
@@ -122,7 +122,7 @@ headless automation. The wrapper uses goal-driven apply by default; pass
 
 The text request is the only input Chromie uses for routing and skill planning.
 `--expect-*` flags are optional post-run assertions for regression tests; they
-are not sent to Router, Agent, or Soridormi and are not needed for natural
+are not sent to Agent cognition or Soridormi and are not needed for natural
 operator rehearsal.
 
 ```bash

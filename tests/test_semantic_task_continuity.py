@@ -342,15 +342,15 @@ class ConversationSemanticTaskTests(unittest.TestCase):
         self.assertEqual(result["reason"], "unknown_task_id")
 
 
-class RouterSemanticTaskPromptTests(unittest.TestCase):
+class InterpreterSemanticTaskPromptTests(unittest.TestCase):
     def test_prompt_exposes_bounded_active_goal_and_semantic_operation_contract(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
-        prompt = router.build_user_prompt(
+        prompt = interpreter.build_user_prompt(
             RouteRequest(
                 sid="s2",
                 text="Make that coffee iced.",

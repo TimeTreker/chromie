@@ -109,7 +109,7 @@ class WeatherToolAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(weather.queries, [])
         self.assertEqual(result.speak_immediate[0].text, "你想查哪个城市的天气？")
 
-    async def test_weather_tool_can_use_router_metadata_without_llm(self) -> None:
+    async def test_weather_tool_can_use_goal_interpretation_metadata_without_llm(self) -> None:
         weather = _FakeWeatherClient()
         agent = ToolAgent(AgentServices(use_llm=False, weather_client=weather))
         request = AgentRunRequest(

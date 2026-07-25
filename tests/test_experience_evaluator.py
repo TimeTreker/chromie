@@ -27,7 +27,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-1",
                     turn_index=1,
                     user_text="Walk forward for 15 seconds, quickly.",
-                    router={
+                    goal_interpretation={
                         "route": "robot_action",
                         "intent": "capability:soridormi.walk_forward",
                         "source": "llm",
@@ -87,7 +87,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-1",
                     turn_index=1,
                     user_text="Hello.",
-                    router={"route": "chat", "intent": "general_conversation"},
+                    goal_interpretation={"route": "chat", "intent": "general_conversation"},
                     agent={
                         "status": "ok",
                         "speech": ["Hello."],
@@ -127,7 +127,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-blink",
                     turn_index=1,
                     user_text="Please blink your eyes 5 times.",
-                    router={
+                    goal_interpretation={
                         "route": "chat",
                         "intent": "general_conversation",
                         "source": "llm",
@@ -166,7 +166,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-blink",
                     turn_index=1,
                     user_text="Please blink your eyes 5 times.",
-                    router={"route": "chat", "intent": "general_conversation"},
+                    goal_interpretation={"route": "chat", "intent": "general_conversation"},
                     agent={
                         "status": "ok",
                         "speech": ["Okay, I blinked my eyes."],

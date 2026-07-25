@@ -163,7 +163,7 @@ trace-summary.json
 Critical incidents should include or reference the correlated completed trace
 when available. Normal interactions may later emit sampled
 `chromie.interaction_trace` events. The trace schema must remain independent of
-any fixed Router, Planner, ASR, TTS, or execution pipeline.
+any fixed specific cognitive, audio, or execution pipeline.
 
 Trace collection, finalization, and instrumentation rules are owned by
 [Runtime Trace Contract](RUNTIME_TRACE.md). Runtime Event packaging remains the

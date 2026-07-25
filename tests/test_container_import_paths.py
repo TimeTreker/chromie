@@ -25,12 +25,8 @@ class ContainerImportPathTests(unittest.TestCase):
                 "agent",
                 ROOT / "agent" / "app",
                 "import app.clients.ollama_client; "
-                "import app.agents.capability; print('ok')",
-            ),
-            (
-                "goal_interpretation",
-                ROOT / "goal_interpretation" / "app",
-                "import app.goal_interpreter; print('ok')",
+                "import app.agents.capability; "
+                "import app.cognitive_core.goal_interpreter.engine; print('ok')",
             ),
         )
 
@@ -61,8 +57,8 @@ class ContainerImportPathTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("ok", result.stdout)
 
-    def test_router_dockerfile_copies_runtime_package(self) -> None:
-        dockerfile = (ROOT / "goal_interpretation" / "Dockerfile").read_text()
+    def test_agent_dockerfile_copies_runtime_package(self) -> None:
+        dockerfile = (ROOT / "agent" / "Dockerfile").read_text()
         self.assertIn("COPY shared/chromie_runtime ./chromie_runtime", dockerfile)
 
     def test_semantic_authority_audit_runs_from_repository_root(self) -> None:

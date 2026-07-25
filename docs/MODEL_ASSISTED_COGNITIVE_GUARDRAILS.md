@@ -1,6 +1,6 @@
-# Model-Assisted Routing Guardrails
+# Model-Assisted Cognitive Guardrails
 
-This document records the routing safety rule for Chromie's fast Router model,
+This document records the fast cognitive interpretation safety rule for Chromie's fast Goal Interpreter model,
 currently configured as `qwen3:4b` in common profiles.
 
 ## Position
@@ -11,7 +11,7 @@ expanding phrase lists. Prompt examples are teaching signals for the model;
 they must not become the implementation of normal conversation, tool, memory,
 robot-action, capability-selection, or deep-thought behavior.
 
-The Router model is a fast semantic helper. It may propose a route and, for
+The Goal Interpreter model is a fast semantic helper. It may propose a structured route/effect envelope and, for
 compound requests made from unlocked common catalog skills, an ordered
 `actions` task list. It is still not the authority for execution, safety, or
 physical behavior.
@@ -27,19 +27,19 @@ them:
 ```text
 emergency filter
   -> optional post-interrupt semantic review after an interrupt is applied
-  -> quick intent router
+  -> quick intent goal interpreter
   -> route validation guardrails
   -> deep_thought handoff when quick confidence is low or planning is needed
   -> schema/runtime/provider validation
 ```
 
-The emergency filter is deterministic and fastest. The quick intent router is
-normally the fast Router model (`qwen3:4b`) with bounded context and the
+The emergency filter is deterministic and fastest. The quick intent goal interpreter is
+normally the fast Goal Interpreter model (`qwen3:4b`) with bounded context and the
 compact unlocked common skill catalog. Safety-locked catalog entries
 (`prompt_tier_locked=true` or safety-critical/restricted/guarded/commissioning
 classes) stay out of that fast prompt and are available only through the
 full-catalog/deepthinking path. Per-query catalog matches are not part of the
-fast Router decision surface; they
+fast Goal Interpreter decision surface; they
 must not be treated as deterministic recommendations. Route validation is
 deterministic but does not answer the user: it only checks capability-contract,
 availability, schema, and safety impossibilities and must not become another
@@ -51,7 +51,7 @@ The ownership invariant is:
 - only the emergency filter may use rules or phrase patterns to determine a
   route;
 - quick intent and common capability selection for normal language belong to the
-  catalog-aware fast Router model, not to regexes or catalog-score action
+  catalog-aware fast Goal Interpreter model, not to regexes or catalog-score action
   rules;
 - quick intent may emit multiple unlocked common-catalog task proposals in
   `RouteDecision.actions`; "quick" means fast model plus compact catalog and
@@ -80,15 +80,15 @@ These fields are not authorization: they are the inspectable plan substrate
 that later validators, agents, Skill Runtime, and providers must accept before
 anything executes.
 
-For quick-router compound robot actions, `RouteDecision.actions[]` is the
+For fast-interpreter compound robot actions, `RouteDecision.actions[]` is the
 compatibility execution hint. Items must use exact unlocked common-catalog
 `capability_id` values, schema-shaped `args`, and per-action `confidence`.
-If any required action is below the Router threshold, the quick plan is
+If any required action is below the Goal Interpreter threshold, the quick plan is
 delegated to `deep_thought` rather than partially executed. Spoken content
 inside a physical task is represented as `chromie.speak` with `args.text`, so
 speech and movement stay in the same task proposal substrate.
 If quick actions are schema-invalid or cover only part of a supported compound
-body request, the Router clears executable action hints and hands the full
+body request, the Goal Interpreter clears executable action hints and hands the full
 request to CapabilityAgent planning instead of narrowing the user's meaning.
 Likewise, if the quick model marks a weather/tool request as chat while its
 intent or metadata still carries weather semantics, the validator can normalize
@@ -102,7 +102,7 @@ The host can act on the first safe part of that substrate before every slower
 proposal has arrived. Today this includes `ORCH_FAST_FIRST_RESPONSE_ENABLED`
 speech and model-provided `speak_first` for deep-thought handoff: a short
 route-level phrase such as `I'll check if I can do that safely.` or a natural
-request for a moment to think after Router returns. It is provisional and
+request for a moment to think after Goal Interpreter returns. It is provisional and
 correctable. Later Agent or deep-thinking output can amend the turn, ask a
 clarification, or cancel/stop work, but the first phrase must never claim that a
 physical action or tool side effect has already happened.
@@ -126,7 +126,7 @@ validation, but it must not automatically resume interrupted physical work.
    phrase routing and regex action parsing must not become normal hybrid
    language understanding.
 2. The capability catalog bounds the model's choices.
-   The fast Router receives the compact unlocked common catalog; deepthinking
+   The fast Goal Interpreter receives the compact unlocked common catalog; deepthinking
    receives the full catalog. The model may select from known routes,
    capabilities, or task types. It must not invent skills, body controls,
    hardware state, or hidden provider support. Catalog partitioning controls
@@ -138,7 +138,7 @@ validation, but it must not automatically resume interrupted physical work.
    structured refusal, or fall back to safe chat/ignore.
    If the quick model returns a deterministic-only operational route such as
    `interrupt` or `ignore` after the emergency filter has already passed, the
-   Router does not let that model output stop the robot, execute catalog
+   Goal Interpreter does not let that model output stop the robot, execute catalog
    motion, or trigger slow deep thought. It falls back to safe chat so the Agent
    can answer or ask for clarification. If the quick model chooses
    `deep_thought`, deterministic code must not override that by phrase
@@ -182,9 +182,9 @@ wrong action." The expected outcome is one of:
   the original route, including when `addressed=false` contradicts a direct
   question or request;
 - a model `robot_action` for a factual knowledge question is addressed by the
-  Router prompt/review model and, if it reaches conversation, by semantic
+  Goal Interpreter prompt/review model and, if it reaches conversation, by semantic
   spoken-response review rather than phrase-based Agent rules;
-- the quick Router model returns low confidence and Chromie delegates to
+- the fast Goal Interpreter model returns low confidence and Chromie delegates to
   `deep_thought`;
 - catalog or schema validation rejects the route;
 - native InteractionRuntime corrects or refuses the route;
@@ -205,6 +205,6 @@ prove model-assisted routes cannot bypass:
 - Soridormi task preview/refusal/event monitoring;
 - physical-motion gates.
 
-This guardrail applies whether the fast Router model is Qwen, another local
+This guardrail applies whether the fast Goal Interpreter model is Qwen, another local
 model, or a future classifier. Model quality can improve routing convenience,
 but safety must come from bounded contracts and deterministic runtime policy.

@@ -8,6 +8,19 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Router removal final repository audit
+
+- Re-ran the maintained full test entrypoint after applying the complete Router-removal sequence and repaired all remaining environment, Compose, trace, scenario, and contract drift.
+- Embedded all Goal Interpreter configuration in the Agent service, removed stale current-architecture Router language from authoritative documents, and retained Router wording only for explicitly historical evidence or removal guards.
+- Strengthened the removal guard against stale service, endpoint, configuration, and current-document claims. The maintained test suite, documentation checks, Benchmark inventory/tests, Compose parsing, and Python compilation now pass together.
+
+### Router removal final closure audit
+
+- Removed the remaining 8091/Router developer-tool, documentation, test-matrix, metadata, provenance, and prompt-tier contracts.
+- Restored the full repository test entrypoint after the Goal Interpreter was integrated into the Agent service.
+- Removed unused Host-authored weather acknowledgement composition so dynamic fast speech remains model-authored.
+- Strengthened the removal guard across active code, tests, configuration, and developer tooling.
+
 ### Router architecture removal closure
 
 - Removed the independent Router service, client, container, health path, and runtime ownership.

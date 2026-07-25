@@ -1,6 +1,6 @@
 # Project Handoff
 
-Last updated: 2026-07-16
+Last updated: 2026-07-25
 
 This handoff records the current resume point for a developer or operator who
 needs to continue Chromie without replaying the full history. Capability and
@@ -12,7 +12,8 @@ Chromie's maintained semantic-planning path is the unified Goal-driven Runtime
 implemented through PR1-PR8:
 
 ```text
-Router classification
+Cognitive Gateway admission
+  -> embedded Goal Interpretation
   -> Goal Association
   -> complete-coverage Fast Planner
   -> terminal Deep Planner when needed
@@ -32,7 +33,7 @@ Goal Association, Fast Planner, Deep Planner, Response Composer, and task
 continuity observer switches are off because the unified coordinator owns
 those stages.
 
-There is one semantic authority per applied turn. Exact Router actions are
+There is one semantic authority per applied turn. Exact Goal Interpretation actions are
 adapter-only. The old CapabilityAgent planner is not a normal fallback: it
 requires the host gate, Agent gate, and an authoritative emergency claim with a
 non-empty `turn_id` exactly matching the request turn. Missing, empty, and

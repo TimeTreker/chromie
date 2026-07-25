@@ -1,6 +1,6 @@
 # Dream Broadly, Execute Honestly
 
-This document records the routing and planning contract for human-like robot
+This document records the interpretation and planning contract for human-like robot
 abilities that Chromie can understand before they are executable.
 
 ## Principle
@@ -17,7 +17,7 @@ authority.
 Understand broadly -> propose honestly -> execute only catalog-backed skills
 ```
 
-The Router and deepthinking Agent may reason about human-like desired
+The Goal Interpreter and deepthinking Agent may reason about human-like desired
 abilities, such as blinking, picking up an object, following a user, opening a
 door, or turning on a light. They must not claim those abilities are executable
 unless the current executable skill catalog supplies an exact skill and the
@@ -54,9 +54,9 @@ can execute through the static registry. Provider-backed embodied work requires
 an exact skill from the live provider catalog; the ontology never infers
 execution from simulator or hardware identity.
 
-## Router Contract
+## Fast Goal Interpretation Contract
 
-The quick Router receives the unlocked common compact skill catalog. It should:
+The quick Goal Interpreter receives the unlocked common compact skill catalog. It should:
 
 - infer the user's desired ability from meaning, context, memory, and catalog
   descriptions;
@@ -101,7 +101,7 @@ should:
   `chromie.speak`;
 - emit `task_proposals[]` for understood desired abilities that cannot execute;
 - speak honestly when the robot lacks the requested ability;
-- revise or supersede quick-router proposals when later reasoning finds a
+- revise or supersede quick-goal interpreter proposals when later reasoning finds a
   mismatch.
 
 Example:
@@ -144,7 +144,7 @@ Example:
 
 ## Orchestrator Contract
 
-The Orchestrator treats router and deepthinking outputs as proposals until a
+The Orchestrator treats goal interpreter and deepthinking outputs as proposals until a
 final `InteractionResponse` contains committed speech or skills.
 
 - `actions[]` and `tasks[]` can become committed only after Agent and Skill

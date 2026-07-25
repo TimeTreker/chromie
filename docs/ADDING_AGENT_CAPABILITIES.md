@@ -1,12 +1,12 @@
 # Adding Agent and Tool Capabilities
 
 This guide explains how to add a new Chromie-side Agent or read-only tool so the
-fast Router, downstream Agents, Orchestrator, and logs all agree on what the
+fast Goal Interpreter, downstream Agents, Orchestrator, and logs all agree on what the
 robot can do.
 
 Chromie should not rely on hidden code paths that only one Agent knows about. If
 an Agent can answer or perform a user request, that capability must be exposed in
-the Agent capability catalog so the Router can ground natural language against a
+the Agent capability catalog so Goal Interpretation can ground natural language against a
 real affordance.
 
 ## Mental model
@@ -15,14 +15,14 @@ Use this split for new capabilities:
 
 ```text
 User request
-  -> Router sees catalog affordance and chooses route/routes plus fast_speech
+  -> Goal Interpreter sees catalog affordance and chooses route/routes plus fast_speech
   -> Agent receives the route and metadata/proposal
   -> Agent/tool performs read-only lookup or creates a proposal
   -> SkillRuntime/Soridormi validate physical work when applicable
   -> Speaker reports grounded result or asks for clarification
 ```
 
-The Router may generate a short process acknowledgement such as “好的，我查一下重庆今天的天气。” It must not invent the final answer. The Agent/tool owns the grounded result.
+The Goal Interpreter may generate a short process acknowledgement such as “好的，我查一下重庆今天的天气。” It must not invent the final answer. The Agent/tool owns the grounded result.
 
 ## One authoritative capability contract
 
@@ -62,7 +62,7 @@ feature.
      setting `llm_hints.prompt_tier = "common"` or adding the capability to
      `capabilities/prompt_tiers.json`.
    - Add `llm_hints.tool_name`, `llm_hints.router_contract`, and any compact
-     guidance that helps the Router choose the correct route without examples.
+     guidance that helps the Goal Interpreter choose the correct route without examples.
 
 4. **Connect execution in the owning Agent.**
    - The Agent should detect its route using route/intent/metadata, then call the
@@ -72,15 +72,15 @@ feature.
    - The Agent should produce a grounded spoken result only after the data source
      returns.
 
-5. **Make the Router prompt and review stages aware of the route contract.**
-   - Main quick Router prompts can mention the general tool family.
+5. **Make the Goal Interpreter prompt and review stages aware of the route contract.**
+   - Main fast Goal Interpreter prompts can mention the general tool family.
    - Intent review and repair prompts must use the same route/tool contract if
      they can override or repair quick routing.
    - Do not make Orchestrator template the user-facing acknowledgement when the
-     Router can supply `fast_speech`.
+     Goal Interpreter can supply `fast_speech`.
 
 6. **Add observability.**
-   - Router logs should show the capability in `tool_like_ability_ids` or a more
+   - Goal Interpreter logs should show the capability in `tool_like_ability_ids` or a more
      specific diagnostic field.
    - Agent logs should show start, parameter extraction, client lookup, success,
      and failure reasons.
@@ -114,15 +114,15 @@ safety_class: safe_read
 prompt_tier: common
 ```
 
-Its schema exposes `location`, `date`, and `units`. The Router should treat
+Its schema exposes `location`, `date`, and `units`. The Goal Interpreter should treat
 current or upcoming weather questions as `route=tool` / `intent=weather_query`
-when this capability is visible. The Router may say it will check the requested
+when this capability is visible. The Goal Interpreter may say it will check the requested
 weather, but only the Weather Tool Agent may report the weather result after the
 lookup returns.
 
 ## Anti-patterns
 
-Do not add a tool only as hidden Agent code. The Router will not reliably choose
+Do not add a tool only as hidden Agent code. The Goal Interpreter will not reliably choose
 it if it is absent from the catalog.
 
 Do not add large phrase tables such as “重庆天气 -> weather”. Use semantic
@@ -132,6 +132,6 @@ Do not let a read-only tool path fall back to ordinary conversation that says �
 cannot access realtime data” when the catalog advertises a working tool. If the
 tool is disabled, the Agent should say it is disabled.
 
-Do not let Router `fast_speech` claim final results, permanent memory writes, or
+Do not let Goal Interpreter `fast_speech` claim final results, permanent memory writes, or
 physical completion. It is only a short acknowledgement before downstream work
 finishes.

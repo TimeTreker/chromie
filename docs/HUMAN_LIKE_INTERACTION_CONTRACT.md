@@ -1,7 +1,7 @@
 # Human-Like Interaction Contract
 
 This document is mandatory guidance for humans and coding agents changing
-Chromie's ASR, Cognitive Gateway, legacy routing path, Goal-Driven Cognitive
+Chromie's ASR, Cognitive Gateway, Goal-Driven Cognitive
 Core, orchestrator, agent, tool, skill, speech, safety, or test behavior.
 
 Chromie should behave like a careful, natural robot companion. It must know the
@@ -79,7 +79,7 @@ Classify the root cause before choosing a fix:
   legacy routing path.
 - **Cognitive Core/goal meaning** - goal association, intent, decomposition,
   planning, affordance grounding, or outcome synthesis is wrong. During
-  migration, some advisory route/intent output still originates in the Router.
+  migration, some advisory route/intent output still originates in the Goal Interpreter.
 - **Agent contract** - the model is allowed to invent speech acts, tool results,
   skill proposals, or physical execution claims.
 - **Prompt wording** - the state and authority are correct, but the generated
@@ -108,7 +108,7 @@ notes must state:
 ```text
 Observed failure: <exact user/ASR text and wrong visible behavior>
 Expected contract: <what Chromie should have done>
-Earliest wrong component: <ASR/gateway/core/router-compat/agent/orchestrator/runtime/provider/test>
+Earliest wrong component: <ASR/gateway/core/goal-interpreter/agent/orchestrator/runtime/provider/test>
 Fix class: <architecture/contract-schema/prompt/runtime-policy/test-evidence>
 Regression boundary: <trace replay, black-box interaction, integration, or unit>
 Evidence level: <live trace, retained trace, Level A, Level B/C/D, or not run>
@@ -204,12 +204,11 @@ catalog as affordance grounding, not phrase tables. Catalog presence does not
 justify weak substitution: a capability may be selected only when user meaning
 and required arguments are sufficiently supported.
 
-The deployed Router remains a compatibility implementation. It currently
-combines Gateway-like emergency and addressedness handling with semantic,
-advisory route/intent, affordance, and task proposals. Preserve that fact in
-traces and tests, but do not treat its service name or advisory output as final
-semantic authority for a turn acquired by the Goal-driven Runtime. The
-Gateway/Core migration is not complete.
+The fast Goal Interpreter is an internal stage of the Goal-Driven Cognitive
+Core. It receives admitted evidence and may emit advisory route/intent,
+affordance, and task proposals. Gateway reflex/admission evidence, Host
+validation, committed plans, runtime results, and provider postconditions remain
+separate authorities.
 
 If no matching capability exists, Chromie should say what is missing or ask a
 clarifying question. It should not substitute a vaguely related skill or tool.
@@ -314,7 +313,7 @@ Use this evidence hierarchy when making claims:
 2. **Black-box interaction tests** - a user utterance enters the same public
    boundary used by the orchestrator or scenario runner, and assertions inspect
    route, speech, skills, confirmation, and forbidden output.
-3. **Integrated component tests** - router, orchestrator, agent runtime, and
+3. **Integrated component tests** - goal interpreter, orchestrator, agent runtime, and
    SkillRuntime are connected with realistic catalog/provider fixtures.
 4. **Contract/unit tests** - schema coercion, prompt construction, helper
    functions, validators, and deterministic guards.
@@ -340,7 +339,7 @@ For every user-visible bug fix:
 Weak tests may still be useful as unit tests, but they must not be used alone to
 claim robot behavior is fixed. Examples of weak evidence:
 
-- mocking the router or agent output to the desired answer and then asserting the
+- mocking the goal interpreter or agent output to the desired answer and then asserting the
   desired answer;
 - checking that a prompt contains a phrase but never checking the resulting
   route, speech, or skill proposal;
@@ -392,7 +391,7 @@ Known gaps: <honest list>
 ```
 
 Do not say "verified" for behavior that was not checked at the user-observable
-boundary. Use precise wording such as "schema coercion test passed" or "router
+boundary. Use precise wording such as "schema coercion test passed" or "goal interpreter
 unit test passed" when that is all that was tested.
 
 ## Root-cause review checklist

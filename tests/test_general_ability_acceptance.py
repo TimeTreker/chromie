@@ -81,7 +81,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                                 "title": "Controls",
                                 "general_rule": "Stops must be deterministic.",
                                 "minimum_level_a_cases": 1,
-                                "root_cause_boundaries": ["Router/intent"],
+                                "root_cause_boundaries": ["GoalInterpreter/intent"],
                                 "level_a_scenarios": [
                                     {
                                         "key": "goal_interpretation/polite_stop",

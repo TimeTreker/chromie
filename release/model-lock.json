@@ -15,7 +15,7 @@
       "gemma4:26b"
     ],
     "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json when provenance is collected",
-    "router_models": [
+    "goal_interpreter_models": [
       "qwen3:4b"
     ]
   },

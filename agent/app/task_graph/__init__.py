@@ -1,4 +1,4 @@
-"""Task graph validation and execution for Chromie's MCP router."""
+"""Task graph validation and execution for Chromie's Agent runtime."""
 
 from .async_executor import (
     GuardedTaskGraphExecutor,

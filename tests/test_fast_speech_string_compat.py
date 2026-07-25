@@ -8,7 +8,7 @@ from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, Rout
 
 
 class FastSpeechStringCompatibilityTests(unittest.TestCase):
-    def test_router_route_decision_accepts_fast_speech_string(self) -> None:
+    def test_interpreter_route_decision_accepts_fast_speech_string(self) -> None:
         decision = RouteDecision.model_validate(
             {
                 "route": "tool",
@@ -30,15 +30,15 @@ class FastSpeechStringCompatibilityTests(unittest.TestCase):
         self.assertEqual(decision.speak_first, "好的，我查一下重庆今天的天气。")
         self.assertEqual(decision.routes[0].fast_speech.text, "好的，我查一下重庆今天的天气。")
 
-    def test_router_decision_from_response_preserves_weather_review_with_fast_speech_string(self) -> None:
-        router = OllamaGoalInterpreter(
+    def test_interpreter_decision_from_response_preserves_weather_review_with_fast_speech_string(self) -> None:
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
 
-        decision = router._decision_from_response(
+        decision = interpreter._decision_from_response(
             RouteRequest(text="今天重庆天气怎么样？", language="zh-CN"),
             {
                 "message": {

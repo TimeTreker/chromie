@@ -121,8 +121,7 @@ used to turn a failed named-skill request into an unvalidated low-level action.
 
 ### Direct conversational fallback
 
-When `ORCH_ENABLE_ROUTER=false`, or when configured compatibility components
-fail, the Orchestrator can use a speech-only Ollama streaming path:
+When Goal Interpretation is unavailable and the turn is safe for speech-only degradation, the Orchestrator can use a speech-only Ollama streaming path:
 
 ```text
 ASR -> Ollama -> TTS -> playback

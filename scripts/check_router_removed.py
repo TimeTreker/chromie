@@ -10,6 +10,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PATHS = (
+    ROOT / "router",
     ROOT / "goal_interpretation",
     ROOT / "orchestrator/clients/router_client.py",
 )
@@ -30,6 +31,19 @@ STRUCTURAL_TOKENS = (
     "AGENT_GOAL_INTERPRETER_HOST",
     "--router-url",
     "assistant.router_client",
+    "ORCH_ENABLE_ROUTER",
+    "AGENT_GOAL_INTERPRETER_URL",
+    "router_prompt_tier",
+    "router_semantic_task_operations",
+    "router_action_count",
+    "router_compound_action_plan",
+    "slow_router",
+    "The deployed Router remains",
+    "service currently named Router",
+    "legacy routing path remains deployed",
+    "ASR/TTS/Router/Agent",
+    "ASR、TTS、Ollama、Router 和 Agent",
+    "builds Chromie-owned ASR, TTS, Router, and Agent images",
 )
 CURRENT_FILES = (
     ROOT / "compose.yml",
@@ -42,6 +56,12 @@ CURRENT_FILES = (
     ROOT / "CHROMIE_RUNBOOK.md",
     ROOT / "SUPPORT.md",
     ROOT / "docs/ACCEPTANCE.md",
+    ROOT / "docs/CONFIGURATION.md",
+    ROOT / "docs/USER_OUTCOME_ACCEPTANCE.md",
+    ROOT / "docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md",
+    ROOT / "tools/chromie_cli/env.py",
+    ROOT / "tools/chromie_cli/doctor.py",
+    ROOT / "scripts/test_matrix.py",
     ROOT / "docs/SCENARIO_DRIVEN_DEVELOPMENT.md",
     ROOT / "scenarios/README.md",
     ROOT / "orchestrator/orchestrator.py",
@@ -84,6 +104,54 @@ for base in (ROOT / "agent", ROOT / "orchestrator", ROOT / "shared", ROOT / "too
         text = path.read_text(encoding="utf-8")
         if "import router" in text or "from router" in text or "router_client" in text:
             errors.append(f"{path.relative_to(ROOT)} imports removed Router code")
+
+
+# Active code and maintained tests may not use Router-owned metadata or service names.
+for base in (ROOT / "agent", ROOT / "orchestrator", ROOT / "shared", ROOT / "tools", ROOT / "scripts", ROOT / "tests"):
+    if not base.exists():
+        continue
+    for path in base.rglob("*.py"):
+        if path == Path(__file__).resolve() or path.name.startswith("test_router_removal_"):
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in (
+            "router_client",
+            "ORCH_ENABLE_ROUTER",
+            "AGENT_GOAL_INTERPRETER_URL",
+            "router_prompt_tier",
+            "router_semantic_task_operations",
+            "router_action_count",
+            "router_compound_action_plan",
+            "slow_router",
+            "primary_router",
+            "quick_router",
+            "second_router",
+            "fast_router",
+            "RouterCapability",
+            "CapabilityRouter",
+            "RouterCore",
+            "RouterRegression",
+            "RouterRouteDecision",
+            "router_ms",
+            "_router_",
+        ):
+            if token in text:
+                errors.append(f"{path.relative_to(ROOT)} contains removed Router contract {token!r}")
+
+# Current documentation may discuss removal or explicitly historical evidence, but
+# it may not claim that a Router service or compatibility authority is deployed.
+for path in (ROOT / "docs").glob("*.md"):
+    text = path.read_text(encoding="utf-8")
+    for token in (
+        "The deployed Router remains",
+        "service currently named Router",
+        "legacy routing path remains deployed",
+        "ASR/TTS/Router/Agent",
+        "ASR、TTS、Ollama、Router 和 Agent",
+        "builds Chromie-owned ASR, TTS, Router, and Agent images",
+    ):
+        if token in text:
+            errors.append(f"{path.relative_to(ROOT)} contains stale current-architecture claim {token!r}")
 
 
 compose_path = ROOT / "docker-compose.yml"

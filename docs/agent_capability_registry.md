@@ -7,7 +7,7 @@ manifest is a static deployment snapshot; live compatibility and target
 acceptance remain separate evidence.
 
 The registry is used by Agent TaskGraph planning, validation, LLM context,
-policy checks, MCP invocation, capability-aware routing, and the normal native
+policy checks, MCP invocation, capability-aware goal interpretation, and the normal native
 InteractionRuntime. It does not replace the host Orchestrator's runtime Skill
 Registry.
 
@@ -69,7 +69,7 @@ Each tool can declare information such as:
 - confirmation requirement;
 - safety monitor and emergency fallback relationships;
 - prompt-tier metadata (`prompt_tier`, `prompt_tier_locked`,
-  `prompt_tier_source`, and `prompt_tier_reason`) for fast Router prompt
+  `prompt_tier_source`, and `prompt_tier_reason`) for fast Goal Interpreter prompt
   budgeting;
 - whether parallel execution is permitted;
 - an `exclusive_group` for resource serialization;
@@ -83,9 +83,9 @@ a tool. Real calls cross a `ToolInvoker` boundary.
 The Agent owns one queryable catalog service. Static manifest tools are indexed
 for routing and planning. Live Soridormi named skills are indexed separately as
 `interaction_executable`, because those exact IDs are resolvable by the host
-Skill Registry. Router calls `POST /capabilities/search`; native
+Skill Registry. The embedded Goal Interpreter calls `POST /capabilities/search` on its owning Agent; native
 InteractionRuntime performs the same search in-process before execution. This
-second check prevents a Router timeout or stale route from silently turning a
+second check prevents a Goal Interpreter timeout or stale route from silently turning a
 robot request into generic chat.
 
 The catalog is retrieval and validation infrastructure, not the normal intent
@@ -105,9 +105,9 @@ Model output is never trusted as registry truth. Graph identity is replaced by
 the service, capability references are resolved again, arguments are validated,
 and execution is separately gated.
 
-When the quick Router emits an exact catalog skill task with enough confidence,
+When the fast Goal Interpreter emits an exact catalog skill task with enough confidence,
 the native Agent path may skip a second LLM planning call and build a
-schema-validated `SkillRequest` directly from the Router task plus simple
+schema-validated `SkillRequest` directly from the Goal Interpretation task plus simple
 catalog arguments. This is an execution-latency optimization only: catalog
 availability, schema validation, confirmation, Skill Runtime policy, and
 provider execution checks still apply unchanged.

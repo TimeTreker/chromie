@@ -1,7 +1,16 @@
 - Final architecture closure: architecture documentation and offline semantic-authority guards now match the final embodiment-independent Social Attention implementation.
+
 - Mind and health contract alignment: active MindProfiles now require owner approval and health/configuration defaults consistently report Social Attention `on`.
 - Provider calibration ownership: Social Attention target evidence is semantic-only; calibration and embodiment-specific arguments are exclusively Soridormi/provider responsibilities.
 # Development Checkpoint
+
+> **Router terminology note:** References to Router below are retained only when
+> describing historical revisions, evidence bundles, scenario provenance, or
+> failure reports. The current architecture has no Router service, client,
+> endpoint, container, or compatibility authority; Goal Interpretation runs
+> inside the Agent-owned Goal-Driven Cognitive Core.
+
+
 
 - Legacy compatibility planning no longer substitutes nearby provider skills or converts/clamps one skill's arguments into another skill's schema.
 
@@ -9,12 +18,13 @@
 - Model-facing Social Attention contracts now expose semantic target identity/direction only; backend identity and provider calibration values remain inside Soridormi.
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
-**Status refresh date:** 2026-07-24
-**Current focus:** Close the remaining embodiment-boundary audit findings. The
-first correction slice removed simulator/hardware ability states and
-simulator-derived confirmation authority from Chromie. The second slice deletes
-the legacy Host-generated deep-thought body gesture and its silent metadata bypass.
-The next slice strips backend identity and calibrated body arguments from
+**Status refresh date:** 2026-07-25
+**Current focus:** Begin the reviewed Social Attention benchmark expansion after
+closing the Router-removal and embodiment-independence architecture audits. The
+Benchmark must measure model behavior without introducing phrase-, scenario-, or
+fixed-action policy into the Host. Historical notes below retain their original
+terminology and evidence provenance. The completed embodiment work strips backend
+identity and calibrated body arguments from
 model-facing Chromie contracts. Fast Planner
 latency qualification and retained TTS evidence remain open engineering tracks
 after this architecture correction.
@@ -24,7 +34,7 @@ This file is a short resume marker, not a second status or roadmap. Use
 milestone intent.
 
 A July 24 live voice trace exposed two user-visible response-quality defects.
-The Router correctly grounded `Hello.` as `chat/greeting`, but the no-active-Goal
+The then-current Goal Interpreter correctly grounded `Hello.` as `chat/greeting`, but the no-active-Goal
 model returned both an empty `new_goals` list and empty clarification. The
 segmentation decoder schema now requires at least one model-authored Goal or one
 non-empty clarification and explicitly treats a standalone social act as a
@@ -159,10 +169,10 @@ exact launcher subsequently reached `Microphone started` after a 4.1 ms empty
 cache resolution. A supervised listening verdict and sustained shared-load A/B
 run remain the next TTS evidence, not another startup-cache generation run.
 
-The same robot log exposed a separate Router failure: unrelated technical
+The same robot log exposed a separate Goal Interpretation failure: unrelated technical
 speech was repeatedly collapsed to `capability_inquiry`, forcing Chromie to
 answer as though it had been addressed. The host now supplies bounded
-interaction-engagement evidence, the Router distinguishes Chromie's abilities
+interaction-engagement evidence, Goal Interpretation distinguishes Chromie's abilities
 from discussion of other systems, and high-confidence semantic ambient speech
 may be ignored only outside an active exchange. Ignored ambient turns do not
 open a new engagement window. This is implemented and Level A verified; a
@@ -184,7 +194,7 @@ Rerun the complete microphone, Agent, weather, and TTS path before making an
 end-to-end live-behavior claim.
 
 The next supervised log exposed a different root cause behind repeated body
-actions. The Router correctly classified “想啥呢？” as
+actions. The then-current Goal Interpreter correctly classified “想啥呢？” as
 `chat/social_exchange`, but the Goal-driven Runtime still saw the earlier walk
 and blink goals as active: semantic `goal_*` IDs had been looked up as unrelated
 host `task_*` IDs, so completed Skill Runtime results did not close their true
@@ -315,7 +325,7 @@ The current development implementation is present:
 - a common safe base with structured interaction and authoritative `chat`
   `apply`, plus a maintained Soridormi launcher that enables the provider and
   widens authority to `chat,robot_action`; both fail closed after ownership;
-- a single-semantic-authority boundary: exact Router actions are adapter-only,
+- a single-semantic-authority boundary: exact Goal Interpretation actions are adapter-only,
   and the old CapabilityAgent planner is emergency-only behind host and Agent
   gates plus a non-empty matching-turn authoritative claim;
 - native strict structured interaction;
@@ -325,7 +335,7 @@ The current development implementation is present:
 - seven-case synthetic, virtual-microphone, acoustic, and supervised acceptance
   tooling;
 - evidence verification and release packaging;
-- small-model quick Router classification for normal semantic routing while
+- small-model fast Goal Interpreter classification for normal semantic routing while
   stop/cancel/ignore controls remain deterministic;
 - model-assisted routing guardrails that treat `qwen3:4b` as a proposer, not
   the authority for capabilities, safety, or physical execution;
@@ -334,7 +344,7 @@ The current development implementation is present:
 - three-stage routing metadata where emergency filtering, quick intent routing,
   and deepthought handoff can each contribute high-level task/action proposals
   to the merged `RouteDecision.metadata.task_list`;
-- host-side task-proposal merge ledger that treats Router task list entries as
+- host-side task-proposal merge ledger that treats Goal Interpretation task list entries as
   proposals, marks effectful proposals as `not_committed` until matched by a
   final `InteractionResponse` skill, and audits committed speech/skills plus
   static preflight status and rejected deepthinking tasks without widening
@@ -349,7 +359,7 @@ The current development implementation is present:
 - `shared/chromie_contracts/task_proposal.py` defines the first shared
   proposal ledger contract, including preflight annotations and the
   `superseded` state; Orchestrator ledger output is validated through this
-  contract, and Router now emits shared `metadata.task_proposals` alongside
+  contract, and Goal Interpretation now emits shared `metadata.task_proposals` alongside
   legacy `metadata.task_list`; the Agent deepthinking path now emits shared
   `metadata.deepthinking_task_proposals`; final Agent speech and skills now
   emit shared `metadata.agent_task_proposals`, including speech as the local
@@ -362,9 +372,9 @@ The current development implementation is present:
   contracts, bounded active-task snapshots, replay-safe versioned goal updates,
   stale-plan and confirmation invalidation, structured information gaps,
   dedicated Agent task-continuity resolution, staged report/apply rollout,
-  immediate ResponsePlan claim validation, and same-turn Router-to-Agent task
+  immediate ResponsePlan claim validation, and same-turn Goal-Interpretation-to-Agent task
   context;
-- Router route/intent contract recovery for stale cross-turn model output,
+- Goal Interpretation route/intent contract recovery for stale cross-turn model output,
   including independent semantic repair, low-confidence clarification, exact-skill
   grounding, and file-backed single-turn plus weather-to-walk multi-turn replay;
 - July 12 voice-log reliability hardening: explicit Router context budget,
@@ -376,7 +386,7 @@ The current development implementation is present:
 - separate ASR and routed-turn lifecycles so a new utterance can replace stale
   Agent/TTS work, with one newest pending VAD utterance retained while ASR is
   still decoding instead of being dropped;
-- dream-broadly/execute-honestly proposal contract: quick Router and
+- dream-broadly/execute-honestly proposal contract: fast Goal Interpreter and
   deepthinking may record understood but non-executable desired abilities as
   `missing_ability` task proposals, while executable work still requires exact
   catalog skill IDs and trusted runtime validation;
@@ -491,7 +501,7 @@ completed target validation.
    diagnostic Level C.
 2. Keep the single-authority boundary fail closed: the common safe base owns
    `chat`, the maintained Soridormi launcher widens ownership to
-   `chat,robot_action`, exact Router actions remain adapter-only, and the legacy
+   `chat,robot_action`, exact Goal Interpretation actions remain adapter-only, and the legacy
    CapabilityAgent planner may run only with both service gates and a fresh
    authoritative emergency claim matching the request turn.
 3. Verify evidence and artifact provenance before any preview packaging:

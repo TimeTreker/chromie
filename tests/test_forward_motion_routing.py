@@ -7,7 +7,7 @@ from agent.app.capabilities.catalog import CapabilityCatalog
 from tests.test_capability_catalog_service import _Invoker, _registry
 from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
-from tests.test_goal_interpreter_capability_routing import _Catalog, _LlmRouter
+from tests.test_goal_interpreter_capability_routing import _Catalog, _LlmInterpreter
 
 
 class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
@@ -21,7 +21,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.matches[0].capability_id, "soridormi.walk_forward")
         self.assertTrue(result.matches[0].interaction_executable)
 
-    async def test_router_does_not_phrase_match_generic_motion_to_a_skill(self) -> None:
+    async def test_goal_interpreter_does_not_phrase_match_generic_motion_to_a_skill(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -59,7 +59,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -67,7 +67,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 confidence=1.0,
                 language="zh-CN",
                 source="llm",
-                reason="quick router did not select an exact skill",
+                reason="fast Goal Interpreter did not select an exact skill",
             )
         )
 
@@ -112,7 +112,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],

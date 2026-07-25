@@ -288,8 +288,8 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
         errors.append(
             "release/model-lock.json agent_models do not match maintained hardware profiles"
         )
-    router_model = common.get("AGENT_GOAL_INTERPRETER_MODEL")
-    if router_model and router_model not in set(ollama.get("router_models", [])):
+    goal_interpreter_model = common.get("AGENT_GOAL_INTERPRETER_MODEL")
+    if goal_interpreter_model and goal_interpreter_model not in set(ollama.get("goal_interpreter_models", [])):
         errors.append("AGENT_GOAL_INTERPRETER_MODEL is absent from release/model-lock.json")
     return errors
 

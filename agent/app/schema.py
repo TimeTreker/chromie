@@ -146,8 +146,9 @@ def _normalize_speech_items(items: list["SpeakItem"], max_chars: int) -> list["S
 class RouteDecision(BaseModel):
     """Cognitive Core interpretation output consumed by the agent service.
 
-    This mirrors router/app/schema.py so the agent module can run independently.
-    Later this can move into shared/chromie_contracts.
+    This versioned advisory contract is shared by Goal Interpretation and the
+    downstream Agent runtime. A later contract revision may move it into
+    shared/chromie_contracts.
     """
 
     route: RouteName

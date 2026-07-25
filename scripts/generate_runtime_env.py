@@ -506,7 +506,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[env] Auto-detected hardware profile: {manifest['active_profile']}")
     print(
         "[env] Model plan: "
-        f"router={models['AGENT_GOAL_INTERPRETER_MODEL']} "
+        f"goal_interpreter={models['AGENT_GOAL_INTERPRETER_MODEL']} "
         f"association={models['AGENT_GOAL_ASSOCIATION_MODEL']} "
         f"fast={models['AGENT_FAST_PLANNER_MODEL']} "
         f"deep={models['AGENT_DEEP_PLANNER_MODEL']} "

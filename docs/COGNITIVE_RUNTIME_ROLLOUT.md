@@ -138,7 +138,7 @@ its user-facing speech plan.
 
 ### `off`
 
-The PR7 unified pipeline is not called. Existing Router, Agent, and trusted
+The PR7 unified pipeline is not called. Existing Goal Interpreter, Agent, and trusted
 runtime behavior remains the compatibility path.
 
 Use this mode for immediate rollback.
@@ -165,7 +165,7 @@ for diagnostics; it is not the maintained default.
 ### `apply`
 
 The unified pipeline may become authoritative only for mapped semantic lanes
-listed in `ORCH_COGNITIVE_APPLY_LANES`. Router routes `chat`, `clarify`, and
+listed in `ORCH_COGNITIVE_APPLY_LANES`. Goal Interpreter routes `chat`, `clarify`, and
 `deep_thought` map to the `chat` lane; `robot_action`, `tool`, and `memory`
 retain their lane names.
 
@@ -216,7 +216,7 @@ through to the legacy CapabilityAgent planner.
 The legacy CapabilityAgent semantic planner is retained only as an explicit
 emergency compatibility path. It requires disabled or non-authoritative
 Goal-driven processing, host and Agent opt-in gates, and a per-turn emergency
-authority claim. Exact Router `actions[]` use a deterministic adapter and never
+authority claim. Exact Goal Interpreter `actions[]` use a deterministic adapter and never
 call that planner. The Agent rejects an empty claim or a claim whose `turn_id`
 does not exactly match the request `sid`, which blocks cross-turn reuse. The
 claim is not stored as a consumed nonce, so this boundary does not independently

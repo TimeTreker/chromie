@@ -54,7 +54,7 @@ class MissingAbilityClarifyTerminalTests(unittest.IsolatedAsyncioTestCase):
             response.metadata.get("trace", []),
         )
 
-    async def test_legacy_runtime_returns_only_router_missing_ability_text(self) -> None:
+    async def test_legacy_runtime_returns_only_goal_interpreter_missing_ability_text(self) -> None:
         result = await AgentRuntime(
             AgentServices(
                 ollama=_ExplodingOllama(),  # type: ignore[arg-type]

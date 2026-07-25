@@ -8,7 +8,7 @@ hardware qualification remain separate evidence steps.
 ## Purpose
 
 Chromie's primary end-to-end acceptance gate evaluates the outcome visible to
-the user rather than binding the test to today's Router, Goal Association, Fast
+the user rather than binding the test to today's Goal Interpreter, Goal Association, Fast
 Planner, Deep Planner, or Response Composer implementation.
 
 A case does not pass merely because a final service returns `ok=true`. It must
@@ -122,7 +122,6 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
   --goal-driven-runtime apply \
   --assertion-scope user-outcome \
   --execute \
-  --router-url http://127.0.0.1:8091 \
   --agent-url http://127.0.0.1:8092 \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --evidence-dir .chromie/acceptance/user-outcome \

@@ -14,7 +14,7 @@ def colorize_for_cli(
 ) -> str:
     """Return ``line`` wrapped in ANSI color when terminal color is enabled.
 
-    The helper is intentionally tiny and dependency-free so Router, Agent, and
+    The helper is intentionally tiny and dependency-free so Agent and
     Orchestrator can share the same semantics without adding color libraries.
     It respects ``NO_COLOR`` and only auto-colors attached terminals unless the
     selected env var is forced on.

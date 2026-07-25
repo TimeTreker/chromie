@@ -150,7 +150,7 @@ class TaskContinuityResolver:
                 }
                 for item in route.routes[:8]
             ],
-            "router_semantic_task_operations": (
+            "goal_interpretation_semantic_task_operations": (
                 route.metadata.get("semantic_task_operations")
                 if isinstance(route.metadata, dict)
                 else None

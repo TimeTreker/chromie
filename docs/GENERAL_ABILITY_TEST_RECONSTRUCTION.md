@@ -84,7 +84,7 @@ robot conversation is fixed.
 
 ### Layer 2 - File-Backed Behavior Scenarios
 
-Purpose: deterministic black-box or integrated checks for Router,
+Purpose: deterministic black-box or integrated checks for Goal Interpreter,
 InteractionRuntime, adapter, and multi-turn dialogue behavior.
 
 Evidence level: Level A.
@@ -111,7 +111,7 @@ means deterministic regression evidence only.
 
 ### Layer 4 - Live Text Preview And Execution
 
-Purpose: feed natural text into the same Router and Agent boundary used after
+Purpose: feed natural text into the same Goal Interpretation and downstream Agent boundary used after
 ASR, with live Soridormi status preflight and optional MuJoCo execution.
 
 Preview command:
@@ -230,7 +230,7 @@ Scope:
 - enforce per-case wall-clock timeouts;
 - write partial summaries when a case hangs or a service fails;
 - expand exception reporting for grouped async failures;
-- surface Router, Agent, review-model, and provider timeout causes separately.
+- surface Goal Interpreter, Agent, review-model, and provider timeout causes separately.
 
 Exit criteria:
 
@@ -243,7 +243,7 @@ Exit criteria:
 Scope:
 
 - attach a first-pass failure classification to retained summaries:
-  ASR/audio, Router/intent, Agent contract, Prompt wording, Orchestrator policy,
+  ASR/audio, Goal Interpreter/intent, Agent contract, Prompt wording, Orchestrator policy,
   Skill Runtime/provider, or Test evidence;
 - include route, response, speech, skill, provider, and fallback facts needed to
   inspect the classification;

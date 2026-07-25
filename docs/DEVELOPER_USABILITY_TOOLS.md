@@ -166,7 +166,7 @@ Initial checks:
 - Docker and Docker Compose availability;
 - generated runtime files;
 - `capabilities/soridormi.json` presence and JSON parseability;
-- Router, Agent, ASR, TTS, Ollama, and Soridormi reachability when configured;
+- Agent cognitive endpoint, ASR, TTS, Ollama, and Soridormi reachability when configured;
 - audio input and output configuration visibility.
 
 Exit criteria:

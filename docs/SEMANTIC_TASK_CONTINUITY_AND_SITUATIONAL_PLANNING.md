@@ -246,7 +246,7 @@ The first dependency-light slice is implemented in the current repository:
   versions, invalidate stale confirmations, and retain operation history;
 - operation IDs are replay-safe so retries do not duplicate task creation or
   apply one semantic update twice;
-- the quick Router prompt receives the bounded active-task snapshot and may emit
+- the fast Goal Interpreter prompt receives the bounded active-task snapshot and may emit
   advisory `metadata.semantic_task_operations`; normal association is explicitly
   meaning-based and may not be decided by regexes, phrase tables, lexical
   overlap, or recency alone;
@@ -772,7 +772,7 @@ replaced by a safe fallback.
 
 ## Responsibility Boundaries
 
-### Quick Router model
+### Fast Goal Interpreter model
 
 - identify independent semantic responsibilities;
 - choose a lightweight context profile;

@@ -18,7 +18,7 @@ from scripts.behavior_scenarios import (
 class BehaviorScenarioRunnerTests(unittest.TestCase):
     def test_loads_one_file_per_scenario_and_filters_by_suite_or_key(self) -> None:
         all_cases = load_scenarios()
-        router_cases = load_scenarios(suites={"goal_interpretation"})
+        goal_interpretation_cases = load_scenarios(suites={"goal_interpretation"})
         adapter_cases = load_scenarios(suites={"adapter"})
         dialogue_cases = load_scenarios(suites={"dialogue"})
         cognitive_core_dialogue_cases = load_scenarios(suites={"cognitive_core_dialogue"})
@@ -31,7 +31,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
         self.assertEqual(len(all_cases), 396)
         self.assertEqual(len(adapter_cases), 4)
-        self.assertEqual(len(router_cases), 24)
+        self.assertEqual(len(goal_interpretation_cases), 24)
         self.assertEqual(len(cognitive_core_dialogue_cases), 2)
         self.assertEqual(len(dialogue_cases), 319)
         self.assertEqual(len(load_scenarios(suites={"interaction"})), 29)
@@ -155,7 +155,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
             str(turns[1]["pre_context"]["history"]),
         )
 
-    def test_router_scenario_replays_inactive_direct_question_false_review(self) -> None:
+    def test_goal_interpretation_scenario_replays_inactive_direct_question_false_review(self) -> None:
         scenarios = load_scenarios(
             only={"goal_interpretation/inactive_direct_weather_question_false_addressedness"}
         )

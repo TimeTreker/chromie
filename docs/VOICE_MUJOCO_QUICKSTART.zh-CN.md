@@ -3,7 +3,7 @@
 本指南用于日常交互运行，不是验收流程。目标是启动完整链路：
 
 ```text
-麦克风 -> Chromie ASR/Router/Goal-driven Runtime -> Soridormi MCP -> MuJoCo
+麦克风 -> Chromie ASR/Cognitive Gateway/Goal-driven Runtime -> Soridormi MCP -> MuJoCo
 扬声器 <- Chromie TTS
 ```
 
@@ -68,7 +68,7 @@ ORCH_OUTPUT_DEVICE=扬声器名称或编号
 
 1. 打开带跟随摄像机的 MuJoCo viewer；
 2. 启动 Soridormi runtime-backed MCP 服务；
-3. 启动 Chromie ASR、TTS、Ollama、Router 和 Agent；
+3. 启动 Chromie ASR、TTS、Ollama 和 Agent（含内嵌 Goal Interpreter）；
 4. 验证 Soridormi capability contract；
 5. 启动主机 Orchestrator，并打开麦克风和扬声器；
 6. 启用统一 Goal-driven Runtime，对 `chat,robot_action` 使用权威

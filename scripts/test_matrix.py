@@ -62,9 +62,9 @@ GROUPS: dict[str, TestGroup] = {
         "Protective filtering, capability grounding, Goal Interpretation, and regressions.",
         (
             _unittest(
-                "tests.test_router_core",
-                "tests.test_router_capability_routing",
-                "tests.test_router_regression_evaluator",
+                "tests.test_goal_interpreter_core",
+                "tests.test_goal_interpreter_capability_routing",
+                "tests.test_goal_interpreter_regression_evaluator",
                 "tests.test_llm_capability_routing",
                 "tests.test_capability_goal_interpretation_actions",
             ),

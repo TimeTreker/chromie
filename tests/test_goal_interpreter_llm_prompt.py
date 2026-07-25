@@ -7,7 +7,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _catalog_observability_profile,
     _payload_message_texts,
     _prompt_feature_flags,
-    _raw_router_output_summary,
+    _raw_interpreter_output_summary,
     is_allowed_model_ignore,
 )
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
@@ -15,14 +15,14 @@ from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, Rout
 
 class GoalInterpreterLlmPromptTests(unittest.TestCase):
     def test_system_prompt_names_goal_interpreter_role_and_context_boundaries(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
 
-        prompt = router.load_system_prompt()
+        prompt = interpreter.load_system_prompt()
 
         self.assertIn("fast Goal Interpretation model", prompt)
         self.assertNotIn("robot-brain", prompt)
@@ -91,7 +91,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
 
 
     def test_goal_interpreter_observability_profiles_prompt_and_raw_tool_output(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -114,11 +114,11 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        payload = router.build_payload(request)
+        payload = interpreter.build_payload(request)
         system_text, user_text, all_text = _payload_message_texts(payload)
         flags = _prompt_feature_flags(all_text)
         catalog_profile = _catalog_observability_profile(request)
-        raw_summary = _raw_router_output_summary(
+        raw_summary = _raw_interpreter_output_summary(
             '{"route":"tool","intent":"weather_query","confidence":0.9,'
             '"fast_speech":{"text":"好的，我查一下重庆今天的天气。"},'
             '"metadata":{"tool_name":"weather","weather_query":{"location":"重庆","date":"today"}}}'
@@ -137,14 +137,14 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertTrue(raw_summary["raw_weather_query_present"])
 
 
-    def test_router_prompt_semantically_separates_capability_inquiry_from_execution(self) -> None:
-        router = OllamaGoalInterpreter(
+    def test_interpreter_prompt_semantically_separates_capability_inquiry_from_execution(self) -> None:
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
-        system = router.load_system_prompt()
+        system = interpreter.load_system_prompt()
         self.assertIn("Capability Inquiry And Execution", system)
         self.assertIn("Availability questions stay chat", system)
         self.assertIn("execution requests use robot_action", system)
@@ -196,7 +196,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertFalse(is_allowed_model_ignore(active, decision))
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -266,8 +266,8 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        prompt = router.build_user_prompt(request)
-        contract_prompt = router.load_system_prompt() + "\n" + prompt
+        prompt = interpreter.build_user_prompt(request)
+        contract_prompt = interpreter.load_system_prompt() + "\n" + prompt
 
         self.assertIn("Global Context Group", prompt)
         self.assertIn("Fast Goal Interpretation Context", prompt)
@@ -342,8 +342,8 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Return one compact JSON object", prompt)
         self.assertLess(len(prompt), 5200)
 
-    def test_fast_router_prompt_uses_common_ability_catalog_not_full_catalog(self) -> None:
-        router = OllamaGoalInterpreter(
+    def test_fast_interpreter_prompt_uses_common_ability_catalog_not_full_catalog(self) -> None:
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -383,14 +383,14 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        prompt = router.build_user_prompt(request)
+        prompt = interpreter.build_user_prompt(request)
 
         self.assertIn("Common Ability Catalog JSON", prompt)
         self.assertIn("soridormi.blink_eyes", prompt)
         self.assertNotIn("soridormi.motion.calibrate_floor", prompt)
 
-    def test_fast_router_prompt_excludes_locked_common_catalog_entries(self) -> None:
-        router = OllamaGoalInterpreter(
+    def test_fast_interpreter_prompt_excludes_locked_common_catalog_entries(self) -> None:
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -420,7 +420,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        prompt = router.build_user_prompt(request)
+        prompt = interpreter.build_user_prompt(request)
 
         self.assertIn("soridormi.blink_eyes", prompt)
         self.assertNotIn("soridormi.motion.calibrate_floor", prompt)
@@ -464,7 +464,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("social.blink_eyes", annotated.actions)
 
     def test_user_prompt_uses_extracted_memory_not_raw_history(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -507,7 +507,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        prompt = router.build_user_prompt(request)
+        prompt = interpreter.build_user_prompt(request)
 
         self.assertIn("Current task: design extracted prompt memory", prompt)
         self.assertNotIn("RAW_TRANSCRIPT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
@@ -516,14 +516,14 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
 
     def test_intent_review_prompt_uses_semantic_generalization(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
 
-        payload = router.build_intent_review_payload(
+        payload = interpreter.build_intent_review_payload(
             RouteRequest(
                 text="你能摇头吗",
                 language="zh-CN",
@@ -558,7 +558,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("capability:<exact capability_id>", system)
 
     def test_post_interrupt_review_prompt_confirms_or_corrects_after_safety_stop(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             review_model="review-model",
@@ -566,7 +566,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             confidence_threshold=0.55,
         )
 
-        payload = router.build_post_interrupt_review_payload(
+        payload = interpreter.build_post_interrupt_review_payload(
             RouteRequest(
                 text="Stop by the table means what?",
                 language="en-US",
@@ -606,7 +606,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("soridormi.walk_forward", user)
 
     def test_payload_disables_qwen_thinking_and_uses_compact_json_mode(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -614,8 +614,8 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         )
         request = RouteRequest(text="Go ahead and sing a song for me.")
 
-        payload = router.build_payload(request)
-        relaxed = router.build_payload(request, relaxed_json=True)
+        payload = interpreter.build_payload(request)
+        relaxed = interpreter.build_payload(request, relaxed_json=True)
 
         self.assertIs(payload["think"], False)
         self.assertIs(relaxed["think"], False)
@@ -631,7 +631,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("Go ahead and sing a song for me.", payload["messages"][1]["content"])
 
     def test_route_only_json_response_gets_default_llm_confidence(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -639,7 +639,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         )
         request = RouteRequest(text="Go ahead and sing a song for me.")
 
-        decision = router._decision_from_response(
+        decision = interpreter._decision_from_response(
             request,
             {"message": {"content": '{"route":"chat"}'}},
         )
@@ -650,7 +650,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("default confidence", decision.reason or "")
 
     def test_intent_only_weather_capability_uses_tool_route(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -671,7 +671,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        decision = router._decision_from_response(
+        decision = interpreter._decision_from_response(
             request,
             {"message": {"content": '{"intent":"capability:chromie.weather.lookup","confidence":0.9}'}},
         )
@@ -681,7 +681,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("normalized capability route", decision.reason or "")
 
     def test_skill_id_route_weather_capability_uses_tool_route(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -702,7 +702,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        decision = router._decision_from_response(
+        decision = interpreter._decision_from_response(
             request,
             {"message": {"content": '{"route":"chromie.weather.lookup","confidence":0.9}'}},
         )
@@ -712,7 +712,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertIn("normalized capability route", decision.reason or "")
 
     def test_goal_interpreter_accepts_deep_thought_route(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -720,7 +720,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         )
         request = RouteRequest(text="Let's design the session memory architecture carefully.")
 
-        decision = router._decision_from_response(
+        decision = interpreter._decision_from_response(
             request,
             {"message": {"content": '{"route":"deep_thought","confidence":0.88}'}},
         )
@@ -732,7 +732,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertTrue(decision.needs_agent)
 
     def test_goal_interpreter_accepts_mixed_route_items_and_builds_task_proposals(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -740,7 +740,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         )
         request = RouteRequest(text="Hi, remember I like tea, and think through tomorrow.")
 
-        decision = router._decision_from_response(
+        decision = interpreter._decision_from_response(
             request,
             {
                 "message": {
@@ -798,14 +798,14 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         )
 
     def test_low_confidence_decision_becomes_deep_thought_handoff(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
         request = RouteRequest(text="Please figure out how to do this unclear task.")
-        quick_decision = router._decision_from_response(
+        quick_decision = interpreter._decision_from_response(
             request,
             {
                 "message": {
@@ -819,7 +819,7 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
             },
         )
 
-        handoff = router._low_confidence_deep_thought_decision(request, quick_decision)
+        handoff = interpreter._low_confidence_deep_thought_decision(request, quick_decision)
 
         self.assertEqual(handoff.source, "llm")
         self.assertEqual(handoff.route, "deep_thought")
@@ -835,9 +835,9 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
         self.assertEqual(handoff.metadata["thinking_ack_source"], "quick_llm_speak_first")
 
 
-class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
+class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
     async def test_inactive_direct_chinese_weather_question_fails_open_on_false_review(self) -> None:
-        class WeatherAddressednessRouter(OllamaGoalInterpreter):
+        class WeatherAddressednessInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -872,8 +872,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = WeatherAddressednessRouter()
-        decision = await router.route(
+        interpreter = WeatherAddressednessInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="今天北京下雨了吗？",
                 language="zh-CN",
@@ -897,10 +897,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "tool")
         self.assertEqual(decision.intent, "weather_query")
         self.assertTrue(decision.should_speak)
-        self.assertEqual(router.stages, ["quick_intent", "addressedness_review"])
+        self.assertEqual(interpreter.stages, ["quick_intent", "addressedness_review"])
 
     async def test_inactive_direct_english_request_fails_open_on_false_review(self) -> None:
-        class FalseRequestRouter(OllamaGoalInterpreter):
+        class FalseRequestInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -912,7 +912,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = FalseRequestRouter(
+        interpreter = FalseRequestInterpreter(
             ollama_url="http://example.invalid",
             model="quick-model",
             timeout_ms=800,
@@ -933,12 +933,12 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             confidence=0.94,
         )
 
-        reviewed = await router._review_inactive_addressedness(request, original)
+        reviewed = await interpreter._review_inactive_addressedness(request, original)
 
         self.assertIs(reviewed, original)
 
     async def test_inactive_question_form_fails_open_on_inconsistent_ambient_act(self) -> None:
-        class FalseQuestionRouter(OllamaGoalInterpreter):
+        class FalseQuestionInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -950,7 +950,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = FalseQuestionRouter(
+        interpreter = FalseQuestionInterpreter(
             ollama_url="http://example.invalid",
             model="quick-model",
             timeout_ms=800,
@@ -967,12 +967,12 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         original = RouteDecision(route="chat", intent="status_question", confidence=0.91)
 
-        reviewed = await router._review_inactive_addressedness(request, original)
+        reviewed = await interpreter._review_inactive_addressedness(request, original)
 
         self.assertIs(reviewed, original)
 
     async def test_inactive_malformed_addressedness_review_fails_open(self) -> None:
-        class MalformedReviewRouter(OllamaGoalInterpreter):
+        class MalformedReviewInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -981,7 +981,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = MalformedReviewRouter(
+        interpreter = MalformedReviewInterpreter(
             ollama_url="http://example.invalid",
             model="quick-model",
             timeout_ms=800,
@@ -998,12 +998,12 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         original = RouteDecision(route="chat", intent="request_help", confidence=0.9)
 
-        reviewed = await router._review_inactive_addressedness(request, original)
+        reviewed = await interpreter._review_inactive_addressedness(request, original)
 
         self.assertIs(reviewed, original)
 
     async def test_inactive_mislabelled_chat_is_reviewed_to_ambient_ignore(self) -> None:
-        class AddressednessRouter(OllamaGoalInterpreter):
+        class AddressednessInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1034,8 +1034,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = AddressednessRouter()
-        decision = await router.route(
+        interpreter = AddressednessInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="之后融合输出一个，他自己回放训练。",
                 language="zh-CN",
@@ -1055,10 +1055,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             decision.metadata["addressedness_speech_act"],
             "ambient_report",
         )
-        self.assertEqual(router.models, ["quick-model", "quick-model"])
+        self.assertEqual(interpreter.models, ["quick-model", "quick-model"])
 
     async def test_inactive_contextless_reply_can_still_be_suppressed(self) -> None:
-        class ContextlessReplyRouter(OllamaGoalInterpreter):
+        class ContextlessReplyInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -1070,7 +1070,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ContextlessReplyRouter(
+        interpreter = ContextlessReplyInterpreter(
             ollama_url="http://example.invalid",
             model="quick-model",
             timeout_ms=800,
@@ -1087,14 +1087,14 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
         original = RouteDecision(route="chat", intent="acknowledge", confidence=0.9)
 
-        reviewed = await router._review_inactive_addressedness(request, original)
+        reviewed = await interpreter._review_inactive_addressedness(request, original)
 
         self.assertEqual(reviewed.route, "ignore")
         self.assertEqual(reviewed.intent, "ambient_speech")
         self.assertEqual(reviewed.metadata["addressedness_speech_act"], "reply")
 
     async def test_inactive_direct_request_preserves_original_action_route(self) -> None:
-        class AddressedRequestRouter(OllamaGoalInterpreter):
+        class AddressedRequestInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 self.assert_payload = payload
                 return {
@@ -1106,7 +1106,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = AddressedRequestRouter(
+        interpreter = AddressedRequestInterpreter(
             ollama_url="http://example.invalid",
             model="quick-model",
             review_model="review-model",
@@ -1128,16 +1128,16 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             confidence=0.93,
         )
 
-        reviewed = await router._review_inactive_addressedness(request, original)
+        reviewed = await interpreter._review_inactive_addressedness(request, original)
 
         self.assertIs(reviewed, original)
-        self.assertEqual(router.assert_payload["model"], "quick-model")
-        self.assertEqual(router.assert_payload["options"]["num_ctx"], 4096)
-        self.assertEqual(router.assert_payload["options"]["num_predict"], 32)
-        self.assertIn("speech_act", router.assert_payload["format"]["required"])
+        self.assertEqual(interpreter.assert_payload["model"], "quick-model")
+        self.assertEqual(interpreter.assert_payload["options"]["num_ctx"], 4096)
+        self.assertEqual(interpreter.assert_payload["options"]["num_predict"], 32)
+        self.assertIn("speech_act", interpreter.assert_payload["format"]["required"])
 
     async def test_goal_interpreter_returns_low_confidence_raw_for_pipeline_validation(self) -> None:
-        class LowConfidenceRouter(OllamaGoalInterpreter):
+        class LowConfidenceInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -1149,14 +1149,14 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = LowConfidenceRouter(
+        interpreter = LowConfidenceInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
             confidence_threshold=0.55,
         )
 
-        decision = await router.route(RouteRequest(text="Hello, how are you doing?"))
+        decision = await interpreter.route(RouteRequest(text="Hello, how are you doing?"))
 
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "unknown")
@@ -1164,7 +1164,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(decision.intent, "deep_thought_low_confidence")
 
     async def test_llm_interrupt_output_falls_back_to_chat(self) -> None:
-        class InterruptRouter(OllamaGoalInterpreter):
+        class InterruptInterpreter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -1176,7 +1176,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = InterruptRouter(
+        interpreter = InterruptInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -1194,7 +1194,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        decision = await router.route(request)
+        decision = await interpreter.route(request)
 
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
@@ -1205,7 +1205,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
 
     async def test_deterministic_only_llm_mistake_uses_review_model(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1229,17 +1229,17 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ReviewRouter()
-        decision = await router.route(RouteRequest(text="What's your name?"))
+        interpreter = ReviewInterpreter()
+        decision = await interpreter.route(RouteRequest(text="What's your name?"))
 
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "identity_question")
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+        self.assertEqual([payload["model"] for payload in interpreter.payloads], ["test-model", "review-model"])
 
     async def test_slow_review_recovery_can_be_disabled_for_realtime_latency(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1262,16 +1262,16 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ReviewRouter()
-        decision = await router.route(RouteRequest(text="What's your name?"))
+        interpreter = ReviewInterpreter()
+        decision = await interpreter.route(RouteRequest(text="What's your name?"))
 
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
         self.assertIn("slow repair disabled", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model"])
+        self.assertEqual([payload["model"] for payload in interpreter.payloads], ["test-model"])
 
     async def test_review_model_can_recover_invalid_interrupt_to_robot_action(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1295,8 +1295,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ReviewRouter()
-        decision = await router.route(
+        interpreter = ReviewInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="你能摇头吗",
                 language="zh-CN",
@@ -1315,10 +1315,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "robot_action")
         self.assertIn("review_model:review-model recovered", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+        self.assertEqual([payload["model"] for payload in interpreter.payloads], ["test-model", "review-model"])
 
     async def test_review_model_repairs_walk_command_misclassified_as_interrupt(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1349,7 +1349,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ReviewRouter()
+        interpreter = ReviewInterpreter()
         request = RouteRequest(
             text="Okay, please walk ahead for a few seconds. Please. Quickly.",
             language="en-US",
@@ -1375,8 +1375,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        decision = await router.route(request)
-        review_user = router.payloads[1]["messages"][1]["content"]
+        decision = await interpreter.route(request)
+        review_user = interpreter.payloads[1]["messages"][1]["content"]
 
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
@@ -1386,7 +1386,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("input_schema", review_user)
 
     async def test_review_failure_does_not_recover_invalid_interrupt_from_catalog_candidate(self) -> None:
-        class ReviewFailureRouter(OllamaGoalInterpreter):
+        class ReviewFailureInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1408,8 +1408,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ReviewFailureRouter()
-        decision = await router.route(
+        interpreter = ReviewFailureInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="你能摇头吗",
                 language="zh-CN",
@@ -1432,7 +1432,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
 
     async def test_fast_repair_model_recovers_when_review_model_fails(self) -> None:
-        class RepairRouter(OllamaGoalInterpreter):
+        class RepairInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1468,8 +1468,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = RepairRouter()
-        decision = await router.route(
+        interpreter = RepairInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="Okay, please walk forward for 15 seconds, quickly, please.",
                 language="en-US",
@@ -1494,12 +1494,12 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
         self.assertIn("fast_model:test-model repaired", decision.reason or "")
         self.assertEqual(
-            [payload["model"] for payload in router.payloads],
+            [payload["model"] for payload in interpreter.payloads],
             ["test-model", "review-model", "test-model"],
         )
 
-    async def test_review_model_recovers_primary_router_timeout(self) -> None:
-        class TimeoutRouter(OllamaGoalInterpreter):
+    async def test_review_model_recovers_primary_interpreter_timeout(self) -> None:
+        class TimeoutInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1525,8 +1525,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 raise TimeoutError("quick model timed out")
 
-        router = TimeoutRouter()
-        decision = await router.route(
+        interpreter = TimeoutInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="Please walk ahead for 15 seconds.",
                 context={
@@ -1546,12 +1546,12 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
         self.assertIn("review_model:review-model recovered route", decision.reason or "")
         self.assertEqual(
-            [payload["model"] for payload in router.payloads],
+            [payload["model"] for payload in interpreter.payloads],
             ["test-model", "review-model"],
         )
 
     async def test_fast_repair_model_runs_after_low_confidence_review_recovery(self) -> None:
-        class RepairRouter(OllamaGoalInterpreter):
+        class RepairInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1596,8 +1596,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = RepairRouter()
-        decision = await router.route(
+        interpreter = RepairInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="Okay, please walk forward for 15 seconds, quickly, please.",
                 language="en-US",
@@ -1621,12 +1621,12 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
         self.assertIn("fast_model:test-model repaired", decision.reason or "")
         self.assertEqual(
-            [payload["model"] for payload in router.payloads],
+            [payload["model"] for payload in interpreter.payloads],
             ["test-model", "review-model", "test-model"],
         )
 
     async def test_review_model_overrides_underspecified_robot_action(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1643,20 +1643,20 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     return {"message": {"content": '{"intent":"chat"}'}}
                 return {"message": {"content": '{"route":"robot_action"}'}}
 
-        router = ReviewRouter()
+        interpreter = ReviewInterpreter()
         request = RouteRequest(text="Go ahead and sing a song for me.")
 
-        decision = await router.route(request)
+        decision = await interpreter.route(request)
 
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "chat")
         self.assertIn("intent-only route JSON", decision.reason or "")
         self.assertIn("review_model:review-model", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
-        self.assertTrue(all(payload["think"] is False for payload in router.payloads))
+        self.assertEqual([payload["model"] for payload in interpreter.payloads], ["test-model", "review-model"])
+        self.assertTrue(all(payload["think"] is False for payload in interpreter.payloads))
 
     async def test_review_model_completes_underspecified_robot_action_with_exact_skill(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1681,7 +1681,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 return {"message": {"content": '{"route":"robot_action","intent":"robot_action"}'}}
 
-        router = ReviewRouter()
+        interpreter = ReviewInterpreter()
         request = RouteRequest(
             text="Walk forward for 15 seconds, please.",
             language="en-US",
@@ -1699,18 +1699,18 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        decision = await router.route(request)
-        review_user = router.payloads[1]["messages"][1]["content"]
+        decision = await interpreter.route(request)
+        review_user = interpreter.payloads[1]["messages"][1]["content"]
 
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
         self.assertIn("selected exact skill for underspecified robot_action", decision.reason or "")
         self.assertIn("soridormi.walk_forward", review_user)
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+        self.assertEqual([payload["model"] for payload in interpreter.payloads], ["test-model", "review-model"])
 
     async def test_review_model_skill_id_route_is_normalized_to_robot_action(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1736,8 +1736,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 return {"message": {"content": '{"route":"robot_action","intent":"robot_action"}'}}
 
-        router = ReviewRouter()
-        decision = await router.route(
+        interpreter = ReviewInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="眨两下眼睛。",
                 language="zh-CN",
@@ -1761,10 +1761,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "capability:soridormi.blink_eyes")
         self.assertIn("skill id in route field", decision.reason or "")
         self.assertIn("selected exact skill for underspecified robot_action", decision.reason or "")
-        self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
+        self.assertEqual([payload["model"] for payload in interpreter.payloads], ["test-model", "review-model"])
 
     async def test_ambiguous_deep_thought_tries_review_then_clarifies(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1786,8 +1786,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ReviewRouter()
-        decision = await router.route(
+        interpreter = ReviewInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="Hello, how are you.",
                 context={
@@ -1807,12 +1807,12 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "clarify_uncertain_request")
         self.assertIn("semantically unresolved", decision.reason or "")
         self.assertEqual(
-            [payload["model"] for payload in router.payloads],
+            [payload["model"] for payload in interpreter.payloads],
             ["test-model", "review-model", "test-model"],
         )
 
     async def test_ambiguous_deep_thought_review_recovers_chinese_walk_command(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1845,8 +1845,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ReviewRouter()
-        decision = await router.route(
+        interpreter = ReviewInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="往前走个15秒。",
                 language="zh-CN",
@@ -1870,12 +1870,12 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
         self.assertIn("review_model:review-model reviewed ambiguous deep_thought", decision.reason or "")
-        review_prompt = router.payloads[1]["messages"][1]["content"]
+        review_prompt = interpreter.payloads[1]["messages"][1]["content"]
         self.assertIn("往前走个15秒", review_prompt)
         self.assertIn("soridormi.walk_forward", review_prompt)
 
     async def test_ambiguous_deep_thought_review_failure_clarifies(self) -> None:
-        class ReviewRouter(OllamaGoalInterpreter):
+        class ReviewInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1897,8 +1897,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = ReviewRouter()
-        decision = await router.route(RouteRequest(text="Hello, how are you."))
+        interpreter = ReviewInterpreter()
+        decision = await interpreter.route(RouteRequest(text="Hello, how are you."))
 
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "clarify")
@@ -1906,7 +1906,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("semantically unresolved", decision.reason or "")
 
     async def test_placeholder_capability_intent_is_repaired_before_agent(self) -> None:
-        class PlaceholderRouter(OllamaGoalInterpreter):
+        class PlaceholderInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1937,8 +1937,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = PlaceholderRouter()
-        decision = await router.route(
+        interpreter = PlaceholderInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="Hello, how are you.",
                 context={
@@ -1956,10 +1956,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "greeting")
         self.assertIn("repaired placeholder capability intent", decision.reason or "")
-        self.assertEqual(len(router.payloads), 2)
+        self.assertEqual(len(interpreter.payloads), 2)
 
     async def test_placeholder_capability_repair_failure_falls_back_to_chat(self) -> None:
-        class PlaceholderRouter(OllamaGoalInterpreter):
+        class PlaceholderInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1981,16 +1981,16 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = PlaceholderRouter()
-        decision = await router.route(RouteRequest(text="Hello, how are you."))
+        interpreter = PlaceholderInterpreter()
+        decision = await interpreter.route(RouteRequest(text="Hello, how are you."))
 
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
         self.assertIn("placeholder capability intent", decision.reason or "")
 
 
-    async def test_tool_route_missing_fast_speech_is_repaired_by_router_llm(self) -> None:
-        class WeatherRouter(OllamaGoalInterpreter):
+    async def test_tool_route_missing_fast_speech_is_repaired_by_interpreter_llm(self) -> None:
+        class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -2003,7 +2003,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
             async def _chat(self, payload: dict) -> dict:
                 system = str(payload["messages"][0].get("content") or "")
-                stage = "fast_speech_repair" if "fast-speech repairer" in system else "primary_router"
+                stage = "fast_speech_repair" if "fast-speech repairer" in system else "primary_interpreter"
                 self.stages.append(stage)
                 if stage == "fast_speech_repair":
                     return {
@@ -2026,8 +2026,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = WeatherRouter()
-        decision = await router.route(
+        interpreter = WeatherInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="今天重庆天气怎么样？",
                 language="zh-CN",
@@ -2050,10 +2050,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.fast_speech.text, "好的，我查一下重庆今天的天气。")
         self.assertEqual(decision.fast_speech.commitment, "checking_only")
         self.assertIn("fast_speech_repair", decision.metadata)
-        self.assertEqual(router.stages, ["primary_router", "fast_speech_repair"])
+        self.assertEqual(interpreter.stages, ["primary_interpreter", "fast_speech_repair"])
 
-    async def test_tool_route_missing_fast_speech_does_not_add_router_latency_by_default(self) -> None:
-        class WeatherRouter(OllamaGoalInterpreter):
+    async def test_tool_route_missing_fast_speech_does_not_add_interpreter_latency_by_default(self) -> None:
+        class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -2075,8 +2075,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = WeatherRouter()
-        decision = await router.route(
+        interpreter = WeatherInterpreter()
+        decision = await interpreter.route(
             RouteRequest(
                 text="今天重庆天气怎么样？",
                 language="zh-CN",
@@ -2095,10 +2095,10 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(decision.route, "tool")
         self.assertIsNone(decision.fast_speech)
-        self.assertEqual(router.calls, 1)
+        self.assertEqual(interpreter.calls, 1)
 
     async def test_tool_route_existing_fast_speech_does_not_repair(self) -> None:
-        class WeatherRouter(OllamaGoalInterpreter):
+        class WeatherInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -2109,7 +2109,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                 self.stages: list[str] = []
 
             async def _chat(self, payload: dict) -> dict:
-                self.stages.append("primary_router")
+                self.stages.append("primary_interpreter")
                 return {
                     "message": {
                         "content": (
@@ -2123,15 +2123,15 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
                     }
                 }
 
-        router = WeatherRouter()
-        decision = await router.route(RouteRequest(text="今天重庆天气怎么样？", language="zh-CN"))
+        interpreter = WeatherInterpreter()
+        decision = await interpreter.route(RouteRequest(text="今天重庆天气怎么样？", language="zh-CN"))
 
         self.assertEqual(decision.route, "tool")
         self.assertIsNotNone(decision.fast_speech)
-        self.assertEqual(router.stages, ["primary_router"])
+        self.assertEqual(interpreter.stages, ["primary_interpreter"])
 
     def test_fast_speech_repair_payload_preserves_route_and_forbids_results(self) -> None:
-        router = OllamaGoalInterpreter(
+        interpreter = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -2161,7 +2161,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        payload = router.build_fast_speech_repair_payload(request, decision)
+        payload = interpreter.build_fast_speech_repair_payload(request, decision)
         rendered = "\n".join(str(message.get("content") or "") for message in payload["messages"])
 
         self.assertIn("fast-speech repairer", rendered)

@@ -20,7 +20,7 @@ The host Orchestrator owns:
 - VAD and utterance boundaries;
 - barge-in and interruption;
 - ASR timeout handling;
-- forwarding recognized text into Router and Agent reasoning.
+- forwarding recognized text into Goal Interpreter and Agent reasoning.
 
 The ASR service owns:
 

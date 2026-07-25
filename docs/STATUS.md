@@ -1,14 +1,22 @@
 # Current Implementation Status
 
+> **Router terminology note:** References to Router below are retained only when
+> describing historical revisions, evidence bundles, scenario provenance, or
+> failure reports. The current architecture has no Router service, client,
+> endpoint, container, or compatibility authority; Goal Interpretation runs
+> inside the Agent-owned Goal-Driven Cognitive Core.
+
+
+
+
 **Status authority:** this file describes what is present in the repository snapshot.
 **Development identity:** `development`; no release version or publication target is planned.
 **Maintained execution scope:** Soridormi MuJoCo `sim`; retained evidence below records the exact revision that produced each bundle.
-**Status refresh date:** 2026-07-24
-**Current focus:** **Improve Fast Planner multi-goal latency and promote the
-functional diagnostic path to source-bound target evidence by adding
-endpoint-reported Soridormi revision identity, using a clean paired checkout,
-and binding running images/models to source. Physical pilot and human
-voice-device validation remain separate engineering tracks.**
+**Status refresh date:** 2026-07-25
+**Current focus:** **Expand the reviewed Social Attention benchmark dataset on
+top of the closed Cognitive Gateway and Goal-Driven Cognitive Core architecture.
+Preserve acceptable behavior regions, deterministic safety invariants, provider-
+owned embodiment adaptation, and model-owned social judgment.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
@@ -20,6 +28,11 @@ recreated. The repository does not define a replacement tag.
 
 The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
+
+The final Router-removal closure audit passes the maintained `./scripts/run_tests.sh`
+entrypoint with 1,357 primary tests plus 20 legacy Agent tests, the 399-scenario
+Benchmark inventory with 27 Benchmark tests, documentation validation, Router
+removal guards, Compose parsing, Python compilation, and diff-hygiene checks.
 
 The current branch closes two July 24 live-conversation regressions. With no
 active Goals, the constrained Goal Segmentation schema now requires a social
@@ -211,7 +224,7 @@ entries, preserve the last complete snapshot, and interpret nested availability,
 execution, and confirmation fields consistently. TaskGraph results expose a
 bounded terminal summary rather than an undeclared provider payload. Missing, pending, running, or unknown TaskGraph
 status is failure, not completion, and a missing legacy Action Client also
-fails instead of fabricating success. The Router no longer infers weather or
+fails instead of fabricating success. The Goal Interpreter no longer infers weather or
 standalone gratitude from user-text phrase tables: normal semantic intent is
 model-authored, while deterministic code only validates/repairs structured
 route contracts or clarifies. The resulting audit gate passed 1,305 primary
@@ -263,9 +276,9 @@ pipelines. Training or tuning motion-control models waits until a selected
 target body or simulator, calibration artifacts, telemetry, safety envelopes,
 and task-level acceptance metrics exist.
 
-The service currently named Router is the compatibility implementation behind
-the Cognitive Gateway boundary, not the Goal-Driven Cognitive Core. Its current
-fast model is not a single source of truth for routing or safety. `qwen3:4b` may
+The independent Router service is removed. The fast Goal Interpreter is an
+internal stage of the Agent-owned Goal-Driven Cognitive Core and is not a single
+source of truth for semantics, authorization, execution, or safety. `qwen3:4b` may
 propose routes for normal requests, but deterministic
 operational controls, capability-catalog constraints, low-confidence
 deepthought delegation, schema validation, host Skill Runtime authorization,
@@ -273,9 +286,9 @@ and Soridormi provider checks remain authoritative. The July 9, 2026 live-text
 general-ability failures exposed the earliest wrong boundary in the Router:
 the old `qwen3:0.6b` profile could time out on cold model load and misclassify
 ordinary catalog-backed body requests even when warm. The fix is architectural:
-use the locally available `qwen3:4b` fast-router profile, keep it resident with
-`AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE`, warm it during Router startup, select primary/review
-timeouts by stage rather than model name, bound quick-router output to compact
+use the locally available `qwen3:4b` fast Goal Interpreter profile, keep it resident with
+`AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE`, warm it during Agent startup, select primary/review
+timeouts by stage rather than model name, bound fast Goal Interpreter output to compact
 classification JSON with `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT=512`, and convert
 schema-invalid or narrowed quick compound `actions[]` into the unified
 Goal-driven Runtime instead of executing or narrowing them. Isolated low-information
@@ -285,10 +298,10 @@ contract and receives one independent semantic repair; failed or inconsistent
 repair clarifies rather than inferring tool intent from user-text keywords.
 A July 12 live voice log exposed the inverse contamination case: after a weather
 turn, a clear walking request was returned as `route=chat`,
-`intent=weather_query`. The Router now treats route/intent and exact-capability
+`intent=weather_query`. The Goal Interpreter now treats route/intent and exact-capability
 route contradictions as invalid model contracts, requests an independent
 semantic repair, and clarifies if repair remains inconsistent or uncertain. A
-file-backed multi-turn Router-to-Interaction replay now forces that stale output
+file-backed historical Router-to-Interaction replay now forces that stale output
 after a weather turn and verifies that repeated walking requests still produce
 the exact bounded walking skill. Low-confidence referential fragments likewise
 reach clarification instead of an unsupported acknowledgement. These are Level A
@@ -299,10 +312,10 @@ robot behavior until the corresponding live acceptance run is retained.
 
 The July 22 robot log also showed repeated unrelated technical fragments being
 classified as the same high-confidence `capability_inquiry`, causing Chromie to
-answer speech that was not directed at it. The earliest wrong boundary was the
+answer speech that was not directed at it. The earliest wrong boundary in that historical revision was the
 Router contract: semantic `ignore` was universally prohibited and the host
-supplied no engagement evidence. The host now supplies bounded active-task and
-recent-exchange state, while the Router reviews addressedness and whether the
+supplied no engagement evidence. The host now supplies bounded active-task and recent-exchange state, while
+Gateway Attention Review evaluates addressedness and whether the
 subject is Chromie's own ability. Only high-confidence `not_addressed` or
 `ambient_speech` may be ignored while host engagement is inactive; interrupt,
 silence, and unusable-audio controls remain deterministic. Direct questions,
@@ -310,7 +323,7 @@ requests, greetings, Chromie's name, active tasks, and recent accepted turns
 remain addressed, and ignored ambient turns do not extend engagement. This is
 Level A automated evidence, not retained live-microphone acceptance.
 The July 23 retained microphone trace exposed the inverse false-negative: the
-quick Router correctly grounded `今天北京下雨了吗？` as `tool/weather_query`, but
+fast Goal Interpreter correctly grounded `今天北京下雨了吗？` as `tool/weather_query`, but
 the focused classifier returned high-confidence `addressed=false` and silently
 replaced it with `ambient_speech`. The addressedness schema now also requires a
 bounded speech-act class. Runtime suppression is limited to inactive ambient
@@ -320,10 +333,10 @@ route. This correction is implemented and automatically verified at Level A;
 a rebuilt retained live-microphone rerun remains open. The retained
 `goal_interpretation/inactive_direct_weather_question_false_addressedness` scenario now
 replays the inactive engagement context, grounded quick weather route, and
-false question review through the real Router pipeline.
+false question review through the historical Router pipeline.
 The July 23 canonical gate passed 1,170 primary tests plus 20 legacy Agent
-tests. The focused Router suite passed 51/51, the Router matrix passed 66/66,
-the exact retained Router scenario passed 1/1, and the
+tests. The historical focused Router suite passed 51/51, the Router matrix passed 66/66,
+and the exact retained Router scenario passed 1/1, and the
 `robust_intent_understanding` Level A class passed 8/8 within a valid 54-case
 manifest. A direct local
 `qwen3:4b` contract probe classified the weather utterance as an addressed
@@ -331,21 +344,21 @@ question and inactive `Yeah.` as an unaddressed reply. The model probe is local
 service evidence only. After rebuilding only `chromie-agent`, its public
 endpoint returned `tool/weather_query` with speech enabled for the reported
 inactive Chinese question and retained `ignore/ambient_speech` for inactive
-`Yeah.`. This is deployed Router evidence, not a retained microphone, Agent,
+`Yeah.`. This is historical pre-removal Router evidence, not a retained microphone, Agent,
 weather-result, or TTS run.
 Deterministic semantic action parsing is now a rules-only or explicit
 compatibility fallback rather than the normal hybrid brain path. The
-fast Qwen-class Router now receives unlocked
+fast Qwen-class Goal Interpreter now receives unlocked
 `common_ability_catalog`/`common_ability_ids` as its commonly used ability menu;
-per-query catalog matches are not used by the fast Router decision surface, and
+per-query catalog matches are not used by the fast Goal Interpreter result surface, and
 rare/full-catalog or `prompt_tier_locked` selections delegate to `deep_thought`
 instead of entering the immediate fast action surface. Catalog prompt tiers now
 carry `prompt_tier_source` and
 `prompt_tier_reason`; the initial preset lives in
 `capabilities/prompt_tiers.json`, and an optional experience-derived overlay can
 move ordinary unlocked skills between common and rare, while safety-sensitive
-locked entries are forced to the full-catalog/deepthinking path. Router
-decisions now retain staged
+locked entries are forced to the full-catalog/deepthinking path. Goal Interpreter
+results now retain staged
 multi-route items in `routes` and `metadata.route_items`, staged task/action
 proposals in `metadata.route_stage_outputs`, optional non-executable
 `metadata.desired_abilities` for understood but unavailable human-like
@@ -360,10 +373,10 @@ cannot claim memory writes, tool results, physical completion, or execution
 authority. Optional post-interrupt review can attach a corrected follow-up
 route after deterministic cancellation has already happened, but it does not
 authorize automatic physical resume. See
-[Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
-The structured host interaction path now copies Router stage proposals into an
+[Model-Assisted Cognitive Guardrails](MODEL_ASSISTED_COGNITIVE_GUARDRAILS.md).
+The structured host interaction path now copies Goal Interpreter stage proposals into an
 internal Orchestrator task-proposal ledger before execution. The ledger marks
-effectful Router tasks as `not_committed` unless the final
+effectful Goal Interpretation tasks as `not_committed` unless the final
 `InteractionResponse` contains a matching committed skill, and records committed
 speech/skills, static preflight status, and rejected deepthinking tasks for
 later diagnostics. Later-stage merge corrections can attach
@@ -374,7 +387,7 @@ before execution, such as skill registry presence, provider registration,
 schema validity, availability, confirmation, and safety-monitor requirements;
 real world feasibility remains a Skill Runtime and Soridormi evidence question.
 The ledger is now validated through the shared `TaskProposalLedger` contract.
-Router emits shared `task_proposals`, and the Agent deepthinking path emits
+Goal Interpreter emits shared `task_proposals`, and the Agent deepthinking path emits
 shared `deepthinking_task_proposals` for proposed speech/skills,
 missing-ability proposals, and rejected candidate tasks. Final Agent speech and skills now emit shared
 `agent_task_proposals`, with speech represented as the local `chromie.speak`
@@ -389,7 +402,7 @@ Semantic task continuity is implemented inside the Goal-Driven Cognitive Core's
 current unified Goal-driven Runtime
 and automatically verified. Shared contracts represent open semantic goals, versioned task
 operations, active-task snapshots, information gaps, planning results, response
-plans, commitments, and speech claims. The Router may propose semantic
+plans, commitments, and speech claims. The Goal Interpreter may propose semantic
 create/modify/clarification and other task operations from meaning and bounded
 active-task context; Goal Association independently reviews active-goal
 relationships and emits stable replay-safe operations. Its model contract is
@@ -425,7 +438,7 @@ simulator validation remain open. See [Semantic Task Continuity and Situational
 Planning](SEMANTIC_TASK_CONTINUITY_AND_SITUATIONAL_PLANNING.md).
 
 The July 12 voice-log reliability slice is also implemented and automatically
-verified. Router Ollama calls now carry an explicit 4096-token context budget so
+verified. Goal Interpreter Ollama calls now carry an explicit 4096-token context budget so
 the common ability menu is not truncated by the global 2048-token default. A
 generic `chat/acknowledge` result is independently rechecked by the fast semantic
 model when executable embodied affordances are present; internally contradictory
@@ -447,7 +460,7 @@ prompt memory.
 
 Chromie now has a structured mind context layer for an owner-approved self
 model, core principles, long-term goals, reflex policy, deliberation policy, and
-experience tuning boundaries. The internal self model identifies one stable speaking, perceiving, acting, and body-owning entity, while language and reasoning models are internal components with bounded roles. The prompt-facing social presentation foregrounds the name Chromie, personality, relationship, and current context; system category, embodiment category, age labels, and internal architecture remain background implementation context rather than ordinary self-introduction material. Router, conversation, DeepThinking, and direct-fallback prompts receive this ontology plus bounded runtime capability evidence, allowing the LLM to answer self-description and capability questions semantically without identity-question branches, fixed replies, or normal-language phrase/regex mapping. An append-only
+experience tuning boundaries. The internal self model identifies one stable speaking, perceiving, acting, and body-owning entity, while language and reasoning models are internal components with bounded roles. The prompt-facing social presentation foregrounds the name Chromie, personality, relationship, and current context; system category, embodiment category, age labels, and internal architecture remain background implementation context rather than ordinary self-introduction material. Goal Interpretation, conversation, DeepThinking, and direct-fallback prompts receive this ontology plus bounded runtime capability evidence, allowing the LLM to answer self-description and capability questions semantically without identity-question branches, fixed replies, or normal-language phrase/regex mapping. An append-only
 experience journal records
 interaction outcomes, and failed or uncertain outcomes can create
 human-review-only update proposals. Experience is not allowed to auto-apply core
@@ -512,25 +525,25 @@ Target validation or Release readiness.
 
 | Capability | Implementation | Automated evidence | Target or live evidence | Default deployment state |
 |---|---|---|---|---|
-| Five Docker services plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
+| Six maintained Compose services (ASR, three selectable TTS providers, LLM, Agent) plus host Orchestrator | Implemented | Compose and control-plane tests | RTX 5090 GPU smoke passed 21/21; all services healthy | Main runtime |
 | Realtime microphone/VAD/ASR/TTS/playback loop | Implemented; ASR and routed execution have separate lifecycles, playback is ordered, delivery/effect barriers prevent motion before audible acknowledgement, and fast-first cache entries are provider/model/reference bound plus duration/ASR checked | Concurrency/cancellation, playback barriers, busy-ASR queue, cleanup, reference binding, TTS readiness, cache identity/content, timing, benchmark, and speech-path coverage | Oute diagnostics exposed enrollment-text leakage and poor Chinese; CosyVoice service startup and nonempty PCM were observed, but a retained Mandarin listening bundle remains open | SenseVoice CUDA and CosyVoice3 are defaults; late or mismatched audio fails closed |
 | Framework-neutral TTS providers | Contract version 1 with default CosyVoice3, explicit Oute and Qwen alternatives, immutable locks, authorized reference installation, common matrix, application readiness, warm synthesis, and bounded drain/restart cancellation | Provider/adapter/reference, cancellation, matrix, benchmark, cache, readiness, timeout, default/fallback wiring, and GPU-verifier tests | Repeated isolated runs: CosyVoice3 3.0987 s/0.5419 ordinary median first-binary/RTF; Qwen3-TTS 5.6786 s/0.9364; forced-restart recovery favored Qwen. Historical Oute listening diagnostics failed Chinese quality | `CHROMIE_TTS_BACKEND=cosyvoice3`, provider `fun-cosyvoice3-0.5b`, port 5000, one host request/worker; Oute on 5001 and Qwen on 5002 are explicit alternatives |
-| Cognitive Gateway ingress foundation | Logical contract implemented; deployment decomposition partial. Frozen version 1 `UserTurnEnvelope` and `ReflexOutcome` contracts preserve immutable input, normalized evidence, quality, attention, source/freshness context references, admission, and stable correlation. Fixed reflex scopes cover output, embodied motion, the foreground interaction, and global emergency. They retain active/queued dispatch receipts; output-only preserves pending approval, while a motion stop revokes the whole shared confirmation token if any confirmed request is motion-bound or unknown. Revocation happens before the first await; global emergency cancels every unfinished host interaction workflow even if runtime dispatch fails and separately attempts the dedicated Soridormi E-stop without waiting for audio teardown. The legacy routing path still hosts addressedness review and mixed semantic work, so the five logical modules are not yet separate deployment units. Named `specific_goal` Core dispatch, exact receipt-to-Goal reconciliation, provider-widening reconciliation, partial confirmation-token rebuilding, and broad fixed-reflex receipt reconciliation are implemented | The current cancellation-closure gate passed 1,324 primary plus 20 legacy Agent tests, following the scoped and named-Goal foundations. Shared-envelope invariants and immutability, bilingual scope classification/contextual rejection, blocked-audio and real VAD/ASR safety dispatch, concurrent protective-reflex priority, active/queued isolation, queued-before-start closure, foreground launch reservation/restoration, global host-task fallback, shared-token approval widening, exact named-Goal dispatch, atomic target/coaffected reconciliation, confirmation-remainder rebuilding, broad request-to-Goal reconciliation, partial cancellation retention, Host-preflight unknown-start handling, shared-owner/stale binding, output/motion provider-scope widening, non-interruptible and cancellation-failure evidence, TaskGraph cancel-before-start/replay/fingerprint validation, dedicated E-stop postcondition checks, Router/direct-fallback suppression, and host/Core integration tests passed. The relevant Level A classes passed 4/4 deterministic safety cases and 5/5 evidence-bound closure cases | No retained post-change microphone, active-task cancellation, dedicated E-stop, safe-idle, simulator, or hardware evidence | Logical Gateway boundary active; legacy routing path remains deployed for attention review and advisory routing |
-| Cognitive Gateway legacy routing path | Implemented; interrupt/silence/unusable-audio controls remain deterministic. Normal routing still uses catalog context, bounded host engagement evidence, structured speech-act/addressedness review, structural validation, semantic repair, clarification, or deep handoff. Its semantic route/intent, affordance, action, and task outputs are migration advisories, not final Core authority. Only high-confidence explicitly ambient inactive speech may use semantic `ignore`; direct/unclear contradictions fail open, ignored turns do not open engagement, and retained completed tasks alone cannot turn a tiny ASR fragment into an effectful follow-up | Router rules, addressedness/engagement, direct-question false-review, low-information retained-task, capability routing, prompt, route-contract, replay, multi-turn, deepthinking, interaction, and regression coverage | July 21 live-text evidence predates this fix. July 22 logs diagnose repeated ambient `capability_inquiry` and isolated `I.` failures; the July 23 trace diagnoses the inverse direct-weather-question false negative. A rebuilt retained post-fix microphone run is open | Enabled; addressedness gate on with a 45-second recent accepted-exchange window; full Gateway/Core split is open |
+| Cognitive Gateway ingress foundation | Logical contract implemented; deployment decomposition partial. Frozen version 1 `UserTurnEnvelope` and `ReflexOutcome` contracts preserve immutable input, normalized evidence, quality, attention, source/freshness context references, admission, and stable correlation. Fixed reflex scopes cover output, embodied motion, the foreground interaction, and global emergency. They retain active/queued dispatch receipts; output-only preserves pending approval, while a motion stop revokes the whole shared confirmation token if any confirmed request is motion-bound or unknown. Revocation happens before the first await; global emergency cancels every unfinished host interaction workflow even if runtime dispatch fails and separately attempts the dedicated Soridormi E-stop without waiting for audio teardown. Gateway admission and Attention Review are Host-owned; admitted semantic work enters the Agent-owned Goal-Driven Cognitive Core. The five Gateway responsibilities remain logically distinct even when co-deployed. Named `specific_goal` Core dispatch, exact receipt-to-Goal reconciliation, provider-widening reconciliation, partial confirmation-token rebuilding, and broad fixed-reflex receipt reconciliation are implemented | The current cancellation-closure gate passed 1,324 primary plus 20 legacy Agent tests, following the scoped and named-Goal foundations. Shared-envelope invariants and immutability, bilingual scope classification/contextual rejection, blocked-audio and real VAD/ASR safety dispatch, concurrent protective-reflex priority, active/queued isolation, queued-before-start closure, foreground launch reservation/restoration, global host-task fallback, shared-token approval widening, exact named-Goal dispatch, atomic target/coaffected reconciliation, confirmation-remainder rebuilding, broad request-to-Goal reconciliation, partial cancellation retention, Host-preflight unknown-start handling, shared-owner/stale binding, output/motion provider-scope widening, non-interruptible and cancellation-failure evidence, TaskGraph cancel-before-start/replay/fingerprint validation, dedicated E-stop postcondition checks, historical Router/direct-fallback suppression, and host/Core integration tests passed. The relevant Level A classes passed 4/4 deterministic safety cases and 5/5 evidence-bound closure cases | No retained post-change microphone, active-task cancellation, dedicated E-stop, safe-idle, simulator, or hardware evidence | Gateway/Core boundary active; Goal Interpretation is embedded in Agent and Attention Review remains Gateway-owned |
+| Cognitive Gateway and embedded Goal Interpretation | Implemented; interrupt/silence/unusable-audio controls remain deterministic. Embedded Goal Interpretation uses catalog context, bounded host engagement evidence supplied by the Gateway, structural validation, semantic repair, clarification, or deep handoff. Its semantic route/intent, affordance, action, and task outputs are migration advisories, not final Core authority. Only high-confidence explicitly ambient inactive speech may use semantic `ignore`; direct/unclear contradictions fail open, ignored turns do not open engagement, and retained completed tasks alone cannot turn a tiny ASR fragment into an effectful follow-up | Goal Interpreter rules, Gateway addressedness/engagement, direct-question false-review, low-information retained-task, capability interpretation, prompt, route-contract, replay, multi-turn, deepthinking, interaction, and regression coverage | July 21 live-text evidence predates this fix. July 22 logs diagnose repeated ambient `capability_inquiry` and isolated `I.` failures; the July 23 trace diagnoses the inverse direct-weather-question false negative. A rebuilt retained post-fix microphone run is open | Enabled; addressedness gate on with a 45-second recent accepted-exchange window; Gateway/Core ownership split is implemented; retained live post-removal evidence remains open |
 | Multi-agent `POST /run` compatibility path | Implemented | Contract and integration tests | Historical compatibility evidence only; it is not the maintained semantic-authority path | Service remains available, but common cognitive `apply` does not use it as semantic authority |
 | Structured `POST /interaction` API | Native `InteractionRuntime` is the default; compatibility adapter remains selectable | Native output, strict validation, fallback, and end-to-end named-skill tests | Text-to-live-MuJoCo evidence `20260617T081411Z` passed with ordered walk, nod, turn execution and safe idle on the historical path; it is not evidence for the current cognitive authority path | Enabled in the common safe base |
 | Native structured Interaction Agent | Implemented as the strict output and compatibility surface for `InteractionSpeech`/`SkillRequest` accumulation, TaskGraph requests, and optional `SocialAttentionPlan` coordination. Under cognitive `apply`, fingerprint-bound Response Composition remains authoritative. Candidate discovery is embodiment-independent; the Host validates target evidence, schemas, parallel timing, provider-declared confirmation policy, and conflicts; Response Composer receives the owner-approved Social Interaction Style plus bounded recent accepted-request evidence. Ordinary deployments select `courteous`, `neutral`, or `reserved` through `ORCH_SOCIAL_INTERACTION_STYLE_PRESET`; reviewed full profiles may use `custom`. The Host no longer stores provider mode or grants simulator-derived confirmation | Native route, TaskGraph, validation, fail-closed, response-composition, public-mode/default/migration, backend-independence, provider-confirmation parity, style/evidence, parallel-only, selection/none/invalid/latency/target/conflict, exact-intent, and file-backed backend-parity tests | Historical live simulator evidence predates this change; retained provider-backed Social Attention qualification remains open | Maintained policy `on`; public modes `off`, `report_only`, `on`. Soridormi/provider owns backend selection, controller adaptation, calibration, motion limits, collision safety, stop, and recovery. Legacy Host cue deletion is complete; backend identity and calibrated target values are excluded from the model-facing Social Attention projection; legacy CapabilityAgent skill substitution and cross-schema argument reinterpretation are removed |
-| Goal-Driven Cognitive Core and single semantic authority | PR1–PR9 contracts and stages are integrated through the current unified Goal-driven Runtime in one host coordinator: state-specific exact-schema Goal Association, exact flat Fast/Deep Planner DTOs with host-owned canonical envelopes, goal-keyed model outcomes, prospective Goal Satisfaction, exact-schema fingerprint-bound Response Composition, response-transport separation, one bounded same-stage repair, source-route effect authority, atomic Goal-state application, goal-scoped runtime evidence, mixed-plan execution, confirmation, playback-gated Skill Runtime execution, and evidence-bound turn closure. Maintained `apply` mode is authoritative for enabled routes and fails closed after ownership acquisition. Exact Router actions are adapter-only. The old CapabilityAgent semantic planner is retained only behind host and Agent gates plus a non-empty authoritative emergency claim whose `turn_id` exactly matches the request | The latest July 23 gate passed 1291 primary plus 20 legacy Agent tests. The `evidence_bound_cognitive_turn_closure` Level A class passed 5/5 deterministic cases; focused reconciliation, cancellation, delivery, stale-response, and recovery audits passed; documentation validation and diff hygiene passed. The earlier July 22 pre-PR9 gate passed 1164 primary plus 20 legacy Agent tests, 382/382 declarative scenarios, and 53/53 then-current Level A cases | The final July 21 diagnostic live-text simulator suite passed 10/10 with complete execution receipts and safe idle. All four daily-life cases terminated at Fast; the explicit numeric three-action compound safely rejected a bad Fast substitution and recovered through Deep with 0.2 m/s preserved. That live evidence predates the July 22 lifecycle/effect-envelope repair and PR9 closure; a post-fix supervised rerun remains open. Daily-life median cognitive runtime was 40.321 seconds, above the 15.46-second target. Dirty checkouts and absent endpoint revision identity prevent source-bound Target validation | Common safe base: authoritative `chat` apply, structured interaction on, Soridormi off. Maintained Soridormi launcher: authoritative `chat,robot_action`, Soridormi on. Both fail closed; legacy semantic fallback gates are off |
+| Goal-Driven Cognitive Core and single semantic authority | PR1–PR9 contracts and stages are integrated through the current unified Goal-driven Runtime in one host coordinator: state-specific exact-schema Goal Association, exact flat Fast/Deep Planner DTOs with host-owned canonical envelopes, goal-keyed model outcomes, prospective Goal Satisfaction, exact-schema fingerprint-bound Response Composition, response-transport separation, one bounded same-stage repair, source-route effect authority, atomic Goal-state application, goal-scoped runtime evidence, mixed-plan execution, confirmation, playback-gated Skill Runtime execution, and evidence-bound turn closure. Maintained `apply` mode is authoritative for enabled routes and fails closed after ownership acquisition. Exact Goal Interpretation actions are adapter-only. The old CapabilityAgent semantic planner is retained only behind host and Agent gates plus a non-empty authoritative emergency claim whose `turn_id` exactly matches the request | The latest July 23 gate passed 1291 primary plus 20 legacy Agent tests. The `evidence_bound_cognitive_turn_closure` Level A class passed 5/5 deterministic cases; focused reconciliation, cancellation, delivery, stale-response, and recovery audits passed; documentation validation and diff hygiene passed. The earlier July 22 pre-PR9 gate passed 1164 primary plus 20 legacy Agent tests, 382/382 declarative scenarios, and 53/53 then-current Level A cases | The final July 21 diagnostic live-text simulator suite passed 10/10 with complete execution receipts and safe idle. All four daily-life cases terminated at Fast; the explicit numeric three-action compound safely rejected a bad Fast substitution and recovered through Deep with 0.2 m/s preserved. That live evidence predates the July 22 lifecycle/effect-envelope repair and PR9 closure; a post-fix supervised rerun remains open. Daily-life median cognitive runtime was 40.321 seconds, above the 15.46-second target. Dirty checkouts and absent endpoint revision identity prevent source-bound Target validation | Common safe base: authoritative `chat` apply, structured interaction on, Soridormi off. Maintained Soridormi launcher: authoritative `chat,robot_action`, Soridormi on. Both fail closed; legacy semantic fallback gates are off |
 | Cognitive Turn Loop closure | Implemented in the manager-owned host path. The admitted envelope is preserved through Core acquisition; effectful responses carry an immutable plan/fingerprint; committed requests must match exact step, skill, arguments, timing, goals, and output-schema digest; unknown results fail exact reconciliation; results/traces produce a deterministic `ExecutionOutcomeBundle`; exact per-goal statuses are committed before one speech-only final response. Missing results become `not_run`, while propagated cancellation without terminal per-request evidence remains conservatively `cancelled` with unknown-start diagnostics. `partial` requires real completed plus unresolved work; heterogeneous all-uncompleted outcomes aggregate conservatively without erasing exact statuses. Output exposure is schema-bound and bounded, only playback-start-verified confirmation/recovery/final speech enters history, stale/cancelled/superseded final speech is suppressed while evidence remains, and recovery requires terminal evidence for every committed sibling before creating a newly fingerprinted confirmation-bound child plan over the recoverable subset | The latest July 23 full suite passed 1291 primary plus 20 legacy Agent tests. Focused contract, host-integration, multi-goal terminal-state, missing-result, exact-correlation, schema identity/projection, low-level-field variant rejection, cancellation/preemption, unknown-start cancellation, delivery-bound history, stale-response, conservative-response, and recovery-child-plan coverage passed. The deterministic Level A class `evidence_bound_cognitive_turn_closure` passed 5/5; this is automatic evidence only | No retained provider-backed, live-text, microphone, simulator, dedicated E-stop, safe-idle, or physical-robot evidence for the closed loop | Implemented for configured cognitive `apply` lanes; not yet a release or target-behavior claim; see `docs/COGNITIVE_TURN_LOOP.md` |
-| Semantic compound capability planning | Implemented inside Fast/Deep canonical planning over bounded capability schemas plus provider/resource evidence. The model chooses exact execution, safe adjustment, alternative proposal, clarification, or unsupported; model-authored timing and explanation are preserved. A quick Router that cannot account for the complete effectful goal hands the original utterance to the unified planner instead of declaring the ability missing or invoking the legacy CapabilityAgent planner. Deterministic code validates the complete plan atomically, blocks partial-skill leakage, requires confirmation for material alternatives, and performs authorization/resource arbitration rather than natural-language action interpretation | Exact parallel composition, sequential alternative proposal, unresolved Router-to-planner handoff, unknown concurrency evidence, invalid-substep atomic rejection, confirmation-prompt override, host blocked-state stripping, repeated-step audit identity, and file-backed Chinese walk/blink regression tests | The July 21 diagnostic compound case executed sequential walk at exactly 0.2 m/s, two nods, and a left turn through Deep recovery, then returned safe idle. This is simulator evidence only and makes no claim that concurrent walking and blinking are physically compatible on a particular robot | Unified cognitive planning enabled for configured apply lanes; provider metadata remains authoritative; no normal-language action/count/speed fast-path parser |
+| Semantic compound capability planning | Implemented inside Fast/Deep canonical planning over bounded capability schemas plus provider/resource evidence. The model chooses exact execution, safe adjustment, alternative proposal, clarification, or unsupported; model-authored timing and explanation are preserved. A fast Goal Interpreter that cannot account for the complete effectful goal hands the original utterance to the unified planner instead of declaring the ability missing or invoking the legacy CapabilityAgent planner. Deterministic code validates the complete plan atomically, blocks partial-skill leakage, requires confirmation for material alternatives, and performs authorization/resource arbitration rather than natural-language action interpretation | Exact parallel composition, sequential alternative proposal, unresolved Goal-Interpreter-to-planner handoff, unknown concurrency evidence, invalid-substep atomic rejection, confirmation-prompt override, host blocked-state stripping, repeated-step audit identity, and file-backed Chinese walk/blink regression tests | The July 21 diagnostic compound case executed sequential walk at exactly 0.2 m/s, two nods, and a left turn through Deep recovery, then returned safe idle. This is simulator evidence only and makes no claim that concurrent walking and blinking are physically compatible on a particular robot | Unified cognitive planning enabled for configured apply lanes; provider metadata remains authoritative; no normal-language action/count/speed fast-path parser |
 | Trusted host Skill Runtime | Implemented, including durable active-and-queued cancellation rules, fixed execution domains, exact goal/plan/fingerprint selection, explicit stale/shared-owner/non-interruptible/provider-failure evidence, provider-granularity widening, and rejection of concurrent interaction-ID reuse | Scheduling, confirmation, timeout, scoped active/queued cancellation, independent-sibling isolation, stale/conflict/no-op, provider-failure truthfulness, widening, and cross-interaction tests | The final July 21 diagnostic 10/10 suite exercised speech and Soridormi requests, sequential multi-step execution, normalized receipts, and safe-idle closure on the then-current Goal-driven path; it predates this scoped-cancellation change | Used only by structured path; natural-language named-Goal dispatch is host-bound and fail-closed |
 | Spoken request-bound confirmation | Implemented with host-owned prompt, exact request fingerprint, expiry, single-use approval, denial, and history insertion only after successful speech delivery | Approval, denial, ambiguity, replay, mutation, expiry, authorization, and failed-delivery history tests | Historical synthetic and virtual-mic approval/denial evidence passed; the current goal-driven path still needs a clean retained rerun | Structured path; provider declaration plus backend-neutral Host safety rules |
 | Local speech skill provider | Implemented | Skill Runtime tests | Exercised by text acceptance; physical speaker validation remains separate | Available in structured path |
 | Soridormi named-skill provider | Implemented | Provider and interaction-coordinator tests | Live MCP/MuJoCo planning, execution, and cancellation paths exist | Off in common safe base; enabled by maintained Soridormi launcher |
 | Provider failure normalization | Strict catalog/availability/plan/monitor/completion validation, stable timeout/cancellation terminal states, deterministic language-matched speech fallback, and a versioned 16-scenario replayable fault matrix with configurable latency thresholds, status snapshots, and safe-idle enforcement | Matrix, threshold and safe-idle evaluation, provider restart, unavailable skill, deterministic jitter, dropped monitor status, malformed completion, mismatched identity, disconnect-during-cancel, timeout, fallback, and completion-suppression tests | Live Soridormi-owned injection passed 16/16 scenarios; all ended safe-idle with no threshold violations | Used by Soridormi named skills |
 | Provider conformance | Shared versioned checks and replayable high-level traces for simulator, recommendation-only hardware shadow, and no-motion hardware dry-run profiles, plus manifest preflight and strict retained-evidence verification | Local three-profile parity, trace-drift detection, opaque-identity normalization, profile-specific no-motion proofs, unsafe-output rejection, manifest preflight, and complete/unsafe bundle tests | Live no-motion `sim`, `hardware_shadow`, and `hardware_dry_run` profiles passed with parity; real hardware mode remains refused | Test tooling; real hardware mode refused |
-| Conversation and semantic task state across VAD utterances | Implemented in host memory with optional local recoverable task-context store; includes extracted session/task memory, bounded active-task snapshots, open semantic goals, replay-safe structured task operations, goal/plan versioning, confirmation invalidation, planning-result freshness checks, information gaps, Goal Association, same-turn Router-to-Agent context refresh, atomic operation application, and immediate response-claim validation. A Goal Association `cancel` mutates state-only goals directly and sends execution- or confirmation-bound goals through exact host/runtime dispatch and atomic receipt reconciliation; failed or stale evidence leaves state unchanged | Boundary, follow-up, task-context, restart-restore, extracted-memory, semantic-task contract, create/modify/clarification/replay, active-cancel fail-closed guard, goal-association continuity/segmentation/ambiguity, task-continuity prompt/target/confidence/idempotency, response-claim, capability information-gap, Router prompt, task-proposal, interaction, and TTS-alignment tests | Available in the host Orchestrator; no retained live semantic-continuity evidence for the current authority path yet | Conversation state and unified cognitive `apply` are enabled in `.env.common` for `chat`; standalone Goal Association, planner, Response Composer, and task-continuity observer modes are off because the unified coordinator owns those stages. Durable personal memory and LLM-assisted extraction remain open |
-| High-level Chromie self and ability model | Implemented as an owner-approved structured self model plus a static Host ability ontology above concrete skills. Prompts bind first-person speech, perception, action, and body ownership to the self-model speaker entity, expose language/reasoning models only as internal components, and use a natural social presentation that foregrounds the name Chromie rather than volunteering system category, embodiment category, age labels, or internal architecture; capability inquiries use supplied catalog/provider evidence semantically and do not execute actions. The ontology uses only backend-neutral lifecycle states; provider-backed body skills remain non-executable there and are resolved only from the live provider catalog | Mind/self-model, conversation prompt, Router inquiry-versus-execution, DeepThinking, direct-fallback, ability-registry vocabulary, provider-confirmation parity, capability-evidence, dialogue-scenario, task-ledger, and Orchestrator TTS-alignment tests | Automated prompt/scenario evidence only; no claim that every live model response will be correct, and only existing text/provider paths exercise executable abilities | Registry enabled in host Orchestrator; no identity-question branch, hardcoded identity reply, normal-language identity/capability regex, simulator-only state, or hardware-only state is present; most body, social, manipulation, navigation, and environment abilities remain honest non-executable roadmap entries |
+| Conversation and semantic task state across VAD utterances | Implemented in host memory with optional local recoverable task-context store; includes extracted session/task memory, bounded active-task snapshots, open semantic goals, replay-safe structured task operations, goal/plan versioning, confirmation invalidation, planning-result freshness checks, information gaps, Goal Association, same-turn Goal-Interpretation-to-Agent context refresh, atomic operation application, and immediate response-claim validation. A Goal Association `cancel` mutates state-only goals directly and sends execution- or confirmation-bound goals through exact host/runtime dispatch and atomic receipt reconciliation; failed or stale evidence leaves state unchanged | Boundary, follow-up, task-context, restart-restore, extracted-memory, semantic-task contract, create/modify/clarification/replay, active-cancel fail-closed guard, goal-association continuity/segmentation/ambiguity, task-continuity prompt/target/confidence/idempotency, response-claim, capability information-gap, Goal Interpreter prompt, task-proposal, interaction, and TTS-alignment tests | Available in the host Orchestrator; no retained live semantic-continuity evidence for the current authority path yet | Conversation state and unified cognitive `apply` are enabled in `.env.common` for `chat`; standalone Goal Association, planner, Response Composer, and task-continuity observer modes are off because the unified coordinator owns those stages. Durable personal memory and LLM-assisted extraction remain open |
+| High-level Chromie self and ability model | Implemented as an owner-approved structured self model plus a static Host ability ontology above concrete skills. Prompts bind first-person speech, perception, action, and body ownership to the self-model speaker entity, expose language/reasoning models only as internal components, and use a natural social presentation that foregrounds the name Chromie rather than volunteering system category, embodiment category, age labels, or internal architecture; capability inquiries use supplied catalog/provider evidence semantically and do not execute actions. The ontology uses only backend-neutral lifecycle states; provider-backed body skills remain non-executable there and are resolved only from the live provider catalog | Mind/self-model, conversation prompt, Goal Interpreter inquiry-versus-execution, DeepThinking, direct-fallback, ability-registry vocabulary, provider-confirmation parity, capability-evidence, dialogue-scenario, task-ledger, and Orchestrator TTS-alignment tests | Automated prompt/scenario evidence only; no claim that every live model response will be correct, and only existing text/provider paths exercise executable abilities | Registry enabled in host Orchestrator; no identity-question branch, hardcoded identity reply, normal-language identity/capability regex, simulator-only state, or hardware-only state is present; most body, social, manipulation, navigation, and environment abilities remain honest non-executable roadmap entries |
 | Structured acceptance evidence capture | Readiness preflight plus JSONL events, generated/captured audio, redacted runtime snapshot, case checks, and four explicit voice modes implemented; text-MuJoCo evidence writes route, interaction, execution, status, events, and summary artifacts | Preflight, synthetic/virtual-mic/acoustic framing, isolation, text-MuJoCo, and bundle-verification tests | Historical clean synthetic, virtual-mic, acoustic, and text-MuJoCo evidence is retained for its recorded revisions; a clean current goal-driven rerun remains open. Physical supervised mode is separate support evidence for human voice-device claims | Acceptance-only |
 | Developer usability CLI | `python -m tools.chromie_cli` implements `status`, `config show`, `config validate`, `doctor`, `capability check`, `trace view`, and `evidence bundle` with plain/JSON output; `trace explain` remains future work | CLI command, output, validation, doctor, manifest-safety, retained-trace, and evidence-preflight unit tests plus full Level A gate | Local doctor can report service reachability, trace view can summarize retained local artifacts, and evidence preflight can label retained bundle pointers, but none create target evidence or release readiness | Tooling |
 | Capability registry and deployment probe | Implemented; materialization preserves provider compatibility tools but forces raw planar `commands[]` controller arrays out of model-facing catalogs, and the static audit rejects visible regressions | Registry, manifest, pagination, schema, materialization-visibility, and CLI safety tests | Checked-in Soridormi manifest is pinned to an upstream commit | Root Compose loads the static manifest by default; live Soridormi provider use remains off in the common safe base; normal model-authored motion uses named skills or structured task goals rather than controller recipes |
@@ -565,7 +578,7 @@ At the current working revision the Level A suite is expected to run:
 - **20** dependency-light legacy Agent test functions under `agent/tests/`;
 - documentation consistency checks after this documentation refresh.
 
-The file-backed behavior scenario runner is implemented for Router and
+The file-backed behavior scenario runner is implemented for Goal Interpretation and
 InteractionRuntime module checks. It loads one deterministic JSON scenario per
 file from `scenarios/`, evaluates route, speech, skill, confirmation, task, and
 forbidden-output expectations, writes timestamped comparison reports under
@@ -614,7 +627,7 @@ verifier tests, and dependency-complete Orchestrator AgentClient coverage. The
 retained local `./scripts/run_tests.sh` baseline on 2026-07-04 passed
 `python scripts/check_docs.py`, ran 640 `unittest` cases with `OK`, and
 then passed 20 dependency-light legacy Agent test functions. The behavior
-scenario runner also passed 353/353 adapter, Router, interaction, and dialogue
+scenario runner also passed 353/353 adapter, Goal Interpretation, interaction, and dialogue
 scenario files with `--no-write`.
 
 The historical 2026-07-09 local gate after the general ability reconstruction
@@ -631,8 +644,8 @@ The retained Level A summary is under
 The historical 2026-07-12 automated regression gate during goal-driven PR7
 runtime migration passed `python scripts/check_docs.py`, 899 `unittest` cases,
 and 20 dependency-light legacy Agent tests through `./scripts/run_tests.sh`.
-The complete file-backed behavior library passed 373/373 adapter, Router,
-Router-dialogue, interaction, dialogue, and cognitive-runtime scenarios with
+The complete file-backed behavior library passed 373/373 adapter, Goal Interpretation,
+Cognitive-Core-dialogue, interaction, dialogue, and cognitive-runtime scenarios with
 `--no-write`. General-ability Level A passed 42/42. The scenarios forced the raw quick model to
 return observed stale or generic decisions for walking and compound nod/blink
 requests, then verify bounded semantic review, exact capability grounding,
@@ -645,7 +658,7 @@ advisory result on model failure; effectful
 Agent disconnects fail closed instead of falling through to an unrestricted
 direct LLM. Stage 6 additionally verifies explicit DAC-device selection,
 worker-reported runtime metadata, synchronized model/codec timings, rolling
-performance summaries, and benchmark result aggregation. The self-model prompt refresh adds a retained three-turn identity/unavailable-dance/available-blink scenario and a prompt-facing social presentation that foregrounds Chromie by name without making a false human-identity claim. A retained Router scenario verifies that an unresolved compound action preserves the original utterance for complete-goal planning instead of becoming a terminal missing-ability response, and verifies inquiry-versus-execution semantics without introducing an
+performance summaries, and benchmark result aggregation. The self-model prompt refresh adds a retained three-turn identity/unavailable-dance/available-blink scenario and a prompt-facing social presentation that foregrounds Chromie by name without making a false human-identity claim. A retained historical Router-origin scenario verifies that an unresolved compound action preserves the original utterance for complete-goal planning instead of becoming a terminal missing-ability response, and verifies inquiry-versus-execution semantics without introducing an
 identity blacklist, fixed identity response, or phrase-matched capability
 handler. Unified Fast/Deep capability planning asks the model to reconstruct the
 complete requested outcome and choose an exact plan, safe adjustment,
@@ -657,8 +670,7 @@ can use a conservative ordinary value or requires a specific user clarification.
 Low-consequence defaults are retained with parameter-grounding evidence;
 material duration, direction, target, authorization, cost, or irreversible
 fields become structured information gaps. The semantic capability-planning
-handoff is not redirected to generic DeepThinking solely because the quick
-Router reports zero confidence. Stage 6.6 adds retained live-interaction
+handoff is not redirected to generic DeepThinking solely because the fast Goal Interpreter reports zero confidence. Stage 6.6 adds retained live-interaction
 replays for compound walking and blinking, semantic recovery from an
 unstructured/internal placeholder clarification, and a later parameter answer
 resuming the original task. Planner-created alternative plans remain
@@ -676,8 +688,8 @@ boundary. The common safe base authoritatively applies `chat`; the maintained
 Soridormi launcher widens authority to `chat,robot_action`. Both use
 fail-closed behavior after ownership acquisition. Atomic Goal-state commit,
 bounded host replan, classified operational evidence, and cognitive
-text-to-MuJoCo entry points are automatically verified. July 21 diagnostic
-Level C runs now exercise the current path live through Router, Agent, Ollama,
+text-to-MuJoCo entry points are automatically verified. Historical July 21 diagnostic
+Level C runs exercised the then-current path live through Router, Agent, Ollama,
 Skill Runtime, TTS, and Soridormi MuJoCo. They are not source-bound Target
 validation because the paired Soridormi checkout was dirty and its endpoint did
 not report the executing revision. A retained Stage 6 GPU benchmark, listening
@@ -698,7 +710,7 @@ Active goals preserve conversation continuity across idle boundaries, and every
 effectful step is asserted against its exact `source_goal_ids`. These were Level
 A automated and harness results. The revised daily-life live manifest
 subsequently passed the July 21 diagnostic qualification described below
-against deployed Router, Agent, Ollama, and MuJoCo services.
+against the then-deployed Router, Agent, Ollama, and MuJoCo services.
 
 The 2026-07-17 root-cause repair replaced permissive or structurally ambiguous
 model contracts at the earliest responsible boundaries. Goal Association now
@@ -722,7 +734,7 @@ July 21, the final hardened working tree completed a fresh ten-case suite,
 including all four daily-life cases; the result and its evidence boundary are
 recorded below.
 
-The 2026-07-09 live text preview run against local Router, Agent, and
+The historical 2026-07-09 live text preview ran against the then-local Router, Agent, and
 Soridormi MCP is not passing yet. After fixing a headless runner blocker where
 `sounddevice` was imported before `ORCH_AUDIO_INPUT_MODE=stdin` and
 `ORCH_AUDIO_OUTPUT_MODE=discard` could take effect, the retained live-text
@@ -731,7 +743,7 @@ summary at
 shows 0/6 cases passed. All six live cases reached Router/Agent/MCP but routed
 through `deep_thought_router_unavailable` after live Router LLM timeouts instead
 of the expected `robot_action`, `clarify`, `tool`, or `chat` routes. This is
-live service evidence for a Router/model-latency and fallback-path failure, not
+historical live-service evidence for a Router/model-latency and fallback-path failure, not
 simulator execution or release readiness.
 
 The tests alone do not prove GPU performance, microphone quality, speaker
@@ -742,7 +754,7 @@ validates the target GPU and automated host audio paths.
 speaker-output, live-MuJoCo checks that skip microphone and ASR. The retained
 `20260617T081411Z` bundle is the historical text-to-MuJoCo interaction closure
 evidence. It does not prove physical microphone recognition or speaker quality.
-On 2026-07-02, local live simulator rehearsals also passed through the current
+On 2026-07-02, local live simulator rehearsals also passed through the then-current
 Router/Agent/Skill Runtime/Soridormi MCP stack: warning text
 `Look out, there is a cable in front of you.` emitted no Soridormi skills and
 kept sim safe-idle under
@@ -872,7 +884,7 @@ The common safe base now enables structured interaction and authoritative
 `apply` for `chat` while leaving the Soridormi provider off. The maintained
 Soridormi launcher enables that trusted provider and widens authority to
 `chat,robot_action`. A turn that enters the Goal-driven Runtime cannot fall
-through to the old CapabilityAgent planner. Exact Router actions are
+through to the old CapabilityAgent planner. Exact Goal Interpretation actions are
 adapter-only, and the retained old semantic planner requires host and Agent
 gates plus a non-empty authoritative emergency claim whose `turn_id` matches
 the request. That claim is internal routing metadata, not caller authentication
@@ -916,7 +928,7 @@ validates the plan.
 
 An earlier July 21 tuning snapshot passed 12/12 Fast-terminal cases with a
 15.355-second aggregate median, but later generic numeric-provenance, decoder,
-Router, and Response Composer hardening superseded that snapshot. The final
+former Router, and Response Composer hardening superseded that snapshot. The final
 hardened working tree passed a fresh 4/4 `multi_goal_daily_life` diagnostic run:
 every case terminated at Fast Planner, recorded no hidden technical planner
 failure or Deep invocation, completed Soridormi `sim` execution, and returned

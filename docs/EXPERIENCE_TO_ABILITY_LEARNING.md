@@ -66,7 +66,7 @@ generic memory blob.
 |---|---|
 | Regression scenario | Deterministic test that prevents a known mistake from returning. |
 | Positive scenario | Demonstrates a good behavior pattern that should stay stable. |
-| SFT example | Input and correct structured output for Router or planner training. |
+| SFT example | Input and correct structured output for Goal Interpreter or planner training. |
 | Preference pair | Chosen correct behavior and rejected bad behavior for DPO/RLHF-style tuning. |
 | Missing ability proposal | Evidence that users need a capability Chromie does not currently have. |
 | Skill catalog improvement | Better descriptions, parameters, examples, or availability boundaries for an existing skill. |
@@ -132,7 +132,7 @@ Experience must not:
 - turn raw logs into prompt payloads;
 - auto-apply safety policy or core principle changes;
 - promote `prompt_tier_locked` safety-sensitive skills into the fast common
-  Router prompt;
+  Goal Interpreter prompt;
 - claim a missing physical skill exists;
 - overwrite operator-reviewed scenario truth.
 
@@ -188,7 +188,7 @@ Create a small local reviewed-case store:
 
 ### Stage 3: Prompt Injection Experiment
 
-Inject the top few approved case cards into Router and deepthinking prompts as
+Inject the top few approved case cards into Goal Interpreter and deepthinking prompts as
 advisory experience context.
 
 Acceptance rule: the retrieved cases must improve behavior scenarios without
@@ -227,7 +227,7 @@ The future implementation is useful only if it proves more than retrieval:
   pairs, and missing ability proposals;
 - case retrieval improves scenario pass rate without granting execution
   authority;
-- SFT/preference exports validate against Router or planner output contracts;
+- SFT/preference exports validate against Goal Interpreter or planner output contracts;
 - missing ability proposals are visible to humans and never executed as skills;
 - full Level A tests and behavior scenarios pass after any prompt or model
   change;

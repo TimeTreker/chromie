@@ -33,7 +33,7 @@ class SessionEvidenceTests(unittest.TestCase):
             tracker.log(sid, "asr_final: asr_ms=%.1f text_chars=%s text=%r", 12.0, 12, "Please walk.")
             tracker.log(
                 sid,
-                "goal_interpretation_done: router_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
+                "goal_interpretation_done: interpretation_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
                 50.0,
                 "robot_action",
                 "capability_agent,speaker_agent",
@@ -140,9 +140,9 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertTrue(any("ERROR" in line for line in error_logs.output))
 
             records = [json.loads(line) for line in path.read_text().splitlines()]
-            router_records = [record for record in records if record["event"] == "goal_interpretation_done"]
+            interpretation_records = [record for record in records if record["event"] == "goal_interpretation_done"]
             skill_records = [record for record in records if record["event"] == "skill_result"]
-            self.assertEqual(router_records[-1]["severity"], "warning")
+            self.assertEqual(interpretation_records[-1]["severity"], "warning")
             self.assertEqual(skill_records[-1]["severity"], "error")
 
     def test_failure_speech_can_be_colored_yellow_in_cli(self) -> None:

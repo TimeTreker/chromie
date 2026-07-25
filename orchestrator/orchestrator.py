@@ -988,7 +988,7 @@ class VoiceAssistant:
         }
         decision.metadata = metadata
         # The cached cue owns the immediate acknowledgement for this turn. Keep
-        # the Router's dynamic wording as audit metadata, but do not let the
+        # the Goal Interpreter's dynamic wording as audit metadata, but do not let the
         # downstream Agent repeat it after the hedge fires.
         if decision.speak_first:
             metadata["goal_interpretation_speak_first_suppressed_by_audio_hedge"] = decision.speak_first
@@ -2783,54 +2783,6 @@ class VoiceAssistant:
         return False
 
 
-    def _weather_tool_ack_text(
-        self,
-        decision: RouteDecision,
-        user_text: str,
-    ) -> str | None:
-        route_candidates: list[dict[str, Any]] = []
-        metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        route_candidates.append({
-            "route": decision.route,
-            "intent": decision.intent,
-            "metadata": metadata,
-        })
-        route_candidates.extend(self._route_item_dicts(decision))
-
-        for item in route_candidates:
-            intent = str(item.get("intent") or "").casefold()
-            item_metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
-            if (
-                str(item.get("route") or "") != "tool"
-                and str(item_metadata.get("tool_name") or "").casefold() != "weather"
-                and "weather" not in intent
-                and "forecast" not in intent
-            ):
-                continue
-            if (
-                str(item_metadata.get("tool_name") or "").casefold() != "weather"
-                and "weather" not in intent
-                and "forecast" not in intent
-                and not isinstance(item_metadata.get("weather_query"), dict)
-            ):
-                continue
-            query = item_metadata.get("weather_query")
-            location = ""
-            date = "today"
-            if isinstance(query, dict):
-                location = " ".join(str(query.get("location") or "").split())
-                date = str(query.get("date") or "today").strip().casefold()
-            language = (decision.language or "").lower()
-            zh = language.startswith("zh") or any(
-                "\u4e00" <= ch <= "\u9fff" for ch in user_text
-            )
-            if zh:
-                day = "明天" if date in {"tomorrow", "明天"} else "今天"
-                return f"我查一下{location}{day}的天气。" if location else f"我查一下{day}的天气。"
-            day = "tomorrow" if date == "tomorrow" else "today"
-            return f"Let me check {location}'s weather {day}." if location else f"Let me check the weather {day}."
-        return None
-
     def _fast_first_response_text(
         self,
         decision: RouteDecision,
@@ -2852,12 +2804,12 @@ class VoiceAssistant:
         ):
             return None
 
-        router_text = self._goal_interpretation_fast_speech_text(
+        interpretation_text = self._goal_interpretation_fast_speech_text(
             decision,
             task_snapshots=task_snapshots,
         )
-        if router_text:
-            return router_text
+        if interpretation_text:
+            return interpretation_text
 
         # Raw speak_first is retained in the wire schema for compatibility but
         # is not independently playable. When the dynamic compatibility gate is
@@ -4293,7 +4245,7 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "cognitive_gateway_reflex_applied: action=%s trigger=%s router_bypassed=True",
+                "cognitive_gateway_reflex_applied: action=%s trigger=%s goal_interpretation_bypassed=True",
                 reflex_outcome.action,
                 reflex_outcome.trigger,
             )
@@ -4329,7 +4281,7 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "cognitive_gateway_reflex_applied: action=%s trigger=%s router_bypassed=True",
+                "cognitive_gateway_reflex_applied: action=%s trigger=%s goal_interpretation_bypassed=True",
                 reflex_outcome.action,
                 reflex_outcome.trigger,
             )
@@ -4581,7 +4533,7 @@ class VoiceAssistant:
             return
 
         if decision.route == "ignore":
-            self.session_log(session_id, "router_ignore: intent=%s reason=%s", decision.intent, decision.reason)
+            self.session_log(session_id, "goal_interpretation_ignore: intent=%s reason=%s", decision.intent, decision.reason)
             state = self.sessions.state.get(session_id)
             if state is not None:
                 state["llm_done"] = True

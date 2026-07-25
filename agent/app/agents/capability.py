@@ -285,7 +285,7 @@ class CapabilityAgent(BaseAgent):
                 self._attach_task_planning_identity(request, result.metadata)
                 result.metadata["capability_catalog_version"] = search.catalog_version
                 result.metadata["capability_selected"] = selected_ids
-                self.trace(result, f"accepted {len(selected_ids)} router capability action(s)")
+                self.trace(result, f"accepted {len(selected_ids)} Goal Interpretation capability action(s)")
                 return result
 
         selected_id = ""

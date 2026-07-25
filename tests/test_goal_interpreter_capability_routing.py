@@ -30,7 +30,7 @@ class _Catalog:
         return self.snapshot_data
 
 
-class _LlmRouter:
+class _LlmInterpreter:
     def __init__(
         self,
         decision: RouteDecision,
@@ -60,7 +60,7 @@ class _LlmRouter:
         return self.interrupt_review_decision or self.decision
 
 
-class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
+class InterpreterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def test_rules_only_catalog_match_does_not_route_to_capability_agent(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
@@ -125,7 +125,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="deep_thought",
                 agents=["deepthinking_agent", "speaker_agent"],
@@ -208,7 +208,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -281,7 +281,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -309,7 +309,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("capability_agent", decision.agents)
         self.assertIn("validator normalized catalog capability intent", decision.reason or "")
 
-    async def test_hybrid_llm_delegates_rare_catalog_skill_from_fast_router(self) -> None:
+    async def test_hybrid_llm_delegates_rare_catalog_skill_from_fast_interpreter(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -346,7 +346,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -379,7 +379,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("outside the fast common ability catalog", decision.reason or "")
         self.assertNotIn("capability_agent", decision.agents)
 
-    async def test_hybrid_llm_excludes_locked_common_catalog_skill_from_fast_router(self) -> None:
+    async def test_hybrid_llm_excludes_locked_common_catalog_skill_from_fast_interpreter(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -418,7 +418,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -467,7 +467,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="turn left", matched=False)
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -513,7 +513,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -564,7 +564,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -613,11 +613,11 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.metadata["route_merge"]["selected_stage"], "emergency_filter")
         self.assertEqual(decision.metadata["route_merge"]["task_count"], 2)
 
-    async def test_priority_interrupt_can_be_semantically_confirmed_by_second_router(self) -> None:
+    async def test_priority_interrupt_can_be_semantically_confirmed_by_second_interpreter(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="stop now", matched=False, matches=[])
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -668,11 +668,11 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             ["emergency_filter"],
         )
 
-    async def test_priority_interrupt_can_record_corrected_second_router_task(self) -> None:
+    async def test_priority_interrupt_can_record_corrected_second_interpreter_task(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="stop", matched=False, matches=[])
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="interrupt",
                 agents=[],
@@ -733,10 +733,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             ["emergency_filter", "post_interrupt_review"],
         )
 
-    async def test_routes_endpoint_lists_quick_and_deep_lanes(self) -> None:
+    async def test_interpretation_profile_lists_quick_and_deep_lanes(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
-        payload = await main.routes()
+        payload = main.interpretation_profile()
 
         self.assertIn("chat", payload["routes"])
         self.assertEqual(payload["mode"], main.settings.mode)
@@ -782,7 +782,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(decision.intent, "capability:chromie.speak")
         self.assertIn("conversation_agent", decision.agents)
 
-    async def test_hybrid_router_uses_common_catalog_snapshot_for_semantic_recovery(self) -> None:
+    async def test_hybrid_interpreter_uses_common_catalog_snapshot_for_semantic_recovery(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -808,7 +808,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -842,7 +842,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "soridormi.walk_forward",
         )
 
-    async def test_hybrid_router_delegates_low_confidence_body_command_to_deep_thought(self) -> None:
+    async def test_hybrid_interpreter_delegates_low_confidence_body_command_to_deep_thought(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -893,7 +893,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -917,7 +917,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_low_confidence")
         self.assertEqual(decision.language, "en-US")
-        self.assertIn("quick router confidence", decision.reason or "")
+        self.assertIn("fast goal interpreter confidence", decision.reason or "")
         self.assertIn("quick_route=robot_action", decision.reason or "")
         self.assertIn("deepthinking_agent", decision.agents)
         self.assertEqual(
@@ -977,7 +977,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1069,7 +1069,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1121,7 +1121,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             catalog_version=22,
             matches=[],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1157,7 +1157,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(thinking_task["text"], "Give me a moment to think that through.")
 
-    async def test_hybrid_router_keeps_llm_deep_thought_without_phrase_recovery(self) -> None:
+    async def test_hybrid_interpreter_keeps_llm_deep_thought_without_phrase_recovery(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1177,7 +1177,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="deep_thought",
                 agents=["deepthinking_agent", "speaker_agent"],
@@ -1211,7 +1211,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             [item["task_type"] for item in decision.metadata["task_list"]],
         )
 
-    async def test_hybrid_router_keeps_complex_deep_thought_direct_motion(self) -> None:
+    async def test_hybrid_interpreter_keeps_complex_deep_thought_direct_motion(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1231,7 +1231,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="deep_thought",
                 agents=["deepthinking_agent", "speaker_agent"],
@@ -1256,7 +1256,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("capability_agent", decision.agents)
         self.assertNotIn("recovered_from_route", decision.metadata)
 
-    async def test_hybrid_router_keeps_planning_text_in_deep_thought(self) -> None:
+    async def test_hybrid_interpreter_keeps_planning_text_in_deep_thought(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1276,7 +1276,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="deep_thought",
                 agents=["deepthinking_agent", "speaker_agent"],
@@ -1297,7 +1297,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.intent, "deep_thought_planning")
         self.assertIn("deepthinking_agent", decision.agents)
 
-    async def test_hybrid_router_delegates_low_confidence_without_catalog_match_to_deep_thought(self) -> None:
+    async def test_hybrid_interpreter_delegates_low_confidence_without_catalog_match_to_deep_thought(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1306,7 +1306,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             catalog_version=8,
             matches=[],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="tool",
                 agents=["tool_agent", "speaker_agent"],
@@ -1327,11 +1327,11 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_low_confidence")
-        self.assertIn("quick router confidence", decision.reason or "")
+        self.assertIn("fast goal interpreter confidence", decision.reason or "")
         self.assertIn("deepthinking_agent", decision.agents)
         self.assertFalse(decision.metadata["thinking_ack_allowed"])
 
-    async def test_hybrid_router_keeps_low_confidence_simple_chat_out_of_deep_thought(self) -> None:
+    async def test_hybrid_interpreter_keeps_low_confidence_simple_chat_out_of_deep_thought(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1340,7 +1340,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             catalog_version=8,
             matches=[],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -1363,7 +1363,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("conversation_agent", decision.agents)
         self.assertNotIn("deepthinking_agent", decision.agents)
 
-    async def test_hybrid_router_treats_chat_speak_skill_as_output_channel(self) -> None:
+    async def test_hybrid_interpreter_treats_chat_speak_skill_as_output_channel(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1390,7 +1390,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -1415,7 +1415,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("conversation_agent", decision.agents)
         self.assertNotIn("capability_agent", decision.agents)
 
-    async def test_hybrid_router_treats_robot_action_speak_skill_as_chat(self) -> None:
+    async def test_hybrid_interpreter_treats_robot_action_speak_skill_as_chat(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1442,7 +1442,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1450,7 +1450,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 confidence=1.0,
                 language="en-US",
                 source="llm",
-                reason="bad quick-router speech skill route",
+                reason="bad fast-interpreter speech skill route",
             )
         )
 
@@ -1468,7 +1468,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("conversation_agent", decision.agents)
         self.assertNotIn("capability_agent", decision.agents)
 
-    async def test_hybrid_router_corrects_generic_robot_action_when_catalog_says_chat(self) -> None:
+    async def test_hybrid_interpreter_corrects_generic_robot_action_when_catalog_says_chat(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1488,7 +1488,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1512,7 +1512,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("capability_agent", decision.agents)
         self.assertIn("llm_robot_action_missing_catalog_skill", decision.reason or "")
 
-    async def test_hybrid_router_accepts_exact_robot_action_from_compact_catalog(self) -> None:
+    async def test_hybrid_interpreter_accepts_exact_robot_action_from_compact_catalog(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1546,7 +1546,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1571,7 +1571,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("capability_agent", decision.agents)
         self.assertIn("safety_agent", decision.agents)
 
-    async def test_hybrid_router_normalizes_raw_skill_id_robot_action_from_compact_catalog(self) -> None:
+    async def test_hybrid_interpreter_normalizes_raw_skill_id_robot_action_from_compact_catalog(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1596,7 +1596,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1622,7 +1622,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("capability_agent", decision.agents)
         self.assertIn("safety_agent", decision.agents)
 
-    async def test_hybrid_router_does_not_recover_invalid_llm_interrupt_through_catalog(self) -> None:
+    async def test_hybrid_interpreter_does_not_recover_invalid_llm_interrupt_through_catalog(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1650,7 +1650,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="interrupt",
                 agents=[],
@@ -1707,7 +1707,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="interrupt",
                 agents=[],
@@ -1754,7 +1754,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="interrupt",
                 agents=[],
@@ -1804,7 +1804,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -1850,7 +1850,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -1876,7 +1876,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.source, "fallback")
         self.assertFalse(decision.metadata.get("thinking_ack_allowed", True))
 
-    async def test_hybrid_router_does_not_synthesize_actions_with_semantic_parser(self) -> None:
+    async def test_hybrid_interpreter_does_not_synthesize_actions_with_semantic_parser(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
@@ -1927,7 +1927,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1984,7 +1984,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -2039,7 +2039,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -2090,7 +2090,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -2141,7 +2141,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -2191,7 +2191,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        goal_interpreter = _LlmRouter(
+        goal_interpreter = _LlmInterpreter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],

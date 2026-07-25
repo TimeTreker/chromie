@@ -372,7 +372,7 @@ class TaskProposalLedgerTests(unittest.TestCase):
                         "proposal_kind": "action",
                         "task_type": "task.execute_skill",
                         "state": "advisory",
-                        "reason": "quick router misread warning as a window gaze request",
+                        "reason": "fast Goal Interpreter misread warning as a window gaze request",
                         "effectful": True,
                         "priority": "high",
                         "sequence": 0,

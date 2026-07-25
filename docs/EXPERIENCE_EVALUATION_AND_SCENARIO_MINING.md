@@ -26,7 +26,7 @@ preserve enough evidence to answer:
 
 - What did the user say?
 - What did ASR produce?
-- What route did the Router choose?
+- What route did the Goal Interpreter choose?
 - What did the Agent say?
 - Which skills did the Agent select?
 - Did those skills preserve the user's intent?
@@ -52,7 +52,7 @@ Chromie already has most of the lower-level pieces:
   `.chromie/experience/experience.jsonl`.
 - Failed interactions can already create human-review-only mind update
   proposals.
-- Dialogue, interaction, and router scenario suites already store deterministic
+- Dialogue, interaction, and goal interpreter scenario suites already store deterministic
   JSON fixtures under [`scenarios/`](../scenarios/).
 - `deepthinking_agent` already has the right model role for slow review,
   planning, debugging, and multi-turn reasoning.
@@ -127,7 +127,7 @@ Recommended top-level shape:
 
 `operator_text` is optional. It can be used when a supervised acceptance harness
 knows the intended phrase and wants to distinguish ASR failure from
-Router/Agent failure.
+Goal Interpreter/Agent failure.
 
 ## Deepthinking Evaluation
 
@@ -139,7 +139,7 @@ thread:
 - infer the user's likely intent from the turn and prior context;
 - compare route, speech, selected skills, and execution against that intent;
 - notice when the robot used a social/body fallback for an unrelated task;
-- separate ASR, Router, Agent, Skill Runtime, TTS, and latency problems;
+- separate ASR, Goal Interpreter, Agent, Skill Runtime, TTS, and latency problems;
 - recommend whether the episode should become a regression scenario.
 
 The evaluator output should be structured JSON:
@@ -151,7 +151,7 @@ The evaluator output should be structured JSON:
   "overall_score": 34,
   "pass": false,
   "severity": "major",
-  "summary": "Walking intent was preserved by the Router but lost by the Agent skill plan.",
+  "summary": "Walking intent was preserved by the Goal Interpreter but lost by the Agent skill plan.",
   "scores": {
     "intent_preservation": 10,
     "route_correctness": 80,
@@ -223,7 +223,7 @@ Use a 0 to 100 score per axis:
 | Axis | What It Checks |
 |---|---|
 | Intent preservation | The robot kept the user's semantic action class and goal across ASR, routing, planning, speech, and skills. |
-| Route correctness | Router selected chat, robot action, memory, clarification, tool, or deep thought appropriately. |
+| Route correctness | Goal Interpreter selected chat, robot action, memory, clarification, tool, or deep thought appropriately. |
 | Skill correctness | Selected skills match the user's intended task and available capability schemas. |
 | Safety and confirmation | Risky or physical actions are bounded, confirmed, refused, or clarified appropriately. |
 | Memory continuity | Follow-up turns use the right dialogue or task context without stale leakage. |
@@ -396,7 +396,7 @@ Behavior:
 - preserve source evidence IDs;
 - default to `dialogue` when the failure spans multiple turns;
 - default to `interaction` when the failure is one Agent/Skill Runtime turn;
-- default to `router` when the failure is route classification only;
+- default to `goal interpreter` when the failure is route classification only;
 - mark every generated file as `requires_human_review=true`.
 
 ### Phase 4: Promotion and regression gate

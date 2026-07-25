@@ -83,7 +83,7 @@ one unbounded payload or allowed to overwrite one another.
 ### Architecture-independent schema
 
 Trace producers declare their own stable module identity and emit generic items.
-The trace schema does not enumerate Router, Planner, ASR, TTS, robot control, or
+The trace schema does not enumerate specific cognitive, audio, robot-control, or
 any other current component.
 
 The completed trace reveals the real architecture that participated in that

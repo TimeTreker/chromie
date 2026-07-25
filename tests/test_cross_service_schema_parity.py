@@ -8,14 +8,14 @@ from agent.app.schema import AgentResult as ServiceAgentResult
 from agent.app.schema import RouteDecision as AgentRouteDecision
 from orchestrator.schemas.agent import AgentResult as HostAgentResult
 from orchestrator.schemas.route import RouteDecision as OrchestratorRouteDecision
-from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as RouterRouteDecision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as GoalInterpreterRouteDecision
 from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
 
 
 class CrossServiceSchemaParityTests(unittest.TestCase):
     def test_fast_speech_contract_is_consistent_across_route_boundaries(self) -> None:
         models = (
-            RouterRouteDecision,
+            GoalInterpreterRouteDecision,
             AgentRouteDecision,
             OrchestratorRouteDecision,
             SharedRouteDecision,

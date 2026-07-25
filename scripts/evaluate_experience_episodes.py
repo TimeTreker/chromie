@@ -204,7 +204,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
             _add_tag(failure_tags, "slow_agent")
             scores["latency"] = min(scores["latency"], 35)
         if turn.goal_interpretation.latency_ms is not None and turn.goal_interpretation.latency_ms > 2000:
-            _add_tag(failure_tags, "slow_router")
+            _add_tag(failure_tags, "slow_goal_interpretation")
             scores["latency"] = min(scores["latency"], 55)
 
     base_score = int(round(sum(scores.values()) / len(scores)))
@@ -353,7 +353,7 @@ def offline_review_from_episode(
         learning_actions.append("owner_review_strategy_prompt_or_skill_selection_update")
     if case_quality == "good_case":
         learning_actions.append("retain_as_positive_reference")
-    if "slow_agent" in tag_set or "slow_router" in tag_set:
+    if "slow_agent" in tag_set or "slow_goal_interpretation" in tag_set:
         learning_actions.append("inspect_latency_budget")
 
     root_cause = _root_cause_from_evaluation(evaluation)
@@ -623,7 +623,7 @@ def _root_cause_from_evaluation(evaluation: EpisodeEvaluation) -> str:
         return "A locomotion request did not produce a locomotion skill."
     if "confirmation_without_skill" in tags:
         return "The response asked for confirmation even though no executable skill was present."
-    if "slow_agent" in tags or "slow_router" in tags:
+    if "slow_agent" in tags or "slow_goal_interpretation" in tags:
         return "The interaction exceeded the latency budget."
     if evaluation.passed:
         return "No contract-level failure was found."

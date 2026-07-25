@@ -351,10 +351,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                     },
                 }
 
-        class _Router:
-            async def route(self, *args: Any, **kwargs: Any) -> None:
+        class _AgentClient:
+            async def interpret_turn(self, *args: Any, **kwargs: Any) -> None:
                 network_calls["goal_interpretation"] += 1
-                raise AssertionError("Router must not run for a local stop reflex")
+                raise AssertionError("Goal Interpretation must not run for a local stop reflex")
 
         class _Sessions:
             state = {"sid-stop": {"llm_done": False}}
@@ -465,7 +465,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.active_interaction_id = "interaction-stop"
         assistant.playback_generation = 7
         assistant.interaction_runtime = _Runtime()
-        assistant.router_client = _Router()
+        assistant.agent_client = _AgentClient()
         assistant.sessions = _Sessions()
         assistant.conversation_state = _ConversationState()
         assistant.confirmation_dialogue = confirmation_dialogue
@@ -521,14 +521,14 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         recorded_turn["approval_during_provider_cancel"] = approval_during_provider_cancel
         return events, recorded_turn
 
-    async def test_english_emergency_stop_bypasses_router_and_model(self) -> None:
+    async def test_english_emergency_stop_bypasses_goal_interpreter_and_model(self) -> None:
         _, turn = await self._exercise_local_stop("Emergency stop!")
         self.assertEqual(
             turn["metadata"]["reflex_outcome"]["trigger"],
             "emergency_stop_command",
         )
 
-    async def test_chinese_emergency_stop_bypasses_router_and_model(self) -> None:
+    async def test_chinese_emergency_stop_bypasses_goal_interpreter_and_model(self) -> None:
         _, turn = await self._exercise_local_stop("急停！")
         self.assertEqual(
             turn["metadata"]["reflex_outcome"]["trigger"],

@@ -10,7 +10,7 @@ per-goal `ExecutionOutcomeBundle`, and speech-only final outcome response are
 integrated as defined by the
 [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md). Retained live-text and MuJoCo
 evidence for the authoritative path remains open. The logical Cognitive
-Gateway contract is active, but the current Router service still contains
+Gateway contract is active, but the current Goal Interpreter service still contains
 attention and compatibility semantics and has not completed physical
 decomposition.
 
@@ -19,7 +19,7 @@ decomposition.
 Chromie has migrated its maintained semantic-planning path from a skill-routed
 interaction system to a goal-driven cognitive runtime. This document defines
 the Goal-Driven Cognitive Core and the principles and contracts that current and
-future Gateway, Router-compatibility, Agent, memory, planning, social
+future Gateway, Goal Interpreter-compatibility, Agent, memory, planning, social
 interaction, and execution work must follow.
 
 The central change is simple:
@@ -39,7 +39,7 @@ control evidence, but it does not own user-goal meaning, decomposition,
 planning, semantic agent coordination, outcome synthesis, or response
 composition. Those belong to the Goal-Driven Cognitive Core.
 
-The deployed Router is currently a compatibility implementation that spans both
+The deployed Goal Interpreter is currently a compatibility implementation that spans both
 sides of this target boundary: it performs Gateway-like emergency and
 addressedness work and still emits semantic/advisory route, intent, affordance,
 action, and task proposals. Those outputs remain current migration inputs, not a
@@ -158,7 +158,7 @@ preserves the user’s goal.
 
 For an enabled route, one turn has one authoritative semantic planner. In
 maintained `apply` mode that owner is the Goal-Driven Cognitive Core, currently
-implemented by the unified Goal-driven Runtime. Exact Router actions may be
+implemented by the unified Goal-driven Runtime. Exact Goal Interpreter actions may be
 consumed only as compatibility-adapter input; they do not form a second semantic
 plan, and a turn acquired by the Goal-driven Runtime cannot fall through to the
 old CapabilityAgent planner after a failure.
@@ -1190,7 +1190,7 @@ The following patterns violate this architecture:
 - hidden keyword-to-skill mapping;
 - one new task per utterance;
 - using recency alone to associate a turn with a goal;
-- Router-selected first skill treated as the complete goal;
+- Goal Interpreter-selected first skill treated as the complete goal;
 - partial action leakage from an invalid compound plan;
 - Deep Planner calling Fast Planner for semantic decomposition;
 - model output directly authorizing execution;
@@ -1216,7 +1216,7 @@ later-stage behavior.
 
 PR1-PR9 establish the Goal-Driven Cognitive Core and close one admitted
 effectful turn through evidence-bound final response. They do not establish
-that the current Router service has been fully decomposed into a narrow
+that the current Goal Interpreter service has been fully decomposed into a narrow
 Cognitive Gateway or that target live behavior is qualified; those migrations
 and evidence claims are tracked separately.
 
@@ -1355,7 +1355,7 @@ Operational details are maintained in
 ### PR8 — Single semantic authority and model-facing contract hardening
 
 Implementation status: the unified runtime is authoritative for configured
-lanes, exact Router actions are adapter-only, and the legacy CapabilityAgent
+lanes, exact Goal Interpreter actions are adapter-only, and the legacy CapabilityAgent
 planner is emergency-only behind matching per-turn authority. Goal Association
 uses the exact model-facing schema while the host constructs canonical
 persistence objects.
@@ -1383,7 +1383,7 @@ This stage closes the two contract gaps around PR1-PR8 without redesigning its
 semantic planners:
 
 - a versioned `UserTurnEnvelope` is the preserved Gateway-to-Core input;
-- a compatibility adapter keeps current Router and Agent interfaces
+- a compatibility adapter keeps current Goal Interpreter and Agent interfaces
   behavior-preserving during migration;
 - a deterministic `ExecutionOutcomeBundle` joins exact canonical
   step/skill/arguments/timing, committed requests/schema identity, and trusted
@@ -1421,12 +1421,12 @@ Migration rules:
 
 - do not delete current safety or evidence boundaries;
 - establish the Cognitive Gateway as a local, model-independent protective
-  reflex and bounded attention/admission boundary before removing Router
+  reflex and bounded attention/admission boundary before removing Goal Interpreter
   compatibility behavior;
 - move goal meaning, goal association, task decomposition, affordance grounding,
   planning, semantic agent coordination, outcome synthesis, and response
   composition behind the Goal-Driven Cognitive Core boundary;
-- preserve current Router route/intent and proposal fields as explicitly named
+- preserve current Goal Interpreter route/intent and proposal fields as explicitly named
   compatibility inputs until every consumer and regression boundary migrates;
 - introduce goal contracts alongside existing task contracts;
 - use `report_only` only for explicit observation or rollout diagnosis, not as

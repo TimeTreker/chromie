@@ -286,7 +286,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(invoker.calls, 1)
 
-    async def test_prompt_tiers_mark_common_skills_for_fast_router(self) -> None:
+    async def test_prompt_tiers_mark_common_skills_for_fast_goal_interpreter(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker(), min_score=0.10)
 
         common = await catalog.prompt_entries(scope="common")
@@ -405,7 +405,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calibrate["prompt_tier_source"], "safety_lock")
         self.assertIn("safety-sensitive", calibrate["prompt_tier_reason"])
 
-    async def test_chromie_speak_is_common_and_executable_for_router_tasks(self) -> None:
+    async def test_chromie_speak_is_common_and_executable_for_goal_interpreter_tasks(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
         catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
 
@@ -416,7 +416,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(speak.interaction_executable)
         self.assertEqual(speak.route, "chat")
 
-    async def test_weather_lookup_tool_is_common_router_visible_tool(self) -> None:
+    async def test_weather_lookup_tool_is_common_goal_interpreter_visible_tool(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
         catalog = CapabilityCatalog(registry, live_invoker=None, min_score=0.10)
 

@@ -584,7 +584,6 @@ class ChromieCliTests(unittest.TestCase):
                 ORCH_ACTION_DRY_RUN=true
                 AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=0
                 AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
-                AGENT_GOAL_INTERPRETER_URL=
                 AGENT_URL=
                 ACTION_EXECUTOR_URL=
                 ASR_URL=

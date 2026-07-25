@@ -26,13 +26,13 @@ to the user.
 The unsafe version of the architecture is:
 
 ```text
-router emits task -> task executes immediately -> deeper stage corrects later
+goal interpreter emits task -> task executes immediately -> deeper stage corrects later
 ```
 
 That is not acceptable for embodied work. The safer architecture is:
 
 ```text
-router emits proposal -> orchestrator merges and commits -> committed work executes
+goal interpreter emits proposal -> orchestrator merges and commits -> committed work executes
 ```
 
 ## Principle
@@ -92,14 +92,14 @@ Implemented in `orchestrator/runtime/task_proposals.py`.
 
 The host now builds an internal proposal ledger from:
 
-- route items copied from Router `RouteDecision.routes[]` and
+- route items copied from Goal Interpreter `RouteDecision.routes[]` and
   `RouteDecision.metadata.route_items[]`, which split one utterance into
   separately governed lanes such as immediate speech, memory, deepthought,
   tool, and Skill Runtime work;
-- `route_task_proposals` copied from Router
+- `route_task_proposals` copied from Goal Interpreter
   `RouteDecision.metadata.task_proposals`, when present;
-- `route_task_list` copied from Router `RouteDecision.metadata.task_list`;
-- non-executable desired ability proposals copied from Router
+- `route_task_list` copied from Goal Interpreter `RouteDecision.metadata.task_list`;
+- non-executable desired ability proposals copied from Goal Interpreter
   `RouteDecision.metadata.desired_abilities` through the shared
   `task_proposals` surface;
 - `deepthinking_task_proposals` emitted by the Agent deepthinking path;
@@ -115,7 +115,7 @@ The ledger is attached to `InteractionResponse.metadata.task_proposal_ledger`
 inside the Orchestrator runtime before execution. It is an audit surface; it
 does not execute anything by itself.
 
-Router now emits shared-schema `task_proposals` alongside the legacy
+Goal Interpreter now emits shared-schema `task_proposals` alongside the legacy
 `task_list`, and mirrors the preferred multi-route split in
 `metadata.route_items`. The Orchestrator prefers shared proposals and route-item
 metadata, and keeps the legacy list as a fallback during migration. The Agent
@@ -127,22 +127,22 @@ local `chromie.speak` skill. The final ledger is validated through the shared
 `shared/chromie_contracts/task_proposal.py` contract before being attached to
 metadata. This keeps the wire shape JSON-compatible while making proposal
 states, summaries, and preflight annotations common across services.
-When low-confidence quick Router proposals are delegated, the Router includes
+When low-confidence fast Goal Interpreter proposals are delegated, the Goal Interpreter includes
 `quick_router_review_request` and deepthinking can record
 `quick_review.decision=accept|revise|supersede`; replaced quick proposals are
 represented through `superseded_task_proposals`.
 
 The first commit rule is intentionally conservative:
 
-- Router tasks are recorded as proposals.
+- Goal Interpretation tasks are recorded as proposals.
 - Safe `immediate_speech` chat route items may schedule host fast-first TTS
   when they contain short validated text and `direct_to_tts=true`; this is
   local speech feedback only and cannot claim memory writes, tool results,
   physical completion, or authorization.
 - Memory, tool, deepthought, and skill route items remain separate policy lanes.
-- Effectful router tasks without a matching `InteractionResponse.skill` become
+- Effectful goal interpreter tasks without a matching `InteractionResponse.skill` become
   `not_committed`.
-- A matching `InteractionResponse.skill` marks the router proposal as
+- A matching `InteractionResponse.skill` marks the goal interpreter proposal as
   `committed`.
 - `InteractionResponse.skills` are commitments that still must pass Skill
   Runtime validation, confirmation, provider availability, timeout, and
@@ -160,7 +160,7 @@ The first commit rule is intentionally conservative:
 - `superseded_task_proposals` metadata can mark a prior proposal as
   `superseded` and record the replacing proposal through `superseded_by`.
 
-This means a quick router can be wrong without moving the robot. A later Agent
+This means a quick goal interpreter can be wrong without moving the robot. A later Agent
 or deepthinking path must produce a valid committed skill before any embodied
 work reaches the trusted Skill Runtime.
 
@@ -259,7 +259,7 @@ looked.
 
 1. Internal proposal ledger. Implemented and automatically verified.
 2. Route metadata bridge. Implemented for the structured `/interaction` path:
-   the Orchestrator copies Router stage outputs and task list into response
+   the Orchestrator copies Goal Interpretation stage outputs and task list into response
    metadata before runtime execution.
 3. Proposal-aware diagnostics. Implemented for experience summaries:
    task-proposal and preflight summaries are retained without leaking raw
@@ -277,7 +277,7 @@ looked.
    The ledger also supports `revised_task_proposals` for explicit
    accept/revise/supersede audits. Broader commit policy remains open.
 7. Shared contract. Implemented for the ledger schema in
-   `shared/chromie_contracts/task_proposal.py`. Router now emits
+   `shared/chromie_contracts/task_proposal.py`. Goal Interpreter now emits
    shared-schema `task_proposals` alongside legacy `task_list`, and the Agent
    deepthinking path emits shared-schema `deepthinking_task_proposals`.
    Final Agent speech and skills also emit shared-schema
@@ -286,7 +286,7 @@ looked.
 8. Context summarization. Partially implemented for deepthinking and its
    spoken-response reviewer: the slow path uses extracted task/session context
    instead of raw transcript turns. The target extractor and prompt-builder
-   contract is documented in `docs/MEMORY_EXTRACTION.md`. Quick Router,
+   contract is documented in `docs/MEMORY_EXTRACTION.md`. Fast Goal Interpreter,
    conversation, capability, direct fallback, and deepthinking prompts now have
    the first deterministic extracted-memory path; durable and LLM-assisted
    memory remain open.
@@ -301,7 +301,7 @@ looked.
 ## Non-Goals
 
 - Do not let any model authorize its own side effects.
-- Do not execute physical tasks merely because a router proposed them.
+- Do not execute physical tasks merely because a goal interpreter proposed them.
 - Do not prove real-world feasibility in the Orchestrator. Soridormi preview,
   submit, monitor, cancellation, and provider evidence remain the authority for
   embodied execution.

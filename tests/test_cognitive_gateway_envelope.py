@@ -313,7 +313,7 @@ class GatewayCoreHostIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 turn_envelope=envelope,
             )
 
-    async def test_host_projects_the_envelope_into_the_core_without_router_mutation(
+    async def test_host_projects_the_envelope_into_the_core_without_goal_interpreter_mutation(
         self,
     ) -> None:
         adapter = CognitiveGateway(

@@ -119,15 +119,15 @@ assume the project root.
 
 ## 5. Select the interaction mode
 
-### Compatibility voice path
+### Maintained voice path
 
-Use this only for explicit rollback or compatibility diagnostics:
+The Orchestrator always admits usable turns through Cognitive Gateway and sends
+semantic interpretation to the Agent-owned Goal-Driven Cognitive Core:
 
 ```env
-ORCH_ENABLE_ROUTER=1
 ORCH_ENABLE_AGENT=1
-ORCH_ENABLE_INTERACTION_RESPONSE=0
-ORCH_COGNITIVE_RUNTIME_MODE=off
+ORCH_ENABLE_INTERACTION_RESPONSE=1
+ORCH_COGNITIVE_RUNTIME_MODE=apply
 ```
 
 ### Structured speech-only path

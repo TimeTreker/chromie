@@ -61,7 +61,7 @@ environment in `build-provenance.json`, so a mutable local alias such as
 | Variable | Purpose |
 |---|---|
 | `CHROMIE_IMAGE_TAG` | Single tag value applied by Compose to the four repository-built service images. |
-| `PYTHON_IMAGE` | Versioned Python base image for Router and Agent builds. |
+| `PYTHON_IMAGE` | Versioned Python base image for the Agent build. |
 | `OLLAMA_IMAGE` | Complete Ollama runtime image reference consumed directly by Compose. |
 | `ASR_CUDA_IMAGE`, `TTS_CUDA_IMAGE` | Versioned CUDA base images selected by the active profile/common configuration. |
 
@@ -77,8 +77,7 @@ All risky or incomplete execution paths are default-off.
 
 | Variable | Generated default | Meaning |
 |---|---:|---|
-| `ORCH_ENABLE_ROUTER` | `1` | Use the Router before Agent/direct-LLM fallback. |
-| `ORCH_ENABLE_AGENT` | `1` | Call the Agent when the Router requests it. |
+| `ORCH_ENABLE_AGENT` | `1` | Enable the Agent-owned Cognitive Core and downstream runtime. |
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured responses. Unified cognitive `apply` requires this; the compatibility `/interaction` surface remains available for explicit diagnostics. |
 | `ORCH_ENABLE_SORIDORMI_SKILLS` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Enable immediate-response policy for slow tool, planning, memory, and embodied turns. |
@@ -93,7 +92,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_FAST_FIRST_AUDIO_TRANSCRIPT_MIN_SIMILARITY` | `0.65` | Minimum normalized similarity between the intended cue and its ASR round trip. |
 | `ORCH_FAST_FIRST_AUDIO_GENERATION_ATTEMPTS` | `2` | Bounded attempts for a missing cue that completes synthesis but fails validation. A rejected sample is never cached; one regeneration handles stochastic content defects without weakening the gate. Synthesis timeouts are not retried during startup. |
 | `ORCH_FAST_FIRST_AUDIO_CACHE_REVISION` | empty | Optional operator invalidation salt. Cache keys already include the TTS endpoint, provider/model declaration, speaker ID, and reported speaker revision. |
-| `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to the Router. Only high-confidence semantic `not_addressed`/`ambient_speech` decisions may use model route `ignore`; stop/cancel and unusable audio remain deterministic. |
+| `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to Cognitive Gateway and Goal Interpretation. Only high-confidence semantic `not_addressed`/`ambient_speech` decisions may use model route `ignore`; stop/cancel and unusable audio remain deterministic. |
 | `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; ignored ambient turns do not. |
 | `ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED` | `0` | Legacy opt-in for tool-route fast-first scheduling. Core-authored dynamic wording also requires `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED=1` and the full structured FastSpeech contract. Cached fast-first audio is independent of both settings. |
 | `ORCH_TTS_CJK_CHUNK_CHARS` | `36` | Smaller chunk target for CJK speech so long Chinese weather/status responses can begin playback while later chunks are still synthesized. |
@@ -129,11 +128,11 @@ cancellable deployment.
 | `FOLLOW_LOGS=1` | Follow service logs after startup. |
 | `CHROMIE_PULL_POLICY` | Compose pull policy used by `start_services.sh`; default `never` for local project images. |
 | `CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced by `start_services.sh` after `.env.runtime`; intended for acceptance/service harnesses that need temporary Compose variables. |
-| `WARM_OLLAMA_BEFORE_ORCH` | Warm the Agent model before opening the microphone; when Router LLM is enabled, also warm the fast Router model. Default `1`. |
+| `WARM_OLLAMA_BEFORE_ORCH` | Warm the Agent model before opening the microphone; also warm the Agent-owned fast Goal Interpreter model. Default `1`. |
 | `OLLAMA_AUTO_RESTART_ON_CRASH` | `1` by default. During host warmup, restart `chromie-llm` once if Ollama reports a native `llama-server` crash such as a segmentation fault, then retry generation. |
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
-| `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for every Router/Agent lane while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
+| `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
 | `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default. Limits the shared-GPU topology to one resident Ollama model while CosyVoice is selected. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
@@ -190,7 +189,6 @@ generated prompts must use a specific speaker.
 | `ASR_URL` | `ws://127.0.0.1:9001` |
 | `TTS_URL` | `ws://127.0.0.1:5000` |
 | `LLM_URL` | `http://127.0.0.1:11434/api/generate` |
-| `AGENT_GOAL_INTERPRETER_URL` | `http://127.0.0.1:8091` |
 | `AGENT_URL` | `http://127.0.0.1:8092` |
 | `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
 | `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
@@ -200,37 +198,36 @@ Inside Docker, use Compose service names such as
 `http://chromie-llm:11434`; do not copy host loopback URLs into container
 configuration.
 
-## Router
+## Goal Interpretation inside Agent
 
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_INTERPRETER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
-| `AGENT_GOAL_INTERPRETER_USE_LLM` | `1`; selects `hybrid` when `AGENT_GOAL_INTERPRETER_MODE` is absent. This uses the fast Router model for semantic routing while the emergency filter remains deterministic. |
+| `AGENT_GOAL_INTERPRETER_USE_LLM` | `1`; selects `hybrid` when `AGENT_GOAL_INTERPRETER_MODE` is absent. This uses the fast Goal Interpreter model for semantic interpretation while the emergency filter remains deterministic. |
 | `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration. |
 | `AGENT_GOAL_INTERPRETER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; used only when an optional review path is enabled. |
-| `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
-| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the quick semantic Router budget for legacy/default readers. |
-| `AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast quick-router model path. |
-| `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `4096`; explicit Router context budget. This prevents the approximately 10k-character quick prompt and common ability menu from being silently truncated by Ollama's smaller global context default. |
-| `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for the fast quick-router model. This fits legitimate multi-action routing objects while still preventing unbounded generations from consuming the realtime route budget. |
-| `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; sent on Router Ollama calls so the warmed routing model remains resident. |
-| `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; the Router service warms its primary LLM during startup so the first live turn does not pay cold model load time. |
-| `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Router model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
-| `AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for optional review paths. Exact capability IDs are normalized without review; semantic repair uses the fast Router model, while the larger review model remains bounded and fail-safe. |
+| `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
+| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the fast semantic interpretation budget. |
+| `AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast Goal Interpreter model path. |
+| `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `4096`; explicit Goal Interpreter context budget. This prevents the approximately 10k-character quick prompt and common ability menu from being silently truncated by Ollama's smaller global context default. |
+| `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for the fast Goal Interpreter model. This fits legitimate multi-action routing objects while still preventing unbounded generations from consuming the realtime route budget. |
+| `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; sent on Goal Interpreter Ollama calls so the warmed routing model remains resident. |
+| `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; the Agent startup lifecycle warms the Goal Interpreter LLM during startup so the first live turn does not pay cold model load time. |
+| `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Goal Interpreter model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
+| `AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for optional review paths. Exact capability IDs are normalized without review; semantic repair uses the fast Goal Interpreter model, while the larger review model remains bounded and fail-safe. |
 | `AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD` | `0.55`. |
 | `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
-| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog snapshot or compatibility search request; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
-| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Router-side cache for the prompt catalog snapshot. The fast Router path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
-| `AGENT_GOAL_INTERPRETER_CAPABILITY_MATCH_LIMIT` | Compatibility search-client limit for catalog inspection/fallback surfaces; default `8`. It is not the fast Router prompt size. |
+| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS` | Goal Interpreter budget for one catalog snapshot; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
+| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Goal-Interpreter-side cache for the prompt catalog snapshot. The fast Goal Interpretation path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
+| `AGENT_GOAL_INTERPRETER_CAPABILITY_MATCH_LIMIT` | Compatibility search-client limit for catalog inspection/fallback surfaces; default `8`. It is not the fast Goal Interpretation prompt size. |
 | `AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
-| `AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables model-based semantic review/repair after malformed, contradictory, low-information, or stale quick-router outputs. |
+| `AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables model-based semantic review/repair after malformed, contradictory, low-information, or stale fast-interpreter outputs. |
 | `AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED` | `1`; a content-free generic chat result such as `acknowledge` is independently rechecked against the supplied executable affordances. The deterministic trigger does not inspect user words or choose a skill. |
-| `AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED` | `0`; disables a second Router generation solely to invent a tool prelude. The full result is still spoken, and deployments may opt in after measuring a genuinely faster acknowledgement path. |
-| `AGENT_GOAL_INTERPRETER_HOST`, `AGENT_GOAL_INTERPRETER_PORT` | Container bind address and port. |
+| `AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED` | `0`; disables a second Goal Interpreter call solely to invent a tool prelude. The full result is still spoken, and deployments may opt in after measuring a genuinely faster acknowledgement path. |
 | `AGENT_GOAL_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
-| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; when enabled, Router logs the full raw LLM JSON output after the default bounded raw-output summary. |
-| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; when enabled, Router logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
-| `CHROMIE_CLI_COLOR` | `auto`; force Agent/Router Ollama diagnostic color with `1`, disable with `0`. Falls back to terminal detection and respects `NO_COLOR`. |
+| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; when enabled, the embedded Goal Interpreter logs the full raw LLM JSON output after the default bounded raw-output summary. |
+| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; when enabled, the embedded Goal Interpreter logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
+| `CHROMIE_CLI_COLOR` | `auto`; force Agent cognitive-model diagnostic color with `1`, disable with `0`. Falls back to terminal detection and respects `NO_COLOR`. |
 
 Hard interrupt, stop, silence, and unusable-audio rules always run before model
 routing and cannot be disabled by environment configuration. Normal intent is
@@ -322,10 +319,10 @@ canonical plan copy, and its fingerprint remain host-owned.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` bypasses the Goal-driven Runtime, `report_only` runs it as a non-authoritative observer, and `apply` makes eligible lanes authoritative through the trusted Skill Runtime. Code fallback is `apply`. |
-| `ORCH_COGNITIVE_APPLY_LANES` | `chat` in the common safe base; `scripts/start_chromie.sh` widens it to `chat,robot_action` only after enabling the trusted Soridormi provider. A route outside the set is rejected before Goal-driven ownership is acquired. This allowlist is necessary but not sufficient for effects: a terminal plan may not exceed the current Router decision's effect envelope, so a `chat` turn cannot become a physical plan merely because `robot_action` is also enabled. Disabled-lane and route-effect escalation both fail closed without entering the legacy planner. |
+| `ORCH_COGNITIVE_APPLY_LANES` | `chat` in the common safe base; `scripts/start_chromie.sh` widens it to `chat,robot_action` only after enabling the trusted Soridormi provider. A route outside the set is rejected before Goal-driven ownership is acquired. This allowlist is necessary but not sufficient for effects: a terminal plan may not exceed the current Goal Interpreter result's effect envelope, so a `chat` turn cannot become a physical plan merely because `robot_action` is also enabled. Disabled-lane and route-effect escalation both fail closed without entering the legacy planner. |
 | `ORCH_COGNITIVE_FALLBACK_POLICY` | Deprecated compatibility input. The effective policy is always `fail_closed`: after Goal-driven authority is acquired, technical or validation failure returns truthful no-action speech and never enters another semantic planner in the same turn. |
 | `ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED` | `0`; host-side emergency compatibility gate. It can create a legacy CapabilityAgent authority claim only on a turn that has not entered authoritative Goal-driven processing. |
-| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a `legacy_capability_fallback` claim with a non-empty `turn_id` exactly matching the request `sid`. Empty or cross-turn claims fail closed before an LLM call. The claim is internal routing metadata, not caller authentication or a single-use replay token. Exact Router actions remain adapter-only and do not require this gate. |
+| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0`; Agent-side emergency gate. The legacy CapabilityAgent LLM planner additionally requires a `legacy_capability_fallback` claim with a non-empty `turn_id` exactly matching the request `sid`. Empty or cross-turn claims fail closed before an LLM call. The claim is internal routing metadata, not caller authentication or a single-use replay token. Exact Goal Interpreter actions remain structured advisory inputs and do not require this gate. |
 | `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | `25000`; total host budget for Goal Association, Fast/Deep planning, bounded host replan, response composition, and runtime adaptation. |
 | `ORCH_COGNITIVE_HOST_REPLAN_BUDGET` | `1`; maximum Deep Planner revision after trusted host schema/provider/resource validation rejects a terminal plan. It never returns to Fast Planner. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
@@ -350,10 +347,10 @@ preparation. A technical failure after authority acquisition cannot execute a pa
 | `AGENT_TASK_CONTINUITY_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Model or parse failure returns an empty, non-authoritative operation set instead of HTTP 500. |
 | `AGENT_TASK_CONTINUITY_MIN_CONFIDENCE` | `0.65`; operations below this confidence are retained as rejected diagnostics and cannot reach host task state. |
 | `AGENT_TASK_CONTINUITY_MAX_ACTIVE_TASKS` | `8`; maximum bounded active-task snapshots supplied to one continuity call. Candidate selection is context projection only and does not decide semantic association. |
-| `AGENT_TASK_CONTINUITY_NUM_CTX` | `4096`; bounded context budget for active tasks, session summary, Router advisory output, and the structured contract. |
+| `AGENT_TASK_CONTINUITY_NUM_CTX` | `4096`; bounded context budget for active tasks, session summary, Goal Interpretation advisory output, and the structured contract. |
 | `AGENT_TASK_CONTINUITY_NUM_PREDICT` | `256`; compact JSON output budget. |
 | `ORCH_TASK_CONTINUITY_MODE` | `off` in `.env.common`; compatibility-only standalone resolver used when unified cognitive mode is `off`. `report_only` observes active-task snapshots without mutation, while `apply` makes a healthy dedicated resolution authoritative before deterministic host validation. |
-| `ORCH_TASK_CONTINUITY_TIMEOUT_MS` | `3500`; host timeout for the dedicated Agent endpoint. Failure records diagnostics and leaves the current Router proposal unchanged. |
+| `ORCH_TASK_CONTINUITY_TIMEOUT_MS` | `3500`; host timeout for the dedicated Agent endpoint. Failure records diagnostics and leaves the current Goal Interpretation proposal unchanged. |
 
 In `apply` mode, an authoritative empty result also suppresses legacy route-based
 task creation. This prevents an ordinary side conversation routed through
@@ -367,15 +364,15 @@ The maintained Soridormi launcher widens the apply lanes to
 `chat,robot_action`; neither profile enables the legacy semantic fallback.
 
 
-Router observability logs are intentionally split into safe summaries and explicit debug output.
-By default, each LLM router call emits `router_prompt_profile`,
-`router_llm_raw_summary`, and `router_normalize_result`. These lines show whether
+Goal Interpretation observability logs are intentionally split into safe summaries and explicit debug output.
+By default, each Goal Interpreter LLM call emits `goal_interpreter_prompt_profile`,
+`goal_interpreter_llm_raw_summary`, and `goal_interpreter_normalize_result`. These lines show whether
 the prompt contained the `fast_speech`, `tool`, and `weather_query` contracts,
 how many catalog items were visible, what route/intent the raw model JSON
 contained, and whether normalization changed the final route. Full raw model
 JSON and prompt text require the debug flags above.
 
-Router routing has a hard operational filter, a focused addressedness gate,
+Goal Interpretation has a hard operational filter, a focused addressedness gate,
 normal semantic stages, and deterministic validation guardrails. Interrupt,
 silence, and unusable-audio handling stay deterministic in every mode. When
 host engagement is inactive, the focused classifier returns only `addressed`
@@ -387,12 +384,12 @@ confirm the stop or attach a corrected follow-up route. The quick intent stage
 uses catalog-bounded LLM routing when `AGENT_GOAL_INTERPRETER_MODE` is `hybrid` or `llm_only`.
 The deep-thought stage is reached when quick intent returns low confidence or
 explicitly chooses `deep_thought`; it is handled by the Agent deepthinking
-module, not by the fast Router model. Soft deterministic validators may correct
+module, not by the fast Goal Interpreter model. Soft deterministic validators may correct
 impossible or unsafe route choices between stages, but they must not answer the
 user or select normal intent by phrase matching.
 
 The hard filter implementation is intentionally narrow in `goal_interpretation/app/rules.py`.
-It is the only Router stage allowed to use phrase patterns to determine a route,
+It is the only Goal Interpretation stage allowed to use phrase patterns to determine a route,
 and it can only produce `interrupt` or `ignore`, including repeated filler or
 acknowledgment ASR hallucinations. Normal robot, tool, memory, conversation, and
 deep-thought intent must come from catalog-bounded model routing or a deeper
@@ -401,11 +398,11 @@ conversation. Validators only enforce capability, schema, availability, and
 safety contracts.
 
 The capability catalog is an ability source, not the normal intent brain. In
-`hybrid` and `llm_only`, the fast Router receives the catalog snapshot's
+`hybrid` and `llm_only`, the fast Goal Interpreter receives the catalog snapshot's
 unlocked `common` prompt-tier entries as `common_ability_catalog`. Catalog
 search still ranks and exposes current ability descriptions, schemas, and
 executable IDs for inspection and Agent-side retrieval, but it is not the fast
-Router decision surface. The catalog must not contain hardcoded per-skill
+Goal Interpreter result surface. The catalog must not contain hardcoded per-skill
 synonym tables that decide body actions in place of model understanding.
 Catalog-only route selection is disabled even in explicit `rules_only`
 compatibility mode; without model routing, normal intent fails closed to safe
@@ -417,7 +414,7 @@ conversation.
 |---|---|
 | `ORCH_MIND_PROFILE_PATH` | Optional JSON mind profile. When unset, Chromie uses the owner-approved default in `shared/chromie_contracts/mind.py`. Relative paths resolve from the project root. |
 | `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` | Optional owner/operator-selected preset: `courteous`, `neutral`, or `reserved`. It overrides only `MindProfile.social_interaction_style`; use `ORCH_MIND_PROFILE_PATH` with `preset=custom` for reviewed custom guidance. |
-| `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600`; maximum prompt-summary size attached to Router and Agent context. |
+| `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600`; maximum prompt-summary size attached to Goal Interpretation and downstream Agent context. |
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1`; append interaction outcomes to the local experience journal. |
 | `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl`; relative paths resolve from the project root. |
 | `ORCH_MIND_PROPOSAL_LOG_PATH` | `.chromie/experience/mind_update_proposals.jsonl`; stores human-review-only proposed updates. |
@@ -523,12 +520,12 @@ retained. See
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Optional comma-separated exact catalog IDs added to behavior-domain discovery. Default empty. Normal candidates are available interaction-executable entries tagged `social_attention`; provider backend metadata is ignored. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | Deprecated compatibility alias. The main Social Attention mode takes precedence. |
 
-| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Common low-latency default `0`; set to `1` for stricter review where executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If the Router selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
+| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | Common low-latency default `0`; set to `1` for stricter review where executable `robot_action` plans fail closed when semantic capability-plan review is unavailable or invalid. If Goal Interpretation selected an exact capability and the Agent proposes a different skill, review must revise the plan rather than merely accept it. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live provider named skills through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
-| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for Agent-side catalog search endpoints and native interaction retrieval; default `0.16`. The fast Router uses the common catalog snapshot instead of per-query catalog matching. |
+| `AGENT_CAPABILITY_MATCH_MIN_SCORE` | Minimum lexical catalog score for Agent-side catalog search endpoints and native interaction retrieval; default `0.16`. Fast Goal Interpretation uses the common catalog snapshot instead of per-query catalog matching. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum candidates supplied to native interaction selection; default `8`. |
 | `AGENT_WEATHER_ENABLED` | Enable the read-only weather lookup handled by `tool_agent`; default `1`. |
 | `AGENT_WEATHER_TIMEOUT_S` | HTTP timeout for Open-Meteo geocoding/forecast calls; default `8`. |
@@ -555,7 +552,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration. It must exceed the Goal Interpreter catalog lookup plus quick-LLM and review timeout budget so interpretation can finish or report its own timeout before the host falls back. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
@@ -609,7 +606,7 @@ generation/playback over the single worker.
 When VAD accepts new user audio, the host interrupts old speech output before
 ASR so the user can barge in. It does not cancel active body skills at that
 point; body cancellation is reserved for a routed `interrupt` decision after ASR
-and Router validation.
+and Goal Interpretation validation.
 
 ## Conversation state
 
@@ -762,7 +759,7 @@ Important variables include `OLLAMA_MODEL`, `OLLAMA_KEEP_ALIVE`,
 `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT`, `OLLAMA_TEMPERATURE`, and
 `OLLAMA_TOP_P`. Hardware profiles own the normal model and context defaults.
 Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
-`OLLAMA_NUM_PARALLEL=1`, which lets the fast Router model and larger Agent
+`OLLAMA_NUM_PARALLEL=1`, which lets the fast Goal Interpreter model and larger Agent
 model stay resident together when memory allows without increasing per-model
 parallel KV-cache pressure.
 

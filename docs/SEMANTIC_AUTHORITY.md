@@ -34,7 +34,7 @@ CapabilityAgent planner.
 
 ## Current compatibility boundary
 
-The service currently named Router has not yet been reduced to the narrow
+The service currently named Goal Interpreter has not yet been reduced to the narrow
 Cognitive Gateway role. It still performs the deployed emergency filter and
 addressedness review and also emits semantic/advisory route, intent, affordance,
 route-item, action, and task proposals. Those fields remain compatibility
@@ -48,9 +48,9 @@ complete.
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
 | Orchestrator turn in `apply`; mapped route lane is allowlisted and apply preconditions pass | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Goal Association → Fast Planner → terminal Deep Planner when required → Response Composer → trusted adapter | Fail closed after ownership is acquired. |
-| Orchestrator turn in `apply`; mapped route lane is excluded | Existing routed Agent path | authoritative | The compatibility path selected before Goal-driven ownership; exact Router actions remain adapter-only | Goal-driven Runtime never acquires this turn. |
+| Orchestrator turn in `apply`; mapped route lane is excluded | Existing routed Agent path | authoritative | The compatibility path selected before Goal-driven ownership; exact Goal Interpretation actions remain adapter-only | Goal-driven Runtime never acquires this turn. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core (current Goal-driven Runtime) | observer | Same stages, evidence only | The existing routed Agent path remains the only authority. |
-| Agent `/interaction` or `/run` with exact Router `actions[]` | No new semantic planner; Router-action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation. |
+| Agent `/interaction` or `/run` with exact Goal Interpreter `actions[]` | No new semantic planner; Goal Interpreter-action materializer | adapter | Schema validation and `SkillRequest` materialization only | Invalid actions are blocked or clarified; no LLM reinterpretation. |
 | Explicit compatibility emergency | Legacy CapabilityAgent | authoritative | Legacy capability semantic planner | Requires both service gates and a per-turn emergency claim. |
 | Post-interrupt correction in `apply`; corrected mapped lane is allowlisted | Goal-Driven Cognitive Core (current Goal-driven Runtime) | authoritative | Same apply coordinator as a normal turn | Fail closed after ownership is acquired. |
 | Post-interrupt correction in `apply`; corrected mapped lane is excluded | Existing post-interrupt Agent path | authoritative | Compatibility handling selected before Goal-driven ownership; exact actions remain adapter-only and physical resume stays locked | Goal-driven Runtime never acquires this correction. |
@@ -63,7 +63,7 @@ the Agent service.
 The CapabilityAgent remains in the repository for compatibility evidence and
 emergency operation. In normal operation it is an adapter:
 
-1. Exact Router `actions[]` are validated and converted to `SkillRequest`
+1. Exact Goal Interpreter `actions[]` are validated and converted to `SkillRequest`
    objects without calling the CapabilityAgent LLM.
 2. A robot-action request without exact actions cannot invoke the old semantic
    planner by default.
@@ -85,12 +85,12 @@ The maintained launcher and common profiles set both gates to `0`.
 
 ## Disabled lanes versus failed authoritative turns
 
-In the current compatibility topology, the Orchestrator first maps Router
+In the current compatibility topology, the Orchestrator first maps Goal Interpreter
 routes to semantic lanes: `chat`, `clarify`, and `deep_thought` map to `chat`;
 `robot_action`, `tool`, and `memory` retain their lane names; everything else
 maps to `unsupported`. A mapped lane excluded by
 `ORCH_COGNITIVE_APPLY_LANES` stays on the existing routed Agent path before the
-Goal-driven Runtime starts. Exact Router actions on that path are still
+Goal-driven Runtime starts. Exact Goal Interpretation actions on that path are still
 adapter-only, and the old CapabilityAgent semantic planner still needs its
 explicit emergency gates and turn claim. This compatibility lane mapping does
 not make the Cognitive Gateway the owner of goal meaning.
@@ -105,7 +105,7 @@ failure produces truthful no-action output and an `error` resolution.
 The migration keeps old planner behavior covered as explicitly labelled
 emergency-fallback tests while adding boundary tests that establish:
 
-- exact Router actions produce the same validated skill requests with the LLM
+- exact Goal Interpretation actions produce the same validated skill requests with the LLM
   available or unavailable;
 - the CapabilityAgent LLM call count remains zero on adapter-only requests;
 - neither a service gate nor a per-turn claim alone can enable the old planner;

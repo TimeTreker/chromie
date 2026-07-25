@@ -1,16 +1,16 @@
-# Quick Router Task Planning
+# Fast Goal Interpreter Task Planning
 
-This document records the task-planning contract for Chromie's fast Router
+This document records the task-planning contract for Chromie's fast Goal Interpreter
 model and the deterministic validation layer around it.
 
 ## Design Position
 
-The second Router is both a router and a bounded fast planner.
+The fast Goal Interpreter is a bounded semantic interpreter and proposal stage inside the Goal-Driven Cognitive Core.
 
 It uses the latest ASR text, compact session context, and the listed skill
 catalog to decide:
 
-- which compatibility route should summarize the request for older callers;
+- which structured route/effect envelope should summarize the request for downstream contracts;
 - which independent route items should handle each part of the request;
 - whether the request can be represented by listed skills immediately;
 - which exact listed skill tasks to propose;
@@ -28,14 +28,14 @@ primary route, but the preferred surface for mixed utterances is
 
 ## Output Contract
 
-For greeting, fact, or speech-only conversation, the Router should return:
+For greeting, fact, or speech-only conversation, the Goal Interpreter should return:
 
 ```json
 {"route":"chat","intent":"general_conversation","confidence":0.9}
 ```
 
 For a simple greeting or acknowledgement that can be spoken immediately without
-Agent reasoning, the Router may include a direct speech lane:
+Agent reasoning, the Goal Interpreter may include a direct speech lane:
 
 ```json
 {
@@ -62,7 +62,7 @@ Direct speech is only for short safe greetings, acknowledgements, and thinking
 preludes. It must not claim memory writes, tool results, identity/value
 answers, physical motion, or completion.
 
-For a mixed utterance, the Router should split the work:
+For a mixed utterance, the Goal Interpreter should split the work:
 
 ```json
 {
@@ -112,13 +112,13 @@ Supported context profiles are:
 | `capability_safety` | Robot/action tasks that need capability and safety contracts. |
 | `full_mind` | Identity, worldview, lifeview, valueview, principles, risk judgment, long-horizon goals, or complex planning. |
 
-For a single clear listed skill, the Router may return:
+For a single clear listed skill, the Goal Interpreter may return:
 
 ```json
 {"route":"robot_action","intent":"capability:soridormi.blink_eyes","confidence":0.91}
 ```
 
-For a compound listed-skill request, the Router may return one route with
+For a compound listed-skill request, the Goal Interpreter may return one route with
 ordered actions:
 
 ```json
@@ -149,7 +149,7 @@ Each action confidence is the model's confidence in that specific skill choice
 and its arguments. It is separate from the whole-route confidence.
 
 For a desired human-like ability that the model understands but cannot represent
-with the listed executable catalog, the Router must not invent an action. It
+with the listed executable catalog, the Goal Interpreter must not invent an action. It
 should delegate or clarify and may preserve the desired ability as
 non-executable metadata:
 
@@ -196,11 +196,11 @@ the task proposals before they can enter the executable task surface:
 
 - every `capability_id` exists in the supplied fast unlocked common ability
   catalog when that catalog is available;
-- rare, full-catalog, or safety-locked capabilities selected by the fast Router
+- rare, full-catalog, or safety-locked capabilities selected by the fast Goal Interpreter
   delegate to `deep_thought` rather than entering the immediate action surface;
 - every non-speech action is available and interaction-executable;
 - `chromie.speak` includes non-empty `args.text`;
-- each action confidence is valid and above the Router threshold;
+- each action confidence is valid and above the Goal Interpreter threshold;
 - no placeholder skill ID or raw low-level robot command is accepted.
 - each route item is mirrored into `metadata.route_items[]`;
 - each route item becomes a task-list entry and shared task proposal with
@@ -208,7 +208,7 @@ the task proposals before they can enter the executable task surface:
 - missing, planned, or unsupported abilities are absent from `actions[]` and
   may appear only as non-executable desired-ability proposals.
 
-When accepted, the Router copies action confidence into `metadata.task_list[]`
+When accepted, the Goal Interpreter copies action confidence into `metadata.task_list[]`
 and `metadata.task_proposals[]`. The Agent also copies it into each emitted
 `SkillRequest.metadata.router_action_confidence` for later trace evidence.
 
@@ -231,7 +231,7 @@ The handoff may include a short truthful thinking prelude:
 That prelude is a speech task for the user experience. It must not claim
 execution, completion, memory writes, tool results, or physical success.
 
-The Router preserves the quick proposal ledger in
+The Goal Interpreter preserves the quick proposal ledger in
 `metadata.quick_router_review_request`:
 
 ```json
@@ -277,7 +277,7 @@ The merge policy is:
 - safe `immediate_speech` chat route items may be scheduled through host
   fast-first TTS without waiting for the slower Agent path;
 - memory, tool, deepthought, and skill route items follow separate policy lanes;
-- quick Router common-skill tasks are accepted only after validation;
+- fast Goal Interpreter common-skill tasks are accepted only after validation;
 - low-confidence, invalid, rare, or complex proposals are delegated to
   deepthinking;
 - deepthinking may accept, revise, or supersede quick proposals;
@@ -287,7 +287,7 @@ The merge policy is:
 ## Parallel Compute Boundary
 
 If the computer has enough compute, the Orchestrator may later start a
-preliminary deepthinking pass in parallel with the quick Router. That
+preliminary deepthinking pass in parallel with the fast Goal Interpreter. That
 optimization must still use the same commit rules:
 
 - quick high-confidence low-risk tasks may commit only after validation;
@@ -306,13 +306,13 @@ contract.
 
 1. Keep the common/rare catalog split preset first, experience-tunable through
    an audited overlay, and safety-locked for sensitive skills.
-2. Keep all unlocked common skills compact enough for the quick Router prompt.
+2. Keep all unlocked common skills compact enough for the fast Goal Interpreter prompt.
 3. Require `actions[].confidence` for compound quick plans.
 4. Reject or delegate malformed and low-confidence action proposals before they
    reach Agent execution.
 5. Pass low-confidence quick proposals to deepthinking through
    `quick_router_review_request`.
-6. Preserve confidence and accept/revise/supersede decisions in Router and Agent
+6. Preserve confidence and accept/revise/supersede decisions in Goal Interpretation and downstream Agent
    task evidence.
 7. Add real daily-life scenarios whenever a live voice or simulator run reveals
    a confusing behavior.

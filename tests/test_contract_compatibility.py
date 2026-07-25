@@ -23,9 +23,9 @@ from shared.chromie_contracts.task_proposal import (
 
 
 class ContractCompatibilityTests(unittest.TestCase):
-    def test_router_decision_survives_orchestrator_and_agent_round_trip(self) -> None:
+    def test_goal_interpreter_decision_survives_orchestrator_and_agent_round_trip(self) -> None:
         route_request = RouteRequest(sid="contract-route", text="turn left")
-        router_decision = finalize_decision(
+        goal_interpreter_decision = finalize_decision(
             RouteDecision(
                 route="robot_action",
                 agents=["robot_pose_controller_agent", "safety_agent", "speaker_agent"],
@@ -47,8 +47,8 @@ class ContractCompatibilityTests(unittest.TestCase):
             source="catalog",
         )
 
-        orchestrator_decision = OrchestratorRouteDecision.model_validate(router_decision.model_dump(mode="json"))
-        shared_decision = SharedRouteDecision.model_validate(router_decision.model_dump(mode="json"))
+        orchestrator_decision = OrchestratorRouteDecision.model_validate(goal_interpreter_decision.model_dump(mode="json"))
+        shared_decision = SharedRouteDecision.model_validate(goal_interpreter_decision.model_dump(mode="json"))
         self.assertTrue(orchestrator_decision.should_speak)
         self.assertEqual(orchestrator_decision.source, "catalog")
         self.assertEqual(orchestrator_decision.actions[0]["type"], "head.turn")

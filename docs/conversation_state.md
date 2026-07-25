@@ -25,7 +25,7 @@ idle expiry, or process restart.
 
 A new task is not the same thing as a new SID. One task can include many
 sessions, for example a command followed by "quickly please", "not that far",
-"did it finish?", and "continue". The Router model should propose whether a new
+"did it finish?", and "continue". The Goal Interpreter model should propose whether a new
 input creates a new task, continues a task, modifies a task, closes a task, or
 is side conversation. The host task manager owns the final task write and safety
 state.
@@ -50,12 +50,12 @@ The state is intended to improve short conversational continuity. It should not
 be treated as authoritative robot state, a durable user profile, or a database
 of completed side effects.
 
-The Orchestrator exposes a compact `session_memory` object to Router and Agent
+The Orchestrator exposes a compact `session_memory` object to Goal Interpretation and downstream Agent
 prompts. It summarizes the current task, active pending tasks, extracted memory
 entries, a compact `memory_summary`, and the current forgetting policy. This is
 the prompt-facing working memory for the current session, not a permanent
 memory store.
-The Router can hand complex requests to `deepthinking_agent`, which uses this
+Goal Interpretation can hand complex requests to `deepthinking_agent`, which uses this
 same bounded memory to split tasks, plan, debug, and produce unified robot
 skill tasks without treating memory as authorization.
 Deep-thinking prompts should consume extracted task context, claims, entities,
@@ -64,7 +64,7 @@ injecting raw conversation transcript turns. The next memory architecture is
 defined in [`MEMORY_EXTRACTION.md`](MEMORY_EXTRACTION.md): raw turns are
 evidence/debug data, while model-facing memory should be compact extracted
 meaning selected by a prompt builder. The first deterministic slice is
-implemented for session/task memory, Router prompt sanitization, direct
+implemented for session/task memory, Goal Interpreter prompt sanitization, direct
 fallback context, ordinary conversation prompts, capability planning/review
 prompts, and deepthinking prompts.
 
@@ -121,7 +121,7 @@ Chromie starts a new conversation when:
 Task context is closed or forgotten when:
 
 - the conversation boundary resets;
-- the Router or user explicitly closes/cancels the task;
+- the Cognitive Core or user explicitly closes/cancels the task;
 - the Skill Runtime reports the associated request IDs as completed, failed,
   cancelled, or expired, and the completed-task retention window elapses;
 - pending-task capacity trims older entries.

@@ -55,7 +55,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
         self.assertEqual(resolution.fingerprint, pending.fingerprint)
         self.assertEqual(replay.decision, "no_pending")
 
-    def test_operational_stop_without_pending_confirmation_reaches_router(self) -> None:
+    def test_operational_stop_without_pending_confirmation_reaches_goal_interpreter(self) -> None:
         dialogue = ConfirmationDialogue(clock=lambda: 100.0)
 
         self.assertEqual(dialogue.resolve("Stop!").decision, "not_confirmation")
@@ -65,7 +65,7 @@ class ConfirmationDialogueTests(unittest.TestCase):
             "not_confirmation",
         )
 
-    def test_operational_interrupt_cancels_pending_and_reaches_router(self) -> None:
+    def test_operational_interrupt_cancels_pending_and_reaches_goal_interpreter(self) -> None:
         for phrase in ("Stop!", "Cancel.", "Emergency stop!", "急停！"):
             with self.subTest(phrase=phrase):
                 dialogue = ConfirmationDialogue(clock=lambda: 100.0)

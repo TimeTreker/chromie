@@ -2,7 +2,7 @@
 
 This decision document records the implementation plan after reviewing the
 brain/body split suggestions against the current Chromie codebase. It keeps the
-existing `Router -> Orchestrator -> Agent/InteractionResponse -> SkillRuntime ->
+existing `Goal Interpreter -> Orchestrator -> Agent/InteractionResponse -> SkillRuntime ->
 Soridormi provider` chain and strengthens it instead of replacing it with a
 parallel dual-brain control loop.
 
@@ -18,7 +18,7 @@ The architecture therefore stays:
 
 ```text
 user input
-  -> Router quick decision
+  -> Goal Interpreter quick decision
   -> Orchestrator fast-first acknowledgement when useful
   -> Agent/InteractionResponse for capability, safety, and deep thinking
   -> SkillRuntime validation, confirmation, and provider dispatch
@@ -148,7 +148,7 @@ exact low-risk body cues can remain fast proposals.
 Status: implemented in the compound Route2 proposal patch.
 
 Allow ordered action lists for simple combined commands such as "nod and say
-hello." Router-provided compound actions are converted into ordered
+hello." Goal Interpreter-provided compound actions are converted into ordered
 `SkillRequest` proposals by `capability_agent`, not into direct body commands.
 Those requests now carry explicit proposal metadata, route-stage provenance,
 compound action position, catalog safety metadata, and runtime validation flags
@@ -156,7 +156,7 @@ so the Soridormi boundary can audit how the request was formed.
 
 If any action in the compound request is high-risk, ambiguous, unavailable, or
 perception-dependent, the compound request must escalate to a deeper agent path.
-The conditional deep-thinking policy therefore treats Router action
+The conditional deep-thinking policy therefore treats Goal Interpretation action
 `capability_id` values, action-level live-perception flags, and selected
 capability risk metadata as first-class escalation evidence.
 
@@ -225,7 +225,7 @@ explain when no safe residual plan exists.
 Status: implemented for corrected `InteractionResponse` outputs and legacy
 Agent actions.
 
-When the Router emergency filter triggers an interrupt, the Orchestrator stops
+When the Goal Interpreter emergency filter triggers an interrupt, the Orchestrator stops
 output and cancels active interactions immediately. If optional post-interrupt
 review later determines the ASR result was a false positive, corrected
 speech-only dialogue may continue. Corrected physical work must not auto-resume,
@@ -247,7 +247,7 @@ the pre-stop physical state.
 
 ### Machine-readable live-perception dependency contract
 
-Status: implemented for Router action proposals, capability-selected skills,
+Status: implemented for Goal Interpretation action proposals, capability-selected skills,
 and Soridormi `chromie_intent` plan metadata.
 
 Represent perception-dependent body work with machine fields, not free-text

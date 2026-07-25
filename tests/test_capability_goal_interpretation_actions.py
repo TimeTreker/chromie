@@ -57,7 +57,7 @@ def _catalog() -> CapabilityCatalog:
     return CapabilityCatalog(registry, live_invoker=_Invoker(), min_score=0.0)
 
 
-class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
+class CapabilityInterpreterActionTests(unittest.IsolatedAsyncioTestCase):
     async def test_goal_interpretation_actions_become_sequential_skill_requests_without_llm(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
@@ -110,10 +110,10 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(skill.metadata["route_stage"], "quick_intent")
             self.assertEqual(skill.metadata["route_source"], "catalog")
             self.assertEqual(skill.metadata["route_confidence"], 0.99)
-            self.assertEqual(skill.metadata["router_action_count"], 3)
-            self.assertEqual(skill.metadata["router_action_index"], index)
-            self.assertTrue(skill.metadata["router_compound_action_plan"])
-            self.assertEqual(skill.metadata["router_action_sequence"], index)
+            self.assertEqual(skill.metadata["goal_interpretation_action_count"], 3)
+            self.assertEqual(skill.metadata["goal_interpretation_action_index"], index)
+            self.assertTrue(skill.metadata["goal_interpretation_compound_action_plan"])
+            self.assertEqual(skill.metadata["goal_interpretation_action_sequence"], index)
         self.assertEqual(response.speech[0].text, "I will run the selected actions in order.")
 
     async def test_goal_interpretation_speak_first_suppresses_generic_direct_plan_speech(self) -> None:
@@ -153,9 +153,9 @@ class CapabilityRouterActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item.text for item in response.speech], ["Hello."])
         self.assertEqual(response.skills[0].metadata["execution_mode"], "proposed")
         self.assertEqual(response.skills[0].metadata["source_component"], "agent.capability")
-        self.assertEqual(response.skills[0].metadata["router_action_count"], 2)
+        self.assertEqual(response.skills[0].metadata["goal_interpretation_action_count"], 2)
 
-    async def test_router_action_live_perception_metadata_is_structured(self) -> None:
+    async def test_goal_interpretation_action_live_perception_metadata_is_structured(self) -> None:
         runtime = InteractionRuntime(
             AgentServices(
                 ollama=None,

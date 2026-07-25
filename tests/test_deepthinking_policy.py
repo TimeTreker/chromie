@@ -66,7 +66,7 @@ class DeepThinkingDelegationPolicyTest(unittest.TestCase):
         self.assertEqual(delegation.threshold, 0.82)
 
 
-    def test_router_capability_id_navigation_action_delegates(self) -> None:
+    def test_goal_interpreter_capability_id_navigation_action_delegates(self) -> None:
         decision = RouteDecision(
             route="robot_action",
             agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -97,7 +97,7 @@ class DeepThinkingDelegationPolicyTest(unittest.TestCase):
         self.assertIn("high_risk_physical_goal", delegation.reasons)
         self.assertEqual(delegation.threshold, 0.95)
 
-    def test_router_action_live_perception_flag_delegates(self) -> None:
+    def test_goal_interpreter_action_live_perception_flag_delegates(self) -> None:
         decision = RouteDecision(
             route="robot_action",
             agents=["capability_agent", "safety_agent", "speaker_agent"],

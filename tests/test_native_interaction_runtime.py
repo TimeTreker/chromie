@@ -816,7 +816,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("wait_for_playback_start", response.speech[0].metadata)
         self.assertEqual(response.skills[0].skill_id, "soridormi.walk_velocity")
 
-    async def test_router_compound_actions_keep_speech_as_skill(self) -> None:
+    async def test_goal_interpreter_compound_actions_keep_speech_as_skill(self) -> None:
         request = _legacy_request(
             {
                 "sid": "native-interaction",
@@ -872,9 +872,9 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.skills[0].metadata["requires_runtime_validation"])
         self.assertEqual(response.skills[0].metadata["source_component"], "agent.capability")
         self.assertEqual(response.skills[0].metadata["route_stage"], "quick_intent")
-        self.assertTrue(response.skills[0].metadata["router_compound_action_plan"])
-        self.assertEqual(response.skills[0].metadata["router_action_confidence"], 0.9)
-        self.assertEqual(response.skills[1].metadata["router_action_confidence"], 0.87)
+        self.assertTrue(response.skills[0].metadata["goal_interpretation_compound_action_plan"])
+        self.assertEqual(response.skills[0].metadata["goal_interpretation_action_confidence"], 0.9)
+        self.assertEqual(response.skills[1].metadata["goal_interpretation_action_confidence"], 0.87)
         self.assertEqual(response.skills[1].metadata["execution_mode"], "proposed")
         self.assertFalse(response.skills[1].metadata["capability_requires_confirmation"])
         proposals = [

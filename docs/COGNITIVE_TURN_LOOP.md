@@ -548,13 +548,13 @@ One trace should answer: what entered, what Chromie understood, what it planned,
 what was authorized, what actually ran, what evidence returned, how each goal
 ended, and why Chromie said the final words.
 
-## 12. Compatibility and migration
+## 12. Implemented boundary and retained contract names
 
 The contract-first loop baseline is implemented:
 
 1. `UserTurnEnvelope` is built and dual-recorded;
-2. the compatibility adapter preserves current Router/Core wire behavior while
-   allowing only admitted envelopes into Core;
+2. the Cognitive Gateway projects only admitted envelopes into the Agent-owned
+   Goal-Driven Cognitive Core;
 3. configured authoritative lanes use Goal Association, canonical planning,
    deterministic validation, and manager-owned delegation;
 4. committed requests bind exact plan/step/skill/arguments/timing/schema
@@ -568,13 +568,13 @@ The contract-first loop baseline is implemented:
 8. recoverable embodied failures use a separately fingerprinted,
    confirmation-bound child plan.
 
-Remaining migration work is to extract the five physical Gateway modules,
-separate Attention Review from legacy routing path semantics, derive
-`RouteDecision` only for older consumers, widen authority only with retained
-evidence, and deprecate Router names only after parity and rollback coverage.
+The five Gateway responsibilities remain logically distinct even when co-deployed.
+`RouteDecision` is retained only as a versioned structured advisory result inside
+the Core path; it is not a service boundary or independent semantic authority.
 
-Existing `chromie-agent`, `/route`, `AGENT_GOAL_INTERPRETER_*`, and Router log names remain
-valid compatibility interfaces during this sequence.
+The maintained external cognitive endpoint is `chromie-agent`
+`POST /cognitive-core/interpret`. There is no `/route` compatibility API or
+independent Goal Interpreter service.
 
 ## 13. Acceptance boundary
 

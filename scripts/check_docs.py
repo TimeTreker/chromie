@@ -436,18 +436,18 @@ def check_configuration_reference(errors: list[str]) -> None:
                 "from .env.common"
             )
     try:
-        router_base_ms = int(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"])
-        router_llm_ms = int(values.get("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", str(router_base_ms)))
-        router_review_ms = int(
-            values.get("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS", values.get("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", str(router_base_ms)))
+        goal_interpreter_base_ms = int(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"])
+        goal_interpreter_llm_ms = int(values.get("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", str(goal_interpreter_base_ms)))
+        goal_interpreter_review_ms = int(
+            values.get("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS", values.get("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", str(goal_interpreter_base_ms)))
         )
-        router_internal_ms = router_llm_ms + router_review_ms
-        router_host_ms = int(values["ORCH_AGENT_TIMEOUT_MS"])
+        goal_interpreter_internal_ms = goal_interpreter_llm_ms + goal_interpreter_review_ms
+        goal_interpreter_host_ms = int(values["ORCH_AGENT_TIMEOUT_MS"])
     except (KeyError, ValueError) as exc:
         errors.append(f".env.common has invalid Goal Interpreter timeout configuration: {exc}")
     else:
         catalog_ms = int(values.get("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS", "0"))
-        if router_host_ms <= router_internal_ms + catalog_ms:
+        if goal_interpreter_host_ms <= goal_interpreter_internal_ms + catalog_ms:
             errors.append(
                 "ORCH_AGENT_TIMEOUT_MS must exceed AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS "
                 "plus AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS and AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS, so Goal Interpretation "

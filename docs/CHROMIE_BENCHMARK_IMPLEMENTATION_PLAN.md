@@ -132,8 +132,7 @@ Architecture terminology rule:
 
 - Cognitive Gateway is the settled ingress/admission boundary;
 - Goal-Driven Cognitive Core owns semantic goal interpretation and planning;
-- legacy Router paths and wire contracts may be indexed only as compatibility or
-  historical-regression evidence;
+- historical Router evidence may retain source provenance, but no active path, wire contract, or first-class component remains;
 - no new generic `router` benchmark component, dataset authority, or architectural
   diagram may be introduced.
 
@@ -180,7 +179,7 @@ Add comprehensive Social Attention benchmark dataset
 
 Deliverables:
 
-- text E2E runner using deployed Router, Agent, tools, and Skill Runtime;
+- text E2E runner using Cognitive Gateway, Agent-owned Cognitive Core, tools, and Skill Runtime;
 - virtual-audio and supervised voice adapters;
 - simulator and supervised target profiles;
 - correlated trace and provider evidence retention;

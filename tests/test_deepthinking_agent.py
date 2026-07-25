@@ -478,7 +478,7 @@ class DeepThinkingAgentTests(unittest.IsolatedAsyncioTestCase):
                 ],
                 "quick_review": {
                     "decision": "supersede",
-                    "reason": "The quick router treated a warning as a gaze command.",
+                    "reason": "The fast Goal Interpreter treated a warning as a gaze command.",
                     "superseded_task_ids": ["quick_intent:0:task.execute_skill"],
                 },
                 "reason": "Warning semantics replace quick proposal.",

@@ -235,7 +235,7 @@ Level A routing evidence must continue to prove:
   remain authoritative for embodied goals.
 
 See
-[Model-Assisted Routing Guardrails](MODEL_ASSISTED_ROUTING_GUARDRAILS.md).
+[Model-Assisted Cognitive Guardrails](MODEL_ASSISTED_COGNITIVE_GUARDRAILS.md).
 
 ## Level B — deployed service checks
 

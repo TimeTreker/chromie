@@ -29,16 +29,16 @@ def test_common_contract_keeps_behavior_regions_separate() -> None:
 
 def test_legacy_list_preserves_declared_id_and_expectation() -> None:
     cases = normalize_payload(
-        [{"scenario_id": "router.weather.zh", "user_text": "重庆天气如何？", "expected_route": "tool"}],
+        [{"scenario_id": "goal_interpretation.weather.zh", "user_text": "重庆天气如何？", "expected_route": "tool"}],
         source_path="scenarios/goal_interpretation/weather.json",
         layer="module",
         datasets=["goal_interpretation", "tool_use"],
         evidence_requirements=["replay"],
     )
-    assert cases[0]["id"] == "router.weather.zh"
+    assert cases[0]["id"] == "goal_interpretation.weather.zh"
     assert cases[0]["inputs"] == {"user_text": "重庆天气如何？"}
     assert cases[0]["legacy_expectations"]["expected_route"] == "tool"
-    assert cases[0]["source"]["source_id"] == "router.weather.zh"
+    assert cases[0]["source"]["source_id"] == "goal_interpretation.weather.zh"
 
 
 def test_legacy_container_and_single_case_are_supported() -> None:

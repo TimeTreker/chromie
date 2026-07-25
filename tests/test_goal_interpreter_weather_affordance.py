@@ -19,7 +19,7 @@ WEATHER_CAPABILITY = {
 }
 
 
-class _EmptyReviewRouter(OllamaGoalInterpreter):
+class _EmptyReviewInterpreter(OllamaGoalInterpreter):
     async def _chat_logged(
         self,
         payload: dict[str, Any],
@@ -30,7 +30,7 @@ class _EmptyReviewRouter(OllamaGoalInterpreter):
         return {"message": {"content": ""}, "done": True, "done_reason": "stop"}
 
 
-class _SemanticRepairRouter(OllamaGoalInterpreter):
+class _SemanticRepairInterpreter(OllamaGoalInterpreter):
     async def _chat_logged(
         self,
         payload: dict[str, Any],
@@ -73,7 +73,7 @@ class _SemanticRepairRouter(OllamaGoalInterpreter):
 
 
 class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
-    def _router(self, cls=_EmptyReviewRouter):
+    def _interpreter(self, cls=_EmptyReviewInterpreter):
         return cls(
             ollama_url="http://example.invalid",
             model="qwen3:4b",
@@ -117,7 +117,7 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             source="llm",
         )
 
-        repaired = await self._router(_SemanticRepairRouter)._repair_route_intent_contract(
+        repaired = await self._interpreter(_SemanticRepairInterpreter)._repair_route_intent_contract(
             request,
             inconsistent,
         )
@@ -149,7 +149,7 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             source="llm",
         )
 
-        result = await self._router()._repair_route_intent_contract(
+        result = await self._interpreter()._repair_route_intent_contract(
             request,
             inconsistent,
         )
@@ -175,7 +175,7 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             source="llm",
         )
 
-        result = await self._router()._review_route_only_robot_action(
+        result = await self._interpreter()._review_route_only_robot_action(
             request,
             bad_quick_decision,
         )
@@ -216,7 +216,7 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
             source="llm",
         )
 
-        result = await self._router()._repair_route_intent_contract(
+        result = await self._interpreter()._repair_route_intent_contract(
             request,
             decision,
         )

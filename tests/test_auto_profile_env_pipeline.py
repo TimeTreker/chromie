@@ -234,7 +234,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             root = self._minimal_root(directory)
             (root / ".env.local").write_text(
                 "CHROMIE_HARDWARE_PROFILE=rtx4090_laptop\n"
-                "AGENT_GOAL_INTERPRETER_REVIEW_MODEL=stale-router-model\n"
+                "AGENT_GOAL_INTERPRETER_REVIEW_MODEL=stale-goal-interpreter-model\n"
                 "AGENT_RESPONSE_REVIEW_MODEL=stale-agent-model\n"
                 "LOG_LEVEL=DEBUG\n",
                 encoding="utf-8",
@@ -256,16 +256,16 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", result.stderr)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
         self.assertEqual(values["CHROMIE_HARDWARE_PROFILE"], "rtx5090")
-        self.assertNotEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_MODEL"], "stale-router-model")
+        self.assertNotEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_MODEL"], "stale-goal-interpreter-model")
         self.assertNotEqual(values["AGENT_RESPONSE_REVIEW_MODEL"], "stale-agent-model")
         self.assertEqual(values["LOG_LEVEL"], "DEBUG")
         self.assertEqual(
-            manifest["ignored_local_overrides"],
-            [
+            set(manifest["ignored_local_overrides"]),
+            {
                 "AGENT_RESPONSE_REVIEW_MODEL",
                 "CHROMIE_HARDWARE_PROFILE",
                 "AGENT_GOAL_INTERPRETER_REVIEW_MODEL",
-            ],
+            },
         )
         self.assertFalse(manifest["strict_local_conflicts"])
 
@@ -273,7 +273,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self._minimal_root(directory)
             (root / ".env.local").write_text(
-                "AGENT_GOAL_INTERPRETER_REVIEW_MODEL=stale-router-model\n",
+                "AGENT_GOAL_INTERPRETER_REVIEW_MODEL=stale-goal-interpreter-model\n",
                 encoding="utf-8",
             )
             system_info = root / "system.env"

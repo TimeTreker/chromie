@@ -603,11 +603,11 @@ class _SemanticCapabilityPlanOllama:
 class _SelectedWalkOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "soridormi.walk_forward" in prompt
-        assert "Router-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert "Goal-Interpreter-selected exact skill_id: soridormi.walk_forward" in prompt
         assert kwargs["response_format"] == "json"
         assert "When decision is execute, skills is required" in prompt
         assert "Never return execute with skills omitted" in prompt
-        assert "Router-selected exact skill_id is best" in prompt
+        assert "Goal-Interpreter-selected exact skill_id is best" in prompt
         return {
             "decision": "execute",
             "speech": "Walking forward for 3 seconds.",
@@ -646,7 +646,7 @@ class _ExtractedMemoryCapabilityOllama:
 
 class _SelectedVelocityBetterForwardOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert "Router-selected exact skill_id: soridormi.walk_velocity" in prompt
+        assert "Goal-Interpreter-selected exact skill_id: soridormi.walk_velocity" in prompt
         assert "soridormi.walk_velocity" in prompt
         assert "soridormi.walk_forward" in prompt
         assert kwargs["response_format"] == "json"
@@ -1081,7 +1081,7 @@ class _BadSocialFallbackOllama:
 class _ExactBadSocialFallbackOllama:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         assert "Walk forward for 15 seconds, quickly." in prompt
-        assert "Router-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert "Goal-Interpreter-selected exact skill_id: soridormi.walk_forward" in prompt
         assert "soridormi.walk_forward" in prompt
         assert "soridormi.nod_yes" in prompt
         assert "Preserve the user's intended action class" in prompt
@@ -1139,7 +1139,7 @@ class _TimeoutCapabilityReviewer:
 
 class _AcceptBadSubstitutionReviewer:
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        assert "Router-selected exact skill_id: soridormi.walk_forward" in prompt
+        assert "Goal-Interpreter-selected exact skill_id: soridormi.walk_forward" in prompt
         assert "do not use decision=accept" in prompt
         assert "soridormi.walk_forward" in prompt
         assert "soridormi.nod_yes" in prompt
@@ -1567,7 +1567,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             "Please clarify what action you want me to perform.",
         )
 
-    async def test_router_selected_capability_prompt_requires_exact_skill(self) -> None:
+    async def test_goal_interpreter_selected_capability_prompt_requires_exact_skill(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_SelectedWalkOllama(),  # type: ignore[arg-type]
@@ -1581,7 +1581,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = _legacy_request(
             {
-                "sid": "router-selected-omitted-skills",
+                "sid": "goal-interpreter-selected-omitted-skills",
                 "text": "Walk forward quickly for 3 seconds.",
                 "route_decision": {
                     "route": "robot_action",
@@ -1665,7 +1665,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.walk_forward"])
         self.assertEqual(response.speech[0].text, "Walking forward.")
 
-    async def test_router_task_list_fast_path_executes_low_risk_blink_without_llm(self) -> None:
+    async def test_goal_interpreter_task_list_fast_path_executes_low_risk_blink_without_llm(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
@@ -1686,7 +1686,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = _legacy_request(
             {
-                "sid": "router-fast-blink",
+                "sid": "goal-interpreter-fast-blink",
                 "text": "Please blink your eyes 5 times.",
                 "route_decision": {
                     "route": "robot_action",
@@ -1727,7 +1727,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["capability_selected"], ["soridormi.blink_eyes"])
         self.assertEqual(response.speech[0].text, "Okay, I'll blink my eyes 5 times.")
 
-    async def test_router_task_list_fast_path_extracts_chinese_blink_count(self) -> None:
+    async def test_goal_interpreter_task_list_fast_path_extracts_chinese_blink_count(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
@@ -1748,7 +1748,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = _legacy_request(
             {
-                "sid": "router-fast-chinese-blink",
+                "sid": "goal-interpreter-fast-chinese-blink",
                 "text": "请眨两小眼睛。",
                 "route_decision": {
                     "route": "robot_action",
@@ -1783,7 +1783,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].args, {"count": 2})
         self.assertEqual(response.speech[0].text, "好的，我会眨眼2次。")
 
-    async def test_router_task_list_fast_path_allows_optional_defaulted_blink_fields(self) -> None:
+    async def test_goal_interpreter_task_list_fast_path_allows_optional_defaulted_blink_fields(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
@@ -1804,7 +1804,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = _legacy_request(
             {
-                "sid": "router-fast-blink-default-fields",
+                "sid": "goal-interpreter-fast-blink-default-fields",
                 "text": "Please blink your eyes 5 times.",
                 "route_decision": {
                     "route": "robot_action",
@@ -1842,7 +1842,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             "capability_catalog",
         )
 
-    async def test_router_task_list_fast_path_batches_over_limit_blink_without_llm(self) -> None:
+    async def test_goal_interpreter_task_list_fast_path_batches_over_limit_blink_without_llm(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
@@ -1867,7 +1867,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = _legacy_request(
             {
-                "sid": "router-fast-blink-over-limit",
+                "sid": "goal-interpreter-fast-blink-over-limit",
                 "text": "Please blink your eyes 15 times.",
                 "route_decision": {
                     "route": "robot_action",
@@ -1912,7 +1912,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("15", response.speech[0].text)
 
-    async def test_router_task_list_fast_path_preserves_physical_confirmation(self) -> None:
+    async def test_goal_interpreter_task_list_fast_path_preserves_physical_confirmation(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_SemanticCapabilityPlanOllama(
@@ -1938,7 +1938,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = _legacy_request(
             {
-                "sid": "router-task-list-walk-fast-path",
+                "sid": "goal-interpreter-task-list-walk-fast-path",
                 "text": "Walk forward quickly for 3 seconds.",
                 "route_decision": {
                     "route": "robot_action",
@@ -1978,7 +1978,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             "capability_catalog",
         )
 
-    async def test_router_selected_capability_does_not_hide_better_candidate(self) -> None:
+    async def test_goal_interpreter_selected_capability_does_not_hide_better_candidate(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_SelectedVelocityBetterForwardOllama(),  # type: ignore[arg-type]
@@ -1990,7 +1990,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = _legacy_request(
             {
-                "sid": "router-selected-velocity-better-forward",
+                "sid": "goal-interpreter-selected-velocity-better-forward",
                 "text": "Walk forward quickly for 15 seconds.",
                 "route_decision": {
                     "route": "robot_action",
@@ -2401,7 +2401,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             "That motion plan did not get a reliable review result, so I will not move.",
         )
 
-    async def test_exact_router_intent_substitution_fails_closed_without_reviewer(self) -> None:
+    async def test_exact_goal_interpretation_intent_substitution_fails_closed_without_reviewer(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_ExactBadSocialFallbackOllama(),  # type: ignore[arg-type]
@@ -2436,7 +2436,7 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
             "That motion plan did not get a reliable review result, so I will not move.",
         )
 
-    async def test_exact_router_intent_substitution_reviewer_accept_is_not_enough(self) -> None:
+    async def test_exact_goal_interpretation_intent_substitution_reviewer_accept_is_not_enough(self) -> None:
         runtime = InteractionRuntime(
             _legacy_services(
                 ollama=_ExactBadSocialFallbackOllama(),  # type: ignore[arg-type]

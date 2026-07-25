@@ -11,7 +11,7 @@ contracts. The first version provides:
   expressiveness, initiative, restraint, cooldown, and repetition guidance;
 - core principles that cannot be changed by experience;
 - long-term goals that can be tuned by reviewed experience;
-- prompt-safe context for Router, conversation, and deepthinking;
+- prompt-safe context for Goal Interpretation, conversation, and deepthinking;
 - an append-only experience journal;
 - human-review-only update proposals;
 - offline good/bad/needs-review episode reviews for scenario and strategy
@@ -72,7 +72,7 @@ calibration, limits, stop, and recovery.
 ## Prompt Context Groups
 
 Prompt-facing robot planning is organized into context groups. This is the
-preferred shape for Router, capability-planning, conversation, and deepthinking
+preferred shape for Goal Interpreter, capability-planning, conversation, and deepthinking
 prompts when they need robot identity, principles, session state, abilities, and
 a strict output contract in one prompt.
 
@@ -107,7 +107,7 @@ prompt path is the compact extracted-memory design in
 [`MEMORY_EXTRACTION.md`](MEMORY_EXTRACTION.md).
 
 `Current Job` states which role the model is performing now, such as quick
-router, capability planner, conversation agent, or deepthinking agent. It tells
+goal interpreter, capability planner, conversation agent, or deepthinking agent. It tells
 the model to use the upper contexts as background and solve only the current
 role's responsibility.
 
@@ -136,18 +136,18 @@ The Orchestrator builds a context object for every routed turn. It now includes:
   initiative, restraint, cooldown, and repetition guidance supplied to Response
   Composer together with bounded recent auxiliary-request evidence;
 - `mind.self_model`: structured speaker, perceiver, actor, body owner, internal
-  components, and capability-evidence source used by Router, conversation,
+  components, and capability-evidence source used by Goal Interpreter, conversation,
   deepthinking, and direct-fallback prompts;
 - `core_principles`: short alias for prompt and inspection code;
 - `long_term_goals`: short alias for prompt and inspection code;
 - `experience_tuning_policy`: explicit learning boundary.
 
-The quick Router receives this context and may use it to classify intent, but
+The fast Goal Interpreter receives this context and may use it to classify intent, but
 it cannot treat principles as authorization. Emergency filtering, capability
 constraints, confirmation, Skill Runtime validation, and Soridormi provider
 checks remain code-enforced.
 
-The quick Router and native capability planner use the prompt context group
+The fast Goal Interpreter and native capability planner use the prompt context group
 shape above. The conversation and deepthinking agents include the mind context
 in their LLM prompts. Deepthinking should use it as the upper constraint when
 planning, debugging, or splitting complex tasks.

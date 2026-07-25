@@ -46,7 +46,7 @@ class ControlPlaneIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.runtime = AgentRuntime(AgentServices(ollama=None, use_llm=False, max_speak_chars=160))
         self.hardware = HardwareService()
 
-    async def test_text_to_router_to_agent_to_mock_hardware(self) -> None:
+    async def test_text_to_gateway_core_to_agent_to_mock_hardware(self) -> None:
         route_request = RouteRequest(sid="e2e-turn", text="turn left")
         decision = _pose_route(route_request)
 

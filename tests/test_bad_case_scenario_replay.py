@@ -15,7 +15,7 @@ from orchestrator.schemas.route import RouteDecision, RouteItem
 from agent.app.cognitive_core.goal_interpreter.engine import (
     _guard_low_information_side_effect,
 )
-from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as RouterRouteDecision, RouteRequest, finalize_decision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as GoalInterpreterRouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
@@ -31,7 +31,7 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
     def test_low_information_w_is_terminal_clarification_not_body_cue(self) -> None:
         request = RouteRequest(text="W.", language="en-US")
         bad_llm_decision = finalize_decision(
-            RouterRouteDecision(
+            GoalInterpreterRouteDecision(
                 route="robot_action",
                 agents=["speaker_agent"],
                 intent="soridormi.blink_eyes",
@@ -68,7 +68,7 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
             },
         )
         bad_llm_decision = finalize_decision(
-            RouterRouteDecision(
+            GoalInterpreterRouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent"],
                 intent="soridormi.blink_eyes",
@@ -127,7 +127,7 @@ class BadCaseScenarioReplayTests(unittest.TestCase):
         self.assertIn("需要先确认", spoken)
         self.assertTrue(prepared.metadata.get("truth_reconciled"))
 
-    def test_router_has_no_phrase_routed_gratitude_shortcut(self) -> None:
+    def test_goal_interpreter_has_no_phrase_routed_gratitude_shortcut(self) -> None:
         from pathlib import Path
 
         source = Path("agent/app/cognitive_core/goal_interpreter/engine.py").read_text(encoding="utf-8")

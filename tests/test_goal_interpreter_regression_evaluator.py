@@ -9,7 +9,7 @@ from scripts.goal_interpretation_regression import (
 )
 
 
-class RouterRegressionEvaluatorTests(unittest.TestCase):
+class GoalInterpreterRegressionEvaluatorTests(unittest.TestCase):
     def test_extracts_single_capability_from_intent(self) -> None:
         response = {"intent": "capability:soridormi.walk_velocity", "actions": []}
         self.assertEqual(selected_capabilities(response), ["soridormi.walk_velocity"])

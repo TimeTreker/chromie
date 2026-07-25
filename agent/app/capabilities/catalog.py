@@ -211,7 +211,7 @@ class CapabilityInvoker(Protocol):
 
 
 class CapabilityCatalog:
-    """Shared, queryable catalog for Router and normal interaction handling.
+    """Shared, queryable catalog for Goal Interpretation and interaction handling.
 
     Static entries come from Chromie's capability registry. Soridormi named
     skills are refreshed from the live provider because those exact IDs are the
@@ -711,7 +711,7 @@ class CapabilityCatalog:
         capability_id: str,
         item: dict[str, Any],
     ) -> CapabilityPromptTier:
-        explicit = str(item.get("prompt_tier") or item.get("router_prompt_tier") or "").strip().lower()
+        explicit = str(item.get("prompt_tier") or "").strip().lower()
         if explicit in {"common", "rare"}:
             return explicit  # type: ignore[return-value]
         preset = self.prompt_tier_presets.get(capability_id)
@@ -720,7 +720,7 @@ class CapabilityCatalog:
         return "rare"
 
     def _prompt_tier_source_for_live_skill(self, capability_id: str, item: dict[str, Any]) -> str:
-        explicit = str(item.get("prompt_tier") or item.get("router_prompt_tier") or "").strip()
+        explicit = str(item.get("prompt_tier") or "").strip()
         if explicit:
             return "provider"
         preset = self.prompt_tier_presets.get(capability_id)
@@ -934,18 +934,13 @@ class CapabilityCatalog:
             cls._truthy(payload.get(key))
             for key in (
                 "prompt_tier_locked",
-                "router_prompt_tier_locked",
                 "safety_sensitive",
             )
         )
 
     @staticmethod
     def _prompt_tier_reason_from(payload: Mapping[str, Any]) -> str | None:
-        reason = str(
-            payload.get("prompt_tier_reason")
-            or payload.get("router_prompt_tier_reason")
-            or ""
-        ).strip()
+        reason = str(payload.get("prompt_tier_reason") or "").strip()
         return reason or None
 
     @staticmethod

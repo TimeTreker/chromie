@@ -148,7 +148,6 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
     def test_configure_environment_uses_isolated_conversation_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir, patch.dict(os.environ, {}, clear=True):
             args = argparse.Namespace(
-                router_url="http://127.0.0.1:8091",
                 agent_url="http://127.0.0.1:8092",
                 grant_confirmation=True,
                 speaker=False,
@@ -246,7 +245,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
-    def test_validate_contract_accepts_agent_skills_when_router_has_no_actions(self) -> None:
+    def test_validate_contract_accepts_agent_skills_when_goal_interpreter_has_no_actions(self) -> None:
         route = RouteDecision.model_validate(
             {
                 "route": "robot_action",

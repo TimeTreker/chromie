@@ -613,7 +613,7 @@ class DeepThinkingAgent(BaseAgent):
         reason = (
             plan.quick_review.reason
             or plan.reason
-            or "deepthinking reviewed and replaced quick router proposal"
+            or "deepthinking reviewed and replaced fast Goal Interpretation proposal"
         )
         superseded: list[dict[str, Any]] = []
         for index, proposal in enumerate(raw_proposals[:12]):
