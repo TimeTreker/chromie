@@ -369,7 +369,7 @@ class HealthResponse(BaseModel):
     tool_result_interpreter_enabled: bool = False
     tool_result_interpreter_model: str | None = None
     task_continuity_model: str | None = None
-    social_attention_mode: str = "off"
+    social_attention_mode: str = "on"
     social_attention_model: str | None = None
 
 

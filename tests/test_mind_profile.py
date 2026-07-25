@@ -276,3 +276,10 @@ class ExperienceManagerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_mind_profile_rejects_unapproved_profile() -> None:
+    payload = default_mind_profile().model_dump(mode="json")
+    payload["owner_approved"] = False
+    with unittest.TestCase().assertRaisesRegex(ValueError, "owner-approved"):
+        MindProfile.model_validate(payload)

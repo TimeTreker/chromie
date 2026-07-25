@@ -1,3 +1,4 @@
+- Step 6 complete: active MindProfiles now require owner approval and health/configuration defaults consistently report Social Attention `on`.
 - Step 5 complete: Social Attention target evidence is semantic-only; calibration and embodiment-specific arguments are exclusively Soridormi/provider responsibilities.
 # Development Checkpoint
 

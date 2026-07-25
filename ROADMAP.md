@@ -1,3 +1,4 @@
+- [x] Reconcile MindProfile approval and Social Attention health defaults across contracts, runtime, tests, and docs.
 - [x] Move remaining Social Attention calibration and embodiment-specific argument ownership entirely into Soridormi/provider contracts.
 # Chromie Roadmap
 

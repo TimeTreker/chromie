@@ -218,6 +218,13 @@ class MindProfile(BaseModel):
     deliberation_policy: list[str] = Field(default_factory=list)
     experience_tuning_policy: list[str] = Field(default_factory=list)
 
+    @field_validator("owner_approved")
+    @classmethod
+    def require_profile_owner_approval(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("active mind profile must be owner-approved")
+        return value
+
     @field_validator("core_principles")
     @classmethod
     def require_core_principles(cls, value: list[CorePrinciple]) -> list[CorePrinciple]:

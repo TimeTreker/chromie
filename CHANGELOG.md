@@ -1,3 +1,4 @@
+- Aligned active MindProfile approval enforcement and Agent health defaults with the owner-approved, Social Attention-on runtime contract.
 - Moved all Social Attention calibration, body-coordinate, joint-target, and controller-parameter ownership below the Chromie boundary; model-facing target evidence is semantic only.
 # Changelog
 
