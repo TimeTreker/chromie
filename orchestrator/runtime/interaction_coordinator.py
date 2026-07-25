@@ -194,7 +194,6 @@ class InteractionRuntimeCoordinator:
             for request in response.skills
             if request.skill_id.startswith("soridormi.")
         ]
-        optional_body_cue = bool(response.metadata.get("optional_body_cue"))
         cognitive_effectful = self._is_cognitive_effectful(response)
         if raw_body_requests:
             if self.soridormi_invoker is None:
@@ -205,7 +204,7 @@ class InteractionRuntimeCoordinator:
                         ),
                     )
                 except RuntimeError as exc:
-                    if optional_body_cue or cognitive_effectful:
+                    if cognitive_effectful:
                         return await self._body_setup_failure(
                             response,
                             raw_body_requests,
@@ -228,7 +227,7 @@ class InteractionRuntimeCoordinator:
                     session_id=session_id,
                     reason_code="catalog_unavailable",
                     message=str(exc),
-                    suppress_speech=optional_body_cue or cognitive_effectful,
+                    suppress_speech=cognitive_effectful,
                 )
 
         prepared = self.prepare_response(
@@ -236,7 +235,6 @@ class InteractionRuntimeCoordinator:
             session_id=session_id,
             confirmed_request_ids=confirmed_request_ids,
         )
-        optional_body_cue = bool(prepared.metadata.get("optional_body_cue"))
         cognitive_effectful = self._is_cognitive_effectful(prepared)
         body_requests = [
             request
@@ -275,7 +273,7 @@ class InteractionRuntimeCoordinator:
                     session_id=session_id,
                     reason_code="skill_unavailable",
                     message=definition.unavailable_reason or "unavailable",
-                    suppress_speech=optional_body_cue or cognitive_effectful,
+                    suppress_speech=cognitive_effectful,
                 )
 
         authorized_request_ids = set(confirmed_request_ids or ())
@@ -296,32 +294,12 @@ class InteractionRuntimeCoordinator:
             if gated_requests and after_skills_speech
             else prepared
         )
-        try:
-            execution = await self.runtime.execute(
-                primary,
-                authorization=RuntimeAuthorization(
-                    confirmed_request_ids=authorized_request_ids,
-                ),
-            )
-        except ValueError as exc:
-            if optional_body_cue and gated_requests:
-                return SkillRuntimeResult(
-                    interaction_id=prepared.interaction_id,
-                    status="failed",
-                    results=[
-                        SkillResult(
-                            request_id=request.request_id,
-                            skill_id=request.skill_id,
-                            skill_version=request.skill_version,
-                            status="failed",
-                            provider_id="soridormi.mcp",
-                            reason_code="optional_body_cue_unavailable",
-                            message=str(exc),
-                        )
-                        for request in gated_requests
-                    ],
-                )
-            raise
+        execution = await self.runtime.execute(
+            primary,
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids=authorized_request_ids,
+            ),
+        )
         if not gated_requests:
             return execution
 
@@ -339,7 +317,7 @@ class InteractionRuntimeCoordinator:
         if execution.status == "cancelled":
             return execution
         if failed_body_results:
-            if optional_body_cue or cognitive_effectful:
+            if cognitive_effectful:
                 return execution
             recovery_confirmation = build_body_recovery_confirmation(
                 prepared,

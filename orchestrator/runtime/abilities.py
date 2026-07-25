@@ -290,12 +290,6 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             optional_by_default=True,
         ),
         AbilitySpec(
-            "social.thinking_pose",
-            "social",
-            "Use a small human-like pose while thinking.",
-            optional_by_default=True,
-        ),
-        AbilitySpec(
             "social.micro_nod",
             "social",
             "Use a small acknowledgement nod.",

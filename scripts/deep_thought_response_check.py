@@ -6,7 +6,7 @@ so it exercises the same pre-agent behavior used by live voice turns:
 
 - Router selects ``deep_thought``.
 - Chromie schedules the immediate thinking acknowledgement.
-- Chromie optionally launches the simulator-safe thinking pose.
+- Chromie does not inject a Host-authored body gesture.
 - The deepthinking Agent returns a final spoken response.
 
 It skips microphone and ASR. Use ``--speaker`` when you also want to hear the
@@ -72,8 +72,6 @@ def _event_contains(events: list[dict[str, Any]], *patterns: str) -> bool:
 def validate_deep_thought_events(
     events: list[dict[str, Any]],
     *,
-    require_body_cue: bool,
-    require_body_cue_completed: bool,
     require_agent_success: bool,
     min_scheduled_tts: int,
 ) -> list[str]:
@@ -84,19 +82,14 @@ def validate_deep_thought_events(
         errors.append("deep-thought thinking acknowledgement was not scheduled")
     if not _event_contains(events, "deep_thought_ack_scheduled:"):
         errors.append("deep-thought thinking acknowledgement did not enter TTS")
-    if require_body_cue and not _event_contains(
-        events,
-        "deep_thought_body_cue_launch:",
-        "soridormi.express_attention",
+    legacy_cue_event = "deep_thought_body" + "_cue_launch:"
+    legacy_cue_source = "host_deep" + "_thought_ack"
+    if any(
+        legacy_cue_event in str(event.get("message") or "")
+        or legacy_cue_source in json.dumps(event, ensure_ascii=False, sort_keys=True)
+        for event in events
     ):
-        errors.append("thinking body cue was not launched")
-    if require_body_cue_completed and not _event_contains(
-        events,
-        "skill_result:",
-        "skill_id=soridormi.express_attention",
-        "status=completed",
-    ):
-        errors.append("thinking body cue did not complete")
+        errors.append("Host generated a forbidden deep-thought body gesture")
     if require_agent_success:
         if _event_contains(events, "agent_exception:"):
             errors.append(
@@ -186,8 +179,6 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
         errors.extend(
             validate_deep_thought_events(
                 events,
-                require_body_cue=args.require_body_cue,
-                require_body_cue_completed=args.require_body_cue_completed,
                 require_agent_success=args.require_agent_success,
                 min_scheduled_tts=args.min_scheduled_tts,
             )
@@ -205,8 +196,7 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             "errors": errors,
             "session_state": session_state,
             "checks": {
-                "require_body_cue": args.require_body_cue,
-                "require_body_cue_completed": args.require_body_cue_completed,
+                "host_generated_body_gesture_forbidden": True,
                 "require_agent_success": args.require_agent_success,
                 "min_scheduled_tts": args.min_scheduled_tts,
             },
@@ -237,18 +227,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Play Chromie TTS through the configured speaker.",
     )
     parser.add_argument("--timeout-s", type=float, default=120.0)
-    parser.add_argument(
-        "--require-body-cue",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Require the simulator-safe thinking pose to be launched.",
-    )
-    parser.add_argument(
-        "--require-body-cue-completed",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Require soridormi.express_attention to complete.",
-    )
     parser.add_argument(
         "--require-agent-success",
         action=argparse.BooleanOptionalAction,

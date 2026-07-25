@@ -158,6 +158,32 @@ def audit() -> dict[str, Any]:
             "/interaction and /run compatibility call site"
         )
 
+    legacy_host_cue_tokens = (
+        "deep_thought_body" + "_cue",
+        "host_deep" + "_thought_ack",
+    )
+    for forbidden in legacy_host_cue_tokens:
+        if forbidden in orchestrator:
+            errors.append(
+                "Orchestrator still contains a Host-authored deep-thought body cue: "
+                f"{forbidden}"
+            )
+
+    coordinator = _read("orchestrator/runtime/interaction_coordinator.py")
+    legacy_optional_cue_key = "optional_body" + "_cue"
+    if legacy_optional_cue_key in coordinator:
+        errors.append(
+            "Interaction coordinator still grants special semantics to legacy "
+            "optional body-cue metadata"
+        )
+
+    abilities = _read("orchestrator/runtime/abilities.py")
+    legacy_thinking_ability = "social.thinking" + "_pose"
+    if legacy_thinking_ability in abilities:
+        errors.append(
+            "Static ability registry still defines a Host-selected thinking gesture"
+        )
+
     return {
         "schema_version": 1,
         "status": "pass" if not errors else "fail",

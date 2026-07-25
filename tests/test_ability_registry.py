@@ -64,13 +64,12 @@ class AbilityRegistryTests(unittest.TestCase):
         self.assertNotIn(legacy_sim_status, statuses)
         self.assertNotIn(legacy_hardware_status, statuses)
 
-    def test_static_registry_does_not_activate_provider_body_skills(self) -> None:
+    def test_static_registry_does_not_define_host_thinking_gestures(self) -> None:
         registry = build_default_ability_registry()
-        ability = registry.get("social.thinking_pose")
+        fixed_thinking_ability = "social.thinking" + "_pose"
 
-        self.assertEqual(ability.status, "stub")
-        self.assertFalse(ability.can_execute)
-        self.assertIsNone(ability.soridormi_skill_id)
+        with self.assertRaisesRegex(ValueError, "unknown ability"):
+            registry.get(fixed_thinking_ability)
 
     def test_known_missing_human_like_ability_is_not_executable(self) -> None:
         registry = build_default_ability_registry()

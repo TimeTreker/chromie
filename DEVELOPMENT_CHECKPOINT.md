@@ -4,10 +4,11 @@
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 **Status refresh date:** 2026-07-24
 **Current focus:** Close the remaining embodiment-boundary audit findings. The
-first correction slice removes simulator/hardware ability states and
-simulator-derived confirmation authority from Chromie. The next slice deletes
-the legacy Host-generated deep-thought body cue and then strips backend identity
-and calibrated body arguments from model-facing Chromie contracts. Fast Planner
+first correction slice removed simulator/hardware ability states and
+simulator-derived confirmation authority from Chromie. The second slice deletes
+the legacy Host-generated deep-thought body gesture and its silent metadata bypass.
+The next slice strips backend identity and calibrated body arguments from
+model-facing Chromie contracts. Fast Planner
 latency qualification and retained TTS evidence remain open engineering tracks
 after this architecture correction.
 
@@ -45,10 +46,11 @@ The broader Social Attention implementation remains: public gate `off`,
 style and bounded recent auxiliary request evidence reach Response Composer;
 candidate discovery ignores provider backend identity; Chromie-owned fallback
 calibration is removed; and auxiliary requests are parallel-only, optional, and
-lower priority than speech, emergency handling, and primary goals. The next
-correction slice should delete the now-inactive Host-generated deep-thought body
-cue and its static semantic defaults. Retained live provider evidence remains
-open.
+lower priority than speech, emergency handling, and primary goals. The legacy
+Host-generated deep-thought body gesture, fixed static ability, and optional-cue
+coordinator semantics are now deleted. Removing model-facing backend identity and
+calibrated arguments is the next correction slice. Retained live provider evidence
+remains open.
 
 The Fast Planner functional implementation in
 [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)

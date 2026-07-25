@@ -2953,71 +2953,6 @@ class VoiceAssistant:
         )
         return False
 
-    def _deep_thought_body_cue_response(
-        self,
-        decision: RouteDecision,
-        user_text: str,
-    ) -> InteractionResponse | None:
-        if not self._deep_thought_prelude_allowed(decision):
-            return None
-        abilities = self._ability_registry()
-        ability = abilities.get("social.thinking_pose")
-        if not ability.can_execute or not ability.soridormi_skill_id:
-            return None
-
-        language = (decision.language or "").lower()
-        zh = language.startswith("zh") or any(
-            "\u4e00" <= ch <= "\u9fff" for ch in user_text
-        )
-        return InteractionResponse(
-            skills=[
-                SkillRequest(
-                    skill_id=ability.soridormi_skill_id,
-                    args=dict(ability.default_args),
-                    timing="parallel",
-                    timeout_ms=ability.timeout_ms,
-                    requires_confirmation=True,
-                    metadata={
-                        "source": "host_deep_thought_ack",
-                        "ability_id": ability.ability_id,
-                        "ability_status": ability.status,
-                        "reason": "thinking_attention",
-                    },
-                )
-            ],
-            metadata={
-                "source": "host_deep_thought_ack",
-                "ability_id": ability.ability_id,
-                "ability_status": ability.status,
-                "optional_body_cue": True,
-                "language": "zh-CN" if zh else (decision.language or "en-US"),
-            },
-        )
-
-    async def _launch_deep_thought_body_cue(
-        self,
-        decision: RouteDecision,
-        user_text: str,
-        session_id: str,
-    ) -> bool:
-        response = self._deep_thought_body_cue_response(decision, user_text)
-        if response is None:
-            return False
-
-        skill_id = response.skills[0].skill_id if response.skills else "<none>"
-        self.session_log(
-            session_id,
-            "deep_thought_body_cue_launch: skill_id=%s",
-            skill_id,
-        )
-        self._launch_interaction(
-            response,
-            session_id,
-            reset_playback=False,
-            mark_session_done=False,
-        )
-        return True
-
     def _apply_conditional_deepthinking_policy(
         self,
         decision: RouteDecision,
@@ -4704,12 +4639,6 @@ class VoiceAssistant:
         fast_first_scheduled = bool(
             (decision.metadata or {}).get("fast_first_response_scheduled")
         )
-        await self._launch_deep_thought_body_cue(
-            decision,
-            user_text,
-            session_id,
-        )
-
         agent_context = self._legacy_agent_authority_context(
             context,
             session_id=session_id,

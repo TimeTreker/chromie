@@ -18,9 +18,11 @@ All notable user-visible changes should be recorded here.
   provider backend.
 - Replaced backend-specific acceptance confirmation controls with an explicit,
   backend-neutral diagnostic confirmation grant.
-- Disabled the legacy static-registry deep-thought body cue by keeping embodied
-  ontology entries non-executable; deletion of the remaining dead Host cue code is
-  the next architecture-cleanup slice.
+- Deleted the legacy Host-generated deep-thought body gesture, its fixed static
+  ability entry, and the coordinator metadata bypass that could silently suppress
+  provider or confirmation failures. Deep-thought prelude behavior is now speech-only
+  unless the model-authoritative Social Attention path independently proposes an
+  auxiliary provider skill.
 
 ### Embodiment-independent Social Attention and personality policy
 

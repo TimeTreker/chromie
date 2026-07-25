@@ -948,9 +948,10 @@ Goal-driven path is implemented. Public policy uses `off`, `report_only`, and
 bounded recent auxiliary-request evidence reach Response Composer; backend
 identity is excluded from candidate selection and Host authorization; the static
 ability ontology has no backend-specific states; and provider confirmation is
-not rewritten from simulator identity. Deleting the now-inactive legacy Host
-deep-thought body cue and removing remaining model-facing backend/calibration
-leaks are the next correction slices. Fresh retained live evidence for contextual
+not rewritten from simulator identity. The legacy Host-generated deep-thought
+body gesture and optional-cue metadata bypass are deleted. Removing remaining
+model-facing backend/calibration leaks is the next correction slice. Fresh retained
+live evidence for contextual
 appropriateness remains open. See
 [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
 

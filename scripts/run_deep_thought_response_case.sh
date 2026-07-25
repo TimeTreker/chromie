@@ -7,8 +7,6 @@ cd "$ROOT_DIR"
 MCP_URL="${SORIDORMI_MCP_URL:-http://127.0.0.1:${SORIDORMI_MCP_PORT:-8000}${SORIDORMI_MCP_PATH:-/mcp}}"
 SPEAKER_FLAG=--no-speaker
 TIMEOUT_S="${CHROMIE_DEEP_THOUGHT_TIMEOUT_S:-120}"
-REQUIRE_BODY_CUE=--require-body-cue
-REQUIRE_BODY_CUE_COMPLETED=--require-body-cue-completed
 REQUIRE_AGENT_SUCCESS=--require-agent-success
 MIN_SCHEDULED_TTS="${CHROMIE_DEEP_THOUGHT_MIN_TTS:-2}"
 EVIDENCE_DIR=()
@@ -25,7 +23,7 @@ Default scenario:
   User asks a complicated planning request.
   Chromie routes deep_thought.
   Chromie says a short "let me think" acknowledgement.
-  Chromie launches the simulator-safe thinking pose.
+  Chromie does not inject a Host-authored body gesture.
   The deepthinking Agent returns a final spoken response.
 
 Examples:
@@ -39,8 +37,6 @@ Options:
   --no-speaker                      Headless check without speaker playback; default
   --timeout-s SECONDS               Wait timeout; default: 120
   --evidence-dir DIR                Write evidence into this directory
-  --no-require-body-cue             Do not fail if thinking pose is not launched
-  --no-require-body-cue-completed   Do not fail if thinking pose does not complete
   --no-require-agent-success        Allow direct-LLM fallback if Agent is stale/down
   --min-scheduled-tts N             Minimum scheduled TTS items; default: 2
   -h, --help                        Show this help
@@ -54,8 +50,6 @@ while [ "$#" -gt 0 ]; do
     --no-speaker) SPEAKER_FLAG=--no-speaker; shift ;;
     --timeout-s) TIMEOUT_S="${2:?--timeout-s requires seconds}"; shift 2 ;;
     --evidence-dir) EVIDENCE_DIR=(--evidence-dir "${2:?--evidence-dir requires a directory}"); shift 2 ;;
-    --no-require-body-cue) REQUIRE_BODY_CUE=--no-require-body-cue; shift ;;
-    --no-require-body-cue-completed) REQUIRE_BODY_CUE_COMPLETED=--no-require-body-cue-completed; shift ;;
     --no-require-agent-success) REQUIRE_AGENT_SUCCESS=--no-require-agent-success; shift ;;
     --min-scheduled-tts) MIN_SCHEDULED_TTS="${2:?--min-scheduled-tts requires an integer}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -95,8 +89,6 @@ args=(
   --soridormi-mcp-url "$MCP_URL"
   "$SPEAKER_FLAG"
   --timeout-s "$TIMEOUT_S"
-  "$REQUIRE_BODY_CUE"
-  "$REQUIRE_BODY_CUE_COMPLETED"
   "$REQUIRE_AGENT_SUCCESS"
   --min-scheduled-tts "$MIN_SCHEDULED_TTS"
   "${EVIDENCE_DIR[@]}"

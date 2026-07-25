@@ -389,14 +389,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "Please do it.",
             session_id,
         )
-        response = assistant._deep_thought_body_cue_response(
-            decision,
-            "Please do it.",
-        )
-
         self.assertFalse(scheduled)
         self.assertEqual(seen, [])
-        self.assertIsNone(response)
         self.assertEqual(
             assistant.sessions.state[session_id]["scheduled_tts"],
             0,
@@ -864,21 +858,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             0,
         )
 
-    def test_legacy_deep_thought_body_cue_is_not_activated_by_static_registry(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        decision = RouteDecision(
-            route="deep_thought",
-            agents=["deepthinking_agent", "speaker_agent"],
-            language="en-US",
-        )
-
-        response = assistant._deep_thought_body_cue_response(
-            decision,
-            "Please think this through.",
-        )
-
-        self.assertIsNone(response)
-
     def test_unavailable_ability_response_is_language_matched(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
 
@@ -1071,7 +1050,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reset_calls, 1)
         self.assertEqual(done_calls, 2)
 
-    async def test_nonterminal_body_cue_does_not_mark_session_done(self) -> None:
+    async def test_nonterminal_interaction_does_not_mark_session_done(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
@@ -1105,7 +1084,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         await assistant.execute_interaction_response(
             InteractionResponse(
                 skills=[{"skill_id": "soridormi.express_attention"}],
-                metadata={"optional_body_cue": True},
             ),
             session_id,
             reset_playback=False,

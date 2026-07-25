@@ -42,7 +42,7 @@ The ontology names normal human-like ability families:
 | Cognition | `cognition.quick_route`, `cognition.deep_think`, `cognition.plan_task`, `cognition.split_task` |
 | Speech | `speech.thinking_ack`, `speech.answer`, `speech.confirm`, `speech.report_progress` |
 | Memory | `memory.remember_session_context`, `memory.recall_session_context`, `memory.forget_current_task` |
-| Social | `social.blink_eyes`, `social.look_at_user`, `social.listen_pose`, `social.thinking_pose`, `social.micro_nod`, `social.nod_yes` |
+| Social | `social.blink_eyes`, `social.look_at_user`, `social.listen_pose`, `social.micro_nod`, `social.nod_yes` |
 | Body | `body.walk_forward`, `body.turn_left`, `body.stop_motion`, `body.recover_balance` |
 | Manipulation | `manipulation.pick_up_object`, `manipulation.place_object` |
 | Navigation | `navigation.follow_user`, `navigation.go_to_location` |
@@ -101,8 +101,8 @@ authorize skills, memory writes, tools, or body motion.
 Optional Social Attention is selected separately by Response Composer from the
 live provider catalog under the owner-approved Social Interaction Style. It is
 parallel-only, optional, and lower priority than speech, emergency handling, and
-explicit user actions. The static ability registry does not generate a fixed
-thinking pose.
+explicit user actions. The static ability registry does not define or generate a
+fixed thinking gesture, and the Host does not inject one when deep thought starts.
 
 Validate the maintained text-to-provider path with:
 

@@ -750,24 +750,6 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 session_id="sid-1",
             )
 
-    async def test_optional_body_cue_disabled_provider_stays_silent(self) -> None:
-        spoken: list[str] = []
-        coordinator = InteractionRuntimeCoordinator(
-            lambda args: spoken.append(str(args["text"])) or {"scheduled": True}
-        )
-
-        result = await coordinator.execute(
-            InteractionResponse(
-                skills=[{"skill_id": "soridormi.express_attention"}],
-                metadata={"optional_body_cue": True},
-            ),
-            session_id="sid-optional-disabled",
-        )
-
-        self.assertEqual(result.status, "failed")
-        self.assertEqual(result.results[0].reason_code, "provider_disabled")
-        self.assertEqual(spoken, [])
-
     async def test_catalog_failure_becomes_terminal_safe_fallback(self) -> None:
         class CatalogFailureInvoker(_SoridormiInvoker):
             async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
@@ -804,7 +786,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             ["I could not complete that movement safely."],
         )
 
-    async def test_optional_body_cue_catalog_failure_stays_silent(self) -> None:
+    async def test_legacy_optional_cue_metadata_cannot_suppress_failure_speech(self) -> None:
         class CatalogFailureInvoker(_SoridormiInvoker):
             async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
                 self.calls.append((tool_name, args, context))
@@ -829,16 +811,16 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                         "skill_id": "soridormi.express_attention",
                     }
                 ],
-                metadata={"optional_body_cue": True},
+                metadata={"optional_body" + "_cue": True},
             ),
             session_id="sid-1",
         )
 
         self.assertEqual(result.status, "failed")
         self.assertEqual(result.results[0].reason_code, "catalog_unavailable")
-        self.assertEqual(spoken, [])
+        self.assertEqual(spoken, ["I could not complete that movement safely."])
 
-    async def test_optional_body_cue_confirmation_requirement_stays_silent(self) -> None:
+    async def test_legacy_optional_cue_metadata_cannot_bypass_confirmation(self) -> None:
         class AttentionInvoker(_SoridormiInvoker):
             async def invoke(self, tool_name, args, *, context=None):  # type: ignore[no-untyped-def]
                 self.calls.append((tool_name, args, context))
@@ -864,26 +846,21 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             soridormi_invoker=AttentionInvoker(),
         )
 
-        result = await coordinator.execute(
-            InteractionResponse(
-                skills=[
-                    {
-                        "request_id": "attention-1",
-                        "skill_id": "soridormi.express_attention",
-                        "requires_confirmation": True,
-                    }
-                ],
-                metadata={"optional_body_cue": True},
-            ),
-            session_id="sid-optional-confirmation",
-        )
+        with self.assertRaisesRegex(ValueError, "requires confirmation"):
+            await coordinator.execute(
+                InteractionResponse(
+                    skills=[
+                        {
+                            "request_id": "attention-1",
+                            "skill_id": "soridormi.express_attention",
+                            "requires_confirmation": True,
+                        }
+                    ],
+                    metadata={"optional_body" + "_cue": True},
+                ),
+                session_id="sid-optional-confirmation",
+            )
 
-        self.assertEqual(result.status, "failed")
-        self.assertEqual(
-            result.results[0].reason_code,
-            "optional_body_cue_unavailable",
-        )
-        self.assertIn("requires confirmation", result.results[0].message)
         self.assertEqual(spoken, [])
 
     async def test_unavailable_catalog_skill_becomes_terminal_safe_fallback(

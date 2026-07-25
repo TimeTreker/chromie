@@ -159,9 +159,10 @@ Implemented scope:
 - contract and file-backed backend-parity scenarios cover stable named-skill and
   semantic-argument behavior.
 
-Remaining architecture work: delete the legacy Host-generated deep-thought body
-cue, remove backend identity from model-facing catalog projections, and move
-calibrated yaw/pitch handling fully behind the provider boundary. Then retain
+The legacy Host-generated deep-thought body gesture and its coordinator bypass
+are deleted. Remaining architecture work: remove backend identity from model-facing
+catalog projections and move calibrated yaw/pitch handling fully behind the
+provider boundary. Then retain
 live Soridormi interaction evidence and run the full release-quality regression
 gate.
 
