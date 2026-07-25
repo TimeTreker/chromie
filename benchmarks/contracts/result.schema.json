@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/benchmark-result-v1.json",
+  "title": "Chromie Benchmark Result Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scenario_id", "run", "observations", "invariant_results", "artifacts"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "scenario_id": {"type": "string", "minLength": 1},
+    "run": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["mode", "evidence_level"],
+      "properties": {
+        "mode": {"type": "string", "minLength": 1},
+        "evidence_level": {"enum": ["static", "replay", "live_model", "live_service", "simulated", "physical", "unknown"]},
+        "model": {"type": ["string", "null"]},
+        "prompt_revision": {"type": ["string", "null"]}
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "primary_outcome": {},
+        "auxiliary_behavior": {},
+        "latency_ms": {"type": ["number", "null"], "minimum": 0},
+        "evidence": {"type": "array"}
+      }
+    },
+    "invariant_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "passed", "detail"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "passed": {"type": "boolean"},
+          "detail": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "artifacts": {"type": "array", "items": {"type": "string"}}
+  }
+}

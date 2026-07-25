@@ -1,0 +1,229 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+from benchmarks.contracts import ContractError, NormalizedScenario, SourceReference
+
+ID_KEYS = ("id", "scenario_id", "case_id", "test_id", "name")
+INPUT_KEYS = (
+    "inputs", "input", "user_input", "user_text", "text", "utterance", "query", "request",
+    "messages", "turns", "conversation",
+)
+CONTEXT_KEYS = (
+    "context", "history", "state", "profile", "mind_profile", "style", "mode",
+    "available_capabilities", "capabilities", "recent_evidence", "metadata",
+)
+EXPECTATION_KEYS = (
+    "expected", "expect", "expectations", "expected_output", "expected_result",
+    "expected_route", "expected_intent", "expected_plan", "assertions", "checks",
+)
+PRIMARY_KEYS = ("primary_outcome", "primary_expectation", "acceptable_outcomes")
+AUXILIARY_KEYS = ("acceptable_auxiliary", "acceptable_auxiliary_behavior", "allowed_auxiliary")
+FORBIDDEN_KEYS = ("forbidden", "forbidden_behavior", "forbidden_behaviors")
+INVARIANT_KEYS = ("invariants", "required_invariants")
+DISTRIBUTION_KEYS = ("distribution_observations", "distribution_expectations")
+RUBRIC_KEYS = ("review_rubric", "rubric", "qualitative_review")
+
+
+@dataclass(frozen=True)
+class AdapterContext:
+    source_path: str
+    layer: str
+    datasets: tuple[str, ...]
+    evidence_requirements: tuple[str, ...]
+
+
+def _first(mapping: Mapping[str, Any], keys: Iterable[str]) -> Any:
+    for key in keys:
+        if key in mapping:
+            return mapping[key]
+    return None
+
+
+def _items(payload: Any) -> Iterable[tuple[int | None, Any]]:
+    if isinstance(payload, list):
+        yield from enumerate(payload)
+        return
+    if isinstance(payload, Mapping):
+        for key in ("scenarios", "cases", "tests", "examples", "items"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                yield from enumerate(value)
+                return
+    yield None, payload
+
+
+def _slug(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9._-]+", "-", value.lower()).strip("-._")
+    if not normalized:
+        raise ContractError("scenario id cannot be normalized")
+    return normalized
+
+
+def _stable_id(context: AdapterContext, item: Any, index: int | None) -> tuple[str, str | None]:
+    declared: str | None = None
+    if isinstance(item, Mapping):
+        raw = _first(item, ID_KEYS)
+        if isinstance(raw, str) and raw.strip():
+            declared = raw.strip()
+    if declared:
+        return _slug(declared), declared
+    canonical = json.dumps(item, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+    stem = _slug(Path(context.source_path).stem)
+    suffix = str(index) if index is not None else "single"
+    return f"legacy.{stem}.{suffix}.{digest}", None
+
+
+def _as_mapping(value: Any, *, fallback_key: str) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if value is None:
+        return {}
+    return {fallback_key: value}
+
+
+def _as_strings(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                result.append(item)
+            elif isinstance(item, Mapping):
+                result.append(json.dumps(item, ensure_ascii=False, sort_keys=True))
+            else:
+                result.append(str(item))
+        return result
+    if isinstance(value, Mapping):
+        return [json.dumps(value, ensure_ascii=False, sort_keys=True)]
+    return [str(value)]
+
+
+def _extract_inputs(item: Mapping[str, Any]) -> dict[str, Any]:
+    explicit = item.get("inputs")
+    if isinstance(explicit, Mapping) and explicit:
+        return dict(explicit)
+    for key in INPUT_KEYS[1:]:
+        if key in item:
+            return _as_mapping(item[key], fallback_key=key)
+    raise ContractError("legacy scenario has no recognizable input field")
+
+
+def _extract_context(item: Mapping[str, Any]) -> dict[str, Any]:
+    explicit = item.get("context")
+    result = dict(explicit) if isinstance(explicit, Mapping) else {}
+    for key in CONTEXT_KEYS:
+        if key == "context" or key not in item:
+            continue
+        result.setdefault(key, item[key])
+    return result
+
+
+def _extract_legacy_expectations(item: Mapping[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key in EXPECTATION_KEYS:
+        if key in item:
+            result[key] = item[key]
+    return result
+
+
+class LegacyJsonAdapter:
+    name = "legacy_json_v1"
+
+    def normalize(self, payload: Any, context: AdapterContext) -> list[NormalizedScenario]:
+        normalized: list[NormalizedScenario] = []
+        for index, raw_item in _items(payload):
+            if not isinstance(raw_item, Mapping):
+                raise ContractError(
+                    f"{context.source_path}[{index}] must be an object, got {type(raw_item).__name__}"
+                )
+            item = dict(raw_item)
+            scenario_id, source_id = _stable_id(context, item, index)
+            primary = _as_strings(_first(item, PRIMARY_KEYS))
+            auxiliary = _as_strings(_first(item, AUXILIARY_KEYS))
+            forbidden = _as_strings(_first(item, FORBIDDEN_KEYS))
+            invariants = _as_strings(_first(item, INVARIANT_KEYS))
+            distribution = _as_strings(_first(item, DISTRIBUTION_KEYS))
+            legacy = _extract_legacy_expectations(item)
+            if not primary and not invariants and legacy:
+                primary = ["Preserve the source scenario's declared semantic expectation"]
+            capabilities = item.get("capabilities")
+            if not isinstance(capabilities, (str, list, tuple)):
+                capabilities = []
+            rubric = _first(item, RUBRIC_KEYS)
+            normalized.append(
+                NormalizedScenario.create(
+                    id=scenario_id,
+                    layer=context.layer,
+                    datasets=context.datasets,
+                    source=SourceReference(
+                        path=context.source_path,
+                        adapter=self.name,
+                        source_index=index,
+                        source_id=source_id,
+                    ),
+                    inputs=_extract_inputs(item),
+                    context=_extract_context(item),
+                    capabilities=capabilities,
+                    primary_outcomes=primary,
+                    acceptable_auxiliary=auxiliary,
+                    forbidden_behaviors=forbidden,
+                    invariants=invariants,
+                    distribution_observations=distribution,
+                    evidence_requirements=context.evidence_requirements,
+                    review_rubric=rubric if isinstance(rubric, Mapping) else {},
+                    legacy_expectations=legacy,
+                )
+            )
+        return normalized
+
+
+def normalize_payload(
+    payload: Any,
+    *,
+    source_path: str,
+    layer: str,
+    datasets: Iterable[str],
+    evidence_requirements: Iterable[str] = ("static",),
+) -> list[dict[str, Any]]:
+    context = AdapterContext(
+        source_path=source_path,
+        layer=layer,
+        datasets=tuple(datasets),
+        evidence_requirements=tuple(evidence_requirements),
+    )
+    return [item.to_dict() for item in LegacyJsonAdapter().normalize(payload, context)]
+
+
+def normalize_json_file(
+    path: Path,
+    *,
+    repo_root: Path,
+    layer: str,
+    datasets: Iterable[str],
+    evidence_requirements: Iterable[str] = ("static",),
+) -> list[dict[str, Any]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ContractError(f"cannot load {path}: {exc}") from exc
+    try:
+        source_path = path.resolve().relative_to(repo_root.resolve()).as_posix()
+    except ValueError as exc:
+        raise ContractError(f"source path is outside repository: {path}") from exc
+    return normalize_payload(
+        payload,
+        source_path=source_path,
+        layer=layer,
+        datasets=datasets,
+        evidence_requirements=evidence_requirements,
+    )
