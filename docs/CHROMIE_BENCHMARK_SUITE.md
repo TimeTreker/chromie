@@ -93,7 +93,7 @@ Exercise one reasoning or contract-producing component with controlled
 surroundings. Examples:
 
 - Cognitive Gateway attention/admission review;
-- Router semantic classification;
+- Goal-Driven Cognitive Core goal interpretation and association;
 - Goal segmentation and association;
 - Fast and Deep Planner output;
 - Response Composer and Social Attention choice;
@@ -111,7 +111,7 @@ system. Examples:
 
 ```text
 MindProfile -> Response Composer -> Social Attention proposal
-Router -> Goal association -> Planner
+Cognitive Gateway -> Goal-Driven Cognitive Core -> Planner
 Capability catalog -> Planner -> Skill Runtime validation
 Tool result -> interpretation -> truthful final speech
 ```
@@ -132,6 +132,14 @@ text or audio
 
 E2E levels remain evidence-scoped. Text-only, virtual audio, simulator, and
 supervised physical-device runs must not be reported as equivalent evidence.
+
+The legacy `Router` service name and wire contract remain compatibility details
+during migration. They are not a substitute name for Cognitive Gateway. Existing
+`scenarios/router/` and `scenarios/router_dialogue/` assets are retained as
+compatibility regressions so historical evidence is not lost. New benchmark
+architecture must name the actual boundary under evaluation: Cognitive Gateway
+for ingress/admission, or Goal-Driven Cognitive Core for semantic goal reasoning
+and planning.
 
 ### 4.4 Stress benchmarks
 

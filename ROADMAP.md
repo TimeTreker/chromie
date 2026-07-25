@@ -16,18 +16,19 @@ The next new development topic is the staged Benchmark Suite described in
 [docs/CHROMIE_BENCHMARK_SUITE.md](docs/CHROMIE_BENCHMARK_SUITE.md) and
 [docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md](docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md).
 
-Immediate milestone: **Phase 1 — benchmark manifest and inventory**. Establish
-the directory skeleton, versioned schemas, deterministic inventory and coverage
-report, tests, and CI entrypoint. Index existing scenarios in place; do not move
-files or add benchmark-specific runtime policy.
+Completed foundation: manifest/inventory, common scenario/result contracts,
+module/integration runners, and deployment-neutral runtime component adapters.
+Before expanding the Social Attention dataset, align those adapters with the
+settled Cognitive Gateway / Goal-Driven Cognitive Core architecture.
 
 Exit criteria:
 
-- every maintained scenario has one stable inventory entry and may have multiple tags;
-- duplicate IDs, invalid paths, unknown tags, and missing provenance fail closed;
-- existing scenario and acceptance commands remain unchanged and passing;
-- inventory output reports coverage by layer, dataset, language, evidence level, and source;
-- no phrase, regex, scenario-ID, or fixed social-action rule is added to production code.
+- Cognitive Gateway is the first-class ingress benchmark component;
+- semantic goal interpretation and planning remain Goal-Driven Cognitive Core concerns;
+- legacy `scenarios/router/` assets are retained only as compatibility regressions;
+- manifests, examples, environment variables, tests, and reports do not present a
+  generic Router as the current architecture;
+- no production Runtime behavior or compatibility wire contract changes.
 
 ## Planning model
 

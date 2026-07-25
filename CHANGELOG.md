@@ -8,6 +8,14 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Cognitive Gateway benchmark alignment
+
+- Replaced the newly introduced first-class `router` Benchmark adapter with the
+  settled `cognitive_gateway` ingress boundary.
+- Reclassified legacy Router and Router-dialogue scenario directories as retained
+  compatibility regressions instead of current module architecture.
+- Added terminology regression guards and clarified Goal-Driven Cognitive Core ownership.
+
 ### Chromie Benchmark Suite design
 
 - Added the constitutional rule that benchmarks evaluate model intelligence but must not become phrase-, regex-, scenario-ID-, or fixed-action runtime policy.

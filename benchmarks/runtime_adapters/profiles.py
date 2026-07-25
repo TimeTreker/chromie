@@ -20,12 +20,15 @@ class ComponentProfile:
 
 
 COMPONENT_PROFILES: dict[str, ComponentProfile] = {
-    "router": ComponentProfile(
-        name="router",
+    "cognitive_gateway": ComponentProfile(
+        name="cognitive_gateway",
         layers=("module", "integration"),
-        url_env="CHROMIE_BENCHMARK_ROUTER_URL",
-        callable_env="CHROMIE_BENCHMARK_ROUTER_CALLABLE",
-        description="Fast/semantic routing boundary",
+        url_env="CHROMIE_BENCHMARK_COGNITIVE_GATEWAY_URL",
+        callable_env="CHROMIE_BENCHMARK_COGNITIVE_GATEWAY_CALLABLE",
+        description=(
+            "Input normalization, protective reflex, attention review, context "
+            "assembly, and turn admission boundary"
+        ),
     ),
     "planner": ComponentProfile(
         name="planner",

@@ -124,7 +124,7 @@ to one backend or adding benchmark-specific production branches.
 component boundaries without importing benchmark policy into production code.
 Supported component profiles are:
 
-- `router`;
+- `cognitive_gateway`;
 - `planner`;
 - `response_composer`;
 - `mind_profile`;
@@ -143,17 +143,17 @@ profile and must return a Benchmark execution observation. The adapter does not
 infer expected behavior from user text and does not translate phrases into
 skills.
 
-Example using a deployed Router adapter endpoint:
+Example using a deployed Cognitive Gateway adapter endpoint:
 
 ```bash
-export CHROMIE_BENCHMARK_ROUTER_URL=http://127.0.0.1:8091/benchmark/router
+export CHROMIE_BENCHMARK_COGNITIVE_GATEWAY_URL=http://127.0.0.1:8091/benchmark/cognitive-gateway
 python -m benchmarks.modules.run \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --mode live_model \
-  --command "python scripts/benchmark_runtime_adapter.py --component router" \
-  --model local-router-model \
-  --prompt-revision router-prompt-revision \
-  --output benchmarks/reports/router-live.json
+  --command "python scripts/benchmark_runtime_adapter.py --component cognitive_gateway" \
+  --model local-gateway-model \
+  --prompt-revision cognitive-gateway-contract-v1 \
+  --output benchmarks/reports/cognitive-gateway-live.json
 ```
 
 Example using an in-process test harness callable:
@@ -166,3 +166,17 @@ python scripts/benchmark_runtime_adapter.py --component social_attention
 
 The callable or HTTP endpoint is an explicit test harness boundary. Production
 modules remain unaware of scenario IDs and benchmark execution.
+
+
+## Cognitive architecture terminology
+
+The current ingress architecture is the **Cognitive Gateway**, which owns only
+input normalization, protective reflex, attention review, context assembly, and
+turn admission. Goal interpretation, planning, capability selection, and response
+composition remain downstream in the Goal-Driven Cognitive Core.
+
+The legacy `scenarios/router/` and `scenarios/router_dialogue/` paths are retained
+for source compatibility and historical comparison. Inventory classifies them as
+`compatibility_router` regression datasets; their directory names do not define
+the current architecture. New benchmark component profiles must not reintroduce a
+generic first-class `router` boundary.

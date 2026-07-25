@@ -21,7 +21,7 @@ def _request(*, layer: str = "module") -> dict:
 
 
 def test_requires_exactly_one_transport_configuration() -> None:
-    profile = get_component_profile("router")
+    profile = get_component_profile("cognitive_gateway")
     with pytest.raises(RuntimeAdapterError, match="exactly one"):
         RuntimeAdapter.from_environment(profile, environment={})
     with pytest.raises(RuntimeAdapterError, match="exactly one"):
@@ -58,7 +58,7 @@ def test_rejects_wrong_layer(tmp_path: Path, monkeypatch) -> None:
         "def invoke(payload): return {'primary_task_passed': True}\n", encoding="utf-8"
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    profile = get_component_profile("router")
+    profile = get_component_profile("cognitive_gateway")
     adapter = RuntimeAdapter.from_environment(
         profile, environment={profile.callable_env: "layer_component:invoke"}
     )
@@ -71,7 +71,7 @@ def test_rejects_unstructured_component_response(tmp_path: Path, monkeypatch) ->
         "def invoke(payload): return {'route': 'chat'}\n", encoding="utf-8"
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    profile = get_component_profile("router")
+    profile = get_component_profile("cognitive_gateway")
     adapter = RuntimeAdapter.from_environment(
         profile, environment={profile.callable_env: "unstructured_component:invoke"}
     )
@@ -132,7 +132,7 @@ def test_manifest_matches_profiles() -> None:
     )
     declared = {item["name"]: item for item in manifest["components"]}
     assert set(declared) == {
-        "router",
+        "cognitive_gateway",
         "planner",
         "response_composer",
         "mind_profile",

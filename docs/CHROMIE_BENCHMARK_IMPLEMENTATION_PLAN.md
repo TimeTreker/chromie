@@ -75,8 +75,9 @@ Add benchmark manifest and scenario inventory
 Deliverables:
 
 - versioned benchmark case schema;
-- adapters from current Router, interaction, dialogue, and general-ability
-  scenario formats;
+- adapters from compatibility Router, interaction, dialogue, and general-ability
+  scenario formats, preserving their source IDs without presenting Router as the
+  settled cognitive ingress architecture;
 - normalized result envelope containing inputs, outputs, evidence, invariant
   results, latency, and provenance;
 - no physical file migration yet.
@@ -104,8 +105,9 @@ Add common benchmark scenario and result contracts
 
 Deliverables:
 
-- `benchmarks/modules/` runner entrypoints for Router, Planner, Composer,
-  Social Attention, MindProfile, catalog projection, and tool interpretation;
+- `benchmarks/modules/` runner entrypoints for Cognitive Gateway, Goal-Driven
+  Cognitive Core boundaries, Planner, Composer, Social Attention, MindProfile,
+  catalog projection, and tool interpretation;
 - `benchmarks/integration/` entrypoints for maintained component chains;
 - replay mode and live-model mode;
 - retained JSON reports.
@@ -125,6 +127,15 @@ Suggested commit:
 ```text
 Add module and integration benchmark runners
 ```
+
+Architecture terminology rule:
+
+- Cognitive Gateway is the settled ingress/admission boundary;
+- Goal-Driven Cognitive Core owns semantic goal interpretation and planning;
+- legacy Router paths and wire contracts may be indexed only as compatibility or
+  historical-regression evidence;
+- no new generic `router` benchmark component, dataset authority, or architectural
+  diagram may be introduced.
 
 ## Phase 4 - Social Attention benchmark expansion
 
