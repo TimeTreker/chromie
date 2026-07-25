@@ -57,6 +57,7 @@ When documents disagree, correct the lower-authority document.
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
 | What staged work builds that benchmark architecture? | `docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md` |
+| How are semantic scenarios executed at distinct E2E evidence levels? | `docs/E2E_BENCHMARK_EXECUTION.md` |
 | Where is the reviewed Social Attention benchmark dataset? | `benchmarks/datasets/social_attention/README.md` |
 | How is the automated suite kept free of stale wrappers and duplicate coverage? | `docs/TEST_SUITE_MAINTENANCE.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
@@ -85,6 +86,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Benchmark Suite](../benchmarks/README.md)
+- [Benchmark E2E Adapter Contract](../benchmarks/e2e/README.md)
 - [Reviewed Social Attention Dataset](../benchmarks/datasets/social_attention/README.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
@@ -93,6 +95,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
 - [Chromie Benchmark Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md)
+- [End-to-End Benchmark Execution](E2E_BENCHMARK_EXECUTION.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)

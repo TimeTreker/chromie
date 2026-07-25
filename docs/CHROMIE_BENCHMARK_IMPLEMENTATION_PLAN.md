@@ -203,6 +203,17 @@ Exit criteria:
 - auxiliary behavior timing is measured against speech and primary execution;
 - failures retain partial evidence instead of hanging the suite.
 
+Implemented evidence:
+
+- six versioned evidence profiles for replay, model-only, deployed text, virtual
+  audio, MuJoCo simulation, and supervised physical execution;
+- explicit claim ceilings and required evidence/timing contracts per profile;
+- command-adapter checkpoints that retain correlated partial evidence and
+  artifacts after timeout, process failure, or invalid final output;
+- timing derivation for primary response, primary execution, and auxiliary
+  behavior without prescribing a behavior schedule;
+- qualification summaries that never auto-promote a run to release-qualified.
+
 Suggested commit:
 
 ```text
@@ -280,7 +291,8 @@ Connect experience mining to reviewed benchmark authoring
 
 ## Recommended immediate next patch
 
-Implement Phase 5 only: add end-to-end text execution and evidence profiles on
-top of the reviewed Social Attention dataset. Preserve the same semantic case
-contracts across replay, live-model, live-service, simulator, and later physical
-evidence levels. Do not add runtime behavior quotas or fixed gesture mappings.
+Implement Phase 6 only: add repeated-session, interruption, timeout, degraded
+provider, and distribution evaluation on top of retained Phase 5 E2E reports.
+Make sample size, run conditions, model/prompt/profile revisions, and confidence
+explicit. Do not turn observed behavior frequencies into runtime quotas or forced
+action schedules.

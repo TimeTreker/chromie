@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "replay_text",
+      "evidence_level": "replay",
+      "transport": "replay",
+      "input_mode": "text",
+      "embodiment": "none",
+      "supervision": "automatic",
+      "allowed_execution_claims": ["replayed_contract"],
+      "required_evidence": ["scenario_replay"],
+      "required_timing_markers": [],
+      "requires_safe_idle": false,
+      "human_approval_required": true,
+      "description": "Deterministic replay of retained observations; no live execution claim."
+    },
+    {
+      "id": "live_model_text",
+      "evidence_level": "live_model",
+      "transport": "command",
+      "input_mode": "text",
+      "embodiment": "none",
+      "supervision": "automatic",
+      "allowed_execution_claims": ["model_output"],
+      "required_evidence": ["model_identity", "prompt_revision", "model_output"],
+      "required_timing_markers": ["input_received_ms", "primary_response_started_ms", "terminal_ms"],
+      "requires_safe_idle": false,
+      "human_approval_required": true,
+      "description": "Configured model execution without a deployed service or provider claim."
+    },
+    {
+      "id": "live_service_text",
+      "evidence_level": "live_service",
+      "transport": "command",
+      "input_mode": "text",
+      "embodiment": "none",
+      "supervision": "automatic",
+      "allowed_execution_claims": ["deployed_service_execution"],
+      "required_evidence": ["cognitive_gateway_turn", "cognitive_core_result", "primary_response", "correlated_trace"],
+      "required_timing_markers": ["input_received_ms", "primary_response_started_ms", "terminal_ms"],
+      "requires_safe_idle": false,
+      "human_approval_required": true,
+      "description": "Deployed text path through Cognitive Gateway, Agent-owned Core, and response delivery."
+    },
+    {
+      "id": "live_service_virtual_audio",
+      "evidence_level": "live_service",
+      "transport": "command",
+      "input_mode": "virtual_audio",
+      "embodiment": "none",
+      "supervision": "automatic",
+      "allowed_execution_claims": ["audio_pipeline_execution", "deployed_service_execution"],
+      "required_evidence": ["virtual_audio_input", "asr_final", "cognitive_gateway_turn", "cognitive_core_result", "primary_response", "correlated_trace"],
+      "required_timing_markers": ["audio_submitted_ms", "asr_final_ms", "primary_response_started_ms", "terminal_ms"],
+      "requires_safe_idle": false,
+      "human_approval_required": true,
+      "description": "Virtual-audio execution through ASR, cognition, and response delivery."
+    },
+    {
+      "id": "simulated_mujoco",
+      "evidence_level": "simulated",
+      "transport": "command",
+      "input_mode": "text",
+      "embodiment": "simulated",
+      "supervision": "automatic",
+      "allowed_execution_claims": ["deployed_service_execution", "simulated_provider_execution"],
+      "required_evidence": ["cognitive_gateway_turn", "cognitive_core_result", "provider_execution", "primary_response", "safe_idle", "correlated_trace"],
+      "required_timing_markers": ["input_received_ms", "primary_response_started_ms", "primary_execution_started_ms", "primary_execution_finished_ms", "terminal_ms"],
+      "requires_safe_idle": true,
+      "human_approval_required": true,
+      "description": "Deployed text path with retained MuJoCo provider execution and safe-idle evidence."
+    },
+    {
+      "id": "physical_supervised",
+      "evidence_level": "physical",
+      "transport": "command",
+      "input_mode": "physical_audio",
+      "embodiment": "physical",
+      "supervision": "operator_required",
+      "allowed_execution_claims": ["audio_pipeline_execution", "deployed_service_execution", "physical_provider_execution"],
+      "required_evidence": ["physical_audio_input", "asr_final", "cognitive_gateway_turn", "cognitive_core_result", "hardware_identity", "provider_execution", "operator_observation", "primary_response", "safe_idle", "correlated_trace"],
+      "required_timing_markers": ["audio_submitted_ms", "asr_final_ms", "primary_response_started_ms", "primary_execution_started_ms", "primary_execution_finished_ms", "terminal_ms"],
+      "requires_safe_idle": true,
+      "human_approval_required": true,
+      "description": "Supervised physical-device execution with operator, hardware, provider, and safe-idle evidence."
+    }
+  ]
+}

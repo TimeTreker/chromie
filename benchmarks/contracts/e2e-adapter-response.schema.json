@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/e2e-adapter-response-v1.json",
+  "title": "Chromie E2E Adapter Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "correlation_id",
+    "execution_state",
+    "execution_claims",
+    "timing",
+    "evidence",
+    "observation"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "scenario_id": {"type": "string", "minLength": 1},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "execution_state": {"enum": ["completed", "failed", "partial"]},
+    "execution_claims": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "timing": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}},
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+    "artifacts": {"type": "array", "items": {"type": "string"}},
+    "observation": {"type": "object"}
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source", "correlation_id", "status"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "source": {"type": "string", "minLength": 1},
+        "correlation_id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["observed", "succeeded", "complete", "partial", "failed", "unavailable"]},
+        "detail": {"type": ["string", "null"]},
+        "artifact": {"type": ["string", "null"]},
+        "timestamp_ms": {"type": ["number", "null"], "minimum": 0}
+      }
+    }
+  }
+}

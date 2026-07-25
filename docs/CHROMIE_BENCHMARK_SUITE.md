@@ -358,3 +358,22 @@ narrow deterministic operational controls already defined by the Charter.
   hygiene and duplicate removal.
 - This document owns the target benchmark architecture, taxonomy, scenario
   contract, metric model, and migration strategy.
+
+
+## 12. End-to-end evidence profiles
+
+One semantic scenario may be evaluated at multiple evidence levels without
+changing its inputs, acceptable behavior region, invariants, or review rubric.
+The evidence profile controls only transport, required evidence, timing markers,
+supervision, embodiment claim, and the maximum claim a report may make.
+
+Maintained profiles distinguish replay, live-model, deployed text, virtual
+audio, MuJoCo simulation, and supervised physical execution. Correlated evidence
+is retained incrementally so timeout or late failure preserves partial diagnostic
+evidence. Partial evidence never upgrades a failed run or a lower evidence level.
+
+Automatic reports remain `release_qualified=false`. Physical execution requires
+operator metadata, hardware identity, provider execution, safe-idle evidence,
+and human approval. Timing reports measure auxiliary behavior relative to speech
+and primary execution but do not prescribe gesture frequency or scheduling. See
+[End-to-End Benchmark Execution](E2E_BENCHMARK_EXECUTION.md).

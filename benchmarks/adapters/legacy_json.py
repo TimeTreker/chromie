@@ -115,6 +115,12 @@ def _extract_inputs(item: Mapping[str, Any]) -> dict[str, Any]:
     for key in INPUT_KEYS[1:]:
         if key in item:
             return _as_mapping(item[key], fallback_key=key)
+    fixture_keys = (
+        "semantic_args", "provider_backend", "skill_id", "timing",
+        "request_payload", "response_payload", "fixture",
+    )
+    if any(key in item for key in fixture_keys):
+        return {"fixture": dict(item)}
     raise ContractError("legacy scenario has no recognizable input field")
 
 
@@ -133,6 +139,20 @@ def _extract_legacy_expectations(item: Mapping[str, Any]) -> dict[str, Any]:
     for key in EXPECTATION_KEYS:
         if key in item:
             result[key] = item[key]
+    turns = item.get("turns")
+    if isinstance(turns, list):
+        turn_expectations: list[dict[str, Any]] = []
+        for index, turn in enumerate(turns):
+            if not isinstance(turn, Mapping) or "expect" not in turn:
+                continue
+            turn_expectations.append(
+                {
+                    "turn_id": turn.get("id", index),
+                    "expect": turn["expect"],
+                }
+            )
+        if turn_expectations:
+            result["turn_expectations"] = turn_expectations
     return result
 
 
@@ -141,6 +161,9 @@ class LegacyJsonAdapter:
 
     def normalize(self, payload: Any, context: AdapterContext) -> list[NormalizedScenario]:
         normalized: list[NormalizedScenario] = []
+        inherited_invariants: list[str] = []
+        if isinstance(payload, Mapping):
+            inherited_invariants = _as_strings(_first(payload, INVARIANT_KEYS))
         for index, raw_item in _items(payload):
             if not isinstance(raw_item, Mapping):
                 raise ContractError(
@@ -151,7 +174,7 @@ class LegacyJsonAdapter:
             primary = _as_strings(_first(item, PRIMARY_KEYS))
             auxiliary = _as_strings(_first(item, AUXILIARY_KEYS))
             forbidden = _as_strings(_first(item, FORBIDDEN_KEYS))
-            invariants = _as_strings(_first(item, INVARIANT_KEYS))
+            invariants = _as_strings(_first(item, INVARIANT_KEYS)) or list(inherited_invariants)
             distribution = _as_strings(_first(item, DISTRIBUTION_KEYS))
             legacy = _extract_legacy_expectations(item)
             if not primary and not invariants and legacy:

@@ -8,6 +8,12 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### End-to-end Benchmark execution and evidence profiles
+
+- Added six explicit E2E evidence profiles spanning replay, live model, deployed text, virtual audio, MuJoCo simulation, and supervised physical execution without changing semantic scenario contracts.
+- Added correlated evidence, execution-claim ceilings, timing observations, partial-evidence retention across timeout/failure, and fail-closed qualification summaries.
+- Kept automatic reports non-release-qualified and required human approval for final qualification; no production Runtime behavior or scenario-specific policy was added.
+
 ### Comprehensive Social Attention benchmark dataset
 
 - Added 128 reviewed Social Attention cases across 16 cohorts covering everyday interaction, tools, explicit robot actions, multi-turn context, interruption, empathy, style, user preferences, repetition/cooldown, policy modes, safety conflicts, bilingual input, ASR ambiguity, and historical regressions.

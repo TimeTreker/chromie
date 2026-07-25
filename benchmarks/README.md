@@ -209,3 +209,34 @@ Generate its deterministic coverage report with:
 ```bash
 python -m benchmarks.datasets.social_attention.validate
 ```
+
+
+## End-to-end evidence profiles
+
+`e2e/` runs the same normalized semantic scenario under an explicit evidence
+profile. The maintained profiles distinguish replay, model-only, deployed text,
+virtual audio, MuJoCo simulation, and supervised physical execution. Each
+profile defines its allowed execution claims, required correlated evidence,
+timing markers, supervision, safe-idle requirements, and human-approval status.
+
+Validate the profile manifest with:
+
+```bash
+python -m benchmarks.e2e.validate --check
+```
+
+Run a cohort with:
+
+```bash
+python -m benchmarks.e2e.run \
+  --normalized benchmarks/reports/normalized_scenarios.json \
+  --profile live_service_text \
+  --command "python scripts/my_e2e_adapter.py" \
+  --dataset social_attention
+```
+
+Command adapters write correlated evidence incrementally. Timeout, process
+failure, or malformed final output retains available partial evidence and
+artifacts instead of hanging or silently discarding the trace. Automatic
+reports never claim final release qualification. See
+[`docs/E2E_BENCHMARK_EXECUTION.md`](../docs/E2E_BENCHMARK_EXECUTION.md).

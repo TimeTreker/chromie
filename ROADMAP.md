@@ -48,9 +48,19 @@ Completed Social Attention dataset milestone:
 - dataset validation, common-contract normalization, inventory, and focused tests
   run through the CI-safe Benchmark entrypoint.
 
-Next active milestone: Phase 5 end-to-end execution and evidence profiles. Reuse
-the same semantic scenarios across replay, live-model, live-service, simulator,
-and later physical evidence without adding runtime quotas or fixed behavior rules.
+Completed end-to-end execution and evidence-profile milestone:
+
+- the same normalized semantic case runs unchanged across replay, model-only,
+  deployed text, virtual audio, MuJoCo simulation, and supervised physical profiles;
+- profiles cap execution claims and require correlated evidence, timing markers,
+  supervision, safe-idle evidence, and human approval as appropriate;
+- timeout and adapter failure retain partial evidence and artifacts without
+  promoting incomplete evidence;
+- automatic qualification reports remain explicitly non-release-qualified.
+
+Next active milestone: Phase 6 stress and behavior-distribution evaluation. Add
+repeated-session, concurrency, interruption, timeout, and degraded-provider runs
+with explicit sample sizes and conditions, without introducing runtime quotas.
 
 ## Planning model
 
