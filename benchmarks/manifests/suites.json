@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "1.0",
+  "allowed_datasets": [
+    "adapter", "asr_noise", "bilingual", "cognitive_turn_loop",
+    "daily_conversation", "dialogue", "emotion", "general_ability",
+    "goal_driven_runtime", "historical_regression", "interaction",
+    "interruptions", "multi_turn", "question_answering", "repetition",
+    "report_only", "robot_actions", "router", "router_dialogue", "safety",
+    "social_attention", "style_matrix", "tool_use", "user_preferences",
+    "voice_acceptance"
+  ],
+  "sources": [
+    {"name": "router", "path": "scenarios/router", "glob": "**/*.json", "layer": "module", "datasets": ["router"], "evidence_levels": ["static"]},
+    {"name": "cognitive_turn_loop", "path": "scenarios/cognitive_turn_loop", "glob": "**/*.json", "layer": "integration", "datasets": ["cognitive_turn_loop"], "evidence_levels": ["replay"]},
+    {"name": "cognitive_runtime", "path": "scenarios/cognitive_runtime", "glob": "**/*.json", "layer": "integration", "datasets": ["goal_driven_runtime"], "evidence_levels": ["replay"]},
+    {"name": "interaction", "path": "scenarios/interaction", "glob": "**/*.json", "layer": "integration", "datasets": ["interaction"], "evidence_levels": ["replay"]},
+    {"name": "dialogue", "path": "scenarios/dialogue", "glob": "**/*.json", "layer": "integration", "datasets": ["dialogue", "multi_turn"], "evidence_levels": ["replay"]},
+    {"name": "router_dialogue", "path": "scenarios/router_dialogue", "glob": "**/*.json", "layer": "integration", "datasets": ["router_dialogue", "multi_turn"], "evidence_levels": ["replay"]},
+    {"name": "adapter", "path": "scenarios/adapter", "glob": "**/*.json", "layer": "regression", "datasets": ["adapter", "historical_regression"], "evidence_levels": ["static"]},
+    {"name": "test_scenarios", "path": "tests/scenarios", "glob": "**/*.json", "layer": "regression", "datasets": ["historical_regression"], "evidence_levels": ["static"]},
+    {"name": "general_ability", "path": "scripts/general_ability_acceptance.py", "kind": "acceptance_entrypoint", "layer": "e2e", "datasets": ["general_ability"], "evidence_levels": ["live_service"]},
+    {"name": "m13_voice", "path": "scripts/m13_voice_acceptance.py", "kind": "acceptance_entrypoint", "layer": "e2e", "datasets": ["voice_acceptance"], "evidence_levels": ["live_service", "simulated"], "optional": true}
+  ]
+}
