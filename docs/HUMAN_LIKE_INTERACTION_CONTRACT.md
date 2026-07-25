@@ -1,7 +1,7 @@
 # Human-Like Interaction Contract
 
 This document is mandatory guidance for humans and coding agents changing
-Chromie's ASR, Cognitive Gateway, compatibility Router, Goal-Driven Cognitive
+Chromie's ASR, Cognitive Gateway, legacy routing path, Goal-Driven Cognitive
 Core, orchestrator, agent, tool, skill, speech, safety, or test behavior.
 
 Chromie should behave like a careful, natural robot companion. It must know the
@@ -17,7 +17,7 @@ do not patch only the exact sentence that exposed the problem. First identify
 which interaction contract was violated:
 
 - Did ASR provide an uncertain hypothesis that was treated as truth?
-- Did the compatibility Router or Cognitive Core substitute a nearby capability
+- Did the legacy routing path or Cognitive Core substitute a nearby capability
   for unclear user meaning?
 - Did fast-first speech and final speech both answer the same conversational act?
 - Did an agent claim an action or tool result that had not been committed?
@@ -76,7 +76,7 @@ Classify the root cause before choosing a fix:
   over-trusted.
 - **Cognitive Gateway/ingress** - normalization, protective reflex, attention,
   or turn admission is wrong. Current traces may expose this through the
-  compatibility Router.
+  legacy routing path.
 - **Cognitive Core/goal meaning** - goal association, intent, decomposition,
   planning, affordance grounding, or outcome synthesis is wrong. During
   migration, some advisory route/intent output still originates in the Router.
@@ -138,7 +138,7 @@ Use an architecture or policy fix when any of these are true:
 
 - Multiple modules can independently speak for the same turn.
 - A downstream agent can reinterpret a Gateway admission decision or a
-  compatibility Router clarification/refusal as an action.
+  legacy routing path clarification/refusal as an action.
 - Fast-first speech is not known to the final response generator.
 - Internal markers such as `checking_only` can reach TTS.
 - ASR homophones, clipped speech, or low-information text are treated as
@@ -401,7 +401,7 @@ Before submitting a fix for a user-visible interaction problem, write down:
 
 1. What did the user actually say, and what did ASR produce?
 2. What reflex or admission decision did the Cognitive Gateway make?
-3. What advisory route/intent did the compatibility Router propose, and what
+3. What advisory route/intent did the legacy routing path propose, and what
    goal meaning did the Cognitive Core resolve?
 4. What uncertainty or missing argument existed?
 5. Which component first violated the human-like interaction contract?

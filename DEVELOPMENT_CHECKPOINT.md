@@ -469,7 +469,7 @@ retain source-bound live-text and MuJoCo evidence for the closed loop; verify
 cancel/stop and safe-idle behavior at the proper evidence level; then extract
 the five logical Gateway modules and compatibility `RouteDecision` derivation
 without changing the contracts. Do not start by renaming the Docker service,
-`/route`, `ROUTER_*`, or log fields, and do not widen Agent autonomy or
+`/route`, `AGENT_GOAL_INTERPRETER_*`, or log fields, and do not widen Agent autonomy or
 automatically replay physical work. The complete ingress sequence and exit
 criteria are owned by [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md), the turn
 lifecycle by [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md), and delivery
@@ -605,7 +605,7 @@ multi-goal cognitive scenarios. It predates the current PR8 authority boundary
 and is retained only as historical Level A evidence.
 
 At the current resume point, complete-goal semantics belong to the unified
-Fast/Deep pipeline. Unresolved effectful Router output preserves the original
+Fast/Deep pipeline. Unresolved effectful Cognitive Core interpretation output preserves the original
 utterance for that planner; it does not normally invoke CapabilityAgent.
 Standalone PR2-PR6 observers are off. The old planner may run only as an
 explicit emergency path with both service gates and a non-empty matching-turn

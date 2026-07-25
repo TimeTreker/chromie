@@ -212,9 +212,9 @@ has not started is cancelled when the final response wins the race.
 These cues are intentionally generic low-commitment states such as “One
 moment” or “我先确认一下”. They are presentation mappings after semantic routing,
 not phrase-based intent decisions, and they never claim a tool result, memory
-commit, physical execution, or completion. The older Router-generated dynamic
+commit, physical execution, or completion. The older Core-generated dynamic
 `fast_speech`/`speak_first` path is retained for wire compatibility but is
-default-off behind `ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED=0`. Bare strings
+default-off behind `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED=0`. Bare strings
 and partial FastSpeech objects are parseable but not playable. An operator who
 enables the gate still gets immediate audio only from a structured object with
 an allowed `purpose`, a non-terminal `commitment`,
@@ -222,7 +222,7 @@ an allowed `purpose`, a non-terminal `commitment`,
 guard. `ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED=0` independently keeps tool-route
 fast-first scheduling off. Startup-cached cues and host-validated
 `metadata.response_plan` immediate speech remain available without enabling
-Router-generated dynamic wording.
+Core-generated dynamic wording.
 
 Manual development start:
 

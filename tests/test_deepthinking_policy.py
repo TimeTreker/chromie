@@ -209,7 +209,7 @@ class DeepThinkingDelegationPolicyTest(unittest.TestCase):
                         "status": "semantic_planning_required",
                     }
                 ],
-                "router_semantic_handoff": {
+                "core_semantic_handoff": {
                     "status": "planner_required",
                     "authority": "advisory",
                 },

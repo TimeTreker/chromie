@@ -436,21 +436,21 @@ def check_configuration_reference(errors: list[str]) -> None:
                 "from .env.common"
             )
     try:
-        router_base_ms = int(values["ROUTER_TIMEOUT_MS"])
-        router_llm_ms = int(values.get("ROUTER_LLM_TIMEOUT_MS", str(router_base_ms)))
+        router_base_ms = int(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"])
+        router_llm_ms = int(values.get("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", str(router_base_ms)))
         router_review_ms = int(
-            values.get("ROUTER_REVIEW_TIMEOUT_MS", values.get("ROUTER_LLM_TIMEOUT_MS", str(router_base_ms)))
+            values.get("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS", values.get("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", str(router_base_ms)))
         )
         router_internal_ms = router_llm_ms + router_review_ms
         router_host_ms = int(values["ORCH_AGENT_TIMEOUT_MS"])
     except (KeyError, ValueError) as exc:
         errors.append(f".env.common has invalid Router timeout configuration: {exc}")
     else:
-        catalog_ms = int(values.get("ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS", "0"))
+        catalog_ms = int(values.get("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS", "0"))
         if router_host_ms <= router_internal_ms + catalog_ms:
             errors.append(
-                "ORCH_AGENT_TIMEOUT_MS must exceed ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS "
-                "plus ROUTER_LLM_TIMEOUT_MS and ROUTER_REVIEW_TIMEOUT_MS, so the Router "
+                "ORCH_AGENT_TIMEOUT_MS must exceed AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS "
+                "plus AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS and AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS, so the Router "
                 "can finish or report its own timeout first"
             )
 

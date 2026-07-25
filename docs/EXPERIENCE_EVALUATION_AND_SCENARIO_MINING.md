@@ -289,7 +289,7 @@ Promotion flow:
 2. Developer or owner reviews the candidate and edits deterministic
    expectations.
 3. Candidate is copied into `scenarios/dialogue`, `scenarios/interaction`, or
-   `scenarios/router`.
+   `scenarios/goal_interpretation`.
 4. `python scripts/scenario_author.py validate-all` and the relevant scenario
    runner gate must pass.
 5. The promoted scenario is committed with the code or prompt fix.

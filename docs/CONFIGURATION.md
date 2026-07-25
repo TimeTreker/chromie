@@ -82,7 +82,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured responses. Unified cognitive `apply` requires this; the compatibility `/interaction` surface remains available for explicit diagnostics. |
 | `ORCH_ENABLE_SORIDORMI_SKILLS` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Enable immediate-response policy for slow tool, planning, memory, and embodied turns. |
-| `ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED` | `0` | Compatibility gate for Router-authored dynamic `fast_speech`/`speak_first`. Bare strings and partial objects remain parseable on the wire but are never playable by themselves. When enabled, immediate audio still requires a structured `fast_speech` object with an allowed `purpose`, a non-terminal `commitment`, `must_not_claim_completion=true`, and safe text. Startup-cached cues and host-validated `metadata.response_plan` speech do not depend on this gate. |
+| `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED` | `0` | Compatibility gate for Core-authored dynamic `fast_speech`/`speak_first`. Bare strings and partial objects remain parseable on the wire but are never playable by themselves. When enabled, immediate audio still requires a structured `fast_speech` object with an allowed `purpose`, a non-terminal `commitment`, `must_not_claim_completion=true`, and safe text. Startup-cached cues and host-validated `metadata.response_plan` speech do not depend on this gate. |
 | `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Use startup-primed in-memory PCM acknowledgements instead of a realtime generative-TTS request. |
 | `ORCH_FAST_FIRST_AUDIO_HEDGE_MS` | `750` | Wait this long after Agent/tool work starts; suppress the acknowledgement when the final response becomes ready first. |
 | `ORCH_FAST_FIRST_AUDIO_CACHE_DIR` | `.chromie/cache/fast-first-audio` | Ignored local WAV cache for speaker-specific English and Chinese acknowledgement cues. |
@@ -95,7 +95,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_FAST_FIRST_AUDIO_CACHE_REVISION` | empty | Optional operator invalidation salt. Cache keys already include the TTS endpoint, provider/model declaration, speaker ID, and reported speaker revision. |
 | `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to the Router. Only high-confidence semantic `not_addressed`/`ambient_speech` decisions may use model route `ignore`; stop/cancel and unusable audio remain deterministic. |
 | `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; ignored ambient turns do not. |
-| `ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED` | `0` | Legacy opt-in for tool-route fast-first scheduling. Router-authored dynamic wording also requires `ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED=1` and the full structured FastSpeech contract. Cached fast-first audio is independent of both settings. |
+| `ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED` | `0` | Legacy opt-in for tool-route fast-first scheduling. Core-authored dynamic wording also requires `ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED=1` and the full structured FastSpeech contract. Cached fast-first audio is independent of both settings. |
 | `ORCH_TTS_CJK_CHUNK_CHARS` | `36` | Smaller chunk target for CJK speech so long Chinese weather/status responses can begin playback while later chunks are still synthesized. |
 | `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
@@ -190,7 +190,7 @@ generated prompts must use a specific speaker.
 | `ASR_URL` | `ws://127.0.0.1:9001` |
 | `TTS_URL` | `ws://127.0.0.1:5000` |
 | `LLM_URL` | `http://127.0.0.1:11434/api/generate` |
-| `ROUTER_URL` | `http://127.0.0.1:8091` |
+| `AGENT_GOAL_INTERPRETER_URL` | `http://127.0.0.1:8091` |
 | `AGENT_URL` | `http://127.0.0.1:8092` |
 | `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
 | `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
@@ -204,32 +204,32 @@ configuration.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ROUTER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
-| `ROUTER_USE_LLM` | `1`; selects `hybrid` when `ROUTER_MODE` is absent. This uses the fast Router model for semantic routing while the emergency filter remains deterministic. |
-| `ROUTER_MODEL` | `qwen3:4b` in common configuration. |
-| `ROUTER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; used only when an optional review path is enabled. |
-| `ROUTER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
-| `ROUTER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the quick semantic Router budget for legacy/default readers. |
-| `ROUTER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast quick-router model path. |
-| `ROUTER_LLM_NUM_CTX` | `4096`; explicit Router context budget. This prevents the approximately 10k-character quick prompt and common ability menu from being silently truncated by Ollama's smaller global context default. |
-| `ROUTER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for the fast quick-router model. This fits legitimate multi-action routing objects while still preventing unbounded generations from consuming the realtime route budget. |
-| `ROUTER_LLM_KEEP_ALIVE` | `24h`; sent on Router Ollama calls so the warmed routing model remains resident. |
-| `ROUTER_WARM_LLM_ON_STARTUP` | `1`; the Router service warms its primary LLM during startup so the first live turn does not pay cold model load time. |
-| `ROUTER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Router model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
-| `ROUTER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for optional review paths. Exact capability IDs are normalized without review; semantic repair uses the fast Router model, while the larger review model remains bounded and fail-safe. |
-| `ROUTER_CONFIDENCE_THRESHOLD` | `0.55`. |
-| `ROUTER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
-| `ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog snapshot or compatibility search request; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
-| `ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Router-side cache for the prompt catalog snapshot. The fast Router path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
-| `ROUTER_CAPABILITY_MATCH_LIMIT` | Compatibility search-client limit for catalog inspection/fallback surfaces; default `8`. It is not the fast Router prompt size. |
-| `ROUTER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
-| `ROUTER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables model-based semantic review/repair after malformed, contradictory, low-information, or stale quick-router outputs. |
-| `ROUTER_GENERIC_CHAT_REVIEW_ENABLED` | `1`; a content-free generic chat result such as `acknowledge` is independently rechecked against the supplied executable affordances. The deterministic trigger does not inspect user words or choose a skill. |
-| `ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED` | `0`; disables a second Router generation solely to invent a tool prelude. The full result is still spoken, and deployments may opt in after measuring a genuinely faster acknowledgement path. |
-| `ROUTER_HOST`, `ROUTER_PORT` | Container bind address and port. |
-| `ROUTER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
-| `CHROMIE_ROUTER_DEBUG_RAW` / `ROUTER_DEBUG_RAW` | `0`; when enabled, Router logs the full raw LLM JSON output after the default bounded raw-output summary. |
-| `CHROMIE_ROUTER_DEBUG_PROMPT` / `ROUTER_DEBUG_PROMPT` | `0`; when enabled, Router logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
+| `AGENT_GOAL_INTERPRETER_MODE` | Explicit `rules_only`, `hybrid`, or `llm_only`. |
+| `AGENT_GOAL_INTERPRETER_USE_LLM` | `1`; selects `hybrid` when `AGENT_GOAL_INTERPRETER_MODE` is absent. This uses the fast Router model for semantic routing while the emergency filter remains deterministic. |
+| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration. |
+| `AGENT_GOAL_INTERPRETER_REVIEW_MODEL` | `gemma4:e2b` in common configuration; used only when an optional review path is enabled. |
+| `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Router-to-Ollama base URL inside the deployment. |
+| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400` in common low-latency configuration; kept aligned with the quick semantic Router budget for legacy/default readers. |
+| `AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS` | `5400` in common configuration for the compact fast quick-router model path. |
+| `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `4096`; explicit Router context budget. This prevents the approximately 10k-character quick prompt and common ability menu from being silently truncated by Ollama's smaller global context default. |
+| `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for the fast quick-router model. This fits legitimate multi-action routing objects while still preventing unbounded generations from consuming the realtime route budget. |
+| `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; sent on Router Ollama calls so the warmed routing model remains resident. |
+| `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; the Router service warms its primary LLM during startup so the first live turn does not pay cold model load time. |
+| `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget for the Router model. The longer budget covers observed laptop-GPU cold loads without declaring a healthy warmup failed just before completion. Failure is logged and the service still starts. |
+| `AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS` | `2500` in common configuration for optional review paths. Exact capability IDs are normalized without review; semantic repair uses the fast Router model, while the larger review model remains bounded and fail-safe. |
+| `AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD` | `0.55`. |
+| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL` | Agent capability-catalog base URL; Compose default `http://chromie-agent:8092`. |
+| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS` | Router budget for one catalog snapshot or compatibility search request; common default `400`. Catalog failure falls back safely and the Agent rechecks in-process. |
+| `AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS` | `5000`; short Router-side cache for the prompt catalog snapshot. The fast Router path uses this snapshot's unlocked common entries, not per-utterance search matches, and execution is revalidated downstream. |
+| `AGENT_GOAL_INTERPRETER_CAPABILITY_MATCH_LIMIT` | Compatibility search-client limit for catalog inspection/fallback surfaces; default `8`. It is not the fast Router prompt size. |
+| `AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED` | `0` in common low-latency runtime; when enabled, after an interrupt has already been applied, the reviewer may confirm the stop or attach a corrected non-interrupt route in metadata. |
+| `AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED` | `1` in common runtime; enables model-based semantic review/repair after malformed, contradictory, low-information, or stale quick-router outputs. |
+| `AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED` | `1`; a content-free generic chat result such as `acknowledge` is independently rechecked against the supplied executable affordances. The deterministic trigger does not inspect user words or choose a skill. |
+| `AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED` | `0`; disables a second Router generation solely to invent a tool prelude. The full result is still spoken, and deployments may opt in after measuring a genuinely faster acknowledgement path. |
+| `AGENT_GOAL_INTERPRETER_HOST`, `AGENT_GOAL_INTERPRETER_PORT` | Container bind address and port. |
+| `AGENT_GOAL_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
+| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; when enabled, Router logs the full raw LLM JSON output after the default bounded raw-output summary. |
+| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; when enabled, Router logs bounded system/user prompt text. Default logs only prompt hashes, sizes, feature flags, and catalog counts. |
 | `CHROMIE_CLI_COLOR` | `auto`; force Agent/Router Ollama diagnostic color with `1`, disable with `0`. Falls back to terminal detection and respects `NO_COLOR`. |
 
 Hard interrupt, stop, silence, and unusable-audio rules always run before model
@@ -384,7 +384,7 @@ non-speaking ambient `ignore`, while failure or uncertainty preserves the
 original route. The optional post-interrupt review runs only after
 that interrupt is already applied, so it cannot delay cancellation; it may only
 confirm the stop or attach a corrected follow-up route. The quick intent stage
-uses catalog-bounded LLM routing when `ROUTER_MODE` is `hybrid` or `llm_only`.
+uses catalog-bounded LLM routing when `AGENT_GOAL_INTERPRETER_MODE` is `hybrid` or `llm_only`.
 The deep-thought stage is reached when quick intent returns low confidence or
 explicitly chooses `deep_thought`; it is handled by the Agent deepthinking
 module, not by the fast Router model. Soft deterministic validators may correct
@@ -555,7 +555,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_ROUTER_TIMEOUT_MS` | `9000` in common low-latency configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
+| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration. It must exceed the Router catalog lookup plus quick-LLM and review timeout budget so the Router can finish or report its own timeout before the host falls back. |
 | `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. Hardware profiles set this value. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |

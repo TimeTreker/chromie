@@ -30,7 +30,7 @@ def test_common_contract_keeps_behavior_regions_separate() -> None:
 def test_legacy_list_preserves_declared_id_and_expectation() -> None:
     cases = normalize_payload(
         [{"scenario_id": "router.weather.zh", "user_text": "重庆天气如何？", "expected_route": "tool"}],
-        source_path="scenarios/router/weather.json",
+        source_path="scenarios/goal_interpretation/weather.json",
         layer="module",
         datasets=["router", "tool_use"],
         evidence_requirements=["replay"],
@@ -61,13 +61,13 @@ def test_legacy_container_and_single_case_are_supported() -> None:
 def test_stable_derived_id_does_not_depend_on_key_order() -> None:
     first = normalize_payload(
         {"input": "hello", "expected": "chat"},
-        source_path="scenarios/router/anonymous.json",
+        source_path="scenarios/goal_interpretation/anonymous.json",
         layer="module",
         datasets=["router"],
     )[0]["id"]
     second = normalize_payload(
         {"expected": "chat", "input": "hello"},
-        source_path="scenarios/router/anonymous.json",
+        source_path="scenarios/goal_interpretation/anonymous.json",
         layer="module",
         datasets=["router"],
     )[0]["id"]

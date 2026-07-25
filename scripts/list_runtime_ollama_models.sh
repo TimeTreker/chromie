@@ -30,12 +30,12 @@ append_model() {
   models+=("$model")
 }
 
-if is_enabled "${ROUTER_USE_LLM:-0}"; then
+if is_enabled "${AGENT_GOAL_INTERPRETER_USE_LLM:-0}"; then
   append_model "${AGENT_GOAL_INTERPRETER_MODEL:-}"
   if [ -n "${AGENT_GOAL_INTERPRETER_REVIEW_MODEL:-}" ] && {
-    is_enabled "${ROUTER_POST_INTERRUPT_REVIEW_ENABLED:-0}" ||
-      is_enabled "${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-1}" ||
-      is_enabled "${ROUTER_GENERIC_CHAT_REVIEW_ENABLED:-1}"
+    is_enabled "${AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED:-0}" ||
+      is_enabled "${AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED:-1}" ||
+      is_enabled "${AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED:-1}"
   }; then
     append_model "$AGENT_GOAL_INTERPRETER_REVIEW_MODEL"
   fi

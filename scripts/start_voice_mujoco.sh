@@ -169,7 +169,7 @@ CHROMIE_PID=$!
 echo "$CHROMIE_PID" > "$CHROMIE_PID_FILE"
 
 wait_for_tcp 127.0.0.1 8092 420 "Chromie Agent"
-wait_for_tcp 127.0.0.1 8091 420 "Chromie Router"
+wait_for_tcp 127.0.0.1 8091 420 "Chromie Goal Interpreter"
 wait_for_tcp 127.0.0.1 9001 420 "Chromie ASR"
 wait_for_tcp 127.0.0.1 5000 420 "Chromie TTS"
 wait_for_tcp 127.0.0.1 11434 420 "Chromie Ollama"

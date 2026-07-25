@@ -31,7 +31,7 @@ files=(
   router/app/main.py
   router/app/schema.py
   router/app/rules.py
-  router/app/llm_router.py
+  router/app/goal_interpreter.py
   router/app/fallback.py
   router/app/prompts/router_system.txt
 

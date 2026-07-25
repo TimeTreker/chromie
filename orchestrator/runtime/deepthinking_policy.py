@@ -229,7 +229,7 @@ class DeepThinkingDelegationPolicy:
         if decision.intent == "semantic_capability_planning":
             return True
         metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
-        for key in ("router_semantic_handoff", "quick_router_action_handoff"):
+        for key in ("core_semantic_handoff", "quick_router_action_handoff"):
             handoff = metadata.get(key)
             if not isinstance(handoff, Mapping):
                 continue

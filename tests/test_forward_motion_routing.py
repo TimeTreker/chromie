@@ -59,7 +59,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -73,7 +73,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="你往前走个15秒。", language="zh-CN"))
 
         self.assertEqual(decision.source, "llm")
@@ -112,7 +112,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -125,7 +125,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="你往前走个15秒。"))
 
         self.assertEqual(decision.route, "robot_action")

@@ -135,7 +135,7 @@ supervised physical-device runs must not be reported as equivalent evidence.
 
 The legacy `Router` service name and wire contract remain compatibility details
 during migration. They are not a substitute name for Cognitive Gateway. Existing
-`scenarios/router/` and `scenarios/router_dialogue/` assets are retained as
+`scenarios/goal_interpretation/` and `scenarios/cognitive_core_dialogue/` assets are retained as
 compatibility regressions so historical evidence is not lost. New benchmark
 architecture must name the actual boundary under evaluation: Cognitive Gateway
 for ingress/admission, or Goal-Driven Cognitive Core for semantic goal reasoning
@@ -311,12 +311,12 @@ They are indexed first, then migrated without changing their semantic IDs.
 
 | Current location | Initial benchmark classification |
 |---|---|
-| `scenarios/router/` | `modules/router` and semantic-routing datasets |
+| `scenarios/goal_interpretation/` | `modules/router` and semantic-routing datasets |
 | `scenarios/cognitive_turn_loop/` | `integration/cognitive_turn_loop` |
 | `scenarios/cognitive_runtime/` | `integration/goal_driven_runtime` |
 | `scenarios/interaction/` | `integration/interaction` and selected `e2e/text` |
 | `scenarios/dialogue/` | `integration/multi_turn` |
-| `scenarios/router_dialogue/` | `integration/router_dialogue` |
+| `scenarios/cognitive_core_dialogue/` | `integration/router_dialogue` |
 | `scenarios/adapter/` | contract/compatibility regression |
 | `tests/scenarios/` | module, integration, or historical-regression datasets according to behavior |
 | `scripts/general_ability_acceptance.py` manifests | E2E ability cohorts and evidence qualification |

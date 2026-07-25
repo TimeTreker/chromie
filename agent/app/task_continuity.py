@@ -175,7 +175,7 @@ class TaskContinuityResolver:
             "Return create, modify, clarification_answer, confirm, reject, cancel, pause, resume, query_status, correct, or replace operations only when semantically justified.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
-            f"Router output is advisory JSON: {self._bounded_json(route_summary, max_chars=2600)}\n\n"
+            f"Cognitive Core interpretation output is advisory JSON: {self._bounded_json(route_summary, max_chars=2600)}\n\n"
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks. Preserve the user's intended outcome before preserving an old plan. "
             "Meaning and bounded context before lexical overlap. Clarify before attaching a change to the wrong task. "
@@ -196,7 +196,7 @@ class TaskContinuityResolver:
             "You are Chromie's semantic Task Continuity Agent. "
             "Understand task relationships from meaning, conversation context, open semantic goals, unresolved information gaps, and task lifecycle. "
             "Do not decide normal association through keywords, phrase tables, regexes, entity overlap, or recency alone. "
-            "Retrieval and Router output are advisory context only. "
+            "Retrieval and Cognitive Core interpretation output are advisory context only. "
             "Never execute, authorize, or claim a task update was applied. Return JSON only."
         )
 

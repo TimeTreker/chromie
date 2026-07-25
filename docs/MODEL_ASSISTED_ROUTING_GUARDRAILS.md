@@ -109,7 +109,7 @@ physical action or tool side effect has already happened.
 
 Operational interrupts are the other first-safe action: the emergency filter may
 cancel current output or motion immediately. If
-`ROUTER_POST_INTERRUPT_REVIEW_ENABLED=1`, a slower semantic reviewer can confirm
+`AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED=1`, a slower semantic reviewer can confirm
 that stop interpretation or attach a corrected non-interrupt follow-up route.
 That correction may apologize for mishearing and continue through normal
 validation, but it must not automatically resume interrupted physical work.
@@ -157,7 +157,7 @@ validation, but it must not automatically resume interrupted physical work.
    and MCP calls must be validated after model output is produced.
 5. Runtime registries remain authoritative.
    The Agent capability registry and host Skill Registry must resolve
-   capabilities again before execution. Router output alone never authorizes a
+   capabilities again before execution. Cognitive Core interpretation output alone never authorizes a
    provider call.
 6. Soridormi remains authoritative for the body.
    Chromie can request high-level goals such as `approach_target` or

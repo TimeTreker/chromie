@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from orchestrator.schemas.route import RouteDecision as OrchestratorRouteDecision
-from agent.app.cognitive_core.goal_interpreter.llm_router import OllamaLLMRouter
+from agent.app.cognitive_core.goal_interpreter.goal_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 
@@ -31,7 +31,7 @@ class FastSpeechStringCompatibilityTests(unittest.TestCase):
         self.assertEqual(decision.routes[0].fast_speech.text, "好的，我查一下重庆今天的天气。")
 
     def test_router_decision_from_response_preserves_weather_review_with_fast_speech_string(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,

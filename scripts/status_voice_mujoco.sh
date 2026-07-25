@@ -49,7 +49,7 @@ check_tcp "Soridormi MuJoCo" 127.0.0.1 "$SIM_PORT"
 check_tcp "Soridormi MCP" 127.0.0.1 "$MCP_PORT"
 check_tcp "Chromie ASR" 127.0.0.1 9001
 check_tcp "Chromie TTS" 127.0.0.1 5000
-check_http "Chromie Router" http://127.0.0.1:8091/health
+check_http "Chromie Goal Interpreter" http://127.0.0.1:8091/health
 check_http "Chromie Agent" http://127.0.0.1:8092/health
 check_http "Chromie Ollama" http://127.0.0.1:11434/api/tags
 

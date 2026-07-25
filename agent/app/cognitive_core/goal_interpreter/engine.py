@@ -15,8 +15,8 @@ from pydantic import BaseModel, Field
 from .capability_catalog import CapabilityCatalogClient, CapabilityCatalogResult
 from .config import router_mode_from_env
 from .fallback import fallback_decision
-from .llm_router import (
-    OllamaLLMRouter,
+from .model_interpreter import (
+    OllamaGoalInterpreter,
     _is_placeholder_capability_intent,
     is_allowed_model_ignore,
 )
@@ -33,8 +33,8 @@ from .schema import (
 
 
 class Settings(BaseModel):
-    host: str = Field(default_factory=lambda: os.getenv("ROUTER_HOST", "0.0.0.0"))
-    port: int = Field(default_factory=lambda: int(os.getenv("ROUTER_PORT", "8091")))
+    host: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_HOST", "0.0.0.0"))
+    port: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_PORT", "8091")))
     mode: Literal["rules_only", "llm_only", "hybrid"] = Field(
         default_factory=router_mode_from_env
     )
@@ -42,70 +42,70 @@ class Settings(BaseModel):
     # safety invariant, not a deployment switch. Keep the health field for
     # compatibility while making its effective value unambiguous.
     rules_first: bool = True
-    ollama_url: str = Field(default_factory=lambda: os.getenv("ROUTER_OLLAMA_URL", "http://chromie-llm:11434"))
-    model: str = Field(default_factory=lambda: os.getenv("ROUTER_MODEL", "qwen3:4b"))
-    review_model: str = Field(default_factory=lambda: os.getenv("ROUTER_REVIEW_MODEL", "gemma4:e2b"))
-    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_TIMEOUT_MS", "5400")))
-    llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_TIMEOUT_MS", os.getenv("ROUTER_TIMEOUT_MS", "5400"))))
+    ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
+    model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"))
+    review_model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", "gemma4:e2b"))
+    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400")))
+    llm_timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS", os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400"))))
     llm_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_CTX", "4096")),
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX", "4096")),
         ge=2048,
         le=131072,
     )
-    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("ROUTER_LLM_NUM_PREDICT", "512")))
+    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT", "512")))
     llm_keep_alive: str = Field(
         default_factory=lambda: os.getenv(
-            "ROUTER_LLM_KEEP_ALIVE",
+            "AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE",
             os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
         )
     )
     warm_llm_on_startup: bool = Field(
-        default_factory=lambda: os.getenv("ROUTER_WARM_LLM_ON_STARTUP", "1").strip().lower()
+        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     warm_llm_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("ROUTER_WARM_LLM_TIMEOUT_MS", "60000"))
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS", "60000"))
     )
     review_timeout_ms: int = Field(
         default_factory=lambda: int(
-            os.getenv("ROUTER_REVIEW_TIMEOUT_MS", "2500")
+            os.getenv("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS", "2500")
         )
     )
     confidence_threshold: float = Field(
-        default_factory=lambda: float(os.getenv("ROUTER_CONFIDENCE_THRESHOLD", "0.55"))
+        default_factory=lambda: float(os.getenv("AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD", "0.55"))
     )
     capability_catalog_url: str = Field(
         default_factory=lambda: os.getenv(
-            "ROUTER_CAPABILITY_CATALOG_URL",
+            "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_URL",
             "http://chromie-agent:8092",
         )
     )
     capability_catalog_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS", "400"))
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS", "400"))
     )
     capability_catalog_cache_ttl_ms: int = Field(
-        default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS", "5000"))
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS", "5000"))
     )
     capability_match_limit: int = Field(
-        default_factory=lambda: int(os.getenv("ROUTER_CAPABILITY_MATCH_LIMIT", "8"))
+        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_CAPABILITY_MATCH_LIMIT", "8"))
     )
     post_interrupt_review_enabled: bool = Field(
-        default_factory=lambda: os.getenv("ROUTER_POST_INTERRUPT_REVIEW_ENABLED", "0").strip().lower()
+        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     slow_review_recovery_enabled: bool = Field(
-        default_factory=lambda: os.getenv("ROUTER_SLOW_REVIEW_RECOVERY_ENABLED", "1").strip().lower()
+        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     generic_chat_review_enabled: bool = Field(
-        default_factory=lambda: os.getenv("ROUTER_GENERIC_CHAT_REVIEW_ENABLED", "1").strip().lower()
+        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     tool_fast_speech_repair_enabled: bool = Field(
-        default_factory=lambda: os.getenv("ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED", "0").strip().lower()
+        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED", "0").strip().lower()
         not in {"0", "false", "no", "off"}
     )
-    log_level: str = Field(default_factory=lambda: os.getenv("ROUTER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
+    log_level: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
 
 
 settings = Settings()
@@ -143,7 +143,7 @@ async def warm_capability_catalog_snapshot() -> None:
         and settings.warm_llm_on_startup
     ):
         try:
-            await llm_router.warm_model(
+            await goal_interpreter.warm_model(
                 timeout_s=max(0.1, settings.warm_llm_timeout_ms / 1000.0)
             )
         except Exception as exc:
@@ -161,7 +161,7 @@ async def warm_capability_catalog_snapshot() -> None:
             )
 
 
-llm_router = OllamaLLMRouter(
+goal_interpreter = OllamaGoalInterpreter(
     ollama_url=settings.ollama_url,
     model=settings.model,
     review_model=settings.review_model,
@@ -479,7 +479,7 @@ def _missing_capability_decision(
                     "user_text": request.text,
                     "reason": reason,
                 },
-                "router_semantic_handoff": {
+                "core_semantic_handoff": {
                     "status": "planner_required",
                     "authority": "advisory",
                     "must_not_execute_partial_route": True,
@@ -1438,7 +1438,7 @@ async def _review_priority_interrupt(
     interrupt_decision.candidate_capabilities = list(prompt_capabilities_common)
 
     try:
-        advisory = await llm_router.review_after_priority_interrupt(
+        advisory = await goal_interpreter.review_after_priority_interrupt(
             request,
             interrupt_decision,
         )
@@ -1554,7 +1554,7 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
         )
 
         if settings.mode in ("llm_only", "hybrid"):
-            llm_decision = await llm_router.route(request)
+            llm_decision = await goal_interpreter.route(request)
             if llm_decision.source == "llm":
                 if _is_isolated_hearing_fragment(request):
                     decision = _clarify_insufficient_information_decision(
@@ -1604,7 +1604,7 @@ async def interpret_turn(request: RouteRequest) -> RouteDecision:
                         request,
                         llm_decision,
                         reason=(
-                            "llm_router_unavailable_low_information_fragment: "
+                            "goal_interpreter_unavailable_low_information_fragment: "
                             f"{llm_decision.reason or 'no_llm_route'}"
                         ),
                         source="fallback",

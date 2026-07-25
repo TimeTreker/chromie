@@ -31,7 +31,7 @@ class EpisodeRecorderTests(unittest.TestCase):
                         "intent": "general_conversation",
                         "route_source": "llm",
                         "route_confidence": 0.95,
-                        "router_latency_ms": 120.0,
+                        "core_interpretation_latency_ms": 120.0,
                         "agent_latency_ms": 300.0,
                     }
                 },
@@ -53,7 +53,7 @@ class EpisodeRecorderTests(unittest.TestCase):
                         "intent": "capability:soridormi.walk_forward",
                         "route_source": "llm",
                         "route_confidence": 0.95,
-                        "router_latency_ms": 456.0,
+                        "core_interpretation_latency_ms": 456.0,
                         "agent_latency_ms": 987.0,
                     }
                 },

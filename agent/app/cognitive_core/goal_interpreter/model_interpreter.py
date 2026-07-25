@@ -123,7 +123,7 @@ def is_disallowed_model_control_route(
         and not is_allowed_model_ignore(request, decision)
     )
 
-_ROUTER_CONTEXT_OMIT_KEYS = {
+_AGENT_GOAL_INTERPRETER_CONTEXT_OMIT_KEYS = {
     "candidate_capabilities",
     "common_ability_catalog",
     "common_ability_ids",
@@ -746,7 +746,7 @@ def _context_without_prompt_globals(context: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in (context or {}).items()
-        if key not in _ROUTER_CONTEXT_OMIT_KEYS
+        if key not in _AGENT_GOAL_INTERPRETER_CONTEXT_OMIT_KEYS
     }
 
 
@@ -930,7 +930,7 @@ def _is_placeholder_capability_intent(intent: str) -> bool:
     return (intent or "").strip().lower() in PLACEHOLDER_CAPABILITY_INTENTS
 
 
-class OllamaLLMRouter:
+class OllamaGoalInterpreter:
     def __init__(
         self,
         *,
@@ -964,8 +964,8 @@ class OllamaLLMRouter:
         self.num_predict = max(32, num_predict)
         self.keep_alive = (keep_alive or "").strip() or None
         self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "router_system.txt"
-        self.debug_raw_output = _env_flag("CHROMIE_ROUTER_DEBUG_RAW") or _env_flag("ROUTER_DEBUG_RAW")
-        self.debug_prompt = _env_flag("CHROMIE_ROUTER_DEBUG_PROMPT") or _env_flag("ROUTER_DEBUG_PROMPT")
+        self.debug_raw_output = _env_flag("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW") or _env_flag("AGENT_GOAL_INTERPRETER_DEBUG_RAW")
+        self.debug_prompt = _env_flag("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT") or _env_flag("AGENT_GOAL_INTERPRETER_DEBUG_PROMPT")
 
     def load_system_prompt(self) -> str:
         try:
@@ -1046,7 +1046,7 @@ class OllamaLLMRouter:
                     "role": "system",
                     "content": (
                         "Current Job:\n"
-                        "- You are the compatibility Router's fast-speech repairer.\n"
+                        "- You are the legacy routing path's fast-speech repairer.\n"
                         "- A previous router decision selected a route that will use a downstream Agent/Tool and needs a short immediate user-facing prelude.\n"
                         "- Generate only the missing fast_speech. Do not change route, intent, metadata, tool arguments, skills, or safety policy.\n"
                         "- The text should sound like Chromie herself: natural, warm, concise, and in the user's language when clear.\n\n"
@@ -2532,7 +2532,7 @@ class OllamaLLMRouter:
                         return reviewed_decision
             return fallback_decision(
                 request,
-                reason=f"llm_router_error:{type(exc).__name__}: {exc}",
+                reason=f"goal_interpreter_error:{type(exc).__name__}: {exc}",
             )
 
         content = ""
@@ -2547,7 +2547,7 @@ class OllamaLLMRouter:
                 logger.info("LLM router recovered with relaxed JSON response")
             except Exception as relaxed_exc:
                 logger.warning("Relaxed LLM router retry failed: %s", relaxed_exc)
-                return fallback_decision(request, reason=f"invalid_llm_router_response: {exc}")
+                return fallback_decision(request, reason=f"invalid_goal_interpreter_response: {exc}")
 
         if (
             decision.route == "deep_thought"

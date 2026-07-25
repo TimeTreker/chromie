@@ -53,7 +53,7 @@ Host Orchestrator
         -> exact plan/request/result join -> per-goal outcome reconciliation
         -> speech-only final response -> TTS -> speaker
 
-Docker: ASR, compatibility Router/Gateway backend, Agent, Ollama, TTS
+Docker: ASR, legacy routing path/Gateway backend, Agent, Ollama, TTS
 Soridormi: embodied planning, simulator/robot execution, monitoring, stop,
            emergency stop, recovery, and hardware commissioning
 ```

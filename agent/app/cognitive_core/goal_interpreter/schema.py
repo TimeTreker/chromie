@@ -52,7 +52,7 @@ class RouteRequest(BaseModel):
 
 
 class FastSpeech(BaseModel):
-    """A short Router-generated user-facing prelude for fast-first TTS.
+    """A short Core-generated user-facing prelude for fast-first TTS.
 
     This is a process acknowledgement, not an answer, tool result, memory commit,
     or physical execution claim.
@@ -186,7 +186,7 @@ class RouteDecision(BaseModel):
 
 class HealthResponse(BaseModel):
     ok: bool = True
-    service: str = "chromie-router"
+    service: str = "chromie-agent"
     mode: str
     model: str | None = None
     ollama_url: str | None = None

@@ -401,7 +401,7 @@ semantic interpretation. A protective reflex may act immediately, before model
 inference, while preserving its input and outcome for cognitive state. Admitted
 turns reach Goal Association with the original user meaning intact.
 
-In the current deployment, the compatibility Router still supplies route and
+In the current deployment, the legacy routing path still supplies route and
 intent advisories, addressedness review, and task/action proposals before this
 pipeline. They may bound rollout lanes and the source-effect envelope, but they
 do not replace Goal Association or become a second authority after Core
@@ -901,7 +901,7 @@ lifecycle.
 
 Effect authority is also monotonic within one turn. The configured cognitive
 lane allowlist says which kinds of plans the deployment can support. During the
-current migration, the compatibility Router decision supplies the turn's
+current migration, the legacy routing path decision supplies the turn's
 maximum source-effect envelope; that safety constraint is not semantic goal
 ownership. A speech-only `chat` turn cannot become `robot_action` after Goal
 Association or planning merely because both lanes are enabled. Such escalation
@@ -1441,7 +1441,7 @@ Migration rules:
 The cognitive pipeline should record, without exposing private model reasoning:
 
 - normalized input identity, protective-reflex result, and admission decision;
-- compatibility Router advisories while that service topology remains;
+- legacy routing path advisories while that service topology remains;
 - goal-association result and confidence;
 - candidate goal IDs considered;
 - goal segmentation count;

@@ -25,7 +25,7 @@ Exit criteria:
 
 - Cognitive Gateway is the first-class ingress benchmark component;
 - semantic goal interpretation and planning remain Goal-Driven Cognitive Core concerns;
-- legacy `scenarios/router/` assets are retained only as compatibility regressions;
+- legacy `scenarios/goal_interpretation/` assets are retained only as compatibility regressions;
 - manifests, examples, environment variables, tests, and reports do not present a
   generic Router as the current architecture;
 - no production Runtime behavior or compatibility wire contract changes.
@@ -254,7 +254,7 @@ capability:
 
 Chromie's settled ingress boundary is the
 [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md), not a renamed brain or a
-cosmetic rename of `chromie-router`. The Gateway owns Input Normalization,
+cosmetic rename of `chromie-agent`. The Gateway owns Input Normalization,
 Protective Reflex, Attention Review, Context Assembly, and Turn Admission. The
 Goal-Driven Cognitive Core owns goal meaning, planning, delegation, outcome
 reconciliation, and response composition.
@@ -293,7 +293,7 @@ Exit criteria before treating the Gateway/Core migration as complete:
   direct or unclear speech, and cannot authorize effects;
 - normal goal interpretation, semantic triage, affordance grounding, planning,
   execution reconciliation, and final response are owned by one Core authority;
-- `RouteDecision`, `chromie-router`, `/route`, `ROUTER_*`, and existing log
+- `RouteDecision`, `chromie-agent`, `/route`, `AGENT_GOAL_INTERPRETER_*`, and existing log
   names remain compatibility surfaces until dual-contract parity and rollback
   evidence permit deprecation;
 - focused contract tests, deterministic-safety General Ability Level A,

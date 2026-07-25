@@ -281,7 +281,7 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                     maybe_session_done,
                     assistant,
                 )
-                assistant._router_exception_safe_response = (
+                assistant._cognitive_core_exception_safe_response = (
                     lambda *args, **kwargs: None
                 )
                 assistant.session_log = lambda *args, **kwargs: None

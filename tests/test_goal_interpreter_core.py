@@ -118,7 +118,7 @@ class RouterCoreTests(unittest.TestCase):
             with self.subTest(text=text):
                 decision = fallback_decision(
                     RouteRequest(sid="fallback-semantic", text=text),
-                    reason="llm_router_error:ReadTimeout",
+                    reason="goal_interpreter_error:ReadTimeout",
                 )
 
                 self.assertEqual(decision.route, "chat")
@@ -159,9 +159,9 @@ class RouterCoreTests(unittest.TestCase):
         self.assertEqual(decision.routes[0].fast_speech.purpose, "acknowledge_and_check")
 
     def test_router_use_llm_controls_default_mode(self) -> None:
-        with patch.dict(os.environ, {"ROUTER_USE_LLM": "0"}, clear=True):
+        with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_USE_LLM": "0"}, clear=True):
             self.assertEqual(router_mode_from_env(), "rules_only")
-        with patch.dict(os.environ, {"ROUTER_USE_LLM": "1"}, clear=True):
+        with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_USE_LLM": "1"}, clear=True):
             self.assertEqual(router_mode_from_env(), "hybrid")
-        with patch.dict(os.environ, {"ROUTER_USE_LLM": "0", "ROUTER_MODE": "llm_only"}, clear=True):
+        with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_USE_LLM": "0", "AGENT_GOAL_INTERPRETER_MODE": "llm_only"}, clear=True):
             self.assertEqual(router_mode_from_env(), "llm_only")

@@ -14,13 +14,13 @@ def _write(path: Path, payload: object) -> None:
 
 
 def _repo(tmp_path: Path) -> tuple[Path, Path]:
-    _write(tmp_path / "scenarios/router/cases.json", [{"id": "route.greeting", "input": "Hello"}, {"id": "route.zh", "input": "你好"}])
+    _write(tmp_path / "scenarios/goal_interpretation/cases.json", [{"id": "route.greeting", "input": "Hello"}, {"id": "route.zh", "input": "你好"}])
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts/general_ability_acceptance.py").write_text("# entrypoint\n", encoding="utf-8")
     config = {
         "schema_version": 1, "benchmark_version": "1.0", "allowed_datasets": ["router", "general_ability"],
         "sources": [
-            {"name": "router", "path": "scenarios/router", "glob": "**/*.json", "layer": "module", "datasets": ["router"], "evidence_levels": ["static"]},
+            {"name": "router", "path": "scenarios/goal_interpretation", "glob": "**/*.json", "layer": "module", "datasets": ["router"], "evidence_levels": ["static"]},
             {"name": "general", "path": "scripts/general_ability_acceptance.py", "kind": "acceptance_entrypoint", "layer": "e2e", "datasets": ["general_ability"], "evidence_levels": ["live_service"]}
         ]
     }
@@ -40,7 +40,7 @@ def test_inventory_is_deterministic_and_classified(tmp_path: Path) -> None:
 
 def test_duplicate_ids_fail_closed(tmp_path: Path) -> None:
     root, config = _repo(tmp_path)
-    _write(root / "scenarios/router/duplicate.json", {"id": "route.greeting"})
+    _write(root / "scenarios/goal_interpretation/duplicate.json", {"id": "route.greeting"})
     with pytest.raises(InventoryError, match="duplicate scenario ID"):
         build_inventory(root, config)
 

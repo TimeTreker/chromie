@@ -563,7 +563,7 @@ class GoalAssociationResolver:
             f"{self._bounded_json(active_goals, 6500)}\n\n"
             "Recent conversation JSON:\n"
             f"{self._bounded_json((context.get('history') or request.history or [])[-6:], 2200)}\n\n"
-            "Router output is advisory JSON:\n"
+            "Cognitive Core interpretation output is advisory JSON:\n"
             f"{self._bounded_json(route_advisory, 1400)}\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.text}\n\n"
             f"FINAL ACTIVE GOAL IDS JSON:\n{self._bounded_json([item.get('goal_id') for item in active_goals], 1600)}"

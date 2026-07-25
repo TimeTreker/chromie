@@ -16,7 +16,7 @@ class RouteRequest(BaseModel):
 
 
 class FastSpeech(BaseModel):
-    """A short Router-generated user-facing prelude for fast-first TTS.
+    """A short Core-generated user-facing prelude for fast-first TTS.
 
     This is a process acknowledgement, not an answer, tool result, memory commit,
     or physical execution claim.

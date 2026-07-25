@@ -395,7 +395,7 @@ class EpisodeRecorder:
                 intent=str(context.get("intent") or "unknown"),
                 source=str(context.get("route_source") or "unknown"),
                 confidence=self._float_or_none(context.get("route_confidence")),
-                latency_ms=self._float_or_none(context.get("router_latency_ms")),
+                latency_ms=self._float_or_none(context.get("core_interpretation_latency_ms")),
             ),
             agent=EpisodeAgentRecord(
                 status=response.status,

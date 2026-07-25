@@ -119,7 +119,7 @@ class Settings(BaseModel):
     social_attention_model: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_SOCIAL_ATTENTION_MODEL",
-            os.getenv("ROUTER_MODEL", "qwen3:4b"),
+            os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"),
         )
     )
     social_attention_timeout_ms: int = Field(

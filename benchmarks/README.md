@@ -175,7 +175,7 @@ input normalization, protective reflex, attention review, context assembly, and
 turn admission. Goal interpretation, planning, capability selection, and response
 composition remain downstream in the Goal-Driven Cognitive Core.
 
-The legacy `scenarios/router/` and `scenarios/router_dialogue/` paths are retained
+The legacy `scenarios/goal_interpretation/` and `scenarios/cognitive_core_dialogue/` paths are retained
 for source compatibility and historical comparison. Inventory classifies them as
 `compatibility_router` regression datasets; their directory names do not define
 the current architecture. New benchmark component profiles must not reintroduce a

@@ -50,7 +50,7 @@ _EMPTY_BRACKETS_RE = re.compile(r"\(\s*\)|\[\s*\]|\{\s*\}")
 
 
 class FastSpeech(BaseModel):
-    """Router-authored process acknowledgement preserved across services."""
+    """Core-authored process acknowledgement preserved across services."""
 
     text: str = ""
     purpose: str | None = None
@@ -144,7 +144,7 @@ def _normalize_speech_items(items: list["SpeakItem"], max_chars: int) -> list["S
 
 
 class RouteDecision(BaseModel):
-    """Router output consumed by the agent service.
+    """Cognitive Core interpretation output consumed by the agent service.
 
     This mirrors router/app/schema.py so the agent module can run independently.
     Later this can move into shared/chromie_contracts.

@@ -24,7 +24,7 @@ profiler.
 The architecture must remain valid when Chromie adds, removes, renames, or
 reorders modules. The observability schema therefore describes generic runtime
 work and relationships. It does not contain fixed fields such as
-`router_latency_ms`, `fast_planner_latency_ms`, or `tts_latency_ms`.
+`core_interpretation_latency_ms`, `fast_planner_latency_ms`, or `tts_latency_ms`.
 
 Runtime Observability supports:
 

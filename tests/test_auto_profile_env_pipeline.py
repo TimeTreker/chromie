@@ -14,8 +14,8 @@ GENERATOR = ROOT / "scripts" / "generate_runtime_env.py"
 MODEL_KEYS = (
     "AGENT_MODEL",
     "OLLAMA_MODEL",
-    "ROUTER_MODEL",
-    "ROUTER_REVIEW_MODEL",
+    "AGENT_GOAL_INTERPRETER_MODEL",
+    "AGENT_GOAL_INTERPRETER_REVIEW_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
@@ -234,7 +234,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             root = self._minimal_root(directory)
             (root / ".env.local").write_text(
                 "CHROMIE_HARDWARE_PROFILE=rtx4090_laptop\n"
-                "ROUTER_REVIEW_MODEL=stale-router-model\n"
+                "AGENT_GOAL_INTERPRETER_REVIEW_MODEL=stale-router-model\n"
                 "AGENT_RESPONSE_REVIEW_MODEL=stale-agent-model\n"
                 "LOG_LEVEL=DEBUG\n",
                 encoding="utf-8",
@@ -253,10 +253,10 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
 
         self.assertIn("[env][warning] Ignoring .env.local values", result.stderr)
         self.assertIn("AGENT_RESPONSE_REVIEW_MODEL", result.stderr)
-        self.assertIn("ROUTER_REVIEW_MODEL", result.stderr)
+        self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", result.stderr)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
         self.assertEqual(values["CHROMIE_HARDWARE_PROFILE"], "rtx5090")
-        self.assertNotEqual(values["ROUTER_REVIEW_MODEL"], "stale-router-model")
+        self.assertNotEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_MODEL"], "stale-router-model")
         self.assertNotEqual(values["AGENT_RESPONSE_REVIEW_MODEL"], "stale-agent-model")
         self.assertEqual(values["LOG_LEVEL"], "DEBUG")
         self.assertEqual(
@@ -264,7 +264,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             [
                 "AGENT_RESPONSE_REVIEW_MODEL",
                 "CHROMIE_HARDWARE_PROFILE",
-                "ROUTER_REVIEW_MODEL",
+                "AGENT_GOAL_INTERPRETER_REVIEW_MODEL",
             ],
         )
         self.assertFalse(manifest["strict_local_conflicts"])
@@ -273,7 +273,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self._minimal_root(directory)
             (root / ".env.local").write_text(
-                "ROUTER_REVIEW_MODEL=stale-router-model\n",
+                "AGENT_GOAL_INTERPRETER_REVIEW_MODEL=stale-router-model\n",
                 encoding="utf-8",
             )
             system_info = root / "system.env"
@@ -295,7 +295,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self._minimal_root(directory)
             local_path = root / ".env.local"
-            local_path.write_text("ROUTER_REVIEW_MODEL=stale-one\n", encoding="utf-8")
+            local_path.write_text("AGENT_GOAL_INTERPRETER_REVIEW_MODEL=stale-one\n", encoding="utf-8")
             system_info = root / "system.env"
             self._system_info(
                 system_info,
@@ -307,13 +307,13 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             self._generate(root, system_info)
             first = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
-            local_path.write_text("ROUTER_REVIEW_MODEL=stale-two\n", encoding="utf-8")
+            local_path.write_text("AGENT_GOAL_INTERPRETER_REVIEW_MODEL=stale-two\n", encoding="utf-8")
             self._generate(root, system_info)
             second = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertEqual(first["fingerprint"], second["fingerprint"])
-        self.assertEqual(first["ignored_local_overrides"], ["ROUTER_REVIEW_MODEL"])
-        self.assertEqual(second["ignored_local_overrides"], ["ROUTER_REVIEW_MODEL"])
+        self.assertEqual(first["ignored_local_overrides"], ["AGENT_GOAL_INTERPRETER_REVIEW_MODEL"])
+        self.assertEqual(second["ignored_local_overrides"], ["AGENT_GOAL_INTERPRETER_REVIEW_MODEL"])
 
     def test_profile_cuda_arch_must_match_detected_hardware(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

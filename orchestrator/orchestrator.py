@@ -2330,7 +2330,7 @@ class VoiceAssistant:
         *,
         user_text: str,
         decision: RouteDecision,
-        router_latency_ms: float | None = None,
+        core_interpretation_latency_ms: float | None = None,
         agent_latency_ms: float | None = None,
     ) -> dict[str, Any]:
         return {
@@ -2339,7 +2339,7 @@ class VoiceAssistant:
             "intent": decision.intent,
             "route_source": decision.source,
             "route_confidence": decision.confidence,
-            "router_latency_ms": router_latency_ms,
+            "core_interpretation_latency_ms": core_interpretation_latency_ms,
             "agent_latency_ms": agent_latency_ms,
             "conversation_id": self.conversation_state.conversation_id,
             "mind_profile_id": self.mind.profile.profile_id,
@@ -2746,7 +2746,7 @@ class VoiceAssistant:
 
     def _immediate_route_speech_text(self, decision: RouteDecision) -> str | None:
         # Backward-compatible name used by older tests/call sites. The actual
-        # source of fast-first speech is now the Router-generated fast_speech
+        # source of fast-first speech is now the Core-generated fast_speech
         # field or an immediate_speech route item, not an Orchestrator template.
         return self._router_fast_speech_text(decision)
 
@@ -3482,7 +3482,7 @@ class VoiceAssistant:
         session_id: str,
         context: dict[str, Any],
         decision: RouteDecision,
-        router_latency_ms: float,
+        core_interpretation_latency_ms: float,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> tuple[bool, RouteDecision]:
         cognitive_lane = self._cognitive_lane_from_route(decision)
@@ -3578,7 +3578,7 @@ class VoiceAssistant:
                     "experience_context": self._experience_context(
                         user_text=user_text,
                         decision=decision,
-                        router_latency_ms=router_latency_ms,
+                        core_interpretation_latency_ms=core_interpretation_latency_ms,
                         agent_latency_ms=float(
                             resolution.timings_ms.get("total", 0.0)
                         ),
@@ -4381,11 +4381,11 @@ class VoiceAssistant:
         self.session_log(session_id, "cognitive_core_start: text_chars=%s text=%r", len(user_text), user_text)
         try:
             decision = await self.agent_client.interpret_turn(session, text=user_text, sid=session_id, context=context)
-            router_latency_ms = now_ms() - core_start_ms
+            core_interpretation_latency_ms = now_ms() - core_start_ms
             self.session_log(
                 session_id,
                 "cognitive_core_done: core_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
-                router_latency_ms,
+                core_interpretation_latency_ms,
                 decision.route,
                 ",".join(decision.agents),
                 decision.intent,
@@ -4396,7 +4396,7 @@ class VoiceAssistant:
         except Exception as exc:
             self.session_log(session_id, "cognitive_core_exception: core_ms=%.1f error=%s", now_ms() - core_start_ms, exc)
             logger.warning("Cognitive Core interpretation failed; falling back safely: %s", exc)
-            safe_response = self._router_exception_safe_response(
+            safe_response = self._cognitive_core_exception_safe_response(
                 user_text,
                 context=context,
             )
@@ -4457,7 +4457,7 @@ class VoiceAssistant:
                 session_id=session_id,
                 context=context,
                 decision=decision,
-                router_latency_ms=router_latency_ms,
+                core_interpretation_latency_ms=core_interpretation_latency_ms,
                 turn_envelope=turn_envelope,
             )
             if handled:
@@ -4548,7 +4548,7 @@ class VoiceAssistant:
             intent=decision.intent,
             metadata=turn_metadata,
         )
-        # Semantic task operations are advisory Router output, but the
+        # Semantic task operations are advisory Cognitive Core interpretation output, but the
         # ConversationStateManager applies and versions them deterministically.
         # Rebuild the bounded context so downstream planning sees the accepted
         # task/goal state from this same turn rather than the pre-route snapshot.
@@ -4638,7 +4638,7 @@ class VoiceAssistant:
                             "experience_context": self._experience_context(
                                 user_text=user_text,
                                 decision=decision,
-                                router_latency_ms=router_latency_ms,
+                                core_interpretation_latency_ms=core_interpretation_latency_ms,
                                 agent_latency_ms=agent_latency_ms,
                             ),
                         }
@@ -4824,7 +4824,7 @@ class VoiceAssistant:
                 session_id=session_id,
                 context=context,
                 decision=decision,
-                router_latency_ms=0.0,
+                core_interpretation_latency_ms=0.0,
                 turn_envelope=turn_envelope,
             )
             if handled:
@@ -5425,7 +5425,7 @@ class VoiceAssistant:
             "cancelled_confirmation": confirmation_evidence,
         }
 
-    def _router_exception_safe_response(
+    def _cognitive_core_exception_safe_response(
         self,
         user_text: str,
         *,
@@ -5442,7 +5442,7 @@ class VoiceAssistant:
         return self._host_speech_response(
             text,
             style="warning",
-            source="host_router_exception_safe_fallback",
+            source="host_cognitive_core_exception_safe_fallback",
         )
 
     def _agent_exception_safe_response(

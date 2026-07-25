@@ -30,7 +30,7 @@ def _common_env() -> dict[str, str]:
 
 class RuntimeConfigurationTests(unittest.TestCase):
     def test_router_safety_rules_cannot_be_disabled_by_environment(self) -> None:
-        with patch.dict(os.environ, {"ROUTER_RULES_FIRST": "0"}, clear=False):
+        with patch.dict(os.environ, {"AGENT_GOAL_INTERPRETER_RULES_FIRST": "0"}, clear=False):
             self.assertTrue(RouterSettings().rules_first)
 
     def test_standalone_service_fallbacks_match_documented_common_budgets(self) -> None:
@@ -41,44 +41,44 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('SHERPA_ONNX_NUM_THREADS", "2"', asr_source)
-        self.assertIn('ORCH_ROUTER_TIMEOUT_MS", "9000"', orchestrator_source)
+        self.assertIn('ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "9000"', orchestrator_source)
         self.assertIn('OLLAMA_KEEP_ALIVE", "24h"', orchestrator_source)
 
     def test_router_host_budget_exceeds_router_internal_budget(self) -> None:
         values = _common_env()
         self.assertGreater(
-            int(values["ORCH_ROUTER_TIMEOUT_MS"]),
-            int(values["ROUTER_LLM_TIMEOUT_MS"])
-            + int(values["ROUTER_REVIEW_TIMEOUT_MS"])
-            + int(values["ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS"]),
+            int(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"]),
+            int(values["AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS"])
+            + int(values["AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS"])
+            + int(values["AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS"]),
         )
 
     def test_router_uses_fast_llm_by_default(self) -> None:
         values = _common_env()
-        self.assertEqual(values["ROUTER_USE_LLM"], "1")
-        self.assertEqual(values["ROUTER_MODEL"], "qwen3:4b")
-        self.assertEqual(values["ROUTER_LLM_KEEP_ALIVE"], "24h")
-        self.assertEqual(values["ROUTER_WARM_LLM_ON_STARTUP"], "1")
-        self.assertEqual(values["ROUTER_WARM_LLM_TIMEOUT_MS"], "60000")
-        self.assertEqual(values["ROUTER_REVIEW_MODEL"], "gemma4:e2b")
-        self.assertEqual(values["ROUTER_TIMEOUT_MS"], "5400")
-        self.assertEqual(values["ROUTER_LLM_TIMEOUT_MS"], "5400")
-        self.assertEqual(values["ROUTER_LLM_NUM_CTX"], "4096")
-        self.assertEqual(values["ROUTER_LLM_NUM_PREDICT"], "512")
-        self.assertEqual(values["ROUTER_REVIEW_TIMEOUT_MS"], "2500")
-        self.assertEqual(values["ROUTER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
-        self.assertEqual(values["ROUTER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
-        self.assertEqual(values["ROUTER_SLOW_REVIEW_RECOVERY_ENABLED"], "1")
-        self.assertEqual(values["ROUTER_GENERIC_CHAT_REVIEW_ENABLED"], "1")
-        self.assertEqual(values["ROUTER_TOOL_FAST_SPEECH_REPAIR_ENABLED"], "0")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_USE_LLM"], "1")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "qwen3:4b")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE"], "24h")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP"], "1")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_MODEL"], "gemma4:e2b")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "5400")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS"], "5400")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_CTX"], "4096")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "512")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS"], "2500")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS"], "5000")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED"], "0")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED"], "1")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED"], "1")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TOOL_FAST_SPEECH_REPAIR_ENABLED"], "0")
 
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         for name in (
-            "ROUTER_MODE",
-            "ROUTER_CONFIDENCE_THRESHOLD",
-            "ROUTER_LOG_LEVEL",
-            "CHROMIE_ROUTER_DEBUG_RAW",
-            "CHROMIE_ROUTER_DEBUG_PROMPT",
+            "AGENT_GOAL_INTERPRETER_MODE",
+            "AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD",
+            "AGENT_GOAL_INTERPRETER_LOG_LEVEL",
+            "CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW",
+            "CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT",
         ):
             self.assertIn(f"{name}:", compose)
 

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from agent.app.cognitive_core.goal_interpreter.llm_router import (
-    OllamaLLMRouter,
+from agent.app.cognitive_core.goal_interpreter.goal_interpreter import (
+    OllamaGoalInterpreter,
     _catalog_observability_profile,
     _payload_message_texts,
     _prompt_feature_flags,
@@ -15,7 +15,7 @@ from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, Rout
 
 class RouterLlmPromptTests(unittest.TestCase):
     def test_system_prompt_names_router_role_and_context_boundaries(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -91,7 +91,7 @@ class RouterLlmPromptTests(unittest.TestCase):
 
 
     def test_router_observability_profiles_prompt_and_raw_weather_output(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -137,7 +137,7 @@ class RouterLlmPromptTests(unittest.TestCase):
 
 
     def test_router_prompt_semantically_separates_capability_inquiry_from_execution(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -195,7 +195,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertFalse(is_allowed_model_ignore(active, decision))
 
     def test_user_prompt_includes_abilities_and_bounded_context(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -342,7 +342,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertLess(len(prompt), 5200)
 
     def test_fast_router_prompt_uses_common_ability_catalog_not_full_catalog(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -389,7 +389,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("soridormi.motion.calibrate_floor", prompt)
 
     def test_fast_router_prompt_excludes_locked_common_catalog_entries(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -463,7 +463,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertNotIn("social.blink_eyes", annotated.actions)
 
     def test_user_prompt_uses_extracted_memory_not_raw_history(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -477,22 +477,22 @@ class RouterLlmPromptTests(unittest.TestCase):
                 "history": [
                     {
                         "role": "user",
-                        "text": "RAW_TRANSCRIPT_SHOULD_NOT_REACH_ROUTER_PROMPT",
+                        "text": "RAW_TRANSCRIPT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT",
                     }
                 ],
                 "conversation": {
                     "history": [
                         {
                             "role": "assistant",
-                            "text": "RAW_CONVERSATION_SHOULD_NOT_REACH_ROUTER_PROMPT",
+                            "text": "RAW_CONVERSATION_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT",
                         }
                     ]
                 },
                 "session_memory": {
                     "kind": "short_term_session_memory",
                     "conversation_id": "session",
-                    "recent_user_request": "RAW_RECENT_USER_SHOULD_NOT_REACH_ROUTER_PROMPT",
-                    "recent_assistant_response": "RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_ROUTER_PROMPT",
+                    "recent_user_request": "RAW_RECENT_USER_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT",
+                    "recent_assistant_response": "RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT",
                     "memory_summary": "- Current task: design extracted prompt memory",
                     "extracted_memory": [
                         {
@@ -509,13 +509,13 @@ class RouterLlmPromptTests(unittest.TestCase):
         prompt = router.build_user_prompt(request)
 
         self.assertIn("Current task: design extracted prompt memory", prompt)
-        self.assertNotIn("RAW_TRANSCRIPT_SHOULD_NOT_REACH_ROUTER_PROMPT", prompt)
-        self.assertNotIn("RAW_CONVERSATION_SHOULD_NOT_REACH_ROUTER_PROMPT", prompt)
-        self.assertNotIn("RAW_RECENT_USER_SHOULD_NOT_REACH_ROUTER_PROMPT", prompt)
-        self.assertNotIn("RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_ROUTER_PROMPT", prompt)
+        self.assertNotIn("RAW_TRANSCRIPT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
+        self.assertNotIn("RAW_CONVERSATION_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
+        self.assertNotIn("RAW_RECENT_USER_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
+        self.assertNotIn("RAW_RECENT_ASSISTANT_SHOULD_NOT_REACH_AGENT_GOAL_INTERPRETER_PROMPT", prompt)
 
     def test_intent_review_prompt_uses_semantic_generalization(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -557,7 +557,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("capability:<exact capability_id>", system)
 
     def test_post_interrupt_review_prompt_confirms_or_corrects_after_safety_stop(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             review_model="review-model",
@@ -605,7 +605,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("soridormi.walk_forward", user)
 
     def test_payload_disables_qwen_thinking_and_uses_compact_json_mode(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -630,7 +630,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("Go ahead and sing a song for me.", payload["messages"][1]["content"])
 
     def test_route_only_json_response_gets_default_llm_confidence(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -649,7 +649,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("default confidence", decision.reason or "")
 
     def test_intent_only_weather_capability_uses_tool_route(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -680,7 +680,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("normalized capability route", decision.reason or "")
 
     def test_skill_id_route_weather_capability_uses_tool_route(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -710,8 +710,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(decision.intent, "capability:chromie.weather.lookup")
         self.assertIn("normalized capability route", decision.reason or "")
 
-    def test_llm_router_accepts_deep_thought_route(self) -> None:
-        router = OllamaLLMRouter(
+    def test_goal_interpreter_accepts_deep_thought_route(self) -> None:
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -730,8 +730,8 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertIn("speaker_agent", decision.agents)
         self.assertTrue(decision.needs_agent)
 
-    def test_llm_router_accepts_mixed_route_items_and_builds_task_proposals(self) -> None:
-        router = OllamaLLMRouter(
+    def test_goal_interpreter_accepts_mixed_route_items_and_builds_task_proposals(self) -> None:
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -797,7 +797,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         )
 
     def test_low_confidence_decision_becomes_deep_thought_handoff(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
@@ -836,7 +836,7 @@ class RouterLlmPromptTests(unittest.TestCase):
 
 class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
     async def test_inactive_direct_chinese_weather_question_fails_open_on_false_review(self) -> None:
-        class WeatherAddressednessRouter(OllamaLLMRouter):
+        class WeatherAddressednessRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -899,7 +899,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(router.stages, ["quick_intent", "addressedness_review"])
 
     async def test_inactive_direct_english_request_fails_open_on_false_review(self) -> None:
-        class FalseRequestRouter(OllamaLLMRouter):
+        class FalseRequestRouter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -937,7 +937,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(reviewed, original)
 
     async def test_inactive_question_form_fails_open_on_inconsistent_ambient_act(self) -> None:
-        class FalseQuestionRouter(OllamaLLMRouter):
+        class FalseQuestionRouter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -971,7 +971,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(reviewed, original)
 
     async def test_inactive_malformed_addressedness_review_fails_open(self) -> None:
-        class MalformedReviewRouter(OllamaLLMRouter):
+        class MalformedReviewRouter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -1002,7 +1002,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(reviewed, original)
 
     async def test_inactive_mislabelled_chat_is_reviewed_to_ambient_ignore(self) -> None:
-        class AddressednessRouter(OllamaLLMRouter):
+        class AddressednessRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1057,7 +1057,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(router.models, ["quick-model", "quick-model"])
 
     async def test_inactive_contextless_reply_can_still_be_suppressed(self) -> None:
-        class ContextlessReplyRouter(OllamaLLMRouter):
+        class ContextlessReplyRouter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -1093,7 +1093,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reviewed.metadata["addressedness_speech_act"], "reply")
 
     async def test_inactive_direct_request_preserves_original_action_route(self) -> None:
-        class AddressedRequestRouter(OllamaLLMRouter):
+        class AddressedRequestRouter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 self.assert_payload = payload
                 return {
@@ -1135,8 +1135,8 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(router.assert_payload["options"]["num_predict"], 32)
         self.assertIn("speech_act", router.assert_payload["format"]["required"])
 
-    async def test_llm_router_returns_low_confidence_raw_for_pipeline_validation(self) -> None:
-        class LowConfidenceRouter(OllamaLLMRouter):
+    async def test_goal_interpreter_returns_low_confidence_raw_for_pipeline_validation(self) -> None:
+        class LowConfidenceRouter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -1163,7 +1163,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(decision.intent, "deep_thought_low_confidence")
 
     async def test_llm_interrupt_output_falls_back_to_chat(self) -> None:
-        class InterruptRouter(OllamaLLMRouter):
+        class InterruptRouter(OllamaGoalInterpreter):
             async def _chat(self, payload: dict) -> dict:
                 del payload
                 return {
@@ -1204,7 +1204,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
 
     async def test_deterministic_only_llm_mistake_uses_review_model(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1238,7 +1238,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
 
     async def test_slow_review_recovery_can_be_disabled_for_realtime_latency(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1270,7 +1270,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model"])
 
     async def test_review_model_can_recover_invalid_interrupt_to_robot_action(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1317,7 +1317,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
 
     async def test_review_model_repairs_walk_command_misclassified_as_interrupt(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1385,7 +1385,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("input_schema", review_user)
 
     async def test_review_failure_does_not_recover_invalid_interrupt_from_catalog_candidate(self) -> None:
-        class ReviewFailureRouter(OllamaLLMRouter):
+        class ReviewFailureRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1431,7 +1431,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deterministic-only route interrupt", decision.reason or "")
 
     async def test_fast_repair_model_recovers_when_review_model_fails(self) -> None:
-        class RepairRouter(OllamaLLMRouter):
+        class RepairRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1498,7 +1498,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_review_model_recovers_primary_router_timeout(self) -> None:
-        class TimeoutRouter(OllamaLLMRouter):
+        class TimeoutRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1550,7 +1550,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_fast_repair_model_runs_after_low_confidence_review_recovery(self) -> None:
-        class RepairRouter(OllamaLLMRouter):
+        class RepairRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1625,7 +1625,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_review_model_overrides_underspecified_robot_action(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1655,7 +1655,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(payload["think"] is False for payload in router.payloads))
 
     async def test_review_model_completes_underspecified_robot_action_with_exact_skill(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1709,7 +1709,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
 
     async def test_review_model_skill_id_route_is_normalized_to_robot_action(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1763,7 +1763,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([payload["model"] for payload in router.payloads], ["test-model", "review-model"])
 
     async def test_ambiguous_deep_thought_tries_review_then_clarifies(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1811,7 +1811,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_ambiguous_deep_thought_review_recovers_chinese_walk_command(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1874,7 +1874,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("soridormi.walk_forward", review_prompt)
 
     async def test_ambiguous_deep_thought_review_failure_clarifies(self) -> None:
-        class ReviewRouter(OllamaLLMRouter):
+        class ReviewRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1905,7 +1905,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("semantically unresolved", decision.reason or "")
 
     async def test_placeholder_capability_intent_is_repaired_before_agent(self) -> None:
-        class PlaceholderRouter(OllamaLLMRouter):
+        class PlaceholderRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1958,7 +1958,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(router.payloads), 2)
 
     async def test_placeholder_capability_repair_failure_falls_back_to_chat(self) -> None:
-        class PlaceholderRouter(OllamaLLMRouter):
+        class PlaceholderRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -1989,7 +1989,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_tool_route_missing_fast_speech_is_repaired_by_router_llm(self) -> None:
-        class WeatherRouter(OllamaLLMRouter):
+        class WeatherRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -2052,7 +2052,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(router.stages, ["primary_router", "fast_speech_repair"])
 
     async def test_tool_route_missing_fast_speech_does_not_add_router_latency_by_default(self) -> None:
-        class WeatherRouter(OllamaLLMRouter):
+        class WeatherRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -2097,7 +2097,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(router.calls, 1)
 
     async def test_tool_route_existing_fast_speech_does_not_repair(self) -> None:
-        class WeatherRouter(OllamaLLMRouter):
+        class WeatherRouter(OllamaGoalInterpreter):
             def __init__(self) -> None:
                 super().__init__(
                     ollama_url="http://example.invalid",
@@ -2130,7 +2130,7 @@ class RouterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(router.stages, ["primary_router"])
 
     def test_fast_speech_repair_payload_preserves_route_and_forbids_results(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,

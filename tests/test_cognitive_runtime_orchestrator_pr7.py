@@ -106,7 +106,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 session_id="sid",
                 context={"history": []},
                 decision=decision,
-                router_latency_ms=10.0,
+                core_interpretation_latency_ms=10.0,
                 turn_envelope=turn_envelope,
             )
             self.assertTrue(handled)
@@ -268,7 +268,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 session_id="sid-cancel",
                 context={"history": []},
                 decision=decision,
-                router_latency_ms=10.0,
+                core_interpretation_latency_ms=10.0,
             )
             self.assertTrue(handled)
             returned_decisions.append(returned)
@@ -330,7 +330,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                         session_id=f"sid-{route}",
                         context={"history": []},
                         decision=decision,
-                        router_latency_ms=10.0,
+                        core_interpretation_latency_ms=10.0,
                     )
                     self.assertTrue(handled)
 
@@ -366,7 +366,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 session_id="sid",
                 context={"history": []},
                 decision=decision,
-                router_latency_ms=10.0,
+                core_interpretation_latency_ms=10.0,
             )
             self.assertTrue(handled)
             self.assertEqual(

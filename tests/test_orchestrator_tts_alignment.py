@@ -871,10 +871,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["ability_id"], "social.look_at_user")
         self.assertEqual(response.metadata["ability_status"], "known_missing")
 
-    def test_router_exception_on_embodied_text_fails_closed(self) -> None:
+    def test_cognitive_core_exception_on_embodied_text_fails_closed(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
 
-        response = assistant._router_exception_safe_response(
+        response = assistant._cognitive_core_exception_safe_response(
             "Please walk ahead quickly for 10 minutes.",
             context={},
         )
@@ -887,13 +887,13 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             response.metadata["source"],
-            "host_router_exception_safe_fallback",
+            "host_cognitive_core_exception_safe_fallback",
         )
 
-    def test_router_exception_on_plain_text_can_use_direct_llm(self) -> None:
+    def test_cognitive_core_exception_on_plain_text_can_use_direct_llm(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
 
-        response = assistant._router_exception_safe_response(
+        response = assistant._cognitive_core_exception_safe_response(
             "Tell me a quick joke.",
             context={},
         )

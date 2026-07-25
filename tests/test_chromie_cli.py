@@ -45,8 +45,8 @@ class ChromieCliTests(unittest.TestCase):
                 ORCH_ACTION_DRY_RUN=true
                 AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=0
                 AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
-                ROUTER_TIMEOUT_MS=1500
-                ORCH_ROUTER_TIMEOUT_MS=3000
+                AGENT_GOAL_INTERPRETER_TIMEOUT_MS=1500
+                ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=3000
                 AGENT_TIMEOUT_MS=30000
                 ORCH_AGENT_TIMEOUT_MS=40000
                 """,
@@ -551,8 +551,8 @@ class ChromieCliTests(unittest.TestCase):
                 AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=1
                 AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
                 ORCH_ACTION_DRY_RUN=false
-                ROUTER_TIMEOUT_MS=1500
-                ORCH_ROUTER_TIMEOUT_MS=3000
+                AGENT_GOAL_INTERPRETER_TIMEOUT_MS=1500
+                ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=3000
                 AGENT_TIMEOUT_MS=30000
                 ORCH_AGENT_TIMEOUT_MS=40000
                 """,
@@ -584,15 +584,15 @@ class ChromieCliTests(unittest.TestCase):
                 ORCH_ACTION_DRY_RUN=true
                 AGENT_ENABLE_PHYSICAL_TASK_GRAPH_EXECUTION=0
                 AGENT_ENABLE_GUARDED_TASK_GRAPH_EXECUTION=0
-                ROUTER_URL=
+                AGENT_GOAL_INTERPRETER_URL=
                 AGENT_URL=
                 ACTION_EXECUTOR_URL=
                 ASR_URL=
                 TTS_URL=
                 LLM_URL=
                 SORIDORMI_MCP_URL=
-                ROUTER_TIMEOUT_MS=1500
-                ORCH_ROUTER_TIMEOUT_MS=3000
+                AGENT_GOAL_INTERPRETER_TIMEOUT_MS=1500
+                ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=3000
                 AGENT_TIMEOUT_MS=30000
                 ORCH_AGENT_TIMEOUT_MS=40000
                 """,

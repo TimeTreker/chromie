@@ -34,7 +34,7 @@
       "confidence": 0.45,
       "language": "en-US",
       "source": "fallback",
-      "reason": "invalid_llm_router_response: no JSON object in model response"
+      "reason": "invalid_goal_interpreter_response: no JSON object in model response"
     }
   },
   "expect": {

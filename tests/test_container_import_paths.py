@@ -30,7 +30,7 @@ class ContainerImportPathTests(unittest.TestCase):
             (
                 "router",
                 ROOT / "router" / "app",
-                "import app.llm_router; print('ok')",
+                "import app.goal_interpreter; print('ok')",
             ),
         )
 

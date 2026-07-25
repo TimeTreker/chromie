@@ -5,7 +5,7 @@ import json
 import unittest
 from typing import Any
 
-from agent.app.cognitive_core.goal_interpreter.llm_router import OllamaLLMRouter
+from agent.app.cognitive_core.goal_interpreter.goal_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import FastSpeech, RouteDecision, RouteItem, RouteRequest, finalize_decision
 
 
@@ -19,7 +19,7 @@ WEATHER_CAPABILITY = {
 }
 
 
-class _EmptyReviewRouter(OllamaLLMRouter):
+class _EmptyReviewRouter(OllamaGoalInterpreter):
     async def _chat_logged(
         self,
         payload: dict[str, Any],
@@ -30,7 +30,7 @@ class _EmptyReviewRouter(OllamaLLMRouter):
         return {"message": {"content": ""}, "done": True, "done_reason": "stop"}
 
 
-class _SemanticRepairRouter(OllamaLLMRouter):
+class _SemanticRepairRouter(OllamaGoalInterpreter):
     async def _chat_logged(
         self,
         payload: dict[str, Any],
@@ -229,7 +229,7 @@ class WeatherAffordanceTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_router_source_has_no_weather_phrase_router(self) -> None:
-        source = inspect.getsource(__import__("router.app.llm_router", fromlist=["*"]))
+        source = inspect.getsource(__import__("router.app.goal_interpreter", fromlist=["*"]))
         for forbidden in (
             "_is_weather_like_text",
             "_ZH_WEATHER_TERMS",

@@ -165,7 +165,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                 "expected": (
                     "Generate 3 candidate JSON scenario files",
                     "deterministic expectations",
-                    "scenarios/router/<id>.json",
+                    "scenarios/goal_interpretation/<id>.json",
                 ),
             },
             {

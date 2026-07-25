@@ -22,7 +22,7 @@ python scripts/scenario_author.py templates
 python scripts/scenario_author.py new --suite router --id draft_case \
   --text "Hello Chromie."
 python scripts/scenario_author.py edit --suite router --id draft_case
-python scripts/scenario_author.py validate scenarios/router/draft_case.json
+python scripts/scenario_author.py validate scenarios/goal_interpretation/draft_case.json
 python scripts/scenario_author.py validate-all
 ```
 
@@ -119,7 +119,7 @@ an LLM to decide whether the robot behaved correctly.
 
 Router fixtures may use `stub.llm_script` instead of one final
 `stub.llm_decision`. The scenario runner then executes the real
-`OllamaLLMRouter.route()` normalization, review, semantic-repair, and validation
+`OllamaGoalInterpreter.route()` normalization, review, semantic-repair, and validation
 pipeline while replacing only external model completions. Each scripted item
 may declare the expected model stage and a compact decision:
 

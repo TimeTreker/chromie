@@ -569,11 +569,11 @@ The contract-first loop baseline is implemented:
    confirmation-bound child plan.
 
 Remaining migration work is to extract the five physical Gateway modules,
-separate Attention Review from compatibility Router semantics, derive
+separate Attention Review from legacy routing path semantics, derive
 `RouteDecision` only for older consumers, widen authority only with retained
 evidence, and deprecate Router names only after parity and rollback coverage.
 
-Existing `chromie-router`, `/route`, `ROUTER_*`, and Router log names remain
+Existing `chromie-agent`, `/route`, `AGENT_GOAL_INTERPRETER_*`, and Router log names remain
 valid compatibility interfaces during this sequence.
 
 ## 13. Acceptance boundary

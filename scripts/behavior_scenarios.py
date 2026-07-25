@@ -60,7 +60,7 @@ from shared.chromie_contracts.response_composition import (
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan
 from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
-from agent.app.cognitive_core.goal_interpreter.llm_router import OllamaLLMRouter
+from agent.app.cognitive_core.goal_interpreter.goal_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
@@ -123,12 +123,12 @@ class _RouterLlm:
         return self.decision
 
 
-class _ScriptedOllamaRouter(OllamaLLMRouter):
+class _ScriptedOllamaRouter(OllamaGoalInterpreter):
     """Run the real Router recovery pipeline with deterministic model output.
 
     This is intentionally closer to a live Router turn than `_RouterLlm`: the
     quick decision, review, semantic repair, normalization, and validators all
-    run through `OllamaLLMRouter.route()`. Only the external model completion is
+    run through `OllamaGoalInterpreter.route()`. Only the external model completion is
     replaced by a file-backed script.
     """
 
@@ -1013,7 +1013,7 @@ async def _run_router_turn(
             _router_catalog_from_stub(stub_scenario),
             snapshot=_router_snapshot_from_stub(stub_scenario),
         ),
-    ), patch.object(main, "llm_router", router):
+    ), patch.object(main, "goal_interpreter", router):
         decision = await main.interpret_turn(
             RouteRequest(
                 text=text,

@@ -35,7 +35,7 @@ def _fast_speech_marker(value: str | None) -> str:
 
 
 class FastSpeech(BaseModel):
-    """Router-authored process acknowledgement preserved across services."""
+    """Core-authored process acknowledgement preserved across services."""
 
     text: str = ""
     purpose: str | None = None

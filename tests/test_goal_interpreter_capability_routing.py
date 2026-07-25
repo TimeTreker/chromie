@@ -125,7 +125,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="deep_thought",
                 agents=["deepthinking_agent", "speaker_agent"],
@@ -138,12 +138,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Walk forward for 15 seconds, quickly.")
             )
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.intent, "deep_thought")
@@ -208,7 +208,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -223,26 +223,26 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         catalog = _Catalog(result, snapshot=snapshot)
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", catalog
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="眨两小眼睛。", language="zh-CN"))
 
-        assert llm_router.request is not None
+        assert goal_interpreter.request is not None
         self.assertEqual(catalog.snapshot_calls, 1)
         self.assertEqual(catalog.search_calls, 0)
-        self.assertIn("common_ability_catalog", llm_router.request.context)
-        self.assertIn("common_ability_ids", llm_router.request.context)
-        self.assertIn("prompt_capabilities_common", llm_router.request.context)
-        self.assertIn("prompt_capabilities_all", llm_router.request.context)
+        self.assertIn("common_ability_catalog", goal_interpreter.request.context)
+        self.assertIn("common_ability_ids", goal_interpreter.request.context)
+        self.assertIn("prompt_capabilities_common", goal_interpreter.request.context)
+        self.assertIn("prompt_capabilities_all", goal_interpreter.request.context)
         self.assertEqual(
-            llm_router.request.context["common_ability_catalog"][0]["capability_id"],
+            goal_interpreter.request.context["common_ability_catalog"][0]["capability_id"],
             "soridormi.blink_eyes",
         )
         self.assertEqual(
-            llm_router.request.context["common_ability_ids"],
+            goal_interpreter.request.context["common_ability_ids"],
             ["soridormi.blink_eyes"],
         )
         self.assertEqual(
-            llm_router.request.context["prompt_capabilities_common"][0]["capability_id"],
+            goal_interpreter.request.context["prompt_capabilities_common"][0]["capability_id"],
             "soridormi.blink_eyes",
         )
         self.assertEqual(decision.source, "llm")
@@ -281,7 +281,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -297,7 +297,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             main,
             "capability_catalog",
             catalog,
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Please blink your eyes twice.", language="en-US")
             )
@@ -346,7 +346,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -362,15 +362,15 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             main,
             "capability_catalog",
             catalog,
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Run floor calibration.", language="en-US")
             )
 
-        assert llm_router.request is not None
+        assert goal_interpreter.request is not None
         self.assertEqual(catalog.search_calls, 0)
         self.assertEqual(
-            llm_router.request.context["common_ability_ids"],
+            goal_interpreter.request.context["common_ability_ids"],
             ["soridormi.blink_eyes"],
         )
         self.assertEqual(decision.source, "llm")
@@ -418,7 +418,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -434,18 +434,18 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             main,
             "capability_catalog",
             catalog,
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Run floor calibration.", language="en-US")
             )
 
-        assert llm_router.request is not None
+        assert goal_interpreter.request is not None
         self.assertEqual(
-            llm_router.request.context["common_ability_ids"],
+            goal_interpreter.request.context["common_ability_ids"],
             ["soridormi.blink_eyes"],
         )
         self.assertEqual(
-            llm_router.request.context["full_ability_catalog"][1]["capability_id"],
+            goal_interpreter.request.context["full_ability_catalog"][1]["capability_id"],
             "soridormi.motion.calibrate_floor",
         )
         self.assertEqual(decision.route, "deep_thought")
@@ -467,7 +467,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="turn left", matched=False)
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -483,15 +483,15 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             main.settings, "rules_first", True
         ), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="turn left"))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.intent, "deep_thought_router_unavailable")
-        assert llm_router.request is not None
-        self.assertEqual(llm_router.request.context["candidate_capabilities"], [])
+        assert goal_interpreter.request is not None
+        self.assertEqual(goal_interpreter.request.context["candidate_capabilities"], [])
 
     async def test_hybrid_mode_ignores_query_matches_after_llm_fallback(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -513,7 +513,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -527,10 +527,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="What's your name?"))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.intent, "deep_thought_router_unavailable")
@@ -564,7 +564,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -577,12 +577,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="I mean, do you know if the sun is round or rectangular?")
             )
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.source, "fallback")
         self.assertNotIn("capability_agent", decision.agents)
@@ -617,7 +617,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="stop now", matched=False, matches=[])
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -640,13 +640,13 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             main.settings, "post_interrupt_review_enabled", True
         ), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Stop now."))
 
         self.assertEqual(decision.route, "interrupt")
         self.assertTrue(decision.interrupt_current)
-        self.assertEqual(llm_router.calls, 0)
-        self.assertEqual(llm_router.interrupt_review_calls, 1)
+        self.assertEqual(goal_interpreter.calls, 0)
+        self.assertEqual(goal_interpreter.interrupt_review_calls, 1)
         self.assertEqual(
             [item["stage"] for item in decision.metadata["route_stage_outputs"]],
             ["emergency_filter", "post_interrupt_review"],
@@ -672,7 +672,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="stop", matched=False, matches=[])
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="interrupt",
                 agents=[],
@@ -696,7 +696,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             main.settings, "post_interrupt_review_enabled", True
         ), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(
                     text="Stop.",
@@ -808,7 +808,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -822,16 +822,16 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="往前走个15秒。", language="zh-CN"))
 
-        self.assertEqual(llm_router.calls, 1)
-        assert llm_router.request is not None
+        self.assertEqual(goal_interpreter.calls, 1)
+        assert goal_interpreter.request is not None
         self.assertEqual(
-            llm_router.request.context["common_ability_catalog"][0]["capability_id"],
+            goal_interpreter.request.context["common_ability_catalog"][0]["capability_id"],
             "soridormi.walk_forward",
         )
-        self.assertEqual(llm_router.request.context["candidate_capabilities"], [])
+        self.assertEqual(goal_interpreter.request.context["candidate_capabilities"], [])
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "capability:soridormi.walk_forward")
@@ -893,7 +893,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -907,12 +907,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Walking forward quickly until I tell you stop.")
             )
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_low_confidence")
@@ -977,7 +977,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1002,7 +1002,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Walk at 0.2 speed for 10 seconds and nod twice.")
             )
@@ -1069,7 +1069,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1093,7 +1093,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(
                     text=(
@@ -1121,7 +1121,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             catalog_version=22,
             matches=[],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1136,7 +1136,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Figure out the safe way to help me with this setup.")
             )
@@ -1177,7 +1177,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="deep_thought",
                 agents=["deepthinking_agent", "speaker_agent"],
@@ -1191,12 +1191,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Hey, Groomy, walking forward for 10 seconds quickly, please.")
             )
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_low_confidence")
@@ -1231,7 +1231,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="deep_thought",
                 agents=["deepthinking_agent", "speaker_agent"],
@@ -1245,10 +1245,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Wal forward for 15 seconds, quickly."))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_complex_reasoning")
@@ -1276,7 +1276,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="deep_thought",
                 agents=["deepthinking_agent", "speaker_agent"],
@@ -1290,7 +1290,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Make a plan to walk forward safely."))
 
         self.assertEqual(decision.route, "deep_thought")
@@ -1306,7 +1306,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             catalog_version=8,
             matches=[],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="tool",
                 agents=["tool_agent", "speaker_agent"],
@@ -1320,10 +1320,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Build an unusual robot latency strategy."))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_low_confidence")
@@ -1340,7 +1340,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             catalog_version=8,
             matches=[],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -1354,10 +1354,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Hello, how are you doing?"))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
         self.assertIn("conversation_agent", decision.agents)
@@ -1390,7 +1390,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -1404,10 +1404,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Hello, how are you."))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
@@ -1442,7 +1442,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1456,10 +1456,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="How are you.", language="en-US"))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
@@ -1488,7 +1488,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1501,10 +1501,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Hello."))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
@@ -1546,7 +1546,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1560,10 +1560,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         catalog = _Catalog(result, snapshot=snapshot)
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", catalog
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Hello, are you."))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(catalog.search_calls, 0)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
@@ -1596,7 +1596,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ]
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1610,10 +1610,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         catalog = _Catalog(result, snapshot=snapshot)
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", catalog
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Walk forward for 15 seconds, please."))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(catalog.search_calls, 0)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
@@ -1650,7 +1650,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="interrupt",
                 agents=[],
@@ -1664,12 +1664,12 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="please walk forward for 10 seconds and blink your eyes")
             )
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
@@ -1707,7 +1707,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="interrupt",
                 agents=[],
@@ -1721,7 +1721,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="Go ahead and sing a song for me."))
 
         self.assertEqual(decision.route, "chat")
@@ -1754,7 +1754,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="interrupt",
                 agents=[],
@@ -1768,10 +1768,10 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
         self.assertEqual(decision.source, "fallback")
@@ -1804,7 +1804,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -1812,13 +1812,13 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 confidence=0.45,
                 language="en-US",
                 source="fallback",
-                reason="llm_router_error:ReadTimeout",
+                reason="goal_interpreter_error:ReadTimeout",
             )
         )
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
 
         self.assertEqual(decision.route, "deep_thought")
@@ -1850,7 +1850,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         )
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -1858,13 +1858,13 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 confidence=0.45,
                 language="en-US",
                 source="fallback",
-                reason="llm_router_error:ReadTimeout",
+                reason="goal_interpreter_error:ReadTimeout",
             )
         )
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(
                     text="Please think carefully and split the work to add long-term memory to Chromie."
@@ -1927,7 +1927,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 },
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1942,11 +1942,11 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(
-            main, "llm_router", llm_router
+            main, "goal_interpreter", goal_interpreter
         ):
             decision = await main.interpret_turn(RouteRequest(text="请向前走十秒，然后点头两次。"))
 
-        self.assertEqual(llm_router.calls, 1)
+        self.assertEqual(goal_interpreter.calls, 1)
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "capability:soridormi.walk_velocity")
@@ -1984,7 +1984,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -1998,7 +1998,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="B.", language="en-US"))
 
         self.assertEqual(decision.route, "clarify")
@@ -2039,7 +2039,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -2053,7 +2053,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="B.", language="en-US"))
 
         self.assertEqual(decision.route, "clarify")
@@ -2090,7 +2090,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="chat",
                 agents=["conversation_agent", "speaker_agent"],
@@ -2098,13 +2098,13 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 confidence=0.45,
                 language="en-US",
                 source="fallback",
-                reason="llm_router_error:ReadTimeout",
+                reason="goal_interpreter_error:ReadTimeout",
             )
         )
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(RouteRequest(text="B.", language="en-US"))
 
         self.assertEqual(decision.route, "clarify")
@@ -2115,7 +2115,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("I only heard", decision.speak_first or "")
         calibration = decision.metadata["confidence_calibration"]
         self.assertEqual(calibration["status"], "downgraded_to_clarify")
-        self.assertIn("llm_router_unavailable", calibration["reason"])
+        self.assertIn("goal_interpreter_unavailable", calibration["reason"])
 
     async def test_short_fragment_with_strong_followup_context_is_not_downgraded(self) -> None:
         from agent.app.cognitive_core.goal_interpreter import engine as main
@@ -2141,7 +2141,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -2154,7 +2154,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(
                     text="B.",
@@ -2191,7 +2191,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         }
-        llm_router = _LlmRouter(
+        goal_interpreter = _LlmRouter(
             RouteDecision(
                 route="robot_action",
                 agents=["capability_agent", "safety_agent", "speaker_agent"],
@@ -2205,7 +2205,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
-        ), patch.object(main, "llm_router", llm_router):
+        ), patch.object(main, "goal_interpreter", goal_interpreter):
             decision = await main.interpret_turn(
                 RouteRequest(text="Please fly up to the ceiling.", language="en-US")
             )
@@ -2224,7 +2224,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "unresolved_requires_planner",
         )
         self.assertEqual(
-            decision.metadata["router_semantic_handoff"]["authority"],
+            decision.metadata["core_semantic_handoff"]["authority"],
             "advisory",
         )
 

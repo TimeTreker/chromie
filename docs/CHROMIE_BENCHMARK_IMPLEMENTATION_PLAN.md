@@ -75,7 +75,7 @@ Add benchmark manifest and scenario inventory
 Deliverables:
 
 - versioned benchmark case schema;
-- adapters from compatibility Router, interaction, dialogue, and general-ability
+- adapters from legacy routing path, interaction, dialogue, and general-ability
   scenario formats, preserving their source IDs without presenting Router as the
   settled cognitive ingress architecture;
 - normalized result envelope containing inputs, outputs, evidence, invariant

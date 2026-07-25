@@ -74,7 +74,7 @@ multi-route surface. Route-item lanes include `immediate_speech`,
 `fast_minimal`, `session_compact`, `capability_safety`, and `full_mind`.
 Only short safe chat items may set `direct_to_tts=true`, but that compatibility
 marker alone cannot schedule audio. Playback additionally requires the
-default-off Router-generated FastSpeech gate and its validated structured
+default-off Core-generated FastSpeech gate and its validated structured
 contract, or an independent trusted host response-plan/cache path, while other
 items continue through Agent, memory, deepthought, tool, or Skill Runtime
 policy.
@@ -83,8 +83,8 @@ Both a top-level `RouteDecision` and an individual `RouteItem` may include
 `fast_speech`. A bare string or partial object remains parseable for wire
 compatibility, and top-level `fast_speech.text` may still populate the
 compatibility `speak_first` field. Neither form is playback authority. Dynamic
-Router-authored playback is default-off behind
-`ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED=0`; when explicitly enabled it still
+Core-authored playback is default-off behind
+`ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED=0`; when explicitly enabled it still
 requires a structured object with safe `text`, an allowed process `purpose`, a
 non-terminal `commitment`, and `must_not_claim_completion=true`. It must not
 claim a result, memory write, physical execution, or final answer. Contract
@@ -196,7 +196,7 @@ existing active goals, become an independent new goal, or produce one natural
 clarification when the reference is ambiguous. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
 are rejected. The endpoint itself does not mutate task state, authorize side
-effects, alter Router output, or execute plans. The unified host uses its result
+effects, alter Cognitive Core interpretation output, or execute plans. The unified host uses its result
 in `report_only` observation or authoritative `apply`, and only the host may
 atomically commit the validated association.
 

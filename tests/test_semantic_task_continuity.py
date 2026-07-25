@@ -5,7 +5,7 @@ import unittest
 from agent.app.agents.capability import CapabilityAgent
 from agent.app.agents.base import AgentServices
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from agent.app.cognitive_core.goal_interpreter.llm_router import OllamaLLMRouter
+from agent.app.cognitive_core.goal_interpreter.goal_interpreter import OllamaGoalInterpreter
 from agent.app.cognitive_core.goal_interpreter.schema import RouteRequest
 from shared.chromie_contracts.semantic_task import (
     SemanticGoal,
@@ -344,7 +344,7 @@ class ConversationSemanticTaskTests(unittest.TestCase):
 
 class RouterSemanticTaskPromptTests(unittest.TestCase):
     def test_prompt_exposes_bounded_active_goal_and_semantic_operation_contract(self) -> None:
-        router = OllamaLLMRouter(
+        router = OllamaGoalInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,

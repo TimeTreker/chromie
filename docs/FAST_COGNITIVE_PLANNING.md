@@ -268,7 +268,7 @@ proposal was replaced by deepthinking output.
 
 ## Merge Model
 
-The Orchestrator treats Router output as task proposals, not as final
+The Orchestrator treats Cognitive Core interpretation output as task proposals, not as final
 authorization.
 
 The merge policy is:

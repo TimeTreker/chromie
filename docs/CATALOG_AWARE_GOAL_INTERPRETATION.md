@@ -87,7 +87,7 @@ include schema-shaped `args`, `sequence`, `timing`, a short `reason`, and a
 0.0-1.0 `confidence` for that specific skill choice and arguments. Speech
 inside a physical task uses `chromie.speak` with `args.text`; it should not be
 dropped as ordinary chat or a separate unstructured final answer.
-If a fast Router output selects a capability outside `common_ability_ids` while
+If a fast Cognitive Core interpretation output selects a capability outside `common_ability_ids` while
 the unlocked common catalog is available, validation delegates to `deep_thought`
 instead of treating that rare, locked, or full-catalog ability as an immediate
 fast-lane action.
@@ -105,7 +105,7 @@ write, or completion has happened.
 
 ## Deepthinking Contract
 
-Deepthinking sees the full catalog and the quick Router output. It may:
+Deepthinking sees the full catalog and the quick Cognitive Core interpretation output. It may:
 
 - accept a quick proposal;
 - revise or supersede it;
@@ -152,5 +152,5 @@ If the fast Router is unavailable, deterministic code may preserve context,
 delegate, or fail closed, but should not replace the model with per-query
 catalog matching as the normal semantic chooser.
 
-See [Quick Router Task Planning](QUICK_ROUTER_TASK_PLANNING.md) for the
+See [Quick Router Task Planning](FAST_COGNITIVE_PLANNING.md) for the
 per-action confidence contract and low-confidence handoff plan.

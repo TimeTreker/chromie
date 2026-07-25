@@ -28,7 +28,7 @@ REQUIREMENT_FILES = (
 PROJECT_IMAGE_NAMES = (
     "chromie-asr",
     "chromie-tts",
-    "chromie-router",
+    "chromie-agent",
     "chromie-agent",
 )
 MUTABLE_TAGS = {"latest", "main", "master", "stable", "edge"}

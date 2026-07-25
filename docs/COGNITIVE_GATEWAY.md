@@ -4,7 +4,7 @@ Status: authoritative architecture and terminology decision. The versioned,
 immutable `UserTurnEnvelope`, shared `ReflexOutcome`/`ReflexFilter`, host
 admission adapter, deterministic stop/cancel path, and deterministic local
 suppression path are implemented. Admitted envelopes are projected into the
-current Goal-Driven Cognitive Core without changing the compatibility Router
+current Goal-Driven Cognitive Core without changing the legacy routing path
 or Agent wire contracts. Physical extraction of the five logical modules,
 dedicated Soridormi E-stop/safe-idle evidence, and service-name migration
 remain open. Current implementation and evidence are owned by
@@ -332,7 +332,7 @@ The repository currently exposes these compatibility names and surfaces:
 
 - Docker service `chromie-router` and component directory `router/`;
 - `POST /route`, `GET /routes`, and `RouteDecision`;
-- `ROUTER_*` configuration and `router_*` logs;
+- `AGENT_GOAL_INTERPRETER_*` configuration and `router_*` logs;
 - routes such as `chat`, `tool`, `memory`, `robot_action`, `interrupt`, and
   `ignore`.
 

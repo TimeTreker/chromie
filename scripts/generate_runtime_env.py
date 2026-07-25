@@ -41,7 +41,7 @@ MODEL_PLAN_KEYS = (
 
 COGNITIVE_BUDGET_KEYS = (
     "CHROMIE_COGNITIVE_BUDGET_PROFILE",
-    "ROUTER_TIMEOUT_MS",
+    "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
     "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
     "AGENT_FAST_PLANNER_TIMEOUT_MS",
     "AGENT_DEEP_PLANNER_TIMEOUT_MS",
@@ -340,12 +340,12 @@ def active_models(values: Mapping[str, str]) -> list[str]:
         if value and value not in models:
             models.append(value)
 
-    if enabled(values.get("ROUTER_USE_LLM")):
+    if enabled(values.get("AGENT_GOAL_INTERPRETER_USE_LLM")):
         append(values.get("AGENT_GOAL_INTERPRETER_MODEL"))
         if values.get("AGENT_GOAL_INTERPRETER_REVIEW_MODEL") and (
-            enabled(values.get("ROUTER_POST_INTERRUPT_REVIEW_ENABLED"))
-            or enabled(values.get("ROUTER_SLOW_REVIEW_RECOVERY_ENABLED"), default=True)
-            or enabled(values.get("ROUTER_GENERIC_CHAT_REVIEW_ENABLED"), default=True)
+            enabled(values.get("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED"))
+            or enabled(values.get("AGENT_GOAL_INTERPRETER_SLOW_REVIEW_RECOVERY_ENABLED"), default=True)
+            or enabled(values.get("AGENT_GOAL_INTERPRETER_GENERIC_CHAT_REVIEW_ENABLED"), default=True)
         ):
             append(values.get("AGENT_GOAL_INTERPRETER_REVIEW_MODEL"))
 
