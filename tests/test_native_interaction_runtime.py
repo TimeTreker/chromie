@@ -106,8 +106,8 @@ class _SocialAttentionOllama:
         return {
             "decision": "express",
             "target": {
-                "target_ref": "calibrated_right_side",
-                "source": "installation_calibration",
+                "target_ref": "known_right_side",
+                "source": "conversation_context",
                 "relative_direction": "right",
                 "confidence": 0.7,
                 "metadata": {},
@@ -697,9 +697,9 @@ def _request(
 
 def _with_provider_social_target(request: AgentRunRequest) -> AgentRunRequest:
     request.context["social_attention_target"] = {
-        "source": "installation_calibration",
+        "source": "conversation_context",
         "target": {
-            "target_ref": "calibrated_right_side",
+            "target_ref": "known_right_side",
             "relative_direction": "right",
             "confidence": 0.7,
         },

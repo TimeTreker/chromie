@@ -59,9 +59,9 @@
     "social_attention_capability_ids": ["soridormi.express_attention"],
     "context": {
       "social_attention_target": {
-        "source": "installation_calibration",
+        "source": "conversation_context",
         "target": {
-          "target_ref": "calibrated_right_side",
+          "target_ref": "known_right_side",
           "relative_direction": "right",
           "confidence": 0.7
         }
@@ -71,8 +71,8 @@
     "social_attention_reply": {
       "decision": "express",
       "target": {
-        "target_ref": "calibrated_right_side",
-        "source": "installation_calibration",
+        "target_ref": "known_right_side",
+        "source": "conversation_context",
         "relative_direction": "right",
         "confidence": 0.7,
         "metadata": {}
@@ -103,8 +103,8 @@
         "hold_fraction": 0.3
       }
     ],
-    "skill_metadata_json_contains": ["social_attention_plan", "calibrated_right_side"],
-    "metadata_json_contains": ["social_attention_plan", "social_attention_skills", "installation_calibration"],
+    "skill_metadata_json_contains": ["social_attention_plan", "known_right_side"],
+    "metadata_json_contains": ["social_attention_plan", "social_attention_skills", "conversation_context"],
     "requires_confirmation": false
   }
 }

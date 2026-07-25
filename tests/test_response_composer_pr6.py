@@ -725,7 +725,7 @@ class ResponseComposerResolverTests(unittest.TestCase):
                 "behaviors": [
                     {
                         "skill_id": "soridormi.look_direction",
-                        "args": {"target_yaw_rad": 0.8},
+                        "args": {"direction": "right"},
                     }
                 ],
             },
@@ -739,8 +739,8 @@ class ResponseComposerResolverTests(unittest.TestCase):
                     "requires_confirmation": False,
                     "input_schema": {
                         "type": "object",
-                        "properties": {"target_yaw_rad": {"type": "number"}},
-                        "required": ["target_yaw_rad"],
+                        "properties": {"direction": {"type": "string"}},
+                        "required": ["direction"],
                     },
                 }
             ]

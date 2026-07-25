@@ -1,5 +1,7 @@
 # Changelog
 
+
+- Removed provider backend identity and calibrated yaw/pitch details from model-facing Social Attention candidates and target evidence; provider-owned calibration schemas now fail closed from cognitive discovery.
 All notable user-visible changes should be recorded here.
 
 ## Unreleased

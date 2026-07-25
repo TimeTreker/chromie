@@ -162,8 +162,8 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
             {
                 "decision": "express",
                 "target": {
-                    "target_ref": "calibrated_right_side",
-                    "source": "installation_calibration",
+                    "target_ref": "known_right_side",
+                    "source": "conversation_context",
                     "relative_direction": "right",
                     "confidence": 0.7,
                     "metadata": {},
@@ -182,12 +182,11 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         )
         request = self._request()
         request.context["social_attention_target"] = {
-            "source": "installation_calibration",
+            "source": "conversation_context",
             "target": {
-                "target_ref": "calibrated_right_side",
+                "target_ref": "known_right_side",
                 "relative_direction": "right",
                 "confidence": 0.7,
-                "suggested_args": {"target_yaw_rad": 0.35},
             },
         }
         response = await InteractionRuntime(
@@ -205,7 +204,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.skills[0].timing, "parallel")
         self.assertTrue(response.skills[0].metadata["auxiliary_social_attention"])
         self.assertEqual(response.metadata["social_attention_status"], "applied")
-        self.assertIn("calibrated_right_side", attention.prompts[0])
+        self.assertIn("known_right_side", attention.prompts[0])
         proposals = response.metadata["agent_task_proposals"]
         self.assertTrue(all(item.get("skill_id") != "soridormi.express_attention" for item in proposals))
 
@@ -396,7 +395,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         target = response.skills[0].metadata["attention_target"]
         self.assertEqual(target["source"], "live_perception")
         self.assertEqual(target["target_ref"], "tracked_user_7")
-        self.assertNotIn("calibrated_right_side", attention.prompts[0].split('attention_target_evidence', 1)[1].split('eligible_social_capabilities', 1)[0])
+        self.assertNotIn("known_right_side", attention.prompts[0].split('attention_target_evidence', 1)[1].split('eligible_social_capabilities', 1)[0])
 
     async def test_provider_target_mismatch_is_rejected(self) -> None:
         attention = _AttentionOllama(
@@ -404,7 +403,7 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
                 "decision": "express",
                 "target": {
                     "target_ref": "invented_left_side",
-                    "source": "installation_calibration",
+                    "source": "conversation_context",
                     "relative_direction": "left",
                     "confidence": 0.9,
                     "metadata": {},
@@ -423,9 +422,9 @@ class SocialAttentionPlanningTests(unittest.IsolatedAsyncioTestCase):
         )
         request = self._request()
         request.context["social_attention_target"] = {
-            "source": "installation_calibration",
+            "source": "conversation_context",
             "target": {
-                "target_ref": "calibrated_right_side",
+                "target_ref": "known_right_side",
                 "relative_direction": "right",
                 "confidence": 0.7,
             },

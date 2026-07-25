@@ -35,6 +35,42 @@ except ImportError:  # pragma: no cover - repository development path
 logger = logging.getLogger("chromie.agent.runtime")
 
 
+_SOCIAL_ATTENTION_PROVIDER_OWNED_FIELDS = frozenset(
+    {
+        "head_yaw_rad",
+        "head_pitch_rad",
+        "yaw_rad",
+        "pitch_rad",
+        "target_yaw_rad",
+        "target_pitch_rad",
+        "suggested_args",
+        "installation_calibration",
+        "mode",
+        "backend",
+    }
+)
+
+
+def _contains_provider_owned_field(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).strip().lower() in _SOCIAL_ATTENTION_PROVIDER_OWNED_FIELDS:
+                return True
+            if _contains_provider_owned_field(item):
+                return True
+    elif isinstance(value, list):
+        return any(_contains_provider_owned_field(item) for item in value)
+    return False
+
+
+def _semantic_target_projection(value: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value[key]
+        for key in ("target_ref", "relative_direction", "label", "confidence")
+        if key in value
+    }
+
+
 def _is_missing_ability_clarify(decision: RouteDecision) -> bool:
     return (
         decision.route == "clarify"
@@ -396,6 +432,20 @@ class InteractionRuntime(_AgentPipeline):
             }
             if capability_id not in configured_ids and "social_attention" not in domains:
                 continue
+            if _contains_provider_owned_field(payload.get("input_schema") or {}):
+                logger.info(
+                    "social_attention_candidate_hidden_provider_owned_schema id=%s",
+                    capability_id,
+                )
+                continue
+            metadata = payload.get("metadata")
+            if isinstance(metadata, dict):
+                payload["metadata"] = {
+                    key: value
+                    for key, value in metadata.items()
+                    if str(key).strip().lower() not in {"mode", "backend"}
+                    and not _contains_provider_owned_field(value)
+                }
             candidates.append(payload)
 
         if candidates:
@@ -440,7 +490,7 @@ class InteractionRuntime(_AgentPipeline):
                 source = (
                     explicit_source
                     if explicit_source
-                    in {"live_perception", "conversation_context", "installation_calibration"}
+                    in {"live_perception", "conversation_context"}
                     else "live_perception"
                     if "perception" in key or "perceived" in key
                     else "conversation_context"
@@ -453,7 +503,7 @@ class InteractionRuntime(_AgentPipeline):
                 return {
                     "available": True,
                     "source": source,
-                    "target": target,
+                    "target": _semantic_target_projection(target),
                 }
 
         return {"available": False}

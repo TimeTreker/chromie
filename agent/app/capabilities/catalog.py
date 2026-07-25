@@ -617,7 +617,6 @@ class CapabilityCatalog:
                         },
                         metadata={
                             "upstream_skill_id": upstream_id,
-                            "mode": output.get("mode"),
                             "version": item.get("version"),
                         },
                         can_run_parallel=(

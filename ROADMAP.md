@@ -1,5 +1,7 @@
 # Chromie Roadmap
 
+
+- [x] Remove backend identity and calibrated yaw/pitch details from model-facing Social Attention contracts.
 This document is the authority for delivery order and milestone exit criteria.
 The stable mission is defined in
 [Project Charter](docs/PROJECT_CHARTER.md). Current implementation and evidence

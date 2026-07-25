@@ -599,36 +599,25 @@ class CanonicalPlanRuntimeAdapter:
         schema: dict[str, Any],
         context: dict[str, Any],
     ) -> str | None:
-        properties = schema.get("properties") if isinstance(schema, dict) else {}
-        if not isinstance(properties, dict):
-            properties = {}
-        target_fields = {
-            str(key)
-            for key in properties
-            if str(key).startswith("target_")
-            or str(key)
-            in {"head_yaw_rad", "head_pitch_rad", "yaw_rad", "pitch_rad"}
-        }
-        if not target_fields:
+        semantic_keys = {"direction", "relative_direction", "target_ref"}
+        if not semantic_keys.intersection(args):
             return None
         evidence = context.get("social_attention_target_evidence")
         if not isinstance(evidence, dict) or not evidence.get("available"):
-            return "targeted_behavior_requires_evidence"
-        evidence_target = evidence.get("target")
-        if not isinstance(evidence_target, dict):
-            return "targeted_behavior_requires_evidence"
-        suggested = evidence_target.get("suggested_args")
-        if not isinstance(suggested, dict):
-            suggested = {}
-        for key, expected in suggested.items():
-            if key not in args:
-                continue
-            actual = args.get(key)
-            if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
-                if abs(float(expected) - float(actual)) > 1e-6:
-                    return f"{key}_mismatch"
-            elif actual != expected:
-                return f"{key}_mismatch"
+            return "targeted_behavior_requires_semantic_evidence"
+        target = evidence.get("target")
+        if not isinstance(target, dict):
+            return "targeted_behavior_requires_semantic_evidence"
+        expected_direction = str(target.get("relative_direction") or "").strip()
+        actual_direction = str(
+            args.get("relative_direction") or args.get("direction") or ""
+        ).strip()
+        if expected_direction and actual_direction and expected_direction != actual_direction:
+            return "direction_mismatch"
+        expected_ref = str(target.get("target_ref") or "").strip()
+        actual_ref = str(args.get("target_ref") or "").strip()
+        if expected_ref and actual_ref and expected_ref != actual_ref:
+            return "target_ref_mismatch"
         return None
 
     @staticmethod

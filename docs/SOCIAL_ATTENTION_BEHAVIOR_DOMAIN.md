@@ -178,6 +178,12 @@ interaction executability, schema, resource, and confirmation metadata. It must
 not filter candidates because a provider is labelled `sim`, `hardware`, or any
 other deployment backend.
 
+The model-facing projection also removes provider backend identity and excludes
+capabilities whose public schema exposes calibrated yaw/pitch or installation
+calibration fields. Target evidence contains only semantic identity and relative
+direction. Soridormi converts those semantics into embodiment-specific joint or
+controller values.
+
 ## Host authority
 
 The host may:

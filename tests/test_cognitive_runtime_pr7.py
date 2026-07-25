@@ -1245,8 +1245,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             provider_id="soridormi.mcp",
             input_schema={
                 "type": "object",
-                "properties": {"head_yaw_rad": {"type": "number"}},
-                "required": ["head_yaw_rad"],
+                "properties": {"direction": {"type": "string"}},
+                "required": ["direction"],
             },
             available=True,
             can_run_parallel=True,
@@ -1277,7 +1277,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 behaviors=[
                     {
                         "skill_id": "soridormi.look_at_person",
-                        "args": {"head_yaw_rad": 0.35},
+                        "args": {"direction": "right"},
                         "timing": "parallel",
                     }
                 ],
@@ -1308,7 +1308,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                         "target": {
                             "target_ref": "active_user",
                             "relative_direction": "right",
-                            "suggested_args": {"head_yaw_rad": 0.35},
+                            "relative_direction": "right",
                         },
                     }
                 },
@@ -1327,8 +1327,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             provider_id="soridormi.mcp",
             input_schema={
                 "type": "object",
-                "properties": {"head_yaw_rad": {"type": "number"}},
-                "required": ["head_yaw_rad"],
+                "properties": {"direction": {"type": "string"}},
+                "required": ["direction"],
             },
             available=True,
             can_run_parallel=True,
@@ -1362,7 +1362,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 behaviors=[
                     {
                         "skill_id": "soridormi.look_at_person",
-                        "args": {"head_yaw_rad": -0.3},
+                        "args": {"direction": "left"},
                         "timing": "parallel",
                     }
                 ],

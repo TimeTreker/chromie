@@ -339,6 +339,52 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
             definition.metadata["behavior_domains"], ["social_attention"]
         )
 
+    def test_model_facing_candidates_hide_backend_identity_and_calibration(self):
+        catalog = _Catalog()
+        request = _request()
+        runtime = InteractionRuntime(
+            AgentServices(
+                use_llm=False,
+                capability_catalog=catalog,  # type: ignore[arg-type]
+                social_attention_mode="on",
+            )
+        )
+        asyncio.run(runtime.prepare_response_composition_context(request))
+        candidates = request.context["social_attention_candidates"]
+        self.assertEqual(len(candidates), 2)
+        self.assertNotIn("mode", candidates[0].get("metadata", {}))
+        self.assertNotIn("mode", candidates[1].get("metadata", {}))
+
+    def test_provider_owned_calibration_schema_is_not_model_facing(self):
+        catalog = _Catalog()
+        catalog._entries.append(
+            CapabilityMatch(
+                capability_id="soridormi.calibrated_head_target",
+                agent_id="soridormi.skill",
+                description="Provider-calibrated head target.",
+                available=True,
+                route="robot_action",
+                interaction_executable=True,
+                behavior_domains=["social_attention"],
+                input_schema={
+                    "type": "object",
+                    "properties": {"head_yaw_rad": {"type": "number"}},
+                },
+                score=0.7,
+            )
+        )
+        request = _request()
+        runtime = InteractionRuntime(
+            AgentServices(
+                use_llm=False,
+                capability_catalog=catalog,  # type: ignore[arg-type]
+                social_attention_mode="on",
+            )
+        )
+        asyncio.run(runtime.prepare_response_composition_context(request))
+        ids = {item["capability_id"] for item in request.context["social_attention_candidates"]}
+        self.assertNotIn("soridormi.calibrated_head_target", ids)
+
 
 if __name__ == "__main__":
     unittest.main()

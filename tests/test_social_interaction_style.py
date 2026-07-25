@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import unittest
+
+from pydantic import ValidationError
 from pathlib import Path
 
 from agent.app.agents.base import AgentServices
@@ -197,65 +199,21 @@ class SocialInteractionStyleTests(unittest.TestCase):
         self.assertIn("timing=parallel", ollama.prompt)
         self.assertIn("simulator or physical backend metadata", ollama.prompt)
 
-    def test_host_drops_sequential_auxiliary_request(self):
-        canonical = plan()
-        composition = CoordinatedResponsePlan(
-            composition_id="composition-style",
-            canonical_plan_id=canonical.plan_id,
-            canonical_plan_fingerprint=canonical_plan_fingerprint(canonical),
-            canonical_plan=canonical,
-            response_plan=ResponsePlan(
-                final=ResponseStage(
-                    text="Here is the result.",
-                    covers_goal_ids=canonical.goal_ids,
-                    must_not_claim_completion=True,
-                )
-            ),
-            social_attention_plan=SocialAttentionPlan(
-                decision="express",
-                purpose="acknowledge",
-                metadata={"auxiliary_social_attention": True},
-                behaviors=[
-                    {
-                        "skill_id": "soridormi.attention",
-                        "args": {"intensity": "subtle"},
-                        "timing": "sequential",
-                    }
-                ],
-            ),
-            metadata={"social_attention_policy": {"mode": "on"}},
-        )
-        definition = SkillDefinition(
-            skill_id="soridormi.attention",
-            provider_id="soridormi.mcp",
-            input_schema={
-                "type": "object",
-                "properties": {"intensity": {"type": "string"}},
-                "additionalProperties": False,
-            },
-            available=True,
-            requires_confirmation=False,
-            metadata={"provider_backend": "physical"},
-        )
-
-        response = asyncio.run(
-            CanonicalPlanRuntimeAdapter(
-                _Runtime(definition),
-                social_attention_mode="on",
-            ).build_response(
-                plan=canonical,
-                composition=composition,
-                session_id="style",
-                language="en-US",
-                context={},
+    def test_contract_rejects_sequential_auxiliary_request(self):
+        with self.assertRaises(ValidationError):
+            SocialAttentionPlan.model_validate(
+                {
+                    "decision": "express",
+                    "purpose": "acknowledge",
+                    "behaviors": [
+                        {
+                            "skill_id": "soridormi.attention",
+                            "args": {"intensity": "subtle"},
+                            "timing": "sequential",
+                        }
+                    ],
+                }
             )
-        )
-
-        self.assertEqual(response.skills, [])
-        self.assertIn(
-            "auxiliary_must_be_parallel:soridormi.attention",
-            response.metadata["omitted_social_attention"],
-        )
 
     def test_file_backed_backend_parity_scenarios(self):
         fixture = (

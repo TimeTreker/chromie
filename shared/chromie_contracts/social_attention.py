@@ -39,10 +39,9 @@ SocialAttentionDecision = Literal["none", "express"]
 SocialAttentionTargetSource = Literal[
     "live_perception",
     "conversation_context",
-    "installation_calibration",
     "none",
 ]
-SocialAttentionSkillTiming = Literal["parallel", "sequential"]
+SocialAttentionSkillTiming = Literal["parallel"]
 SocialAttentionInteractionRole = Literal["auxiliary_expression"]
 SocialAttentionPurpose = Literal[
     "acknowledge",

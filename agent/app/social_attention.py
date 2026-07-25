@@ -315,8 +315,6 @@ class SocialAttentionPlanner:
             return "attention_target_not_available"
         if source == "live_perception" and evidence_source != "live_perception":
             return "unverified_live_perception_target"
-        if source == "installation_calibration" and evidence_source != "installation_calibration":
-            return "unverified_calibrated_target"
         evidence_target = target_evidence.get("target")
         if not isinstance(evidence_target, dict):
             evidence_target = {}
@@ -336,34 +334,24 @@ class SocialAttentionPlanner:
         schema: dict[str, Any],
         target_evidence: dict[str, Any],
     ) -> str | None:
-        properties = schema.get("properties") if isinstance(schema, dict) else {}
-        if not isinstance(properties, dict):
-            properties = {}
-        target_fields = {
-            key
-            for key in properties
-            if str(key).startswith("target_")
-            or str(key) in {"head_yaw_rad", "head_pitch_rad", "yaw_rad", "pitch_rad"}
-        }
-        if not target_fields:
+        semantic_keys = {"direction", "relative_direction", "target_ref"}
+        if not semantic_keys.intersection(args):
             return None
         if not bool(target_evidence.get("available")):
-            return "targeted_behavior_without_target_evidence"
+            return "targeted_behavior_without_semantic_target_evidence"
         target = target_evidence.get("target")
         if not isinstance(target, dict):
-            target = {}
-        suggested = target.get("suggested_args")
-        if not isinstance(suggested, dict):
-            suggested = {}
-        for key, expected in suggested.items():
-            if key not in args:
-                continue
-            actual = args.get(key)
-            if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
-                if abs(float(expected) - float(actual)) > 1e-6:
-                    return f"{key} does not match calibrated target evidence"
-            elif actual != expected:
-                return f"{key} does not match target evidence"
+            return "targeted_behavior_without_semantic_target_evidence"
+        expected_direction = str(target.get("relative_direction") or "").strip()
+        actual_direction = str(
+            args.get("relative_direction") or args.get("direction") or ""
+        ).strip()
+        if expected_direction and actual_direction and expected_direction != actual_direction:
+            return "direction does not match semantic target evidence"
+        expected_ref = str(target.get("target_ref") or "").strip()
+        actual_ref = str(args.get("target_ref") or "").strip()
+        if expected_ref and actual_ref and expected_ref != actual_ref:
+            return "target_ref does not match semantic target evidence"
         return None
 
     def _all_candidate_map(self, request: AgentRunRequest) -> dict[str, dict[str, Any]]:
