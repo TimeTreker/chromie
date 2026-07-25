@@ -41,6 +41,11 @@ from .deep_planner import DeepPlannerResolver
 from .response_composer import ResponseComposerResolver
 from .tool_result_interpreter import ToolResultInterpreter
 from .schema import AgentResult, AgentRunRequest, HealthResponse
+from .cognitive_core.goal_interpreter import (
+    RouteDecision as CoreRouteDecision,
+    RouteRequest as CoreRouteRequest,
+    interpret_turn,
+)
 from .task_graph import (
     ExecutionTrace,
     TaskGraph,
@@ -778,6 +783,13 @@ async def agents() -> dict:
         },
     }
 
+
+
+
+@app.post("/cognitive-core/interpret", response_model=CoreRouteDecision)
+async def interpret_cognitive_turn(request: CoreRouteRequest) -> CoreRouteDecision:
+    """Interpret one admitted turn inside the Goal-Driven Cognitive Core."""
+    return await interpret_turn(request)
 
 @app.post("/fast-plan")
 async def resolve_fast_plan(request: AgentRunRequest):

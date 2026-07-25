@@ -78,6 +78,34 @@ class AgentClient:
                 raise RuntimeError(f"Agent returned HTTP {resp.status}: {body[:500]}")
             return AgentResult.model_validate_json(body)
 
+    async def interpret_turn(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        text: str,
+        sid: str | None = None,
+        language: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> RouteDecision:
+        payload = {
+            "sid": sid,
+            "text": text,
+            "language": language,
+            "context": context or {},
+        }
+        timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
+        async with session.post(
+            f"{self.base_url}/cognitive-core/interpret",
+            json=payload,
+            timeout=timeout,
+        ) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                raise RuntimeError(
+                    f"Cognitive Core returned HTTP {resp.status}: {body[:500]}"
+                )
+            return RouteDecision.model_validate_json(body)
+
     async def health(self, session: aiohttp.ClientSession) -> dict[str, Any]:
         timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
         async with session.get(f"{self.base_url}/health", timeout=timeout) as resp:
