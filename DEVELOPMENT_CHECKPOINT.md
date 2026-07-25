@@ -1,5 +1,7 @@
 # Development Checkpoint
 
+- Legacy compatibility planning no longer substitutes nearby provider skills or converts/clamps one skill's arguments into another skill's schema.
+
 
 - Model-facing Social Attention contracts now expose semantic target identity/direction only; backend identity and provider calibration values remain inside Soridormi.
 **Development identity:** `development`; no release version or publication target is planned.

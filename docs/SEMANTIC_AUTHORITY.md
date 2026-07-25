@@ -146,3 +146,12 @@ On the NVIDIA workstation, retain evidence for:
 A live failure does not reopen the old planner during the same turn. Recovery
 must start a new turn or use an explicitly initiated emergency compatibility
 operation.
+
+## Exact skill identity in compatibility planning
+
+Even under the explicitly enabled emergency compatibility planner, the selected
+named skill and its semantic arguments remain model-authored. The CapabilityAgent
+may validate the selected skill against the live catalog and validate or repair
+arguments against that same skill schema, but it must not substitute a nearby
+skill, translate one skill's arguments into another schema, or clamp values as a
+semantic rewrite. Invalid output fails closed or returns to model repair.

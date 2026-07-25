@@ -752,3 +752,10 @@ Operational details and evidence commands are maintained in
 [Goal-Driven Cognitive Runtime Rollout](docs/COGNITIVE_RUNTIME_ROLLOUT.md).
 
 This checkpoint is implemented and automatically verified only. Retained live-text and MuJoCo evidence must still be collected before target validation is claimed.
+
+### Completed: compatibility semantic identity closure
+
+- Removed legacy CapabilityAgent substitution of one provider skill for another.
+- Removed cross-schema yaw/pitch conversion and clamping from Chromie.
+- Added a static authority guard and regression test requiring exact selected
+  skill identity and arguments to survive compatibility planning.

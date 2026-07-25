@@ -756,7 +756,7 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(proposals[1].request_id, response.skills[0].request_id)
         self.assertTrue(proposals[1].effectful)
 
-    async def test_native_runtime_preserves_routed_head_target_wrapper(self) -> None:
+    async def test_native_runtime_preserves_model_selected_skill_and_args(self) -> None:
         request = _request(
             text="Please turn your head right.",
             route="robot_action",
@@ -773,9 +773,11 @@ class NativeInteractionRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         ).run(request)
 
-        self.assertEqual(response.skills[0].skill_id, "soridormi.look_at_person")
-        self.assertEqual(response.skills[0].args["target_yaw_rad"], 0.3)
-        self.assertEqual(response.skills[0].args["duration_s"], 2.0)
+        self.assertEqual(response.skills[0].skill_id, "soridormi.look_direction")
+        self.assertEqual(
+            response.skills[0].args,
+            {"head_yaw_rad": 0.3, "duration_s": 1.0},
+        )
 
     async def test_speech_while_body_action_waits_for_playback_start(self) -> None:
         request = _legacy_request(

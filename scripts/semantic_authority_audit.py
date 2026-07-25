@@ -124,6 +124,17 @@ def audit() -> dict[str, Any]:
         if required not in capability:
             errors.append(f"CapabilityAgent authority guard missing: {required}")
 
+    for forbidden in (
+        "_normalize_plan_for_routed_surface",
+        "_look_direction_args_to_person_target_args",
+        "_clamp_number_for_schema",
+    ):
+        if forbidden in capability:
+            errors.append(
+                "CapabilityAgent still rewrites model-selected skill semantics: "
+                f"{forbidden}"
+            )
+
     conversation = _read("agent/app/agents/conversation.py")
     for forbidden in (
         "_ensure_factual_subject_anchor",

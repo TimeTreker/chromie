@@ -325,3 +325,11 @@ Normally start the complete service set through:
 - TaskGraph scheduler, grants, and traces are process-local rather than durable or distributed.
 - Cross-process robot exclusivity is enforced by Soridormi, not by the Agent's local scheduler.
 - Enabling physical execution is not equivalent to hardware commissioning or target acceptance.
+
+## Compatibility planner semantic boundary
+
+The emergency-only legacy CapabilityAgent preserves the exact named skill chosen
+by its model and validates arguments only against that skill's advertised schema.
+It does not replace `soridormi.look_direction` with
+`soridormi.look_at_person`, reinterpret yaw/pitch fields, or silently clamp one
+skill into another provider contract.

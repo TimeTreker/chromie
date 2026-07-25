@@ -1,5 +1,7 @@
 # Changelog
 
+- Removed legacy CapabilityAgent semantic skill substitution and argument reinterpretation; compatibility planning now preserves the exact model-selected named skill and schema-valid arguments.
+
 
 - Removed provider backend identity and calibrated yaw/pitch details from model-facing Social Attention candidates and target evidence; provider-owned calibration schemas now fail closed from cognitive discovery.
 All notable user-visible changes should be recorded here.
