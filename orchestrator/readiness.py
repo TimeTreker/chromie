@@ -23,9 +23,7 @@ class ServiceReadinessGate:
         ollama_model: str | None = None,
         speaker_id: str = "default",
         get_http_session: Callable[[], Awaitable[aiohttp.ClientSession]] | None = None,
-        router_url: str | None = None,
         agent_url: str | None = None,
-        enable_router: bool = False,
         enable_agent: bool = False,
     ):
         self.asr_url = asr_url
@@ -34,9 +32,7 @@ class ServiceReadinessGate:
         self.ollama_model = ollama_model
         self.speaker_id = speaker_id
         self.get_http_session = get_http_session
-        self.router_url = router_url.rstrip("/") if router_url else None
         self.agent_url = agent_url.rstrip("/") if agent_url else None
-        self.enable_router = enable_router
         self.enable_agent = enable_agent
 
     async def wait_until_ready(self, interval: float = 2.0):
@@ -78,10 +74,7 @@ class ServiceReadinessGate:
         if self.llm_url:
             # Ollama generate endpoint may not support GET; skip strict LLM check here.
             logger.info("LLM URL configured: %s model=%s", self.llm_url, self.ollama_model)
-        if self.enable_router and self.router_url:
-            async with session.get(f"{self.router_url}/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
-                if resp.status != 200:
-                    raise RuntimeError(f"Router health HTTP {resp.status}")
+
         if self.enable_agent and self.agent_url:
             async with session.get(f"{self.agent_url}/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 if resp.status != 200:

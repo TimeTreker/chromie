@@ -51,13 +51,8 @@ class CoreTurnProjection:
     history: list[dict[str, Any]]
 
 
-class GatewayCoreCompatibilityAdapter:
-    """Build the canonical turn envelope while preserving current interfaces.
-
-    Router and Agent wire shapes remain unchanged during this migration slice.
-    The envelope is recorded alongside them and is the source of Core turn
-    identity, normalized text, language, and context correlation.
-    """
+class CognitiveGateway:
+    """Build the canonical turn envelope before Goal-Driven Core reasoning."""
 
     _CONTEXT_SOURCES = {
         "conversation": "orchestrator.conversation_state",
@@ -219,7 +214,7 @@ class GatewayCoreCompatibilityAdapter:
             admission="suppress",
         )
 
-    def for_route(
+    def for_core_review(
         self,
         capture: GatewayTurnCapture,
         *,
@@ -229,7 +224,7 @@ class GatewayCoreCompatibilityAdapter:
         metadata = (
             decision.metadata if isinstance(getattr(decision, "metadata", None), dict) else {}
         )
-        reflex = self._router_reflex(metadata) or capture.reflex_candidate
+        reflex = self._core_reflex(metadata) or capture.reflex_candidate
         route = str(getattr(decision, "route", "") or "")
         if route == "ignore" or reflex.action == "ignore":
             confidence = self._bounded_confidence(
@@ -252,7 +247,7 @@ class GatewayCoreCompatibilityAdapter:
                     source=(
                         "cognitive_gateway.reflex_filter"
                         if reflex.action == "ignore"
-                        else "compatibility_router.attention_review"
+                        else "cognitive_core.attention_review"
                     ),
                     confidence=confidence,
                     reason=str(
@@ -282,11 +277,11 @@ class GatewayCoreCompatibilityAdapter:
             reflex=reflex,
             attention=AttentionFinding(
                 disposition="admit",
-                source="compatibility_router.attention_review",
+                source="cognitive_core.attention_review",
                 confidence=attention_confidence,
                 reason=str(
                     getattr(decision, "reason", "")
-                    or "input admitted by compatibility review"
+                    or "input admitted after Cognitive Core attention review"
                 ),
             ),
             context=context,
@@ -398,7 +393,7 @@ class GatewayCoreCompatibilityAdapter:
         return tuple(references)
 
     @staticmethod
-    def _router_reflex(metadata: dict[str, Any]) -> ReflexOutcome | None:
+    def _core_reflex(metadata: dict[str, Any]) -> ReflexOutcome | None:
         raw = metadata.get("reflex_outcome")
         if not isinstance(raw, dict):
             return None
@@ -428,7 +423,7 @@ class GatewayCoreCompatibilityAdapter:
 
 __all__ = [
     "CoreTurnProjection",
-    "GatewayCoreCompatibilityAdapter",
+    "CognitiveGateway",
     "GatewayTurnCapture",
     "USER_TURN_ENVELOPE_CONTEXT_KEY",
 ]

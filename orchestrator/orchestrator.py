@@ -29,7 +29,6 @@ from orchestrator.readiness import ServiceReadinessGate
 from orchestrator.vad import VAD
 from orchestrator.clients.action_client import ActionClient
 from orchestrator.clients.agent_client import AgentClient
-from orchestrator.clients.router_client import RouterClient
 from orchestrator.runtime.abilities import (
     AbilityRegistry,
     build_default_ability_registry,
@@ -54,7 +53,7 @@ from orchestrator.runtime.cognitive_runtime import (
 )
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.cognitive_gateway import (
-    GatewayCoreCompatibilityAdapter,
+    CognitiveGateway,
 )
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.episode import EpisodeRecorder
@@ -204,7 +203,6 @@ class VoiceAssistant:
         self.llm_url = os.getenv("LLM_URL", "http://localhost:11434/api/generate")
         self.ollama_model = os.getenv("OLLAMA_MODEL", "gemma4:e2b")
 
-        self.enable_router = env_bool("ORCH_ENABLE_ROUTER", False)
         self.enable_agent = env_bool("ORCH_ENABLE_AGENT", False)
         self.enable_interaction_response = env_bool(
             "ORCH_ENABLE_INTERACTION_RESPONSE",
@@ -231,8 +229,8 @@ class VoiceAssistant:
             "ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED",
             False,
         )
-        self.router_generated_fast_speech_enabled = env_bool(
-            "ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED",
+        self.core_generated_fast_speech_enabled = env_bool(
+            "ORCH_CORE_GENERATED_FAST_SPEECH_ENABLED",
             False,
         )
         self.fast_first_audio_enabled = env_bool(
@@ -405,14 +403,12 @@ class VoiceAssistant:
         self.deepthinking_policy = DeepThinkingDelegationPolicy(
             DeepThinkingPolicyConfig.from_env()
         )
-        self.router_url = os.getenv("ROUTER_URL", "http://127.0.0.1:8091")
         self.agent_url = os.getenv("AGENT_URL", "http://127.0.0.1:8092")
         self.action_executor_url = os.getenv("ACTION_EXECUTOR_URL", "http://127.0.0.1:8095")
         self.action_dry_run = env_bool("ORCH_ACTION_DRY_RUN", True)
         self.abilities = build_default_ability_registry(
             enable_agent=self.enable_agent,
         )
-        self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "9000")))
         self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "3000")))
         self.action_client = ActionClient(self.action_executor_url, int(os.getenv("ORCH_ACTION_TIMEOUT_MS", "5000")))
         self.asr_timeout_s = max(
@@ -717,7 +713,7 @@ class VoiceAssistant:
         self.cognitive_turn_closure = CognitiveTurnClosure(
             self.interaction_runtime
         )
-        self.cognitive_gateway = GatewayCoreCompatibilityAdapter()
+        self.cognitive_gateway = CognitiveGateway()
         self.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=self.agent_client,
             adapter=CanonicalPlanRuntimeAdapter(
@@ -743,7 +739,7 @@ class VoiceAssistant:
             self.confirmation_dialogue.ttl_s,
             self.fast_first_response_enabled,
             self.fast_first_tool_response_enabled,
-            self.router_generated_fast_speech_enabled,
+            self.core_generated_fast_speech_enabled,
             self.fast_first_audio_cache.enabled,
             self.fast_first_audio_hedge_ms,
             self.fast_first_audio_cache.cache_dir,
@@ -2981,7 +2977,7 @@ class VoiceAssistant:
     def _cognitive_gateway_adapter(self) -> GatewayCoreCompatibilityAdapter:
         adapter = getattr(self, "cognitive_gateway", None)
         if adapter is None:
-            adapter = GatewayCoreCompatibilityAdapter()
+            adapter = CognitiveGateway()
             self.cognitive_gateway = adapter
         return adapter
 
@@ -4358,32 +4354,6 @@ class VoiceAssistant:
                 boundary.get("reason"),
             )
 
-        if not self.enable_router:
-            turn_envelope = gateway.for_direct(
-                turn_capture,
-                source="orchestrator.router_disabled",
-                reason="compatibility Router is disabled; preserving existing direct path",
-            )
-            self.conversation_state.record_user_turn(
-                session_id,
-                user_text,
-                route="direct_llm",
-                intent="unknown",
-                metadata=self._metadata_with_turn_envelope(
-                    {"source": "router_disabled"},
-                    turn_envelope,
-                ),
-            )
-            self.active_llm_task = asyncio.create_task(
-                self.process_llm_tts(
-                    user_text,
-                    session_id,
-                    fallback_reason="router_disabled",
-                    route="direct_llm",
-                )
-            )
-            return
-
         session = await self.get_http_session()
         context = self.build_context(session_id)
         turn_capture = gateway.with_conversation_id(
@@ -4407,14 +4377,14 @@ class VoiceAssistant:
                 separators=(",", ":"),
             ),
         )
-        router_start_ms = now_ms()
-        self.session_log(session_id, "router_start: text_chars=%s text=%r", len(user_text), user_text)
+        core_start_ms = now_ms()
+        self.session_log(session_id, "cognitive_core_start: text_chars=%s text=%r", len(user_text), user_text)
         try:
-            decision = await self.router_client.route(session, text=user_text, sid=session_id, context=context)
-            router_latency_ms = now_ms() - router_start_ms
+            decision = await self.agent_client.interpret_turn(session, text=user_text, sid=session_id, context=context)
+            router_latency_ms = now_ms() - core_start_ms
             self.session_log(
                 session_id,
-                "router_done: router_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
+                "cognitive_core_done: core_ms=%.1f route=%s agents=%s intent=%s confidence=%.2f interrupt=%s needs_agent=%s",
                 router_latency_ms,
                 decision.route,
                 ",".join(decision.agents),
@@ -4424,8 +4394,8 @@ class VoiceAssistant:
                 decision.needs_agent,
             )
         except Exception as exc:
-            self.session_log(session_id, "router_exception: router_ms=%.1f error=%s", now_ms() - router_start_ms, exc)
-            logger.warning("Router failed; falling back to direct LLM: %s", exc)
+            self.session_log(session_id, "cognitive_core_exception: core_ms=%.1f error=%s", now_ms() - core_start_ms, exc)
+            logger.warning("Cognitive Core interpretation failed; falling back safely: %s", exc)
             safe_response = self._router_exception_safe_response(
                 user_text,
                 context=context,
@@ -4433,23 +4403,23 @@ class VoiceAssistant:
             turn_envelope = gateway.for_direct(
                 turn_capture,
                 context=context,
-                source="orchestrator.router_exception",
-                reason="compatibility Router failed; preserving existing fallback path",
+                source="orchestrator.cognitive_core_exception",
+                reason="Cognitive Core interpretation failed; preserving safe fallback",
             )
             if safe_response is not None:
                 self.conversation_state.record_user_turn(
                     session_id,
                     user_text,
                     route="safe_fallback",
-                    intent="router_exception_embodied",
+                    intent="cognitive_core_exception_embodied",
                     metadata=self._metadata_with_turn_envelope(
-                        {"source": "router_exception", "error": str(exc)},
+                        {"source": "cognitive_core_exception", "error": str(exc)},
                         turn_envelope,
                     ),
                 )
                 self.session_log(
                     session_id,
-                    "router_exception_safe_fallback: reason=embodied_request text=%r",
+                    "cognitive_core_exception_safe_fallback: reason=embodied_request text=%r",
                     user_text,
                 )
                 self.conversation_state.record_agent_result(session_id, safe_response)
@@ -4459,9 +4429,9 @@ class VoiceAssistant:
                 session_id,
                 user_text,
                 route="direct_llm",
-                intent="router_exception",
+                intent="cognitive_core_exception",
                 metadata=self._metadata_with_turn_envelope(
-                    {"source": "router_exception", "error": str(exc)},
+                    {"source": "cognitive_core_exception", "error": str(exc)},
                     turn_envelope,
                 ),
             )
@@ -4469,13 +4439,13 @@ class VoiceAssistant:
                 self.process_llm_tts(
                     user_text,
                     session_id,
-                    fallback_reason="router_exception",
+                    fallback_reason="cognitive_core_exception",
                     route="direct_llm",
                 )
             )
             return
 
-        turn_envelope = gateway.for_route(
+        turn_envelope = gateway.for_core_review(
             turn_capture,
             context=context,
             decision=decision,
@@ -7829,9 +7799,7 @@ class VoiceAssistant:
             ollama_model=self.ollama_model,
             speaker_id=self.speaker_id,
             get_http_session=self.get_http_session,
-            router_url=self.router_url,
             agent_url=self.agent_url,
-            enable_router=self.enable_router,
             enable_agent=self.enable_agent,
         )
         self.asr_ws = await gate.wait_until_ready()
