@@ -389,7 +389,6 @@ class _CognitiveTurnScenarioRuntime:
         self.cancelled_request_ids: list[str] = []
         self.on_effectful_done: Any = None
         self.soridormi_invoker = None
-        self.soridormi_mode = None
         self.runtime: SkillRuntime | None = None
         if self.mode == "active_cancel":
             registry = SkillRegistry()

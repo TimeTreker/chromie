@@ -90,7 +90,6 @@ class InteractionRuntimeCoordinator:
         soridormi_invoker: AsyncToolInvoker | None = None,
         task_graph_handler: TaskGraphHandler | None = None,
         task_graph_cancel_handler: TaskGraphCancelHandler | None = None,
-        auto_confirm_sim: bool = True,
     ) -> None:
         self.registry = SkillRegistry()
         self.registry.register(local_speech_definition())
@@ -119,8 +118,6 @@ class InteractionRuntimeCoordinator:
                 )
             )
         self.soridormi_invoker = soridormi_invoker
-        self.auto_confirm_sim = auto_confirm_sim
-        self.soridormi_mode: str | None = None
         self._catalog_loaded = False
         self._catalog_last_loaded_at: float | None = None
         self._catalog_refresh_ttl_s = _float_env(
@@ -282,15 +279,6 @@ class InteractionRuntimeCoordinator:
                 )
 
         authorized_request_ids = set(confirmed_request_ids or ())
-        if (
-            body_requests
-            and self.soridormi_mode == "sim"
-            and self.auto_confirm_sim
-            and self._body_auto_confirm_allowed(prepared)
-        ):
-            authorized_request_ids.update(
-                request.request_id for request in body_requests
-            )
         after_skills_speech = [
             speech for speech in prepared.speech if speech.timing == "after_skills"
         ]
@@ -608,19 +596,6 @@ class InteractionRuntimeCoordinator:
             traces=[*first.traces, *second.traces],
         )
 
-    @staticmethod
-    def _body_auto_confirm_allowed(response: InteractionResponse) -> bool:
-        metadata = response.metadata if isinstance(response.metadata, dict) else {}
-        if metadata.get("disable_body_auto_confirm") is True:
-            return False
-        if metadata.get("post_interrupt_physical_resume_lock") is True:
-            return False
-        for request in response.skills:
-            request_metadata = request.metadata if isinstance(request.metadata, dict) else {}
-            if request_metadata.get("post_interrupt_physical_resume_lock") is True:
-                return False
-        return True
-
     async def confirmation_request_ids(
         self,
         response: InteractionResponse,
@@ -643,42 +618,7 @@ class InteractionRuntimeCoordinator:
         }
         if response.requires_confirmation and not required:
             required.update(request.request_id for request in response.skills)
-        if (
-            self.soridormi_mode == "sim"
-            and self.auto_confirm_sim
-            and self._body_auto_confirm_allowed(response)
-        ):
-            required.difference_update(
-                request.request_id for request in body_requests
-            )
         return required
-
-    async def confirmation_exemption_request_ids(
-        self,
-        response: InteractionResponse,
-    ) -> set[str]:
-        body_requests = [
-            request
-            for request in response.skills
-            if request.skill_id.startswith("soridormi.")
-        ]
-        if not body_requests:
-            return set()
-        await self._ensure_soridormi_catalog(
-            required_skill_ids=(request.skill_id for request in body_requests),
-        )
-        if not (
-            self.soridormi_mode == "sim"
-            and self.auto_confirm_sim
-            and self._body_auto_confirm_allowed(response)
-        ):
-            return set()
-        return {
-            request.request_id
-            for request in body_requests
-            if request.requires_confirmation
-            or self.registry.get(request.skill_id).requires_confirmation
-        }
 
     async def cancel_all(self) -> None:
         await self.runtime.cancel_all()
@@ -773,13 +713,7 @@ class InteractionRuntimeCoordinator:
                 raise RuntimeError(
                     "Soridormi named-skill catalog response has no skills list"
                 )
-            self.soridormi_mode = str(outcome.output.get("mode") or "unknown")
-            self.registry.import_soridormi_catalog(
-                skills,
-                requires_confirmation=not (
-                    self.soridormi_mode == "sim" and self.auto_confirm_sim
-                ),
-            )
+            self.registry.import_soridormi_catalog(skills)
             if "soridormi.mcp" not in self.runtime.provider_ids():
                 self.runtime.register_provider(
                     SoridormiNamedSkillAdapter(self.soridormi_invoker)

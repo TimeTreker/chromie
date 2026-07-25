@@ -19,7 +19,7 @@ Implemented now:
 - bounded scheduling and exclusive groups;
 - timeouts, traces, cancellation, and barge-in propagation;
 - host-owned spoken request-bound confirmation with expiry and denial;
-- simulation-only auto-confirm exemptions;
+- provider-declared confirmation requirements plus backend-neutral Host safety rules;
 - deterministic text-driven live Soridormi acceptance.
 
 Open release-support gates:
@@ -213,7 +213,9 @@ The coordinator:
 - loads the Soridormi named-skill catalog when the provider is enabled;
 - attaches session metadata;
 - translates speech items into Skill Runtime requests;
-- computes applicable simulation confirmation exemptions;
+- imports the provider's effective semantic confirmation contract;
+- applies Host-owned confirmation only for interaction-level rules such as a
+  material alternative or post-interrupt physical resume;
 - executes the complete response through one runtime;
 - exposes interaction-scoped cancellation.
 
@@ -287,7 +289,7 @@ Implemented behavior:
 
 - per-request and per-definition confirmation flags;
 - authorization by exact request ID;
-- simulation-mode catalog exemptions;
+- provider-declared catalog confirmation requirements;
 - rejection when required confirmation is absent;
 - TaskGraph graph-bound confirmation grants on the Agent side.
 - an explicit host-generated, action-specific spoken prompt;
@@ -303,7 +305,7 @@ Implemented behavior:
 
 Only one confirmation is pending in the host process at a time. Its default
 expiry is 20 seconds and is configurable with `ORCH_CONFIRMATION_TTL_SEC`.
-No hardware motion uses simulation auto-confirm behavior.
+No confirmation decision is inferred from simulator or hardware identity.
 
 ## Failure and fallback behavior
 
@@ -325,7 +327,6 @@ No hardware motion uses simulation auto-confirm behavior.
 ```env
 ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=0
-ORCH_AUTO_CONFIRM_SIM_SKILLS=0
 ORCH_CONFIRMATION_TTL_SEC=20
 ORCH_SKILL_MAX_CONCURRENCY=8
 ORCH_COGNITIVE_RUNTIME_MODE=apply
@@ -335,9 +336,10 @@ AGENT_NATIVE_INTERACTION_FALLBACK=0
 ```
 
 The common safe base owns the `chat` lane through the unified cognitive runtime
-while leaving Soridormi skills and simulation auto-confirm off. The maintained
-Soridormi launcher widens authority to `chat,robot_action`; simulator acceptance
-must still close before any supervised hardware work.
+while leaving Soridormi skills off. The maintained Soridormi launcher widens
+authority to `chat,robot_action`; provider-backed simulator acceptance must still
+close before any supervised physical deployment. Runtime confirmation policy is
+not selected from backend identity.
 
 ## Acceptance
 

@@ -19,11 +19,15 @@ class _SoridormiInvoker:
         execute_outcome: ToolCallOutcome | None = None,
         monitor_outcome: ToolCallOutcome | None = None,
         execute_delay_s: float = 0,
+        requires_confirmation: bool = False,
+        provider_mode: str = "opaque-backend",
     ) -> None:
         self.calls: list[tuple[str, dict[str, Any], ToolInvocationContext | None]] = []
         self.execute_outcome = execute_outcome
         self.monitor_outcome = monitor_outcome
         self.execute_delay_s = execute_delay_s
+        self.requires_confirmation = requires_confirmation
+        self.provider_mode = provider_mode
 
     async def invoke(
         self,
@@ -36,7 +40,7 @@ class _SoridormiInvoker:
         if tool_name == "soridormi.skill.list":
             return ToolCallOutcome.success(
                 {
-                    "mode": "sim",
+                    "mode": self.provider_mode,
                     "skills": [
                         {
                             "skill_id": "nod_yes",
@@ -53,6 +57,7 @@ class _SoridormiInvoker:
                                 "additionalProperties": False,
                             },
                             "interruptible": True,
+                            "requires_confirmation": self.requires_confirmation,
                         }
                     ],
                 }
@@ -382,8 +387,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
-            soridormi_invoker=_SoridormiInvoker(),
-            auto_confirm_sim=False,
+            soridormi_invoker=_SoridormiInvoker(requires_confirmation=True),
         )
         response = InteractionResponse(
             skills=[
@@ -441,7 +445,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(scheduled, [])
 
-    async def test_sim_body_skill_discovers_catalog_and_executes(self) -> None:
+    async def test_provider_body_skill_discovers_catalog_and_executes(self) -> None:
         invoker = _SoridormiInvoker()
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
@@ -471,7 +475,7 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 "soridormi.skill.execute_plan",
             ],
         )
-        self.assertTrue(invoker.calls[-1][2].confirmed)
+        self.assertFalse(invoker.calls[-1][2].confirmed)
 
     async def test_existing_body_skill_reuses_fresh_catalog(self) -> None:
         invoker = _SoridormiInvoker()
@@ -686,34 +690,35 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(invoker.catalog_calls, 3)
         self.assertTrue(coordinator.registry.get("soridormi.wave_hand").available)
 
-    async def test_sim_auto_confirm_exemption_is_reportable(self) -> None:
+    async def test_provider_confirmation_is_not_changed_by_backend_metadata(self) -> None:
+        for provider_mode in ("sim", "hardware", "opaque-backend"):
+            with self.subTest(provider_mode=provider_mode):
+                coordinator = InteractionRuntimeCoordinator(
+                    lambda args: {"scheduled": True},
+                    soridormi_invoker=_SoridormiInvoker(
+                        requires_confirmation=True,
+                        provider_mode=provider_mode,
+                    ),
+                )
+                response = InteractionResponse(
+                    skills=[
+                        {
+                            "request_id": "nod-1",
+                            "skill_id": "soridormi.nod_yes",
+                            "args": {"count": 2},
+                        }
+                    ]
+                )
+
+                self.assertEqual(
+                    await coordinator.confirmation_request_ids(response),
+                    {"nod-1"},
+                )
+
+    async def test_semantic_alternative_requires_confirmation_independent_of_backend(self) -> None:
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
             soridormi_invoker=_SoridormiInvoker(),
-            auto_confirm_sim=True,
-        )
-        response = InteractionResponse(
-            skills=[
-                {
-                    "request_id": "nod-1",
-                    "skill_id": "soridormi.nod_yes",
-                    "args": {"count": 2},
-                    "requires_confirmation": True,
-                }
-            ]
-        )
-
-        self.assertEqual(await coordinator.confirmation_request_ids(response), set())
-        self.assertEqual(
-            await coordinator.confirmation_exemption_request_ids(response),
-            {"nod-1"},
-        )
-
-    async def test_semantic_alternative_disables_sim_auto_confirmation(self) -> None:
-        coordinator = InteractionRuntimeCoordinator(
-            lambda args: {"scheduled": True},
-            soridormi_invoker=_SoridormiInvoker(),
-            auto_confirm_sim=True,
         )
         response = InteractionResponse(
             skills=[
@@ -724,19 +729,12 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
                     "requires_confirmation": True,
                 }
             ],
-            metadata={
-                "disable_body_auto_confirm": True,
-                "semantic_plan_confirmation_required": True,
-            },
+            metadata={"semantic_plan_confirmation_required": True},
         )
 
         self.assertEqual(
             await coordinator.confirmation_request_ids(response),
             {"nod-alternative"},
-        )
-        self.assertEqual(
-            await coordinator.confirmation_exemption_request_ids(response),
-            set(),
         )
 
     async def test_body_skill_fails_closed_when_provider_is_disabled(self) -> None:
@@ -941,11 +939,10 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_request_bound_confirmation_authorizes_only_exact_request(self) -> None:
-        invoker = _SoridormiInvoker()
+        invoker = _SoridormiInvoker(requires_confirmation=True)
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
             soridormi_invoker=invoker,
-            auto_confirm_sim=False,
         )
         response = InteractionResponse(
             skills=[

@@ -3,12 +3,13 @@
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 **Status refresh date:** 2026-07-24
-**Current focus:** Implement embodiment-independent Social Attention: remove
-simulation-aware policy from Chromie, enable Social Attention by default, move
-courtesy and expressiveness into the owner-approved mind profile, and keep
-simulator-versus-physical selection plus body safety entirely in Soridormi and
-its providers. Fast Planner latency qualification and retained TTS evidence
-remain open engineering tracks after this architecture correction.
+**Current focus:** Close the remaining embodiment-boundary audit findings. The
+first correction slice removes simulator/hardware ability states and
+simulator-derived confirmation authority from Chromie. The next slice deletes
+the legacy Host-generated deep-thought body cue and then strips backend identity
+and calibrated body arguments from model-facing Chromie contracts. Fast Planner
+latency qualification and retained TTS evidence remain open engineering tracks
+after this architecture correction.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -29,16 +30,25 @@ path.
 
 ## Resume point
 
-The embodiment-independent Social Attention implementation is complete in the
-working tree. The public gate is `off`, `report_only`, or `on`, with maintained
-default `on`; owner-approved interaction style and bounded recent auxiliary
-request evidence reach Response Composer; candidate discovery and Host
-materialization ignore provider backend identity; Chromie-owned fallback
+The first post-audit correction slice is complete in the working tree. Chromie's
+static ability ontology now has only backend-neutral lifecycle states and never
+activates provider body skills from simulator, hardware, or dry-run settings.
+The Host no longer stores provider mode, no longer imports a simulator
+confirmation exemption, and no longer suppresses confirmation speech with
+phrase matching. The live provider catalog supplies the effective named-skill
+confirmation requirement; material alternatives and post-interrupt physical
+resume remain fresh-confirmation rules independent of backend. Diagnostic tools
+may inject an explicit confirmation grant, but never infer it from simulation.
+
+The broader Social Attention implementation remains: public gate `off`,
+`report_only`, or `on` with maintained default `on`; owner-approved interaction
+style and bounded recent auxiliary request evidence reach Response Composer;
+candidate discovery ignores provider backend identity; Chromie-owned fallback
 calibration is removed; and auxiliary requests are parallel-only, optional, and
-lower priority than speech, emergency handling, and primary goals. Soridormi
-retains backend selection and all body-specific safety. Automated focused and
-scenario validation is required after applying this patch; retained live
-provider evidence remains open.
+lower priority than speech, emergency handling, and primary goals. The next
+correction slice should delete the now-inactive Host-generated deep-thought body
+cue and its static semantic defaults. Retained live provider evidence remains
+open.
 
 The Fast Planner functional implementation in
 [Fast Planner Multi-Goal Contract Path](docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)

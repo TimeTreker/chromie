@@ -1,10 +1,8 @@
 # Chromie High-Level Ability Registry
 
-Chromie's high-level ability registry is the robot's current self-model of
-what it can do. It sits above concrete Soridormi skills and host services.
-Routers, planners, and host orchestration should request abilities such as
-`speech.thinking_ack` or `social.thinking_pose`, then let the runtime decide
-whether the ability is fulfilled now.
+Chromie's high-level ability registry is a static cognitive ontology of abilities
+it can understand and discuss. It is not a body-backend selector and it is not an
+executable Soridormi catalog.
 
 The registry is implemented in `orchestrator/runtime/abilities.py`.
 
@@ -12,25 +10,32 @@ The registry is implemented in `orchestrator/runtime/abilities.py`.
 
 | Status | Meaning |
 |---|---|
-| `available` | The ability can be fulfilled in the current host runtime. |
-| `sim_only` | The ability is fulfilled only in the simulator-safe path. |
-| `hardware_only` | The ability is reserved for a hardware-only implementation. |
-| `stub` | Placeholder entry without a reviewed roadmap decision. |
+| `available` | A trusted Chromie-local implementation can fulfill the ability now. |
+| `stub` | Placeholder entry without an executable implementation. |
 | `planned` | A reviewed roadmap ability, not executable yet. |
 | `known_missing` | Chromie understands the ability, but no trusted implementation exists now. |
-| `forbidden` | The ability should not be implemented or offered for safety/policy reasons. |
-| `disabled` | The ability has an implementation but is disabled by runtime flags. |
+| `forbidden` | The ability must not be offered or implemented under current safety/policy rules. |
+| `disabled` | A Chromie-local implementation exists but is disabled by a runtime gate. |
+
+The ontology deliberately has no simulator-only or hardware-only status. Chromie
+does not decide whether Soridormi is simulated or physical. A backend change must
+not change Chromie's personality, social policy, semantic skill choice, or user
+authorization logic.
+
+Only `available` entries with a non-stub Chromie-local implementation are
+executable through this static registry. Provider-backed embodied abilities are
+resolved from the live provider catalog at planning/execution time instead.
 
 Optional social abilities may be skipped silently when unavailable. If the user
-directly asks for an ability that is not fulfilled, Chromie should answer with a
-language-matched unavailable message:
+directly requests an unavailable ability, Chromie should answer with a
+language-matched message:
 
 - English: `Sorry, I don't have that ability yet.`
 - Chinese: `抱歉，我现在还没有这个能力。`
 
 ## Initial Ability Map
 
-The registry currently names normal human-like ability families:
+The ontology names normal human-like ability families:
 
 | Family | Examples |
 |---|---|
@@ -44,79 +49,63 @@ The registry currently names normal human-like ability families:
 | Environment | `environment.open_door`, `environment.turn_on_light`, `environment.clean_surface` |
 | Task | `task.execute_skill`, `task.confirm_before_action`, `task.cancel_current_action`, `task.monitor_action` |
 | Safety | `safety.check_capability`, `safety.check_motion_allowed`, `safety.refuse_unsafe_request` |
-| State | `state.report_robot_status`, `state.report_sim_or_hardware_mode`, `state.report_missing_ability` |
+| State | `state.report_robot_status`, `state.report_missing_ability` |
 
-Many human-like abilities are deliberately `known_missing` or `planned` until a
-trusted implementation exists. This lets Chromie understand broad requests,
-answer honestly when the ability is missing, and preserve stable names for
-future implementation.
+Many human-like abilities remain `known_missing` or `planned` until a trusted
+implementation exists. This lets Chromie understand broad requests, answer
+honestly, and preserve stable semantic names without claiming execution.
 
-The registry is not an execution catalog. A `known_missing`, `planned`, or
-`stub` ability may appear in a task-proposal ledger as `state=missing_ability`,
-but it must not be sent to the Skill Runtime. Executable work still requires an
-exact skill from the current executable catalog plus the normal Agent,
-Orchestrator, Skill Runtime, and provider gates.
+## Static Ontology Versus Live Provider Catalog
+
+The static ontology and the live execution catalog have different jobs:
+
+```text
+Static ability ontology
+  -> understands broad human intent and missing abilities
+
+Live provider catalog
+  -> supplies exact named skills, schemas, effective availability,
+     confirmation requirements, scheduling constraints, and resources
+
+Skill Runtime
+  -> validates and executes only exact live definitions
+```
+
+A `known_missing`, `planned`, or `stub` ontology entry may appear in a proposal
+ledger as missing, but it must never be sent to Skill Runtime. Executable body
+work requires an exact live provider skill and the normal planner, Host,
+authorization, runtime, and provider gates.
+
+The Host does not infer body availability from dry-run mode, simulator identity,
+hardware identity, or a launcher profile. Soridormi/provider owns backend
+selection and returns the effective semantic contract for the active body.
 
 See [Dream Broadly, Execute Honestly](DREAM_BROADLY_EXECUTE_HONESTLY.md) for the
-router/deepthinking contract that separates broad understanding from honest
-execution.
+understanding-versus-execution contract.
 
 ## Fast-First Speech Loop
 
-The host may speak a short route-level first phrase before the slower Agent
-finishes. This is the first implemented slice of the live proposal/arbiter
-model: fast output is preferred, and later Agent or deep-thinking output may
-clarify, correct, confirm, cancel, or complete the turn.
-
-The first phrase must be a truthful state signal, not an execution claim:
+The Host may speak a short route-level acknowledgement before slower reasoning.
+It must be a truthful state signal, not an execution claim:
 
 - chat: `I'm here.` / `我在。`
 - factual or non-small-talk chat: `I'll answer.` / `我来回答。`
-- robot action: no host fast-first phrase; committed `chromie.speak` tasks own
-  any acknowledgement or requested spoken performance inside the robot-action
-  plan.
+- robot action: no Host-authored body or execution claim;
 - tool lookup: `I'll check that.` / `我查一下。`
 - memory request: `I'll note that.` / `我记一下。`
 - deep thought: `Okay, let me think about that.` / `好的，我想一下。`
 
-`ORCH_FAST_FIRST_RESPONSE_ENABLED=1` enables this behavior by default. It does
-not authorize skills, memory writes, tools, or body motion. It only reduces the
-silence between Router completion and Agent completion.
+`ORCH_FAST_FIRST_RESPONSE_ENABLED=1` enables this speech behavior. It does not
+authorize skills, memory writes, tools, or body motion.
 
-## Deep-Thinking Fulfilled Loop
+Optional Social Attention is selected separately by Response Composer from the
+live provider catalog under the owner-approved Social Interaction Style. It is
+parallel-only, optional, and lower priority than speech, emergency handling, and
+explicit user actions. The static ability registry does not generate a fixed
+thinking pose.
 
-The first ability-backed social/body loop remains the deep-thinking handoff:
-
-```text
-User asks for complicated planning
--> Emergency filter passes because this is not stop/cancel/noise
--> Quick intent router chooses explicit deep_thought
--> Chromie executes speech.thinking_ack
--> Chromie optionally executes social.thinking_pose in simulator-safe mode
--> Deepthinking agent plans
--> Chromie speaks the final answer
-```
-
-Low-confidence routing handoffs do not automatically execute a generic
-`speech.thinking_ack` or `social.thinking_pose`; Chromie should avoid saying
-“let me think” for short operational commands or ambiguous follow-ups unless the
-quick Router model explicitly supplied a truthful `speak_first` prelude. That
-prelude is treated as a provisional speech task and must not claim physical
-execution, tool results, memory writes, or completion. Stop, cancel, emergency,
-silence, and unusable-audio paths stay deterministic and bypass this loop.
-
-`social.thinking_pose` resolves to `soridormi.express_attention` only when all
-simulator-safe gates are enabled:
-
-- structured interaction response is enabled;
-- Soridormi skills are enabled;
-- simulator auto-confirm is enabled;
-- host action mode is dry-run.
-
-Outside that mode, the ability remains a `stub` and is not executed.
-
-Validate this scenario against a running voice-MuJoCo stack with:
+Validate the maintained text-to-provider path with:
 
 ```bash
-./scripts/run_deep_thought_response_case.sh --no-speaker
+./scripts/run_voice_mujoco_text_case.sh --no-speaker "Please nod twice."
 ```

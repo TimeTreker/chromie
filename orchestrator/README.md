@@ -103,8 +103,11 @@ are explicit rollback controls.
 Use `ORCH_ENABLE_SORIDORMI_SKILLS=0` for speech-only rollout. Named body skills
 fail closed when their provider is disabled or unavailable.
 
-`ORCH_AUTO_CONFIRM_SIM_SKILLS=1` applies only to Soridormi-declared simulation
-exemptions. It must not waive confirmation for real hardware motion.
+Soridormi's live named-skill catalog supplies the effective confirmation
+requirement for each skill. Chromie does not inspect simulator or hardware mode
+to add or remove authorization. Interaction-level rules such as material
+alternatives and post-interrupt physical resume may still require fresh user
+confirmation regardless of the provider declaration.
 
 ### Compatibility path
 
@@ -289,7 +292,8 @@ is process-local; Soridormi is the cross-process robot authority.
 The non-skippable spoken confirmation dialogue is implemented with an
 action-specific prompt, bounded reply matching, request binding, expiry,
 single-use approval, deterministic denial, and operational-interrupt
-passthrough. Simulation-only auto-confirm exemptions remain separate. Retained
+passthrough. Confirmation is derived from the provider contract plus backend-neutral
+Host safety rules. Retained
 automatic and supervised approval/denial evidence is still an alpha gate.
 One pending token may cover multiple requests. A motion stop revokes that whole
 token if any confirmed request is motion-bound or cannot be safely classified;

@@ -406,7 +406,6 @@ def check_configuration_reference(errors: list[str]) -> None:
     safety_default_names = (
         "ORCH_ENABLE_INTERACTION_RESPONSE",
         "ORCH_ENABLE_SORIDORMI_SKILLS",
-        "ORCH_AUTO_CONFIRM_SIM_SKILLS",
         "ORCH_GOAL_ASSOCIATION_MODE",
         "ORCH_FAST_PLANNER_MODE",
         "ORCH_DEEP_PLANNER_MODE",

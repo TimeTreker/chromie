@@ -5,7 +5,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 MCP_URL="${SORIDORMI_MCP_URL:-http://127.0.0.1:8000/mcp}"
-AUTO_CONFIRM=1
 BUILD_IMAGES=0
 REBUILD_NO_CACHE=0
 KEEP_SERVICES=0
@@ -26,8 +25,6 @@ Options:
   --rebuild-no-cache      Rebuild repository-owned images without cache
   --mcp-url URL           Soridormi MCP URL
                           default: http://127.0.0.1:8000/mcp
-  --require-confirmation  Require spoken confirmation for simulator skills
-  --auto-confirm          Use declared simulator confirmation exemptions (default)
   --keep-services         Leave Chromie containers running after exit
   --no-orchestrator       Start/probe services, then skip the host Orchestrator
   --architecture-validation
@@ -43,8 +40,6 @@ while [ "$#" -gt 0 ]; do
     --build) BUILD_IMAGES=1; shift ;;
     --rebuild-no-cache) BUILD_IMAGES=1; REBUILD_NO_CACHE=1; shift ;;
     --mcp-url) MCP_URL="${2:?--mcp-url requires a URL}"; shift 2 ;;
-    --require-confirmation) AUTO_CONFIRM=0; shift ;;
-    --auto-confirm) AUTO_CONFIRM=1; shift ;;
     --keep-services) KEEP_SERVICES=1; shift ;;
     --no-orchestrator) START_ORCHESTRATOR=0; shift ;;
     --architecture-validation) ARCHITECTURE_VALIDATION=1; shift ;;
@@ -504,7 +499,6 @@ ORCH_ENABLE_ROUTER=1
 ORCH_ENABLE_AGENT=1
 ORCH_ENABLE_INTERACTION_RESPONSE=1
 ORCH_ENABLE_SORIDORMI_SKILLS=1
-ORCH_AUTO_CONFIRM_SIM_SKILLS=${AUTO_CONFIRM}
 ORCH_SORIDORMI_MANIFEST=capabilities/soridormi.json
 AGENT_INTERACTION_OUTPUT_MODE=native
 AGENT_NATIVE_INTERACTION_FALLBACK=0

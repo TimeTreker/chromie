@@ -214,10 +214,6 @@ class VoiceAssistant:
             "ORCH_ENABLE_SORIDORMI_SKILLS",
             False,
         )
-        self.auto_confirm_sim_skills = env_bool(
-            "ORCH_AUTO_CONFIRM_SIM_SKILLS",
-            False,
-        )
         self.addressedness_gate_enabled = env_bool(
             "ORCH_ADDRESSEDNESS_GATE_ENABLED",
             True,
@@ -415,10 +411,6 @@ class VoiceAssistant:
         self.action_dry_run = env_bool("ORCH_ACTION_DRY_RUN", True)
         self.abilities = build_default_ability_registry(
             enable_agent=self.enable_agent,
-            enable_interaction_response=self.enable_interaction_response,
-            enable_soridormi_skills=self.enable_soridormi_skills,
-            auto_confirm_sim_skills=self.auto_confirm_sim_skills,
-            action_dry_run=self.action_dry_run,
         )
         self.router_client = RouterClient(self.router_url, int(os.getenv("ORCH_ROUTER_TIMEOUT_MS", "9000")))
         self.agent_client = AgentClient(self.agent_url, int(os.getenv("ORCH_AGENT_TIMEOUT_MS", "3000")))
@@ -705,7 +697,6 @@ class VoiceAssistant:
             soridormi_invoker=soridormi_invoker,
             task_graph_handler=self._execute_planning_task_graph,
             task_graph_cancel_handler=self._cancel_planning_task_graph,
-            auto_confirm_sim=self.auto_confirm_sim_skills,
         )
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
@@ -743,13 +734,12 @@ class VoiceAssistant:
             goal_state_apply=None,
         )
         logger.info(
-            "Interaction runtime: endpoint=%s soridormi_skills=%s auto_confirm_sim=%s "
+            "Interaction runtime: endpoint=%s soridormi_skills=%s "
             "confirmation_ttl_s=%.1f fast_first_response=%s fast_first_tool=%s "
             "router_generated_fast_speech=%s fast_first_audio=%s hedge_ms=%s "
             "cache_dir=%s prime_on_startup=%s prime_timeout_ms=%s",
             self.enable_interaction_response,
             self.enable_soridormi_skills,
-            self.auto_confirm_sim_skills,
             self.confirmation_dialogue.ttl_s,
             self.fast_first_response_enabled,
             self.fast_first_tool_response_enabled,
@@ -2467,16 +2457,6 @@ class VoiceAssistant:
             return abilities
         return build_default_ability_registry(
             enable_agent=bool(getattr(self, "enable_agent", True)),
-            enable_interaction_response=bool(
-                getattr(self, "enable_interaction_response", False)
-            ),
-            enable_soridormi_skills=bool(
-                getattr(self, "enable_soridormi_skills", False)
-            ),
-            auto_confirm_sim_skills=bool(
-                getattr(self, "auto_confirm_sim_skills", True)
-            ),
-            action_dry_run=bool(getattr(self, "action_dry_run", True)),
         )
 
     def _ability_unavailable_response(
@@ -5089,22 +5069,7 @@ class VoiceAssistant:
         confirmation_request_ids = (
             await self.interaction_runtime.confirmation_request_ids(response)
         )
-        exempted_request_ids = (
-            await self.interaction_runtime.confirmation_exemption_request_ids(response)
-        )
-        if exempted_request_ids:
-            self.session_log(
-                session_id,
-                "confirmation_exempted: reason=sim_auto_confirm mode=sim request_ids=%s",
-                ",".join(sorted(exempted_request_ids)),
-            )
         if not confirmation_request_ids:
-            if exempted_request_ids:
-                self._suppress_auto_confirm_confirmation_speech(
-                    response,
-                    exempted_request_ids=exempted_request_ids,
-                    session_id=session_id,
-                )
             return False
 
         confirmation_prompt = str(
@@ -5180,55 +5145,6 @@ class VoiceAssistant:
             reset_playback=reset_playback,
         )
         return True
-
-    def _suppress_auto_confirm_confirmation_speech(
-        self,
-        response: InteractionResponse,
-        *,
-        exempted_request_ids: set[str],
-        session_id: str,
-    ) -> None:
-        if not exempted_request_ids or len(response.speech) < 2:
-            return
-        kept = []
-        dropped_text: list[str] = []
-        for speech in response.speech:
-            if self._is_confirmation_only_speech(speech.text):
-                dropped_text.append(speech.text)
-                continue
-            kept.append(speech)
-        if not dropped_text or not kept:
-            return
-        response.speech = kept
-        response.metadata = {
-            **response.metadata,
-            "auto_confirm_suppressed_confirmation_speech": len(dropped_text),
-        }
-        self.session_log(
-            session_id,
-            "auto_confirm_speech_suppressed: dropped=%s kept=%s request_ids=%s",
-            len(dropped_text),
-            len(kept),
-            ",".join(sorted(exempted_request_ids)),
-        )
-
-    @staticmethod
-    def _is_confirmation_only_speech(text: str) -> bool:
-        normalized = " ".join((text or "").casefold().split())
-        if not normalized:
-            return False
-        confirmation_needles = (
-            "can you confirm",
-            "please confirm",
-            "confirm this action",
-            "confirm the action",
-            "do you confirm",
-            "确认这个动作",
-            "请确认",
-            "你确认",
-            "确认吗",
-        )
-        return any(needle in normalized for needle in confirmation_needles)
 
     async def _handle_confirmation_reply(
         self,
@@ -6520,11 +6436,10 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "skill_runtime_done: status=%s results=%s traces=%s provider_mode=%s runtime_ms=%.1f",
+                "skill_runtime_done: status=%s results=%s traces=%s runtime_ms=%.1f",
                 execution.status,
                 len(execution.results),
                 len(execution.traces),
-                getattr(self.interaction_runtime, "soridormi_mode", None) or "not-used",
                 now_ms() - started_ms,
             )
             for result in execution.results:

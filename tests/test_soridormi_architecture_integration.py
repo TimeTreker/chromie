@@ -92,7 +92,6 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
             soridormi_invoker=invoker,
-            auto_confirm_sim=True,
         )
 
         result = await coordinator.execute(
@@ -146,7 +145,6 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
             soridormi_invoker=invoker,
-            auto_confirm_sim=True,
         )
 
         result = await coordinator.execute(
@@ -183,14 +181,13 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("x", chromie_intent)
         self.assertNotIn("y", chromie_intent)
 
-    async def test_post_interrupt_body_correction_cannot_auto_resume_in_sim(
+    async def test_post_interrupt_body_correction_requires_fresh_confirmation(
         self,
     ) -> None:
         invoker = _ArchitectureInvoker()
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
             soridormi_invoker=invoker,
-            auto_confirm_sim=True,
         )
         response, locked_request_ids = lock_post_interrupt_physical_resume(
             InteractionResponse(

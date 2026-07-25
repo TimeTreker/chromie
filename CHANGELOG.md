@@ -4,6 +4,24 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Backend-neutral ability and confirmation boundary
+
+- Removed backend-scoped states from Chromie's static ability
+  ontology. Provider-backed body skills are no longer activated from Host dry-run,
+  simulator, or hardware settings.
+- Removed the legacy simulator-derived confirmation flag and every backend-mode confirmation
+  branch from the Host runtime, launchers, configuration, diagnostics, tests, and
+  active documentation.
+- Made the live Soridormi/provider catalog authoritative for each named skill's
+  effective confirmation requirement. Material alternatives and post-interrupt
+  physical resume still require fresh Host-owned confirmation independent of the
+  provider backend.
+- Replaced backend-specific acceptance confirmation controls with an explicit,
+  backend-neutral diagnostic confirmation grant.
+- Disabled the legacy static-registry deep-thought body cue by keeping embodied
+  ontology entries non-executable; deletion of the remaining dead Host cue code is
+  the next architecture-cleanup slice.
+
 ### Embodiment-independent Social Attention and personality policy
 
 - Reduced the public policy to `off`, `report_only`, and `on`, with `on` as the

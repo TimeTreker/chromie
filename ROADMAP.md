@@ -130,7 +130,7 @@ Completion criteria:
 
 See [TTS Provider Contract and Evaluation](docs/TTS_PROVIDER_EVALUATION.md).
 
-## Completed architecture track - Embodiment-independent Social Attention
+## Active architecture correction - Embodiment-independent Social Attention
 
 Chromie should decide social intent, style, and optional semantic expression
 without knowing whether Soridormi currently targets a simulator or a physical
@@ -145,6 +145,11 @@ The authoritative decision, migration sequence, and acceptance criteria are in
 Implemented scope:
 
 - public modes are `off`, `report_only`, and `on`, with maintained default `on`;
+- the static Chromie ability ontology has no simulator-only or hardware-only
+  lifecycle states and does not activate provider body skills from Host mode;
+- the live provider catalog supplies effective confirmation requirements, while
+  material alternatives and post-interrupt physical resume use backend-neutral
+  Host confirmation rules;
 - owner-approved courtesy, expressiveness, initiative, restraint, cooldown, and
   repetition guidance lives in `MindProfile.social_interaction_style`;
 - candidate discovery, model prompting, and Host materialization are independent
@@ -154,8 +159,11 @@ Implemented scope:
 - contract and file-backed backend-parity scenarios cover stable named-skill and
   semantic-argument behavior.
 
-Remaining evidence work: retain live Soridormi interaction evidence through the
-currently configured provider and run the full release-quality regression gate.
+Remaining architecture work: delete the legacy Host-generated deep-thought body
+cue, remove backend identity from model-facing catalog projections, and move
+calibrated yaw/pitch handling fully behind the provider boundary. Then retain
+live Soridormi interaction evidence and run the full release-quality regression
+gate.
 
 ## Open architecture track - Orchestrator task proposal merge
 

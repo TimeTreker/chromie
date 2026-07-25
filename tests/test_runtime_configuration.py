@@ -171,7 +171,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_FAST_FIRST_TOOL_RESPONSE_ENABLED"], "0")
         self.assertEqual(values["ORCH_ENABLE_INTERACTION_RESPONSE"], "1")
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_SKILLS"], "0")
-        self.assertEqual(values["ORCH_AUTO_CONFIRM_SIM_SKILLS"], "0")
         self.assertEqual(values["TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC"], "3")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
         self.assertEqual(values["ORCH_COGNITIVE_APPLY_LANES"], "chat")

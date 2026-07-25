@@ -42,18 +42,17 @@ Ability ontology entries use these meanings:
 
 | Status | Meaning |
 |---|---|
-| `available` | Fulfilled by the current host runtime. |
-| `sim_only` | Fulfilled only in the simulator-safe path. |
-| `hardware_only` | Reserved for a commissioned hardware implementation. |
+| `available` | Fulfilled by a trusted Chromie-local implementation. |
 | `stub` | Placeholder entry without a reviewed roadmap decision. |
 | `planned` | A reviewed roadmap ability, not executable yet. |
 | `known_missing` | Chromie understands the ability, but no trusted implementation exists now. |
 | `forbidden` | The ability should not be implemented or offered for safety/policy reasons. |
 | `disabled` | An implementation exists but is disabled by runtime flags or provider state. |
 
-Only `available`, `sim_only`, and `hardware_only` can become executable, and
-only when their implementation is not a stub and a matching runtime skill is
-present.
+Only `available` ontology entries with a non-stub Chromie-local implementation
+can execute through the static registry. Provider-backed embodied work requires
+an exact skill from the live provider catalog; the ontology never infers
+execution from simulator or hardware identity.
 
 ## Router Contract
 

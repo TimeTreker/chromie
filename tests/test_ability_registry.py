@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
+from typing import get_args
+
 from orchestrator.runtime.abilities import (
+    AbilityStatus,
     DEFAULT_UNAVAILABLE_EN,
     DEFAULT_UNAVAILABLE_ZH,
     build_default_ability_registry,
@@ -50,34 +53,19 @@ class AbilityRegistryTests(unittest.TestCase):
             "好的，我想一下。",
         )
 
-    def test_thinking_pose_is_sim_only_when_safe_sim_cues_are_enabled(self) -> None:
-        registry = build_default_ability_registry(
-            enable_interaction_response=True,
-            enable_soridormi_skills=True,
-            auto_confirm_sim_skills=True,
-            action_dry_run=True,
-        )
-        ability = registry.get("social.thinking_pose")
+    def test_static_registry_has_no_backend_specific_statuses(self) -> None:
+        registry = build_default_ability_registry()
+        statuses = {ability.status for ability in registry.list()}
 
-        self.assertEqual(ability.status, "sim_only")
-        self.assertTrue(ability.can_execute)
-        self.assertEqual(ability.soridormi_skill_id, "soridormi.express_attention")
-        self.assertEqual(
-            dict(ability.default_args),
-            {
-                "style": "neutral",
-                "duration_s": 2.4,
-                "hold_fraction": 0.35,
-            },
-        )
+        legacy_sim_status = "sim" + "_only"
+        legacy_hardware_status = "hardware" + "_only"
+        self.assertNotIn(legacy_sim_status, get_args(AbilityStatus))
+        self.assertNotIn(legacy_hardware_status, get_args(AbilityStatus))
+        self.assertNotIn(legacy_sim_status, statuses)
+        self.assertNotIn(legacy_hardware_status, statuses)
 
-    def test_thinking_pose_is_stub_outside_safe_sim_mode(self) -> None:
-        registry = build_default_ability_registry(
-            enable_interaction_response=True,
-            enable_soridormi_skills=True,
-            auto_confirm_sim_skills=True,
-            action_dry_run=False,
-        )
+    def test_static_registry_does_not_activate_provider_body_skills(self) -> None:
+        registry = build_default_ability_registry()
         ability = registry.get("social.thinking_pose")
 
         self.assertEqual(ability.status, "stub")

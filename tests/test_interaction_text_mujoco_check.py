@@ -142,13 +142,15 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertIn("SEMANTIC_RUNTIME_FLAG=--cognitive-runtime", source)
         self.assertIn("--legacy-agent-runtime", source)
         self.assertIn('"$SEMANTIC_RUNTIME_FLAG"', source)
+        self.assertIn("--grant-confirmation", source)
+        self.assertNotIn("auto-confirm" + "-sim", source)
 
     def test_configure_environment_uses_isolated_conversation_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir, patch.dict(os.environ, {}, clear=True):
             args = argparse.Namespace(
                 router_url="http://127.0.0.1:8091",
                 agent_url="http://127.0.0.1:8092",
-                auto_confirm_sim=True,
+                grant_confirmation=True,
                 speaker=False,
                 manifest=Path("capabilities/soridormi.json"),
                 cognitive_runtime=True,

@@ -467,7 +467,6 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
     os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_INTERACTION_RESPONSE"] = "1"
     os.environ["ORCH_ENABLE_SORIDORMI_SKILLS"] = "1"
-    os.environ["ORCH_AUTO_CONFIRM_SIM_SKILLS"] = "1" if args.auto_confirm_sim else "0"
     os.environ["ORCH_AUDIO_INPUT_MODE"] = "stdin"
     os.environ["ORCH_AUDIO_OUTPUT_MODE"] = "device" if args.speaker else "discard"
     if not args.speaker:
@@ -735,15 +734,24 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
             reject_speech_patterns = INTERNAL_SPEECH_PATTERNS + reject_speech_patterns
         errors.extend(validate_speech_contract(response, reject_speech_patterns))
 
-        if response.requires_confirmation and not args.auto_confirm_sim:
+        confirmation_request_ids = (
+            await assistant.interaction_runtime.confirmation_request_ids(response)
+        )
+        if confirmation_request_ids and not args.grant_confirmation:
             errors.append(
-                "InteractionResponse requires confirmation, but this text check "
-                "does not collect a spoken confirmation reply."
+                "The provider/Host contract requires confirmation, but this text "
+                "check was not given an explicit confirmation grant."
             )
 
         if not errors and not args.preview_only:
             execution_start = time.perf_counter()
-            execution = await assistant.execute_interaction_response(response, sid)
+            execution = await assistant.execute_interaction_response(
+                response,
+                sid,
+                confirmed_request_ids=(
+                    confirmation_request_ids if args.grant_confirmation else None
+                ),
+            )
             timings_ms["execution_ms"] = (
                 time.perf_counter() - execution_start
             ) * 1000.0
@@ -899,7 +907,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--preview-only", action="store_true", help="Route and validate /interaction without executing Soridormi skills.")
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi modes. Use only under separate supervision.")
-    parser.add_argument("--auto-confirm-sim", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--grant-confirmation",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Grant any provider/Host-declared confirmation requirements inside "
+            "this supervised diagnostic harness, independent of backend type."
+        ),
+    )
     parser.add_argument("--require-speech", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument(
         "--expect-route",

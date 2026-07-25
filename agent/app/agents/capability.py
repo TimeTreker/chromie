@@ -649,7 +649,6 @@ class CapabilityAgent(BaseAgent):
         if semantic_confirmation:
             result.metadata.update(
                 {
-                    "disable_body_auto_confirm": True,
                     "semantic_plan_confirmation_required": True,
                     "confirmation_prompt": speech,
                 }

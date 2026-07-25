@@ -214,7 +214,8 @@ does not authorize a side effect.
 - requires the TaskGraph diagnostics bearer token;
 - makes no MCP calls;
 - simulates dependency and policy behavior;
-- can auto-confirm simulated confirmation nodes when requested;
+- can inject explicit confirmation proofs when requested by the diagnostic
+  caller;
 - stores the resulting trace in process memory.
 
 ### Read-only

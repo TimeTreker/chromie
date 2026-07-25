@@ -1237,9 +1237,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertTrue(
             all(item.requires_confirmation for item in result.interaction_response.skills)
         )
-        self.assertTrue(
-            result.interaction_response.metadata["disable_body_auto_confirm"]
-        )
 
     def test_host_keeps_attention_with_matching_runtime_evidence(self):
         plan = respond_plan()

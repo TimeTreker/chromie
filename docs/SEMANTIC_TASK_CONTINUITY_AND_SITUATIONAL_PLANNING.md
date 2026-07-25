@@ -264,8 +264,8 @@ The first dependency-light slice is implemented in the current repository:
   A malformed or unavailable sub-step rejects the entire effectful plan, so a
   clarification response cannot coexist with a leaked partial execution;
 - a material alternative plan is retained as a complete pending proposal with
-  the model-authored explanation and is never simulator-auto-confirmed. The host
-  waits for user confirmation tied to that plan version before execution;
+  the model-authored explanation. The Host waits for user confirmation tied to
+  that plan version before execution, independent of provider backend;
 - legacy normal-language capability parsers for action names, counts, speeds, and
   durations are removed from the Capability Agent. Deterministic code remains
   responsible only for contract validation, resource arbitration, confirmation,

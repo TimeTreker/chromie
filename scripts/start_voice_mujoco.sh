@@ -15,7 +15,6 @@ FOLLOW_CAMERA=1
 BUILD_IMAGES=0
 REBUILD_NO_CACHE=0
 KEEP_RUNNING=0
-AUTO_CONFIRM=1
 
 usage() {
   cat <<'USAGE'
@@ -35,9 +34,6 @@ Options:
   --no-viewer           Run MuJoCo headless
   --follow-camera       Keep the viewer centered on the robot; default
   --no-follow-camera    Disable viewer follow camera
-  --require-confirmation
-                        Require spoken confirmation for simulator skills
-  --auto-confirm        Use simulator confirmation exemptions; default
   --keep-running        Leave containers/simulator running after launcher exits
   -h, --help            Show this help
 USAGE
@@ -54,8 +50,6 @@ while [ "$#" -gt 0 ]; do
     --no-viewer) VIEWER=0; shift ;;
     --follow-camera) FOLLOW_CAMERA=1; shift ;;
     --no-follow-camera) FOLLOW_CAMERA=0; shift ;;
-    --require-confirmation) AUTO_CONFIRM=0; shift ;;
-    --auto-confirm) AUTO_CONFIRM=1; shift ;;
     --keep-running) KEEP_RUNNING=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[voice-mujoco][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -168,12 +162,6 @@ chromie_args=(--mcp-url "http://127.0.0.1:${MCP_PORT}${MCP_PATH}")
 if [ "$KEEP_RUNNING" = "1" ]; then chromie_args+=(--keep-services); fi
 if [ "$BUILD_IMAGES" = "1" ]; then chromie_args+=(--build); fi
 if [ "$REBUILD_NO_CACHE" = "1" ]; then chromie_args+=(--rebuild-no-cache); fi
-if [ "$AUTO_CONFIRM" = "1" ]; then
-  chromie_args+=(--auto-confirm)
-else
-  chromie_args+=(--require-confirmation)
-fi
-
 ORCH_EVENT_LOG_PATH="$EVENT_LOG" \
   ORCH_SESSION_TIMING_LOGS=1 \
   ./scripts/start_chromie.sh "${chromie_args[@]}" 2>&1 | tee "$CHROMIE_LOG" &

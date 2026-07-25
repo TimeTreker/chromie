@@ -111,7 +111,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(ValueError, "must be unique"):
             await runtime.execute(unsafe)
 
-    async def test_soridormi_import_keeps_physical_confirmation_when_host_requires_it(self) -> None:
+    async def test_soridormi_import_preserves_provider_confirmation_requirement(self) -> None:
         registry = SkillRegistry()
         registry.import_soridormi_catalog(
             [
@@ -122,10 +122,9 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     "available": True,
                     "effects": ["physical_motion"],
                     "safety_class": "physical_motion",
-                    "requires_confirmation": False,
+                    "requires_confirmation": True,
                 }
-            ],
-            requires_confirmation=True,
+            ]
         )
 
         self.assertTrue(registry.get("soridormi.nod_yes").requires_confirmation)
@@ -134,7 +133,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             SORIDORMI_NAMED_SKILL_OUTPUT_SCHEMA,
         )
 
-    async def test_soridormi_import_allows_declared_sim_exemption_when_host_allows_it(self) -> None:
+    async def test_soridormi_import_preserves_provider_confirmation_exemption(self) -> None:
         registry = SkillRegistry()
         registry.import_soridormi_catalog(
             [
@@ -147,8 +146,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     "safety_class": "physical_motion",
                     "requires_confirmation": False,
                 }
-            ],
-            requires_confirmation=False,
+            ]
         )
 
         self.assertFalse(registry.get("soridormi.nod_yes").requires_confirmation)
@@ -164,8 +162,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     "available": True,
                     "timeout_s": 1.0,
                 }
-            ],
-            requires_confirmation=False,
+            ]
         )
         registry.import_soridormi_catalog(
             [
@@ -184,8 +181,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     "resource_claims": ["eyelids"],
                     "execution_constraints": {"requires_stationary_head": False},
                 }
-            ],
-            requires_confirmation=False,
+            ]
         )
 
         definition = registry.get("soridormi.nod_yes")
@@ -246,8 +242,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     "confirmation": {"required": False},
                     "effects": ["physical_motion"],
                 }
-            ],
-            requires_confirmation=False,
+            ]
         )
 
         definition = registry.get("soridormi.look_at_person")
@@ -260,8 +255,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_soridormi_import_rejects_duplicate_catalog_atomically(self) -> None:
         registry = SkillRegistry()
         registry.import_soridormi_catalog(
-            [{"skill_id": "nod_yes", "available": True}],
-            requires_confirmation=False,
+            [{"skill_id": "nod_yes", "available": True}]
         )
         before = registry.get("soridormi.nod_yes").model_dump(mode="json")
 
@@ -270,8 +264,7 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 [
                     {"skill_id": "wave_hand", "available": True},
                     {"skill_id": "wave_hand", "available": False},
-                ],
-                requires_confirmation=False,
+                ]
             )
 
         self.assertEqual(
@@ -287,12 +280,10 @@ class SkillRuntimeTests(unittest.IsolatedAsyncioTestCase):
             [
                 {"skill_id": "nod_yes", "available": True},
                 {"skill_id": "wave_hand", "available": True},
-            ],
-            requires_confirmation=False,
+            ]
         )
         registry.import_soridormi_catalog(
-            [{"skill_id": "wave_hand", "available": True}],
-            requires_confirmation=False,
+            [{"skill_id": "wave_hand", "available": True}]
         )
 
         removed = registry.get("soridormi.nod_yes")

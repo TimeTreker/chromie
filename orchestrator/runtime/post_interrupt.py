@@ -56,8 +56,8 @@ def lock_post_interrupt_physical_resume(
     """Require explicit confirmation for post-interrupt physical corrections.
 
     Speech-only corrected decisions can proceed normally. Body or task-graph
-    skills are preserved as proposals, but are marked confirmation-required and
-    annotated so the host disables simulator auto-confirm for this interaction.
+    skills are preserved as proposals and marked confirmation-required. This
+    rule depends on interaction history, never on the provider backend.
     """
 
     locked_request_ids: list[str] = []
@@ -93,7 +93,6 @@ def lock_post_interrupt_physical_resume(
         "post_interrupt_physical_resume_lock": True,
         "post_interrupt_resume_policy": "physical_requires_fresh_confirmation",
         "post_interrupt_locked_request_ids": locked_request_ids,
-        "disable_body_auto_confirm": True,
     }
     return (
         response.model_copy(

@@ -6,8 +6,6 @@ from typing import Any, Literal, Mapping
 
 AbilityStatus = Literal[
     "available",
-    "sim_only",
-    "hardware_only",
     "stub",
     "planned",
     "known_missing",
@@ -37,9 +35,7 @@ class AbilitySpec:
 
     @property
     def can_execute(self) -> bool:
-        return self.status in {"available", "sim_only", "hardware_only"} and (
-            self.implementation != "stub"
-        )
+        return self.status == "available" and self.implementation != "stub"
 
     def with_updates(self, **updates: Any) -> "AbilitySpec":
         return replace(self, **updates)
@@ -100,17 +96,15 @@ class AbilityRegistry:
 def build_default_ability_registry(
     *,
     enable_agent: bool = True,
-    enable_interaction_response: bool = False,
-    enable_soridormi_skills: bool = False,
-    auto_confirm_sim_skills: bool = True,
-    action_dry_run: bool = True,
 ) -> AbilityRegistry:
-    sim_expressive_body = (
-        enable_interaction_response
-        and enable_soridormi_skills
-        and auto_confirm_sim_skills
-        and action_dry_run
-    )
+    """Build Chromie's static cognitive ability inventory.
+
+    Embodied skills are intentionally not activated here. Their availability,
+    confirmation policy, and execution contract come from the live provider
+    catalog and are validated by Skill Runtime. The static registry therefore
+    cannot infer body capability from simulator, hardware, or dry-run settings.
+    """
+
     abilities = _base_abilities()
 
     _set_status(
@@ -131,64 +125,6 @@ def build_default_ability_registry(
         status="available" if enable_agent else "disabled",
         implementation="deepthinking_agent" if enable_agent else "disabled",
     )
-
-    for ability_id, skill_id, args, timeout_ms in (
-        (
-            "social.thinking_pose",
-            "soridormi.express_attention",
-            {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
-            10000,
-        ),
-        (
-            "social.listen_pose",
-            "soridormi.express_attention",
-            {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
-            10000,
-        ),
-        (
-            "social.express_attention",
-            "soridormi.express_attention",
-            {"style": "neutral", "duration_s": 2.4, "hold_fraction": 0.35},
-            10000,
-        ),
-        (
-            "social.micro_nod",
-            "soridormi.nod_yes",
-            {"count": 1, "amplitude": "small", "duration_s": 0.9},
-            10000,
-        ),
-        (
-            "social.nod_yes",
-            "soridormi.nod_yes",
-            {"count": 2, "amplitude": "small", "duration_s": 1.4},
-            10000,
-        ),
-    ):
-        _set_status(
-            abilities,
-            ability_id,
-            status="sim_only" if sim_expressive_body else "stub",
-            implementation=skill_id if sim_expressive_body else "stub",
-            soridormi_skill_id=skill_id if sim_expressive_body else None,
-            default_args=args if sim_expressive_body else {},
-            timeout_ms=timeout_ms if sim_expressive_body else None,
-        )
-
-    if enable_soridormi_skills and auto_confirm_sim_skills and action_dry_run:
-        for ability_id, skill_id in (
-            ("body.walk_forward", "soridormi.walk_velocity"),
-            ("body.walk_backward", "soridormi.walk_velocity"),
-            ("body.turn_left", "soridormi.turn_in_place"),
-            ("body.turn_right", "soridormi.turn_in_place"),
-            ("body.stop_motion", "soridormi.stop"),
-        ):
-            _set_status(
-                abilities,
-                ability_id,
-                status="sim_only",
-                implementation=skill_id,
-                soridormi_skill_id=skill_id,
-            )
 
     return AbilityRegistry(list(abilities.values()))
 
@@ -567,11 +503,6 @@ def _base_abilities() -> dict[str, AbilitySpec]:
             "state.report_robot_status",
             "state",
             "Report current robot/runtime status.",
-        ),
-        AbilitySpec(
-            "state.report_sim_or_hardware_mode",
-            "state",
-            "Report whether Chromie is connected to simulation or hardware.",
         ),
         AbilitySpec(
             "state.report_missing_ability",

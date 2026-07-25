@@ -290,9 +290,9 @@ The adapter assigns:
 - canonical-plan and Goal provenance;
 - response-composition metadata.
 
-Material alternatives and safe adjustments never receive simulator
-confirmation exemption automatically. The changed plan must be approved by the
-user unless an existing policy explicitly authorizes the adjustment class.
+Material alternatives and safe adjustments never receive a backend-derived
+confirmation exemption. The changed plan must be approved by the user unless an
+existing policy explicitly authorizes the adjustment class.
 
 ## 9. Goal-state commit
 
@@ -577,8 +577,8 @@ python scripts/interaction_text_mujoco_check.py \
 ```
 
 After preview succeeds against the exact simulator/provider revision, rerun the
-approved executable scenario without `--preview-only` under the existing
-simulator confirmation and safety policy.
+approved executable scenario without `--preview-only` under the provider
+contract and backend-neutral Host confirmation and safety policy.
 
 The run retains `cognitive_runtime_resolution.json` alongside the existing
 summary and provider evidence.

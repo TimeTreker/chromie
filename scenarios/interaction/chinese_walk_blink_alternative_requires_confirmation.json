@@ -139,7 +139,6 @@
     ],
     "requires_confirmation": true,
     "metadata_true": [
-      "disable_body_auto_confirm",
       "semantic_plan_confirmation_required"
     ],
     "metadata_json_contains": [

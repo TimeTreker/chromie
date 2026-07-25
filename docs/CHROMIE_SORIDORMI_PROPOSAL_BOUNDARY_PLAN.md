@@ -229,8 +229,8 @@ When the Router emergency filter triggers an interrupt, the Orchestrator stops
 output and cancels active interactions immediately. If optional post-interrupt
 review later determines the ASR result was a false positive, corrected
 speech-only dialogue may continue. Corrected physical work must not auto-resume,
-even in simulator auto-confirm mode. Any corrected Soridormi or TaskGraph skill
-is marked with:
+regardless of provider backend or ordinary skill confirmation policy. Any
+corrected Soridormi or TaskGraph skill is marked with:
 
 ```json
 {
@@ -240,8 +240,8 @@ is marked with:
 }
 ```
 
-The lock forces request-bound confirmation and disables body auto-confirm for
-that interaction. Confirmation still only restarts the normal preflight,
+The lock forces fresh request-bound confirmation for that interaction,
+independent of the provider's ordinary confirmation declaration. Confirmation still only restarts the normal preflight,
 SkillRuntime, and Soridormi plan/monitor/execute path; it is not a resume of
 the pre-stop physical state.
 
@@ -310,8 +310,8 @@ The final acceptance tests cover the main safety chain across modules:
 - route provenance reaches the body-planning boundary;
 - live-perception dependencies reach planning as semantic contract fields, not
   fabricated coordinates;
-- post-interrupt corrected physical work cannot use simulator auto-confirm and
-  requires fresh confirmation before planning;
+- post-interrupt corrected physical work requires fresh confirmation before
+  planning, independent of provider backend;
 - the old provider class name remains a compatibility alias for existing code.
 
 ### Addendum - Capability proposal adjudication
@@ -352,7 +352,7 @@ these behaviors:
   is missing.
 - Recoverable Soridormi failures do not retry indefinitely.
 - Residual replan preserves completed steps and current physical state.
-- Post-interrupt corrected physical skills require fresh confirmation and disable auto-confirm.
+- Post-interrupt corrected physical skills require fresh confirmation independent of backend identity and ordinary provider policy.
 - Perception-dependent plans do not contain invented coordinates from Chromie.
 - Soridormi `create_plan` advertises and receives proposal contract metadata.
 - Capability Agent skill proposals carry adjudication metadata when parameters
@@ -376,7 +376,7 @@ Implemented so far:
    irreversible effects, and Soridormi next-action hints for residual-only
    replanning.
 7. Post-interrupt corrected physical work is locked behind fresh confirmation
-   and cannot use simulator body auto-confirm.
+   independent of provider backend or ordinary skill confirmation policy.
 8. Live-perception dependencies are represented as machine fields and passed to
    Soridormi without invented coordinates.
 9. The Soridormi `create_plan` manifest and provider payload expose the

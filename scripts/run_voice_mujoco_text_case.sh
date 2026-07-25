@@ -10,7 +10,7 @@ MCP_URL="${SORIDORMI_MCP_URL:-http://127.0.0.1:${SORIDORMI_MCP_PORT:-8000}${SORI
 SORIDORMI_REPO="${SORIDORMI_REPO:-$ROOT_DIR/../soridormi}"
 SPEAKER_FLAG=--speaker
 PREVIEW_ONLY=0
-AUTO_CONFIRM=1
+GRANT_CONFIRMATION=1
 SKILL_TIMEOUT_S="${CHROMIE_VOICE_MUJOCO_SKILL_TIMEOUT_S:-120}"
 SEMANTIC_RUNTIME_FLAG=--cognitive-runtime
 EXPECT_ROUTE=()
@@ -43,7 +43,7 @@ Options:
   --speaker                  Play Chromie TTS through configured speaker; default
   --no-speaker               Headless check without speaker playback
   --preview-only             Route and validate without executing Soridormi skills
-  --no-auto-confirm-sim      Do not auto-confirm simulator skills
+  --no-grant-confirmation   Do not grant confirmation in this diagnostic harness
   --skill-timeout-s SECONDS  Per-Soridormi-skill timeout; default: 120
   --goal-driven-runtime      Use the maintained goal-driven apply path; default
   --legacy-agent-runtime     Use Agent /interaction compatibility mode explicitly
@@ -68,7 +68,7 @@ while [ "$#" -gt 0 ]; do
     --speaker) SPEAKER_FLAG=--speaker; shift ;;
     --no-speaker) SPEAKER_FLAG=--no-speaker; shift ;;
     --preview-only) PREVIEW_ONLY=1; shift ;;
-    --no-auto-confirm-sim) AUTO_CONFIRM=0; shift ;;
+    --no-grant-confirmation) GRANT_CONFIRMATION=0; shift ;;
     --skill-timeout-s) SKILL_TIMEOUT_S="${2:?--skill-timeout-s requires seconds}"; shift 2 ;;
     --goal-driven-runtime) SEMANTIC_RUNTIME_FLAG=--cognitive-runtime; shift ;;
     --legacy-agent-runtime) SEMANTIC_RUNTIME_FLAG=--no-cognitive-runtime; shift ;;
@@ -139,10 +139,10 @@ args=(
   "$SEMANTIC_RUNTIME_FLAG"
 )
 if [ "$PREVIEW_ONLY" = "1" ]; then args+=(--preview-only); fi
-if [ "$AUTO_CONFIRM" = "1" ]; then
-  args+=(--auto-confirm-sim)
+if [ "$GRANT_CONFIRMATION" = "1" ]; then
+  args+=(--grant-confirmation)
 else
-  args+=(--no-auto-confirm-sim)
+  args+=(--no-grant-confirmation)
 fi
 if [ -n "$EVIDENCE_DIR" ]; then args+=(--evidence-dir "$EVIDENCE_DIR"); fi
 args+=(

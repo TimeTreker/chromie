@@ -143,7 +143,6 @@ class _Runtime:
         self.on_first_execute = on_first_execute
         self.calls: list[InteractionResponse] = []
         self.soridormi_invoker = None
-        self.soridormi_mode = None
         self._definitions = {
             skill_id: SkillDefinition(
                 skill_id=skill_id,

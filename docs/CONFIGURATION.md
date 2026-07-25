@@ -81,7 +81,6 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_AGENT` | `1` | Call the Agent when the Router requests it. |
 | `ORCH_ENABLE_INTERACTION_RESPONSE` | `1` | Enable strict structured responses. Unified cognitive `apply` requires this; the compatibility `/interaction` surface remains available for explicit diagnostics. |
 | `ORCH_ENABLE_SORIDORMI_SKILLS` | `0` | Allow named Soridormi skills in the structured path. |
-| `ORCH_AUTO_CONFIRM_SIM_SKILLS` | `0` | Apply only Soridormi-declared simulation confirmation exemptions. The maintained simulator launcher opts in explicitly unless `--require-confirmation` is used. |
 | `ORCH_FAST_FIRST_RESPONSE_ENABLED` | `1` | Enable immediate-response policy for slow tool, planning, memory, and embodied turns. |
 | `ORCH_ROUTER_GENERATED_FAST_SPEECH_ENABLED` | `0` | Compatibility gate for Router-authored dynamic `fast_speech`/`speak_first`. Bare strings and partial objects remain parseable on the wire but are never playable by themselves. When enabled, immediate audio still requires a structured `fast_speech` object with an allowed `purpose`, a non-terminal `commitment`, `must_not_claim_completion=true`, and safe text. Startup-cached cues and host-validated `metadata.response_plan` speech do not depend on this gate. |
 | `ORCH_FAST_FIRST_AUDIO_ENABLED` | `1` | Use startup-primed in-memory PCM acknowledgements instead of a realtime generative-TTS request. |

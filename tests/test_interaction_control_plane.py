@@ -165,7 +165,11 @@ class InteractionControlPlaneTests(unittest.IsolatedAsyncioTestCase):
         execution = await InteractionRuntimeCoordinator(
             lambda args: spoken.append(str(args["text"])) or {"scheduled": True},
             soridormi_invoker=invoker,
-        ).execute(response, session_id=route_request.sid)
+        ).execute(
+            response,
+            session_id=route_request.sid,
+            confirmed_request_ids={response.skills[0].request_id},
+        )
 
         self.assertEqual(execution.status, "completed")
         self.assertEqual(response.skills[0].skill_id, "soridormi.nod_yes")

@@ -113,12 +113,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ) -> set[str]:
                 return {request.request_id for request in response.skills}
 
-            async def confirmation_exemption_request_ids(
-                self,
-                response: InteractionResponse,
-            ) -> set[str]:
-                del response
-                return set()
 
         def session_log(
             self: VoiceAssistant,
@@ -234,12 +228,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ) -> set[str]:
                 return {request.request_id for request in response.skills}
 
-            async def confirmation_exemption_request_ids(
-                self,
-                response: InteractionResponse,
-            ) -> set[str]:
-                del response
-                return set()
 
         def session_log(
             self: VoiceAssistant,
@@ -876,49 +864,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             0,
         )
 
-    def test_deep_thought_body_cue_uses_optional_express_attention(self) -> None:
+    def test_legacy_deep_thought_body_cue_is_not_activated_by_static_registry(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.enable_interaction_response = True
-        assistant.enable_soridormi_skills = True
-        assistant.auto_confirm_sim_skills = True
-        assistant.action_dry_run = True
-        decision = RouteDecision(
-            route="deep_thought",
-            agents=["deepthinking_agent", "speaker_agent"],
-            language="en-US",
-        )
-
-        response = assistant._deep_thought_body_cue_response(
-            decision,
-            "Please think this through.",
-        )
-
-        self.assertIsNotNone(response)
-        assert response is not None
-        self.assertEqual(len(response.skills), 1)
-        self.assertEqual(
-            response.skills[0].skill_id,
-            "soridormi.express_attention",
-        )
-        self.assertEqual(
-            response.skills[0].args,
-            {
-                "style": "neutral",
-                "duration_s": 2.4,
-                "hold_fraction": 0.35,
-            },
-        )
-        self.assertTrue(response.skills[0].requires_confirmation)
-        self.assertTrue(response.metadata["optional_body_cue"])
-        self.assertEqual(response.metadata["ability_id"], "social.thinking_pose")
-        self.assertEqual(response.metadata["ability_status"], "sim_only")
-
-    def test_deep_thought_body_cue_is_sim_safe_only(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.enable_interaction_response = True
-        assistant.enable_soridormi_skills = True
-        assistant.auto_confirm_sim_skills = True
-        assistant.action_dry_run = False
         decision = RouteDecision(
             route="deep_thought",
             agents=["deepthinking_agent", "speaker_agent"],
@@ -973,41 +920,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIsNone(response)
-
-    def test_auto_confirm_suppresses_confirmation_only_speech_chunk(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.sessions = SessionTracker(enabled=True)
-        session_id = assistant.sessions.create()
-
-        def session_log(self: VoiceAssistant, sid: str | None, message: str, *args: Any) -> None:
-            self.sessions.log(sid, message, *args)
-
-        assistant.session_log = MethodType(session_log, assistant)
-        response = InteractionResponse(
-            speech=[
-                {"text": "I will walk forward quickly for 15 seconds."},
-                {"text": "Can you confirm this action?"},
-            ],
-            skills=[
-                {
-                    "request_id": "walk-1",
-                    "skill_id": "soridormi.walk_forward",
-                    "requires_confirmation": True,
-                }
-            ],
-        )
-
-        assistant._suppress_auto_confirm_confirmation_speech(
-            response,
-            exempted_request_ids={"walk-1"},
-            session_id=session_id,
-        )
-
-        self.assertEqual(
-            [item.text for item in response.speech],
-            ["I will walk forward quickly for 15 seconds."],
-        )
-        self.assertEqual(response.metadata["auto_confirm_suppressed_confirmation_speech"], 1)
 
     def test_direct_llm_prompt_uses_chromie_social_self_model(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

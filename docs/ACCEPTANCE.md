@@ -938,7 +938,7 @@ text and operator-visible context may contain private speech.
 ## Pass/fail discipline
 
 - Do not count a dry run as simulator or hardware evidence.
-- Do not count a simulator exemption as hardware confirmation.
+- Do not infer confirmation authority or safety evidence from simulator or hardware identity.
 - Do not infer broad deployment support from text-input acceptance alone.
 - Do not publish logs containing execution tokens or private environment data.
 - Record failure evidence as well as successful reruns; otherwise regressions are

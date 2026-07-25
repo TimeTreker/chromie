@@ -321,7 +321,7 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
         registry.import_soridormi_catalog(
             [
                 {
-                    "skill_id": "sim_attention",
+                    "skill_id": "opaque_attention",
                     "description": "Attention",
                     "parameters_schema": {"type": "object", "properties": {}},
                     "metadata": {
@@ -332,9 +332,8 @@ class SocialAttentionPolicyClosureTests(unittest.TestCase):
                     "effects": [],
                 }
             ],
-            requires_confirmation=False,
         )
-        definition = registry.get("soridormi.sim_attention")
+        definition = registry.get("soridormi.opaque_attention")
         self.assertNotIn("mode", definition.metadata)
         self.assertEqual(
             definition.metadata["behavior_domains"], ["social_attention"]

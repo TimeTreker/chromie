@@ -729,7 +729,7 @@ def _live_case_namespace(
         speaker=args.speaker,
         preview_only=not args.execute,
         allow_non_sim=args.allow_non_sim,
-        auto_confirm_sim=args.auto_confirm_sim,
+        grant_confirmation=args.grant_confirmation,
         require_speech=case.require_speech,
         expect_route=expected_route if args.assertion_scope == "full" else None,
         expect_no_skills=case.expect_no_skills and not case.allow_expressive_cues,
@@ -994,7 +994,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--execute", action="store_true", help="Execute live text skills through Soridormi/MuJoCo.")
     parser.add_argument("--speaker", action="store_true", help="Play TTS for live text runs. Default is headless.")
     parser.add_argument("--allow-non-sim", action="store_true", help="Permit non-sim Soridormi mode under separate supervision.")
-    parser.add_argument("--auto-confirm-sim", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--grant-confirmation",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Grant provider/Host-declared confirmation requirements in the "
+            "supervised live-text harness, independent of backend type."
+        ),
+    )
     parser.add_argument("--arg-tolerance", type=float, default=1e-6)
     parser.add_argument(
         "--timeout-s",

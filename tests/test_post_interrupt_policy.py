@@ -63,7 +63,6 @@ class PostInterruptPolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request_ids, ("nod-1",))
         self.assertTrue(locked.requires_confirmation)
         self.assertTrue(locked.metadata["post_interrupt_physical_resume_lock"])
-        self.assertTrue(locked.metadata["disable_body_auto_confirm"])
         self.assertTrue(locked.skills[0].requires_confirmation)
         self.assertTrue(locked.skills[0].metadata["post_interrupt_physical_resume_lock"])
         self.assertEqual(
@@ -71,13 +70,11 @@ class PostInterruptPolicyTests(unittest.IsolatedAsyncioTestCase):
             "requires_fresh_confirmation",
         )
 
-    async def test_body_lock_disables_sim_auto_confirm(self) -> None:
+    async def test_body_lock_requires_confirmation_even_when_provider_does_not(self) -> None:
         coordinator = InteractionRuntimeCoordinator(
             lambda args: {"scheduled": True},
             soridormi_invoker=_Invoker(),
-            auto_confirm_sim=True,
         )
-        coordinator.soridormi_mode = "sim"
         response, _ = lock_post_interrupt_physical_resume(
             InteractionResponse(
                 skills=[
@@ -91,10 +88,8 @@ class PostInterruptPolicyTests(unittest.IsolatedAsyncioTestCase):
         )
 
         required = await coordinator.confirmation_request_ids(response)
-        exempted = await coordinator.confirmation_exemption_request_ids(response)
 
         self.assertEqual(required, {"nod-1"})
-        self.assertEqual(exempted, set())
 
 
 if __name__ == "__main__":

@@ -1341,7 +1341,6 @@ class CanonicalPlanRuntimeAdapter:
             ),
         }
         if alternative:
-            metadata["disable_body_auto_confirm"] = True
             metadata["material_plan_change_requires_confirmation"] = True
         return InteractionResponse(
             status=status_map.get(plan.disposition, "error"),

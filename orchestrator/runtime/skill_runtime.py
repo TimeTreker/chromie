@@ -109,7 +109,6 @@ class SkillRegistry:
         *,
         provider_id: str = "soridormi.mcp",
         version: str = "0.1.0",
-        requires_confirmation: bool = True,
         mark_absent_unavailable: bool = True,
     ) -> None:
         """Atomically replace the live Soridormi named-skill view.
@@ -166,16 +165,7 @@ class SkillRegistry:
                     confirmation_contract.get("required", False),
                 )
             )
-            effective_requires_confirmation = (
-                provider_requires_confirmation
-                or (
-                    requires_confirmation
-                    and (
-                        safety_class in {"physical_motion", "safety_critical"}
-                        or "physical_motion" in effects
-                    )
-                )
-            )
+            effective_requires_confirmation = provider_requires_confirmation
             timeout_s = item.get(
                 "timeout_s",
                 execution_contract.get("timeout_s", 30.0),

@@ -1381,7 +1381,6 @@ class CapabilityAwareInteractionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual([item.timing for item in response.skills], ["sequential", "sequential"])
         self.assertTrue(response.requires_confirmation)
-        self.assertTrue(response.metadata["disable_body_auto_confirm"])
         self.assertTrue(response.metadata["semantic_plan_confirmation_required"])
         self.assertEqual(response.metadata["planning_result"], "alternative_plan")
         self.assertIn("先走十五秒", response.metadata["confirmation_prompt"])
