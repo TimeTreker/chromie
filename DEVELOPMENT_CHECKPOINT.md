@@ -36,6 +36,28 @@ spoken budgets before one concise answer is accepted. Weather is the first
 built-in caller; canonical Skill Runtime observations use the same post-execution
 path.
 
+## Next topic: Chromie Benchmark Suite Phase 1
+
+Implement only the benchmark foundation described in
+`docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md`:
+
+1. add `benchmarks/` skeleton and versioned schemas;
+2. inventory and classify existing scenarios without moving them;
+3. add deterministic validation and coverage reports;
+4. add tests and a CI-safe entrypoint;
+5. preserve all existing runners and evidence claims.
+
+Do not add phrase-specific behavior, benchmark-ID branches, fixed gesture
+mappings, or runtime quotas. Model-dependent cognition stays in LLM prompts and
+bounded context; the Host validates contracts, safety, authorization, and
+observable evidence.
+
+Recommended commit for the next patch:
+
+```text
+Add benchmark manifest and scenario inventory
+```
+
 ## Resume point
 
 The first post-audit correction slice is complete in the working tree. Chromie's

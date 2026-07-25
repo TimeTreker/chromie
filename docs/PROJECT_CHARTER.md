@@ -145,6 +145,15 @@ and its migration status is reported in [STATUS.md](STATUS.md).
    supervised multi-skill, and broader autonomy are distinct gates.
 10. **Local-first does not mean opaque.** Failures, fallbacks, authorization,
    timing, and recovery causes remain inspectable.
+11. **Benchmarks evaluate intelligence; they do not implement it.** Cognitive,
+   personality, planning, and Social Attention choices remain model reasoning
+   problems expressed through general prompts, bounded context, and contracts.
+   Benchmark cases define acceptable behavior regions, hard safety and evidence
+   invariants, and distribution measurements. They must not justify phrase
+   tables, regular expressions, scenario-ID branches, fixed greeting gestures,
+   or other Host rules that imitate intelligence merely to pass visible cases.
+   LLMs may generate candidate scenarios and qualitative critique, but reviewed
+   contracts and retained evidence remain authoritative for acceptance.
 
 ## Non-goals
 

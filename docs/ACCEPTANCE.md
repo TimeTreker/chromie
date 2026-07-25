@@ -202,6 +202,14 @@ python scripts/scenario_author.py prompt --suite interaction --count 20
 The prompt command is for generating reviewed candidate JSON with an LLM; the
 LLM is not used as the pass/fail judge during regression runs.
 
+The target organization, common case contract, distribution metrics, and staged
+migration are defined in the
+[Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md) and its
+[Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md). Benchmark
+failures must be fixed through general model, prompt, context, contract,
+architecture, or provider improvements; they must not introduce phrase-specific
+Host behavior rules.
+
 ## Model-assisted routing guardrails
 
 The fast Router model is accepted only as an advisory semantic classifier.

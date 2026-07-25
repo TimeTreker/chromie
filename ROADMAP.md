@@ -10,6 +10,25 @@ The stable mission is defined in
 [Project Charter](docs/PROJECT_CHARTER.md). Current implementation and evidence
 are tracked in [Status](docs/STATUS.md).
 
+## Chromie Benchmark Suite
+
+The next new development topic is the staged Benchmark Suite described in
+[docs/CHROMIE_BENCHMARK_SUITE.md](docs/CHROMIE_BENCHMARK_SUITE.md) and
+[docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md](docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md).
+
+Immediate milestone: **Phase 1 — benchmark manifest and inventory**. Establish
+the directory skeleton, versioned schemas, deterministic inventory and coverage
+report, tests, and CI entrypoint. Index existing scenarios in place; do not move
+files or add benchmark-specific runtime policy.
+
+Exit criteria:
+
+- every maintained scenario has one stable inventory entry and may have multiple tags;
+- duplicate IDs, invalid paths, unknown tags, and missing provenance fail closed;
+- existing scenario and acceptance commands remain unchanged and passing;
+- inventory output reports coverage by layer, dataset, language, evidence level, and source;
+- no phrase, regex, scenario-ID, or fixed social-action rule is added to production code.
+
 ## Planning model
 
 Chromie plans and reports work by the problem being solved, the capability being

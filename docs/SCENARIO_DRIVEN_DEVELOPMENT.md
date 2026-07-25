@@ -23,6 +23,23 @@ interaction or requirement
 A scenario is not merely a unit test. It is a durable statement of what Chromie
 should understand, plan, say, execute, and retain across one or more turns.
 
+
+## Benchmark relationship
+
+Scenario-driven development supplies the durable cases; the
+[Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md) organizes those cases by
+execution layer, semantic dataset, evidence level, and aggregate metric.
+
+A scenario is not permission to add an input-specific implementation rule.
+Model-dependent behavior should be expressed as an acceptable outcome region
+plus deterministic safety, authorization, truthfulness, and evidence
+invariants. LLMs may help generate and diversify candidate scenarios, but a
+reviewer must reject cases that encode phrase-to-action mappings or teach the
+runtime to the test.
+
+Existing scenario directories remain authoritative during staged migration.
+The benchmark inventory will index and classify them before any physical move.
+
 ## 2. Why scenarios are required
 
 Model-based systems can pass narrow tests while failing conversationally because

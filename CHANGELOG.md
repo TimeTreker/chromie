@@ -8,6 +8,13 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Chromie Benchmark Suite design
+
+- Added the constitutional rule that benchmarks evaluate model intelligence but must not become phrase-, regex-, scenario-ID-, or fixed-action runtime policy.
+- Defined a layered benchmark architecture for module, integration, end-to-end, stress, regression, datasets, and reports.
+- Defined acceptable behavior regions, deterministic hard gates, distribution metrics, Social Attention coverage axes, and reviewed LLM-assisted scenario authoring.
+- Classified existing scenario sources for index-first migration and added a staged implementation plan beginning with a deterministic manifest and inventory.
+
 ### Social Attention closure and regression matrix
 
 - Added owner/operator-selectable `courteous`, `neutral`, and `reserved` Social Interaction Style presets, with reviewed `custom` guidance available through a full MindProfile JSON.

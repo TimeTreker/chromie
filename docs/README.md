@@ -55,6 +55,8 @@ When documents disagree, correct the lower-authority document.
 | What is the implementation contract for terminal Fast Planner multi-goal planning? | `docs/FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md` |
 | Which component owns semantic planning for each entrypoint? | `docs/SEMANTIC_AUTHORITY.md` |
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
+| What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
+| What staged work builds that benchmark architecture? | `docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md` |
 | How is the automated suite kept free of stale wrappers and duplicate coverage? | `docs/TEST_SUITE_MAINTENANCE.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
 | How are embodiment-independent, personality-driven language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
@@ -86,6 +88,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
 - [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
+- [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
+- [Chromie Benchmark Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)
@@ -131,6 +135,8 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Fast Planner Multi-Goal Contract Path](FAST_PLANNER_MULTI_GOAL_CONTRACT_PATH.md)
 - [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
+- [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
+- [Chromie Benchmark Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)
