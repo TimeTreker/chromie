@@ -27,7 +27,7 @@ def _compact_text(value: str, *, limit: int = 800) -> str:
     return text
 
 
-class EpisodeRouterRecord(BaseModel):
+class EpisodeGoalInterpretationRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     route: str = "unknown"
@@ -92,7 +92,7 @@ class EpisodeTurnRecord(BaseModel):
     turn_index: int = Field(ge=1)
     created_at: str = Field(default_factory=_now_iso)
     user_text: str = ""
-    router: EpisodeRouterRecord = Field(default_factory=EpisodeRouterRecord)
+    router: EpisodeGoalInterpretationRecord = Field(default_factory=EpisodeGoalInterpretationRecord)
     agent: EpisodeAgentRecord = Field(default_factory=EpisodeAgentRecord)
     execution: EpisodeExecutionRecord = Field(default_factory=EpisodeExecutionRecord)
     errors: list[str] = Field(default_factory=list)
@@ -390,7 +390,7 @@ class EpisodeRecorder:
             sid=session_id,
             turn_index=turn_index,
             user_text=str(context.get("user_text") or ""),
-            router=EpisodeRouterRecord(
+            router=EpisodeGoalInterpretationRecord(
                 route=str(context.get("route") or "unknown"),
                 intent=str(context.get("intent") or "unknown"),
                 source=str(context.get("route_source") or "unknown"),

@@ -1,10 +1,13 @@
 {
   "schema_version": 1,
-  "id": "remember_preference",
+  "id": "goal_interpretation_remember_preference",
   "suite": "router",
   "level": "module",
   "description": "Simple memory request is understood by the quick LLM router and routes to memory, not body motion.",
-  "tags": ["memory", "normal"],
+  "tags": [
+    "memory",
+    "normal"
+  ],
   "input": {
     "text": "Remember that my favorite color is blue."
   },
@@ -26,7 +29,12 @@
     "route": "memory",
     "intent": "remember_user_fact",
     "source": "llm",
-    "task_types_include": ["memory.remember_session_context"],
+    "task_types_include": [
+      "memory.remember_session_context"
+    ],
     "llm_calls": 1
+  },
+  "provenance": {
+    "legacy_scenario_id": "remember_preference"
   }
 }

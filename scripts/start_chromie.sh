@@ -668,7 +668,6 @@ run_soridormi_capability_probe() {
 
 wait_for_ws_health 127.0.0.1 9001 asr 900 "ASR"
 wait_for_ws_health 127.0.0.1 "$TTS_READY_PORT" tts 1200 "$TTS_READY_LABEL"
-wait_for_http 127.0.0.1 8091 /health 300 "Router"
 wait_for_http 127.0.0.1 8092 /health 300 "Agent"
 wait_for_tcp 127.0.0.1 11434 300 "Ollama"
 
@@ -676,7 +675,7 @@ if [ "$TTS_BACKEND" = "cosyvoice3" ]; then
   # CosyVoice lazily initializes language/reference-specific inference paths.
   # Warming only speaker=default with a Chinese hint primes chromie_zh but leaves
   # the first real English and mixed requests cold. Prime every committed voice
-  # before the Router/Orchestrator starts accepting microphone turns.
+  # before Goal Interpretation/Orchestrator starts accepting microphone turns.
   COSYVOICE_WARMUP_TIMEOUT_SEC="${TTS_COSYVOICE_WARMUP_TIMEOUT_SEC:-300}"
   COSYVOICE_ZH_WARMUP_TEXT="${TTS_COSYVOICE_ZH_WARMUP_TEXT:-你好。}"
   COSYVOICE_EN_WARMUP_TEXT="${TTS_COSYVOICE_EN_WARMUP_TEXT:-Hello.}"

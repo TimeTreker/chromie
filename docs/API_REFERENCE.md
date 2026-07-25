@@ -5,126 +5,28 @@ is a separate deployment; only its checked-in capability contract is summarized
 here. Current revision and verification status are maintained in
 [STATUS.md](STATUS.md).
 
-## Router HTTP API — port 8091
+## Cognitive Core turn-interpretation API — Agent port 8092
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | Return Router mode, model, Ollama URL, and rule-order state. |
-| `GET` | `/routes` | List route names, routing stages, active mode, and known Agent names. |
-| `POST` | `/route` | Convert text and session context into a validated `RouteDecision`. |
+| `POST` | `/cognitive-core/interpret` | Interpret one admitted `UserTurnEnvelope` projection into a bounded cognitive decision for downstream goal association, planning, and response composition. |
 
-`POST /route` accepts `sid`, `text`, optional `language`, and a free-form
-`context` object. Route names are `chat`, `deep_thought`, `robot_action`,
-`tool`, `memory`, `clarify`, `interrupt`, and `ignore`.
+The Cognitive Gateway remains an embedded Host boundary and does not expose a
+separate semantic-routing service. It owns input normalization, protective
+reflexes, attention review, bounded context assembly, and turn admission. The
+Goal-Driven Cognitive Core owns ordinary meaning, goal interpretation, task
+continuity proposals, capability intent, planning handoff, and response intent.
 
-Interrupt, silence, and unusable-audio decisions remain deterministic. A
-separate focused addressedness classifier may propose `addressed=false` only
-when host evidence says no exchange or task is active; deterministic code maps
-a high-confidence result to a non-speaking `ignore`. Classifier failure,
-uncertainty, direct address, or active engagement preserves normal routing.
-For other input, Router queries the
-Agent-owned shared capability catalog snapshot, sends bounded context and the
-unlocked common ability catalog to the quick intent Router model when enabled,
-and delegates low-confidence or explicitly complex quick routes to
-`deep_thought`. Normal robot, tool, memory, conversation, and deep-thought
-intent is not selected by phrase rules.
-Per-query catalog search matches are not part of the fast Router decision
-surface.
+`POST /cognitive-core/interpret` accepts the admitted text, session identity,
+optional language, and bounded source-attributed context. The result is advisory
+cognitive evidence; it does not authorize side effects. The Orchestrator still
+validates schemas, authorization, confirmation, resource conflicts, commitment,
+and trusted execution evidence before any effectful request runs.
 
-Router also attaches staged task metadata:
-
-- `routes`: optional preferred multi-route items for one utterance; each item
-  has its own `route`, `intent`, `confidence`, `lane`, `context_profile`,
-  optional `requires_mind`, optional `direct_to_tts`, and optional `text`,
-  `skill_id`, `args`, or `actions`;
-- `metadata.route_items`: JSON mirror of `routes[]` for older callers and
-  trace tools;
-- `metadata.route_stage_outputs`: one entry per route stage that contributed or
-  passed, each with legacy proposed `tasks`/`actions` and shared
-  `task_proposals`;
-- `metadata.desired_abilities`: optional non-executable ability proposals when
-  the Router understands a broad human-like ability that is not safely
-  represented by the current common executable catalog;
-- `metadata.task_list`: the legacy merged priority/stage ordered task list;
-- `metadata.task_proposals`: the preferred shared-schema merged task proposal
-  list, including `state=missing_ability` entries derived from desired
-  abilities;
-- `metadata.route_merge`: the concise merge ledger, including merge strategy,
-  final route/intent/source, selected stage, proposal count, task count,
-  task-proposal count, and task source stages.
-
-For conversation continuity, the quick Router model may also attach advisory
-task-lifecycle metadata:
-
-- `metadata.task_relation`: `new_task`, `continue_task`, `modify_task`,
-  `close_task`, `side_conversation`, or `clarify_task`;
-- `metadata.target_task_id`: the task context the utterance appears to refer
-  to, when known from bounded context;
-- `metadata.task_context_patch`: compact fields such as goal, task type,
-  important claims, entities, constraints, pending questions, status, and
-  persistence policy.
-
-This metadata is advisory planning state. Concrete skill execution still uses
-validated `RouteDecision.actions`, Agent-selected `InteractionResponse.skills`,
-and Skill Runtime/provider authorization. When the quick Router model can
-represent a mixed utterance, `RouteDecision.routes[]` is the preferred
-multi-route surface. Route-item lanes include `immediate_speech`,
-`conversation`, `post_turn`, `deepthought`, `skill_runtime`, `tool`,
-`deterministic_control`, and `none`. Context profiles include `none`,
-`fast_minimal`, `session_compact`, `capability_safety`, and `full_mind`.
-Only short safe chat items may set `direct_to_tts=true`, but that compatibility
-marker alone cannot schedule audio. Playback additionally requires the
-default-off Core-generated FastSpeech gate and its validated structured
-contract, or an independent trusted host response-plan/cache path, while other
-items continue through Agent, memory, deepthought, tool, or Skill Runtime
-policy.
-
-Both a top-level `RouteDecision` and an individual `RouteItem` may include
-`fast_speech`. A bare string or partial object remains parseable for wire
-compatibility, and top-level `fast_speech.text` may still populate the
-compatibility `speak_first` field. Neither form is playback authority. Dynamic
-Core-authored playback is default-off behind
-`ORCH_AGENT_GOAL_INTERPRETER_GENERATED_FAST_SPEECH_ENABLED=0`; when explicitly enabled it still
-requires a structured object with safe `text`, an allowed process `purpose`, a
-non-terminal `commitment`, and `must_not_claim_completion=true`. It must not
-claim a result, memory write, physical execution, or final answer. Contract
-markers such as `thinking` or `checking_only` are not spoken as literal text.
-Validated `metadata.response_plan` immediate speech and startup-cached host cues
-are separate trusted paths and do not require this compatibility gate.
-
-For ordered listed-skill work inside a robot-action route item,
-`RouteDecision.actions` may still contain an ordered list of skill proposals.
-The fast Router receives `common_ability_catalog` and `common_ability_ids` as
-the small-model executable menu.
-Each action uses an exact `capability_id` from that common menu,
-schema-shaped `args`, optional `sequence`, and optional `timing`, plus a
-0.0-1.0 `confidence` for that specific skill choice and arguments. Speech that
-belongs inside a physical task is represented as the `chromie.speak` skill with
-`args.text`, not as unstructured final text. If any required compound action is
-below the Router confidence threshold, or if the fast Router selects a
-rare/full-catalog skill outside `common_ability_ids`, the Router delegates the
-whole plan to `deep_thought` rather than executing only the high-confidence or
-rare subset. The delegated
-`RouteDecision.metadata` includes
-`quick_router_review_request` with the quick actions, legacy task list, shared
-task proposals, and `execution_state=not_committed` so deepthinking can
-`accept`, `revise`, or `supersede` the quick plan.
-If the quick Router understands an unsupported body/social/manipulation goal,
-it must not put that goal in `RouteDecision.actions`. It should delegate or
-clarify and may record `metadata.desired_abilities[]` with `ability_id`,
-`intent`, `status=missing_ability`, `confidence`, and `reason`.
-The host Orchestrator owns the final task context write, persistence policy,
-confirmation, cancellation, and safety state.
-
-The Router exposes four conceptual stages plus deterministic validation:
-
-| Stage | Routes | LLM use |
-|---|---|---|
-| `emergency_filter` | `interrupt`, `ignore` | Never |
-| `post_interrupt_review` | `chat`, `deep_thought`, `robot_action`, `tool`, `memory`, `clarify`, `interrupt`, `ignore` | Optional after an interrupt has already been applied |
-| `quick_intent` | `chat`, `deep_thought`, `robot_action`, `tool`, `memory`, `clarify` | Optional when Router mode is `hybrid` or `llm_only` |
-| `route_validation` | `chat`, `deep_thought`, `robot_action`, `tool`, `memory`, `clarify` | Never |
-| `deep_thought` | `deep_thought` | Handled by Agent after routing |
+The implementation may use fast and review models, but it must reason from
+meaning, context, active goals, and capability descriptions. Production code
+must not use phrase tables, regular-expression intent routing, scenario IDs, or
+fixed input-to-action mappings.
 
 ## Agent HTTP API — port 8092
 

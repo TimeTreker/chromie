@@ -22,7 +22,7 @@ from .fallback import fallback_decision
 from .schema import FastSpeech, RouteDecision, RouteRequest, finalize_decision
 
 
-logger = logging.getLogger("chromie.router.llm")
+logger = logging.getLogger("chromie.agent.goal_interpreter.llm")
 
 
 ROUTE_NAMES = {
@@ -1006,15 +1006,15 @@ class OllamaGoalInterpreter:
             f"Bounded session, memory, task, and robot/world context JSON:{context_json}\n"
             f"Active Task Snapshot JSON:{active_tasks_json}\n\n"
             "Current Job:\n"
-            "compatibility quick-intent and lane proposer. The deterministic emergency/noise filter already ran. Decide from meaning, bounded context, active semantic goals, and common abilities. The result is a migration advisory and source-effect bound, not final goal meaning or a plan. Return calibrated confidence; do not answer, execute, commit task changes, or authorize side effects.\n\n"
+            "fast goal-interpretation and lane proposer. The deterministic emergency/noise filter already ran. Decide from meaning, bounded context, active semantic goals, and common abilities. The result is bounded cognitive evidence and source-effect bound, not final goal meaning or a plan. Return calibrated confidence; do not answer, execute, commit task changes, or authorize side effects.\n\n"
             "Task Context Group:\n"
             f"Latest user input: {request.text}\n"
             f"Common ability IDs: {_bounded_json(common_ability_ids, max_chars=420)}\n"
             f"Common Ability Catalog JSON: {common_ability_catalog_json}\n"
             "Task Continuity:\n"
             "Use active task IDs and open goals semantically. A turn may create, modify, answer, correct, confirm, reject, cancel, pause, resume, replace, or query a task. Decide by meaning, never keywords, regexes, overlap, or recency alone. One independent responsibility is one route item; plan steps are downstream. Clarify ambiguous targets instead of guessing a task ID.\n"
-            "Compatibility Affordance Proposal:\n"
-            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. These are candidate proposals, not authoritative grounding. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Standalone greetings, thanks, reassurance, and other social acts remain chat even when task history exists; do not reinterpret them as capability requests or resume commands. Bind an exact skill only for an explicit execution method with one clear match. One parameterized skill may leave args to CapabilityAgent; compound explicit skills use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. Weather -> route=tool intent=weather_query metadata.tool_name=weather. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
+            "Capability Affordance Proposal:\n"
+            "Semantic first. Catalog is a compact body/tool affordance interface, not a phrase table. These are candidate proposals, not authoritative grounding. capability_inquiry is only for an inquiry about Chromie's bounded abilities; technical discussion about another person, model, vehicle, sensor, or system is not a Chromie capability inquiry. Distinguish an availability inquiry from a request to execute by the user's intended speech act and context: inquiries remain chat/capability_inquiry, while execution requests may use robot_action. Standalone greetings, thanks, reassurance, and other social acts remain chat even when task history exists; do not reinterpret them as capability requests or resume commands. Bind an exact skill only for an explicit execution method with one clear match. One parameterized skill may leave args to CapabilityAgent; compound explicit skills use ordered actions[]. Isolated letters and low-information ASR fragments clarify. Outcome requests with multiple methods or missing context use deep_thought with an open goal. Use an available trusted lookup tool when the user needs current external facts; select it from capability meaning and context rather than a topic keyword. Missing ability -> non-executable ability proposals in metadata.desired_abilities. Never claim completion or output raw motor/joint/actuator/controller-array/torque commands.\n\n"
             "Cost Function:\n"
             "Preserve task continuity before creating unnecessary tasks; update goals before plans. Speech-only conversation and capability availability inquiry=chat; requested catalog execution=robot_action; lookup=tool; situational planning=deep_thought; ambiguity=clarify. Never return interrupt or ignore; a separate focused addressedness stage owns bounded ambient suppression.\n\n"
             "Output Contract:\n"

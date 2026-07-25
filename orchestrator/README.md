@@ -16,7 +16,7 @@ For authoritative architecture, status, and configuration, see:
 ## Service boundaries
 
 - ASR converts complete PCM utterances to final text.
-- Router produces deterministic or model-assisted `RouteDecision` objects.
+- Goal Interpretation produces deterministic or model-assisted `RouteDecision` objects.
 - Agent exposes schema-constrained Goal Association, Fast/Deep Planning, and
   Response Composition, plus compatibility `AgentResult`/`InteractionResponse`
   surfaces.
@@ -43,7 +43,7 @@ outcome reconciliation, and final response composition.
 The frozen version 1 `UserTurnEnvelope`, shared deterministic reflex contract,
 host admission adapter, source/freshness context references, and local
 stop/suppression paths are implemented. The host begins stop/cancel handling
-before Router or model inference, records the requested and effective
+before Goal Interpretation model inference, records the requested and effective
 cancellation scopes, and projects only admitted envelopes into the Core.
 Output, embodied-motion, foreground-interaction, and global-emergency reflex
 scopes are implemented. Exact named-Goal cancellation is also implemented in
@@ -52,9 +52,9 @@ plan/runtime bindings, validates Skill Runtime receipts, atomically reconciles
 Goal state, and rebuilds an unaffected confirmation remainder when possible.
 A shared-owner pending request fails closed without changing its token, while a
 post-dispatch reconciliation failure is surfaced as an uncertain final state.
-The Router still hosts addressedness review and mixed compatibility semantics,
+Goal Interpretation still hosts addressedness review and mixed compatibility semantics,
 so physical extraction of the five Gateway modules remains open. Existing
-Router APIs, service names, environment variables, and log fields remain
+legacy routing APIs, service names, environment variables, and log fields remain
 current compatibility surfaces.
 
 ## Current interaction paths
@@ -112,7 +112,7 @@ confirmation regardless of the provider declaration.
 ### Compatibility path
 
 ```text
-ASR -> Router -> Agent /run -> AgentResult
+ASR -> Cognitive Gateway -> Goal-Driven Cognitive Core /run -> AgentResult
   -> compatibility speech/actions -> TTS and optional mock hardware daemon
 ```
 
@@ -129,10 +129,10 @@ ASR -> Ollama -> TTS -> playback
 ```
 
 This fallback produces speech only. It does not gain permission to invoke
-skills or hardware. If the Router fails while the utterance or active pending
+skills or hardware. If Goal Interpretation fails while the utterance or active pending
 task looks embodied, the Orchestrator uses a deterministic safe-fallback speech
 response instead of the generic conversational LLM path. Deterministic local
-silence/unusable-input suppression is applied before Router enablement or
+silence/unusable-input suppression is applied before Goal Interpretation enablement or
 failure handling, so suppressed input cannot fall through to this LLM path.
 
 ## Configuration precedence
@@ -325,11 +325,11 @@ truncation logs, while near-limit prompt/output budgets produce yellow pressure
 logs with tuning suggestions. The operator CLI colors warning lines yellow and
 error lines red when attached to a color-capable terminal. Set
 `ORCH_CLI_COLOR=1` to force Orchestrator session color or `ORCH_CLI_COLOR=0` to
-disable it. Agent and Router Ollama diagnostics also respect
+disable it. Agent and Goal Interpretation Ollama diagnostics also respect
 `CHROMIE_CLI_COLOR=1` for forced color, falling back to the same auto/NO_COLOR
 terminal behavior. Finished sessions also write
 `session_workflow` and `session_workflow_graph` evidence covering
-VAD, ASR, Router, Agent, Skill Runtime, TTS, playback, per-stage deltas, and
+VAD, ASR, Cognitive Gateway, Goal-Driven Cognitive Core, Skill Runtime, TTS, playback, per-stage deltas, and
 final timing. The operator console keeps only a compact
 `session_workflow_summary` line with the slowest steps.
 

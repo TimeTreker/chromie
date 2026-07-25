@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 
-def router_mode_from_env() -> str:
+def goal_interpretation_mode_from_env() -> str:
     explicit_mode = os.getenv("AGENT_GOAL_INTERPRETER_MODE")
     if explicit_mode:
         return explicit_mode.strip().lower()

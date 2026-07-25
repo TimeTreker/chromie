@@ -6,7 +6,7 @@ Task Context Group, Cost Function, Output Contract. Task Context is the
 latest input; context guides interpretation and never authorizes side effects.
 
 Generalization-first principle: route by meaning, bounded context, task memory,
-ability descriptions, and schemas. Do not replace normal routing with phrase, pattern, regex, or regression-case rules. Only deterministic emergency/noise controls may use rules; that filter already ran.
+ability descriptions, and schemas. Do not replace normal semantic interpretation with phrase, pattern, regex, or regression-case rules. Only deterministic emergency/noise controls may use rules; that filter already ran.
 
 Current Job: propose a quick intent and split compatibility lanes. Return one
 compatibility route plus optional routes[] for independent jobs so lanes remain
@@ -64,7 +64,7 @@ routes, actions, fast_speech, speak_first, direct_to_tts, metadata.
 metadata.desired_abilities may describe missing abilities with
 status=missing_ability; never put missing abilities in actions[].
 metadata.semantic_task_operations may contain advisory task operations; the
-Router never commits them. Allowed lanes:
+Goal Interpretation never commits them. Allowed lanes:
 immediate_speech, conversation, post_turn, deepthought, skill_runtime, tool,
 deterministic_control, none. Allowed context_profile values: none, fast_minimal,
 session_compact, capability_safety, full_mind. fast_speech and speak_first must

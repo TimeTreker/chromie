@@ -89,7 +89,7 @@ AGENT_RESPONSE_REVIEW_MODEL
 
 Startup warms every active model in that plan and stops immediately if a model
 is missing. After containers start, `scripts/verify_runtime_profile.sh` checks
-that Router and Agent received the same profile and fingerprint as
+that Goal Interpretation and the Cognitive Core received the same profile and fingerprint as
 `.env.runtime`.
 
 During the current architecture-qualification phase, the maintained RTX 5090
@@ -115,7 +115,7 @@ launcher option and are regenerated automatically with the detected profile.
 | `jetson_thor` | AGX Thor placeholder profile | `gemma4:26b` | `qwen3:4b` | 4096 |
 
 The quality model is used by Deep Planner and Response Composer. The fast model
-is used by Router, Goal Association, Fast Planner, Task Continuity, and Social
+is used by Goal Interpretation, Goal Association, Fast Planner, Task Continuity, and Social
 Attention unless the profile explicitly states otherwise.
 
 ## Detection order
@@ -146,7 +146,7 @@ Generation fails before Docker build/start when:
 Without strict mode, conflicting profile-owned local keys are ignored with an
 `[env][warning]` message. Inspect `ignored_local_overrides` in
 `.chromie/runtime_profile.json` to clean them up later. After startup, container
-verification fails if Agent or Router received a stale profile, stale
+verification fails if Agent or Goal Interpretation received a stale profile, stale
 fingerprint, or different model assignment.
 
 Inspect the active result with:

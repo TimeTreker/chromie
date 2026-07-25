@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field
 
-logger = logging.getLogger("chromie.router.capability_catalog")
+logger = logging.getLogger("chromie.agent.goal_interpreter.capability_catalog")
 
 
 class CapabilityCatalogResult(BaseModel):

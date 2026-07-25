@@ -26,13 +26,12 @@ def test_runtime_adapter_manifest_uses_gateway_terminology() -> None:
     assert "router" not in names
 
 
-def test_legacy_router_paths_are_explicit_regressions() -> None:
+def test_goal_interpretation_paths_use_current_architecture_taxonomy() -> None:
     payload = json.loads(
         (ROOT / "benchmarks/manifests/suites.json").read_text(encoding="utf-8")
     )
     by_path = {item["path"]: item for item in payload["sources"]}
     for path in ("scenarios/goal_interpretation", "scenarios/cognitive_core_dialogue"):
         source = by_path[path]
-        assert source["layer"] == "regression"
-        assert "historical_regression" in source["datasets"]
-        assert any(tag.startswith("compatibility_router") for tag in source["datasets"])
+        assert source["layer"] in {"module", "integration"}
+        assert any(tag in {"goal_interpretation", "cognitive_core_dialogue"} for tag in source["datasets"])

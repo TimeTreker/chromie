@@ -8,6 +8,15 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Router architecture removal closure
+
+- Removed the independent Router service, client, container, health path, and runtime ownership.
+- Moved ingress responsibilities to Cognitive Gateway and ordinary semantic interpretation to the Goal-Driven Cognitive Core.
+- Corrected stale startup, release-provenance, API-reference, observability, and benchmark terminology left by the initial R1-R4 migration.
+- Removed a fixed weather-to-tool prompt mapping; tool selection remains model reasoning over capability descriptions and bounded context.
+- Strengthened the repository guard so deleted Router service paths, clients, endpoints, environment namespaces, and first-class architecture declarations cannot return.
+
+
 ### Cognitive Gateway benchmark alignment
 
 - Replaced the newly introduced first-class `router` Benchmark adapter with the

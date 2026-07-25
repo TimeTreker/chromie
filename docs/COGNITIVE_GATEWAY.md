@@ -330,7 +330,7 @@ dispatches Soridormi's dedicated E-stop regardless of the host request ledger.
 
 The repository currently exposes these compatibility names and surfaces:
 
-- Docker service `chromie-router` and component directory `router/`;
+- the former independent routing service and component directory;
 - `POST /route`, `GET /routes`, and `RouteDecision`;
 - `AGENT_GOAL_INTERPRETER_*` configuration and `router_*` logs;
 - routes such as `chat`, `tool`, `memory`, `robot_action`, `interrupt`, and
@@ -447,5 +447,5 @@ prove result reconciliation or final spoken truth.
 | `UserTurnEnvelope` | Evidence-preserving admitted/suppressed/reflex turn record |
 | Protective Reflex / 保护性反射 | Immediate deterministic operational-control path |
 | Goal-Driven Cognitive Core / 目标驱动认知核心 | Semantic goal understanding, planning, delegation, reconciliation, and response authority |
-| Router / `chromie-router` | Current compatibility component and API name during migration |
+| Goal Interpretation | Agent-owned Cognitive Core boundary; no independent routing service |
 | `RouteDecision` | Current compatibility routing contract, not the target cognitive object |

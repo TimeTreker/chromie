@@ -46,7 +46,7 @@ class TaskProposalLedgerTests(unittest.TestCase):
                         "proposal_kind": "action",
                         "task_type": "task.execute_skill",
                         "state": "advisory",
-                        "reason": "router proposal awaiting Orchestrator merge and commit",
+                        "reason": "goal-interpreter proposal awaiting Orchestrator merge and commit",
                         "effectful": True,
                         "priority": "normal",
                         "sequence": 0,

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "id": "joke_discourse_marker",
-  "suite": "router",
+  "id": "goal_interpretation_joke_discourse_marker",
+  "suite": "goal_interpretation",
   "level": "module",
   "description": "Discourse marker 'go ahead' does not become locomotion.",
   "tags": ["chat", "discourse-marker", "motion-confusion"],
@@ -9,7 +9,7 @@
     "text": "Go ahead and tell me a short joke about robots."
   },
   "stub": {
-    "router_mode": "hybrid",
+    "goal_interpretation_mode": "hybrid",
     "catalog": {
       "matched": true,
       "capabilities": [

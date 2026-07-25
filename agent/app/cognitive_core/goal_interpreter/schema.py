@@ -240,7 +240,7 @@ def _is_effectful_task_type(task_type: str) -> bool:
 
 def _task_proposal_for_item(item: dict[str, Any]) -> dict[str, Any]:
     task_type = str(item.get("task_type") or "unknown").strip() or "unknown"
-    source_stage = str(item.get("source_stage") or "router").strip() or "router"
+    source_stage = str(item.get("source_stage") or "goal_interpreter").strip() or "goal_interpreter"
     capability_id = str(item.get("capability_id") or "").strip()
     proposal = TaskProposal(
         id=str(item.get("id") or f"{source_stage}:{task_type}"),
@@ -248,7 +248,7 @@ def _task_proposal_for_item(item: dict[str, Any]) -> dict[str, Any]:
         proposal_kind=str(item.get("kind") or "task"),
         task_type=task_type,
         state="advisory",
-        reason="router proposal awaiting Orchestrator merge and commit",
+        reason="goal-interpreter proposal awaiting Orchestrator merge and commit",
         effectful=_is_effectful_task_type(task_type),
         priority=str(item.get("priority") or "normal"),
         sequence=_safe_int(item.get("merged_sequence"), _safe_int(item.get("sequence"), 0)),

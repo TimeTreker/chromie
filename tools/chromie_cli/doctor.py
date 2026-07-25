@@ -132,7 +132,7 @@ def _file_checks(root: Path) -> list[Diagnostic]:
 def _service_checks(snapshot) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     checks = {
-        "router": snapshot.get("AGENT_GOAL_INTERPRETER_URL"),
+        "goal_interpreter": snapshot.get("AGENT_GOAL_INTERPRETER_URL"),
         "agent": snapshot.get("AGENT_URL"),
         "action_executor": snapshot.get("ACTION_EXECUTOR_URL"),
         "asr": snapshot.get("ASR_URL", "ws://127.0.0.1:9001"),

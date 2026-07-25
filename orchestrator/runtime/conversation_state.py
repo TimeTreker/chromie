@@ -2782,7 +2782,7 @@ class ConversationStateManager:
                 user_text=compact,
                 route=route,
                 intent=intent,
-                source=str(turn_metadata.get("source") or "router"),
+                source=str(turn_metadata.get("source") or "goal_interpreter"),
             )
             turn_metadata["semantic_task_operation_results"] = operation_results
         self._turns.append(

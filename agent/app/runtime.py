@@ -89,7 +89,7 @@ def _safe_missing_ability_text(request: AgentRunRequest) -> str:
     return "I do not have a matching skill for that action, so I will not guess a similar movement."
 
 
-def _router_fast_first_already_scheduled(decision: RouteDecision) -> bool:
+def _goal_interpretation_fast_first_already_scheduled(decision: RouteDecision) -> bool:
     metadata = decision.metadata if isinstance(decision.metadata, dict) else {}
     if metadata.get("fast_first_response_scheduled") is True:
         return True
@@ -97,12 +97,12 @@ def _router_fast_first_already_scheduled(decision: RouteDecision) -> bool:
     return isinstance(fast_first, dict) and fast_first.get("scheduled") is True
 
 
-def _is_terminal_router_acknowledgement(decision: RouteDecision) -> bool:
+def _is_terminal_goal_interpretation_acknowledgement(decision: RouteDecision) -> bool:
     return (
         decision.route == "chat"
         and str(decision.intent or "").strip() in {"greeting", "gratitude_acknowledgement"}
         and decision.should_speak
-        and (bool(decision.speak_first) or _router_fast_first_already_scheduled(decision))
+        and (bool(decision.speak_first) or _goal_interpretation_fast_first_already_scheduled(decision))
     )
 
 
@@ -164,7 +164,7 @@ class _AgentPipeline:
             result.trace.append("runtime: terminal missing-ability clarify; skipped agent rewrite")
             return result
 
-        if _is_terminal_router_acknowledgement(decision):
+        if _is_terminal_goal_interpretation_acknowledgement(decision):
             result.status = "ok"
             intent = str(decision.intent or "").strip()
             is_greeting = intent == "greeting"

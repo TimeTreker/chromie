@@ -47,7 +47,7 @@ STATUS_FILES = [
 ]
 
 ROUTE_SOURCES = [
-    ROOT / "router" / "app" / "main.py",
+    ROOT / "agent" / "app" / "main.py",
     ROOT / "agent" / "app" / "main.py",
     ROOT / "hardware" / "daemon.py",
 ]
@@ -57,7 +57,7 @@ RUNTIME_CONFIG_SOURCES = [
     ROOT / "agent" / "app" / "main.py",
     ROOT / "asr" / "server.py",
     ROOT / "tts" / "server.py",
-    ROOT / "router" / "app" / "main.py",
+    ROOT / "agent" / "app" / "main.py",
 ]
 
 # Generated dependency, cache, coverage, and build directories are not project
@@ -444,13 +444,13 @@ def check_configuration_reference(errors: list[str]) -> None:
         router_internal_ms = router_llm_ms + router_review_ms
         router_host_ms = int(values["ORCH_AGENT_TIMEOUT_MS"])
     except (KeyError, ValueError) as exc:
-        errors.append(f".env.common has invalid Router timeout configuration: {exc}")
+        errors.append(f".env.common has invalid Goal Interpreter timeout configuration: {exc}")
     else:
         catalog_ms = int(values.get("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS", "0"))
         if router_host_ms <= router_internal_ms + catalog_ms:
             errors.append(
                 "ORCH_AGENT_TIMEOUT_MS must exceed AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_TIMEOUT_MS "
-                "plus AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS and AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS, so the Router "
+                "plus AGENT_GOAL_INTERPRETER_LLM_TIMEOUT_MS and AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS, so Goal Interpretation "
                 "can finish or report its own timeout first"
             )
 

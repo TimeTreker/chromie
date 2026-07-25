@@ -118,7 +118,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         text = turn.user_text.lower()
         skills = [item.skill_id for item in turn.agent.selected_skills]
         skill_set = set(skills)
-        route = turn.router.route
+        route = turn.goal_interpretation.route
         speech = " ".join(turn.agent.speech).strip()
 
         looks_like_locomotion = any(hint in text for hint in LOCOMOTION_HINTS)
@@ -203,7 +203,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         if turn.agent.latency_ms is not None and turn.agent.latency_ms > 8000:
             _add_tag(failure_tags, "slow_agent")
             scores["latency"] = min(scores["latency"], 35)
-        if turn.router.latency_ms is not None and turn.router.latency_ms > 2000:
+        if turn.goal_interpretation.latency_ms is not None and turn.goal_interpretation.latency_ms > 2000:
             _add_tag(failure_tags, "slow_router")
             scores["latency"] = min(scores["latency"], 55)
 
@@ -505,10 +505,10 @@ def scenario_candidate_from_episode(
         }
         if forbidden:
             expect["forbidden_skills"] = forbidden
-        if "body_skill_for_chat" in evaluation.failure_tags and turn.router.route == "chat":
+        if "body_skill_for_chat" in evaluation.failure_tags and turn.goal_interpretation.route == "chat":
             expect["no_skills"] = True
         if "missing_eye_skill" in evaluation.failure_tags:
-            if turn.router.route == "robot_action":
+            if turn.goal_interpretation.route == "robot_action":
                 expect["skills"] = ["soridormi.blink_eyes"]
             else:
                 expect["no_skills"] = True
@@ -527,11 +527,11 @@ def scenario_candidate_from_episode(
                 "ask": turn.user_text,
                 "stub": {
                     "route_decision": {
-                        "route": turn.router.route,
-                        "agents": _agents_for_route(turn.router.route),
-                        "intent": turn.router.intent,
-                        "confidence": turn.router.confidence or 0.5,
-                        "source": turn.router.source,
+                        "route": turn.goal_interpretation.route,
+                        "agents": _agents_for_route(turn.goal_interpretation.route),
+                        "intent": turn.goal_interpretation.intent,
+                        "confidence": turn.goal_interpretation.confidence or 0.5,
+                        "source": turn.goal_interpretation.source,
                     }
                 },
                 "expect": expect,

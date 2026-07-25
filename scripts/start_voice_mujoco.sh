@@ -21,7 +21,7 @@ usage() {
 Usage: ./scripts/start_voice_mujoco.sh [options]
 
 Start the paired operator loop:
-  microphone -> Chromie ASR/Router/Agent -> Soridormi MCP -> MuJoCo viewer
+  microphone -> Chromie ASR/Cognitive Gateway/Goal-Driven Cognitive Core -> Soridormi MCP -> MuJoCo viewer
   speaker <- Chromie TTS
 
 Options:

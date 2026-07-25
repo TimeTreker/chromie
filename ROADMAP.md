@@ -10,6 +10,21 @@ The stable mission is defined in
 [Project Charter](docs/PROJECT_CHARTER.md). Current implementation and evidence
 are tracked in [Status](docs/STATUS.md).
 
+## Completed architecture correction — Router removal
+
+The independent Router service and compatibility authority are removed. Input
+normalization, protective reflex, attention review, context assembly, and turn
+admission belong to Cognitive Gateway. Ordinary semantic interpretation, goal
+association, capability intent, planning handoff, and response intent belong to
+the Goal-Driven Cognitive Core. The Host retains only validation, authorization,
+safety, commitment, scheduling, evidence, and execution boundaries.
+
+The closure audit also removed stale startup and documentation references and
+added a repository guard against reintroducing a Router service or first-class
+Router architecture. Historical Git and regression provenance may still mention
+the former component, but no current architecture or production dependency may
+do so.
+
 ## Chromie Benchmark Suite
 
 The next new development topic is the staged Benchmark Suite described in
@@ -27,7 +42,7 @@ Exit criteria:
 - semantic goal interpretation and planning remain Goal-Driven Cognitive Core concerns;
 - legacy `scenarios/goal_interpretation/` assets are retained only as compatibility regressions;
 - manifests, examples, environment variables, tests, and reports do not present a
-  generic Router as the current architecture;
+  generic Goal Interpretation as the current architecture;
 - no production Runtime behavior or compatibility wire contract changes.
 
 ## Planning model
@@ -59,7 +74,7 @@ documentation, and evidence indexes use capability- and issue-oriented names.
 
 ### Objective
 
-Prove the deterministic text-input path through Router, native `/interaction`,
+Prove the deterministic text-input path through Goal Interpretation, native `/interaction`,
 trusted Skill Runtime, Soridormi named skills, MuJoCo execution, and safe-idle
 recovery.
 
@@ -191,15 +206,15 @@ interaction evidence and the full release-quality regression gate.
 
 ## Open architecture track - Orchestrator task proposal merge
 
-Router, quick intent, and deepthinking stages may all propose tasks, but
+Goal Interpretation, quick intent, and deepthinking stages may all propose tasks, but
 effectful work must become an Orchestrator commitment before execution. The
 detailed design and implementation sequence are maintained in
 [Orchestrator Task Proposal Merge](docs/ORCHESTRATOR_TASK_PROPOSAL_MERGE.md).
 
 Exit criteria before treating this as a complete smart merge layer:
 
-- Router, Agent, and deepthinking task proposals use one shared schema; the
-  shared `TaskProposalLedger` contract exists and Router emits shared
+- Goal Interpretation, Agent, and deepthinking task proposals use one shared schema; the
+  shared `TaskProposalLedger` contract exists and Goal Interpretation emits shared
   `task_proposals`, the Agent deepthinking path emits shared
   `deepthinking_task_proposals`, and final Agent speech/skills emit shared
   `agent_task_proposals`;
@@ -265,7 +280,7 @@ source/freshness context references, admission, and stable correlation. The
 host builds and dual-records it across current interaction paths, projects only
 admitted envelopes into Core, and applies local deterministic stop or
 suppression before ordinary cognition. The shared reflex contract is also used
-by Router compatibility rules; pending approval is revoked before the first
+by Goal Interpretation compatibility rules; pending approval is revoked before the first
 await and a later utterance cannot preempt the active reflex lifecycle.
 Fixed cancellation scopes, active/queued dispatch receipts, and the dedicated
 Soridormi E-stop dispatch path are implemented and automatically verified.
@@ -355,7 +370,7 @@ mistaken for validation of newer source.
 The common safe base enables structured interaction and authoritative `apply`
 for `chat` while leaving Soridormi off. The maintained Soridormi launcher
 enables that trusted provider and widens authority to `chat,robot_action`. Both
-fail closed after the Goal-driven Runtime acquires a turn. Exact Router actions
+fail closed after the Goal-driven Runtime acquires a turn. Exact Goal Interpretation actions
 are adapter-only; the old CapabilityAgent semantic planner is emergency-only
 behind both service gates and a non-empty matching-turn authority claim. That
 internal claim is exact turn binding, not caller authentication or a consumed
@@ -552,7 +567,7 @@ structured Soridormi goals, not translated by Chromie into raw or low-level
 body controls.
 
 Model-assisted routing supports this boundary but does not own it. The small
-Router model may propose routes for normal requests, but deterministic controls,
+Goal Interpreter model may propose routes for normal requests, but deterministic controls,
 catalog constraints, schema validation, runtime authorization, and Soridormi
 provider checks remain the authority.
 
@@ -627,7 +642,7 @@ If the answer is no, defer the work or revise its scope.
 ### Objective
 
 Maintain [Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-as the cognitive constitution for current and future Router, Agent, planning,
+as the cognitive constitution for current and future Goal Interpretation, Agent, planning,
 continuity, response, and social-interaction work.
 
 The architecture changes the primary planning question from “which skill matches
@@ -653,7 +668,7 @@ remain open.
    migration, per-lane apply/rollback, atomic Goal-state commit, bounded host
    replan, evidence tooling, and cognitive text-to-MuJoCo entry point.
 8. **Implemented with Level A evidence; target evidence open:** Single semantic
-   authority, adapter-only exact Router actions, emergency-only legacy planner
+   authority, adapter-only exact Goal Interpretation actions, emergency-only legacy planner
    with non-empty matching-turn claims, exact Goal Association schema, and strict
    source/evidence provenance checks.
 9. **Implemented; diagnostic functional run complete; latency and target evidence open:** Fast Planner

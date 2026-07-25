@@ -177,6 +177,6 @@ composition remain downstream in the Goal-Driven Cognitive Core.
 
 The legacy `scenarios/goal_interpretation/` and `scenarios/cognitive_core_dialogue/` paths are retained
 for source compatibility and historical comparison. Inventory classifies them as
-`compatibility_router` regression datasets; their directory names do not define
+`goal_interpretation` and `cognitive_core_dialogue` datasets; their directory names define
 the current architecture. New benchmark component profiles must not reintroduce a
 generic first-class `router` boundary.

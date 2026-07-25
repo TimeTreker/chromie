@@ -13,7 +13,7 @@ from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field
 
 from .capability_catalog import CapabilityCatalogClient, CapabilityCatalogResult
-from .config import router_mode_from_env
+from .config import goal_interpretation_mode_from_env
 from .fallback import fallback_decision
 from .model_interpreter import (
     OllamaGoalInterpreter,
@@ -36,7 +36,7 @@ class Settings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_HOST", "0.0.0.0"))
     port: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_PORT", "8091")))
     mode: Literal["rules_only", "llm_only", "hybrid"] = Field(
-        default_factory=router_mode_from_env
+        default_factory=goal_interpretation_mode_from_env
     )
     # Deterministic interrupt, stop, silence, and unusable-audio handling is a
     # safety invariant, not a deployment switch. Keep the health field for

@@ -22,13 +22,11 @@ REQUIREMENT_FILES = (
     "hardware/requirements.txt",
     "orchestrator/requirements.txt",
     "requirements-test.txt",
-    "router/requirements.txt",
     "tts/requirements.txt",
 )
 PROJECT_IMAGE_NAMES = (
     "chromie-asr",
     "chromie-tts",
-    "chromie-agent",
     "chromie-agent",
 )
 MUTABLE_TAGS = {"latest", "main", "master", "stable", "edge"}

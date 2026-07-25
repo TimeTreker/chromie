@@ -501,7 +501,7 @@ retained. See
 | `AGENT_MODEL` | Ollama model selected by the hardware profile. |
 | `AGENT_OLLAMA_URL` | Container Ollama base URL. |
 | `AGENT_TIMEOUT_MS` | Agent-to-Ollama timeout; profile-specific. |
-| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; must exceed `AGENT_TIMEOUT_MS`. |
+| `ORCH_AGENT_TIMEOUT_MS` | Host-to-Agent timeout; common default `9000`; must exceed `AGENT_TIMEOUT_MS`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
 | `AGENT_RESPONSE_REVIEW_ENABLED` | Enable model-based semantic review of spoken Agent replies; common low-latency default `0`. |
 | `AGENT_RESPONSE_REVIEW_MODEL` | Ollama model used to accept or rewrite weak spoken replies; default `gemma4:e2b`, matching the main Agent model. |

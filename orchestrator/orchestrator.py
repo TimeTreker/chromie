@@ -616,9 +616,7 @@ class VoiceAssistant:
             self.discard_playback_realtime,
         )
         logger.info(
-            "Control plane: router=%s enabled=%s agent=%s enabled=%s action_url=%s dry_run=%s task_continuity_mode=%s cognitive_runtime_mode=%s cognitive_apply_lanes=%s",
-            self.router_url,
-            self.enable_router,
+            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s action_url=%s dry_run=%s task_continuity_mode=%s cognitive_runtime_mode=%s cognitive_apply_lanes=%s",
             self.agent_url,
             self.enable_agent,
             self.action_executor_url,
@@ -732,7 +730,7 @@ class VoiceAssistant:
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s "
             "confirmation_ttl_s=%.1f fast_first_response=%s fast_first_tool=%s "
-            "router_generated_fast_speech=%s fast_first_audio=%s hedge_ms=%s "
+            "core_generated_fast_speech=%s fast_first_audio=%s hedge_ms=%s "
             "cache_dir=%s prime_on_startup=%s prime_timeout_ms=%s",
             self.enable_interaction_response,
             self.enable_soridormi_skills,
@@ -2515,7 +2513,7 @@ class VoiceAssistant:
             return None
         if decision.fast_speech is not None and getattr(
             self,
-            "router_generated_fast_speech_enabled",
+            "core_generated_fast_speech_enabled",
             False,
         ):
             model_text = self._validated_fast_speech_payload_text(
@@ -2672,7 +2670,7 @@ class VoiceAssistant:
             return None
         return cleaned
 
-    def _router_fast_speech_diagnostics(self, decision: RouteDecision) -> dict[str, Any]:
+    def _goal_interpretation_fast_speech_diagnostics(self, decision: RouteDecision) -> dict[str, Any]:
         top_raw = self._fast_speech_payload_text(getattr(decision, "fast_speech", None))
         top_safe = self._validated_fast_speech_payload_text(
             getattr(decision, "fast_speech", None)
@@ -2691,8 +2689,8 @@ class VoiceAssistant:
         speak_first_raw = " ".join((decision.speak_first or "").split())
         speak_first_safe = self._safe_immediate_route_speech(speak_first_raw)
         return {
-            "router_generated_fast_speech_enabled": bool(
-                getattr(self, "router_generated_fast_speech_enabled", False)
+            "core_generated_fast_speech_enabled": bool(
+                getattr(self, "core_generated_fast_speech_enabled", False)
             ),
             "top_fast_speech_present": bool(top_raw),
             "top_fast_speech_safe": bool(top_safe),
@@ -2723,7 +2721,7 @@ class VoiceAssistant:
                 )
                 if planned_text:
                     return planned_text
-        if not getattr(self, "router_generated_fast_speech_enabled", False):
+        if not getattr(self, "core_generated_fast_speech_enabled", False):
             return None
 
         text = self._validated_fast_speech_payload_text(
@@ -2899,7 +2897,7 @@ class VoiceAssistant:
                 decision.intent,
                 "not_applicable",
                 json.dumps(
-                    self._router_fast_speech_diagnostics(decision),
+                    self._goal_interpretation_fast_speech_diagnostics(decision),
                     ensure_ascii=False,
                     sort_keys=True,
                 ),

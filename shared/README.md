@@ -6,7 +6,7 @@ primitives used across Chromie's control plane.
 ## `chromie_contracts`
 
 The contract package keeps JSON boundaries consistent between the host
-Orchestrator, Router, Agent, compatibility hardware daemon, tests, and
+Orchestrator, Goal Interpretation, Agent, compatibility hardware daemon, tests, and
 acceptance tools. It includes:
 
 - route requests and `RouteDecision`;
@@ -19,7 +19,7 @@ acceptance tools. It includes:
   trusted receipts into canonical Goal state; dispatch, provider, and dedicated
   E-stop/safe-idle evidence remain separately represented;
 - shared `TaskProposal`, `TaskProposalLedger`, and preflight-summary contracts
-  for Router/Agent/Orchestrator proposal merge diagnostics;
+  for Goal Interpretation/Cognitive Core/Orchestrator proposal merge diagnostics;
 - Goal, Goal Association, semantic task-operation, and active-goal contracts;
 - immutable `CanonicalPlan`, goal-satisfaction, response-composition, and
   single-semantic-authority contracts;

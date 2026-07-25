@@ -2,7 +2,7 @@
 
 Chromie is a local-first realtime interaction control plane for voice assistants
 that can invoke trusted embodied skills. It combines host audio and interruption,
-containerized ASR/Router/Agent/TTS services, native structured interaction, and
+containerized ASR/Cognitive Gateway/Goal-Driven Cognitive Core/TTS services, native structured interaction, and
 optional Soridormi-backed simulator or robot skills.
 
 The long-term goal and ownership boundaries are defined in the
@@ -84,7 +84,7 @@ language model. The legacy `hardware/` daemon is mock compatibility only.
 - sherpa-onnx SenseVoice as the single supported final-utterance ASR runtime,
   with immutable model provenance, CUDA/CPU providers, and startup warm-up;
 - a host-side Cognitive Gateway with a frozen immutable turn envelope,
-  deterministic stop/cancel/emergency recognition before Router or model
+  deterministic stop/cancel/emergency recognition before Goal Interpretation model
   inference, deterministic local suppression, and bounded model-assisted
   addressedness that can only suppress an inactive ambient turn and fails open
   to admitted cognition;
@@ -217,7 +217,7 @@ documented in
 | Path | Responsibility |
 |---|---|
 | `orchestrator/` | Host audio, interruption, conversation state, and Skill Runtime |
-| `router/` | Compatibility Cognitive Gateway backend for attention review and advisory routing |
+| `agent/app/cognitive_core/goal_interpreter/` | Compatibility Cognitive Gateway backend for attention review and advisory routing |
 | `agent/` | Native interaction, capabilities, and TaskGraph APIs |
 | `asr/`, `tts/` | Speech services |
 | `shared/` | Shared contracts and scheduling primitives |

@@ -1,10 +1,13 @@
 {
   "schema_version": 1,
-  "id": "normal_greeting",
+  "id": "goal_interpretation_normal_greeting",
   "suite": "router",
   "level": "module",
   "description": "Ordinary greeting stays conversational.",
-  "tags": ["chat", "normal"],
+  "tags": [
+    "chat",
+    "normal"
+  ],
   "input": {
     "text": "Hello Chromie, how are you today?"
   },
@@ -26,7 +29,12 @@
     "route": "chat",
     "intent": "general_conversation",
     "source": "llm",
-    "task_types_include": ["speech.answer"],
+    "task_types_include": [
+      "speech.answer"
+    ],
     "llm_calls": 1
+  },
+  "provenance": {
+    "legacy_scenario_id": "normal_greeting"
   }
 }

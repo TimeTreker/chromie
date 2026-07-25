@@ -76,17 +76,17 @@ Core endpoints:
 
 Catalog entries include `prompt_tier`, `prompt_tier_locked`,
 `prompt_tier_source`, and `prompt_tier_reason`. Unlocked `common` entries are
-compacted into the fast Router prompt; `rare` and safety-locked entries stay
+compacted into the fast Goal Interpretation prompt; `rare` and safety-locked entries stay
 available to deepthinking and other full-catalog planning paths. The initial
 common/rare preset lives in `capabilities/prompt_tiers.json`, loaded by
 `AGENT_CAPABILITY_PROMPT_TIER_PRESET`; it should be edited as data rather than
 as Python code. Experience can change ordinary prompt tiers through an overlay
 loaded by `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES`, but safety-locked entries
 cannot be promoted into the fast common catalog. `chromie.speak` is a common,
-interaction-executable catalog entry so the quick Router can keep spoken parts
+interaction-executable catalog entry so the quick Goal Interpretation can keep spoken parts
 of physical requests as normal skill proposals instead of dropping them into
 unstructured reply text.
-When Router compound `actions[]` include per-action confidence, the native
+When Goal Interpretation compound `actions[]` include per-action confidence, the native
 runtime preserves it in each emitted `SkillRequest.metadata` as
 `router_action_confidence` for trace and evidence review.
 
@@ -128,14 +128,14 @@ execution authority.
 | `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | social named skills | Exact catalog IDs eligible for semantic selection; this list does not force any gesture. |
 | `AGENT_EXPRESSIVE_BODY_CUES` | `off` | Deprecated compatibility alias. The main Social Attention mode takes precedence. |
 
-| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | When `1`, require semantic review for executable robot-action plans and fail closed if that optional reviewer is unavailable; exact Router capability substitutions also require a reviewer revision. At the default `0`, this extra review gate is skipped. |
+| `AGENT_REQUIRE_CAPABILITY_PLAN_REVIEW` | `0` | When `1`, require semantic review for executable robot-action plans and fail closed if that optional reviewer is unavailable; exact Goal Interpretation capability substitutions also require a reviewer revision. At the default `0`, this extra review gate is skipped. |
 | `AGENT_CONVERSATION_NUM_CTX` | `2048` | Context window for normal conversation prompts. |
 | `AGENT_CONVERSATION_NUM_PREDICT` | `64` | Output budget for normal conversation replies. |
 | `AGENT_DEEPTHINKING_NUM_CTX` | `8192` | Context window for deep-thinking prompts with session memory. |
 | `AGENT_DEEPTHINKING_NUM_PREDICT` | `384` | Output budget for deep-thinking replies. |
 | `AGENT_INTERACTION_OUTPUT_MODE` | `native` | Select `native` or explicit `legacy-adapter` output for `/interaction`. |
 | `AGENT_NATIVE_INTERACTION_FALLBACK` | `0` | On native contract-validation failure, opt in to legacy adapter fallback instead of failing closed. |
-| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0` | Emergency-only gate for the old CapabilityAgent semantic planner. It also requires a `legacy_capability_fallback` authority claim whose non-empty `turn_id` exactly matches the request `sid`; exact Router actions are always adapter-only. |
+| `AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED` | `0` | Emergency-only gate for the old CapabilityAgent semantic planner. It also requires a `legacy_capability_fallback` authority claim whose non-empty `turn_id` exactly matches the request `sid`; exact Goal Interpretation actions are always adapter-only. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | `30` | Refresh live named skills while keeping the last known-good catalog. |
 | `AGENT_CAPABILITY_MATCH_MIN_SCORE` | `0.16` | Minimum score for automatic native route correction. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | `8` | Bound candidates sent to capability selection. |

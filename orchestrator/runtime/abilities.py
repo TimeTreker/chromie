@@ -132,11 +132,11 @@ def build_default_ability_registry(
 def _base_abilities() -> dict[str, AbilitySpec]:
     specs = [
         AbilitySpec(
-            "cognition.quick_route",
+            "cognition.interpret_turn",
             "cognition",
-            "Choose a fast route for the current utterance.",
+            "Interpret the current turn into a bounded cognitive decision.",
             status="available",
-            implementation="router",
+            implementation="goal_interpreter",
         ),
         AbilitySpec(
             "cognition.deep_think",

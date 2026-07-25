@@ -36,7 +36,7 @@ not set `CHROMIE_HARDWARE_PROFILE` in `.env.local` or on a launcher command.
 
 `./scripts/start_services.sh` is the low-level Docker service launcher. It first
 refreshes hardware detection and `.env.runtime`, validates Compose, builds or
-starts ASR, TTS, Ollama, Router, and Agent, and then verifies that containers
+starts ASR, TTS, Ollama, Goal Interpretation, and Agent, and then verifies that containers
 and the TTS CUDA build match the detected profile. It does not start the host
 Orchestrator and does not assume Soridormi is running.
 
@@ -243,7 +243,7 @@ python scripts/general_ability_acceptance.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-This checks representative ability-class probes through Router and the
+This checks representative ability-class probes through Goal Interpretation and the
 goal-driven runtime in preview mode and writes evidence under
 `.chromie/acceptance/general-ability/<id>/`. Add `--execute` only for a
 supervised simulator run.
@@ -253,7 +253,7 @@ supervised simulator run.
 ```bash
 ./scripts/compose.sh ps
 curl -fsS http://127.0.0.1:8091/health | python -m json.tool
-curl -fsS http://127.0.0.1:8091/routes | python -m json.tool
+curl -fsS http://127.0.0.1:8092/health | python -m json.tool
 curl -fsS http://127.0.0.1:8092/health | python -m json.tool
 curl -fsS http://127.0.0.1:8092/capabilities | python -m json.tool
 curl -fsS http://127.0.0.1:11434/api/tags | python -m json.tool
@@ -472,7 +472,7 @@ python scripts/provider_conformance.py --live --profile sim
 
 Run the automatic synthetic matrix first. It generates input WAV files with the
 existing TTS service and injects them through the Orchestrator's private stdin
-audio path, so the test still crosses VAD, ASR, Router, goal-driven Agent
+audio path, so the test still crosses VAD, ASR, Goal Interpretation, goal-driven Agent
 planning/composition, Skill Runtime, response TTS, and Soridormi without relying
 on a person speaking:
 
@@ -497,7 +497,7 @@ python scripts/voice_acceptance.py \
 ```
 
 The run is fully automatic. The terminal displays generated fixture paths, ASR
-transcripts, Router results, proposed skill IDs, skill results, and final case
+transcripts, Goal Interpretation results, proposed skill IDs, skill results, and final case
 verdicts. Validate this regression evidence with:
 
 ```bash

@@ -398,7 +398,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_low_confidence_deep_thought_schedules_model_speak_first(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.router_generated_fast_speech_enabled = True
+        assistant.core_generated_fast_speech_enabled = True
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.order_lock = asyncio.Lock()
@@ -462,7 +462,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     def test_fast_first_response_text_uses_router_generated_speech(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
-        assistant.router_generated_fast_speech_enabled = True
+        assistant.core_generated_fast_speech_enabled = True
 
         self.assertIsNone(
             assistant._fast_first_response_text(
@@ -636,7 +636,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     def test_tool_fast_first_response_is_opt_in(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.fast_first_response_enabled = True
-        assistant.router_generated_fast_speech_enabled = True
+        assistant.core_generated_fast_speech_enabled = True
         decision = RouteDecision(
             route="tool",
             intent="weather_query",
@@ -687,7 +687,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             assistant._fast_first_response_text(decision, "What is the weather?")
         )
 
-        assistant.router_generated_fast_speech_enabled = True
+        assistant.core_generated_fast_speech_enabled = True
         self.assertEqual(
             assistant._fast_first_response_text(decision, "What is the weather?"),
             "Let me check the weather.",
@@ -720,7 +720,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     def test_unsafe_deep_thought_speak_first_uses_trusted_ack(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.router_generated_fast_speech_enabled = True
+        assistant.core_generated_fast_speech_enabled = True
         decision = RouteDecision(
             route="deep_thought",
             intent="plan_task",
@@ -735,7 +735,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     def test_incomplete_deep_thought_fast_speech_uses_trusted_ack(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.router_generated_fast_speech_enabled = True
+        assistant.core_generated_fast_speech_enabled = True
         decision = RouteDecision(
             route="deep_thought",
             intent="plan_task",

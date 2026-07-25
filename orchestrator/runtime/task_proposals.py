@@ -99,7 +99,7 @@ def _route_task_proposals(response: InteractionResponse) -> list[dict[str, Any]]
             continue
         task_type = str(task.get("task_type") or "").strip()
         capability_id = _normalized_skill_id(str(task.get("capability_id") or "").strip())
-        source_stage = str(task.get("source_stage") or "router").strip() or "router"
+        source_stage = str(task.get("source_stage") or "goal_interpreter").strip() or "goal_interpreter"
         committed_by = ""
         state = "advisory"
         reason = "route proposal recorded for final commit review"

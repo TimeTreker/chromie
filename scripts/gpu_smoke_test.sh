@@ -194,7 +194,6 @@ run_step "Verify GPU visibility in ASR container" check_container_gpu chromie-as
 run_step "Verify GPU visibility in TTS container" check_container_gpu chromie-tts || true
 run_step "Verify GPU visibility in Ollama container" check_container_gpu chromie-llm || true
 
-run_step "Check Router HTTP health" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" http://127.0.0.1:8091/health || true
 run_step "Check Agent HTTP health" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" http://127.0.0.1:8092/health || true
 run_step "Check Ollama model registry" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" http://127.0.0.1:11434/api/tags || true
 
@@ -214,7 +213,7 @@ def post(url, payload):
         return json.load(response)
 
 route = post(
-    "http://127.0.0.1:8091/route",
+    "http://127.0.0.1:8092/cognitive-core/interpret",
     {"sid": "gpu-smoke-control", "text": "turn left", "language": "en-US", "context": {}},
 )
 assert route.get("route") == "chat", route
@@ -239,7 +238,7 @@ print(json.dumps({"route": route, "agent": agent}, ensure_ascii=False))
 PY
 }
 
-run_step "Run deployed Router-to-Agent safe chat control-plane round trip" check_control_plane_http || true
+run_step "Run deployed Cognitive Core-to-Agent safe chat control-plane round trip" check_control_plane_http || true
 
 check_asr_websocket() {
   docker exec -i chromie-asr python - <<'PY'

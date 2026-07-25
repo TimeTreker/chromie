@@ -66,7 +66,6 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         session_id = "turn-post-interrupt"
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.enable_router = True
         assistant.enable_agent = True
         assistant.cognitive_runtime_mode = "apply"
         assistant.conversation_state = _ConversationState(
@@ -99,8 +98,8 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-        class _Router:
-            async def route(self, *args: Any, **kwargs: Any) -> RouteDecision:
+        class _CoreInterpreter:
+            async def interpret_turn(self, *args: Any, **kwargs: Any) -> RouteDecision:
                 del args, kwargs
                 return routed_interrupt
 
@@ -153,7 +152,7 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
             return decision
 
         self_interruption_ids: list[str | None] = []
-        assistant.router_client = _Router()
+        assistant.agent_client = _CoreInterpreter()
         assistant.get_http_session = MethodType(get_http_session, assistant)
         assistant._handle_confirmation_reply = MethodType(
             confirmation_reply,
@@ -199,11 +198,10 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
     async def test_deterministic_ignore_stays_suppressed_without_router_result(
         self,
     ) -> None:
-        for router_mode in ("disabled", "raises"):
-            with self.subTest(router_mode=router_mode):
-                session_id = f"turn-ignore-{router_mode}"
+        for core_mode in ("unavailable", "raises"):
+            with self.subTest(core_mode=core_mode):
+                session_id = f"turn-ignore-{core_mode}"
                 assistant = VoiceAssistant.__new__(VoiceAssistant)
-                assistant.enable_router = router_mode != "disabled"
                 assistant.cognitive_runtime_mode = "apply"
                 assistant.conversation_state = _ConversationState(
                     "conversation-ignore"
@@ -213,14 +211,14 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                 model_calls: list[str] = []
                 done_calls: list[str] = []
 
-                class _Router:
-                    async def route(
+                class _CoreInterpreter:
+                    async def interpret_turn(
                         self,
                         *args: Any,
                         **kwargs: Any,
                     ) -> RouteDecision:
                         del self, args, kwargs
-                        raise RuntimeError("router unavailable")
+                        raise RuntimeError("cognitive core unavailable")
 
                 async def get_http_session(
                     self: VoiceAssistant,
@@ -263,7 +261,7 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
                     del self
                     done_calls.append(sid)
 
-                assistant.router_client = _Router()
+                assistant.agent_client = _CoreInterpreter()
                 assistant.get_http_session = MethodType(
                     get_http_session,
                     assistant,
