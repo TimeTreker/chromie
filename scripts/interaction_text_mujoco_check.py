@@ -461,9 +461,9 @@ def _apply_soridormi_skill_timeout(response: Any, timeout_s: float | None) -> An
 
 
 def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None:
-    os.environ["ROUTER_URL"] = args.router_url
+    os.environ["AGENT_URL"] = args.router_url
     os.environ["AGENT_URL"] = args.agent_url
-    os.environ["ORCH_ENABLE_ROUTER"] = "1"
+    os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_AGENT"] = "1"
     os.environ["ORCH_ENABLE_INTERACTION_RESPONSE"] = "1"
     os.environ["ORCH_ENABLE_SORIDORMI_SKILLS"] = "1"
@@ -858,7 +858,7 @@ def build_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("text", nargs="?", default=DEFAULT_TEXT)
-    parser.add_argument("--router-url", default=os.getenv("ROUTER_URL", "http://127.0.0.1:8091"))
+    parser.add_argument("--router-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8091"))
     parser.add_argument("--agent-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8092"))
     parser.add_argument(
         "--soridormi-mcp-url",

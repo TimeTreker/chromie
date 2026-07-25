@@ -4,10 +4,10 @@ import os
 import unittest
 from unittest.mock import patch
 
-from router.app.config import router_mode_from_env
-from router.app.fallback import fallback_decision
-from router.app.rules import route_by_priority_rules
-from router.app.schema import RouteRequest
+from agent.app.cognitive_core.goal_interpreter.config import router_mode_from_env
+from agent.app.cognitive_core.goal_interpreter.fallback import fallback_decision
+from agent.app.cognitive_core.goal_interpreter.rules import route_by_priority_rules
+from agent.app.cognitive_core.goal_interpreter.schema import RouteRequest
 
 
 class RouterCoreTests(unittest.TestCase):
@@ -128,7 +128,7 @@ class RouterCoreTests(unittest.TestCase):
 
 
     def test_route_decision_preserves_fast_speech_contract(self) -> None:
-        from router.app.schema import RouteDecision
+        from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision
 
         decision = RouteDecision.model_validate({
             "route": "tool",

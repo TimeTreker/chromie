@@ -416,7 +416,7 @@ def check_configuration_reference(errors: list[str]) -> None:
         "ORCH_COGNITIVE_FALLBACK_POLICY",
         "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED",
         "AGENT_LEGACY_CAPABILITY_FALLBACK_ENABLED",
-        "ORCH_ROUTER_TIMEOUT_MS",
+        "ORCH_AGENT_TIMEOUT_MS",
     )
     for name in safety_default_names:
         value = values.get(name)
@@ -442,14 +442,14 @@ def check_configuration_reference(errors: list[str]) -> None:
             values.get("ROUTER_REVIEW_TIMEOUT_MS", values.get("ROUTER_LLM_TIMEOUT_MS", str(router_base_ms)))
         )
         router_internal_ms = router_llm_ms + router_review_ms
-        router_host_ms = int(values["ORCH_ROUTER_TIMEOUT_MS"])
+        router_host_ms = int(values["ORCH_AGENT_TIMEOUT_MS"])
     except (KeyError, ValueError) as exc:
         errors.append(f".env.common has invalid Router timeout configuration: {exc}")
     else:
         catalog_ms = int(values.get("ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS", "0"))
         if router_host_ms <= router_internal_ms + catalog_ms:
             errors.append(
-                "ORCH_ROUTER_TIMEOUT_MS must exceed ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS "
+                "ORCH_AGENT_TIMEOUT_MS must exceed ROUTER_CAPABILITY_CATALOG_TIMEOUT_MS "
                 "plus ROUTER_LLM_TIMEOUT_MS and ROUTER_REVIEW_TIMEOUT_MS, so the Router "
                 "can finish or report its own timeout first"
             )

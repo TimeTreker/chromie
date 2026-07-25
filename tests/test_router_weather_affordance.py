@@ -5,8 +5,8 @@ import json
 import unittest
 from typing import Any
 
-from router.app.llm_router import OllamaLLMRouter
-from router.app.schema import FastSpeech, RouteDecision, RouteItem, RouteRequest, finalize_decision
+from agent.app.cognitive_core.goal_interpreter.llm_router import OllamaLLMRouter
+from agent.app.cognitive_core.goal_interpreter.schema import FastSpeech, RouteDecision, RouteItem, RouteRequest, finalize_decision
 
 
 WEATHER_CAPABILITY = {

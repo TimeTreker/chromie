@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-__all__ = ["RouterClient", "AgentClient", "ActionClient", "ASRClient", "TTSClient"]
+__all__ = ["AgentClient", "ActionClient", "ASRClient", "TTSClient"]
 
 
 def __getattr__(name: str):
-    if name == "RouterClient":
-        from .router_client import RouterClient
-
-        return RouterClient
     if name == "AgentClient":
         from .agent_client import AgentClient
 

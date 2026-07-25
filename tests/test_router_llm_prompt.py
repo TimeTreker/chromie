@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from router.app.llm_router import (
+from agent.app.cognitive_core.goal_interpreter.llm_router import (
     OllamaLLMRouter,
     _catalog_observability_profile,
     _payload_message_texts,
@@ -10,7 +10,7 @@ from router.app.llm_router import (
     _raw_router_output_summary,
     is_allowed_model_ignore,
 )
-from router.app.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 
 class RouterLlmPromptTests(unittest.TestCase):
@@ -446,7 +446,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         )
 
         finalized = RouteDecision.model_validate(decision.model_dump())
-        from router.app.schema import annotate_default_stage_output
+        from agent.app.cognitive_core.goal_interpreter.schema import annotate_default_stage_output
 
         annotated = annotate_default_stage_output(finalized)
         proposals = [
@@ -765,7 +765,7 @@ class RouterLlmPromptTests(unittest.TestCase):
         self.assertEqual(len(decision.routes), 3)
         self.assertEqual(decision.metadata["route_item_count"], 3)
         self.assertIn("dominant compatibility route", decision.reason or "")
-        from router.app.schema import annotate_pipeline_stage_outputs
+        from agent.app.cognitive_core.goal_interpreter.schema import annotate_pipeline_stage_outputs
 
         annotated = annotate_pipeline_stage_outputs(decision)
 

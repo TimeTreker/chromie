@@ -945,7 +945,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-failures", action="store_true", help="Return success even when checks fail.")
     parser.add_argument("--evidence-dir", help="Directory for retained evidence summary.")
 
-    parser.add_argument("--router-url", default=os.getenv("ROUTER_URL", "http://127.0.0.1:8091"))
+    parser.add_argument("--router-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8091"))
     parser.add_argument("--agent-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8092"))
     parser.add_argument(
         "--soridormi-mcp-url",

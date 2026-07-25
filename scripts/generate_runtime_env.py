@@ -27,8 +27,8 @@ KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 MODEL_PLAN_KEYS = (
     "AGENT_MODEL",
     "OLLAMA_MODEL",
-    "ROUTER_MODEL",
-    "ROUTER_REVIEW_MODEL",
+    "AGENT_GOAL_INTERPRETER_MODEL",
+    "AGENT_GOAL_INTERPRETER_REVIEW_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
@@ -47,7 +47,7 @@ COGNITIVE_BUDGET_KEYS = (
     "AGENT_DEEP_PLANNER_TIMEOUT_MS",
     "AGENT_RESPONSE_COMPOSER_TIMEOUT_MS",
     "AGENT_TOOL_RESULT_INTERPRETER_TIMEOUT_MS",
-    "ORCH_ROUTER_TIMEOUT_MS",
+    "ORCH_AGENT_TIMEOUT_MS",
     "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
     "ORCH_FAST_PLANNER_TIMEOUT_MS",
     "ORCH_DEEP_PLANNER_TIMEOUT_MS",
@@ -341,13 +341,13 @@ def active_models(values: Mapping[str, str]) -> list[str]:
             models.append(value)
 
     if enabled(values.get("ROUTER_USE_LLM")):
-        append(values.get("ROUTER_MODEL"))
-        if values.get("ROUTER_REVIEW_MODEL") and (
+        append(values.get("AGENT_GOAL_INTERPRETER_MODEL"))
+        if values.get("AGENT_GOAL_INTERPRETER_REVIEW_MODEL") and (
             enabled(values.get("ROUTER_POST_INTERRUPT_REVIEW_ENABLED"))
             or enabled(values.get("ROUTER_SLOW_REVIEW_RECOVERY_ENABLED"), default=True)
             or enabled(values.get("ROUTER_GENERIC_CHAT_REVIEW_ENABLED"), default=True)
         ):
-            append(values.get("ROUTER_REVIEW_MODEL"))
+            append(values.get("AGENT_GOAL_INTERPRETER_REVIEW_MODEL"))
 
     if enabled(values.get("AGENT_USE_LLM"), default=True):
         append(values.get("AGENT_MODEL") or values.get("OLLAMA_MODEL"))
@@ -506,7 +506,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[env] Auto-detected hardware profile: {manifest['active_profile']}")
     print(
         "[env] Model plan: "
-        f"router={models['ROUTER_MODEL']} "
+        f"router={models['AGENT_GOAL_INTERPRETER_MODEL']} "
         f"association={models['AGENT_GOAL_ASSOCIATION_MODEL']} "
         f"fast={models['AGENT_FAST_PLANNER_MODEL']} "
         f"deep={models['AGENT_DEEP_PLANNER_MODEL']} "

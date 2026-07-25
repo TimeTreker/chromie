@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 from agent.app.capabilities.catalog import CapabilityCatalog
 from tests.test_capability_catalog_service import _Invoker, _registry
-from router.app.capability_catalog import CapabilityCatalogResult
-from router.app.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 from tests.test_router_capability_routing import _Catalog, _LlmRouter
 
 
@@ -22,7 +22,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.matches[0].interaction_executable)
 
     async def test_router_does_not_phrase_match_generic_motion_to_a_skill(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="你往前走个15秒。",
@@ -74,7 +74,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="你往前走个15秒。", language="zh-CN"))
+            decision = await main.interpret_turn(RouteRequest(text="你往前走个15秒。", language="zh-CN"))
 
         self.assertEqual(decision.source, "llm")
         self.assertEqual(decision.route, "robot_action")
@@ -87,7 +87,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_missing_forward_motion_speech_uses_user_language(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="你往前走个15秒。",
@@ -126,7 +126,7 @@ class ForwardMotionRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="你往前走个15秒。"))
+            decision = await main.interpret_turn(RouteRequest(text="你往前走个15秒。"))
 
         self.assertEqual(decision.route, "robot_action")
         self.assertEqual(decision.intent, "semantic_capability_planning")

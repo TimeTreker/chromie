@@ -145,7 +145,7 @@ check_compose_health() {
 
   while true; do
     pending=0
-    for service in chromie-asr chromie-tts chromie-llm chromie-router chromie-agent; do
+    for service in chromie-asr chromie-tts chromie-llm chromie-agent; do
       container_id="$(docker compose "${COMPOSE_ARGS[@]}" ps -q "$service")"
       if [ -z "$container_id" ]; then
         printf '%s: container is not running\n' "$service"

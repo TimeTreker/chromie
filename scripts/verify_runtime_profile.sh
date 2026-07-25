@@ -76,7 +76,7 @@ if [ "$manifest_fingerprint" != "${CHROMIE_RUNTIME_ENV_FINGERPRINT:-}" ]; then
   exit 1
 fi
 
-services=(chromie-asr chromie-llm "$tts_service" chromie-router chromie-agent)
+services=(chromie-asr chromie-llm "$tts_service" chromie-agent)
 declare -A service_env
 for service in "${services[@]}"; do
   container_id="$(docker compose "${compose_args[@]}" ps -q "$service")"
@@ -119,8 +119,8 @@ for name in \
   AGENT_RESPONSE_REVIEW_MODEL; do
   check_value chromie-agent "$name"
 done
-for name in ROUTER_MODEL ROUTER_REVIEW_MODEL; do
-  check_value chromie-router "$name"
+for name in AGENT_GOAL_INTERPRETER_MODEL AGENT_GOAL_INTERPRETER_REVIEW_MODEL; do
+  check_value "$name"
 done
 check_value "$tts_service" TTS_CUDA_ARCH
 actual_tts_provider="$(value_from_dump "${service_env[$tts_service]}" TTS_PROVIDER)"

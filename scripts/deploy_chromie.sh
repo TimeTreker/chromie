@@ -136,7 +136,7 @@ else
 fi
 
 if [ "$BUILD_IMAGES" = "1" ]; then
-  build_services=(chromie-asr chromie-tts chromie-router chromie-agent)
+  build_services=(chromie-asr chromie-tts chromie-agent)
   if [ "$REBUILD_NO_CACHE" = "1" ]; then
     echo "[deploy-chromie] Building Chromie images with --no-cache..."
     docker compose "${COMPOSE_ARGS[@]}" build --no-cache "${build_services[@]}"

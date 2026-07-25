@@ -8,7 +8,7 @@ from agent.app.schema import AgentResult as ServiceAgentResult
 from agent.app.schema import RouteDecision as AgentRouteDecision
 from orchestrator.schemas.agent import AgentResult as HostAgentResult
 from orchestrator.schemas.route import RouteDecision as OrchestratorRouteDecision
-from router.app.schema import RouteDecision as RouterRouteDecision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as RouterRouteDecision
 from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision
 
 

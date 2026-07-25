@@ -11,7 +11,7 @@ from orchestrator.schemas.action import ActionResult as OrchestratorActionResult
 from orchestrator.schemas.agent import AgentRequest as OrchestratorAgentRequest
 from orchestrator.schemas.agent import AgentResult as OrchestratorAgentResult
 from orchestrator.schemas.route import RouteDecision as OrchestratorRouteDecision
-from router.app.schema import RouteDecision, RouteRequest, finalize_decision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.action import ActionCommand as SharedActionCommand
 from shared.chromie_contracts.agent import AgentResult as SharedAgentResult
 from shared.chromie_contracts.route import RouteDecision as SharedRouteDecision

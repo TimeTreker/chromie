@@ -12,10 +12,10 @@ from orchestrator.runtime.deepthinking_policy import (
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.schemas.route import RouteDecision, RouteItem
-from router.app.main import (
+from agent.app.cognitive_core.goal_interpreter.main import (
     _guard_low_information_side_effect,
 )
-from router.app.schema import RouteDecision as RouterRouteDecision, RouteRequest, finalize_decision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision as RouterRouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.interaction import InteractionResponse
 
 

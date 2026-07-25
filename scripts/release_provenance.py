@@ -290,9 +290,9 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
         errors.append(
             "release/model-lock.json agent_models do not match maintained hardware profiles"
         )
-    router_model = common.get("ROUTER_MODEL")
+    router_model = common.get("AGENT_GOAL_INTERPRETER_MODEL")
     if router_model and router_model not in set(ollama.get("router_models", [])):
-        errors.append("ROUTER_MODEL is absent from release/model-lock.json")
+        errors.append("AGENT_GOAL_INTERPRETER_MODEL is absent from release/model-lock.json")
     return errors
 
 def collect_provenance(
@@ -371,7 +371,7 @@ def collect_provenance(
         try:
             resolved_ollama = ollama_models(
                 env.get("OLLAMA_URL", "http://127.0.0.1:11434"),
-                [env.get("AGENT_MODEL", "gemma4:e2b"), env.get("ROUTER_MODEL", "qwen3:4b")],
+                [env.get("AGENT_MODEL", "gemma4:e2b"), env.get("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b")],
             )
         except Exception as exc:  # release diagnostics should preserve all failures
             runtime_errors.append(f"could not capture Ollama model digests: {exc}")

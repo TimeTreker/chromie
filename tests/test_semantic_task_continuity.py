@@ -5,8 +5,8 @@ import unittest
 from agent.app.agents.capability import CapabilityAgent
 from agent.app.agents.base import AgentServices
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from router.app.llm_router import OllamaLLMRouter
-from router.app.schema import RouteRequest
+from agent.app.cognitive_core.goal_interpreter.llm_router import OllamaLLMRouter
+from agent.app.cognitive_core.goal_interpreter.schema import RouteRequest
 from shared.chromie_contracts.semantic_task import (
     SemanticGoal,
     SemanticTaskOperation,

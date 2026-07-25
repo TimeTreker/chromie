@@ -3,8 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from router.app.capability_catalog import CapabilityCatalogResult
-from router.app.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 
 class _Catalog:
@@ -62,7 +62,7 @@ class _LlmRouter:
 
 class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def test_rules_only_catalog_match_does_not_route_to_capability_agent(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="move forward",
@@ -83,7 +83,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "rules_only"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ):
-            decision = await main.route(RouteRequest(text="Move forward."))
+            decision = await main.interpret_turn(RouteRequest(text="Move forward."))
 
         self.assertEqual(decision.source, "fallback")
         self.assertEqual(decision.route, "chat")
@@ -106,7 +106,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.metadata["route_merge"]["task_count"], 1)
 
     async def test_hybrid_deep_thought_for_direct_motion_keeps_model_route(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="walk forward quickly",
@@ -139,7 +139,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Walk forward for 15 seconds, quickly.")
             )
 
@@ -152,7 +152,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("recovered_from_route", decision.metadata)
 
     async def test_hybrid_llm_accepts_skill_from_compact_catalog_without_search_match(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="眨两小眼睛。",
@@ -224,7 +224,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", catalog
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="眨两小眼睛。", language="zh-CN"))
+            decision = await main.interpret_turn(RouteRequest(text="眨两小眼睛。", language="zh-CN"))
 
         assert llm_router.request is not None
         self.assertEqual(catalog.snapshot_calls, 1)
@@ -252,7 +252,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("safety_agent", decision.agents)
 
     async def test_hybrid_llm_normalizes_unique_compact_catalog_suffix_without_search_match(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Please blink your eyes twice.",
@@ -298,7 +298,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "capability_catalog",
             catalog,
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Please blink your eyes twice.", language="en-US")
             )
 
@@ -310,7 +310,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("validator normalized catalog capability intent", decision.reason or "")
 
     async def test_hybrid_llm_delegates_rare_catalog_skill_from_fast_router(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Run floor calibration.",
@@ -363,7 +363,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "capability_catalog",
             catalog,
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Run floor calibration.", language="en-US")
             )
 
@@ -380,7 +380,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("capability_agent", decision.agents)
 
     async def test_hybrid_llm_excludes_locked_common_catalog_skill_from_fast_router(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Run floor calibration.",
@@ -435,7 +435,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
             "capability_catalog",
             catalog,
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Run floor calibration.", language="en-US")
             )
 
@@ -452,19 +452,19 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("outside the fast common ability catalog", decision.reason or "")
 
     async def test_catalog_miss_does_not_use_legacy_robot_phrase_rule_by_default(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="turn your head left", matched=False)
         with patch.object(main.settings, "mode", "rules_only"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ):
-            decision = await main.route(RouteRequest(text="Turn your head left."))
+            decision = await main.interpret_turn(RouteRequest(text="Turn your head left."))
 
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.source, "fallback")
 
     async def test_hybrid_mode_does_not_use_legacy_phrase_rules_after_llm_fallback(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="turn left", matched=False)
         llm_router = _LlmRouter(
@@ -484,7 +484,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="turn left"))
+            decision = await main.interpret_turn(RouteRequest(text="turn left"))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.route, "deep_thought")
@@ -494,7 +494,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(llm_router.request.context["candidate_capabilities"], [])
 
     async def test_hybrid_mode_ignores_query_matches_after_llm_fallback(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="what's your name",
@@ -528,7 +528,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="What's your name?"))
+            decision = await main.interpret_turn(RouteRequest(text="What's your name?"))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.route, "deep_thought")
@@ -545,7 +545,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_main_validator_rejects_generic_llm_robot_action(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="i mean do you know if the sun is round or rectangular",
@@ -578,7 +578,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="I mean, do you know if the sun is round or rectangular?")
             )
 
@@ -589,9 +589,9 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("llm_robot_action_missing_catalog_skill", decision.reason or "")
 
     async def test_stop_now_is_priority_interrupt(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
-        decision = await main.route(RouteRequest(text="Stop now."))
+        decision = await main.interpret_turn(RouteRequest(text="Stop now."))
 
         self.assertEqual(decision.route, "interrupt")
         self.assertTrue(decision.interrupt_current)
@@ -614,7 +614,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.metadata["route_merge"]["task_count"], 2)
 
     async def test_priority_interrupt_can_be_semantically_confirmed_by_second_router(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="stop now", matched=False, matches=[])
         llm_router = _LlmRouter(
@@ -641,7 +641,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Stop now."))
+            decision = await main.interpret_turn(RouteRequest(text="Stop now."))
 
         self.assertEqual(decision.route, "interrupt")
         self.assertTrue(decision.interrupt_current)
@@ -669,7 +669,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_priority_interrupt_can_record_corrected_second_router_task(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(query="stop", matched=False, matches=[])
         llm_router = _LlmRouter(
@@ -697,7 +697,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(
                     text="Stop.",
                     context={"asr_alternatives": ["Stop by the table means what?"]},
@@ -734,7 +734,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_routes_endpoint_lists_quick_and_deep_lanes(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         payload = await main.routes()
 
@@ -754,7 +754,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deep_thought", lanes["deep_thought"]["routes"])
 
     async def test_chat_catalog_match_does_not_select_speech_tool_as_intent(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="tell me a joke",
@@ -775,7 +775,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main, "capability_catalog", _Catalog(result)), patch.object(
             main.settings, "mode", "rules_only"
         ):
-            decision = await main.route(RouteRequest(text="Tell me a joke."))
+            decision = await main.interpret_turn(RouteRequest(text="Tell me a joke."))
 
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
@@ -783,7 +783,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("conversation_agent", decision.agents)
 
     async def test_hybrid_router_uses_common_catalog_snapshot_for_semantic_recovery(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="往前走个15秒。",
@@ -823,7 +823,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="往前走个15秒。", language="zh-CN"))
+            decision = await main.interpret_turn(RouteRequest(text="往前走个15秒。", language="zh-CN"))
 
         self.assertEqual(llm_router.calls, 1)
         assert llm_router.request is not None
@@ -843,7 +843,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_hybrid_router_delegates_low_confidence_body_command_to_deep_thought(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="walking forward quickly until i tell you stop",
@@ -908,7 +908,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Walking forward quickly until I tell you stop.")
             )
 
@@ -934,7 +934,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_schema_invalid_quick_actions_handoff_to_capability_planner(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="walk at 0.2 speed for 10 seconds and nod twice",
@@ -1003,7 +1003,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Walk at 0.2 speed for 10 seconds and nod twice.")
             )
 
@@ -1023,7 +1023,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("deepthinking_agent", decision.agents)
 
     async def test_validator_does_not_infer_compound_plan_from_user_phrase(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left",
@@ -1094,7 +1094,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(
                     text=(
                         "walk ahead at 0.2 speed for 10 seconds and then "
@@ -1112,7 +1112,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("compound_common_catalog_task", str(decision.metadata))
 
     async def test_hybrid_low_confidence_handoff_uses_llm_speak_first_thinking_ack(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="figure out the safe way to help me with this setup",
@@ -1137,7 +1137,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Figure out the safe way to help me with this setup.")
             )
 
@@ -1158,7 +1158,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(thinking_task["text"], "Give me a moment to think that through.")
 
     async def test_hybrid_router_keeps_llm_deep_thought_without_phrase_recovery(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="hey groomy walking forward for 10 seconds quickly please",
@@ -1192,7 +1192,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Hey, Groomy, walking forward for 10 seconds quickly, please.")
             )
 
@@ -1212,7 +1212,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_hybrid_router_keeps_complex_deep_thought_direct_motion(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="wal forward for 15 seconds quickly",
@@ -1246,7 +1246,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Wal forward for 15 seconds, quickly."))
+            decision = await main.interpret_turn(RouteRequest(text="Wal forward for 15 seconds, quickly."))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.source, "llm")
@@ -1257,7 +1257,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("recovered_from_route", decision.metadata)
 
     async def test_hybrid_router_keeps_planning_text_in_deep_thought(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="make a plan to walk forward safely",
@@ -1291,14 +1291,14 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Make a plan to walk forward safely."))
+            decision = await main.interpret_turn(RouteRequest(text="Make a plan to walk forward safely."))
 
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_planning")
         self.assertIn("deepthinking_agent", decision.agents)
 
     async def test_hybrid_router_delegates_low_confidence_without_catalog_match_to_deep_thought(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="build an unusual robot latency strategy",
@@ -1321,7 +1321,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Build an unusual robot latency strategy."))
+            decision = await main.interpret_turn(RouteRequest(text="Build an unusual robot latency strategy."))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.source, "llm")
@@ -1332,7 +1332,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(decision.metadata["thinking_ack_allowed"])
 
     async def test_hybrid_router_keeps_low_confidence_simple_chat_out_of_deep_thought(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Hello, how are you doing?",
@@ -1355,7 +1355,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Hello, how are you doing?"))
+            decision = await main.interpret_turn(RouteRequest(text="Hello, how are you doing?"))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.route, "chat")
@@ -1364,7 +1364,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("deepthinking_agent", decision.agents)
 
     async def test_hybrid_router_treats_chat_speak_skill_as_output_channel(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Hello, how are you.",
@@ -1405,7 +1405,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Hello, how are you."))
+            decision = await main.interpret_turn(RouteRequest(text="Hello, how are you."))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.source, "llm")
@@ -1416,7 +1416,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("capability_agent", decision.agents)
 
     async def test_hybrid_router_treats_robot_action_speak_skill_as_chat(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="How are you.",
@@ -1457,7 +1457,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="How are you.", language="en-US"))
+            decision = await main.interpret_turn(RouteRequest(text="How are you.", language="en-US"))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.source, "llm")
@@ -1469,7 +1469,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("capability_agent", decision.agents)
 
     async def test_hybrid_router_corrects_generic_robot_action_when_catalog_says_chat(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Hello.",
@@ -1502,7 +1502,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Hello."))
+            decision = await main.interpret_turn(RouteRequest(text="Hello."))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.source, "fallback")
@@ -1513,7 +1513,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("llm_robot_action_missing_catalog_skill", decision.reason or "")
 
     async def test_hybrid_router_accepts_exact_robot_action_from_compact_catalog(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Hello, are you.",
@@ -1561,7 +1561,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", catalog
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Hello, are you."))
+            decision = await main.interpret_turn(RouteRequest(text="Hello, are you."))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(catalog.search_calls, 0)
@@ -1572,7 +1572,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("safety_agent", decision.agents)
 
     async def test_hybrid_router_normalizes_raw_skill_id_robot_action_from_compact_catalog(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Walk forward for 15 seconds, please.",
@@ -1611,7 +1611,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", catalog
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Walk forward for 15 seconds, please."))
+            decision = await main.interpret_turn(RouteRequest(text="Walk forward for 15 seconds, please."))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(catalog.search_calls, 0)
@@ -1623,7 +1623,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("safety_agent", decision.agents)
 
     async def test_hybrid_router_does_not_recover_invalid_llm_interrupt_through_catalog(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="walk forward and blink",
@@ -1665,7 +1665,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="please walk forward for 10 seconds and blink your eyes")
             )
 
@@ -1688,7 +1688,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_invalid_interrupt_recovery_does_not_use_catalog_for_discourse_marker(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="go ahead and sing a song for me",
@@ -1722,7 +1722,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="Go ahead and sing a song for me."))
+            decision = await main.interpret_turn(RouteRequest(text="Go ahead and sing a song for me."))
 
         self.assertEqual(decision.route, "chat")
         self.assertEqual(decision.intent, "general_conversation")
@@ -1735,7 +1735,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_invalid_interrupt_recovery_does_not_use_catalog_for_appearance_statement(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="you look beautiful don't you",
@@ -1769,7 +1769,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="You look beautiful, don't you?"))
+            decision = await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.route, "chat")
@@ -1785,7 +1785,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_llm_fallback_delegates_social_compliment_without_catalog_motion(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="you look beautiful don't you",
@@ -1819,7 +1819,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="You look beautiful, don't you?"))
+            decision = await main.interpret_turn(RouteRequest(text="You look beautiful, don't you?"))
 
         self.assertEqual(decision.route, "deep_thought")
         self.assertEqual(decision.intent, "deep_thought_router_unavailable")
@@ -1831,7 +1831,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_quick_router_fallback_delegates_to_deep_thought_without_phrase_rules(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="please think carefully and split the work to add long-term memory",
@@ -1865,7 +1865,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(
                     text="Please think carefully and split the work to add long-term memory to Chromie."
                 )
@@ -1877,7 +1877,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(decision.metadata.get("thinking_ack_allowed", True))
 
     async def test_hybrid_router_does_not_synthesize_actions_with_semantic_parser(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="请向前走十秒，然后点头两次。",
@@ -1944,7 +1944,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         ), patch.object(
             main, "llm_router", llm_router
         ):
-            decision = await main.route(RouteRequest(text="请向前走十秒，然后点头两次。"))
+            decision = await main.interpret_turn(RouteRequest(text="请向前走十秒，然后点头两次。"))
 
         self.assertEqual(llm_router.calls, 1)
         self.assertEqual(decision.source, "llm")
@@ -1958,7 +1958,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_short_asr_fragment_robot_action_is_downgraded_to_clarify(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="B.",
@@ -1999,7 +1999,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="B.", language="en-US"))
+            decision = await main.interpret_turn(RouteRequest(text="B.", language="en-US"))
 
         self.assertEqual(decision.route, "clarify")
         self.assertEqual(decision.intent, "clarify_insufficient_information")
@@ -2017,7 +2017,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_short_asr_fragment_chat_is_downgraded_to_clarify(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="B.",
@@ -2054,7 +2054,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="B.", language="en-US"))
+            decision = await main.interpret_turn(RouteRequest(text="B.", language="en-US"))
 
         self.assertEqual(decision.route, "clarify")
         self.assertEqual(decision.source, "llm")
@@ -2067,7 +2067,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_llm_unavailable_short_asr_fragment_clarifies_without_deep_thought(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="B.",
@@ -2105,7 +2105,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(RouteRequest(text="B.", language="en-US"))
+            decision = await main.interpret_turn(RouteRequest(text="B.", language="en-US"))
 
         self.assertEqual(decision.route, "clarify")
         self.assertEqual(decision.source, "fallback")
@@ -2118,7 +2118,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("llm_router_unavailable", calibration["reason"])
 
     async def test_short_fragment_with_strong_followup_context_is_not_downgraded(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="B.",
@@ -2155,7 +2155,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(
                     text="B.",
                     language="en-US",
@@ -2168,7 +2168,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("capability_agent", decision.agents)
 
     async def test_missing_body_skill_tells_user_without_substitution(self) -> None:
-        from router.app import main
+        from agent.app.cognitive_core.goal_interpreter import engine as main
 
         result = CapabilityCatalogResult(
             query="Please fly up to the ceiling.",
@@ -2206,7 +2206,7 @@ class RouterCapabilityRoutingTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(main.settings, "mode", "hybrid"), patch.object(
             main, "capability_catalog", _Catalog(result, snapshot=snapshot)
         ), patch.object(main, "llm_router", llm_router):
-            decision = await main.route(
+            decision = await main.interpret_turn(
                 RouteRequest(text="Please fly up to the ceiling.", language="en-US")
             )
 

@@ -7,8 +7,8 @@ from agent.app.runtime import AgentRuntime
 from agent.app.schema import AgentRunRequest
 from hardware.schema import ActionCommand as HardwareActionCommand
 from hardware.service import HardwareService
-from router.app.fallback import fallback_decision
-from router.app.schema import RouteDecision, RouteRequest, finalize_decision
+from agent.app.cognitive_core.goal_interpreter.fallback import fallback_decision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest, finalize_decision
 
 
 def _pose_route(request: RouteRequest) -> RouteDecision:

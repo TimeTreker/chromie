@@ -55,7 +55,7 @@ fi
 echo "[start] Hardware profile: ${CHROMIE_ACTIVE_PROFILE:-unknown}"
 echo "[start] GPU: ${CHROMIE_NVIDIA_GPU_NAME:-unknown} compute=${CHROMIE_NVIDIA_COMPUTE_CAP:-unknown} cuda_arch=${TTS_CUDA_ARCH:-unset}"
 echo "[start] CPU: ${CHROMIE_CPU_MODEL:-unknown} cores=${CHROMIE_CPU_CORES:-unknown} mem=${CHROMIE_MEM_TOTAL_MIB:-unknown}MiB"
-echo "[start] Router model: ${ROUTER_MODEL:-unset} use_llm=${ROUTER_USE_LLM:-unset}"
+echo "[start] Router model: ${AGENT_GOAL_INTERPRETER_MODEL:-unset} use_llm=${ROUTER_USE_LLM:-unset}"
 echo "[start] Agent model: ${AGENT_MODEL:-unset}"
 echo "[start] Cognitive models: association=${AGENT_GOAL_ASSOCIATION_MODEL:-unset} fast=${AGENT_FAST_PLANNER_MODEL:-unset} deep=${AGENT_DEEP_PLANNER_MODEL:-unset} composer=${AGENT_RESPONSE_COMPOSER_MODEL:-unset}"
 echo "[start] Ollama: max_loaded=${OLLAMA_MAX_LOADED_MODELS:-unset} num_parallel=${OLLAMA_NUM_PARALLEL:-unset}"
@@ -122,8 +122,8 @@ esac
 
 if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}" = "1" ]; then
   COSYVOICE_BRAIN_MODEL="${TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b}"
-  export ROUTER_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export ROUTER_REVIEW_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_GOAL_INTERPRETER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_GOAL_INTERPRETER_REVIEW_MODEL="$COSYVOICE_BRAIN_MODEL"
   export AGENT_MODEL="$COSYVOICE_BRAIN_MODEL"
   export AGENT_GOAL_ASSOCIATION_MODEL="$COSYVOICE_BRAIN_MODEL"
   export AGENT_FAST_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
@@ -155,14 +155,14 @@ SERVICES=(
   chromie-asr
   chromie-llm
   "$TTS_SERVICE"
-  chromie-router
+ 
   chromie-agent
 )
 
 BUILD_SERVICES=(
   chromie-asr
   "$TTS_SERVICE"
-  chromie-router
+ 
   chromie-agent
 )
 
@@ -220,7 +220,7 @@ echo "[start] Useful follow-up commands:"
 echo " ./scripts/compose.sh logs -f chromie-llm"
 echo " ./scripts/compose.sh logs -f $TTS_SERVICE"
 echo " ./scripts/compose.sh logs -f chromie-asr"
-echo " ./scripts/compose.sh logs -f chromie-router"
+echo " ./scripts/compose.sh logs -f"
 echo " ./scripts/compose.sh logs -f chromie-agent"
 echo " ./scripts/compose.sh ps"
 echo " ./scripts/show_profile.sh"

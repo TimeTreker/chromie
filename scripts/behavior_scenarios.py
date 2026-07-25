@@ -59,9 +59,9 @@ from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.semantic_task import ResponsePlan
-from router.app.capability_catalog import CapabilityCatalogResult
-from router.app.llm_router import OllamaLLMRouter
-from router.app.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.capability_catalog import CapabilityCatalogResult
+from agent.app.cognitive_core.goal_interpreter.llm_router import OllamaLLMRouter
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
@@ -986,7 +986,7 @@ async def _run_router_turn(
     context: dict[str, Any] | None,
     stub: dict[str, Any],
 ) -> tuple[RouteDecision, _RouterLlm | _ScriptedOllamaRouter]:
-    from router.app import main
+    from agent.app.cognitive_core.goal_interpreter import engine as main
 
     router = _scenario_router_from_stub(
         scenario.key,
@@ -1014,7 +1014,7 @@ async def _run_router_turn(
             snapshot=_router_snapshot_from_stub(stub_scenario),
         ),
     ), patch.object(main, "llm_router", router):
-        decision = await main.route(
+        decision = await main.interpret_turn(
             RouteRequest(
                 text=text,
                 language=language,

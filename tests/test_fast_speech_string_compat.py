@@ -3,8 +3,8 @@ from __future__ import annotations
 import unittest
 
 from orchestrator.schemas.route import RouteDecision as OrchestratorRouteDecision
-from router.app.llm_router import OllamaLLMRouter
-from router.app.schema import RouteDecision, RouteRequest
+from agent.app.cognitive_core.goal_interpreter.llm_router import OllamaLLMRouter
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest
 
 
 class FastSpeechStringCompatibilityTests(unittest.TestCase):

@@ -11,7 +11,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from agent.app import main as agent_main
-from router.app.main import Settings as RouterSettings
+from agent.app.cognitive_core.goal_interpreter.main import Settings as RouterSettings
 
 
 ROOT = Path(__file__).resolve().parents[1]

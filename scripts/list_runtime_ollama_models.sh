@@ -31,13 +31,13 @@ append_model() {
 }
 
 if is_enabled "${ROUTER_USE_LLM:-0}"; then
-  append_model "${ROUTER_MODEL:-}"
-  if [ -n "${ROUTER_REVIEW_MODEL:-}" ] && {
+  append_model "${AGENT_GOAL_INTERPRETER_MODEL:-}"
+  if [ -n "${AGENT_GOAL_INTERPRETER_REVIEW_MODEL:-}" ] && {
     is_enabled "${ROUTER_POST_INTERRUPT_REVIEW_ENABLED:-0}" ||
       is_enabled "${ROUTER_SLOW_REVIEW_RECOVERY_ENABLED:-1}" ||
       is_enabled "${ROUTER_GENERIC_CHAT_REVIEW_ENABLED:-1}"
   }; then
-    append_model "$ROUTER_REVIEW_MODEL"
+    append_model "$AGENT_GOAL_INTERPRETER_REVIEW_MODEL"
   fi
 fi
 

@@ -2249,7 +2249,7 @@ def write_override_file(
     acoustic_response_output_mode: str = "discard",
 ) -> None:
     values = {
-        "ORCH_ENABLE_ROUTER": "1",
+        "ORCH_ENABLE_AGENT": "1",
         "ORCH_ENABLE_AGENT": "1",
         "ORCH_ENABLE_INTERACTION_RESPONSE": "1",
         "ORCH_ENABLE_SORIDORMI_SKILLS": "1" if enable_soridormi else "0",

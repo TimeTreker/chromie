@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from router.app.schema import RouteDecision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision
 from scripts.interaction_text_mujoco_check import (
     INTERNAL_SPEECH_PATTERNS,
     _apply_soridormi_skill_timeout,

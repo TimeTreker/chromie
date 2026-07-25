@@ -79,7 +79,7 @@ echo "[voice-mujoco-logs] Capturing recent logs into $LOG_DIR"
 capture_file_log chromie-launcher "$LOG_DIR/chromie.log"
 capture_file_log soridormi-launcher "$LOG_DIR/soridormi.log"
 
-for service in chromie-asr chromie-tts chromie-router chromie-agent chromie-llm; do
+for service in chromie-asr chromie-tts chromie-agent chromie-llm; do
   capture_container_log "$service" "$LOG_DIR/${service}.docker.log"
 done
 

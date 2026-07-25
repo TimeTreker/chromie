@@ -12,7 +12,7 @@ from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
-from router.app.schema import RouteDecision, RouteRequest, finalize_decision
+from agent.app.cognitive_core.goal_interpreter.schema import RouteDecision, RouteRequest, finalize_decision
 from shared.chromie_contracts.interaction import InteractionSpeech
 
 
