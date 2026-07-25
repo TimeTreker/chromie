@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/benchmark-suite-result-v1.json",
+  "title": "Chromie Benchmark Suite Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run", "summary", "results", "errors"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run": {"type": "object"},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "pass", "fail", "review", "error"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "pass": {"type": "integer", "minimum": 0},
+        "fail": {"type": "integer", "minimum": 0},
+        "review": {"type": "integer", "minimum": 0},
+        "error": {"type": "integer", "minimum": 0}
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {"$ref": "benchmark-result-v1.json"}
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario_id", "error"],
+        "properties": {
+          "scenario_id": {"type": "string"},
+          "error": {"type": "string"}
+        }
+      }
+    }
+  }
+}

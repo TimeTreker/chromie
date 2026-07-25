@@ -75,3 +75,45 @@ python -m benchmarks.adapters.normalize
 
 Generated normalized JSON belongs under `benchmarks/reports/` and is not an
 authoritative source dataset.
+
+## Phase 3 module and integration runners
+
+`runners/` executes normalized scenarios through an explicit executor boundary.
+It does not import production services or infer expected behavior from user text.
+Two modes are available:
+
+- `replay`: evaluate retained observations deterministically;
+- `live_model`: invoke an explicit adapter command over JSON stdin/stdout.
+
+Machine evaluation is intentionally limited to declared boundaries: reported
+invariants, explicit `primary_task_passed`, and exact forbidden-behavior labels.
+Naturalness, empathy, style fit, and other semantic dimensions are returned as
+`review` when no reviewed evaluator supplies a result. Missing required invariant
+evidence fails closed.
+
+Run a module cohort from the generated inventory:
+
+```bash
+python -m benchmarks.modules.run \
+  --inventory benchmarks/manifests/existing_scenarios.json \
+  --mode replay \
+  --replay-file /path/to/replay-observations.json \
+  --output benchmarks/reports/module-replay.json
+```
+
+Run an integration cohort against an explicitly configured adapter:
+
+```bash
+python -m benchmarks.integration.run \
+  --normalized benchmarks/reports/normalized_scenarios.json \
+  --mode live_model \
+  --command "python scripts/my_benchmark_adapter.py" \
+  --model local-model-name \
+  --prompt-revision prompt-revision-id \
+  --output benchmarks/reports/integration-live-model.json
+```
+
+The adapter receives one JSON request on stdin containing `scenario` and `run`,
+and returns one observation object on stdout. This boundary allows later Router,
+Planner, Composer, and deployed-runtime adapters without coupling benchmark code
+to one backend or adding benchmark-specific production branches.

@@ -4,19 +4,59 @@
   "title": "Chromie Benchmark Result Envelope",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "scenario_id", "run", "observations", "invariant_results", "artifacts"],
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "status",
+    "run",
+    "observations",
+    "evaluation",
+    "invariant_results",
+    "artifacts"
+  ],
   "properties": {
-    "schema_version": {"const": 1},
-    "scenario_id": {"type": "string", "minLength": 1},
+    "schema_version": {
+      "const": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "run": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["mode", "evidence_level"],
+      "required": [
+        "mode",
+        "evidence_level"
+      ],
       "properties": {
-        "mode": {"type": "string", "minLength": 1},
-        "evidence_level": {"enum": ["static", "replay", "live_model", "live_service", "simulated", "physical", "unknown"]},
-        "model": {"type": ["string", "null"]},
-        "prompt_revision": {"type": ["string", "null"]}
+        "mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_level": {
+          "enum": [
+            "static",
+            "replay",
+            "live_model",
+            "live_service",
+            "simulated",
+            "physical",
+            "unknown"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prompt_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "observations": {
@@ -25,8 +65,28 @@
       "properties": {
         "primary_outcome": {},
         "auxiliary_behavior": {},
-        "latency_ms": {"type": ["number", "null"], "minimum": 0},
-        "evidence": {"type": "array"}
+        "latency_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "evidence": {
+          "type": "array"
+        },
+        "primary_task_passed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "behaviors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "invariant_results": {
@@ -34,14 +94,59 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "passed", "detail"],
+        "required": [
+          "name",
+          "passed",
+          "detail"
+        ],
         "properties": {
-          "name": {"type": "string", "minLength": 1},
-          "passed": {"type": "boolean"},
-          "detail": {"type": ["string", "null"]}
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         }
       }
     },
-    "artifacts": {"type": "array", "items": {"type": "string"}}
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "review"
+      ]
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_review_required",
+        "forbidden_behavior_hits"
+      ],
+      "properties": {
+        "semantic_review_required": {
+          "type": "boolean"
+        },
+        "forbidden_behavior_hits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
   }
 }
