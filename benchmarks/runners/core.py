@@ -32,12 +32,39 @@ def load_normalized_cases(
     return normalize_inventory(repo_root, inventory_path)["cases"]
 
 
+def _scenario_axis(source: Mapping[str, Any], name: str) -> str | None:
+    context = source.get("context", {})
+    if not isinstance(context, Mapping):
+        return None
+    metadata = context.get("metadata", {})
+    if isinstance(metadata, Mapping):
+        value = metadata.get(name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    if name == "language":
+        inputs = source.get("inputs", {})
+        if isinstance(inputs, Mapping):
+            value = inputs.get("language")
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    value = context.get(name)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
 def select_cases(
     cases: Iterable[Mapping[str, Any]],
     *,
     layers: set[str] | None = None,
     datasets: set[str] | None = None,
     ids: set[str] | None = None,
+    cohorts: set[str] | None = None,
+    styles: set[str] | None = None,
+    modes: set[str] | None = None,
+    languages: set[str] | None = None,
+    invariants: set[str] | None = None,
+    forbidden_behaviors: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
     for source in cases:
@@ -46,6 +73,23 @@ def select_cases(
         if datasets and not datasets.intersection(source.get("datasets", [])):
             continue
         if ids and source.get("id") not in ids:
+            continue
+        if cohorts and _scenario_axis(source, "cohort") not in cohorts:
+            continue
+        if styles and _scenario_axis(source, "style") not in styles:
+            continue
+        if modes and _scenario_axis(source, "mode") not in modes:
+            continue
+        if languages and _scenario_axis(source, "language") not in languages:
+            continue
+        expectations = source.get("expectations", {})
+        if not isinstance(expectations, Mapping):
+            expectations = {}
+        declared_invariants = set(expectations.get("invariants", []))
+        declared_forbidden = set(expectations.get("forbidden_behaviors", []))
+        if invariants and not invariants.intersection(declared_invariants):
+            continue
+        if forbidden_behaviors and not forbidden_behaviors.intersection(declared_forbidden):
             continue
         selected.append(dict(source))
     selected.sort(key=lambda item: item["id"])

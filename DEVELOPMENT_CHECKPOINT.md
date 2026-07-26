@@ -19,11 +19,12 @@
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 **Status refresh date:** 2026-07-26
-**Current focus:** Use the completed Benchmark Suite foundation to collect
-model/service/MuJoCo evidence and promote reviewed regressions from real
-experience. Scenario migration, compatibility schedules, candidate indexing,
-fingerprint-bound human review, controlled variation briefs, and promotion are
-implemented without adding Runtime behavior policy.
+**Current focus:** Execute Social Attention Baseline Qualification. Effective
+model/runtime identity, first-party adapter boundaries, lifecycle evidence,
+semantic cohort selection, and deterministic hard-gate reporting are implemented.
+The remaining evidence work is to connect maintained live-model/live-service
+harnesses and retain the first 128-case baseline without adding Runtime behavior
+policy.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -57,6 +58,16 @@ Recommended commit:
 ```text
 Complete benchmark scenario migration and reviewed mining
 ```
+
+## Social Attention Baseline Qualification foundation
+
+The first qualification implementation is present: a versioned manifest,
+launcher-effective identity fields, first-party E2E adapter profiles, mode/style/
+cohort/invariant selectors, proposal-to-provider lifecycle evidence, and a
+fail-closed hard-gate report. The implementation observes explicit facts only and
+does not infer gestures from text, select a model winner, or grant release
+qualification. See
+[Social Attention Baseline Qualification](docs/SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md).
 
 ## Resume point
 

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "adapters": [
+    {
+      "id": "live_model_text",
+      "evidence_profiles": ["live_model_text"],
+      "url_env": "CHROMIE_BENCHMARK_LIVE_MODEL_URL",
+      "callable_env": "CHROMIE_BENCHMARK_LIVE_MODEL_CALLABLE",
+      "description": "First-party bridge to a configured model-only qualification harness."
+    },
+    {
+      "id": "live_service_text",
+      "evidence_profiles": ["live_service_text"],
+      "url_env": "CHROMIE_BENCHMARK_LIVE_SERVICE_URL",
+      "callable_env": "CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE",
+      "description": "First-party bridge to the deployed authoritative text runtime qualification harness."
+    },
+    {
+      "id": "live_service_virtual_audio",
+      "evidence_profiles": ["live_service_virtual_audio"],
+      "url_env": "CHROMIE_BENCHMARK_VIRTUAL_AUDIO_URL",
+      "callable_env": "CHROMIE_BENCHMARK_VIRTUAL_AUDIO_CALLABLE",
+      "description": "First-party bridge to the deployed virtual-audio qualification harness."
+    },
+    {
+      "id": "simulated_mujoco",
+      "evidence_profiles": ["simulated_mujoco"],
+      "url_env": "CHROMIE_BENCHMARK_MUJOCO_URL",
+      "callable_env": "CHROMIE_BENCHMARK_MUJOCO_CALLABLE",
+      "description": "First-party bridge to a deployed Chromie and Soridormi MuJoCo qualification harness."
+    },
+    {
+      "id": "physical_supervised",
+      "evidence_profiles": ["physical_supervised"],
+      "url_env": "CHROMIE_BENCHMARK_PHYSICAL_URL",
+      "callable_env": "CHROMIE_BENCHMARK_PHYSICAL_CALLABLE",
+      "description": "First-party bridge to a supervised physical-device qualification harness."
+    }
+  ]
+}

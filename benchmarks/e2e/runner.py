@@ -30,7 +30,27 @@ class E2ERunProfile:
     provider_revision: str | None = None
     hardware_profile: str | None = None
     operator: str | None = None
+    effective_model_topology: Mapping[str, str] = field(default_factory=dict)
+    mind_profile: str | None = None
+    social_interaction_style: str | None = None
+    apply_lanes: tuple[str, ...] = ()
+    semantic_authority_owner: str | None = None
+    runtime_topology: str | None = None
+    sample_count: int = 1
     metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.sample_count < 1:
+            raise ValueError("E2E sample_count must be at least 1")
+        if not all(
+            isinstance(name, str) and name.strip() and isinstance(model, str) and model.strip()
+            for name, model in self.effective_model_topology.items()
+        ):
+            raise ValueError(
+                "effective_model_topology must map non-empty component names to models"
+            )
+        if not all(isinstance(item, str) and item.strip() for item in self.apply_lanes):
+            raise ValueError("apply_lanes must contain non-empty strings")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -47,6 +67,13 @@ class E2ERunProfile:
             "provider_revision": self.provider_revision,
             "hardware_profile": self.hardware_profile,
             "operator": self.operator,
+            "effective_model_topology": dict(self.effective_model_topology),
+            "mind_profile": self.mind_profile,
+            "social_interaction_style": self.social_interaction_style,
+            "apply_lanes": list(self.apply_lanes),
+            "semantic_authority_owner": self.semantic_authority_owner,
+            "runtime_topology": self.runtime_topology,
+            "sample_count": self.sample_count,
             "metadata": dict(self.metadata),
         }
 
@@ -63,6 +90,26 @@ class E2EBenchmarkRunner:
         evidence_counts = Counter(
             item["qualification"]["evidence_state"] for item in results
         )
+        lifecycle_counts: dict[str, Counter[str]] = {
+            name: Counter()
+            for name in (
+                "proposal_state",
+                "materialization_state",
+                "provider_acceptance_state",
+                "provider_completion_state",
+                "safe_idle_state",
+            )
+        }
+        for item in results:
+            lifecycle = item.get("observations", {}).get(
+                "social_attention_lifecycle", {}
+            )
+            if not isinstance(lifecycle, Mapping):
+                continue
+            for name, counter in lifecycle_counts.items():
+                value = lifecycle.get(name, "not_observed")
+                if isinstance(value, str) and value:
+                    counter[value] += 1
         return {
             "schema_version": 1,
             "run": self._run_profile.to_dict(),
@@ -76,6 +123,10 @@ class E2EBenchmarkRunner:
                 "evidence_complete": evidence_counts["complete"],
                 "evidence_partial": evidence_counts["partial"],
                 "evidence_missing": evidence_counts["missing"],
+                "social_attention_lifecycle": {
+                    name: dict(sorted(counter.items()))
+                    for name, counter in lifecycle_counts.items()
+                },
             },
             "qualification": {
                 "release_qualified": False,
@@ -131,6 +182,7 @@ class E2EBenchmarkRunner:
                     "auxiliary_behavior": None,
                     "behaviors": [],
                     "latency_ms": None,
+                    "social_attention_lifecycle": {},
                     "evidence": [item.to_dict() for item in record.evidence],
                 },
                 "evaluation": {

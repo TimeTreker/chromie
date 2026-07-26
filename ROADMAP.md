@@ -87,6 +87,20 @@ The Benchmark infrastructure issue is complete. Future work uses the suite to
 collect real model/service/MuJoCo/physical evidence and to promote reviewed gaps,
 not to add another evaluation-policy layer.
 
+Active issue — Social Attention Baseline Qualification:
+
+- [x] define the versioned qualification identity and deterministic hard gates;
+- [x] record launcher-effective model topology, MindProfile, style, authority,
+  lanes, provider, hardware, and sample count;
+- [x] add first-party E2E adapter boundaries and semantic cohort selectors;
+- [x] distinguish proposal, Host materialization, Provider acceptance/completion,
+  and safe-idle evidence;
+- [x] generate fail-closed hard-gate reports without adding Runtime behavior policy;
+- [ ] connect maintained live-model and authoritative live-service harnesses;
+- [ ] retain the current 128-case default-model baseline and reviewed qualitative samples;
+- [ ] retain selected MuJoCo evidence, classify earliest error boundaries, and promote reviewed regressions.
+
+
 ## Planning model
 
 Chromie plans and reports work by the problem being solved, the capability being

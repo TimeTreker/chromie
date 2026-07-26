@@ -10,9 +10,9 @@ profile cannot report a simulator or physical execution claim. No automatic run
 is final release qualification; profiles that require human approval remain
 `human_review_required` even after complete evidence is collected.
 
-## Command adapter protocol
+## Adapter protocols
 
-For command-backed profiles, the runner writes one JSON request to stdin:
+External command adapters receive one JSON request on stdin. Maintained first-party adapters use the same payload through one configured URL or Python callable and retain request/response artifacts directly:
 
 ```json
 {
@@ -68,17 +68,43 @@ python -m benchmarks.e2e.run \
   --id sa.v1.greetings_farewells.friendly_morning
 ```
 
-Run a deployed text adapter:
+Run the maintained deployed-text adapter boundary:
 
 ```bash
+export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
+
 python -m benchmarks.e2e.run \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_service_text \
-  --command "python scripts/my_e2e_adapter.py" \
+  --adapter live_service_text \
   --dataset social_attention \
+  --effective-model response_composer=qwen3:4b \
+  --mind-profile owner-profile-v1 \
+  --social-style mixed-by-scenario \
+  --apply-lane chat \
+  --apply-lane robot_action \
+  --semantic-authority-owner goal_driven_cognitive_core \
+  --runtime-topology cognitive-runtime-apply \
+  --sample-count 1 \
   --run-id local-text-e2e \
   --output benchmarks/reports/local-text-e2e.json
 ```
 
+The first-party adapter manifest stores only environment variable names. It does
+not embed deployment endpoints, models, Prompts, backend identity, or behavior
+policy. `--command` remains available for explicit external harnesses.
+
 Physical profiles require explicit `--operator` metadata and always remain
 subject to human approval.
+
+## Social Attention lifecycle evidence
+
+Qualification adapters may return `social_attention_lifecycle` inside the
+observation. Proposal, Host materialization, Provider acceptance, Provider
+completion, and safe idle are recorded as separate facts. The E2E runner reports
+their distributions but does not choose an action or change Runtime policy.
+
+Use `--cohort`, `--style`, `--mode`, `--language`, `--invariant`, and
+`--forbidden-behavior` to select declared scenario metadata and contracts. These
+selectors choose evaluation assets only; they are never forwarded as semantic
+action rules.

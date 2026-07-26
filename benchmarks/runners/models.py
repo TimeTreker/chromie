@@ -8,6 +8,14 @@ from benchmarks.contracts import ContractError
 
 VALID_RUN_MODES = frozenset({"replay", "live_model"})
 
+SOCIAL_ATTENTION_LIFECYCLE_STATES = {
+    "proposal_state": frozenset({"none", "proposed", "invalid", "not_observed"}),
+    "materialization_state": frozenset({"not_applicable", "accepted", "rejected", "not_observed"}),
+    "provider_acceptance_state": frozenset({"not_applicable", "accepted", "rejected", "not_observed"}),
+    "provider_completion_state": frozenset({"not_applicable", "completed", "failed", "not_observed"}),
+    "safe_idle_state": frozenset({"not_applicable", "confirmed", "failed", "not_observed"}),
+}
+
 
 @dataclass(frozen=True)
 class RunProfile:
@@ -68,6 +76,7 @@ class ExecutionObservation:
     invariant_results: tuple[InvariantObservation, ...] = ()
     latency_ms: float | None = None
     artifacts: tuple[str, ...] = ()
+    social_attention_lifecycle: Mapping[str, Any] = field(default_factory=dict)
     raw: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -101,6 +110,33 @@ class ExecutionObservation:
             raise ContractError("evidence must be an array")
         if not isinstance(artifacts, list) or not all(isinstance(item, str) for item in artifacts):
             raise ContractError("artifacts must be an array of strings")
+        lifecycle_value = payload.get("social_attention_lifecycle", {})
+        if lifecycle_value is None:
+            lifecycle_value = {}
+        if not isinstance(lifecycle_value, Mapping):
+            raise ContractError("social_attention_lifecycle must be an object")
+        lifecycle = dict(lifecycle_value)
+        unknown_lifecycle_fields = set(lifecycle) - (
+            set(SOCIAL_ATTENTION_LIFECYCLE_STATES) | {"semantic_class", "detail"}
+        )
+        if unknown_lifecycle_fields:
+            raise ContractError(
+                "social_attention_lifecycle contains unknown fields: "
+                + ", ".join(sorted(unknown_lifecycle_fields))
+            )
+        for name, allowed in SOCIAL_ATTENTION_LIFECYCLE_STATES.items():
+            value = lifecycle.get(name)
+            if value is not None and value not in allowed:
+                raise ContractError(
+                    f"social_attention_lifecycle.{name} must be one of: "
+                    + ", ".join(sorted(allowed))
+                )
+        for name in ("semantic_class", "detail"):
+            value = lifecycle.get(name)
+            if value is not None and not isinstance(value, str):
+                raise ContractError(
+                    f"social_attention_lifecycle.{name} must be a string or null"
+                )
         return cls(
             scenario_id=scenario_id,
             primary_task_passed=primary_task_passed,
@@ -111,5 +147,6 @@ class ExecutionObservation:
             invariant_results=invariants,
             latency_ms=float(latency) if latency is not None else None,
             artifacts=tuple(artifacts),
+            social_attention_lifecycle=lifecycle,
             raw=dict(payload),
         )

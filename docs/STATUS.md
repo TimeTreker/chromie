@@ -13,11 +13,13 @@
 **Development identity:** `development`; no release version or publication target is planned.
 **Maintained execution scope:** Soridormi MuJoCo `sim`; retained evidence below records the exact revision that produced each bundle.
 **Status refresh date:** 2026-07-26
-**Current focus:** **Use the completed Benchmark Suite foundation for real
-model, deployed-service, MuJoCo, and supervised physical evidence. Maintained
-scenario migration and reviewed experience-to-regression promotion are complete;
-future changes must fix the earliest responsible intelligence or boundary layer
-without turning Benchmark observations into Runtime behavior policy.**
+**Current focus:** **Run Social Attention Baseline Qualification. The repository
+now records launcher-effective model/runtime identity, provides first-party E2E
+adapter contracts, distinguishes proposal/materialization/provider lifecycle
+evidence, selects semantic cohorts, and produces deterministic hard-gate reports.
+The next evidence increment connects maintained live-model and authoritative
+live-service harnesses and retains the first 128-case baseline without turning
+Benchmark observations into Runtime behavior policy.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
@@ -39,6 +41,14 @@ migration manifest, and connects immutable experience candidates to separate
 human review and deterministic promotion. Benchmark validation, documentation
 validation, Router removal guards, Compose parsing, Python compilation, and
 diff-hygiene checks remain maintained gates.
+
+The Social Attention Baseline Qualification foundation is implemented. Its
+versioned manifest defines run-identity requirements and hard gates for off,
+report-only, stillness, emergency priority, explicit-action priority, Provider
+contracts, non-blocking primary work, and backend neutrality. First-party E2E
+adapters resolve deployment harnesses only through configured URL/callable
+boundaries; they do not embed endpoints or behavior rules. Qualification output
+remains non-release-qualified and requires human review.
 
 The current branch closes two July 24 live-conversation regressions. With no
 active Goals, the constrained Goal Segmentation schema now requires a social

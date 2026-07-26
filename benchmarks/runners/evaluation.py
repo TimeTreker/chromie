@@ -63,6 +63,7 @@ def evaluate_boundaries(
             "auxiliary_behavior": observation.auxiliary_behavior,
             "behaviors": list(observation.behaviors),
             "latency_ms": observation.latency_ms,
+            "social_attention_lifecycle": dict(observation.social_attention_lifecycle),
             "evidence": list(observation.evidence),
         },
         "evaluation": {

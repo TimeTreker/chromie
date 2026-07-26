@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/social-attention-qualification-result-v1.json",
+  "title": "Chromie Social Attention Qualification Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "qualification_id",
+    "dataset_id",
+    "run",
+    "identity_validation",
+    "summary",
+    "qualification",
+    "hard_gates",
+    "policy"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "qualification_id": {"type": "string", "minLength": 1},
+    "dataset_id": {"type": "string", "minLength": 1},
+    "run": {"type": "object"},
+    "identity_validation": {
+      "type": "object",
+      "required": ["complete", "missing"],
+      "properties": {
+        "complete": {"type": "boolean"},
+        "missing": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "summary": {"type": "object"},
+    "qualification": {
+      "type": "object",
+      "required": [
+        "deterministic_hard_gates_passed",
+        "identity_complete",
+        "release_qualified",
+        "human_approval_required",
+        "state"
+      ],
+      "properties": {
+        "deterministic_hard_gates_passed": {"type": "boolean"},
+        "identity_complete": {"type": "boolean"},
+        "release_qualified": {"const": false},
+        "human_approval_required": {"const": true},
+        "state": {"enum": ["not_eligible", "human_review_required"]}
+      }
+    },
+    "hard_gates": {"type": "array", "items": {"type": "object"}},
+    "policy": {
+      "type": "object",
+      "required": [
+        "runtime_policy_authority",
+        "benchmark_specific_prompt_or_runtime_changes_allowed",
+        "automatic_model_selection_allowed"
+      ],
+      "properties": {
+        "runtime_policy_authority": {"const": false},
+        "benchmark_specific_prompt_or_runtime_changes_allowed": {"const": false},
+        "automatic_model_selection_allowed": {"const": false}
+      }
+    }
+  }
+}

@@ -225,14 +225,20 @@ Validate the profile manifest with:
 python -m benchmarks.e2e.validate --check
 ```
 
-Run a cohort with:
+Run a cohort through a maintained first-party adapter boundary with:
 
 ```bash
+export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
 python -m benchmarks.e2e.run \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_service_text \
-  --command "python scripts/my_e2e_adapter.py" \
-  --dataset social_attention
+  --adapter live_service_text \
+  --dataset social_attention \
+  --effective-model response_composer=<resolved-model> \
+  --mind-profile <approved-profile-revision> \
+  --social-style mixed-by-scenario \
+  --semantic-authority-owner goal_driven_cognitive_core \
+  --runtime-topology cognitive-runtime-apply
 ```
 
 Command adapters write correlated evidence incrementally. Timeout, process
@@ -241,6 +247,30 @@ artifacts instead of hanging or silently discarding the trace. Automatic
 reports never claim final release qualification. See
 [`docs/E2E_BENCHMARK_EXECUTION.md`](../docs/E2E_BENCHMARK_EXECUTION.md).
 
+
+## Social Attention baseline qualification
+
+`manifests/social_attention_qualification_v1.json` defines the current
+qualification identity and deterministic hard gates. E2E runs now retain
+launcher-effective model topology, MindProfile, Social Interaction Style, apply
+lanes, semantic authority, runtime topology, provider/hardware revisions, and
+sample count. Optional Social Attention lifecycle evidence distinguishes proposal,
+Host materialization, Provider acceptance/completion, and safe idle.
+
+Build a deterministic hard-gate report from retained E2E evidence with:
+
+```bash
+python -m benchmarks.social_attention \
+  --normalized benchmarks/reports/normalized_scenarios.json \
+  --report benchmarks/reports/social-attention-live-service.json \
+  --output benchmarks/reports/social-attention-hard-gates.json
+```
+
+The report fails closed on missing identity or evidence and always remains
+non-release-qualified. It checks explicit contracts only; it does not infer
+naturalness, select a model winner, map phrases to actions, or create Runtime
+behavior policy. See
+[Social Attention Baseline Qualification](../docs/SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md).
 
 ## Stress and behavior-distribution evaluation
 

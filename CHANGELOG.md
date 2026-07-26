@@ -8,6 +8,12 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Social Attention baseline qualification foundation
+
+- Added a versioned qualification manifest with deterministic hard gates, required effective runtime identity, and an explicit denial of Runtime policy authority or automatic release qualification.
+- Added first-party environment-resolved E2E adapters, Social Attention cohort selectors, lifecycle evidence for proposal/materialization/provider completion, and fail-closed hard-gate reporting.
+- Added qualification tests and documentation without adding phrase mappings, scenario-ID branches, fixed gestures, Runtime quotas, or automatic model selection.
+
 ### Benchmark scenario migration and reviewed mining closure
 
 - Made one migration manifest authoritative for maintained scenario sources while preserving 527 inventory entries, 526 normalized semantic scenarios, stable IDs, source provenance, existing evidence claims, and criteria-based compatibility removal schedules.

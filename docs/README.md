@@ -102,6 +102,7 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Maintained Scenario Migration](../benchmarks/scenarios/README.md)
 - [Continuous Scenario Mining and Review](../benchmarks/mining/README.md)
 - [End-to-End Benchmark Execution](E2E_BENCHMARK_EXECUTION.md)
+- [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
 - [Stress and Behavior-Distribution Evaluation](STRESS_BENCHMARK_EVALUATION.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
