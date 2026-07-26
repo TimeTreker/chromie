@@ -12,7 +12,9 @@
     "social_interaction_style",
     "semantic_authority_owner",
     "runtime_topology",
-    "sample_count"
+    "sample_count",
+    "run_id",
+    "social_attention_mode"
   ],
   "profile_required_run_identity": {
     "live_model_text": [

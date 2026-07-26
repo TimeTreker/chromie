@@ -80,7 +80,10 @@ python -m benchmarks.e2e.run \
   --dataset social_attention \
   --effective-model response_composer=qwen3:4b \
   --mind-profile owner-profile-v1 \
-  --social-style mixed-by-scenario \
+  --social-style courteous \
+  --social-attention-mode on \
+  --style courteous \
+  --mode on \
   --apply-lane chat \
   --apply-lane robot_action \
   --semantic-authority-owner goal_driven_cognitive_core \

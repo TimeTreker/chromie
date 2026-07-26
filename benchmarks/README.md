@@ -6,7 +6,7 @@ contracts and provenance, aggregate evidence, and report coverage. It must not
 add phrase tables, regular-expression intent rules, scenario-ID branches, or
 fixed input-to-action mappings.
 
-## Phase 1 layout
+## Repository layout
 
 - `benchmark.schema.json`: versioned generated-inventory contract.
 - `manifests/suites.json`: authoritative source classification and taxonomy.
@@ -44,11 +44,11 @@ closed with exit status `2`.
 ## Classification policy
 
 One source scenario appears once in the inventory and may carry multiple dataset
-tags. Source files and legacy runners are not moved or replaced in Phase 1.
+tags. Source files and legacy runners are not moved or replaced by inventory generation.
 Language detection is descriptive metadata only. Acceptance scripts are indexed
-as entrypoints until Phase 2 introduces format adapters for their internal cases.
+as entrypoints until format adapters cover their internal cases.
 
-## Phase 2 common scenario contract
+## Common scenario contract
 
 `contracts/scenario.schema.json` defines the normalized scenario boundary and
 `contracts/result.schema.json` defines the retained execution-result envelope.
@@ -61,7 +61,7 @@ declared IDs and legacy expectations, records source provenance, and derives a
 stable content ID only when the source has no ID. Adapters do not execute a
 scenario and do not interpret user phrases.
 
-After generating the Phase 1 inventory, check all JSON scenario adapters with:
+After generating the inventory, check all JSON scenario adapters with:
 
 ```bash
 python -m benchmarks.adapters.normalize --check
@@ -76,7 +76,7 @@ python -m benchmarks.adapters.normalize
 Generated normalized JSON belongs under `benchmarks/reports/` and is not an
 authoritative source dataset.
 
-## Phase 3 module and integration runners
+## Module and integration runners
 
 `runners/` executes normalized scenarios through an explicit executor boundary.
 It does not import production services or infer expected behavior from user text.
@@ -118,7 +118,7 @@ and returns one observation object on stdout. This boundary allows later Cogniti
 Planner, Composer, and deployed-runtime adapters without coupling benchmark code
 to one backend or adding benchmark-specific production branches.
 
-## Phase 4 runtime component adapters
+## Runtime component adapters
 
 `runtime_adapters/` connects the generic `live_model` runner to real Chromie
 component boundaries without importing benchmark policy into production code.
@@ -236,7 +236,10 @@ python -m benchmarks.e2e.run \
   --dataset social_attention \
   --effective-model response_composer=<resolved-model> \
   --mind-profile <approved-profile-revision> \
-  --social-style mixed-by-scenario \
+  --social-style courteous \
+  --social-attention-mode on \
+  --style courteous \
+  --mode on \
   --semantic-authority-owner goal_driven_cognitive_core \
   --runtime-topology cognitive-runtime-apply
 ```
@@ -262,12 +265,24 @@ Build a deterministic hard-gate report from retained E2E evidence with:
 ```bash
 python -m benchmarks.social_attention \
   --normalized benchmarks/reports/normalized_scenarios.json \
-  --report benchmarks/reports/social-attention-live-service.json \
+  --report benchmarks/reports/social-attention-live-service-off-courteous.json \
+  --report benchmarks/reports/social-attention-live-service-off-custom.json \
+  --report benchmarks/reports/social-attention-live-service-off-neutral.json \
+  --report benchmarks/reports/social-attention-live-service-off-reserved.json \
+  --report benchmarks/reports/social-attention-live-service-on-courteous.json \
+  --report benchmarks/reports/social-attention-live-service-on-custom.json \
+  --report benchmarks/reports/social-attention-live-service-on-neutral.json \
+  --report benchmarks/reports/social-attention-live-service-on-reserved.json \
+  --report benchmarks/reports/social-attention-live-service-report-only-custom.json \
+  --report benchmarks/reports/social-attention-live-service-report-only-neutral.json \
+  --report benchmarks/reports/social-attention-live-service-report-only-reserved.json \
   --output benchmarks/reports/social-attention-hard-gates.json
 ```
 
-The report fails closed on missing identity or evidence and always remains
-non-release-qualified. It checks explicit contracts only; it does not infer
+Each input report represents exactly one launcher-effective mode and one
+owner-approved interaction style. The assembled report fails closed on missing
+identity, scope drift, duplicate or missing scenario coverage, or required evidence
+and always remains non-release-qualified. It checks explicit contracts only; it does not infer
 naturalness, select a model winner, map phrases to actions, or create Runtime
 behavior policy. See
 [Social Attention Baseline Qualification](../docs/SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md).
@@ -276,8 +291,8 @@ behavior policy. See
 
 `stress/` repeats unchanged normalized scenarios under six versioned workloads:
 long session, repetition/cooldown, interruption, concurrency, provider
-degradation, and synthetic multi-user context isolation. Each workload reuses a
-Phase 5 E2E evidence profile and declares sample count, sessions, concurrency,
+degradation, and synthetic multi-user context isolation. Each workload reuses an
+E2E evidence profile and declares sample count, sessions, concurrency,
 seed, selectors, descriptive conditions, and observational dimensions.
 
 Validate workloads with:

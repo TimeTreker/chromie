@@ -29,7 +29,7 @@ The final closure audit also removed stale 8091 developer-tool/configuration con
 
 ## Chromie Benchmark Suite
 
-The next new development topic is the staged Benchmark Suite described in
+The completed Benchmark Suite foundation is described in
 [docs/CHROMIE_BENCHMARK_SUITE.md](docs/CHROMIE_BENCHMARK_SUITE.md) and
 [docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md](docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md).
 
@@ -96,6 +96,8 @@ Active issue — Social Attention Baseline Qualification:
 - [x] distinguish proposal, Host materialization, Provider acceptance/completion,
   and safe-idle evidence;
 - [x] generate fail-closed hard-gate reports without adding Runtime behavior policy;
+- [x] require homogeneous launcher-effective mode/style runs and complete,
+  non-duplicated 128-case bundle coverage;
 - [ ] connect maintained live-model and authoritative live-service harnesses;
 - [ ] retain the current 128-case default-model baseline and reviewed qualitative samples;
 - [ ] retain selected MuJoCo evidence, classify earliest error boundaries, and promote reviewed regressions.

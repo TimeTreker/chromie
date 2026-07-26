@@ -8,6 +8,17 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Social Attention qualification run-scope integrity
+
+- Formally closed the Benchmark Suite foundation after confirming the reviewed
+  scenario-migration commit is present on `main`.
+- Added launcher-effective Social Attention mode to E2E run identity and changed
+  baseline qualification from one mixed report to a bundle of homogeneous
+  mode/style reports.
+- Added fail-closed identity, scope, duplicate, unexpected-result, and complete
+  128-case coverage checks without adding behavior policy, phrase mappings, model
+  selection, or automatic release qualification.
+
 ### Social Attention baseline qualification foundation
 
 - Added a versioned qualification manifest with deterministic hard gates, required effective runtime identity, and an explicit denial of Runtime policy authority or automatic release qualification.

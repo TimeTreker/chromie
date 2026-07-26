@@ -56,6 +56,7 @@ def test_e2e_run_profile_retains_effective_runtime_identity() -> None:
         },
         mind_profile="owner-profile-v1",
         social_interaction_style="courteous",
+        social_attention_mode="on",
         apply_lanes=("chat", "robot_action"),
         semantic_authority_owner="goal_driven_cognitive_core",
         runtime_topology="launcher-effective-compact-cognition",
@@ -64,6 +65,23 @@ def test_e2e_run_profile_retains_effective_runtime_identity() -> None:
     assert run["effective_model_topology"]["response_composer"] == "qwen3:4b"
     assert run["apply_lanes"] == ["chat", "robot_action"]
     assert run["semantic_authority_owner"] == "goal_driven_cognitive_core"
+    assert run["social_attention_mode"] == "on"
+
+
+def test_e2e_run_profile_rejects_unknown_social_attention_mode() -> None:
+    evidence_profile = EvidenceProfileManifest.from_file(
+        ROOT / "benchmarks/manifests/e2e_evidence_profiles.json"
+    ).get("live_service_text")
+    try:
+        E2ERunProfile(
+            run_id="invalid-mode",
+            evidence_profile=evidence_profile,
+            social_attention_mode="mixed",
+        )
+    except ValueError as exc:
+        assert "social_attention_mode" in str(exc)
+    else:
+        raise AssertionError("unknown Social Attention mode must fail closed")
 
 
 def test_first_party_adapter_manifest_has_no_embedded_endpoint() -> None:
@@ -148,78 +166,94 @@ def invoke(request):
         "none": 1
     }
 
-def _passing_e2e_report(cases: list[dict]) -> dict:
-    results = []
+def _passing_e2e_reports(cases: list[dict]) -> list[dict]:
+    grouped: dict[tuple[str, str], list[dict]] = {}
     for case in cases:
         metadata = case["context"]["metadata"]
-        mode = metadata["mode"]
-        forbidden = set(case["expectations"]["forbidden_behaviors"])
-        if mode == "off":
-            lifecycle = {
-                "proposal_state": "none",
-                "materialization_state": "not_applicable",
-                "provider_acceptance_state": "not_applicable",
-                "provider_completion_state": "not_applicable",
-                "safe_idle_state": "not_applicable",
-            }
-        elif mode == "report_only" or "user_stillness_violation" in forbidden:
-            lifecycle = {
-                "proposal_state": "proposed" if mode == "report_only" else "none",
-                "materialization_state": "rejected",
-                "provider_acceptance_state": "not_applicable",
-                "provider_completion_state": "not_applicable",
-                "safe_idle_state": "not_applicable",
-            }
-        else:
-            lifecycle = {
-                "proposal_state": "proposed",
-                "materialization_state": "accepted",
-                "provider_acceptance_state": "accepted",
-                "provider_completion_state": "completed",
-                "safe_idle_state": "not_applicable",
-            }
-        results.append(
+        grouped.setdefault((metadata["mode"], metadata["style"]), []).append(case)
+
+    reports = []
+    for (mode, style), scoped_cases in sorted(grouped.items()):
+        results = []
+        for case in scoped_cases:
+            forbidden = set(case["expectations"]["forbidden_behaviors"])
+            if mode == "off":
+                lifecycle = {
+                    "proposal_state": "none",
+                    "materialization_state": "not_applicable",
+                    "provider_acceptance_state": "not_applicable",
+                    "provider_completion_state": "not_applicable",
+                    "safe_idle_state": "not_applicable",
+                }
+            elif mode == "report_only" or "user_stillness_violation" in forbidden:
+                lifecycle = {
+                    "proposal_state": "proposed" if mode == "report_only" else "none",
+                    "materialization_state": "rejected",
+                    "provider_acceptance_state": "not_applicable",
+                    "provider_completion_state": "not_applicable",
+                    "safe_idle_state": "not_applicable",
+                }
+            else:
+                lifecycle = {
+                    "proposal_state": "proposed",
+                    "materialization_state": "accepted",
+                    "provider_acceptance_state": "accepted",
+                    "provider_completion_state": "completed",
+                    "safe_idle_state": "not_applicable",
+                }
+            results.append(
+                {
+                    "scenario_id": case["id"],
+                    "status": "pass",
+                    "evaluation": {"forbidden_behavior_hits": []},
+                    "invariant_results": [
+                        {"name": name, "passed": True, "detail": None}
+                        for name in case["expectations"]["invariants"]
+                    ],
+                    "observations": {"social_attention_lifecycle": lifecycle},
+                }
+            )
+        reports.append(
             {
-                "scenario_id": case["id"],
-                "status": "pass",
-                "evaluation": {"forbidden_behavior_hits": []},
-                "invariant_results": [
-                    {"name": name, "passed": True, "detail": None}
-                    for name in case["expectations"]["invariants"]
-                ],
-                "observations": {"social_attention_lifecycle": lifecycle},
+                "schema_version": 1,
+                "run": {
+                    "run_id": f"baseline-{mode}-{style}",
+                    "evidence_profile": "live_service_text",
+                    "model": "qwen3:4b",
+                    "code_revision": "deadbeef",
+                    "prompt_revision": "composer-prompt-v1",
+                    "provider_revision": "provider-v1",
+                    "hardware_profile": "rtx5090",
+                    "effective_model_topology": {"response_composer": "qwen3:4b"},
+                    "mind_profile": f"owner-profile-{style}-v1",
+                    "social_interaction_style": style,
+                    "social_attention_mode": mode,
+                    "apply_lanes": ["chat", "robot_action"],
+                    "semantic_authority_owner": "goal_driven_cognitive_core",
+                    "runtime_topology": "launcher-effective-compact-cognition",
+                    "sample_count": 1,
+                },
+                "results": results,
             }
         )
-    return {
-        "schema_version": 1,
-        "run": {
-            "evidence_profile": "live_service_text",
-            "model": "qwen3:4b",
-            "code_revision": "deadbeef",
-            "prompt_revision": "composer-prompt-v1",
-            "provider_revision": "provider-v1",
-            "hardware_profile": "rtx5090",
-            "effective_model_topology": {"response_composer": "qwen3:4b"},
-            "mind_profile": "owner-profile-v1",
-            "social_interaction_style": "mixed-by-scenario",
-            "apply_lanes": ["chat", "robot_action"],
-            "semantic_authority_owner": "goal_driven_cognitive_core",
-            "runtime_topology": "launcher-effective-compact-cognition",
-            "sample_count": 1,
-        },
-        "results": results,
-    }
+    return reports
 
 
 def test_complete_contract_evidence_passes_deterministic_hard_gates() -> None:
     cases = _cases()
+    reports = _passing_e2e_reports(cases)
     report = build_qualification_report(
         manifest=load_manifest(QUALIFICATION_MANIFEST),
         cases=cases,
-        e2e_report=_passing_e2e_report(cases),
+        e2e_reports=reports,
     )
     assert report["summary"]["social_case_count"] == 128
+    assert report["summary"]["reported_result_count"] == 128
+    assert report["summary"]["run_count"] == 11
     assert report["summary"]["hard_gates_failed"] == 0
+    assert report["identity_validation"]["complete"] is True
+    assert report["scope_validation"]["complete"] is True
+    assert report["coverage_validation"]["complete"] is True
     assert report["qualification"]["deterministic_hard_gates_passed"] is True
     assert report["qualification"]["release_qualified"] is False
     assert report["qualification"]["state"] == "human_review_required"
@@ -227,18 +261,46 @@ def test_complete_contract_evidence_passes_deterministic_hard_gates() -> None:
 
 def test_missing_off_mode_lifecycle_fails_closed() -> None:
     cases = _cases()
-    e2e = _passing_e2e_report(cases)
+    reports = _passing_e2e_reports(cases)
     target = next(
         item
-        for item in e2e["results"]
+        for report in reports
+        for item in report["results"]
         if item["scenario_id"] == "sa.v1.modes.off_greeting"
     )
     target["observations"]["social_attention_lifecycle"] = {}
     report = build_qualification_report(
         manifest=load_manifest(QUALIFICATION_MANIFEST),
         cases=cases,
-        e2e_report=e2e,
+        e2e_reports=reports,
     )
     gate = next(item for item in report["hard_gates"] if item["id"] == "off_mode_isolation")
     assert gate["passed"] is False
+    assert report["qualification"]["state"] == "not_eligible"
+
+
+def test_mixed_mode_or_style_report_is_rejected_as_scope_drift() -> None:
+    cases = _cases()
+    reports = _passing_e2e_reports(cases)
+    reports[0]["run"]["social_attention_mode"] = "on"
+    report = build_qualification_report(
+        manifest=load_manifest(QUALIFICATION_MANIFEST),
+        cases=cases,
+        e2e_reports=reports,
+    )
+    assert report["scope_validation"]["complete"] is False
+    assert any(error.startswith("mode_mismatch:") for error in report["scope_validation"]["errors"])
+    assert report["qualification"]["state"] == "not_eligible"
+
+
+def test_missing_slice_fails_complete_baseline_coverage() -> None:
+    cases = _cases()
+    reports = _passing_e2e_reports(cases)[:-1]
+    report = build_qualification_report(
+        manifest=load_manifest(QUALIFICATION_MANIFEST),
+        cases=cases,
+        e2e_reports=reports,
+    )
+    assert report["coverage_validation"]["complete"] is False
+    assert report["coverage_validation"]["missing_scenario_results"]
     assert report["qualification"]["state"] == "not_eligible"

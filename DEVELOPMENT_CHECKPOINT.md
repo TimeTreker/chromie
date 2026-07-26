@@ -21,10 +21,11 @@
 **Status refresh date:** 2026-07-26
 **Current focus:** Execute Social Attention Baseline Qualification. Effective
 model/runtime identity, first-party adapter boundaries, lifecycle evidence,
-semantic cohort selection, and deterministic hard-gate reporting are implemented.
-The remaining evidence work is to connect maintained live-model/live-service
-harnesses and retain the first 128-case baseline without adding Runtime behavior
-policy.
+semantic cohort selection, homogeneous mode/style report bundling, complete
+128-case coverage validation, and deterministic hard-gate reporting are
+implemented. The remaining evidence work is to connect maintained
+live-model/live-service harnesses and retain the first real baseline without
+adding Runtime behavior policy.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -45,7 +46,7 @@ path.
 
 ## Benchmark Suite foundation closure
 
-The staged Benchmark infrastructure is complete. The authoritative migration
+The Benchmark infrastructure issue is formally closed. The authoritative migration
 manifest reconciles 527 inventory entries with 526 common-contract scenarios,
 retains current commands under explicit removal gates, and exposes a
 Benchmark-native deterministic runner. Episode candidates remain immutable until
@@ -64,7 +65,9 @@ Complete benchmark scenario migration and reviewed mining
 The first qualification implementation is present: a versioned manifest,
 launcher-effective identity fields, first-party E2E adapter profiles, mode/style/
 cohort/invariant selectors, proposal-to-provider lifecycle evidence, and a
-fail-closed hard-gate report. The implementation observes explicit facts only and
+fail-closed hard-gate report. Qualification now assembles repeated homogeneous
+mode/style E2E reports, rejects scope drift, and requires exact non-duplicated
+coverage of all 128 cases. The implementation observes explicit facts only and
 does not infer gestures from text, select a model winner, or grant release
 qualification. See
 [Social Attention Baseline Qualification](docs/SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md).

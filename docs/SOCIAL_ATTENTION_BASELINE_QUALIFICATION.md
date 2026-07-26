@@ -15,6 +15,94 @@ executes embodiment-specific work. Benchmark only selects scenarios, records
 identity and evidence, checks declared deterministic boundaries, and preserves
 review artifacts.
 
+## Repository audit
+
+### Benchmark CLI
+
+The maintained CLI already separates scenario normalization, E2E execution,
+evidence-profile validation, stress analysis, and Social Attention hard-gate
+reporting. It can select by dataset, mode, style, cohort, language, invariant,
+and forbidden-behavior label. First-party adapters receive the unchanged
+normalized scenario and resolve only a configured URL or Python callable.
+
+The audit found one qualification-orchestration defect: the original foundation
+accepted one global E2E `run` while the 128-case dataset intentionally spans
+three launcher-effective Social Attention modes and four owner-approved
+interaction styles. A deployed Runtime does not become `off`, `report_only`, or
+`on` because Benchmark metadata says so, and an owner-approved MindProfile is not
+`mixed-by-scenario`. The qualification contract now accepts a bundle of repeated
+`--report` inputs. Each report must be homogeneous for one effective mode and one
+interaction style, and every result is checked against its scenario scope.
+Missing, duplicate, unexpected, or scope-mismatched results fail closed.
+
+### Default model topology
+
+The RTX 5090 hardware profile declares `qwen3:4b` for Goal Interpretation, Goal
+Association, Fast Planning, and the standalone compatibility Social Attention
+planner, while Deep Planning, Response Composition, and response review use
+`gemma4:26b`. Other profiles use their declared Gemma variant for the heavier
+components.
+
+The launchers may change that topology. With the maintained CosyVoice shared-GPU
+compact-cognition setting enabled, all cognition components, including Response
+Composer and Social Attention, resolve to `qwen3:4b` and Ollama keeps one resident
+model. Qualification therefore records launcher-effective component identities;
+a static hardware-profile name is not sufficient evidence.
+
+### Social Attention runtime entrances
+
+The authoritative goal-driven path is:
+
+```text
+Cognitive Gateway
+→ Goal-Driven Cognitive Core
+→ CanonicalPlan
+→ Response Composer optional SocialAttentionPlan
+→ Host validation/materialization
+→ Provider acceptance/completion
+```
+
+The Agent `/interaction` compatibility path still contains a standalone,
+body-only `SocialAttentionPlanner`. It exists for compatibility and must not be
+used to claim authoritative baseline evidence. The maintained live-service
+harness must prove that the goal-driven runtime acquired the turn and that
+Response Composer was the proposal source.
+
+### Evidence and execution profiles
+
+The available Benchmark evidence profiles remain:
+
+```text
+replay_text
+live_model_text
+live_service_text
+live_service_virtual_audio
+simulated_mujoco
+physical_supervised
+```
+
+Hardware profiles and validation overlays configure deployment resources and
+models; they do not raise an evidence level. In particular, a run on an RTX 5090
+is not live-service or MuJoCo evidence unless the selected E2E profile retains
+its required correlated observations.
+
+## Semantic implementation sequence
+
+- Freeze the homogeneous mode/style run matrix and launcher-effective identity.
+- Connect the maintained model-only and authoritative goal-driven live-service
+  harnesses without adding scenario interpretation to Benchmark.
+- Retain the complete 128-case current-default-model baseline and deterministic
+  hard-gate bundle.
+- Review courteous, neutral, reserved, and custom behavior distributions,
+  including `none`, repetition, restraint, drift, and latency.
+- Classify each important failure at its earliest cognitive, composition,
+  materialization, Provider, or evidence boundary.
+- Compare candidate models with identical scenarios, Prompt revision, MindProfile,
+  runtime topology, and evidence profile; preserve human model selection.
+- Retain selected live-service and MuJoCo evidence for execution-sensitive cohorts.
+- Promote only reviewed recurring failures into regressions, audit documents and
+  architecture, and close the Issue after human approval.
+
 ## Implemented qualification foundation
 
 The repository now provides:
@@ -87,12 +175,15 @@ python -m benchmarks.e2e.run \
   --prompt-revision response-composer-prompt-v1 \
   --code-revision <commit-sha> \
   --mind-profile <approved-profile-revision> \
-  --social-style mixed-by-scenario \
+  --social-style courteous \
+  --social-attention-mode on \
+  --style courteous \
+  --mode on \
   --semantic-authority-owner goal_driven_cognitive_core \
   --runtime-topology launcher-effective-compact-cognition \
   --sample-count 1 \
-  --run-id social-attention-live-model-baseline \
-  --output benchmarks/reports/social-attention-live-model-baseline.json
+  --run-id social-attention-live-model-on-courteous \
+  --output benchmarks/reports/social-attention-live-model-on-courteous.json
 ```
 
 Example deployed-service run adds the effective lanes, provider, and hardware:
@@ -115,8 +206,12 @@ python -m benchmarks.e2e.run \
   --prompt-revision <prompt-revision> \
   --effective-model response_composer=<resolved-model> \
   --mind-profile <approved-profile-revision> \
-  --social-style mixed-by-scenario \
-  --output benchmarks/reports/social-attention-live-service.json
+  --social-style courteous \
+  --social-attention-mode on \
+  --style courteous \
+  --mode on \
+  --run-id social-attention-live-service-on-courteous \
+  --output benchmarks/reports/social-attention-live-service-on-courteous.json
 ```
 
 ## Lifecycle evidence
@@ -143,12 +238,22 @@ final speech or motion.
 
 ## Deterministic hard-gate report
 
-After an E2E run, build the hard-gate report with:
+After all homogeneous mode/style E2E runs are retained, build one hard-gate bundle with repeated `--report`:
 
 ```bash
 python -m benchmarks.social_attention \
   --normalized benchmarks/reports/normalized_scenarios.json \
-  --report benchmarks/reports/social-attention-live-service.json \
+  --report benchmarks/reports/social-attention-live-service-off-courteous.json \
+  --report benchmarks/reports/social-attention-live-service-off-custom.json \
+  --report benchmarks/reports/social-attention-live-service-off-neutral.json \
+  --report benchmarks/reports/social-attention-live-service-off-reserved.json \
+  --report benchmarks/reports/social-attention-live-service-on-courteous.json \
+  --report benchmarks/reports/social-attention-live-service-on-custom.json \
+  --report benchmarks/reports/social-attention-live-service-on-neutral.json \
+  --report benchmarks/reports/social-attention-live-service-on-reserved.json \
+  --report benchmarks/reports/social-attention-live-service-report-only-custom.json \
+  --report benchmarks/reports/social-attention-live-service-report-only-neutral.json \
+  --report benchmarks/reports/social-attention-live-service-report-only-reserved.json \
   --output benchmarks/reports/social-attention-hard-gates.json
 ```
 
@@ -164,7 +269,8 @@ The maintained gates cover:
 - backend and calibration neutrality.
 
 The report checks only declared scenario invariants, reported forbidden behavior,
-explicit lifecycle evidence, execution status, and run identity. It does not
+explicit lifecycle evidence, execution status, run identity, homogeneous mode/style
+scope, and complete one-result-per-scenario coverage. It does not
 score naturalness, empathy, personality quality, or model preference. Those
 remain reviewed qualitative dimensions.
 
@@ -172,7 +278,7 @@ remain reviewed qualitative dimensions.
 
 The next repository increment should connect the first-party adapter contract to
 the maintained model-only and authoritative cognitive-runtime harnesses, then
-retain the first 128-case baseline. After that, the same fixed scenarios and
+retain the first 128-case baseline across the validated homogeneous run bundle. After that, the same fixed scenarios and
 identity contract can be used for model comparison, stress distribution,
 selected MuJoCo evidence, earliest-error-boundary classification, and reviewed
 regression promotion.

@@ -28,7 +28,16 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--normalized", type=Path)
     parser.add_argument("--inventory", type=Path)
-    parser.add_argument("--report", type=Path)
+    parser.add_argument(
+        "--report",
+        type=Path,
+        action="append",
+        default=[],
+        help=(
+            "E2E report for one homogeneous launcher-effective mode/style slice. "
+            "Repeat to assemble the complete baseline bundle."
+        ),
+    )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--check", action="store_true")
     return parser
@@ -65,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
         report = build_qualification_report(
             manifest=manifest,
             cases=cases,
-            e2e_report=load_report(resolved(args.report)),
+            e2e_reports=[load_report(resolved(path)) for path in args.report],
         )
     except (QualificationError, ContractError) as exc:
         print(f"Social Attention qualification error: {exc}", file=sys.stderr)

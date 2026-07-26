@@ -17,9 +17,10 @@
 now records launcher-effective model/runtime identity, provides first-party E2E
 adapter contracts, distinguishes proposal/materialization/provider lifecycle
 evidence, selects semantic cohorts, and produces deterministic hard-gate reports.
-The next evidence increment connects maintained live-model and authoritative
-live-service harnesses and retains the first 128-case baseline without turning
-Benchmark observations into Runtime behavior policy.**
+Qualification now requires repeated homogeneous launcher-effective mode/style
+reports and exact non-duplicated 128-case coverage. The next evidence increment
+connects maintained live-model and authoritative live-service harnesses without
+turning Benchmark observations into Runtime behavior policy.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
@@ -42,7 +43,9 @@ human review and deterministic promotion. Benchmark validation, documentation
 validation, Router removal guards, Compose parsing, Python compilation, and
 diff-hygiene checks remain maintained gates.
 
-The Social Attention Baseline Qualification foundation is implemented. Its
+The Social Attention Baseline Qualification foundation is implemented. The
+qualification bundle rejects mixed mode/style runtime identity, missing slices,
+duplicate results, and unexpected scenarios before human review. Its
 versioned manifest defines run-identity requirements and hard gates for off,
 report-only, stillness, emergency priority, explicit-action priority, Provider
 contracts, non-blocking primary work, and backend neutrality. First-party E2E

@@ -33,6 +33,7 @@ class E2ERunProfile:
     effective_model_topology: Mapping[str, str] = field(default_factory=dict)
     mind_profile: str | None = None
     social_interaction_style: str | None = None
+    social_attention_mode: str | None = None
     apply_lanes: tuple[str, ...] = ()
     semantic_authority_owner: str | None = None
     runtime_topology: str | None = None
@@ -42,6 +43,10 @@ class E2ERunProfile:
     def __post_init__(self) -> None:
         if self.sample_count < 1:
             raise ValueError("E2E sample_count must be at least 1")
+        if self.social_attention_mode not in {None, "off", "report_only", "on"}:
+            raise ValueError(
+                "social_attention_mode must be off, report_only, on, or omitted"
+            )
         if not all(
             isinstance(name, str) and name.strip() and isinstance(model, str) and model.strip()
             for name, model in self.effective_model_topology.items()
@@ -70,6 +75,7 @@ class E2ERunProfile:
             "effective_model_topology": dict(self.effective_model_topology),
             "mind_profile": self.mind_profile,
             "social_interaction_style": self.social_interaction_style,
+            "social_attention_mode": self.social_attention_mode,
             "apply_lanes": list(self.apply_lanes),
             "semantic_authority_owner": self.semantic_authority_owner,
             "runtime_topology": self.runtime_topology,
