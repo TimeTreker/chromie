@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from benchmarks.adapters.legacy_json import normalize_json_file
+from benchmarks.inventory.core import load_config
 from benchmarks.datasets.social_attention.validate import (
     DatasetValidationError,
     validate_dataset,
@@ -77,15 +78,12 @@ def test_duplicate_input_contract_is_rejected() -> None:
 
 
 def test_social_attention_source_is_registered_once() -> None:
-    suites = _load(SUITES_PATH)
-    sources = [item for item in suites["sources"] if item["name"] == "social_attention_v1"]
-    assert sources == [
-        {
-            "name": "social_attention_v1",
-            "path": "benchmarks/datasets/social_attention",
-            "glob": "cases.json",
-            "layer": "integration",
-            "datasets": ["social_attention"],
-            "evidence_levels": ["static", "live_model"],
-        }
-    ]
+    _, rules = load_config(SUITES_PATH)
+    sources = [item for item in rules if item.name == "social_attention_v1"]
+    assert len(sources) == 1
+    source = sources[0]
+    assert source.path == "benchmarks/datasets/social_attention"
+    assert source.glob == "cases.json"
+    assert source.layer == "integration"
+    assert source.datasets == ("social_attention",)
+    assert source.evidence_levels == ("static", "live_model")

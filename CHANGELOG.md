@@ -8,6 +8,13 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Benchmark scenario migration and reviewed mining closure
+
+- Made one migration manifest authoritative for maintained scenario sources while preserving 527 inventory entries, 526 normalized semantic scenarios, stable IDs, source provenance, existing evidence claims, and criteria-based compatibility removal schedules.
+- Added a Benchmark-native deterministic scenario entrypoint and removed duplicate source classification from the compatibility suites manifest.
+- Connected immutable episode-derived candidates to deterministic indexing, related/historical-regression detection, fingerprint-bound human review, controlled variation authoring briefs, and approved deterministic promotion.
+- Kept automatic commit, Prompt mutation, personality/safety changes, Runtime policy authority, training promotion, and release qualification disabled.
+
 ### Stress and behavior-distribution Benchmark evaluation
 
 - Added six versioned workload families for long sessions, repetition/cooldown, interruption, concurrency, provider degradation, and synthetic multi-user context isolation.

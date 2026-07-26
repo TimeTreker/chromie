@@ -75,9 +75,10 @@ Every newly mined candidate must declare:
 ```
 
 The candidate event producer rejects any unreviewed candidate that already
-allows regression or training promotion. Approval and promotion are intentionally
-not implemented in the mining command. They require a separate auditable owner
-workflow.
+allows regression or training promotion. Approval and promotion are intentionally separate from the mining command. The
+implemented Benchmark workflow writes a review record bound to the immutable
+candidate fingerprint and promotes only an approved candidate through a separate
+auditable command.
 
 ## Command
 
@@ -104,3 +105,25 @@ bandwidth and storage control, upload reliability, retention, and cloud delivery
 
 Cloud analysis may rank, cluster, or annotate candidates, but it must not mutate
 the immutable source package or silently promote a candidate.
+
+## Implemented review and promotion workflow
+
+```bash
+python -m benchmarks.mining index \
+  --candidate-dir .chromie/scenario_candidates \
+  --output .chromie/benchmark-artifacts/candidate_catalog.json
+
+python -m benchmarks.mining review candidate.json \
+  --decision approved --reviewer owner-id \
+  --rationale "Reproduces the earliest wrong boundary." \
+  --output candidate.review.json
+
+python -m benchmarks.mining promote candidate.json \
+  --review candidate.review.json --id reviewed_regression_case
+```
+
+The candidate remains immutable and pending review. Approval lives in a separate
+record containing its SHA-256 fingerprint. Promotion rejects exact duplicates,
+requires explicit reviewer acknowledgement for related committed scenarios,
+validates the deterministic scenario contract, and preserves source provenance.
+It never commits changes or edits Prompts, personality, safety, or Runtime policy.

@@ -70,9 +70,22 @@ Completed stress and behavior-distribution milestone:
 - comparison shows model, Prompt, MindProfile, provider, and code deltas without
   selecting a winner or creating Runtime quotas.
 
-Next active milestone: Phase 7 scenario migration and legacy cleanup. Preserve
-stable IDs, provenance, existing entrypoints, and evidence parity while moving
-maintained sources toward the target Benchmark hierarchy.
+Completed Benchmark Suite foundation closure:
+
+- maintained scenario sources are referenced through one authoritative migration
+  manifest with inventory/normalization parity and explicit compatibility removal
+  gates;
+- the Benchmark-native scenario entrypoint runs existing deterministic suites
+  without changing their IDs, paths, or evidence claims;
+- episode-derived candidates can be indexed, deduplicated, reviewed in a separate
+  fingerprint-bound record, varied through review-only authoring briefs, and
+  promoted into deterministic regressions only after explicit approval;
+- no Benchmark workflow edits production Prompts, personality, safety, Runtime
+  policy, or release qualification.
+
+The Benchmark infrastructure issue is complete. Future work uses the suite to
+collect real model/service/MuJoCo/physical evidence and to promote reviewed gaps,
+not to add another evaluation-policy layer.
 
 ## Planning model
 

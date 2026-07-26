@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "manifest_id": "chromie.scenario_mining.v1",
+  "status": "complete",
+  "runtime_policy_authority": false,
+  "auto_promotion_allowed": false,
+  "authoritative_prompt_mutation_allowed": false,
+  "candidate_roots": [
+    ".chromie/scenario_candidates",
+    ".chromie/experience/candidates"
+  ],
+  "review_decisions": [
+    "approved",
+    "rejected"
+  ],
+  "promotion": {
+    "required_review_decision": "approved",
+    "required_fields": [
+      "reviewer",
+      "reviewed_at",
+      "rationale",
+      "candidate_fingerprint"
+    ],
+    "allowed_suites": [
+      "goal_interpretation",
+      "cognitive_core_dialogue",
+      "interaction",
+      "dialogue",
+      "adapter",
+      "cognitive_runtime",
+      "cognitive_turn_loop"
+    ],
+    "auto_commit": false,
+    "auto_prompt_edit": false,
+    "auto_runtime_policy_edit": false
+  },
+  "deduplication": {
+    "exact_input_rejected": true,
+    "related_similarity_threshold": 0.9,
+    "near_duplicate_similarity_threshold": 0.96,
+    "human_override_required_for_related": true
+  },
+  "variation_axes": {
+    "language": [
+      "en-US",
+      "zh-CN",
+      "mixed"
+    ],
+    "politeness": [
+      "high",
+      "normal",
+      "low",
+      "hostile",
+      "unknown"
+    ],
+    "interaction_context": [
+      "single_turn",
+      "multi_turn",
+      "interrupted",
+      "active_goal_followup"
+    ],
+    "failure_condition": [
+      "provider_unavailable",
+      "timeout",
+      "ambiguous_input",
+      "resource_conflict",
+      "none"
+    ]
+  },
+  "release_qualification": "human_approval_required"
+}

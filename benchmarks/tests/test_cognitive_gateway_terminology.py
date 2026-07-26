@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from benchmarks.inventory.core import load_config
 from benchmarks.runtime_adapters.profiles import COMPONENT_PROFILES
 
 
@@ -27,11 +28,9 @@ def test_runtime_adapter_manifest_uses_gateway_terminology() -> None:
 
 
 def test_goal_interpretation_paths_use_current_architecture_taxonomy() -> None:
-    payload = json.loads(
-        (ROOT / "benchmarks/manifests/suites.json").read_text(encoding="utf-8")
-    )
-    by_path = {item["path"]: item for item in payload["sources"]}
+    _, rules = load_config(ROOT / "benchmarks/manifests/suites.json")
+    by_path = {item.path: item for item in rules}
     for path in ("scenarios/goal_interpretation", "scenarios/cognitive_core_dialogue"):
         source = by_path[path]
-        assert source["layer"] in {"module", "integration"}
-        assert any(tag in {"goal_interpretation", "cognitive_core_dialogue"} for tag in source["datasets"])
+        assert source.layer in {"module", "integration"}
+        assert any(tag in {"goal_interpretation", "cognitive_core_dialogue"} for tag in source.datasets)

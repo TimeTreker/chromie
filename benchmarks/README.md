@@ -282,3 +282,42 @@ observations, invariant/forbidden-behavior families, latency p50/p95, session
 drift, and 95% Wilson intervals. They do not define a target gesture frequency,
 select a model winner, or carry Runtime policy authority. See
 [`docs/STRESS_BENCHMARK_EVALUATION.md`](../docs/STRESS_BENCHMARK_EVALUATION.md).
+
+## Maintained scenario migration
+
+`manifests/scenario_migration_v1.json` is the authoritative classification for
+all maintained scenario sources. Existing deterministic fixtures remain
+referenced in place so stable IDs, Git provenance, general-ability manifests,
+and evidence claims remain comparable. `manifests/suites.json` is a compatibility
+redirect and no longer duplicates source rules.
+
+Validate migration parity and run the file-backed suites with:
+
+```bash
+python -m benchmarks.scenarios check
+python -m benchmarks.scenarios run --suite dialogue --no-write
+```
+
+Compatibility entrypoints and their criteria-based removal schedules are stored
+in the migration manifest.
+
+## Continuous scenario mining and review
+
+`mining/` connects immutable episode-derived candidates to reviewed Benchmark
+authoring. It indexes and clusters candidates, identifies related committed and
+historical-regression cases, creates separate human review records bound to the
+candidate fingerprint, emits controlled variation briefs, and promotes only an
+approved candidate into the deterministic scenario tree.
+
+```bash
+python -m benchmarks.mining index --candidate-dir .chromie/scenario_candidates
+python -m benchmarks.mining review candidate.json --decision approved \
+  --reviewer owner-id --rationale "Reviewed regression boundary." \
+  --output candidate.review.json
+python -m benchmarks.mining promote candidate.json \
+  --review candidate.review.json --id reviewed_regression_case
+```
+
+The mining workflow never commits changes, edits Prompts, changes personality or
+Runtime policy, selects an action from a phrase, or grants release qualification.
+See [Benchmark Scenario Migration and Continuous Review](../docs/BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md).

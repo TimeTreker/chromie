@@ -4,16 +4,23 @@ This directory stores one frozen behavior scenario per JSON file. The files are
 Level A regression fixtures: they are deterministic, dependency-light, and do
 not prove GPU, microphone, speaker, simulator, or robot behavior.
 
-Run behavior-quality gates through the general ability manifest:
+Run maintained file-backed scenarios through the Benchmark Suite entrypoint:
+
+```bash
+python -m benchmarks.scenarios check
+python -m benchmarks.scenarios run --suite dialogue --no-write
+```
+
+Run behavior-quality gates through the retained general ability manifest:
 
 ```bash
 python scripts/general_ability_acceptance.py --mode check
 python scripts/general_ability_acceptance.py --mode level-a
 ```
 
-`scripts/scenario_runner.py` remains a low-level fixture engine for authoring
-and focused debugging, but it should not be used by itself as a claim that
-Chromie behaves naturally.
+`scripts/scenario_runner.py` remains a compatibility entrypoint under the
+criteria-based removal schedule in the Benchmark migration manifest. Neither it
+nor a Level A pass alone proves natural live robot behavior.
 
 Create and validate scenarios with:
 
@@ -236,11 +243,22 @@ The planned experience loop for turning low-scoring real dialogue/task episodes
 into reviewed scenario candidates is described in
 [Experience Evaluation and Scenario Mining](../docs/EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md).
 
-To score recorded runtime episodes and write candidate scenarios for review:
+To score recorded runtime episodes and write immutable candidate scenarios for review:
 
 ```bash
 python scripts/evaluate_experience_episodes.py \
   --episodes .chromie/experience/episodes.jsonl \
   --output .chromie/experience/evaluations.jsonl \
   --candidate-dir .chromie/scenario_candidates
+```
+
+Index, review, and promote candidates through the Benchmark workflow:
+
+```bash
+python -m benchmarks.mining index --candidate-dir .chromie/scenario_candidates
+python -m benchmarks.mining review candidate.json --decision approved \
+  --reviewer owner-id --rationale "Reviewed regression boundary." \
+  --output candidate.review.json
+python -m benchmarks.mining promote candidate.json \
+  --review candidate.review.json --id reviewed_regression_case
 ```

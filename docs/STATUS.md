@@ -12,12 +12,12 @@
 **Status authority:** this file describes what is present in the repository snapshot.
 **Development identity:** `development`; no release version or publication target is planned.
 **Maintained execution scope:** Soridormi MuJoCo `sim`; retained evidence below records the exact revision that produced each bundle.
-**Status refresh date:** 2026-07-25
-**Current focus:** **Begin Benchmark Phase 7 scenario migration and legacy
-cleanup after completing reviewed Social Attention content, E2E evidence profiles,
-and observational stress/distribution evaluation. Preserve stable IDs, source
-provenance, existing entrypoints, and evidence claims while avoiding Runtime
-behavior changes.**
+**Status refresh date:** 2026-07-26
+**Current focus:** **Use the completed Benchmark Suite foundation for real
+model, deployed-service, MuJoCo, and supervised physical evidence. Maintained
+scenario migration and reviewed experience-to-regression promotion are complete;
+future changes must fix the earliest responsible intelligence or boundary layer
+without turning Benchmark observations into Runtime behavior policy.**
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance.
 
 `ROADMAP.md` describes milestone intent. This file is the source of truth for
@@ -31,12 +31,14 @@ The stable project goal and ownership boundaries are defined in
 [Project Charter](PROJECT_CHARTER.md).
 
 The final Router-removal closure audit passes the maintained `./scripts/run_tests.sh`
-entrypoint with 1,357 primary tests plus 20 legacy Agent tests. The Benchmark
-foundation now inventories 527 entries, normalizes 526 semantic scenarios,
-retains 128 reviewed Social Attention cases, and adds E2E evidence profiles plus
-six stress workload families. Benchmark validation, documentation validation,
-Router removal guards, Compose parsing, Python compilation, and diff-hygiene
-checks remain maintained gates.
+entrypoint with 1,357 primary tests plus 20 legacy Agent tests. The completed
+Benchmark foundation inventories 527 entries, normalizes 526 semantic scenarios,
+retains 128 reviewed Social Attention cases, adds E2E evidence profiles and six
+stress workload families, reconciles every maintained source through one
+migration manifest, and connects immutable experience candidates to separate
+human review and deterministic promotion. Benchmark validation, documentation
+validation, Router removal guards, Compose parsing, Python compilation, and
+diff-hygiene checks remain maintained gates.
 
 The current branch closes two July 24 live-conversation regressions. With no
 active Goals, the constrained Goal Segmentation schema now requires a social

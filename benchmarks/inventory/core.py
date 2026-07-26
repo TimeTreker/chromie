@@ -42,6 +42,19 @@ def load_config(path: Path) -> tuple[dict[str, Any], list[SourceRule]]:
     raw = _load_json(path)
     if raw.get("schema_version") != 1:
         raise InventoryError("suites manifest schema_version must be 1")
+    source_manifest = raw.get("source_manifest")
+    if source_manifest is not None:
+        if not isinstance(source_manifest, str) or not source_manifest.strip():
+            raise InventoryError("source_manifest must be a non-empty repository path")
+        repo_root = path.resolve().parents[2]
+        target = (repo_root / source_manifest).resolve()
+        try:
+            target.relative_to(repo_root)
+        except ValueError as exc:
+            raise InventoryError("source_manifest escapes repository") from exc
+        raw = _load_json(target)
+        if raw.get("schema_version") != 1:
+            raise InventoryError("scenario source manifest schema_version must be 1")
     allowed = set(raw.get("allowed_datasets", []))
     if not allowed:
         raise InventoryError("allowed_datasets must not be empty")

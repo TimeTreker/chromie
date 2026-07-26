@@ -262,20 +262,20 @@ Add stress and behavior-distribution benchmark reports
 
 ## Phase 7 - Scenario migration and legacy cleanup
 
-After adapters and inventory are stable:
+Status: implemented.
 
-- move or reference existing scenarios into the target hierarchy;
-- retain redirects or compatibility manifests for old commands;
-- consolidate duplicate wrappers and obsolete one-off scripts;
-- preserve historical regression IDs and git provenance;
-- update CI and documentation to the Benchmark Suite entrypoints.
+Implemented evidence:
 
-Exit criteria:
-
-- all prior maintained scenarios remain discoverable and runnable;
-- old and new aggregate counts reconcile;
-- no release claim loses its original evidence source;
-- compatibility paths have an explicit removal schedule.
+- one authoritative migration manifest references maintained sources in place;
+- the former suites manifest is a compatibility redirect rather than duplicate
+  classification authority;
+- inventory and common-contract totals reconcile at 527 entries and 526 semantic
+  scenarios;
+- stable IDs, source paths, evidence levels, Git provenance, and existing
+  general-ability entrypoints remain intact;
+- a Benchmark-native file-backed scenario runner is available;
+- every retained compatibility entrypoint has explicit criteria-based removal
+  gates.
 
 Suggested commit:
 
@@ -285,18 +285,21 @@ Migrate maintained scenarios into the benchmark suite
 
 ## Phase 8 - Continuous scenario mining and review
 
-Integrate runtime evidence and reported failures with the existing scenario
-candidate data loop:
+Status: implemented.
 
-- propose candidates from retained episodes;
-- cluster and deduplicate semantically similar cases;
-- generate controlled variations for language, politeness, context, and failure
-  conditions;
-- require human review and provenance before promotion;
-- track coverage gaps and historical bug recurrence.
+Implemented evidence:
 
-The LLM may propose and critique. It does not silently modify authoritative
-prompts, production personality, or pass/fail policy.
+- immutable episode-derived candidates retain source episode and evaluation IDs;
+- deterministic indexing clusters candidates against committed scenarios and
+  exposes historical-regression recurrence;
+- review decisions are separate records bound to the candidate fingerprint;
+- controlled variation briefs cover language, politeness, interaction context,
+  and failure conditions without generating fixed behavior policy;
+- promotion requires an approved review, rejects exact duplicates, requires an
+  explicit override for related scenarios, validates the deterministic fixture,
+  and preserves auditable provenance;
+- no workflow auto-commits, edits Prompts, changes personality or Runtime policy,
+  or grants release qualification.
 
 Suggested commit:
 
@@ -304,9 +307,10 @@ Suggested commit:
 Connect experience mining to reviewed benchmark authoring
 ```
 
-## Recommended immediate next patch
+## Benchmark Suite foundation closure
 
-Implement Phase 7 only: migrate or index maintained legacy scenarios into the
-target Benchmark hierarchy after proving adapter and count parity. Preserve
-stable IDs, provenance, old entrypoints, and evidence claims until compatibility
-removal gates are explicit. Do not combine migration with new Runtime behavior.
+The staged foundation is complete. Future work should use these contracts to
+collect real model, service, MuJoCo, and supervised physical evidence; expand
+reviewed datasets from observed gaps; and fix the earliest responsible model,
+Prompt, contract, provider, or Runtime boundary. It should not add another hidden
+behavior-policy layer to the Benchmark infrastructure.

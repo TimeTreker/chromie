@@ -1,0 +1,253 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "1.0",
+  "manifest_id": "chromie.scenario_migration.v1",
+  "status": "complete",
+  "authority": "benchmark_suite",
+  "source_strategy": "referenced_in_place",
+  "runtime_policy_authority": false,
+  "expected_inventory_total": 527,
+  "expected_normalized_total": 526,
+  "allowed_datasets": [
+    "adapter",
+    "asr_noise",
+    "bilingual",
+    "cognitive_turn_loop",
+    "daily_conversation",
+    "dialogue",
+    "emotion",
+    "general_ability",
+    "goal_driven_runtime",
+    "historical_regression",
+    "interaction",
+    "interruptions",
+    "multi_turn",
+    "question_answering",
+    "repetition",
+    "report_only",
+    "robot_actions",
+    "safety",
+    "social_attention",
+    "style_matrix",
+    "tool_use",
+    "user_preferences",
+    "voice_acceptance",
+    "goal_interpretation",
+    "cognitive_core_dialogue"
+  ],
+  "sources": [
+    {
+      "name": "goal_interpretation",
+      "path": "scenarios/goal_interpretation",
+      "glob": "**/*.json",
+      "layer": "module",
+      "datasets": [
+        "goal_interpretation"
+      ],
+      "evidence_levels": [
+        "static"
+      ],
+      "target_reference": "modules/goal_interpretation",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 24
+    },
+    {
+      "name": "cognitive_turn_loop",
+      "path": "scenarios/cognitive_turn_loop",
+      "glob": "**/*.json",
+      "layer": "integration",
+      "datasets": [
+        "cognitive_turn_loop"
+      ],
+      "evidence_levels": [
+        "replay"
+      ],
+      "target_reference": "integration/cognitive_turn_loop",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 5
+    },
+    {
+      "name": "cognitive_runtime",
+      "path": "scenarios/cognitive_runtime",
+      "glob": "**/*.json",
+      "layer": "integration",
+      "datasets": [
+        "goal_driven_runtime"
+      ],
+      "evidence_levels": [
+        "replay"
+      ],
+      "target_reference": "integration/goal_driven_runtime",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 13
+    },
+    {
+      "name": "interaction",
+      "path": "scenarios/interaction",
+      "glob": "**/*.json",
+      "layer": "integration",
+      "datasets": [
+        "interaction"
+      ],
+      "evidence_levels": [
+        "replay"
+      ],
+      "target_reference": "integration/interaction",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 29
+    },
+    {
+      "name": "dialogue",
+      "path": "scenarios/dialogue",
+      "glob": "**/*.json",
+      "layer": "integration",
+      "datasets": [
+        "dialogue",
+        "multi_turn"
+      ],
+      "evidence_levels": [
+        "replay"
+      ],
+      "target_reference": "integration/multi_turn",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 319
+    },
+    {
+      "name": "cognitive_core_dialogue",
+      "path": "scenarios/cognitive_core_dialogue",
+      "glob": "**/*.json",
+      "layer": "integration",
+      "datasets": [
+        "cognitive_core_dialogue",
+        "multi_turn"
+      ],
+      "evidence_levels": [
+        "replay"
+      ],
+      "target_reference": "integration/cognitive_core_dialogue",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 2
+    },
+    {
+      "name": "adapter",
+      "path": "scenarios/adapter",
+      "glob": "**/*.json",
+      "layer": "regression",
+      "datasets": [
+        "adapter",
+        "historical_regression"
+      ],
+      "evidence_levels": [
+        "static"
+      ],
+      "target_reference": "regression/adapter_contracts",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 4
+    },
+    {
+      "name": "test_scenarios",
+      "path": "tests/scenarios",
+      "glob": "**/*.json",
+      "layer": "regression",
+      "datasets": [
+        "historical_regression"
+      ],
+      "evidence_levels": [
+        "static"
+      ],
+      "target_reference": "regression/historical",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 2
+    },
+    {
+      "name": "social_attention_v1",
+      "path": "benchmarks/datasets/social_attention",
+      "glob": "cases.json",
+      "layer": "integration",
+      "datasets": [
+        "social_attention"
+      ],
+      "evidence_levels": [
+        "static",
+        "live_model"
+      ],
+      "target_reference": "datasets/social_attention",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 128
+    },
+    {
+      "name": "general_ability",
+      "path": "scripts/general_ability_acceptance.py",
+      "kind": "acceptance_entrypoint",
+      "layer": "e2e",
+      "datasets": [
+        "general_ability"
+      ],
+      "evidence_levels": [
+        "live_service"
+      ],
+      "target_reference": "e2e/general_ability",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": 1
+    },
+    {
+      "name": "m13_voice",
+      "path": "scripts/m13_voice_acceptance.py",
+      "kind": "acceptance_entrypoint",
+      "layer": "e2e",
+      "datasets": [
+        "voice_acceptance"
+      ],
+      "evidence_levels": [
+        "live_service",
+        "simulated"
+      ],
+      "optional": true,
+      "target_reference": "e2e/voice_acceptance",
+      "migration_state": "referenced_in_place",
+      "expected_inventory_count": null
+    }
+  ],
+  "compatibility_entrypoints": [
+    {
+      "path": "scripts/scenario_runner.py",
+      "replacement": "python -m benchmarks.scenarios run",
+      "state": "retained_redirect",
+      "removal_schedule": {
+        "earliest_after": "two consecutive full-suite parity reports",
+        "required_gates": [
+          "benchmark_native_runner_executes_all_file_backed_suites",
+          "report_schema_parity_is_retained",
+          "general_ability_acceptance_no_longer_imports_the_legacy_cli",
+          "documentation_and_support_commands_use_the_benchmark_entrypoint"
+        ]
+      }
+    },
+    {
+      "path": "scripts/scenario_author.py",
+      "replacement": "python -m benchmarks.mining promote",
+      "state": "retained_authoring_tool",
+      "removal_schedule": {
+        "earliest_after": "benchmark authoring supports every maintained deterministic suite",
+        "required_gates": [
+          "template_creation_parity",
+          "schema_validation_parity",
+          "reviewed_candidate_promotion_parity"
+        ]
+      }
+    },
+    {
+      "path": "scripts/general_ability_acceptance.py",
+      "replacement": "future benchmark e2e ability cohort entrypoint",
+      "state": "retained_evidence_entrypoint",
+      "removal_schedule": {
+        "earliest_after": "benchmark E2E runner retains equivalent evidence bundles",
+        "required_gates": [
+          "level_a_case_parity",
+          "live_text_claim_scope_parity",
+          "mujoco_safe_idle_evidence_parity"
+        ]
+      }
+    }
+  ]
+}

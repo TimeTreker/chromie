@@ -57,6 +57,7 @@ When documents disagree, correct the lower-authority document.
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
 | What staged work builds that benchmark architecture? | `docs/CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md` |
+| How are maintained scenarios migrated and episode candidates reviewed? | `docs/BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md` |
 | How are stress workloads and behavior distributions executed and compared? | `docs/STRESS_BENCHMARK_EVALUATION.md` |
 | How are semantic scenarios executed at distinct E2E evidence levels? | `docs/E2E_BENCHMARK_EXECUTION.md` |
 | Where is the reviewed Social Attention benchmark dataset? | `benchmarks/datasets/social_attention/README.md` |
@@ -97,6 +98,9 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
 - [Chromie Benchmark Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md)
+- [Benchmark Scenario Migration and Continuous Review](BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md)
+- [Maintained Scenario Migration](../benchmarks/scenarios/README.md)
+- [Continuous Scenario Mining and Review](../benchmarks/mining/README.md)
 - [End-to-End Benchmark Execution](E2E_BENCHMARK_EXECUTION.md)
 - [Stress and Behavior-Distribution Evaluation](STRESS_BENCHMARK_EVALUATION.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
@@ -150,6 +154,9 @@ milestone histories or duplicate complete setup and acceptance procedures.
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
 - [Chromie Benchmark Implementation Plan](CHROMIE_BENCHMARK_IMPLEMENTATION_PLAN.md)
+- [Benchmark Scenario Migration and Continuous Review](BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md)
+- [Maintained Scenario Migration](../benchmarks/scenarios/README.md)
+- [Continuous Scenario Mining and Review](../benchmarks/mining/README.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
 - [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)

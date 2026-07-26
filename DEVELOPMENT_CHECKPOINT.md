@@ -19,11 +19,11 @@
 **Development identity:** `development`; no release version or publication target is planned.
 **Soridormi capability snapshot:** generated from the paired Soridormi checkout; see `capabilities/soridormi.json` metadata for provenance
 **Status refresh date:** 2026-07-26
-**Current focus:** Begin Benchmark Phase 7 scenario migration and legacy cleanup.
-The reviewed Social Attention dataset, E2E evidence profiles, and six
-stress/distribution workload families are implemented. Preserve stable scenario
-IDs, source provenance, existing commands, and evidence parity; do not add
-Runtime behavior policy while reorganizing evaluation assets.
+**Current focus:** Use the completed Benchmark Suite foundation to collect
+model/service/MuJoCo evidence and promote reviewed regressions from real
+experience. Scenario migration, compatibility schedules, candidate indexing,
+fingerprint-bound human review, controlled variation briefs, and promotion are
+implemented without adding Runtime behavior policy.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -42,17 +42,20 @@ spoken budgets before one concise answer is accepted. Weather is the first
 built-in caller; canonical Skill Runtime observations use the same post-execution
 path.
 
-## Next topic: Chromie Benchmark Suite Phase 7
+## Benchmark Suite foundation closure
 
-Migrate or index maintained scenario sources into the target Benchmark hierarchy
-only after proving normalized count, ID, adapter, and evidence parity. Keep old
-entrypoints until explicit removal gates exist. Do not mix migration with Runtime
-behavior or Prompt changes.
+The staged Benchmark infrastructure is complete. The authoritative migration
+manifest reconciles 527 inventory entries with 526 common-contract scenarios,
+retains current commands under explicit removal gates, and exposes a
+Benchmark-native deterministic runner. Episode candidates remain immutable until
+a separate fingerprint-bound review approves promotion. Future work should run
+the suite against real evidence profiles and fix the earliest responsible model,
+Prompt, contract, provider, or Runtime boundary.
 
 Recommended commit:
 
 ```text
-Migrate maintained scenarios into the benchmark suite
+Complete benchmark scenario migration and reviewed mining
 ```
 
 ## Resume point

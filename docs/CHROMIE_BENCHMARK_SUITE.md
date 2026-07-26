@@ -313,8 +313,9 @@ The matrix must demonstrate that:
 
 ## 9. Existing scenario classification and migration
 
-Existing scenarios remain valid evidence while the Benchmark Suite is built.
-They are indexed first, then migrated without changing their semantic IDs.
+Existing scenarios remain valid evidence under the completed Benchmark migration.
+They are referenced through one authoritative manifest without changing their
+semantic IDs, source paths, Git provenance, or evidence claims.
 
 | Current location | Initial benchmark classification |
 |---|---|
@@ -330,9 +331,12 @@ They are indexed first, then migrated without changing their semantic IDs.
 | voice-milestone and MuJoCo acceptance paths | E2E audio/simulator cohorts |
 | Social Attention closure scenarios | `social_attention`, `style_matrix`, `user_preferences`, and regression cohorts |
 
-Migration begins with a generated index that points to existing files. Physical
-moves happen only after runner compatibility, history preservation, and CI
-coverage are proven. No scenario is copied into multiple directories solely to
+`benchmarks/manifests/scenario_migration_v1.json` now owns this classification.
+The suites manifest is only a compatibility redirect. Physical moves are not
+required for closure because the Benchmark-native runner, inventory, common
+normalizer, and retained commands reconcile 527 inventory entries with 526
+semantic scenarios. Compatibility entrypoints have explicit criteria-based
+removal schedules. No scenario is copied into multiple directories solely to
 represent multiple tags.
 
 ## 10. Authoring and review policy
@@ -353,6 +357,16 @@ fix classes are model choice, prompt principles, context quality, contract
 clarity, capability description, architecture, provider behavior, or genuine
 validation defects. Adding an input-specific Host rule is prohibited except for
 narrow deterministic operational controls already defined by the Charter.
+
+
+The implemented mining workflow preserves each candidate as an immutable,
+pending-review artifact. Candidate indexing reports similarity clusters,
+coverage gaps, and possible historical-regression recurrence. Approval is a
+separate record bound to the candidate fingerprint. Promotion requires that
+record, rejects exact duplicates, requires explicit review for related cases,
+and preserves episode/evaluation/review provenance. Controlled variations are
+authoring briefs only; they do not mechanically translate text or choose robot
+actions.
 
 ## 11. Relationship to existing documents
 

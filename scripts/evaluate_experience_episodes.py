@@ -539,6 +539,12 @@ def scenario_candidate_from_episode(
         )
     return {
         "schema_version": 1,
+        "candidate_contract": {
+            "schema_version": 1,
+            "authoritative": False,
+            "runtime_policy_authority": False,
+            "auto_promotion_allowed": False,
+        },
         "id": scenario_id,
         "suite": "dialogue",
         "level": "integration",

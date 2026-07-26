@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/scenario-candidate-review-v1.json",
+  "title": "Chromie Scenario Candidate Review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "review_id",
+    "candidate_id",
+    "candidate_fingerprint",
+    "decision",
+    "reviewer",
+    "reviewed_at",
+    "rationale",
+    "regression_promotion_allowed",
+    "training_promotion_allowed",
+    "auto_apply",
+    "runtime_policy_authority"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "review_id": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "candidate_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "decision": {"enum": ["approved", "rejected"]},
+    "reviewer": {"type": "string", "minLength": 1},
+    "reviewed_at": {"type": "string", "minLength": 1},
+    "rationale": {"type": "string", "minLength": 1},
+    "regression_promotion_allowed": {"type": "boolean"},
+    "training_promotion_allowed": {"const": false},
+    "auto_apply": {"const": false},
+    "runtime_policy_authority": {"const": false}
+  }
+}

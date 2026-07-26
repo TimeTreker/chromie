@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/schemas/scenario-variation-brief-v1.json",
+  "title": "Chromie Scenario Variation Authoring Brief",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "variation_id",
+    "source_candidate_id",
+    "source_candidate_fingerprint",
+    "axis",
+    "requested_value",
+    "authoring_instruction",
+    "generated_scenario",
+    "requires_human_review",
+    "auto_promotion_allowed",
+    "runtime_policy_authority"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "variation_id": {"type": "string", "minLength": 1},
+    "source_candidate_id": {"type": "string", "minLength": 1},
+    "source_candidate_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "axis": {"type": "string", "minLength": 1},
+    "requested_value": {"type": "string", "minLength": 1},
+    "authoring_instruction": {"type": "string", "minLength": 1},
+    "generated_scenario": {"type": "null"},
+    "requires_human_review": {"const": true},
+    "auto_promotion_allowed": {"const": false},
+    "runtime_policy_authority": {"const": false}
+  }
+}

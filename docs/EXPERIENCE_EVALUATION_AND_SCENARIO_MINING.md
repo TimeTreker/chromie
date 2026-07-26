@@ -401,10 +401,10 @@ Behavior:
 
 ### Phase 4: Promotion and regression gate
 
-Add a promotion helper that copies a reviewed candidate into the committed
-scenario tree and validates it.
+Status: implemented through the Benchmark mining workflow. A separate review
+record is bound to the immutable candidate fingerprint before promotion.
 
-Planned command (the promotion helper is not implemented yet):
+Compatibility command:
 
 ```bash
 python scripts/promote_scenario_candidate.py \
@@ -416,9 +416,15 @@ python scripts/promote_scenario_candidate.py \
 Behavior:
 
 - require the target ID to follow scenario naming rules;
-- strip candidate-only private metadata unless `--keep-review-metadata` is set;
-- run `python scripts/scenario_author.py validate <target>`;
-- print the exact scenario runner command to reproduce it.
+- require a separate approved review record with reviewer, timestamp, rationale,
+  and matching candidate fingerprint;
+- reject exact committed-input duplicates and require explicit review for related
+  scenarios;
+- strip candidate-only authority fields and preserve episode/evaluation/review
+  provenance;
+- validate the deterministic scenario contract;
+- print the exact Benchmark scenario command to reproduce it;
+- never commit, edit Prompts, change Runtime policy, or grant release qualification.
 
 ### Phase 5: Scenario-run report scoring
 
