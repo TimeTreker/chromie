@@ -93,17 +93,19 @@ that Goal Interpretation and the Cognitive Core received the same profile and fi
 `.env.runtime`.
 
 During the current architecture-qualification phase, the maintained RTX 5090
-profile owns a correctness-first cognitive budget as well as generous timeouts.
-Every active cognitive stage uses one 32768-token runner topology, reserves its
-complete declared output budget plus a 2048-token safety margin before inference,
-and rejects prompt or completion truncation as an LLM-budget failure. Structured
-quality stages may generate up to 4096 or 8192 tokens while the architecture is
-being finished. Agent model stages receive up to 120 seconds, host stage calls
-receive up to 150 seconds, and the complete staged cognitive runtime receives up
-to 900 seconds. This is intentional: live acceptance should measure model
-capability and workflow correctness before latency, KV-cache, and token-budget
-optimization. These budgets require no launcher option and are regenerated
-automatically with the detected profile.
+and RTX 4090 Laptop profiles own correctness-first cognitive budgets as well as
+generous timeouts. Every active cognitive stage uses one 32768-token runner
+topology, reserves its complete declared output budget plus a 2048-token safety
+margin before inference, and rejects prompt or completion truncation as an
+LLM-budget failure. RTX 5090 retains its larger structured-output budgets and
+two-model topology. RTX 4090 Laptop keeps one compact Qwen runner beside
+CosyVoice with bounded per-stage output budgets appropriate for its 16GB VRAM.
+Agent model stages receive up to 120 seconds, host stage calls receive up to 150
+seconds, and the complete staged cognitive runtime receives up to 900 seconds.
+This is intentional: live acceptance should measure model capability and
+workflow correctness before latency, KV-cache, and token-budget optimization.
+These budgets require no launcher option and are regenerated automatically with
+the detected profile.
 
 ## Current profiles
 
@@ -121,12 +123,14 @@ automatically with the detected profile.
 
 The quality model is used by Deep Planner and Response Composer. The fast model
 is used by Goal Interpretation, Fast Planner, Task Continuity, and Social
-Attention unless the profile explicitly states otherwise. RTX 5090 also assigns
-Goal Association and Tool Result Interpretation to `gemma4:26b`, opts out of the
+Attention unless the profile explicitly states otherwise. RTX 4090 Laptop's
+maintained CosyVoice path collapses those roles to one resident `qwen3:4b` model
+and explicitly gives the launcher, Ollama server, warmup request, and every
+cognitive stage the same profile-owned 32768-token context. RTX 5090 assigns Goal
+Association and Tool Result Interpretation to `gemma4:26b`, opts out of the
 CosyVoice one-model compact override, keeps two Ollama models resident, and uses
-one 32768-token development/qualification context topology for every cognitive
-stage to avoid runner eviction caused only by context-size changes. Input
-preflight reserves each stage's full `num_predict` allowance and safety margin;
+the same 32768-token development/qualification context topology. Input preflight
+reserves each stage's full `num_predict` allowance and safety margin;
 `done_reason=length`, exhausted output budgets, and prompt-context truncation are
 fail-closed evidence, not user ambiguity.
 

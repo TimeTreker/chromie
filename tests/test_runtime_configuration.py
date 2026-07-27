@@ -354,6 +354,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("ORCH_FAST_FIRST_AUDIO_PRIME_ON_STARTUP=0", launcher)
         self.assertIn('echo "ORCH_TTS_CONCURRENCY=1"', launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b", launcher)
+        self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", launcher)
+        self.assertIn("context=${COSYVOICE_BRAIN_NUM_CTX}", launcher)
+        self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", services)
+        self.assertIn("context=$COSYVOICE_BRAIN_NUM_CTX", services)
+        self.assertIn(
+            'export AGENT_TOOL_RESULT_INTERPRETER_MODEL="$COSYVOICE_BRAIN_MODEL"',
+            services,
+        )
         self.assertIn("EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1", launcher)
         self.assertIn(
             'EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL="$COSYVOICE_BRAIN_MODEL"',

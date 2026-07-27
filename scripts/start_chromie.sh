@@ -460,7 +460,7 @@ if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}
   EFFECTIVE_RESPONSE_COMPOSER_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"
   EFFECTIVE_TOOL_RESULT_INTERPRETER_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"
   EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1
-  echo "[chromie] CosyVoice shared-GPU cognition: ${COSYVOICE_BRAIN_MODEL} (one resident Ollama model)."
+  echo "[chromie] CosyVoice shared-GPU cognition: ${COSYVOICE_BRAIN_MODEL} context=${COSYVOICE_BRAIN_NUM_CTX} (one resident Ollama model/runner)."
 fi
 
 cat > "$SERVICE_OVERRIDE" <<EOF_SERVICE

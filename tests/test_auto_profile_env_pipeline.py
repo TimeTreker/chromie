@@ -203,6 +203,29 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:e2b")
         self.assertEqual(values["AGENT_RESPONSE_COMPOSER_MODEL"], "gemma4:e2b")
+        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
+        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
+        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
+        for key in (
+            "OLLAMA_CONTEXT_LENGTH",
+            "OLLAMA_NUM_CTX",
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
+            "AGENT_GOAL_INTERPRETER_LLM_NUM_CTX",
+            "AGENT_GOAL_ASSOCIATION_NUM_CTX",
+            "AGENT_FAST_PLANNER_NUM_CTX",
+            "AGENT_DEEP_PLANNER_NUM_CTX",
+            "AGENT_RESPONSE_COMPOSER_NUM_CTX",
+            "AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX",
+            "AGENT_TASK_CONTINUITY_NUM_CTX",
+            "AGENT_SOCIAL_ATTENTION_NUM_CTX",
+            "AGENT_CONVERSATION_NUM_CTX",
+            "AGENT_DEEPTHINKING_NUM_CTX",
+            "AGENT_CAPABILITY_NUM_CTX",
+        ):
+            self.assertEqual(values[key], "32768", key)
+        self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
+        self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "120000")
 
     def test_primary_gpu_profiles_use_long_qualification_budgets(self) -> None:
         required = {
