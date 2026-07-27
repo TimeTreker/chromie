@@ -5,11 +5,18 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from shared.chromie_contracts.user_turn import (
-    AttentionReviewRequest,
-    AttentionReviewResult,
-    AttentionSpeechAct,
-)
+try:
+    from chromie_contracts.user_turn import (
+        AttentionReviewRequest,
+        AttentionReviewResult,
+        AttentionSpeechAct,
+    )
+except ImportError:  # pragma: no cover - repository source-layout fallback
+    from shared.chromie_contracts.user_turn import (
+        AttentionReviewRequest,
+        AttentionReviewResult,
+        AttentionSpeechAct,
+    )
 
 from ..clients.ollama_client import OllamaClient
 
