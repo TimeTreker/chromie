@@ -24,7 +24,8 @@ falls through to an independent direct-LLM path; it produces only a conservative
 speech-only operational failure response. Digest-bound runtime identity capture,
 a maintained live-service text runner, deterministic stop and tool-continuity
 gates, Provider-start-bound active-Goal cancellation, MuJoCo provenance/safe-idle
-verification, fingerprint-bound human review, and a fail-closed qualification
+verification, fingerprint-bound human review, one resumable artifact-fingerprinted
+collection/finalization workflow, and a fail-closed qualification
 report are now implemented. Actual clean live-text, active-cancellation, reviewed,
 and paired-source MuJoCo evidence remain open. Social Attention Baseline
 Qualification stays paused until that evidence checkpoint closes.**

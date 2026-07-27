@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chromie.local/contracts/cognitive-gateway-core-workflow-state.schema.json",
+  "title": "Cognitive Gateway/Core qualification workflow state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "qualification_id",
+    "run_id",
+    "evidence_root",
+    "created_at",
+    "updated_at",
+    "stages",
+    "qualification"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "qualification_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "evidence_root": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "minLength": 1},
+    "updated_at": {"type": "string", "minLength": 1},
+    "stages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["status", "started_at", "command", "log", "artifacts"],
+        "properties": {
+          "status": {"enum": ["running", "failed", "completed"]},
+          "started_at": {"type": "string", "minLength": 1},
+          "completed_at": {"type": "string", "minLength": 1},
+          "command": {"type": "array", "items": {"type": "string"}},
+          "log": {"type": "string", "minLength": 1},
+          "exit_code": {"type": "integer"},
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256", "size_bytes"],
+              "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "size_bytes": {"type": "integer", "minimum": 0}
+              }
+            }
+          }
+        }
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "issue_closure_eligible",
+        "release_qualified",
+        "human_review_required"
+      ],
+      "properties": {
+        "issue_closure_eligible": {"type": "boolean"},
+        "release_qualified": {"const": false},
+        "human_review_required": {"const": true},
+        "report_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

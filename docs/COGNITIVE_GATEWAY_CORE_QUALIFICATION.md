@@ -101,6 +101,52 @@ The running Soridormi endpoint must report its own source revision.
 
 ## Run the qualification
 
+The maintained entrypoint is a single resumable workflow. It coordinates the
+existing collectors and verifier without injecting expectations into cognition:
+
+```bash
+python scripts/run_cognitive_gateway_core_qualification.py collect \
+  --reviewer "<reviewer identity>" \
+  --soridormi-repo ../soridormi
+```
+
+The command creates a timestamped evidence root under
+`.chromie/acceptance/cognitive-gateway-core/`, records each exact subprocess and
+log, and fingerprints every expected artifact in `workflow-state.json`. If an
+environmental interruption occurs, resume the same root only after correcting the
+external problem:
+
+```bash
+python scripts/run_cognitive_gateway_core_qualification.py collect \
+  --reviewer "<reviewer identity>" \
+  --soridormi-repo ../soridormi \
+  --evidence-root "${EVIDENCE_ROOT}" \
+  --resume
+
+python scripts/run_cognitive_gateway_core_qualification.py status \
+  --evidence-root "${EVIDENCE_ROOT}"
+```
+
+Resume skips a stage only when the state says it completed and every retained
+artifact still matches its SHA-256 fingerprint. The workflow reads the active
+cancellation command, interrupt text, and required Provider skill from the
+versioned qualification manifest. It does not contain a second copy of those
+semantic inputs.
+
+After reviewing the artifacts, explicitly edit the generated
+`human-review.json`; every required check remains `pending` until a human changes
+it. Finalize the exact bundle with:
+
+```bash
+python scripts/run_cognitive_gateway_core_qualification.py finalize \
+  --evidence-root "${EVIDENCE_ROOT}"
+```
+
+`finalize` delegates to the fail-closed verifier and exits successfully only when
+that report says `issue_closure_eligible=true`. It can never set
+`release_qualified=true`. The expanded commands below remain documented for
+diagnostics and individual-stage reruns.
+
 Apply, test, commit, and push the implementation before collecting evidence.
 The identity capture rejects a dirty checkout.
 

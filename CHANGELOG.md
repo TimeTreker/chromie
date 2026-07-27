@@ -4,6 +4,14 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Gateway/Core qualification workflow
+
+- Added one maintained, resumable `collect` / `status` / `finalize` command for
+  source-bound Gateway/Core qualification. The workflow fingerprints every
+  retained artifact, derives cancellation inputs from the versioned manifest,
+  creates only a pending human-review record, and delegates closure eligibility
+  to the existing fail-closed verifier.
+
 ### Cognitive Gateway/Core mainline restored
 
 - Restored Cognitive Gateway decomposition and Core-entry migration as the sole

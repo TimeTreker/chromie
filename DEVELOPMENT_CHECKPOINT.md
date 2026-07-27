@@ -25,9 +25,11 @@ Core-owned interpretation result, and digest-bound compatibility projection are
 implemented and automatically verified. The repository now also contains strict
 runtime-identity capture, a maintained live-service text runner, deterministic
 stop and tool-follow-up checks, source-bound MuJoCo/safe-idle verification, a
-Provider-start-bound active-Goal cancellation path, and fingerprint-bound human
-review. The remaining work is to execute those tools from a clean committed
-deployment, review and approve the exact artifacts, and complete the final audit.
+Provider-start-bound active-Goal cancellation path, fingerprint-bound human
+review, and a maintained resumable `collect/status/finalize` workflow whose state
+records exact commands, logs, and artifact digests. The remaining work is to
+execute that workflow from a clean committed deployment, review and approve the
+exact artifacts, and complete the final audit.
 Social Attention qualification remains paused until this checkpoint closes.
 
 This file is a short resume marker, not a second status or roadmap. Use
