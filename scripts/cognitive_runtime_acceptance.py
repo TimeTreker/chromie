@@ -86,22 +86,31 @@ def _level_a_report() -> dict[str, Any]:
 
 
 def _events_report(events: list[dict[str, Any]]) -> dict[str, Any]:
-    status = Counter(str(item.get("status") or "unknown") for item in events)
-    lanes = Counter(str(item.get("lane") or "unknown") for item in events)
-    modes = Counter(str(item.get("mode") or "unknown") for item in events)
+    runtime_events = [
+        item
+        for item in events
+        if item.get("event") in {None, "cognitive_runtime_resolution"}
+        and (item.get("status") is not None or item.get("lane") is not None)
+    ]
+    status = Counter(
+        str(item.get("status") or "unknown") for item in runtime_events
+    )
+    lanes = Counter(str(item.get("lane") or "unknown") for item in runtime_events)
+    modes = Counter(str(item.get("mode") or "unknown") for item in runtime_events)
     latencies = [
         float((item.get("timings_ms") or {}).get("total", 0.0))
-        for item in events
+        for item in runtime_events
         if isinstance(item.get("timings_ms"), dict)
     ]
     applied_skills: list[str] = []
-    for item in events:
+    for item in runtime_events:
         interaction = item.get("interaction")
         if isinstance(interaction, dict):
             applied_skills.extend(str(value) for value in interaction.get("skill_ids") or [])
     return {
         "evidence_class": "live_text_operational",
-        "event_count": len(events),
+        "event_count": len(runtime_events),
+        "observed_event_count": len(events),
         "status_counts": dict(sorted(status.items())),
         "lane_counts": dict(sorted(lanes.items())),
         "mode_counts": dict(sorted(modes.items())),

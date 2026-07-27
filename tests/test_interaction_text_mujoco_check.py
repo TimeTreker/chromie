@@ -12,6 +12,7 @@ from scripts.interaction_text_mujoco_check import (
     INTERNAL_SPEECH_PATTERNS,
     _apply_soridormi_skill_timeout,
     _configure_environment,
+    _endpoint_source_revision,
     build_parser,
     build_debug_summary,
     collect_run_provenance,
@@ -38,6 +39,19 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
             .soridormi_repo,
             "/tmp/soridormi-checkout",
         )
+
+    def test_endpoint_source_revision_accepts_direct_and_nested_status(self) -> None:
+        self.assertEqual(
+            _endpoint_source_revision({"source_revision": "soridormi-direct"}),
+            "soridormi-direct",
+        )
+        self.assertEqual(
+            _endpoint_source_revision(
+                {"provider": {"git_revision": "soridormi-nested"}}
+            ),
+            "soridormi-nested",
+        )
+        self.assertIsNone(_endpoint_source_revision({"mode": "sim"}))
 
     def test_run_provenance_records_source_manifest_and_selected_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

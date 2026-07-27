@@ -724,6 +724,7 @@ def _live_case_namespace(
         manifest=args.soridormi_manifest,
         language=args.language,
         evidence_dir=str(evidence_dir),
+        runtime_identity=args.runtime_identity,
         conversation_id=f"ga-live-{case.case_id}",
         speaker=args.speaker,
         preview_only=not args.execute,
@@ -943,6 +944,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-write", action="store_true", help="Do not write an evidence summary.")
     parser.add_argument("--allow-failures", action="store_true", help="Return success even when checks fail.")
     parser.add_argument("--evidence-dir", help="Directory for retained evidence summary.")
+    parser.add_argument(
+        "--runtime-identity",
+        type=Path,
+        default=ROOT / ".chromie" / "evidence" / "runtime-identity.json",
+        help=(
+            "Optional digest-bound deployment identity attached to retained "
+            "live-text and simulator evidence."
+        ),
+    )
 
     parser.add_argument("--agent-url", default=os.getenv("AGENT_URL", "http://127.0.0.1:8092"))
     parser.add_argument(

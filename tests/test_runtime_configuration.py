@@ -339,6 +339,18 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('echo "ORCH_TTS_CONCURRENCY=1"', launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b", launcher)
         self.assertIn("EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1", launcher)
+        self.assertIn(
+            'EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL="$COSYVOICE_BRAIN_MODEL"',
+            launcher,
+        )
+        self.assertIn(
+            'AGENT_TOOL_RESULT_INTERPRETER_MODEL=${EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL}',
+            launcher,
+        )
+        verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("AGENT_TOOL_RESULT_INTERPRETER_MODEL", verifier)
         self.assertIn('voice_root = root / voice_root', launcher)
         self.assertIn('voice_root = root / voice_root', services)
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", launcher)

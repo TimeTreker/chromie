@@ -27,6 +27,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from orchestrator.runtime.evidence_identity import (
+    load_runtime_evidence_identity,
+)
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "text-mujoco"
 DEFAULT_TEXT = (
     "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, "
@@ -374,6 +378,34 @@ def _manifest_upstream_revision(path: Path) -> str | None:
     return revision or None
 
 
+def _endpoint_source_revision(status: dict[str, Any] | None) -> str | None:
+    if not isinstance(status, dict):
+        return None
+    candidates: list[Any] = [
+        status.get("source_revision"),
+        status.get("provider_revision"),
+        status.get("build_revision"),
+        status.get("revision"),
+    ]
+    for key in ("metadata", "provider", "build"):
+        nested = status.get(key)
+        if isinstance(nested, dict):
+            candidates.extend(
+                [
+                    nested.get("source_revision"),
+                    nested.get("provider_revision"),
+                    nested.get("build_revision"),
+                    nested.get("revision"),
+                    nested.get("git_revision"),
+                ]
+            )
+    for value in candidates:
+        normalized = str(value or "").strip()
+        if normalized:
+            return normalized
+    return None
+
+
 def collect_run_provenance(
     *,
     manifest: Path,
@@ -381,6 +413,8 @@ def collect_run_provenance(
     cognitive_apply_lanes: str,
     cognitive_runtime_selected: bool | None = None,
     soridormi_repo: Path | None = None,
+    endpoint_revision: str | None = None,
+    runtime_identity_path: Path | None = None,
     root: Path = ROOT,
 ) -> dict[str, Any]:
     """Capture the source and semantic-runtime identity for retained evidence."""
@@ -408,6 +442,21 @@ def collect_run_provenance(
     selected = cognitive_runtime if cognitive_runtime_selected is None else bool(
         cognitive_runtime_selected
     )
+    runtime_identity = load_runtime_evidence_identity(runtime_identity_path)
+    runtime_identity_ref = {
+        "path": str(runtime_identity_path) if runtime_identity_path else None,
+        "identity_sha256": (
+            runtime_identity.get("identity_sha256")
+            if isinstance(runtime_identity, dict)
+            else None
+        ),
+        "complete": runtime_identity is not None,
+    }
+    source_binding = (
+        "endpoint_reported_revision"
+        if endpoint_revision
+        else "declared_paired_checkout"
+    )
     return {
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "chromie": {
@@ -423,9 +472,10 @@ def collect_run_provenance(
             "checkout_dirty": (
                 None if soridormi_status is None else bool(soridormi_status)
             ),
-            "source_binding": "declared_paired_checkout",
-            "endpoint_revision": None,
+            "source_binding": source_binding,
+            "endpoint_revision": endpoint_revision,
         },
+        "runtime_identity": runtime_identity_ref,
         "semantic_runtime": {
             "path": (
                 "goal_driven_cognitive_runtime"
@@ -479,6 +529,9 @@ def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None
     os.environ["ORCH_COGNITIVE_RUNTIME_MODE"] = (
         "apply" if args.cognitive_runtime else "off"
     )
+    runtime_identity = getattr(args, "runtime_identity", None)
+    if runtime_identity:
+        os.environ["ORCH_COGNITIVE_RUN_IDENTITY_PATH"] = str(runtime_identity)
     if args.cognitive_runtime:
         os.environ["ORCH_COGNITIVE_APPLY_LANES"] = args.cognitive_apply_lanes
         os.environ["ORCH_COGNITIVE_FALLBACK_POLICY"] = "fail_closed"
@@ -856,6 +909,12 @@ async def run_check(args: argparse.Namespace) -> dict[str, Any]:
                 soridormi_repo=(
                     Path(raw_soridormi_repo) if raw_soridormi_repo else None
                 ),
+                endpoint_revision=_endpoint_source_revision(status_before),
+                runtime_identity_path=(
+                    Path(args.runtime_identity)
+                    if getattr(args, "runtime_identity", None)
+                    else None
+                ),
             ),
         }
         _write_json(evidence_dir / "summary.json", summary)
@@ -889,6 +948,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--language", default=None)
     parser.add_argument("--evidence-dir")
+    parser.add_argument(
+        "--runtime-identity",
+        type=Path,
+        default=ROOT / ".chromie" / "evidence" / "runtime-identity.json",
+        help="Source/model/image identity captured for the evaluated deployment.",
+    )
     parser.add_argument(
         "--conversation-id",
         default="",

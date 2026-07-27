@@ -13,12 +13,14 @@ milestones and component notes.
 | D | Target GPU/audio/hardware | Real latency, device behavior, hardware safety, recovery, and release supportability. |
 
 A higher level does not replace lower-level regression tests.
+ The active Gateway/Core qualification procedure is [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
 ## Current evidence summary
 
 | Area | A | B | C | D |
 |---|:---:|:---:|:---:|:---:|
 | Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
+| Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Source-bound live-service runner implemented; retained current bundle open | Source-bound MuJoCo verifier implemented; paired current bundle open | Not claimed |
 | Interaction contracts and Skill Runtime | Yes | Text path | Historical legacy live-MuJoCo closure passed; current goal-driven rerun open | Physical audio open separately |
 | TaskGraph read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
 | Guarded cancellation and emergency fallback | Yes | Acceptance tooling | Runtime-backed path available | Supervised hardware evidence open |

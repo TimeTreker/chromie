@@ -1,0 +1,385 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import tempfile
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+
+from orchestrator.runtime.evidence_identity import canonical_json_sha256
+from scripts.verify_cognitive_gateway_core_qualification import verify
+
+ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = (
+    ROOT / "benchmarks" / "manifests" / "cognitive_gateway_core_qualification_v1.json"
+)
+
+
+def write_identity(path: Path) -> dict:
+    payload = {
+        "schema_version": 1,
+        "captured_at": "2026-07-27T00:00:00+00:00",
+        "evidence_claim": "runtime_identity_only",
+        "chromie": {
+            "revision": "chromie-current",
+            "dirty": False,
+        },
+        "runtime_profile": {
+            "fingerprint": "runtime-fingerprint",
+            "sha256": "a" * 64,
+            "models": {"AGENT_GOAL_INTERPRETER_MODEL": "qwen3:4b"},
+        },
+        "orchestrator_runtime": {
+            "effective_models": {
+                "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "qwen3:4b",
+                "AGENT_GOAL_INTERPRETER_MODEL": "qwen3:4b",
+                "AGENT_GOAL_ASSOCIATION_MODEL": "qwen3:4b",
+                "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
+                "AGENT_DEEP_PLANNER_MODEL": "qwen3:4b",
+                "AGENT_RESPONSE_COMPOSER_MODEL": "qwen3:4b",
+                "AGENT_TOOL_RESULT_INTERPRETER_MODEL": "qwen3:4b",
+            }
+        },
+        "capability_manifests": [
+            {
+                "path": "capabilities/soridormi.json",
+                "sha256": "b" * 64,
+                "upstream_revision": "soridormi-current",
+            }
+        ],
+        "deployment": {
+            "complete": True,
+            "service_images": {
+                "chromie-agent": {
+                    "image_id": "sha256:agent",
+                    "effective_runtime": {
+                        "CHROMIE_RUNTIME_ENV_FINGERPRINT": "runtime-fingerprint"
+                    },
+                    "effective_models": {
+                        "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "qwen3:4b",
+                        "AGENT_GOAL_INTERPRETER_MODEL": "qwen3:4b",
+                        "AGENT_GOAL_ASSOCIATION_MODEL": "qwen3:4b",
+                        "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
+                        "AGENT_DEEP_PLANNER_MODEL": "qwen3:4b",
+                        "AGENT_RESPONSE_COMPOSER_MODEL": "qwen3:4b",
+                        "AGENT_TOOL_RESULT_INTERPRETER_MODEL": "qwen3:4b",
+                    },
+                },
+                "chromie-llm": {"image_id": "sha256:llm"},
+                "chromie-asr": {"image_id": "sha256:asr"},
+                "chromie-tts": {"image_id": "sha256:tts"},
+            },
+        },
+        "qualification": {
+            "source_clean": True,
+            "deployment_complete": True,
+            "release_qualified": False,
+            "human_review_required": True,
+        },
+    }
+    payload["identity_sha256"] = canonical_json_sha256(payload)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return payload
+
+
+def gateway_event(
+    sid: str,
+    conversation: str,
+    admission: str,
+    identity: str,
+    refs=None,
+    *,
+    reflex_action: str = "continue",
+    cancellation_scope: str = "none",
+):
+    return {
+        "schema_version": 2,
+        "event": "cognitive_gateway_admission",
+        "sid": sid,
+        "turn_id": sid,
+        "conversation_id": conversation,
+        "admission": admission,
+        "reflex": {
+            "action": reflex_action,
+            "cancellation_scope": cancellation_scope,
+        },
+        "context_reference_types": list(refs or []),
+        "run_identity": {"identity_sha256": identity, "complete": True},
+    }
+
+
+def runtime_event(
+    sid: str,
+    conversation: str,
+    identity: str,
+    *,
+    lane: str,
+    skills=None,
+    goal_ids=None,
+    targets=None,
+):
+    associations = []
+    if targets:
+        associations.append(
+            {
+                "association_id": f"assoc-{sid}",
+                "relationship": "continue",
+                "target_goal_ids": list(targets),
+            }
+        )
+    return {
+        "schema_version": 2,
+        "event": "cognitive_runtime_resolution",
+        "sid": sid,
+        "turn_id": sid,
+        "conversation_id": conversation,
+        "run_identity": {"identity_sha256": identity, "complete": True},
+        "status": "applied",
+        "lane": lane,
+        "core_interpretation": {"authority": "goal_driven_cognitive_core"},
+        "terminal_plan": {
+            "goal_ids": list(goal_ids or []),
+            "skill_ids": list(skills or []),
+        },
+        "goal_association": {
+            "associations": associations,
+            "new_goals": [
+                {"goal_id": goal_id} for goal_id in list(goal_ids or [])
+            ] if not targets else [],
+        },
+    }
+
+
+class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
+    def build_fixture(self, root: Path) -> tuple[Path, Path, Path]:
+        identity_path = root / "runtime-identity.json"
+        identity = write_identity(identity_path)
+        digest = identity["identity_sha256"]
+        events = [
+            gateway_event("sid-ambient", "conv-ambient", "suppress", digest),
+            gateway_event(
+                "sid-stop",
+                "conv-stop",
+                "reflex_and_admit",
+                digest,
+                reflex_action="interrupt",
+                cancellation_scope="current_interaction",
+            ),
+            gateway_event("sid-direct", "conv-direct", "admit", digest),
+            runtime_event(
+                "sid-direct", "conv-direct", digest, lane="chat", goal_ids=["goal-direct"]
+            ),
+            gateway_event("sid-weather-1", "conv-weather", "admit", digest),
+            runtime_event(
+                "sid-weather-1",
+                "conv-weather",
+                digest,
+                lane="tool",
+                skills=["chromie.weather.lookup"],
+                goal_ids=["goal-weather"],
+            ),
+            {
+                "schema_version": 2,
+                "event": "cognitive_execution_outcome",
+                "sid": "sid-weather-1",
+                "turn_id": "sid-weather-1",
+                "run_identity": {"identity_sha256": digest, "complete": True},
+                "outcome_bundle": {"aggregate_status": "completed"},
+            },
+            gateway_event(
+                "sid-weather-2",
+                "conv-weather",
+                "admit",
+                digest,
+                refs=["recent_tool_evidence"],
+            ),
+            runtime_event(
+                "sid-weather-2",
+                "conv-weather",
+                digest,
+                lane="chat",
+                skills=[],
+                targets=["goal-weather"],
+            ),
+        ]
+        events_path = root / "cognitive-events.jsonl"
+        events_path.write_text(
+            "".join(json.dumps(item) + "\n" for item in events),
+            encoding="utf-8",
+        )
+        def retained(turn_key: str, sid: str, text: str) -> dict:
+            return {
+                "turn_key": turn_key,
+                "sid": sid,
+                "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            }
+
+        summary = {
+            "schema_version": 1,
+            "qualification_id": "cognitive_gateway_core_entry_v1",
+            "ok": True,
+            "runtime_identity": {"identity_sha256": digest},
+            "cognitive_events": str(events_path),
+            "scenarios": [
+                {
+                    "scenario_id": "inactive_ambient_suppression",
+                    "turns": [
+                        retained(
+                            "ambient",
+                            "sid-ambient",
+                            "The build server finished compiling at nine.",
+                        )
+                    ],
+                },
+                {
+                    "scenario_id": "deterministic_stop_reflex",
+                    "turns": [retained("stop", "sid-stop", "Stop.")],
+                },
+                {
+                    "scenario_id": "direct_question_admission",
+                    "turns": [
+                        retained(
+                            "direct_question",
+                            "sid-direct",
+                            "Chromie, what can you do?",
+                        )
+                    ],
+                },
+                {
+                    "scenario_id": "beijing_weather_tool_continuity",
+                    "turns": [
+                        retained(
+                            "weather_initial",
+                            "sid-weather-1",
+                            "你好，今天北京天气热不热？",
+                        ),
+                        retained(
+                            "weather_followup",
+                            "sid-weather-2",
+                            "那到底是热还是不热呢？",
+                        ),
+                    ],
+                },
+            ],
+        }
+        summary_path = root / "summary.json"
+        summary_path.write_text(json.dumps(summary), encoding="utf-8")
+        return identity_path, events_path, summary_path
+
+    def test_live_text_qualification_passes_with_bound_continuity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity_path, events_path, summary_path = self.build_fixture(root)
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary_path,
+                runtime_identity_path=identity_path,
+                cognitive_events_path=events_path,
+                expected_chromie_revision="chromie-current",
+                expected_soridormi_revision="soridormi-current",
+            )
+        self.assertTrue(report["passed"], report["errors"])
+        self.assertTrue(report["qualification"]["live_text_target_validated"])
+        self.assertFalse(report["qualification"]["issue_closure_eligible"])
+        self.assertFalse(report["qualification"]["release_qualified"])
+
+    def test_repeated_weather_lookup_fails_continuity_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity_path, events_path, summary_path = self.build_fixture(root)
+            events = [json.loads(line) for line in events_path.read_text().splitlines()]
+            for event in events:
+                if event.get("sid") == "sid-weather-2" and event.get("event") == "cognitive_runtime_resolution":
+                    event["terminal_plan"]["skill_ids"] = ["chromie.weather.lookup"]
+            events_path.write_text(
+                "".join(json.dumps(item) + "\n" for item in events),
+                encoding="utf-8",
+            )
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary_path,
+                runtime_identity_path=identity_path,
+                cognitive_events_path=events_path,
+                expected_chromie_revision="chromie-current",
+                expected_soridormi_revision="soridormi-current",
+            )
+        self.assertFalse(report["passed"])
+        self.assertIn("forbidden repeated terminal skill", "\n".join(report["errors"]))
+
+    def test_runtime_agent_fingerprint_mismatch_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity_path, events_path, summary_path = self.build_fixture(root)
+            identity = json.loads(identity_path.read_text(encoding="utf-8"))
+            identity["deployment"]["service_images"]["chromie-agent"][
+                "effective_runtime"
+            ]["CHROMIE_RUNTIME_ENV_FINGERPRINT"] = "wrong"
+            identity.pop("identity_sha256")
+            identity["identity_sha256"] = canonical_json_sha256(identity)
+            identity_path.write_text(json.dumps(identity), encoding="utf-8")
+            report = verify(
+                manifest_path=MANIFEST,
+                live_summary_path=summary_path,
+                runtime_identity_path=identity_path,
+                cognitive_events_path=events_path,
+                expected_chromie_revision="chromie-current",
+                expected_soridormi_revision="soridormi-current",
+            )
+        self.assertFalse(report["passed"])
+        self.assertIn(
+            "running Agent runtime fingerprint does not match",
+            "\n".join(report["errors"]),
+        )
+
+    def test_source_bound_mujoco_constraints_make_issue_closure_eligible(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            identity_path, events_path, summary_path = self.build_fixture(root)
+            identity = json.loads(identity_path.read_text(encoding="utf-8"))
+            mujoco_path = root / "mujoco-summary.json"
+            mujoco_path.write_text(
+                json.dumps(
+                    {
+                        "cognitive_runtime": {
+                            "terminal_plan": {
+                                "skill_ids": [
+                                    "soridormi.walk_velocity",
+                                    "soridormi.nod_yes",
+                                    "soridormi.turn_in_place",
+                                ]
+                            }
+                        },
+                        "provenance": {
+                            "runtime_identity": {
+                                "identity_sha256": identity["identity_sha256"],
+                                "complete": True,
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch(
+                "scripts.verify_cognitive_gateway_core_qualification._simulator_report",
+                return_value={
+                    "target_validated": True,
+                    "completed_soridormi_results": 3,
+                },
+            ):
+                report = verify(
+                    manifest_path=MANIFEST,
+                    live_summary_path=summary_path,
+                    runtime_identity_path=identity_path,
+                    cognitive_events_path=events_path,
+                    mujoco_summary_path=mujoco_path,
+                    expected_chromie_revision="chromie-current",
+                    expected_soridormi_revision="soridormi-current",
+                )
+        self.assertTrue(report["passed"], report["errors"])
+        self.assertTrue(report["qualification"]["issue_closure_eligible"])
+        self.assertFalse(report["qualification"]["release_qualified"])
+
+
+if __name__ == "__main__":
+    unittest.main()

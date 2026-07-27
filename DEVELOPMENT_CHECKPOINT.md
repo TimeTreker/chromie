@@ -22,10 +22,13 @@
 **Current focus:** Qualify the implemented Cognitive Gateway/Core migration. The
 five Gateway modules, pre-Core admission, admitted-envelope-only Core API,
 Core-owned interpretation result, and digest-bound compatibility projection are
-implemented and automatically verified. The remaining work is source-bound
-live-text, cancellation, tool-follow-up, multi-goal, MuJoCo, and safe-idle
-evidence followed by the final audit. Social Attention qualification remains
-paused until this checkpoint closes.
+implemented and automatically verified. The repository now also contains strict
+runtime-identity capture, a maintained live-service text runner, deterministic
+stop and tool-follow-up checks, and source-bound MuJoCo/safe-idle verification.
+The remaining work is to execute those tools from a clean committed deployment,
+retain active-goal cancellation evidence, review the artifacts, and complete the
+final audit. Social Attention qualification remains paused until this checkpoint
+closes.
 
 This file is a short resume marker, not a second status or roadmap. Use
 [Status](docs/STATUS.md) for capability claims and [Roadmap](ROADMAP.md) for
@@ -85,8 +88,10 @@ Interpretation. The Core accepts the admitted envelope and returns
 only for dependent planner contracts.
 
 Do not reopen this boundary with phrase routing, Benchmark-conditioned behavior,
-a second semantic authority, or automatic physical replay. Resume from the
-source-bound evidence checkpoint, then complete the final authority audit.
+a second semantic authority, or automatic physical replay. Resume from
+[Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md),
+retain the actual live-service and MuJoCo bundle, then complete the final
+authority audit.
 
 ## Resume point
 

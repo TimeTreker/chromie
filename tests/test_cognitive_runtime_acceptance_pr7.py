@@ -36,6 +36,27 @@ class CognitiveRuntimeAcceptanceTests(unittest.TestCase):
         self.assertEqual(report["evidence_class"], "live_text_operational")
         self.assertEqual(report["status_counts"]["applied"], 1)
         self.assertEqual(report["applied_skill_ids"], ["soridormi.blink_eyes"])
+        mixed = _events_report(
+            [
+                {
+                    "event": "cognitive_gateway_admission",
+                    "admission": "admit",
+                },
+                {
+                    "event": "cognitive_runtime_resolution",
+                    "mode": "apply",
+                    "status": "applied",
+                    "lane": "chat",
+                },
+                {
+                    "event": "cognitive_execution_outcome",
+                    "outcome_bundle": {"aggregate_status": "completed"},
+                },
+            ]
+        )
+        self.assertEqual(mixed["event_count"], 1)
+        self.assertEqual(mixed["observed_event_count"], 3)
+        self.assertNotIn("unknown", mixed["status_counts"])
 
     def test_bundle_requires_matching_run_provenance_for_target_validation(self):
         with tempfile.TemporaryDirectory() as tmp:

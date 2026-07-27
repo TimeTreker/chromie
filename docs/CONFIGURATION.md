@@ -345,7 +345,8 @@ canonical plan copy, and its fingerprint remain host-owned.
 | `ORCH_COGNITIVE_HOST_REPLAN_BUDGET` | `1`; maximum Deep Planner revision after trusted host schema/provider/resource validation rejects a terminal plan. It never returns to Fast Planner. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default. Enable raw text only under an explicit privacy decision. |
-| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Goal Association, terminal plan, composition, lane, latency, fallback, and prepared-interaction summaries. |
+| `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal plan, composition, lane, latency, fallback, and execution-outcome summaries. |
+| `ORCH_COGNITIVE_RUN_IDENTITY_PATH` | `.chromie/evidence/runtime-identity.json`; optional digest-bound source/profile/model/image/manifest identity attached to cognitive evidence. Missing identity is allowed for ordinary development but fails source-bound qualification. |
 
 `apply` additionally requires `ORCH_ENABLE_INTERACTION_RESPONSE=1`. The common
 profile satisfies that prerequisite for `chat` and explicitly trusted local
@@ -355,6 +356,7 @@ steps still pass the existing trusted registry, schema, provider, confirmation,
 resource, cancellation, and execution-evidence gates. Goal state is committed
 atomically only after the terminal plan and composed response have passed host
 preparation. A technical failure after authority acquisition cannot execute a partial plan or widen authority through the legacy planner. See [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md).
+ Source-bound qualification and runtime-identity capture are defined in [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
 ## Semantic task continuity
 

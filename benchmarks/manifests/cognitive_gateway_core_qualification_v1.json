@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "qualification_id": "cognitive_gateway_core_entry_v1",
+  "description": "Source-bound live-text qualification for pre-Core admission, single Core authority, and conversational tool continuity.",
+  "runtime_policy_authority": false,
+  "release_qualified": false,
+  "human_review_required": true,
+  "scenarios": [
+    {
+      "scenario_id": "inactive_ambient_suppression",
+      "conversation_scope": "isolated",
+      "turns": [
+        {
+          "turn_key": "ambient",
+          "text": "The build server finished compiling at nine.",
+          "expect": {
+            "gateway_admission": "suppress",
+            "core_entered": false
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "deterministic_stop_reflex",
+      "conversation_scope": "isolated",
+      "turns": [
+        {
+          "turn_key": "stop",
+          "text": "Stop.",
+          "expect": {
+            "gateway_admission": "reflex_and_admit",
+            "core_entered": false,
+            "reflex_action": "interrupt",
+            "cancellation_scope": "current_interaction"
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "direct_question_admission",
+      "conversation_scope": "isolated",
+      "turns": [
+        {
+          "turn_key": "direct_question",
+          "text": "Chromie, what can you do?",
+          "expect": {
+            "gateway_admission": "admit",
+            "core_entered": true,
+            "core_authority": "goal_driven_cognitive_core",
+            "runtime_status": "applied",
+            "runtime_lane": "chat"
+          }
+        }
+      ]
+    },
+    {
+      "scenario_id": "beijing_weather_tool_continuity",
+      "conversation_scope": "shared",
+      "turns": [
+        {
+          "turn_key": "weather_initial",
+          "text": "你好，今天北京天气热不热？",
+          "expect": {
+            "gateway_admission": "admit",
+            "core_entered": true,
+            "core_authority": "goal_driven_cognitive_core",
+            "runtime_status": "applied",
+            "runtime_lane": "tool",
+            "required_terminal_skills": [
+              "chromie.weather.lookup"
+            ],
+            "require_completed_outcome": true
+          }
+        },
+        {
+          "turn_key": "weather_followup",
+          "text": "那到底是热还是不热呢？",
+          "expect": {
+            "gateway_admission": "admit",
+            "core_entered": true,
+            "core_authority": "goal_driven_cognitive_core",
+            "runtime_status": "applied",
+            "forbidden_terminal_skills": [
+              "chromie.weather.lookup"
+            ],
+            "required_context_reference_types": [
+              "recent_tool_evidence"
+            ],
+            "require_goal_continuity_from": "weather_initial"
+          }
+        }
+      ]
+    }
+  ],
+  "simulator_expectations": {
+    "required": true,
+    "minimum_terminal_skill_count": 3,
+    "minimum_completed_soridormi_results": 3,
+    "safe_idle_required": true,
+    "required_terminal_skills": [
+      "soridormi.walk_velocity",
+      "soridormi.nod_yes",
+      "soridormi.turn_in_place"
+    ]
+  }
+}

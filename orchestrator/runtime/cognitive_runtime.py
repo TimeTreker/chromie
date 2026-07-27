@@ -33,8 +33,14 @@ from shared.chromie_contracts.response_composition import (
     canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.social_attention import normalize_social_attention_mode
-from shared.chromie_contracts.user_turn import UserTurnEnvelope
+from shared.chromie_contracts.user_turn import (
+    AttentionReviewResult,
+    GatewayContextSnapshot,
+    UserTurnEnvelope,
+)
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+
+from orchestrator.runtime.evidence_identity import runtime_identity_reference
 
 CognitiveRuntimeMode = Literal["off", "report_only", "apply"]
 CognitiveRuntimeStatus = Literal[
@@ -118,16 +124,71 @@ class CognitiveEvidenceRecorder:
         *,
         enabled: bool = True,
         include_text: bool = False,
+        run_identity: dict[str, Any] | None = None,
+        run_identity_path: Path | None = None,
     ) -> None:
         self.path = path
         self.enabled = enabled
         self.include_text = include_text
+        self.run_identity = dict(run_identity) if run_identity is not None else None
+        self.run_identity_path = run_identity_path
         self.counters: Counter[str] = Counter()
         self.total_latency_ms = 0.0
 
     @staticmethod
     def _text_digest(text: str) -> str:
         return hashlib.sha256((text or "").encode("utf-8")).hexdigest()[:16]
+
+    def _identity_reference(self) -> dict[str, Any]:
+        return runtime_identity_reference(
+            self.run_identity,
+            path=self.run_identity_path,
+        )
+
+    def record_gateway(
+        self,
+        envelope: UserTurnEnvelope,
+        *,
+        text: str,
+        context_snapshot: GatewayContextSnapshot | None = None,
+        attention_review: AttentionReviewResult | None = None,
+    ) -> None:
+        """Append the pre-Core admission decision for one received turn."""
+
+        self.counters[f"gateway_admission:{envelope.admission}"] += 1
+        self.counters[f"gateway_attention:{envelope.attention.disposition}"] += 1
+        if not self.enabled:
+            return
+        payload: dict[str, Any] = {
+            "schema_version": 2,
+            "event": "cognitive_gateway_admission",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "sid": envelope.session_id,
+            "turn_id": envelope.turn_id,
+            "conversation_id": envelope.conversation_id,
+            "channel": envelope.channel,
+            "admission": envelope.admission,
+            "core_eligible": envelope.admission in {"admit", "reflex_and_admit"},
+            "quality": envelope.quality.model_dump(mode="json"),
+            "reflex": envelope.reflex.model_dump(mode="json"),
+            "attention": envelope.attention.model_dump(mode="json"),
+            "context_snapshot_digest": (
+                context_snapshot.digest if context_snapshot is not None else None
+            ),
+            "context_reference_types": [
+                item.context_type for item in envelope.context_refs
+            ],
+            "text_chars": len(text or ""),
+            "text_sha256_16": self._text_digest(text),
+            "run_identity": self._identity_reference(),
+        }
+        if attention_review is not None:
+            payload["attention_review"] = attention_review.model_dump(mode="json")
+        if self.include_text:
+            payload["text"] = text
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
 
     def record(self, resolution: CognitiveRuntimeResolution, *, sid: str, text: str) -> None:
         self.counters[f"status:{resolution.status}"] += 1
@@ -171,9 +232,21 @@ class CognitiveEvidenceRecorder:
         if not self.enabled:
             return
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
+            "event": "cognitive_runtime_resolution",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "sid": sid,
+            "turn_id": (
+                resolution.turn_envelope.turn_id
+                if resolution.turn_envelope is not None
+                else sid
+            ),
+            "conversation_id": (
+                resolution.turn_envelope.conversation_id
+                if resolution.turn_envelope is not None
+                else None
+            ),
+            "run_identity": self._identity_reference(),
             "mode": resolution.mode,
             "status": resolution.status,
             "lane": resolution.lane,
@@ -197,6 +270,16 @@ class CognitiveEvidenceRecorder:
             "timings_ms": resolution.timings_ms,
             "fallback_reason": resolution.fallback_reason,
             "metadata": resolution.metadata,
+            "core_interpretation": (
+                resolution.metadata.get("core_interpretation")
+                if isinstance(resolution.metadata, dict)
+                else None
+            ),
+            "core_interpretation_projection_digest": (
+                resolution.metadata.get("core_interpretation_projection_digest")
+                if isinstance(resolution.metadata, dict)
+                else None
+            ),
         }
         if self.include_text:
             payload["text"] = text
@@ -222,10 +305,13 @@ class CognitiveEvidenceRecorder:
         if not self.enabled:
             return
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "event": "cognitive_execution_outcome",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "sid": sid,
+            "turn_id": bundle.turn_id,
+            "interaction_id": bundle.interaction_id,
+            "run_identity": self._identity_reference(),
             "outcome_fingerprint": execution_outcome_fingerprint(bundle),
             "outcome_bundle": bundle.model_dump(mode="json", exclude_none=True),
             "goal_state_results": list(goal_state_results or []),
@@ -1522,6 +1608,22 @@ class GoalDrivenRuntimeCoordinator:
         turn_index = context.get("turn_index") or experience.get("turn_index")
         route = str(getattr(route_decision, "route", "") or "")
         intent = str(getattr(route_decision, "intent", "") or "")
+
+        def attach_core_identity(
+            resolution: CognitiveRuntimeResolution,
+        ) -> CognitiveRuntimeResolution:
+            if core_interpretation is None:
+                return resolution
+            metadata = dict(resolution.metadata)
+            metadata["core_interpretation"] = core_interpretation.model_dump(
+                mode="json",
+                exclude={"compatibility_projection"},
+            )
+            metadata["core_interpretation_projection_digest"] = (
+                core_interpretation.projection_digest
+            )
+            return resolution.model_copy(update={"metadata": metadata})
+
         trace_scope = runtime_tracer.start_trace(
             correlations={
                 "session_id": sid,
@@ -1552,7 +1654,7 @@ class GoalDrivenRuntimeCoordinator:
                 resolution = resolution.model_copy(
                     update={"turn_envelope": turn_envelope}
                 )
-            return resolution
+            return attach_core_identity(resolution)
         try:
             async with trace_scope:
                 async with runtime_tracer.span(
@@ -1574,6 +1676,7 @@ class GoalDrivenRuntimeCoordinator:
                         resolution = resolution.model_copy(
                             update={"turn_envelope": turn_envelope}
                         )
+                    resolution = attach_core_identity(resolution)
                     span.set_attribute("result_status", resolution.status)
                     span.set_attribute("lane", resolution.lane)
                     span.set_attribute(

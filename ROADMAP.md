@@ -41,8 +41,15 @@ final post-evidence audit:
   deterministic and evidence-bound;
 - [x] fail closed with a speech-only operational response when Core
   interpretation fails, rather than invoking an independent direct-LLM fallback;
-- [ ] retain source-bound live-text, cancellation, tool-follow-up, multi-goal,
-  MuJoCo, and safe-idle evidence for the completed path;
+- [x] implement digest-bound runtime identity capture, Gateway/Core live-service
+  text execution, deterministic stop/tool-continuity gates, MuJoCo provenance and
+  safe-idle verification, and one fail-closed qualification report;
+- [ ] retain a clean source-bound live-text bundle from the deployed services and
+  review the ambient, stop, direct-question, and tool-follow-up behavior;
+- [ ] retain a clean paired-source MuJoCo bundle with endpoint-reported Soridormi
+  revision, compound named-skill execution, and explicit pre/post safe idle;
+- [ ] retain an active-goal cancellation run; the deterministic no-active-work
+  stop probe does not by itself prove provider cancellation or final safe idle;
 - [ ] complete the final repository-wide authority and documentation audit after
   the retained evidence is available.
 
@@ -50,6 +57,7 @@ final post-evidence audit:
 resumes only after the Gateway/Core path above is the deployed single semantic
 authority. Benchmark remains an evaluator and must not supply cognition or
 Runtime behavior policy.
+ The maintained evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
 ## Chromie Benchmark Suite
 

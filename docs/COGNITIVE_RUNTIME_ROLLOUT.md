@@ -656,5 +656,8 @@ PR7 implementation is automatically verified when:
 - dependency-light cognitive scenarios and the full test suite pass.
 
 Target validation remains open until retained live-text and MuJoCo artifacts
-from the intended deployment are reviewed. PR7 implementation alone does not
-make Chromie release ready.
+from the intended deployment are reviewed. Use [Cognitive Gateway/Core
+Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md) for the
+current identity capture, live-service cases, endpoint source binding, and
+safe-idle verification. Implementation alone does not make Chromie release
+ready.

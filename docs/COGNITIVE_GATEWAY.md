@@ -408,6 +408,7 @@ evidence status is reported separately in [STATUS.md](STATUS.md).
 Acceptance asserts required and forbidden behavior. A Goal Interpretation unit
 test alone cannot prove stop-to-provider cancellation, and a planner test alone
 cannot prove result reconciliation or final spoken truth.
+ The maintained live-service and MuJoCo evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
 
 ## 11. Terminology summary
 

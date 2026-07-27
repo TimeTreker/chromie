@@ -69,6 +69,14 @@
               },
               "robot_time": {
                 "type": "number"
+              },
+              "source_revision": {
+                "type": "string",
+                "description": "Optional provider-reported source revision for evidence binding."
+              },
+              "provider_revision": {
+                "type": "string",
+                "description": "Optional provider build or source revision alias for evidence binding."
               }
             }
           },

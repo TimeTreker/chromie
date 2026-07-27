@@ -24,6 +24,18 @@ All notable user-visible changes should be recorded here.
 - Removed the post-admission direct-LLM fallback on Core failure. A failed Core
   turn now returns only a conservative language-matched, speech-only operational
   failure response and never creates a second semantic authority.
+- Added digest-bound runtime identity capture for exact source, generated profile,
+  launcher-effective models, running service images, Agent runtime identity, and
+  capability manifests; cognitive evidence events now carry that identity.
+- Added maintained live-service Gateway/Core qualification cases for ambient
+  suppression, deterministic stop, direct admission, weather lookup, and
+  evidence-backed follow-up continuity without injecting expected semantics.
+- Added source-bound MuJoCo verification for endpoint-reported Soridormi revision,
+  compound named-skill execution, correlated outcome evidence, and explicit
+  pre/post safe idle.
+- Included Tool Result Interpretation in the CosyVoice one-resident-model override
+  so weather/tool turns use the recorded launcher-effective topology rather than
+  cold-loading an omitted profile model.
 
 ### Prior architecture corrections
 

@@ -114,6 +114,7 @@ GROUPS: dict[str, TestGroup] = {
                 "tests.test_cognitive_runtime_pr7",
                 "tests.test_cognitive_runtime_orchestrator_pr7",
                 "tests.test_cognitive_runtime_acceptance_pr7",
+                "tests.test_cognitive_gateway_core_qualification",
                 "tests.test_semantic_authority",
                 "tests.test_cross_service_schema_parity",
             ),
@@ -181,6 +182,7 @@ GROUPS: dict[str, TestGroup] = {
         (
             _unittest(
                 "tests.test_interaction_text_mujoco_check",
+                "tests.test_cognitive_gateway_core_qualification",
                 "tests.test_voice_interaction_acceptance",
                 "tests.test_supervised_target_acceptance",
             ),
@@ -196,6 +198,8 @@ GROUPS: dict[str, TestGroup] = {
                 "tests.test_release_provenance",
                 "tests.test_robot_candidate_verifier",
                 "tests.test_runtime_configuration",
+                "tests.test_runtime_evidence_identity",
+                "tests.test_runtime_identity_capture",
             ),
         ),
     ),

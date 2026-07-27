@@ -55,6 +55,9 @@ from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.cognitive_gateway import (
     CognitiveGateway,
 )
+from orchestrator.runtime.evidence_identity import (
+    load_runtime_evidence_identity,
+)
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.episode import EpisodeRecorder
 from orchestrator.runtime.experience import ExperienceManager
@@ -403,6 +406,18 @@ class VoiceAssistant:
         if not cognitive_evidence_path.is_absolute():
             cognitive_evidence_path = PROJECT_ROOT / cognitive_evidence_path
         self.cognitive_evidence_path = cognitive_evidence_path
+        cognitive_run_identity_path = Path(
+            os.getenv(
+                "ORCH_COGNITIVE_RUN_IDENTITY_PATH",
+                ".chromie/evidence/runtime-identity.json",
+            )
+        ).expanduser()
+        if not cognitive_run_identity_path.is_absolute():
+            cognitive_run_identity_path = PROJECT_ROOT / cognitive_run_identity_path
+        self.cognitive_run_identity_path = cognitive_run_identity_path
+        self.cognitive_run_identity = load_runtime_evidence_identity(
+            cognitive_run_identity_path
+        )
         self.deepthinking_policy = DeepThinkingDelegationPolicy(
             DeepThinkingPolicyConfig.from_env()
         )
@@ -712,6 +727,8 @@ class VoiceAssistant:
             self.cognitive_evidence_path,
             enabled=self.cognitive_evidence_enabled,
             include_text=self.cognitive_evidence_include_text,
+            run_identity=self.cognitive_run_identity,
+            run_identity_path=self.cognitive_run_identity_path,
         )
         self.cognitive_turn_closure = CognitiveTurnClosure(
             self.interaction_runtime
@@ -3004,6 +3021,29 @@ class VoiceAssistant:
                 exc,
             )
 
+    def _record_cognitive_gateway_evidence(
+        self,
+        turn_envelope: UserTurnEnvelope,
+        *,
+        user_text: str,
+        context_snapshot: Any | None = None,
+        attention_review: Any | None = None,
+    ) -> None:
+        try:
+            self.cognitive_evidence.record_gateway(
+                turn_envelope,
+                text=user_text,
+                context_snapshot=context_snapshot,
+                attention_review=attention_review,
+            )
+        except Exception as exc:
+            self.session_log(
+                turn_envelope.session_id,
+                "cognitive_gateway_evidence_failed: error_type=%s error=%s",
+                type(exc).__name__,
+                exc,
+            )
+
     def _goal_driven_authority_context(
         self,
         context: dict[str, Any],
@@ -4235,6 +4275,10 @@ class VoiceAssistant:
                 reflex_outcome,
             )
             turn_envelope = gateway.for_reflex(turn_capture)
+            self._record_cognitive_gateway_evidence(
+                turn_envelope,
+                user_text=user_text,
+            )
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
@@ -4277,6 +4321,10 @@ class VoiceAssistant:
 
         if reflex_outcome.action == "ignore":
             turn_envelope = gateway.for_suppression(turn_capture)
+            self._record_cognitive_gateway_evidence(
+                turn_envelope,
+                user_text=user_text,
+            )
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
@@ -4363,6 +4411,12 @@ class VoiceAssistant:
             turn_capture,
             context_snapshot,
             attention_review,
+        )
+        self._record_cognitive_gateway_evidence(
+            turn_envelope,
+            user_text=user_text,
+            context_snapshot=context_snapshot,
+            attention_review=attention_review,
         )
         self.session_log(
             session_id,
