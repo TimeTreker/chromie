@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+import unittest
+
+from agent.app.capabilities.local import chromie_capability_bundle
+from agent.app.capabilities.models import CapabilityRegistry
+from agent.app.clients.weather_client import WeatherReport
+from agent.app.local_tool_execution import LocalToolExecutor
+from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
+from shared.chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
+
+
+class _WeatherClient:
+    def __init__(self) -> None:
+        self.queries = []
+
+    async def lookup(self, query):
+        self.queries.append(query)
+        return WeatherReport(
+            location_name="Beijing",
+            country="China",
+            timezone="Asia/Shanghai",
+            date="2026-07-27",
+            current_temperature_c=29.0,
+            apparent_temperature_c=35.0,
+            daily_high_c=33.0,
+            daily_low_c=25.0,
+            precipitation_probability_max=60.0,
+            precipitation_sum_mm=1.2,
+            weather_code=51,
+            wind_speed_kmh=8.0,
+        )
+
+
+class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_executor_runs_exact_planned_weather_tool_and_returns_evidence(self) -> None:
+        client = _WeatherClient()
+        executor = LocalToolExecutor(
+            CapabilityRegistry.from_bundles([chromie_capability_bundle()]),
+            weather_client=client,
+        )
+
+        result = await executor.execute(
+            ToolExecutionRequest(
+                request_id="weather-1",
+                tool_id="chromie.weather.lookup",
+                args={"location": "北京", "date": "today", "units": "metric"},
+            )
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.output["location"], "Beijing")
+        self.assertEqual(result.output["apparent_temperature_c"], 35.0)
+        self.assertEqual(result.output["source"], "open-meteo")
+        self.assertEqual(client.queries[0].location, "北京")
+
+    async def test_executor_fails_closed_on_schema_invalid_arguments(self) -> None:
+        executor = LocalToolExecutor(
+            CapabilityRegistry.from_bundles([chromie_capability_bundle()]),
+            weather_client=_WeatherClient(),
+        )
+
+        result = await executor.execute(
+            ToolExecutionRequest(
+                request_id="weather-invalid",
+                tool_id="chromie.weather.lookup",
+                args={"date": "today"},
+            )
+        )
+
+        self.assertEqual(result.status, "refused")
+        self.assertEqual(result.reason_code, "contract_invalid")
+        self.assertEqual(result.output, {})
+
+    async def test_host_runtime_registers_and_executes_local_tool_provider(self) -> None:
+        requests: list[ToolExecutionRequest] = []
+
+        async def handler(request: ToolExecutionRequest, timeout_ms: int) -> ToolExecutionResponse:
+            requests.append(request)
+            self.assertEqual(timeout_ms, 8000)
+            return ToolExecutionResponse(
+                request_id=request.request_id,
+                tool_id=request.tool_id,
+                status="completed",
+                output={
+                    "location": "Beijing",
+                    "country": "China",
+                    "timezone": "Asia/Shanghai",
+                    "date": "2026-07-27",
+                    "condition": "light drizzle",
+                    "weather_code": 51,
+                    "current_temperature_c": 29.0,
+                    "apparent_temperature_c": 35.0,
+                    "high_c": 33.0,
+                    "low_c": 25.0,
+                    "precipitation_probability_max": 60.0,
+                    "precipitation_sum_mm": 1.2,
+                    "wind_speed_kmh": 8.0,
+                    "summary": "Today in Beijing, it is about 29°C now.",
+                    "source": "open-meteo",
+                },
+            )
+
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"spoken": True},
+            agent_tool_handler=handler,
+        )
+        result = await coordinator.execute(
+            InteractionResponse(
+                interaction_id="interaction-weather",
+                skills=[
+                    SkillRequest(
+                        request_id="weather-host-1",
+                        skill_id="chromie.weather.lookup",
+                        args={"location": "北京", "date": "today", "units": "metric"},
+                    )
+                ],
+            ),
+            session_id="sid-weather",
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.results[0].status, "completed")
+        self.assertEqual(result.results[0].output["apparent_temperature_c"], 35.0)
+        self.assertEqual(requests[0].tool_id, "chromie.weather.lookup")
+
+
+if __name__ == "__main__":
+    unittest.main()

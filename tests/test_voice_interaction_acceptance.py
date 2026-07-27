@@ -178,7 +178,7 @@ def fixture_case_session_ids(index: int, case_id: str) -> list[str]:
 
 GOAL_DRIVEN_OVERRIDE_TEXT = (
     "ORCH_COGNITIVE_RUNTIME_MODE=apply\n"
-    "ORCH_COGNITIVE_APPLY_LANES=chat,robot_action\n"
+    "ORCH_COGNITIVE_APPLY_LANES=chat,robot_action,tool\n"
     "ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed\n"
     "ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0\n"
     "ORCH_COGNITIVE_EVIDENCE_ENABLED=1\n"
@@ -668,7 +668,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             self.assertIn("ORCH_AUDIO_OUTPUT_MODE=discard", text)
             self.assertIn("ORCH_MIN_AUDIO_MS=250", text)
             self.assertIn("ORCH_COGNITIVE_RUNTIME_MODE=apply", text)
-            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,robot_action", text)
+            self.assertIn("ORCH_COGNITIVE_APPLY_LANES=chat,robot_action,tool", text)
             self.assertIn("ORCH_COGNITIVE_FALLBACK_POLICY=fail_closed", text)
             self.assertIn("ORCH_LEGACY_SEMANTIC_FALLBACK_ENABLED=0", text)
             self.assertIn("cognitive-runtime.jsonl", text)

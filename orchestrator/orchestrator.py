@@ -90,6 +90,8 @@ from shared.chromie_contracts.interaction import (
     SkillResult,
 )
 from shared.chromie_contracts.tool_result import (
+    ToolExecutionRequest,
+    ToolExecutionResponse,
     ToolResultEvidence,
     ToolResultInterpretationRequest,
     canonical_value_sha256,
@@ -352,7 +354,7 @@ class VoiceAssistant:
                 "ORCH_COGNITIVE_RUNTIME_MODE must be off, report_only, or apply"
             )
         raw_apply_lanes = os.getenv(
-            "ORCH_COGNITIVE_APPLY_LANES", "chat"
+            "ORCH_COGNITIVE_APPLY_LANES", "chat,robot_action,tool"
         )
         self.cognitive_apply_lanes = frozenset(
             item.strip()
@@ -691,6 +693,8 @@ class VoiceAssistant:
             soridormi_invoker=soridormi_invoker,
             task_graph_handler=self._execute_planning_task_graph,
             task_graph_cancel_handler=self._cancel_planning_task_graph,
+            agent_tool_handler=self._execute_agent_tool,
+            capability_manifest_paths=os.getenv("AGENT_CAPABILITY_MANIFESTS", ""),
         )
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
@@ -2258,6 +2262,7 @@ class VoiceAssistant:
             "active_task_snapshots": conversation.get("active_task_snapshots", []),
             "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
             "current_task_context": conversation.get("current_task_context"),
+            "recent_tool_evidence": conversation.get("recent_tool_evidence", []),
             "robot_state": {
                 "available": not self.action_dry_run,
                 "source": "host_orchestrator",
@@ -5550,6 +5555,18 @@ class VoiceAssistant:
             out["truth_reconciliation_reason"] = truth_reason.strip()
         return out
 
+    async def _execute_agent_tool(
+        self,
+        request: ToolExecutionRequest,
+        timeout_ms: int,
+    ) -> ToolExecutionResponse:
+        session = await self.get_http_session()
+        return await self.agent_client.execute_tool(
+            session,
+            request=request,
+            timeout_ms=timeout_ms,
+        )
+
     async def _execute_planning_task_graph(self, graph: dict[str, Any]) -> dict[str, Any]:
         session = await self.get_http_session()
         return await self.agent_client.execute_planning_task_graph(session, graph)
@@ -6125,6 +6142,8 @@ class VoiceAssistant:
                 "language": language,
                 "canonical_plan_id": plan.plan_id,
                 "canonical_plan_fingerprint": bundle.canonical_plan_fingerprint,
+                "user_request": user_request,
+                "source_goal_ids": goal_ids,
                 "execution_outcome_bundle": bundle.model_dump(mode="json"),
                 "aggregate_status": bundle.aggregate_status,
                 "interpretation": interpretation.model_dump(mode="json"),

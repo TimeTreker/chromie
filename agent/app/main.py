@@ -15,15 +15,24 @@ from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, Ca
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .clients.ollama_client import OllamaClient
 from .clients.weather_client import OpenMeteoWeatherClient
+from .local_tool_execution import LocalToolExecutor
 
 try:
-    from chromie_contracts.tool_result import ToolResultInterpretationRequest
+    from chromie_contracts.tool_result import (
+        ToolExecutionRequest,
+        ToolExecutionResponse,
+        ToolResultInterpretationRequest,
+    )
     from chromie_contracts.social_attention import (
         SocialAttentionMode,
         normalize_social_attention_mode,
     )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.tool_result import ToolResultInterpretationRequest
+    from shared.chromie_contracts.tool_result import (
+        ToolExecutionRequest,
+        ToolExecutionResponse,
+        ToolResultInterpretationRequest,
+    )
     from shared.chromie_contracts.social_attention import (
         SocialAttentionMode,
         normalize_social_attention_mode,
@@ -470,6 +479,10 @@ task_continuity_resolver = (
 )
 configured_registry = build_configured_registry(parse_manifest_paths(settings.capability_manifests))
 capability_registry = configured_registry.registry
+local_tool_executor = LocalToolExecutor(
+    capability_registry,
+    weather_client=weather_client,
+)
 try:
     capability_registry.get_tool("soridormi.skill.list")
 except KeyError:
@@ -817,6 +830,12 @@ async def compose_response_plan(request: AgentRunRequest):
         raise HTTPException(status_code=503, detail="Response composer is disabled")
     await interaction_runtime.prepare_response_composition_context(request)
     return await response_composer_resolver.resolve(request)
+
+
+@app.post("/tools/execute", response_model=ToolExecutionResponse)
+async def execute_local_tool(request: ToolExecutionRequest) -> ToolExecutionResponse:
+    """Execute one exact planner-selected local read-only capability."""
+    return await local_tool_executor.execute(request)
 
 
 @app.post("/tool-result/interpret")

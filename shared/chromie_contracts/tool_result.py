@@ -20,6 +20,59 @@ ToolResultStatus = Literal[
 ]
 ToolAnswerMode = Literal["direct", "summary", "detailed"]
 ToolInterpretationStatus = Literal["resolved", "fallback", "unavailable", "invalid"]
+ToolExecutionStatus = Literal["completed", "failed", "timed_out", "refused", "unavailable"]
+
+
+class ToolExecutionRequest(BaseModel):
+    """Trusted execution request for one already-planned semantic tool call."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str = Field(min_length=1, max_length=160)
+    tool_id: str = Field(min_length=1, max_length=160)
+    args: dict[str, Any] = Field(default_factory=dict)
+    correlation_id: str = Field(default="", max_length=160)
+
+    @field_validator("request_id", "tool_id", "correlation_id", mode="before")
+    @classmethod
+    def normalize_execution_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("args")
+    @classmethod
+    def reject_low_level_args(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
+
+
+class ToolExecutionResponse(BaseModel):
+    """Normalized provider result returned to the trusted Host Skill Runtime."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str = Field(min_length=1, max_length=160)
+    tool_id: str = Field(min_length=1, max_length=160)
+    status: ToolExecutionStatus
+    output: dict[str, Any] = Field(default_factory=dict)
+    reason_code: str = Field(default="", max_length=160)
+    message: str = Field(default="", max_length=600)
+
+    @field_validator("request_id", "tool_id", "reason_code", "message", mode="before")
+    @classmethod
+    def normalize_execution_result_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("output")
+    @classmethod
+    def reject_low_level_output(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
+
+    @model_validator(mode="after")
+    def validate_execution_output(self) -> "ToolExecutionResponse":
+        if self.status == "completed" and not self.output:
+            raise ValueError("completed tool execution requires structured output")
+        if self.status != "completed" and self.output:
+            raise ValueError("non-completed tool execution must not expose output")
+        return self
 
 
 def canonical_value_sha256(value: Any) -> str:
@@ -150,6 +203,9 @@ class ToolResultInterpretation(BaseModel):
 
 __all__ = [
     "ToolAnswerMode",
+    "ToolExecutionRequest",
+    "ToolExecutionResponse",
+    "ToolExecutionStatus",
     "ToolResultEvidence",
     "ToolResultFactReference",
     "ToolResultInterpretation",

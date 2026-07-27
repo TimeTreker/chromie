@@ -173,7 +173,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_SKILLS"], "0")
         self.assertEqual(values["TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC"], "3")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
-        self.assertEqual(values["ORCH_COGNITIVE_APPLY_LANES"], "chat")
+        self.assertEqual(values["ORCH_COGNITIVE_APPLY_LANES"], "chat,tool")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
         self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
         self.assertEqual(values["ORCH_DEEP_PLANNER_MODE"], "off")

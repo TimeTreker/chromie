@@ -188,9 +188,10 @@ def format_weather_report(report: WeatherReport, *, language: str, units: Weathe
 class OpenMeteoWeatherClient:
     """Small no-key weather provider for Chromie's read-only weather tool.
 
-    The client intentionally returns structured reports rather than prose. The
-    ToolAgent decides how to speak the result while the provider remains a
-    read-only data boundary.
+    The client intentionally returns structured reports rather than choosing
+    the conversational answer. The Goal-driven Runtime and Response Composer
+    remain the semantic authority while this provider stays a read-only data
+    boundary.
     """
 
     def __init__(

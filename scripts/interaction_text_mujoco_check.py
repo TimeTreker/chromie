@@ -897,7 +897,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--cognitive-apply-lanes",
-        default="chat,robot_action",
+        default="chat,robot_action,tool",
         help="Comma-separated PR7 apply lanes used with --cognitive-runtime.",
     )
     parser.add_argument("--preview-only", action="store_true", help="Route and validate /interaction without executing Soridormi skills.")

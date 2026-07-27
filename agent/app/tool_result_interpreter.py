@@ -172,7 +172,7 @@ class ToolResultInterpreter:
             "support the answer and cite each with evidence_id plus an RFC 6901 JSON Pointer. "
             "Then write a natural spoken answer. Do not enumerate every retrieved field, dump "
             "payloads, mention JSON, tools, providers, evidence IDs, internal processing, or "
-            "unrequested metadata. Answer the question first; normally use one or two short "
+            "unrequested metadata. Answer the question first; for yes/no, qualitative, comparative, or decision-shaped requests, state the direct conclusion before the supporting measurements. Normally use one or two short "
             "sentences and no more than three supporting facts. Preserve numbers and named "
             "facts exactly. Conclusions may be phrased naturally but must be supported by the "
             "selected facts. Return JSON only."

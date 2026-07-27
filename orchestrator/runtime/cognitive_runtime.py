@@ -84,7 +84,7 @@ class CognitiveRuntimeResolution(BaseModel):
 @dataclass(frozen=True)
 class CognitiveRuntimePolicy:
     mode: CognitiveRuntimeMode = "off"
-    apply_lanes: frozenset[str] = frozenset({"chat", "robot_action"})
+    apply_lanes: frozenset[str] = frozenset({"chat", "robot_action", "tool"})
     fallback_policy: str = "fail_closed"
     max_total_ms: int = 25000
     host_replan_budget: int = 1

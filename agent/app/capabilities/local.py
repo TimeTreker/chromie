@@ -183,13 +183,30 @@ def chromie_manifests() -> list[AgentManifest]:
                 output_schema={
                     "type": "object",
                     "properties": {
-                        "location": {"type": "string"},
-                        "date": {"type": "string"},
-                        "summary": {"type": "string"},
-                        "temperature_c": {"type": "number"},
-                        "high_c": {"type": "number"},
-                        "low_c": {"type": "number"},
+                        "location": {"type": "string", "minLength": 1},
+                        "country": {"type": ["string", "null"]},
+                        "timezone": {"type": ["string", "null"]},
+                        "date": {"type": ["string", "null"]},
+                        "condition": {"type": "string", "minLength": 1},
+                        "weather_code": {"type": ["integer", "null"]},
+                        "current_temperature_c": {"type": ["number", "null"]},
+                        "apparent_temperature_c": {"type": ["number", "null"]},
+                        "high_c": {"type": ["number", "null"]},
+                        "low_c": {"type": ["number", "null"]},
+                        "precipitation_probability_max": {"type": ["number", "null"]},
+                        "precipitation_sum_mm": {"type": ["number", "null"]},
+                        "wind_speed_kmh": {"type": ["number", "null"]},
+                        "summary": {"type": "string", "minLength": 1},
+                        "source": {"type": "string", "minLength": 1},
                     },
+                    "required": [
+                        "location", "country", "timezone", "date", "condition",
+                        "weather_code", "current_temperature_c",
+                        "apparent_temperature_c", "high_c", "low_c",
+                        "precipitation_probability_max", "precipitation_sum_mm",
+                        "wind_speed_kmh", "summary", "source"
+                    ],
+                    "additionalProperties": False,
                 },
                 effects=["read_only", "external_read", "weather_lookup"],
                 safety_class="safe_read",
@@ -202,6 +219,7 @@ def chromie_manifests() -> list[AgentManifest]:
                 ),
                 default_failure_policy=FailurePolicy(strategy="stop_and_report"),
                 llm_hints={
+                    "interaction_executable": True,
                     "prompt_tier": "common",
                     "prompt_tier_reason": (
                         "Weather/current forecast questions are common spoken "

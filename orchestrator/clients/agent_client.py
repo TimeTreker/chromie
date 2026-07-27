@@ -12,6 +12,8 @@ from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.response_composition import ResponseCompositionResolution
 from shared.chromie_contracts.semantic_task import SemanticTaskOperationSet
 from shared.chromie_contracts.tool_result import (
+    ToolExecutionRequest,
+    ToolExecutionResponse,
     ToolResultInterpretation,
     ToolResultInterpretationRequest,
 )
@@ -269,6 +271,40 @@ class AgentClient:
                     )
                 result = ResponseCompositionResolution.model_validate_json(body)
             runtime_tracer.merge_fragment_from_metadata(result.metadata)
+            span.set_attribute("result_status", result.status)
+            return result
+
+    async def execute_tool(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        request: ToolExecutionRequest,
+        timeout_ms: int | None = None,
+    ) -> ToolExecutionResponse:
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="execute_tool",
+            kind="tool_call",
+            attributes={
+                "endpoint": "/tools/execute",
+                "timeout_ms": effective_timeout_ms,
+                "tool_id": request.tool_id,
+            },
+        ) as span:
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/tools/execute",
+                json=request.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent tool execution returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = ToolExecutionResponse.model_validate_json(body)
             span.set_attribute("result_status", result.status)
             return result
 

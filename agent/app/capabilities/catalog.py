@@ -951,9 +951,11 @@ class CapabilityCatalog:
             return False
         return str(value).strip().lower() in {"1", "true", "yes", "on", "locked"}
 
-    @staticmethod
-    def _interaction_executable_for_tool(tool: ToolCapability) -> bool:
-        return tool.name == "chromie.speak"
+    @classmethod
+    def _interaction_executable_for_tool(cls, tool: ToolCapability) -> bool:
+        return tool.name == "chromie.speak" or cls._truthy(
+            tool.llm_hints.get("interaction_executable")
+        )
 
     def _route_for_tool(self, tool: ToolCapability) -> CapabilityRoute:
         effects = set(tool.effects)

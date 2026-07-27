@@ -42,6 +42,11 @@ from .skill_adapters import (
     task_graph_skill_definition,
 )
 from .soridormi_skill_provider import SoridormiNamedSkillAdapter
+from .agent_tool_provider import (
+    AgentToolHandler,
+    AgentToolSkillProvider,
+    local_agent_tool_definitions,
+)
 from .body_recovery import (
     build_body_recovery_confirmation,
     conservative_body_failure_message,
@@ -90,6 +95,8 @@ class InteractionRuntimeCoordinator:
         soridormi_invoker: AsyncToolInvoker | None = None,
         task_graph_handler: TaskGraphHandler | None = None,
         task_graph_cancel_handler: TaskGraphCancelHandler | None = None,
+        agent_tool_handler: AgentToolHandler | None = None,
+        capability_manifest_paths: str | None = None,
     ) -> None:
         self.registry = SkillRegistry()
         self.registry.register(local_speech_definition())
@@ -109,6 +116,12 @@ class InteractionRuntimeCoordinator:
             )
         )
         self.runtime.register_provider(SessionControlSkillProvider())
+        if agent_tool_handler is not None:
+            definitions = local_agent_tool_definitions(capability_manifest_paths)
+            for definition in definitions:
+                self.registry.register(definition)
+            if definitions:
+                self.runtime.register_provider(AgentToolSkillProvider(agent_tool_handler))
         self._task_graph_enabled = task_graph_handler is not None
         if task_graph_handler is not None:
             self.runtime.register_provider(

@@ -183,6 +183,7 @@ class ConversationStateManager:
         turn_max_text_chars: int = 260,
         max_context_chars: int = 2200,
         max_pending_tasks: int = 8,
+        max_tool_evidence: int = 8,
         max_memory_entries: int = 24,
         completed_task_retention_sec: int = 180,
         task_store_enabled: bool = False,
@@ -199,6 +200,7 @@ class ConversationStateManager:
         self.turn_max_text_chars = max(20, int(turn_max_text_chars))
         self.max_context_chars = max(200, int(max_context_chars))
         self.max_pending_tasks = max(0, int(max_pending_tasks))
+        self.max_tool_evidence = max(1, int(max_tool_evidence))
         self.max_memory_entries = max(1, int(max_memory_entries))
         self.completed_task_retention_sec = max(0, int(completed_task_retention_sec))
         self.task_store_enabled = bool(task_store_enabled)
@@ -215,6 +217,9 @@ class ConversationStateManager:
         self._turns: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_turns * 2))
         self._pending_tasks: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_pending_tasks))
         self._task_contexts: Deque[dict[str, Any]] = deque(maxlen=max(1, self.max_pending_tasks))
+        self._recent_tool_evidence: Deque[dict[str, Any]] = deque(
+            maxlen=self.max_tool_evidence
+        )
         self._memory_store = MemoryStore(max_entries=self.max_memory_entries)
         self._memory_extractor = MemoryExtractor()
         self._memory_prompt_builder = MemoryPromptBuilder()
@@ -240,6 +245,9 @@ class ConversationStateManager:
             max_context_chars=int(os.getenv("ORCH_CONVERSATION_MAX_CONTEXT_CHARS", "2200")),
             max_pending_tasks=int(
                 os.getenv("ORCH_CONVERSATION_MAX_PENDING_TASKS", os.getenv("ORCH_CONTEXT_MAX_PENDING_TASKS", "8"))
+            ),
+            max_tool_evidence=int(
+                os.getenv("ORCH_CONVERSATION_MAX_TOOL_EVIDENCE", "8")
             ),
             max_memory_entries=int(os.getenv("ORCH_CONVERSATION_MAX_MEMORY_ENTRIES", "24")),
             completed_task_retention_sec=int(os.getenv("ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC", "180")),
@@ -2592,6 +2600,7 @@ class ConversationStateManager:
         self._turns.clear()
         self._pending_tasks.clear()
         self._task_contexts.clear()
+        self._recent_tool_evidence.clear()
         self._memory_store.clear()
         self._persist_task_contexts_if_enabled()
         self.last_split_reason = reason
@@ -2676,6 +2685,71 @@ class ConversationStateManager:
                 return turn
         return None
 
+    def recent_tool_evidence(self) -> list[dict[str, Any]]:
+        """Return bounded, schema-validated tool facts for LLM context."""
+        if not self.enabled:
+            return []
+        return [copy.deepcopy(item) for item in self._recent_tool_evidence]
+
+    def _record_tool_evidence(self, metadata: dict[str, Any]) -> None:
+        bundle = metadata.get("execution_outcome_bundle")
+        if not isinstance(bundle, dict):
+            return
+        user_request = self._compact_text(
+            str(metadata.get("user_request") or ""),
+            limit=500,
+        )
+        canonical_plan_id = str(
+            metadata.get("canonical_plan_id")
+            or bundle.get("canonical_plan_id")
+            or ""
+        ).strip()
+        goal_ids = self._string_list(metadata.get("source_goal_ids"))
+        if not goal_ids:
+            outcomes = bundle.get("goal_outcomes")
+            if isinstance(outcomes, list):
+                goal_ids = [
+                    str(item.get("goal_id"))
+                    for item in outcomes
+                    if isinstance(item, dict) and str(item.get("goal_id") or "").strip()
+                ]
+        evidence_items = bundle.get("evidence")
+        if not isinstance(evidence_items, list):
+            return
+        known_ids = {
+            str(item.get("evidence_id") or "")
+            for item in self._recent_tool_evidence
+        }
+        for raw in evidence_items:
+            if not isinstance(raw, dict):
+                continue
+            observation = raw.get("observation")
+            if not isinstance(observation, dict):
+                continue
+            if observation.get("status") != "available":
+                continue
+            if observation.get("schema_validated") is not True:
+                continue
+            data = observation.get("data")
+            if not isinstance(data, dict) or not data:
+                continue
+            evidence_id = str(raw.get("evidence_id") or "").strip()
+            if not evidence_id or evidence_id in known_ids:
+                continue
+            entry = {
+                "evidence_id": evidence_id,
+                "tool_id": str(raw.get("skill_id") or "").strip(),
+                "status": str(raw.get("status") or "").strip(),
+                "data": self._json_safe(data),
+                "recorded_ms": _now_ms(),
+                "user_request": user_request,
+                "goal_ids": goal_ids,
+                "canonical_plan_id": canonical_plan_id,
+                "source": "trusted_execution_outcome",
+            }
+            self._recent_tool_evidence.append(entry)
+            known_ids.add(evidence_id)
+
     def session_memory(self) -> dict[str, Any]:
         active_tasks = self._active_pending_tasks()
         active_task_contexts = self._active_task_contexts()
@@ -2710,6 +2784,7 @@ class ConversationStateManager:
             "active_task_contexts": active_task_contexts[-4:],
             "active_task_snapshots": self.active_task_snapshots(limit=4),
             "active_pending_tasks": active_tasks[-4:],
+            "recent_tool_evidence": self.recent_tool_evidence(),
             "extracted_memory": extracted_memory["entries"],
             "memory_summary": extracted_memory["summary"],
             "forgetting_policy": {
@@ -2736,6 +2811,7 @@ class ConversationStateManager:
             "active_task_contexts": self._active_task_contexts(),
             "active_task_snapshots": self.active_task_snapshots(),
             "current_task_context": self._current_task_context(),
+            "recent_tool_evidence": self.recent_tool_evidence(),
             "extracted_memory": self._memory_store.snapshot(),
             "session_memory": self.session_memory(),
             "task_store": {
@@ -2749,6 +2825,7 @@ class ConversationStateManager:
                 "soft_idle_timeout_sec": self.soft_idle_timeout_sec,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
                 "max_memory_entries": self.max_memory_entries,
+                "max_tool_evidence": self.max_tool_evidence,
                 "completed_task_retention_sec": self.completed_task_retention_sec,
             },
         }
@@ -3740,6 +3817,7 @@ class ConversationStateManager:
         canonical_plan_fingerprint = ""
         goal_outcomes: dict[str, dict[str, Any]] = {}
         if isinstance(result_metadata, dict):
+            self._record_tool_evidence(result_metadata)
             turn_id = str(result_metadata.get("turn_id") or "").strip()
             canonical_plan_id = str(
                 result_metadata.get("canonical_plan_id") or ""

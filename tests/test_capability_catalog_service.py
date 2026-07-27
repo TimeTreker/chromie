@@ -428,7 +428,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(weather.safety_class, "safe_read")
         self.assertFalse(weather.requires_confirmation)
         self.assertFalse(weather.prompt_tier_locked)
-        self.assertFalse(weather.interaction_executable)
+        self.assertTrue(weather.interaction_executable)
         self.assertIn("weather_lookup", weather.effects)
         self.assertIn("location", weather.input_schema.get("required", []))
         self.assertIn("tool", weather.tags)
