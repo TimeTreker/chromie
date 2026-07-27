@@ -2085,11 +2085,48 @@ class VoiceAssistant:
         sentence = ""
         llm_start_ms = now_ms()
         self.session_log(session_id, "llm_request_start: prompt_chars=%s input_chars=%s text=%r fallback_reason=%s route=%s think=%s num_ctx=%s num_predict=%s", len(prompt), len(user_text), user_text, fallback_reason or "", route or "", payload.get("think"), payload["options"]["num_ctx"], payload["options"]["num_predict"])
-        for diagnostic in ollama_prompt_preflight_diagnostics(
+        preflight = ollama_prompt_preflight_diagnostics(
             prompt_chars=len(prompt),
             options=payload.get("options"),
-        ):
+            chars_per_token=env_float(
+                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE",
+                2.0,
+                minimum=0.1,
+            ),
+            safety_margin_tokens=env_int(
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
+                512,
+                minimum=0,
+            ),
+        )
+        for diagnostic in preflight:
             self.session_log(session_id, "%s", diagnostic.render())
+        blocking_preflight = next(
+            (
+                item
+                for item in preflight
+                if item.event == "llm_prompt_budget_exceeded"
+                and item.level >= logging.ERROR
+            ),
+            None,
+        )
+        if blocking_preflight is not None:
+            state = self.sessions.state.get(session_id or "")
+            if state is not None:
+                state["llm_done"] = True
+            self.session_log(
+                session_id,
+                "llm_request_rejected: failure_class=prompt_budget_exceeded "
+                "failure_domain=llm_budget result_trusted=false detail=%s",
+                blocking_preflight.render(),
+            )
+            self.maybe_session_done(session_id)
+            return
+
+        require_complete_output = env_bool(
+            "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT",
+            True,
+        )
         try:
             session = await self.get_http_session()
             async with session.post(self.llm_url, json=payload) as resp:
@@ -2120,29 +2157,66 @@ class VoiceAssistant:
                                 self.session_log(session_id, "llm_first_token: first_token_ms=%.1f", now_ms() - llm_start_ms)
                             state["response_chars"] = int(state.get("response_chars", 0)) + len(token)
                         sentence += token
-                        while True:
-                            chunk, sentence = self.pop_tts_chunk(sentence)
-                            if not chunk:
-                                break
-                            if self.is_valid_tts_text(chunk):
-                                self.session_log(session_id, "llm_flush_to_tts: chars=%s text=%r", len(chunk), chunk)
-                                await self.schedule_tts_sentence(chunk, session_id)
+                        if not require_complete_output:
+                            while True:
+                                chunk, sentence = self.pop_tts_chunk(sentence)
+                                if not chunk:
+                                    break
+                                if self.is_valid_tts_text(chunk):
+                                    self.session_log(session_id, "llm_flush_to_tts: chars=%s text=%r", len(chunk), chunk)
+                                    await self.schedule_tts_sentence(chunk, session_id)
                     if data.get("done"):
+                        completion = ollama_completion_diagnostics(
+                            options=payload.get("options"),
+                            data=data,
+                            prompt_chars=len(prompt),
+                        )
+                        for diagnostic in completion:
+                            self.session_log(session_id, "%s", diagnostic.render())
+                        blocking_completion = next(
+                            (
+                                item
+                                for item in completion
+                                if item.event in {"llm_output_truncated", "llm_prompt_truncated"}
+                                and item.level >= logging.ERROR
+                            ),
+                            None,
+                        )
+                        state = self.sessions.state.get(session_id or "")
+                        if blocking_completion is not None:
+                            if state is not None:
+                                state["llm_done"] = True
+                            self.session_log(
+                                session_id,
+                                "llm_completion_rejected: failure_class=%s "
+                                "failure_domain=llm_budget result_trusted=false detail=%s",
+                                "output_truncated"
+                                if blocking_completion.event == "llm_output_truncated"
+                                else "prompt_truncated",
+                                blocking_completion.render(),
+                            )
+                            self.maybe_session_done(session_id)
+                            return
+
+                        if require_complete_output:
+                            complete_text = sentence
+                            sentence = ""
+                            while True:
+                                chunk, complete_text = self.pop_tts_chunk(complete_text)
+                                if not chunk:
+                                    break
+                                if self.is_valid_tts_text(chunk):
+                                    self.session_log(session_id, "llm_verified_flush_to_tts: chars=%s text=%r", len(chunk), chunk)
+                                    await self.schedule_tts_sentence(chunk, session_id)
+                            sentence = complete_text
                         final_text = self.normalize_tts_candidate(sentence)
                         if self.is_valid_tts_text(final_text):
                             self.session_log(session_id, "llm_final_flush_to_tts: chars=%s text=%r", len(final_text), final_text)
                             await self.schedule_tts_sentence(final_text, session_id)
-                        state = self.sessions.state.get(session_id or "")
                         if state is not None:
                             state["llm_done"] = True
                         self.session_log(session_id, "llm_done: llm_ms=%.1f response_chars=%s scheduled_tts=%s", now_ms() - llm_start_ms, state.get("response_chars", 0) if state else "unknown", state.get("scheduled_tts", 0) if state else "unknown")
                         self.session_log(session_id, "llm_done_raw: done_reason=%s total_duration=%s load_duration=%s prompt_eval_count=%s prompt_eval_duration=%s eval_count=%s eval_duration=%s", data.get("done_reason"), data.get("total_duration"), data.get("load_duration"), data.get("prompt_eval_count"), data.get("prompt_eval_duration"), data.get("eval_count"), data.get("eval_duration"))
-                        for diagnostic in ollama_completion_diagnostics(
-                            options=payload.get("options"),
-                            data=data,
-                            prompt_chars=len(prompt),
-                        ):
-                            self.session_log(session_id, "%s", diagnostic.render())
                         self.maybe_session_done(session_id)
                         return
         except asyncio.CancelledError:

@@ -152,7 +152,13 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_RESPONSE_COMPOSER_NUM_CTX",
             "AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX",
         ):
-            self.assertEqual(values[key], "8192", key)
+            self.assertEqual(values[key], "32768", key)
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "2048")
+        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_NUM_PREDICT"], "2048")
+        self.assertEqual(values["AGENT_FAST_PLANNER_NUM_PREDICT"], "4096")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_PREDICT"], "8192")
+        self.assertEqual(values["AGENT_RESPONSE_COMPOSER_NUM_PREDICT"], "4096")
+        self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(manifest["active_profile"], "rtx5090")
         self.assertEqual(manifest["fingerprint"], values["CHROMIE_RUNTIME_ENV_FINGERPRINT"])
         self.assertEqual(
@@ -162,6 +168,22 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(
             manifest["cognitive_budgets"]["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"],
             "900000",
+        )
+        self.assertEqual(
+            manifest["cognitive_budgets"]["OLLAMA_NUM_CTX"],
+            "32768",
+        )
+        self.assertEqual(
+            manifest["cognitive_budgets"]["AGENT_DEEP_PLANNER_NUM_PREDICT"],
+            "8192",
+        )
+        self.assertEqual(
+            manifest["cognitive_budgets"]["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"],
+            "2048",
+        )
+        self.assertEqual(
+            manifest["cognitive_budgets"]["ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT"],
+            "1",
         )
 
     def test_rtx4090_laptop_is_detected_without_manual_profile_argument(self) -> None:

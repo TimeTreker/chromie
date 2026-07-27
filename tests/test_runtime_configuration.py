@@ -106,6 +106,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["OLLAMA_NUM_PARALLEL"], "1")
         self.assertEqual(values["OLLAMA_AUTO_RESTART_ON_CRASH"], "1")
         self.assertEqual(values["OLLAMA_WARM_NUM_PREDICT"], "1")
+        self.assertEqual(values["AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE"], "2.0")
+        self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "512")
+        self.assertEqual(values["ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT"], "1")
 
     def test_capability_planner_has_json_output_budget(self) -> None:
         values = _common_env()
@@ -229,11 +232,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_RESPONSE_COMPOSER_MODEL=gemma4:26b", rtx5090)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", rtx5090)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", rtx5090)
-        self.assertIn("OLLAMA_NUM_CTX=8192", rtx5090)
-        self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX=8192", rtx5090)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=8192", rtx5090)
-        self.assertIn("AGENT_GOAL_ASSOCIATION_NUM_CTX=8192", rtx5090)
-        self.assertIn("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX=8192", rtx5090)
+        self.assertIn("OLLAMA_NUM_CTX=32768", rtx5090)
+        self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX=32768", rtx5090)
+        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=32768", rtx5090)
+        self.assertIn("AGENT_GOAL_ASSOCIATION_NUM_CTX=32768", rtx5090)
+        self.assertIn("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX=32768", rtx5090)
+        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=8192", rtx5090)
+        self.assertIn("AGENT_RESPONSE_COMPOSER_NUM_PREDICT=4096", rtx5090)
+        self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS=2048", rtx5090)
 
     def test_episode_recording_is_enabled_by_default(self) -> None:
         values = _common_env()
@@ -403,6 +409,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", verifier)
         self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", verifier)
         self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL", verifier)
+        self.assertIn("OLLAMA_CONTEXT_LENGTH", verifier)
+        self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", verifier)
+        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT", verifier)
+        self.assertIn("AGENT_CAPABILITY_PARAMETER_REPAIR_NUM_PREDICT", verifier)
         self.assertNotIn('check_value "$name"', verifier)
 
     def test_start_chromie_waits_for_application_health(self) -> None:
@@ -433,6 +443,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_CTX=32768", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_PREDICT=4096", overlay)
         self.assertIn("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS=120000", overlay)
+        self.assertIn("OLLAMA_NUM_CTX=32768", overlay)
+        self.assertIn("OLLAMA_NUM_PREDICT=4096", overlay)
         self.assertIn("OLLAMA_NUM_PARALLEL=2", overlay)
 
 

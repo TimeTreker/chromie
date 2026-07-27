@@ -110,6 +110,26 @@ def llm_failure_metadata(exc: Exception) -> dict[str, Any]:
     }
 
 
+def _env_int(name: str, default: int = 0) -> int:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return int(default)
+    try:
+        return int(float(value))
+    except ValueError:
+        return int(default)
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return float(default)
+    try:
+        return float(value)
+    except ValueError:
+        return float(default)
+
+
 class OllamaClient:
     TRACE_MODULE = TraceModule(
         name="agent.ollama",
@@ -147,14 +167,45 @@ class OllamaClient:
             or "3000"
         )
         self.purpose = str(purpose or "unspecified").strip() or "unspecified"
+        self.default_num_ctx = _env_int(
+            "OLLAMA_NUM_CTX",
+            _env_int("OLLAMA_CONTEXT_LENGTH", 0),
+        )
+        self.default_num_predict = _env_int("OLLAMA_NUM_PREDICT", 0)
+        self.prompt_chars_per_token_estimate = max(
+            0.1,
+            _env_float(
+                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE",
+                2.0,
+            ),
+        )
+        self.context_safety_margin_tokens = max(
+            0,
+            _env_int(
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
+                0,
+            ),
+        )
 
         logger.info(
-            "ollama_client_init purpose=%s base_url=%s model=%s timeout_ms=%s",
+            "ollama_client_init purpose=%s base_url=%s model=%s timeout_ms=%s "
+            "default_num_ctx=%s default_num_predict=%s context_safety_margin_tokens=%s",
             self.purpose,
             self.base_url,
             self.model,
             self.timeout_ms,
+            self.default_num_ctx or None,
+            self.default_num_predict or None,
+            self.context_safety_margin_tokens,
         )
+
+    def _effective_options(self, options: dict[str, Any] | None) -> dict[str, Any]:
+        resolved = dict(options or {})
+        if "num_ctx" not in resolved and self.default_num_ctx > 0:
+            resolved["num_ctx"] = self.default_num_ctx
+        if "num_predict" not in resolved and self.default_num_predict > 0:
+            resolved["num_predict"] = self.default_num_predict
+        return resolved
 
     async def generate(
         self,
@@ -164,7 +215,7 @@ class OllamaClient:
         options: dict[str, Any] | None = None,
         response_format: ResponseFormat = "text",
     ) -> str | dict[str, Any]:
-        request_options = dict(options or {})
+        request_options = self._effective_options(options)
         response_format_label = (
             "json_schema" if isinstance(response_format, dict) else response_format
         )
@@ -186,7 +237,7 @@ class OllamaClient:
             result = await self._generate(
                 prompt,
                 system=system,
-                options=options,
+                options=request_options,
                 response_format=response_format,
             )
             if isinstance(result, str):
@@ -233,9 +284,11 @@ class OllamaClient:
         num_ctx = request_options.get("num_ctx")
         num_predict = request_options.get("num_predict")
 
+        system_chars = len(system or "")
         logger.info(
             "ollama_generate_start purpose=%s url=%s model=%s response_format=%s "
-            "timeout_ms=%s num_ctx=%s num_predict=%s prompt_chars=%s prompt_preview=%r",
+            "timeout_ms=%s num_ctx=%s num_predict=%s prompt_chars=%s system_chars=%s "
+            "input_chars=%s prompt_preview=%r",
             self.purpose,
             url,
             self.model,
@@ -244,13 +297,67 @@ class OllamaClient:
             num_ctx,
             num_predict,
             len(prompt),
+            system_chars,
+            len(prompt) + system_chars,
             prompt_preview,
         )
-        for diagnostic in ollama_prompt_preflight_diagnostics(
+        preflight_diagnostics = ollama_prompt_preflight_diagnostics(
             prompt_chars=len(prompt),
-            options=options,
-        ):
+            system_chars=system_chars,
+            options=request_options,
+            chars_per_token=self.prompt_chars_per_token_estimate,
+            safety_margin_tokens=self.context_safety_margin_tokens,
+        )
+        for diagnostic in preflight_diagnostics:
             self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
+        blocking_preflight = next(
+            (
+                item
+                for item in preflight_diagnostics
+                if item.event == "llm_prompt_budget_exceeded"
+                and item.level >= logging.ERROR
+            ),
+            None,
+        )
+        if blocking_preflight is not None:
+            failure = OllamaGenerationError(
+                f"Ollama request rejected before inference: {blocking_preflight.render()}",
+                failure_class="prompt_budget_exceeded",
+                failure_domain="llm_budget",
+                architecture_attribution="not_evaluated",
+                retryable=False,
+                details={
+                    "purpose": self.purpose,
+                    "model": self.model,
+                    "response_format": response_format_label,
+                    "timeout_ms": self.timeout_ms,
+                    **blocking_preflight.fields,
+                    "automatic_retry_allowed": False,
+                    "context_reduction_allowed": False,
+                    "result_trusted": False,
+                    "new_execution_allowed": False,
+                    "_incident_evidence": {
+                        "request": {
+                            "model": self.model,
+                            "purpose": self.purpose,
+                            "prompt": prompt,
+                            "system": system,
+                            "options": request_options,
+                            "response_format": response_format,
+                        }
+                    },
+                },
+            )
+            logger.error(
+                "ollama_request_rejected purpose=%s failure_class=prompt_budget_exceeded "
+                "failure_domain=llm_budget architecture_attribution=not_evaluated "
+                "retryable=false num_ctx=%s num_predict=%s required_context_tokens=%s",
+                self.purpose,
+                num_ctx,
+                num_predict,
+                blocking_preflight.fields.get("required_context_tokens"),
+            )
+            raise failure
 
         started = time.perf_counter()
 
@@ -339,9 +446,9 @@ class OllamaClient:
                 " ".join(text.split())[:160],
             )
             completion_diagnostics = ollama_completion_diagnostics(
-                options=options,
+                options=request_options,
                 data=data,
-                prompt_chars=len(prompt),
+                prompt_chars=len(prompt) + system_chars,
             )
             for diagnostic in completion_diagnostics:
                 self._log_budget_diagnostic(diagnostic.level, diagnostic.render())

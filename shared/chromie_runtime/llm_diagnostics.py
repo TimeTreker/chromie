@@ -34,38 +34,71 @@ def ollama_prompt_preflight_diagnostics(
     *,
     prompt_chars: int,
     options: dict[str, Any] | None,
-    chars_per_token: float = 4.0,
+    system_chars: int = 0,
+    chars_per_token: float = 2.0,
+    safety_margin_tokens: int = 0,
     warning_ratio: float = 0.90,
 ) -> list[LlmBudgetDiagnostic]:
-    """Return approximate prompt-context warnings before an Ollama request.
+    """Return conservative context-budget diagnostics before an Ollama request.
 
-    Ollama reports exact token counts only after generation.  This preflight is
-    deliberately conservative and emits only context-pressure warnings based on
-    a rough character/token estimate; exact truncation is detected by
-    ``ollama_completion_diagnostics`` when ``prompt_eval_count`` is available.
+    Ollama exposes exact token counts only after generation.  The preflight
+    therefore uses a configurable character/token estimate, includes both the
+    prompt and system text, reserves the complete requested output budget, and
+    adds an explicit safety margin.  When that declared request cannot fit in
+    ``num_ctx`` it fails closed before model execution instead of allowing
+    silent prompt truncation or output/context competition.
     """
 
     opts = options or {}
     num_ctx = _int_or_zero(opts.get("num_ctx"))
-    if num_ctx <= 0 or prompt_chars <= 0 or chars_per_token <= 0:
+    num_predict = _int_or_zero(opts.get("num_predict"))
+    input_chars = max(0, int(prompt_chars)) + max(0, int(system_chars))
+    margin = max(0, int(safety_margin_tokens))
+    if num_ctx <= 0 or input_chars <= 0 or chars_per_token <= 0:
         return []
-    estimated_prompt_tokens = int((prompt_chars / chars_per_token) + 0.999)
-    if estimated_prompt_tokens < int(num_ctx * warning_ratio):
-        return []
-    return [
-        LlmBudgetDiagnostic(
-            event="llm_prompt_context_pressure",
-            level=logging.WARNING,
-            fields={
-                "reason": "estimated_prompt_near_num_ctx",
-                "prompt_chars": prompt_chars,
-                "estimated_prompt_tokens": estimated_prompt_tokens,
-                "num_ctx": num_ctx,
-                "usage": _ratio(estimated_prompt_tokens, num_ctx),
-                "suggestion": "increase_num_ctx_or_compact_prompt",
-            },
-        )
-    ]
+
+    estimated_prompt_tokens = int((input_chars / chars_per_token) + 0.999)
+    required_context_tokens = estimated_prompt_tokens + num_predict + margin
+    fields = {
+        "prompt_chars": max(0, int(prompt_chars)),
+        "system_chars": max(0, int(system_chars)),
+        "input_chars": input_chars,
+        "chars_per_token_estimate": _format_float(chars_per_token),
+        "estimated_prompt_tokens": estimated_prompt_tokens,
+        "reserved_output_tokens": num_predict,
+        "safety_margin_tokens": margin,
+        "required_context_tokens": required_context_tokens,
+        "num_ctx": num_ctx,
+        "usage": _ratio(required_context_tokens, num_ctx),
+    }
+    if required_context_tokens > num_ctx:
+        return [
+            LlmBudgetDiagnostic(
+                event="llm_prompt_budget_exceeded",
+                level=logging.ERROR,
+                fields={
+                    "reason": "estimated_prompt_plus_output_exceeds_num_ctx",
+                    "failure_domain": "llm_budget",
+                    "architecture_attribution": "not_evaluated",
+                    "retryable": False,
+                    "suggestion": "increase_num_ctx_or_reduce_declared_request_budget",
+                    **fields,
+                },
+            )
+        ]
+    if required_context_tokens >= int(num_ctx * warning_ratio):
+        return [
+            LlmBudgetDiagnostic(
+                event="llm_prompt_context_pressure",
+                level=logging.WARNING,
+                fields={
+                    "reason": "estimated_request_near_num_ctx",
+                    "suggestion": "increase_num_ctx_or_compact_prompt",
+                    **fields,
+                },
+            )
+        ]
+    return []
 
 
 def ollama_completion_diagnostics(
@@ -192,6 +225,10 @@ def _ratio(numerator: int, denominator: int) -> str:
     if denominator <= 0:
         return "0.00"
     return f"{numerator / denominator:.2f}"
+
+
+def _format_float(value: float) -> str:
+    return f"{float(value):.3f}".rstrip("0").rstrip(".")
 
 
 def _format_value(value: Any) -> str:

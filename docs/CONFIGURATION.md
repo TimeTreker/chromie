@@ -777,6 +777,64 @@ accepts a complete text request rather than incremental model tokens, so
 end-to-end token-to-audio streaming is not claimed. Cancellation uses a bounded
 drain followed by worker restart when synchronous inference cannot stop.
 
+## Development/qualification cognitive budget integrity
+
+`num_ctx` and `num_predict` are independent budgets. `num_ctx` must hold the
+complete prompt, the complete generated output, and an explicit safety margin;
+raising only the context window does not prevent an output from stopping at
+`num_predict`. During development and source-bound qualification, the maintained
+RTX 5090 profile therefore prioritizes complete inference over latency:
+
+```text
+OLLAMA_CONTEXT_LENGTH=32768
+OLLAMA_NUM_CTX=32768
+AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE=2.0
+AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS=2048
+```
+
+Every active Qwen and Gemma cognitive stage uses that same 32K runner topology.
+This avoids Ollama creating or evicting separate runners for the same model at
+2K, 4K, 8K, and 32K. Output ceilings remain role-specific: narrow Gateway work
+stays small, Fast Planning may use 4096 tokens, and Deep Planning may use 8192.
+These values are ceilings, not required response lengths.
+
+Before inference, Chromie estimates prompt tokens from the complete user and
+system text, reserves the entire declared output budget and the configured
+safety margin, and emits `llm_prompt_budget_exceeded` when the request cannot
+fit. No HTTP request is sent in that case. After inference, the following are
+untrusted hard failures:
+
+- `done_reason=length` or another explicit generation-limit reason;
+- `eval_count` exhausting `num_predict` without a normal stop;
+- `prompt_eval_count` reaching the declared context window;
+- incomplete structured JSON caused by either budget boundary.
+
+These failures use `failure_domain=llm_budget`; they must not be translated into
+"the user was unclear" and cannot authorize planning or execution. The rare
+host direct-LLM fallback additionally uses
+`ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT=1`: it buffers the full streamed text,
+checks completion diagnostics, and only then schedules TTS. A truncated stream
+is never partially spoken.
+
+The generated `.chromie/runtime_profile.json` retains the exact global and
+per-stage context/output budgets, estimator, safety margin, and timeouts.
+`scripts/verify_runtime_profile.sh` checks that the running Ollama and Agent
+containers received those values. Product optimization may reduce these budgets
+only after retained warm-run evidence establishes real prompt/output
+distributions and p95/p99 latency.
+
+Key controls:
+
+| Variable | Meaning |
+|---|---|
+| `OLLAMA_CONTEXT_LENGTH` / `OLLAMA_NUM_CTX` | Shared runner and request context topology. RTX 5090 development/qualification default: `32768`. |
+| `OLLAMA_NUM_PREDICT` | Global fallback output ceiling; stage-specific variables override it. |
+| `AGENT_*_NUM_CTX` | Per-stage context declaration; kept equal on RTX 5090 to prevent runner churn. |
+| `AGENT_*_NUM_PREDICT` | Per-stage maximum generated tokens. |
+| `AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE` | Conservative mixed-language preflight estimate; RTX 5090 uses `2.0`. |
+| `AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS` | Tokens held back beyond prompt plus maximum output; RTX 5090 uses `2048`. |
+| `ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT` | Buffer and verify the direct fallback response before any TTS; maintained default `1`. |
+
 ## Ollama
 
 Important variables include `OLLAMA_MODEL`, `OLLAMA_KEEP_ALIVE`,

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
+from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
     _catalog_observability_profile,
@@ -836,6 +838,139 @@ class GoalInterpreterLlmPromptTests(unittest.TestCase):
 
 
 class InterpreterLlmReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_direct_chat_rejects_declared_request_that_cannot_fit(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "4.0",
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "256",
+            },
+            clear=False,
+        ):
+            interpreter = OllamaGoalInterpreter(
+                ollama_url="http://example.invalid",
+                model="test-model",
+                timeout_ms=800,
+                confidence_threshold=0.55,
+                num_ctx=2048,
+                num_predict=1024,
+            )
+
+        payload = {
+            "model": "test-model",
+            "messages": [
+                {"role": "system", "content": "s" * 1000},
+                {"role": "user", "content": "u" * 5000},
+            ],
+            "options": {"num_ctx": 2048, "num_predict": 1024},
+        }
+        with mock.patch(
+            "agent.app.cognitive_core.goal_interpreter.model_interpreter.httpx.AsyncClient"
+        ) as client_class:
+            with self.assertRaises(OllamaGenerationError) as raised:
+                await interpreter._chat(payload, stage="quick_intent")
+
+        self.assertEqual(raised.exception.failure_class, "prompt_budget_exceeded")
+        self.assertFalse(raised.exception.retryable)
+        client_class.assert_not_called()
+
+    async def test_direct_chat_rejects_truncated_completion_before_parsing(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://example.invalid",
+            model="test-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+            num_ctx=32768,
+            num_predict=512,
+        )
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "message": {"content": '{"route":"tool"'},
+            "done_reason": "length",
+            "prompt_eval_count": 100,
+            "eval_count": 512,
+        }
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+        payload = {
+            "model": "test-model",
+            "messages": [{"role": "user", "content": "weather"}],
+            "options": {"num_ctx": 32768, "num_predict": 512},
+        }
+
+        with mock.patch(
+            "agent.app.cognitive_core.goal_interpreter.model_interpreter.httpx.AsyncClient",
+            return_value=context,
+        ):
+            with self.assertRaises(OllamaGenerationError) as raised:
+                await interpreter._chat(payload, stage="semantic_route_repair")
+
+        self.assertEqual(raised.exception.failure_class, "output_truncated")
+        self.assertFalse(raised.exception.retryable)
+
+    async def test_route_does_not_translate_budget_failure_into_chat_fallback(self) -> None:
+        class BudgetFailureInterpreter(OllamaGoalInterpreter):
+            async def _chat(self, payload: dict, *, stage: str) -> dict:
+                raise OllamaGenerationError(
+                    "truncated",
+                    failure_class="output_truncated",
+                    failure_domain="llm_budget",
+                    architecture_attribution="not_evaluated",
+                    retryable=False,
+                )
+
+        interpreter = BudgetFailureInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            review_model="",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+
+        with self.assertRaises(OllamaGenerationError) as raised:
+            await interpreter.route(RouteRequest(text="今天北京热不热？", language="zh-CN"))
+
+        self.assertEqual(raised.exception.failure_domain, "llm_budget")
+        self.assertEqual(raised.exception.failure_class, "output_truncated")
+
+    async def test_semantic_repair_does_not_turn_budget_failure_into_user_clarification(self) -> None:
+        class BudgetFailureInterpreter(OllamaGoalInterpreter):
+            async def _chat(self, payload: dict, *, stage: str) -> dict:
+                raise OllamaGenerationError(
+                    "prompt too large",
+                    failure_class="prompt_budget_exceeded",
+                    failure_domain="llm_budget",
+                    architecture_attribution="not_evaluated",
+                    retryable=False,
+                )
+
+        interpreter = BudgetFailureInterpreter(
+            ollama_url="http://example.invalid",
+            model="quick-model",
+            timeout_ms=800,
+            confidence_threshold=0.55,
+        )
+        request = RouteRequest(text="今天北京热不热？", language="zh-CN")
+        decision = RouteDecision(
+            route="chat",
+            intent="weather_inquiry",
+            confidence=0.9,
+            language="zh-CN",
+            source="llm",
+        )
+
+        with self.assertRaises(OllamaGenerationError) as raised:
+            await interpreter._repair_semantic_route(
+                request,
+                decision,
+                reason="weather_semantics_require_tool_route",
+            )
+
+        self.assertEqual(raised.exception.failure_class, "prompt_budget_exceeded")
+
     async def test_inactive_direct_chinese_weather_question_fails_open_on_false_review(self) -> None:
         class WeatherAddressednessInterpreter(OllamaGoalInterpreter):
             def __init__(self) -> None:

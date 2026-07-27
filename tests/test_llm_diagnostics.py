@@ -63,15 +63,35 @@ class LlmDiagnosticsTests(unittest.TestCase):
         )
         self.assertFalse(any(item.event == "llm_output_truncated" for item in diagnostics))
 
+
+    def test_prompt_preflight_reserves_output_and_system_text(self) -> None:
+        diagnostics = ollama_prompt_preflight_diagnostics(
+            prompt_chars=4000,
+            system_chars=2000,
+            options={"num_ctx": 2048, "num_predict": 512},
+            chars_per_token=4.0,
+            safety_margin_tokens=256,
+        )
+
+        self.assertEqual(len(diagnostics), 1)
+        item = diagnostics[0]
+        self.assertEqual(item.event, "llm_prompt_budget_exceeded")
+        self.assertEqual(item.level, logging.ERROR)
+        self.assertEqual(item.fields["estimated_prompt_tokens"], 1500)
+        self.assertEqual(item.fields["reserved_output_tokens"], 512)
+        self.assertEqual(item.fields["safety_margin_tokens"], 256)
+        self.assertEqual(item.fields["required_context_tokens"], 2268)
+        self.assertFalse(item.fields["retryable"])
+
     def test_prompt_preflight_uses_estimated_token_pressure(self) -> None:
         diagnostics = ollama_prompt_preflight_diagnostics(
-            prompt_chars=7600,
+            prompt_chars=3800,
             options={"num_ctx": 2048},
         )
 
         self.assertEqual(len(diagnostics), 1)
         self.assertEqual(diagnostics[0].event, "llm_prompt_context_pressure")
-        self.assertIn("reason=estimated_prompt_near_num_ctx", diagnostics[0].render())
+        self.assertIn("reason=estimated_request_near_num_ctx", diagnostics[0].render())
 
 
 if __name__ == "__main__":

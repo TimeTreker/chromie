@@ -4,14 +4,31 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Development/qualification LLM budget integrity
+
+- Raised the maintained RTX 5090 cognitive runner topology from 8192 to 32768
+  tokens and assigned generous stage-specific output ceilings while architecture
+  correctness remains the priority. The generated runtime profile retains every
+  context, output, timeout, estimator, and safety-margin value.
+- Added fail-closed request preflight that estimates the complete prompt, reserves
+  the full declared output budget plus a safety margin, and rejects requests that
+  cannot fit instead of allowing silent prompt clipping.
+- Added completion gates for both shared Ollama clients and the independent Goal
+  Interpreter chat path. `done_reason=length`, exhausted `num_predict`, and
+  prompt-context exhaustion are untrusted LLM-budget failures and cannot be
+  reinterpreted as user ambiguity.
+- Changed the rare host direct-LLM fallback to buffer the complete stream, verify
+  completion diagnostics, and only then schedule TTS, preventing truncated partial
+  speech from becoming audible.
+
 ### RTX 5090 cognitive topology and contract hardening
 
 - Restored the intended RTX 5090 two-model topology while CosyVoice is active:
   `qwen3:4b` owns narrow fast stages and `gemma4:26b` owns Goal Association,
   Deep Planning, Tool Result Interpretation, and Response Composition. The
   profile explicitly opts out of the low-memory one-model compact override.
-- Unified every active RTX 5090 cognitive stage on an 8192-token runner context
-  so Ollama does not repeatedly evict and reload the same model at 2K/4K/8K.
+- Unified every active RTX 5090 cognitive stage on one runner context
+  so Ollama does not repeatedly evict and reload the same model merely because stages request different context sizes.
 - Replaced mutually exclusive Goal Association payload branches with an explicit
   decision discriminant; inactive branch content is structurally ignored rather
   than triggering another self-repair call. Runtime routing/validation failures

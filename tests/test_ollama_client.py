@@ -141,6 +141,80 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
             any("architecture_attribution=not_evaluated" in line for line in error_logs.output)
         )
 
+
+    async def test_generate_inherits_declared_context_defaults_into_request(self) -> None:
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = '{"response":"ready","done_reason":"stop"}'
+        response.json.return_value = {
+            "response": "ready",
+            "done_reason": "stop",
+            "prompt_eval_count": 10,
+            "eval_count": 1,
+        }
+        response.raise_for_status.return_value = None
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "OLLAMA_NUM_CTX": "32768",
+                "OLLAMA_NUM_PREDICT": "4096",
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "2048",
+            },
+            clear=False,
+        ), mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ):
+            result = await OllamaClient(
+                base_url="http://chromie-llm:11434",
+                model="test-model",
+            ).generate("hello", options={"temperature": 0})
+
+        self.assertEqual(result, "ready")
+        options = http_client.post.call_args.kwargs["json"]["options"]
+        self.assertEqual(options["num_ctx"], 32768)
+        self.assertEqual(options["num_predict"], 4096)
+
+    async def test_generate_rejects_request_that_cannot_fit_before_http(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "4.0",
+                "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "256",
+            },
+            clear=False,
+        ), mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient"
+        ) as client_class, self.assertLogs(
+            "chromie.agent.ollama", level="ERROR"
+        ) as error_logs:
+            with self.assertRaises(OllamaGenerationError) as raised:
+                await OllamaClient(
+                    base_url="http://chromie-llm:11434",
+                    model="test-model",
+                    purpose="deep_planner",
+                ).generate(
+                    "x" * 4000,
+                    system="y" * 1000,
+                    options={"num_ctx": 1024, "num_predict": 512},
+                    response_format="json",
+                )
+
+        self.assertEqual(raised.exception.failure_class, "prompt_budget_exceeded")
+        metadata = raised.exception.metadata()
+        self.assertEqual(metadata["failure_domain"], "llm_budget")
+        self.assertFalse(metadata["retryable"])
+        self.assertFalse(metadata["new_execution_allowed"])
+        client_class.assert_not_called()
+        self.assertTrue(
+            any("ollama_request_rejected" in line for line in error_logs.output)
+        )
+
     async def test_generate_classifies_timeout_as_infrastructure_not_architecture(
         self,
     ) -> None:

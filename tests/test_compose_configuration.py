@@ -83,6 +83,17 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX: ${AGENT_GOAL_INTERPRETER_LLM_NUM_CTX:-4096}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT: ${AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT:-512}", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS:-2500}", agent_block)
+        self.assertIn("OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-2048}", agent_block)
+        self.assertIn("OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-2048}", agent_block)
+        self.assertIn("OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-64}", agent_block)
+        self.assertIn(
+            "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE: ${AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE:-2.0}",
+            agent_block,
+        )
+        self.assertIn(
+            "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS: ${AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS:-512}",
+            agent_block,
+        )
         self.assertIn(
             "AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS: ${AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_CACHE_TTL_MS:-5000}",
             agent_block,

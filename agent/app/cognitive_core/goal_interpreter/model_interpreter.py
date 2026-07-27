@@ -11,14 +11,32 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from ...clients.ollama_client import OllamaGenerationError
+
 try:
-    from chromie_runtime.llm_diagnostics import ollama_completion_diagnostics
+    from chromie_runtime.llm_diagnostics import (
+        ollama_completion_diagnostics,
+        ollama_prompt_preflight_diagnostics,
+    )
     from chromie_runtime.log_colors import colorize_for_cli
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_runtime.llm_diagnostics import ollama_completion_diagnostics
+    from shared.chromie_runtime.llm_diagnostics import (
+        ollama_completion_diagnostics,
+        ollama_prompt_preflight_diagnostics,
+    )
     from shared.chromie_runtime.log_colors import colorize_for_cli
 
 from .fallback import fallback_decision
+
+
+def _raise_if_llm_budget_failure(exc: Exception) -> None:
+    """Never reinterpret prompt/output truncation as user-semantic uncertainty."""
+
+    if (
+        isinstance(exc, OllamaGenerationError)
+        and exc.failure_domain == "llm_budget"
+    ):
+        raise exc
 from .schema import FastSpeech, RouteDecision, RouteRequest, finalize_decision
 
 
@@ -971,6 +989,14 @@ class OllamaGoalInterpreter:
         self.tool_fast_speech_repair_enabled = bool(tool_fast_speech_repair_enabled)
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(32, num_predict)
+        self.prompt_chars_per_token_estimate = max(
+            0.1,
+            float(os.getenv("AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE", "2.0")),
+        )
+        self.context_safety_margin_tokens = max(
+            0,
+            int(os.getenv("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", "0")),
+        )
         self.keep_alive = (keep_alive or "").strip() or None
         self.prompt_path = prompt_path or Path(__file__).parent / "prompts" / "goal_interpreter_system.txt"
         self.debug_raw_output = _env_flag("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW") or _env_flag("AGENT_GOAL_INTERPRETER_DEBUG_RAW")
@@ -1642,21 +1668,102 @@ class OllamaGoalInterpreter:
 
     async def _chat(self, payload: dict[str, Any], *, stage: str) -> dict[str, Any]:
         timeout_s = self.review_timeout_s if stage in REVIEW_STAGES else self.timeout_s
-        async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
-            response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
-            response.raise_for_status()
-            data = response.json()
-        for diagnostic in ollama_completion_diagnostics(
-            options=payload.get("options"),
-            data=data,
-            prompt_chars=self._payload_prompt_chars(payload),
-        ):
+        options = dict(payload.get("options") or {})
+        prompt_chars = self._payload_prompt_chars(payload)
+        preflight = ollama_prompt_preflight_diagnostics(
+            prompt_chars=prompt_chars,
+            options=options,
+            chars_per_token=self.prompt_chars_per_token_estimate,
+            safety_margin_tokens=self.context_safety_margin_tokens,
+        )
+        for diagnostic in preflight:
             logger.log(
                 diagnostic.level,
                 "%s",
                 colorize_for_cli(diagnostic.render(), diagnostic.level),
             )
+        blocking_preflight = next(
+            (
+                item
+                for item in preflight
+                if item.event == "llm_prompt_budget_exceeded"
+                and item.level >= logging.ERROR
+            ),
+            None,
+        )
+        if blocking_preflight is not None:
+            raise OllamaGenerationError(
+                f"Goal Interpreter request rejected before inference: {blocking_preflight.render()}",
+                failure_class="prompt_budget_exceeded",
+                failure_domain="llm_budget",
+                architecture_attribution="not_evaluated",
+                retryable=False,
+                details={
+                    "purpose": f"goal_interpreter:{stage}",
+                    "model": payload.get("model") or self.model,
+                    "stage": stage,
+                    **blocking_preflight.fields,
+                    "automatic_retry_allowed": False,
+                    "context_reduction_allowed": False,
+                    "result_trusted": False,
+                    "new_execution_allowed": False,
+                    "_incident_evidence": {"request": payload},
+                },
+            )
+
+        async with httpx.AsyncClient(timeout=timeout_s, trust_env=False) as client:
+            response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
+            response.raise_for_status()
+            data = response.json()
+        completion = ollama_completion_diagnostics(
+            options=options,
+            data=data,
+            prompt_chars=prompt_chars,
+        )
+        for diagnostic in completion:
+            logger.log(
+                diagnostic.level,
+                "%s",
+                colorize_for_cli(diagnostic.render(), diagnostic.level),
+            )
+        blocking_completion = next(
+            (
+                item
+                for item in completion
+                if item.event in {"llm_output_truncated", "llm_prompt_truncated"}
+                and item.level >= logging.ERROR
+            ),
+            None,
+        )
+        if blocking_completion is not None:
+            failure_class = (
+                "output_truncated"
+                if blocking_completion.event == "llm_output_truncated"
+                else "prompt_truncated"
+            )
+            raise OllamaGenerationError(
+                f"Goal Interpreter result rejected: {blocking_completion.render()}",
+                failure_class=failure_class,
+                failure_domain="llm_budget",
+                architecture_attribution="not_evaluated",
+                retryable=False,
+                details={
+                    "purpose": f"goal_interpreter:{stage}",
+                    "model": payload.get("model") or self.model,
+                    "stage": stage,
+                    **blocking_completion.fields,
+                    "automatic_retry_allowed": False,
+                    "context_reduction_allowed": False,
+                    "result_trusted": False,
+                    "new_execution_allowed": False,
+                    "_incident_evidence": {
+                        "request": payload,
+                        "response": data,
+                    },
+                },
+            )
         return data
+
 
     async def _chat_logged(
         self,
@@ -1764,6 +1871,7 @@ class OllamaGoalInterpreter:
             reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
             reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
         except Exception as exc:
+            _raise_if_llm_budget_failure(exc)
             raw_content = ""
             if isinstance(locals().get("reviewed"), dict):
                 raw_content = str(reviewed.get("message", {}).get("content") or "")
@@ -2058,6 +2166,7 @@ class OllamaGoalInterpreter:
                 source="llm",
             )
         except Exception as exc:
+            _raise_if_llm_budget_failure(exc)
             logger.warning(
                 "semantic route repair failed sid=%s reason=%s error_type=%s error=%s",
                 request.sid,
@@ -2182,6 +2291,7 @@ class OllamaGoalInterpreter:
                     stage="intent_review",
                 )
             except Exception as exc:
+                _raise_if_llm_budget_failure(exc)
                 logger.warning(
                     "LLM review model uncertain deep_thought check failed: %s",
                     exc,
@@ -2248,6 +2358,7 @@ class OllamaGoalInterpreter:
                 reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
                 reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
             except Exception as exc:
+                _raise_if_llm_budget_failure(exc)
                 logger.warning("LLM review model deterministic-only recovery failed: %s", exc)
             else:
                 if not is_disallowed_model_control_route(
@@ -2273,6 +2384,7 @@ class OllamaGoalInterpreter:
             repaired = await self._chat_logged(self.build_deterministic_route_repair_payload(request), stage="deterministic_route_repair", request=request)
             repaired_decision = self._decision_from_response(request, repaired, stage="deterministic_route_repair")
         except Exception as exc:
+            _raise_if_llm_budget_failure(exc)
             logger.warning("LLM fast route repair failed: %s", exc)
         else:
             if not is_disallowed_model_control_route(request, repaired_decision):
@@ -2310,6 +2422,7 @@ class OllamaGoalInterpreter:
             repaired = await self._chat_logged(self.build_placeholder_capability_repair_payload(request), stage="placeholder_capability_repair", request=request)
             repaired_decision = self._decision_from_response(request, repaired, stage="placeholder_capability_repair")
         except Exception as exc:
+            _raise_if_llm_budget_failure(exc)
             logger.warning("LLM placeholder capability repair failed: %s", exc)
         else:
             if (
@@ -2524,6 +2637,7 @@ class OllamaGoalInterpreter:
                     reviewed = await self._chat_logged(self.build_intent_review_payload(request), stage="intent_review", request=request)
                     reviewed_decision = self._decision_from_response(request, reviewed, stage="intent_review")
                 except Exception as review_exc:
+                    _raise_if_llm_budget_failure(review_exc)
                     logger.warning("LLM review model primary-error recovery failed: %s", review_exc)
                 else:
                     if not is_disallowed_model_control_route(
@@ -2539,6 +2653,7 @@ class OllamaGoalInterpreter:
                             reviewed_decision.intent,
                         )
                         return reviewed_decision
+            _raise_if_llm_budget_failure(exc)
             return fallback_decision(
                 request,
                 reason=f"goal_interpreter_error:{type(exc).__name__}: {exc}",
@@ -2555,6 +2670,7 @@ class OllamaGoalInterpreter:
                 decision = self._decision_from_response(request, relaxed, stage="quick_intent_relaxed")
                 logger.info("Goal Interpreter model recovered with relaxed JSON response")
             except Exception as relaxed_exc:
+                _raise_if_llm_budget_failure(relaxed_exc)
                 logger.warning("Relaxed Goal Interpreter model retry failed: %s", relaxed_exc)
                 return fallback_decision(request, reason=f"invalid_goal_interpreter_response: {exc}")
 
