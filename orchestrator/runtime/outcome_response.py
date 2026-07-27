@@ -33,7 +33,7 @@ _ENGLISH_STATUS_SUFFIX = {
 _CHINESE_STATUS_SUFFIX = {
     "completed": "已完成。",
     "partial": "仅部分完成。",
-    "failed": "执行失败。",
+    "failed": "未能完成。",
     "refused": "被拒绝执行。",
     "timed_out": "执行超时。",
     "cancelled": "已取消。",

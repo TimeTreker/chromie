@@ -32,8 +32,9 @@ class ToolExecutionRequest(BaseModel):
     tool_id: str = Field(min_length=1, max_length=160)
     args: dict[str, Any] = Field(default_factory=dict)
     correlation_id: str = Field(default="", max_length=160)
+    language: str = Field(default="en-US", min_length=1, max_length=32)
 
-    @field_validator("request_id", "tool_id", "correlation_id", mode="before")
+    @field_validator("request_id", "tool_id", "correlation_id", "language", mode="before")
     @classmethod
     def normalize_execution_text(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())

@@ -871,7 +871,7 @@ class InteractionRuntimeCoordinator:
     def _speech_claims_unverified_effect(text: str) -> bool:
         return bool(
             re.search(
-                r"(?:执行(?:指令|命令)?|已经执行|正在执行|我(?:会|将|要|这就|马上|现在)(?:[^。！？,.，]*)(?:向前|往前|移动|走|转|执行)|"
+                r"(?:执行(?:指令|命令)|已经执行|正在执行|我(?:会|将|要|这就|马上|现在)(?:[^。！？,.，]*)(?:向前|往前|移动|走|转|执行)|"
                 r"I(?:'ll| will) (?:walk|move|turn|execute|perform)|\b(?:moving|walking|turning|executing|performing)\b|soridormi\.|chromie\.)",
                 text,
                 flags=re.IGNORECASE,
@@ -942,15 +942,37 @@ class InteractionRuntimeCoordinator:
 
     @staticmethod
     def _has_effectful_runtime_skill(response: InteractionResponse) -> bool:
-        return any(
-            request.skill_id.startswith("soridormi.")
-            or request.skill_id == _TASK_GRAPH_SKILL_ID
-            or (
-                request.skill_id not in {"chromie.speak"}
-                and request.skill_id.startswith("chromie.")
-            )
-            for request in response.skills
-        )
+        for request in response.skills:
+            if request.skill_id == "chromie.speak":
+                continue
+            metadata = request.metadata if isinstance(request.metadata, dict) else {}
+            if "effectful" in metadata:
+                if metadata.get("effectful") is True:
+                    return True
+                continue
+            safety_class = str(metadata.get("safety_class") or "")
+            effects = {str(item) for item in metadata.get("effects") or []}
+            if safety_class in {
+                "physical_motion",
+                "safety_critical",
+                "high_risk_action",
+                "guarded_operation",
+            }:
+                return True
+            if effects.intersection(
+                {"physical_motion", "safety_control", "emergency_stop"}
+            ):
+                return True
+            # Historical compatibility may lack capability metadata. Keep the
+            # old body/task safety surface, but never classify arbitrary
+            # chromie.* read-only tools as physical effects by name alone.
+            if not metadata and (
+                request.skill_id.startswith("soridormi.")
+                or request.skill_id == _TASK_GRAPH_SKILL_ID
+                or request.skill_id == "session.interrupt"
+            ):
+                return True
+        return False
 
 
 def build_soridormi_invoker(

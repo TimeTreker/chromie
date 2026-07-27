@@ -4,6 +4,22 @@ All notable user-visible changes should be recorded here.
 
 ## Unreleased
 
+### Goal-scope and read-only tool truthfulness
+
+- Preserved temporal/comparison qualifiers through Goal Association and exposed
+  capability semantic-scope limits to Fast/Deep Planning so unsupported broad
+  requests clarify or report unavailable instead of silently narrowing to a
+  short forecast.
+- Propagated the admitted turn language into trusted local tools, so Chinese
+  locations use Chinese geocoding and Chinese evidence summaries.
+- Classified effects from capability metadata instead of `chromie.*` name
+  prefixes, rendered safe-read work as an information lookup rather than robot
+  motion, and stopped treating a failure phrase such as `执行失败` as an
+  unverified execution claim.
+- Unified the CosyVoice one-resident-model context size across the maintained
+  Gateway, Interpreter, Planner, Composer, and Tool Result stages to avoid
+  repeated context-size cold reloads on the first turn.
+
 ### Gateway/Core qualification preflight
 
 - Added a read-only fail-fast preflight before runtime identity, live-model, or

@@ -235,6 +235,20 @@ def chromie_manifests() -> list[AgentManifest]:
                         "Acknowledge only that Chromie will check the requested "
                         "location/date. Do not state weather results before the tool returns."
                     ),
+                    "semantic_scope": {
+                        "domain": "weather_forecast",
+                        "supported_temporal_scopes": [
+                            "current", "today", "tomorrow", "near_term_forecast"
+                        ],
+                        "unsupported_temporal_scopes": [
+                            "annual", "seasonal", "historical", "climate_normals"
+                        ],
+                        "scope_mismatch_policy": "clarify_or_unavailable_never_narrow",
+                    },
+                    "pre_execution_acknowledgement": {
+                        "zh": "我查一下相关信息。",
+                        "en": "I'll check the requested information.",
+                    },
                 },
             )
         ],

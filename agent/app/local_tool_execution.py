@@ -67,8 +67,10 @@ class LocalToolExecutor:
 
         try:
             _validate_json_schema(request.args, tool.input_schema, path="args")
+            handler_args = dict(request.args)
+            handler_args["__request_language"] = request.language
             output = await asyncio.wait_for(
-                handler(dict(request.args)),
+                handler(handler_args),
                 timeout=max(0.001, float(tool.execution.timeout_s or 30.0)),
             )
             _validate_json_schema(output, tool.output_schema, path="output")
@@ -119,15 +121,16 @@ class LocalToolExecutor:
         if self.weather_client is None:
             raise WeatherLookupError("weather provider is disabled")
         units = str(args.get("units") or "metric")
+        language = str(args.pop("__request_language", "en-US") or "en-US")
         report = await self.weather_client.lookup(
             WeatherQuery(
                 location=str(args.get("location") or ""),
                 date=str(args.get("date") or "today"),
                 units=units,
-                language="en-US",
+                language=language,
             )
         )
-        return _weather_output(report, units=units)
+        return _weather_output(report, units=units, language=language)
 
     @staticmethod
     def _result(
@@ -145,13 +148,21 @@ class LocalToolExecutor:
         )
 
 
-def _weather_output(report: WeatherReport, *, units: str) -> dict[str, Any]:
+def _weather_output(
+    report: WeatherReport,
+    *,
+    units: str,
+    language: str,
+) -> dict[str, Any]:
     return {
         "location": report.location_name,
         "country": report.country,
         "timezone": report.timezone,
         "date": report.date,
-        "condition": weather_code_text(report.weather_code, zh=False),
+        "condition": weather_code_text(
+            report.weather_code,
+            zh=language.lower().startswith("zh"),
+        ),
         "weather_code": report.weather_code,
         "current_temperature_c": report.current_temperature_c,
         "apparent_temperature_c": report.apparent_temperature_c,
@@ -160,7 +171,7 @@ def _weather_output(report: WeatherReport, *, units: str) -> dict[str, Any]:
         "precipitation_probability_max": report.precipitation_probability_max,
         "precipitation_sum_mm": report.precipitation_sum_mm,
         "wind_speed_kmh": report.wind_speed_kmh,
-        "summary": format_weather_report(report, language="en-US", units=units),
+        "summary": format_weather_report(report, language=language, units=units),
         "source": report.source,
     }
 

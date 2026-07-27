@@ -35,6 +35,7 @@ class AgentToolSkillProvider:
                 tool_id=request.skill_id,
                 args=request.args,
                 correlation_id=context.interaction_id,
+                language=str(request.metadata.get("language") or "en-US"),
             ),
             request.timeout_ms or definition.timeout_ms,
         )

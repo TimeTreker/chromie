@@ -34,6 +34,10 @@ The model owns:
 
 The Host and Agent contract boundary owns:
 
+- carrying the admitted turn language through trusted execution so provider
+  lookup, normalization, and compact evidence use the same language context;
+- treating `safe_read`/`external_read` capabilities as information access rather
+  than physical effects or confirmation-gated robot motion;
 - retaining the complete tool result unchanged;
 - exposing only closed, schema-validated, bounded observations;
 - requiring every selected fact to reference one exact evidence ID and RFC 6901

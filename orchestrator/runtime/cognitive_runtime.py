@@ -820,7 +820,13 @@ class CanonicalPlanRuntimeAdapter:
         return f"{numeric:g}"
 
     @classmethod
-    def _authoritative_step_text(cls, step: Any, *, language: str) -> str:
+    def _authoritative_step_text(
+        cls,
+        step: Any,
+        *,
+        language: str,
+        definition: Any | None = None,
+    ) -> str:
         """Describe one validated high-level step from its skill id and args.
 
         The text is deliberately rendered by the host from the same structured
@@ -833,6 +839,20 @@ class CanonicalPlanRuntimeAdapter:
         zh = language.lower().startswith("zh")
         skill_id = str(step.skill_id)
         args = dict(step.args)
+        definition_metadata = dict(getattr(definition, "metadata", {}) or {})
+        safety_class = str(definition_metadata.get("safety_class") or "")
+        effects = {str(item) for item in definition_metadata.get("effects") or []}
+        read_only_effects = {
+            "read_only",
+            "external_read",
+            "weather_lookup",
+            "audio_input",
+            "user_interaction",
+        }
+        if safety_class == "safe_read" or (
+            effects and effects.issubset(read_only_effects)
+        ):
+            return "查询相关信息" if zh else "check the requested information"
         count = args.get("count", 1)
         duration = args.get("duration_s")
 
@@ -908,9 +928,8 @@ class CanonicalPlanRuntimeAdapter:
 
         return "执行请求的动作" if zh else "perform the requested action"
 
-    @classmethod
     def _authoritative_operational_text(
-        cls,
+        self,
         plan: CanonicalPlan,
         *,
         language: str,
@@ -919,10 +938,29 @@ class CanonicalPlanRuntimeAdapter:
         """Render prospective action speech from validated runtime authority."""
 
         zh = language.lower().startswith("zh")
-        actions = [
-            cls._authoritative_step_text(step, language=language)
+        definitions = [
+            self.interaction_runtime.skill_definition(step.skill_id)
             for step in plan.steps
         ]
+        actions = [
+            self._authoritative_step_text(
+                step,
+                language=language,
+                definition=definition,
+            )
+            for step, definition in zip(plan.steps, definitions)
+        ]
+        read_only = bool(definitions) and all(
+            str((definition.metadata or {}).get("safety_class") or "")
+            == "safe_read"
+            for definition in definitions
+        )
+        if read_only and not confirmation_required:
+            return (
+                "我查一下相关信息。"
+                if zh
+                else "I'll check the requested information."
+            )
         if zh:
             if len(actions) == 1:
                 action_text = actions[0]
@@ -1245,6 +1283,14 @@ class CanonicalPlanRuntimeAdapter:
                         "step_id": step.step_id,
                         "source_goal_ids": step.source_goal_ids,
                         "reason_summary": step.reason_summary,
+                        "language": language,
+                        "effects": list(definition.metadata.get("effects") or []),
+                        "safety_class": str(
+                            definition.metadata.get("safety_class") or ""
+                        ),
+                        "effectful": str(
+                            definition.metadata.get("safety_class") or ""
+                        ) not in {"safe_read", "planning_only"},
                         **step.metadata,
                     },
                 )
@@ -1380,6 +1426,12 @@ class CanonicalPlanRuntimeAdapter:
             "unavailable": "refused",
             "refused": "refused",
         }
+        primary_effectful_count = sum(
+            1
+            for request in skills
+            if request.metadata.get("auxiliary_social_attention") is not True
+            and request.metadata.get("effectful") is True
+        )
         metadata = {
             "source": "goal_driven_cognitive_runtime",
             "cognitive_runtime_apply": True,
@@ -1416,6 +1468,10 @@ class CanonicalPlanRuntimeAdapter:
                 if effectful_pre_execution
                 else "not_applicable"
             ),
+            "deepthinking_proposed_effect_task_count": primary_effectful_count,
+            "deepthinking_valid_effect_task_count": primary_effectful_count,
+            "deepthinking_proposed_action_count": primary_effectful_count,
+            "deepthinking_valid_action_count": primary_effectful_count,
         }
         if alternative:
             metadata["material_plan_change_requires_confirmation"] = True
@@ -1987,6 +2043,24 @@ class GoalDrivenRuntimeCoordinator:
             composition_context["canonical_plan_resolution"] = terminal_plan.model_dump(
                 mode="json", exclude_none=True
             )
+            composition_context["execution_capabilities"] = [
+                {
+                    "skill_id": step.skill_id,
+                    "effects": list(
+                        self.adapter.interaction_runtime.skill_definition(
+                            step.skill_id
+                        ).metadata.get("effects")
+                        or []
+                    ),
+                    "safety_class": str(
+                        self.adapter.interaction_runtime.skill_definition(
+                            step.skill_id
+                        ).metadata.get("safety_class")
+                        or ""
+                    ),
+                }
+                for step in terminal_plan.steps
+            ]
             recent_auxiliary_evidence = getattr(
                 self.adapter,
                 "recent_auxiliary_behavior_evidence",

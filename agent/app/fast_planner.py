@@ -121,6 +121,9 @@ class FastPlannerResolver:
                 "requires_confirmation": item.requires_confirmation,
                 "can_run_parallel": item.can_run_parallel,
                 "exclusive_group": item.exclusive_group,
+                "effects": list(item.effects),
+                "safety_class": item.safety_class,
+                "hints": dict(item.hints),
             }
             for item in executable[: self.max_capabilities]
         ]
@@ -456,6 +459,9 @@ class FastPlannerResolver:
             if str(request.route_decision.route or "").strip() == "chat"
             else ""
         )
+        semantic_scope_contract = (
+            "Capability semantic_scope metadata is authoritative applicability evidence. Preserve every canonical-goal qualifier, including temporal scope, comparison period, and answer shape. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
+        )
         concise_output_contract = (
             "Keep goal summaries, step reasons, satisfaction rationales, and "
             "outcome rationales concise: one short sentence each. Do not "
@@ -472,6 +478,7 @@ class FastPlannerResolver:
                 "When validation errors are present, regenerate one fresh complete model-authored plan object from the authoritative goals and catalog. Author the semantic plan directly. Do not classify text with lexical rules and do not expect the host to choose a skill, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
                 "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog skill IDs and schema-valid args. Recent trusted tool evidence may satisfy a conversational goal without another execution when the model judges it semantically relevant and fresh; use a respond outcome in that case. Never infer relevance through fixed phrase rules. "
                 f"{argument_grounding_contract}"
+                f"{semantic_scope_contract}"
                 f"{route_effect_contract}"
                 f"{concise_output_contract}"
                 "Author stable non-empty step_id values, exact source_goal_ids, and matching outcome step_ids yourself. "
@@ -503,6 +510,7 @@ class FastPlannerResolver:
             "Fast Planner may emit disposition=mixed only for a completely covered simple combination of common unlocked execute goals and direct conversational respond goals. A mixed plan requires at least one execute outcome, at least one respond outcome, complete per-goal satisfaction, and exact step ownership. "
             "For complete direct execution, use exact supplied skill IDs and schema-valid args. "
             f"{argument_grounding_contract}"
+            f"{semantic_scope_contract}"
             f"{route_effect_contract}"
             f"{concise_output_contract}"
             "User-facing speech is owned by Response Composer, not a plan step. Represent each conversational responsibility with disposition=respond and an actual response_text now; never substitute chromie.speak or a body gesture. "

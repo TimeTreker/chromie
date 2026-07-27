@@ -8,7 +8,7 @@ from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import InteractionResponse, SkillRequest
 from shared.chromie_contracts.reflex import CancellationDirective
 
 
@@ -252,6 +252,55 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             prepared.metadata["suppressed_skill_ids"],
             ["soridormi.walk_forward"],
+        )
+
+
+    async def test_failed_status_text_is_not_misread_as_execution_claim(self) -> None:
+        self.assertFalse(
+            InteractionRuntimeCoordinator._speech_claims_unverified_effect(
+                "这个查询未能完成。"
+            )
+        )
+        self.assertFalse(
+            InteractionRuntimeCoordinator._speech_claims_unverified_effect(
+                "第一个目标执行失败。"
+            )
+        )
+
+    async def test_read_only_chromie_tool_is_not_classified_as_effectful_motion(self) -> None:
+        response = InteractionResponse(
+            skills=[
+                SkillRequest(
+                    request_id="weather-read",
+                    skill_id="chromie.weather.lookup",
+                    metadata={
+                        "effects": ["read_only", "external_read", "weather_lookup"],
+                        "safety_class": "safe_read",
+                        "effectful": False,
+                    },
+                )
+            ]
+        )
+        self.assertFalse(
+            InteractionRuntimeCoordinator._has_effectful_runtime_skill(response)
+        )
+
+    async def test_physical_skill_metadata_remains_effectful(self) -> None:
+        response = InteractionResponse(
+            skills=[
+                SkillRequest(
+                    request_id="walk",
+                    skill_id="soridormi.walk_velocity",
+                    metadata={
+                        "effects": ["physical_motion"],
+                        "safety_class": "physical_motion",
+                        "effectful": True,
+                    },
+                )
+            ]
+        )
+        self.assertTrue(
+            InteractionRuntimeCoordinator._has_effectful_runtime_skill(response)
         )
 
     async def test_prepare_response_exposes_truth_correction_and_proposal_ledger(

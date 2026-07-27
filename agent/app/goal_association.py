@@ -553,6 +553,7 @@ class GoalAssociationResolver:
             "A standalone social interaction such as a greeting, thanks, reassurance request, or casual check-in is itself one satisfiable conversational Goal: respond naturally to that social act. Do not treat it as an empty turn. "
             "A physical action and a conversational answer are independent goals. Ordered physical actions are independent goals when either can succeed or fail separately. "
             "Put all user-visible parameters such as count, duration, direction, target, or requested content into the natural-language description. "
+            "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Never silently rewrite annual, seasonal, historical, comparative, or otherwise broad scope into current, today, tomorrow, or another narrower scope. If the intended scope is materially ambiguous, return clarification instead of choosing a narrower interpretation. "
             "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
             "If the user meaning is materially ambiguous, return only one concise clarification.\n\n"
             "Abstract decomposition example: a request to perform action A, then action B, and answer question C produces three new_goals descriptions: perform action A; perform action B; answer question C. "

@@ -46,6 +46,7 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
                 request_id="weather-1",
                 tool_id="chromie.weather.lookup",
                 args={"location": "北京", "date": "today", "units": "metric"},
+                language="zh-CN",
             )
         )
 
@@ -54,6 +55,7 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.output["apparent_temperature_c"], 35.0)
         self.assertEqual(result.output["source"], "open-meteo")
         self.assertEqual(client.queries[0].location, "北京")
+        self.assertEqual(client.queries[0].language, "zh-CN")
 
     async def test_executor_fails_closed_on_schema_invalid_arguments(self) -> None:
         executor = LocalToolExecutor(
@@ -114,6 +116,12 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
                         request_id="weather-host-1",
                         skill_id="chromie.weather.lookup",
                         args={"location": "北京", "date": "today", "units": "metric"},
+                        metadata={
+                            "language": "zh-CN",
+                            "effects": ["read_only", "external_read"],
+                            "safety_class": "safe_read",
+                            "effectful": False,
+                        },
                     )
                 ],
             ),
@@ -124,6 +132,7 @@ class LocalToolExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.results[0].status, "completed")
         self.assertEqual(result.results[0].output["apparent_temperature_c"], 35.0)
         self.assertEqual(requests[0].tool_id, "chromie.weather.lookup")
+        self.assertEqual(requests[0].language, "zh-CN")
 
 
 if __name__ == "__main__":
